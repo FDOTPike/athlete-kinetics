@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verification suite (7 gates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      # MiniLM (~25 MB) used by verify:semantic; cached across runs.
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: node_modules/@xenova/transformers/.cache
+          key: minilm-${{ hashFiles('packages/inference/assets/phrase-codebase.json') }}
+          restore-keys: minilm-
+      - name: verify:all (typecheck, db, demo, policy, semantic, store, memory)
+        run: npm run verify:all
+      - name: Seeder physiology — pinned alignment + today's alignment
+        run: |
+          node scripts/seed-db.ts --end=2026-06-10 --db=/tmp/pinned.db
+          node scripts/seed-db.ts --db=/tmp/today.db
+      - name: Metro production bundle
+        working-directory: apps/mobile
+        run: |
+          mkdir -p build
+          npx react-native bundle --platform android --dev false \
+            --entry-file index.js \
+            --bundle-output build/index.android.bundle \
+            --assets-dest build/assets
+
+  android-apk:
+    name: Android APK (sideloadable)
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - run: npm ci
+      # Release variant bundles JS + Hermes bytecode; the RN template signs
+      # release with the committed debug keystore, so the artifact installs
+      # directly on a phone with "install unknown apps" enabled.
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: athlete-kinetics-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
