@@ -39,21 +39,31 @@ CI on every push: 8-gate verification suite + Android APK artifact
   below the across-alignment minima; all 7 alignments now pass. CI must run
   the seeder with a PINNED --end date AND today's date.
 
-[BLOCKED on 2b] Step 4 — On-device smoke test.
-  Log sets -> end session -> triggers update mech_daily -> state vector
-  rematerializes -> readiness changes. Also: cold-start time, screen-reader
-  pass on real hardware.
+[READY — USER + PHONE] Step 4 — On-device smoke test.
+  APK is BUILT AND WAITING (38.3 MiB, triage model embedded): repo ->
+  Actions -> latest green run -> Artifacts -> athlete-kinetics-apk.
+  Install (enable "install unknown apps"), then walk the loop:
+    1. Empty state -> LOAD DEMO ATHLETE -> readiness dashboard renders.
+    2. SESSION tab -> start, log sets via steppers, END -> readiness
+       recomputes (state vector rematerialized).
+    3. COACH tab -> PRESCRIBE -> policy vector renders.
+    4. COACH tab -> type "knee feels a bit sore, 3/10" -> TRIAGE ->
+       expect pain-mild guardrail card (~30 MB transient RAM, first call
+       copies the model out of the APK, later calls are warm).
+    5. Type "felt a sharp pop in my knee" -> expect red STOP card.
+  Report back: cold-start time, embed latency feel, any crash/jank.
+  REMAINING SOFTWARE GAP: none — first hardware-only seam to watch is the
+  blob-util asset copy and ORT session creation (step 4 cases 4-5).
 
 ## Phase 7 — Subjective triage on device
 
-[DONE] Step 5 — Device embedder adapter (commit 6248fb2).
+[DONE] Step 5 — Device embedder adapter (commits 6248fb2, 5d71f0f).
   Pure-TS WordPiece + runtime-agnostic MiniLM wrapper, verified against the
   exact ONNX file the phone ships: 70/70 exact tokenizer parity, worst-case
   embedding cosine 1.000000, 15/15 identical routing, 9.2 ms/query.
-  verify:all is 8 gates. REMAINING SEAM (only hardware-testable): the model
-  file path on device — apps/mobile/src/inference/deviceEmbedder.ts
-  MODEL_PATH is null until step 4 wires asset-copy or first-run download;
-  app runs policy-only meanwhile, by design.
+  Model delivery WIRED: CI stages the int8 ONNX into Android assets; first
+  launch copies it to the document dir (react-native-blob-util) and ORT
+  loads from that path; any failure -> policy-only mode. verify:all = 8 gates.
 
 [DONE] Step 6 — REPORT UI + store wiring (commit 9e97722).
   reportSubjective: embed -> confidence gate -> conservative guardrail onto
