@@ -13,7 +13,17 @@
  */
 import { create } from 'zustand';
 import type { DB } from '@op-engineering/op-sqlite';
-import { MATERIALIZE_STATE_VECTOR_SQL, migrate, openKineticsDb } from '@ak/core-db';
+import {
+  DEMO_DAYS,
+  MATERIALIZE_STATE_VECTOR_SQL,
+  SPO2_FOLD_SQL,
+  SPO2_TRIM_SQL,
+  demoDates,
+  generateDemoHistory,
+  migrate,
+  openKineticsDb,
+  type DemoSql,
+} from '@ak/core-db';
 import { getPrescription, type MovementPattern, type Prescription, type StateVectorRow } from '@ak/inference';
 
 // ---------------------------------------------------------------------------
@@ -80,6 +90,9 @@ interface KineticsStore {
   logSet: (movementId: number, reps: number, loadKg: number, rpe: number) => void;
   endSession: () => void;
   computePrescription: (patterns: readonly MovementPattern[]) => void;
+  /** First-run affordance: 180-day deterministic demo athlete. Refuses to run
+   *  unless the database is empty — it must never touch real training data. */
+  loadDemoAthlete: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +136,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     try {
       db = openKineticsDb();
       migrate(db);
+      // Catch-up materialization: idempotent upsert over the trailing week so
+      // today's state_vector row exists whenever any base data does (a no-op
+      // on days with no data at all).
+      for (const date of demoDates(localToday(), 7)) {
+        db.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
+      }
       const movements = rowsOf<Movement>(
         getDb().executeSync(
           'SELECT movement_id, name, pattern FROM movement ORDER BY movement_id',
@@ -240,5 +259,40 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // Subjective-report guardrails (semantic triage) refine this vector once
     // the on-device embedder adapter lands; the pipeline is already verified.
     set({ prescription: { ...getPrescription(vector), forDate: today } });
+  },
+
+  loadDemoAthlete: () => {
+    const d = getDb();
+    const existing = rowsOf<{ c: number }>(
+      d.executeSync('SELECT count(*) AS c FROM session'),
+    )[0];
+    if (existing !== undefined && existing.c > 0) return; // never touch real data
+    const adapter: DemoSql = {
+      run: (sql, params = []) => {
+        d.executeSync(sql, params as (string | number | null)[]);
+      },
+      one: <T,>(sql: string, params: readonly (string | number | null)[] = []) =>
+        rowsOf<T>(d.executeSync(sql, params as (string | number | null)[]))[0],
+    };
+    const today = localToday();
+    d.executeSync('BEGIN');
+    try {
+      generateDemoHistory(adapter, today, DEMO_DAYS);
+      d.executeSync(SPO2_FOLD_SQL);
+      d.executeSync(SPO2_TRIM_SQL, [Date.now() - 14 * 86_400_000]);
+      for (const date of demoDates(today, DEMO_DAYS)) {
+        d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
+      }
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    const movements = rowsOf<Movement>(
+      d.executeSync('SELECT movement_id, name, pattern FROM movement ORDER BY movement_id'),
+    );
+    set({ movements });
+    get().refreshVector();
   },
 }));

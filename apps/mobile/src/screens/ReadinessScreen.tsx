@@ -103,6 +103,7 @@ export default function ReadinessScreen(): React.JSX.Element {
   const trend = useStore((s) => s.trend);
   const boot = useStore((s) => s.boot);
   const refreshVector = useStore((s) => s.refreshVector);
+  const loadDemoAthlete = useStore((s) => s.loadDemoAthlete);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
@@ -144,8 +145,17 @@ export default function ReadinessScreen(): React.JSX.Element {
       <View style={styles.center}>
         <Text style={styles.errorTitle}>NO STATE VECTOR</Text>
         <Text style={styles.dimText}>
-          No materialized row for {today}. Sync telemetry or run the seed script, then retry.
+          No data yet for {today}. Log sessions and sync telemetry — or explore the app with a
+          180-day demo athlete (only available while the database is empty).
         </Text>
+        <Pressable
+          style={styles.bigButton}
+          onPress={loadDemoAthlete}
+          accessibilityRole="button"
+          accessibilityLabel="Load the 180 day demo athlete"
+        >
+          <Text style={styles.bigButtonText}>LOAD DEMO ATHLETE</Text>
+        </Pressable>
         <Pressable
           style={styles.bigButton}
           onPress={refreshVector}

@@ -1,30 +1,95 @@
-Here's the roadmap from where we are (verified JS/TS layer, no native build yet) to a working app on your phone, ordered by dependency — each phase unblocks the next.
+# Athlete Kinetics — Phase Manager (rev 2, 2026-06-11)
 
-## Phase 6 — Make it run on a device (the critical path)
+Living status document. Revised after completing Steps 1-2; revise again
+after each phase. Verification gate for every step: `npm run verify:all`
+green + a step-specific check listed below.
 
-1. **Put the repo under git.** Everything so far is verified but unversioned — one bad edit and there's no undo. `git init` + initial commit, and optionally a GitHub repo (public would suit the free/accessible goal and unlocks free CI). *Needs your go-ahead — say the word and I'll do it.*
-2. **Scaffold the native projects.** Run the RN CLI template once, merge in our `src/`, babel/metro configs, and op-sqlite. **Android first** — that's buildable on this Windows machine if the Android SDK is present (I'll check; if not, it's one Android Studio install). iOS needs a Mac, so it's documented and deferred.
-3. **First-run data path.** A fresh install has an empty `state_vector` (the screens already handle that gracefully, but it's a dull demo). Add a dev-menu action: "load demo athlete" that runs the seeder logic in-app, plus the nightly compaction/materialize job on app foreground so today's row always exists once real data flows.
-4. **On-device smoke test** of the loop that matters: log sets → end session → triggers update `mech_daily` → state vector rematerializes → readiness changes tomorrow.
+## Phase 6 — Make it run on a device
 
-## Phase 7 — Subjective triage on device (the new pipeline's last mile)
+[DONE] Step 1 — Git safety net.
+  Commit b62a48b (46 files, 8,597 lines), then e303181 (native scaffold).
+  .gitattributes normalizes line endings; local editor settings ignored.
+  OPEN DECISION: GitHub remote (public unlocks free CI + F-Droid path).
 
-5. **Device embedder adapter** — `onnxruntime-react-native` + bundled int8 MiniLM (~23 MB) + a pure-TS WordPiece tokenizer. The tokenizer and ONNX inference are *fully verifiable on this machine first* (run the same ONNX in Node, assert vectors match the transformers.js ones we generated) — so the device step becomes plug-in, not debug.
-6. **REPORT UI on the COACH tab**: text input → matched cue, follow-up question, guardrail-adjusted prescription with the amber GUARDRAIL badge; a full-screen red directive for halt matches (sharp pain / dizziness / chest).
-7. **Persist reports** — migration `005_subjective_report.sql` (date, text, matched entry, similarity) so pain history becomes longitudinal data the state vector could later use.
+[DONE*] Step 2 — Native projects scaffolded (RN 0.81.6, monorepo-adapted).
+  android/ + ios/ live in apps/mobile; gradle paths point at the hoisted
+  workspace node_modules; apps/mobile/package.json added for autolinking.
+  Verified headlessly: Metro PRODUCTION BUNDLE builds (1.06 MB — schema SQL
+  inlined through babel inline-import, policy engine + all screens present)
+  and `react-native config` autolinks op-sqlite's Android native source.
+  *Remaining: the Gradle compile itself. BLOCKED on toolchain (below).
+
+[BLOCKED — USER DECISION] Step 2b (new) — Android toolchain on this PC.
+  No JDK, no Android SDK present. winget IS available. Options:
+    (a) Full Android Studio (~3 GB; GUI, emulator manager — easiest)
+    (b) Lean CLI-only: winget Microsoft.OpenJDK.17 + Android cmdline-tools
+        + sdkmanager packages (~1.5 GB, scriptable, no GUI)
+  Either needs the user's go-ahead (multi-GB system install). A physical
+  Android phone with USB debugging also works and skips the emulator.
+
+[NEXT] Step 3 — First-run data path (software-only, unblocked).
+  3a. Extract the seeder's generation logic into packages/core-db (adapter-
+      based, bundle-safe) so scripts/seed-db.ts and the app share one
+      implementation; Node seeder's determinism + physiology checks must
+      still pass.
+  3b. Store action loadDemoAthlete() for the empty state ("LOAD DEMO
+      ATHLETE" button on ReadinessScreen's NO STATE VECTOR view).
+  3c. Boot-time catch-up: materialize state_vector for the trailing week on
+      every boot (idempotent) so today's row always exists once data flows.
+  Verify: verify:all + re-run seeder assertions + fresh in-memory app-path
+  simulation (migrate -> demo load -> today's row exists).
+
+[BLOCKED on 2b] Step 4 — On-device smoke test.
+  Log sets -> end session -> triggers update mech_daily -> state vector
+  rematerializes -> readiness changes. Also: cold-start time, screen-reader
+  pass on real hardware.
+
+## Phase 7 — Subjective triage on device
+
+[READY — Node-verifiable now] Step 5 — Device embedder adapter.
+  onnxruntime-react-native + bundled int8 MiniLM (~23 MB) + pure-TS
+  WordPiece tokenizer. Verify on THIS machine first: run the same ONNX via
+  onnxruntime-node and assert vectors match the @xenova/transformers ones in
+  assets/phrase-codebase.vectors.json (cosine > 0.999 per phrase).
+
+[READY] Step 6 — REPORT UI on COACH tab.
+  Text input -> matched cue + follow-up + guardrail-adjusted vector with
+  amber GUARDRAIL badge; full-screen red directive on halt matches.
+  NOTE (from step 2 bundle check): phrase-codebase.json is not yet imported
+  by the app — wiring it in is part of this step; re-verify it appears in
+  the Metro bundle afterwards.
+
+[READY] Step 7 — Persist reports: 005_subjective_report.sql migration
+  (date, raw text, matched entry id, similarity, action taken) + extend
+  verify:db. Gives pain history longitudinal value.
 
 ## Phase 8 — Real telemetry (retire the seed data)
 
-8. **`packages/biometrics`**: Health Connect adapter (Android) feeding `hrv_daily` / `sleep_daily` / `spo2_sample`, with the compaction job (fold + 14-day trim) wired to app foreground. HealthKit follows when iOS exists.
-9. **Movement library UI** — right now the `movement` table is only populated by the seeder; needs a minimal add/edit screen.
+[ ] Step 8 — packages/biometrics: Health Connect (Android) -> hrv_daily /
+    sleep_daily / spo2_sample; compaction job (fold + 14-day trim +
+    materialize) wired to app foreground. HealthKit when iOS exists.
+[ ] Step 9 — Movement library add/edit screen (movement table currently
+    only populated by the seeder/demo loader).
 
 ## Phase 9 — Ship it free
 
-10. **CI**: GitHub Actions running `verify:all` on every push (free on a public repo — our whole verification suite is already headless).
-11. **Distribution**: signed APK on GitHub Releases + an **F-Droid** submission — genuinely free end-to-end. The honest caveat: iOS distribution requires a Mac and Apple's $99/year, so Android is the free flagship; the privacy story (all data local, no network calls) is also exactly what F-Droid wants documented.
+[ ] Step 10 — CI: GitHub Actions running verify:all on push (needs the
+    GitHub remote from Step 1's open decision; free on public repos).
+    Note: CI can also run the Metro bundle check + a Gradle assembleDebug
+    on GitHub's runners — which have the Android SDK preinstalled, so CI
+    becomes the build machine even before the local toolchain exists.
+[ ] Step 11 — Distribution: signed APK on GitHub Releases + F-Droid
+    submission (all-local privacy story is F-Droid-friendly). iOS deferred
+    (Mac + USD 99/yr).
 
 ## Backlog (valuable, not blocking)
+History/trends screen; per-movement e1RM tracking; data export (CSV/SQLite
+copy); voice input for reports; micro-cycle planner UI; localization.
 
-History/trends screen, per-movement e1RM tracking, data export (your data, one tap, CSV/SQLite — that's accessibility too), voice input for reports, screen-reader pass on real hardware, micro-cycle planner UI.
-
-**My recommendation for the next working session:** steps 1–2 plus step 5's Node-verified tokenizer/embedder — git safety net, an app that boots in an emulator, and the triage pipeline proven against real ONNX before it ever touches a phone. Decision points only you can make: public vs private repo, and whether "Athlete Kinetics" is the shipping name. Want me to start?
+## Standing facts
+- verify:all = typecheck + db + policy + semantic + store + memory gates.
+- Editing the phrase codebase requires `npm run embed:codebase`.
+- npm scripts: seed, bench:cosine, embed:codebase; apps/mobile has
+  bundle:android.
+- The generative SLM stays removed; verify:memory fails the build if
+  llama.rn reappears in any manifest.

@@ -2,6 +2,7 @@ node_modules/
 .claude/settings.local.json
 *.tsbuildinfo
 packages/inference/test/.build/
+packages/core-db/test/.build/
 athlete_kinetics.seed.db
 models/*.gguf
 apps/mobile/ios/Pods/
