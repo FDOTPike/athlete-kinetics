@@ -67,6 +67,20 @@ jobs:
           java-version: 17
           cache: gradle
       - run: npm ci
+      # The triage embedding model ships inside the APK (Android assets);
+      # cache-first fetch, then stage it where AGP packages assets from.
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: node_modules/@xenova/transformers/.cache
+          key: minilm-${{ hashFiles('packages/inference/assets/phrase-codebase.json') }}
+          restore-keys: minilm-
+      - name: Stage embedder model into Android assets
+        run: |
+          npm run fetch:embedder
+          mkdir -p apps/mobile/android/app/src/main/assets
+          cp packages/inference/assets/minilm/model_quantized.onnx \
+             apps/mobile/android/app/src/main/assets/minilm.onnx
       # Release variant bundles JS + Hermes bytecode; the RN template signs
       # release with the committed debug keystore, so the artifact installs
       # directly on a phone with "install unknown apps" enabled.

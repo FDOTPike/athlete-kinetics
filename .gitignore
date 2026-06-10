@@ -6,6 +6,7 @@ packages/core-db/test/.build/
 athlete_kinetics.seed.db
 packages/inference/assets/minilm/*.onnx
 packages/inference/assets/minilm/tokenizer.full.json
+apps/mobile/android/app/src/main/assets/minilm.onnx
 apps/mobile/ios/Pods/
 apps/mobile/android/.gradle/
 apps/mobile/android/app/build/
