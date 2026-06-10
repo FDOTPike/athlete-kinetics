@@ -1,0 +1,17 @@
+{
+  "name": "@ak/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "bundle:android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output build/index.android.bundle --assets-dest build/assets"
+  },
+  "dependencies": {
+    "@op-engineering/op-sqlite": "*",
+    "react": "^19.1.0",
+    "react-native": "^0.81.6",
+    "zustand": "^5.0.0"
+  }
+}
