@@ -1,8 +1,11 @@
-# Athlete Kinetics — Phase Manager (rev 2, 2026-06-11)
+# Athlete Kinetics — Phase Manager (rev 3, 2026-06-11)
 
-Living status document. Revised after completing Steps 1-2; revise again
-after each phase. Verification gate for every step: `npm run verify:all`
-green + a step-specific check listed below.
+Living status document. Verification gate for every step: `npm run
+verify:all` green + a step-specific check listed below.
+
+REPO IS LIVE: https://github.com/FDOTPike/athlete-kinetics (public).
+CI on every push: 8-gate verification suite + Android APK artifact
+(release variant, debug-signed, sideloadable on a phone).
 
 ## Phase 6 — Make it run on a device
 
@@ -19,13 +22,10 @@ green + a step-specific check listed below.
   and `react-native config` autolinks op-sqlite's Android native source.
   *Remaining: the Gradle compile itself. BLOCKED on toolchain (below).
 
-[BLOCKED — USER DECISION] Step 2b (new) — Android toolchain on this PC.
-  No JDK, no Android SDK present. winget IS available. Options:
-    (a) Full Android Studio (~3 GB; GUI, emulator manager — easiest)
-    (b) Lean CLI-only: winget Microsoft.OpenJDK.17 + Android cmdline-tools
-        + sdkmanager packages (~1.5 GB, scriptable, no GUI)
-  Either needs the user's go-ahead (multi-GB system install). A physical
-  Android phone with USB debugging also works and skips the emulator.
+[RESOLVED] Step 2b — toolchain decision: NO local install (user choice).
+  CI is the build machine (GitHub runners carry the Android SDK); testing
+  happens on the user's physical phone via the CI APK artifact. Download
+  path: repo -> Actions -> latest run -> Artifacts -> athlete-kinetics-apk.
 
 [DONE] Step 3 — First-run data path (commit d95ec3b).
   Generation logic extracted to packages/core-db/src/demoData.ts (shared by
@@ -46,22 +46,25 @@ green + a step-specific check listed below.
 
 ## Phase 7 — Subjective triage on device
 
-[READY — Node-verifiable now] Step 5 — Device embedder adapter.
-  onnxruntime-react-native + bundled int8 MiniLM (~23 MB) + pure-TS
-  WordPiece tokenizer. Verify on THIS machine first: run the same ONNX via
-  onnxruntime-node and assert vectors match the @xenova/transformers ones in
-  assets/phrase-codebase.vectors.json (cosine > 0.999 per phrase).
+[DONE] Step 5 — Device embedder adapter (commit 6248fb2).
+  Pure-TS WordPiece + runtime-agnostic MiniLM wrapper, verified against the
+  exact ONNX file the phone ships: 70/70 exact tokenizer parity, worst-case
+  embedding cosine 1.000000, 15/15 identical routing, 9.2 ms/query.
+  verify:all is 8 gates. REMAINING SEAM (only hardware-testable): the model
+  file path on device — apps/mobile/src/inference/deviceEmbedder.ts
+  MODEL_PATH is null until step 4 wires asset-copy or first-run download;
+  app runs policy-only meanwhile, by design.
 
-[READY] Step 6 — REPORT UI on COACH tab.
-  Text input -> matched cue + follow-up + guardrail-adjusted vector with
-  amber GUARDRAIL badge; full-screen red directive on halt matches.
-  NOTE (from step 2 bundle check): phrase-codebase.json is not yet imported
-  by the app — wiring it in is part of this step; re-verify it appears in
-  the Metro bundle afterwards.
+[DONE] Step 6 — REPORT UI + store wiring (commit 9e97722).
+  reportSubjective: embed -> confidence gate -> conservative guardrail onto
+  today's prescription; matched/halt/rejected cards on COACH tab; explicit
+  inactive state while MODEL_PATH is null. Codebase+vectors+tokenizer
+  verified present in the 1.7 MB Metro bundle.
 
-[READY] Step 7 — Persist reports: 005_subjective_report.sql migration
-  (date, raw text, matched entry id, similarity, action taken) + extend
-  verify:db. Gives pain history longitudinal value.
+[DONE] Step 7 — 005_subjective_report.sql (commit 6248fb2).
+  Raw text + routing outcome + applied guardrail persisted (rejected
+  reports kept for codebase curation); all three schema-loading verifiers
+  extended with insert/readback + CHECK tests.
 
 ## Phase 8 — Real telemetry (retire the seed data)
 

@@ -1,5 +1,7 @@
 # Athlete Kinetics
 
+[![CI](https://github.com/FDOTPike/athlete-kinetics/actions/workflows/ci.yml/badge.svg)](https://github.com/FDOTPike/athlete-kinetics/actions/workflows/ci.yml)
+
 A **free, offline, on-device** training intelligence app for strength + grappling
 athletes. It tracks mechanical load (sets / reps / tonnage / RPE) and passive
 biometrics (HRV, sleep, SpO2), computes a daily **System Readiness Score**, and
@@ -56,15 +58,19 @@ npm run seed           # deterministic 180-day athlete -> athlete_kinetics.seed.
 
 ## Running the app
 
-The JS/TS layer here is complete and type-checked; native projects are
-generated once with the RN CLI:
+**On a phone, no toolchain needed:** every push builds a sideloadable APK in
+CI. Grab it from [Actions](https://github.com/FDOTPike/athlete-kinetics/actions)
+→ latest green run → Artifacts → `athlete-kinetics-apk`, copy it to an
+Android phone, and install (enable "install unknown apps" for your file
+manager). It is signed with the public RN debug keystore — fine for testing,
+re-signed properly for releases.
+
+**Local development** (native projects live in `apps/mobile/{android,ios}`):
 
 ```powershell
-npx @react-native-community/cli init AthleteKinetics --directory apps/mobile-native
-# copy apps/mobile/{src,index.js,app.json,babel.config.js,metro.config.js} over the template,
-# add deps: @op-engineering/op-sqlite zustand (+ onnxruntime-react-native for triage)
-# iOS (on a Mac): cd ios && pod install
-npx react-native run-android   # or run-ios
+npm install
+npm run android   # needs a local JDK 17 + Android SDK
+# iOS (on a Mac): cd apps/mobile/ios && pod install && npm run ios
 ```
 
 After editing the Phrase Codebase, regenerate its vectors (free, local):
