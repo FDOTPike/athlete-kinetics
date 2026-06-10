@@ -1,0 +1,224 @@
+{
+  "embeddingModel": "Xenova/all-MiniLM-L6-v2",
+  "dim": 384,
+  "entries": [
+    {
+      "id": "pain-mild",
+      "category": "pain",
+      "text": "mild pain around three out of ten, more of an ache",
+      "aliases": [
+        "injury feels 3/10 pain",
+        "joint feels a bit sore but I can train",
+        "slight ache in the muscle during warmup",
+        "knee is a little tender today"
+      ],
+      "cue": "Mild pain reported: load drops 30% and effort caps at RPE 7. Pain-free range only.",
+      "guardrail": {
+        "load_multiplier": 0.7,
+        "set_delta": 0,
+        "rpe_cap_max": 7.0,
+        "halt": false,
+        "follow_up": "Does the pain worsen as the set progresses?"
+      }
+    },
+    {
+      "id": "pain-moderate",
+      "category": "pain",
+      "text": "moderate pain around five or six out of ten during the movement",
+      "aliases": [
+        "it hurts about 5/10 when I lift",
+        "painful through the middle of the range",
+        "shoulder pain is making the press uncomfortable"
+      ],
+      "cue": "Moderate pain: this movement is done for today. Substitute a pain-free pattern at half load.",
+      "guardrail": {
+        "load_multiplier": 0.5,
+        "set_delta": -2,
+        "rpe_cap_max": 6.0,
+        "halt": false,
+        "follow_up": "Is the pain sharp and localized, or a broad dull ache?"
+      }
+    },
+    {
+      "id": "pain-sharp",
+      "category": "pain",
+      "text": "sharp stabbing pain, sudden and severe",
+      "aliases": [
+        "felt a sharp pop during the set",
+        "stabbing pain eight out of ten",
+        "something tweaked and now it really hurts",
+        "shooting pain down my arm or leg"
+      ],
+      "cue": "Sharp or radiating pain ends the session now. Unload the bar. Reassess in 48 hours.",
+      "guardrail": {
+        "load_multiplier": 0,
+        "set_delta": -3,
+        "rpe_cap_max": 0,
+        "halt": true,
+        "follow_up": "Is there swelling, numbness, or loss of range right now?"
+      }
+    },
+    {
+      "id": "illness-systemic",
+      "category": "illness",
+      "text": "feeling sick, feverish, sore throat or chills",
+      "aliases": [
+        "I think I am coming down with something",
+        "fever and body aches today",
+        "really congested and run down"
+      ],
+      "cue": "Systemic symptoms: no training today. A fever and tonnage do not mix.",
+      "guardrail": {
+        "load_multiplier": 0,
+        "set_delta": -3,
+        "rpe_cap_max": 0,
+        "halt": true,
+        "follow_up": "Any fever above 38C in the last 24 hours?"
+      }
+    },
+    {
+      "id": "dizzy",
+      "category": "illness",
+      "text": "dizzy or lightheaded between sets",
+      "aliases": [
+        "feeling faint when I stand up from the bench",
+        "vision went spotty after the last set",
+        "lightheaded and shaky"
+      ],
+      "cue": "Dizziness ends the session. Sit down, hydrate, eat. Do not load a spine while lightheaded.",
+      "guardrail": {
+        "load_multiplier": 0,
+        "set_delta": -3,
+        "rpe_cap_max": 0,
+        "halt": true,
+        "follow_up": "Have you eaten and had fluids in the last three hours?"
+      }
+    },
+    {
+      "id": "fatigue-heavy",
+      "category": "fatigue",
+      "text": "everything feels unusually heavy today, bar speed is slow",
+      "aliases": [
+        "warmup weights feel like maxes",
+        "no pop today, bar is crawling",
+        "legs are dead from yesterday"
+      ],
+      "cue": "Bar speed is the readout: cut load 15% and stop every set two reps short.",
+      "guardrail": {
+        "load_multiplier": 0.85,
+        "set_delta": -1,
+        "rpe_cap_max": 7.5,
+        "halt": false,
+        "follow_up": "Is the slowness even across movements, or one lift only?"
+      }
+    },
+    {
+      "id": "fatigue-sleep",
+      "category": "fatigue",
+      "text": "barely slept last night, exhausted",
+      "aliases": [
+        "got maybe four hours of sleep",
+        "up all night, running on nothing",
+        "terrible night with the kids awake"
+      ],
+      "cue": "Acute sleep debt: keep the pattern, drop 10%, cap RPE 7.5. Stimulus today, PRs another day.",
+      "guardrail": {
+        "load_multiplier": 0.9,
+        "set_delta": -1,
+        "rpe_cap_max": 7.5,
+        "halt": false,
+        "follow_up": null
+      }
+    },
+    {
+      "id": "soreness-doms",
+      "category": "fatigue",
+      "text": "very sore muscles from the last session, normal soreness",
+      "aliases": [
+        "quads are wrecked from squats",
+        "DOMS is brutal today",
+        "hamstrings still sore from deadlifts"
+      ],
+      "cue": "DOMS is not damage: full warmup, first work set at 90%, build only if movement quality holds.",
+      "guardrail": {
+        "load_multiplier": 0.9,
+        "set_delta": 0,
+        "rpe_cap_max": 8.0,
+        "halt": false,
+        "follow_up": "Does the soreness ease as you warm up?"
+      }
+    },
+    {
+      "id": "technique-breakdown",
+      "category": "technique",
+      "text": "form is breaking down, losing position under the bar",
+      "aliases": [
+        "lower back rounding on the pull",
+        "knees caving on the way up",
+        "losing the brace halfway through the set"
+      ],
+      "cue": "Position beats load: drop 10% and end every set the rep before form breaks.",
+      "guardrail": {
+        "load_multiplier": 0.9,
+        "set_delta": 0,
+        "rpe_cap_max": 7.5,
+        "halt": false,
+        "follow_up": "Does the breakdown appear on rep one or only late in the set?"
+      }
+    },
+    {
+      "id": "positive-strong",
+      "category": "positive",
+      "text": "feeling strong and fresh today, weights are moving fast",
+      "aliases": [
+        "feeling great, bar speed is flying",
+        "best I have felt in weeks",
+        "everything feels light today"
+      ],
+      "cue": "Good day confirmed. The plan already accounts for readiness; execute it with intent.",
+      "guardrail": {
+        "load_multiplier": 1.0,
+        "set_delta": 0,
+        "rpe_cap_max": 10.0,
+        "halt": false,
+        "follow_up": null
+      }
+    },
+    {
+      "id": "equipment-improvised",
+      "category": "equipment",
+      "text": "training in a hotel gym with limited equipment",
+      "aliases": [
+        "only dumbbells available today",
+        "no rack here, improvising",
+        "travelling with minimal kit"
+      ],
+      "cue": "Match the pattern, not the implement: higher reps, RPE cap 8, keep daily tonnage near plan.",
+      "guardrail": {
+        "load_multiplier": 1.0,
+        "set_delta": 0,
+        "rpe_cap_max": 8.0,
+        "halt": false,
+        "follow_up": null
+      }
+    },
+    {
+      "id": "pain-chest",
+      "category": "illness",
+      "text": "chest pain or pressure during exertion",
+      "aliases": [
+        "tightness in my chest on the heavy set",
+        "chest feels heavy and strange",
+        "pressure in chest and short of breath"
+      ],
+      "cue": "Chest symptoms under load: stop immediately. This is outside training; seek medical assessment.",
+      "guardrail": {
+        "load_multiplier": 0,
+        "set_delta": -3,
+        "rpe_cap_max": 0,
+        "halt": true,
+        "follow_up": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "comment": "Memory contract for the Vector-Heuristic pipeline (Phase 5 revision: generative SLM removed). verify:memory recomputes the footprint from the shipped assets and fails on breach. The dominant former risk (a ~1 GB mmap'd GGUF) is gone; the worst case is now a transient ONNX embed call.",
+  "runtimeDirtyBytes": {
+    "hermesAndUi": 314572800,
+    "sqliteLayer": 52428800,
+    "comment": "300 MB Hermes/RN/UI + 50 MB SQLite ceiling (unchanged, audited)"
+  },
+  "embedderTransientBytes": 104857600,
+  "embedderComment": "onnxruntime-react-native + int8 MiniLM (~23 MB weights) during a SINGLE short-string embed call, session released after: 100 MB ceiling.",
+  "deviceTiers": [
+    {
+      "name": "3GB-android",
+      "maxDirtyBytes": 1342177280,
+      "comment": "lmkd pressure tier"
+    },
+    {
+      "name": "4GB-iphone12-class",
+      "maxDirtyBytes": 2199912448,
+      "comment": "jetsam ActiveHard ~2098 MB phys_footprint"
+    },
+    {
+      "name": "6GB-plus",
+      "maxDirtyBytes": 2621440000,
+      "comment": "iPhone 15/16 class and mid/flagship Android"
+    }
+  ]
+}

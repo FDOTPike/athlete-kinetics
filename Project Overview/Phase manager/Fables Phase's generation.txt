@@ -1,0 +1,30 @@
+Here's the roadmap from where we are (verified JS/TS layer, no native build yet) to a working app on your phone, ordered by dependency — each phase unblocks the next.
+
+## Phase 6 — Make it run on a device (the critical path)
+
+1. **Put the repo under git.** Everything so far is verified but unversioned — one bad edit and there's no undo. `git init` + initial commit, and optionally a GitHub repo (public would suit the free/accessible goal and unlocks free CI). *Needs your go-ahead — say the word and I'll do it.*
+2. **Scaffold the native projects.** Run the RN CLI template once, merge in our `src/`, babel/metro configs, and op-sqlite. **Android first** — that's buildable on this Windows machine if the Android SDK is present (I'll check; if not, it's one Android Studio install). iOS needs a Mac, so it's documented and deferred.
+3. **First-run data path.** A fresh install has an empty `state_vector` (the screens already handle that gracefully, but it's a dull demo). Add a dev-menu action: "load demo athlete" that runs the seeder logic in-app, plus the nightly compaction/materialize job on app foreground so today's row always exists once real data flows.
+4. **On-device smoke test** of the loop that matters: log sets → end session → triggers update `mech_daily` → state vector rematerializes → readiness changes tomorrow.
+
+## Phase 7 — Subjective triage on device (the new pipeline's last mile)
+
+5. **Device embedder adapter** — `onnxruntime-react-native` + bundled int8 MiniLM (~23 MB) + a pure-TS WordPiece tokenizer. The tokenizer and ONNX inference are *fully verifiable on this machine first* (run the same ONNX in Node, assert vectors match the transformers.js ones we generated) — so the device step becomes plug-in, not debug.
+6. **REPORT UI on the COACH tab**: text input → matched cue, follow-up question, guardrail-adjusted prescription with the amber GUARDRAIL badge; a full-screen red directive for halt matches (sharp pain / dizziness / chest).
+7. **Persist reports** — migration `005_subjective_report.sql` (date, text, matched entry, similarity) so pain history becomes longitudinal data the state vector could later use.
+
+## Phase 8 — Real telemetry (retire the seed data)
+
+8. **`packages/biometrics`**: Health Connect adapter (Android) feeding `hrv_daily` / `sleep_daily` / `spo2_sample`, with the compaction job (fold + 14-day trim) wired to app foreground. HealthKit follows when iOS exists.
+9. **Movement library UI** — right now the `movement` table is only populated by the seeder; needs a minimal add/edit screen.
+
+## Phase 9 — Ship it free
+
+10. **CI**: GitHub Actions running `verify:all` on every push (free on a public repo — our whole verification suite is already headless).
+11. **Distribution**: signed APK on GitHub Releases + an **F-Droid** submission — genuinely free end-to-end. The honest caveat: iOS distribution requires a Mac and Apple's $99/year, so Android is the free flagship; the privacy story (all data local, no network calls) is also exactly what F-Droid wants documented.
+
+## Backlog (valuable, not blocking)
+
+History/trends screen, per-movement e1RM tracking, data export (your data, one tap, CSV/SQLite — that's accessibility too), voice input for reports, screen-reader pass on real hardware, micro-cycle planner UI.
+
+**My recommendation for the next working session:** steps 1–2 plus step 5's Node-verified tokenizer/embedder — git safety net, an app that boots in an emulator, and the triage pipeline proven against real ONNX before it ever touches a phone. Decision points only you can make: public vs private repo, and whether "Athlete Kinetics" is the shipping name. Want me to start?
