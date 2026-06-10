@@ -23,6 +23,13 @@ export {
   type PhraseEntry,
 } from './semantic/codebase';
 export { type Embedder } from './semantic/embedder';
+export { WordPieceTokenizer, type TokenizerSpec } from './semantic/wordpiece';
+export {
+  createMiniLmEmbedder,
+  type MiniLmEmbedderOptions,
+  type OrtSessionLike,
+  type OrtTensorCtor,
+} from './semantic/onnxEmbedder';
 export {
   AMBIGUITY_MARGIN,
   CONFIDENCE_THRESHOLD,

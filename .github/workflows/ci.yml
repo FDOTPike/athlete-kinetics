@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  # Runner JS actions default to Node 20 until 2026-06-16; opt in early so
+  # the forced switch can't break CI mid-week.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   verify:
     name: Verification suite (7 gates)
@@ -20,14 +25,18 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
-      # MiniLM (~25 MB) used by verify:semantic; cached across runs.
+      # MiniLM (~25 MB) used by verify:semantic + verify:embedder; cached.
       - name: Cache embedding model
         uses: actions/cache@v4
         with:
           path: node_modules/@xenova/transformers/.cache
           key: minilm-${{ hashFiles('packages/inference/assets/phrase-codebase.json') }}
           restore-keys: minilm-
-      - name: verify:all (typecheck, db, demo, policy, semantic, store, memory)
+      # Materialize the gitignored ONNX into assets/minilm (cache-first,
+      # Hugging Face download on a cold cache).
+      - name: Fetch embedder assets
+        run: npm run fetch:embedder
+      - name: verify:all (8 gates)
         run: npm run verify:all
       - name: Seeder physiology — pinned alignment + today's alignment
         run: |
