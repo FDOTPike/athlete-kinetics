@@ -24,7 +24,23 @@ import {
   openKineticsDb,
   type DemoSql,
 } from '@ak/core-db';
-import { getPrescription, type MovementPattern, type Prescription, type StateVectorRow } from '@ak/inference';
+import {
+  applyGuardrail,
+  getPrescription,
+  loadCodebase,
+  triage,
+  type Embedder,
+  type LoadedCodebase,
+  type MovementPattern,
+  type PhraseCodebase,
+  type Prescription,
+  type SessionDirective,
+  type StateVectorRow,
+} from '@ak/inference';
+// Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
+// relative imports resolve via metro watchFolders / tsc include.
+import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
+import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 
 // ---------------------------------------------------------------------------
 // Shared dark palette (sweaty-hands UI: high contrast, zero decoration)
@@ -74,6 +90,10 @@ export interface TrendPoint {
 
 export type BootStatus = 'booting' | 'ready' | 'error';
 
+export type TriageOutcome =
+  | { kind: 'rejected'; similarity: number }
+  | { kind: 'matched'; directive: SessionDirective };
+
 interface KineticsStore {
   status: BootStatus;
   error: string | null;
@@ -83,8 +103,14 @@ interface KineticsStore {
   movements: Movement[];
   session: ActiveSession | null;
   prescription: (Prescription & { forDate: string }) | null;
+  /** True when an on-device embedder is wired (policy-only mode otherwise). */
+  triageReady: boolean;
+  triaging: boolean;
+  lastTriage: TriageOutcome | null;
 
   boot: () => void;
+  setEmbedder: (e: Embedder | null) => void;
+  reportSubjective: (text: string) => Promise<void>;
   refreshVector: () => void;
   startSession: () => void;
   logSet: (movementId: number, reps: number, loadKg: number, rpe: number) => void;
@@ -119,6 +145,21 @@ const localToday = (): string => {
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
 
 // ---------------------------------------------------------------------------
+// Semantic triage singletons (native-adjacent, non-serializable: module level)
+// ---------------------------------------------------------------------------
+let embedder: Embedder | null = null;
+let codebaseCache: LoadedCodebase | null = null;
+const getCodebase = (): LoadedCodebase => {
+  if (codebaseCache === null) {
+    codebaseCache = loadCodebase(
+      phraseCodebaseJson as unknown as PhraseCodebase,
+      phraseVectorsJson.vectors,
+    );
+  }
+  return codebaseCache;
+};
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 export const useStore = create<KineticsStore>()((set, get) => ({
@@ -130,6 +171,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   movements: [],
   session: null,
   prescription: null,
+  triageReady: false,
+  triaging: false,
+  lastTriage: null,
 
   boot: () => {
     if (get().status === 'ready') return;
@@ -259,6 +303,57 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // Subjective-report guardrails (semantic triage) refine this vector once
     // the on-device embedder adapter lands; the pipeline is already verified.
     set({ prescription: { ...getPrescription(vector), forDate: today } });
+  },
+
+  setEmbedder: (e) => {
+    embedder = e;
+    set({ triageReady: e !== null });
+  },
+
+  reportSubjective: async (text) => {
+    const { vector, today, prescription, triaging } = get();
+    const raw = text.trim();
+    if (embedder === null || vector === null || triaging) return;
+    if (raw.length === 0 || raw.length > 500) return;
+    set({ triaging: true });
+    try {
+      const query = await embedder.embed(raw);
+      const result = triage(query, getCodebase());
+      const d = getDb();
+      if (!result.confident || result.entry === null) {
+        // Rejected by the confidence gate: log it (codebase curation data),
+        // change NOTHING about the prescription.
+        d.executeSync(
+          `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
+           VALUES (?, ?, ?, NULL, ?, 0, NULL, NULL, NULL)`,
+          [today, Date.now(), raw, result.similarity],
+        );
+        set({ lastTriage: { kind: 'rejected', similarity: result.similarity } });
+        return;
+      }
+      // Guardrails compose onto today's operative prescription (or the
+      // policy's, when none was computed yet) — monotone conservative.
+      const base =
+        prescription !== null && prescription.forDate === today
+          ? prescription.vector
+          : getPrescription(vector).vector;
+      const directive = applyGuardrail(base, result.entry, result.similarity);
+      d.executeSync(
+        `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          today, Date.now(), raw, result.entry.id, result.similarity,
+          directive.halt ? 1 : 0, directive.vector.load_modifier,
+          directive.vector.set_modifier, directive.vector.rpe_cap,
+        ],
+      );
+      set({
+        lastTriage: { kind: 'matched', directive },
+        prescription: { vector: directive.vector, source: 'guardrail', forDate: today },
+      });
+    } finally {
+      set({ triaging: false });
+    }
   },
 
   loadDemoAthlete: () => {

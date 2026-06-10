@@ -7,7 +7,7 @@
  * both obey the same contract, so the screen renders them identically.
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MOVEMENT_PATTERNS, type MovementPattern } from '@ak/inference';
 import { palette, useStore } from '../state/useStore';
 
@@ -32,8 +32,13 @@ export default function PrescriptionScreen(): React.JSX.Element {
   const today = useStore((s) => s.today);
   const prescription = useStore((s) => s.prescription);
   const computePrescription = useStore((s) => s.computePrescription);
+  const triageReady = useStore((s) => s.triageReady);
+  const triaging = useStore((s) => s.triaging);
+  const lastTriage = useStore((s) => s.lastTriage);
+  const reportSubjective = useStore((s) => s.reportSubjective);
 
   const [selected, setSelected] = useState<readonly MovementPattern[]>(['squat', 'push_h']);
+  const [reportText, setReportText] = useState('');
 
   const toggle = (p: MovementPattern): void => {
     setSelected((cur) =>
@@ -139,6 +144,76 @@ export default function PrescriptionScreen(): React.JSX.Element {
             : 'Pick patterns and prescribe. Deterministic, offline, instant.'}
         </Text>
       )}
+
+      {/* ---- subjective report triage ---- */}
+      <Text style={[styles.sectionLabel, styles.reportLabel]}>SUBJECTIVE REPORT</Text>
+      {!triageReady ? (
+        <Text style={styles.dimText}>
+          On-device triage is inactive in this build (embedding model not wired yet).
+          Prescriptions stay policy-driven.
+        </Text>
+      ) : (
+        <>
+          <TextInput
+            style={styles.reportInput}
+            value={reportText}
+            onChangeText={setReportText}
+            placeholder="How does it feel? e.g. knee a bit sore, 3/10"
+            placeholderTextColor={palette.dim}
+            maxLength={500}
+            multiline
+            accessibilityLabel="Describe how your body feels today"
+          />
+          <Pressable
+            disabled={reportText.trim().length === 0 || triaging}
+            onPress={() => {
+              void reportSubjective(reportText).then(() => setReportText(''));
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Triage this report"
+            style={({ pressed }) => [
+              styles.triageBtn,
+              pressed && styles.triageBtnPressed,
+              (reportText.trim().length === 0 || triaging) && styles.triageBtnDisabled,
+            ]}
+          >
+            <Text style={styles.triageBtnText}>{triaging ? 'MATCHING…' : 'TRIAGE'}</Text>
+          </Pressable>
+
+          {lastTriage !== null && lastTriage.kind === 'rejected' && (
+            <View style={styles.rejectCard}>
+              <Text style={styles.rejectTitle}>NO CONFIDENT MATCH</Text>
+              <Text style={styles.dimTextLeft}>
+                Closest cue scored {(lastTriage.similarity * 100).toFixed(0)}% — below the
+                threshold, so nothing changed. Rephrase with how it feels during movement.
+              </Text>
+            </View>
+          )}
+          {lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt && (
+            <View style={styles.haltCard}>
+              <Text style={styles.haltTitle}>STOP — SESSION OVER</Text>
+              <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+              {lastTriage.directive.followUp !== null && (
+                <Text style={styles.followUp}>{lastTriage.directive.followUp}</Text>
+              )}
+            </View>
+          )}
+          {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
+            <View style={styles.matchCard}>
+              <Text style={styles.matchTitle}>
+                GUARDRAIL APPLIED · {(lastTriage.directive.similarity * 100).toFixed(0)}% MATCH
+              </Text>
+              <Text style={styles.matchCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+              {lastTriage.directive.followUp !== null && (
+                <Text style={styles.followUp}>{lastTriage.directive.followUp}</Text>
+              )}
+              <Text style={styles.dimTextLeft}>
+                The prescription above now reflects this report.
+              </Text>
+            </View>
+          )}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -214,4 +289,59 @@ const styles = StyleSheet.create({
   cue: { color: palette.text, fontSize: 16, lineHeight: 23 },
   errorTitle: { color: palette.red, fontSize: 20, fontWeight: '800', letterSpacing: 2 },
   dimText: { color: palette.dim, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  dimTextLeft: { color: palette.dim, fontSize: 14, lineHeight: 20, marginTop: 8 },
+  reportLabel: { marginTop: 28 },
+  reportInput: {
+    minHeight: 64,
+    borderRadius: 12,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    color: palette.text,
+    fontSize: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    textAlignVertical: 'top',
+    marginBottom: 10,
+  },
+  triageBtn: {
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: palette.surface,
+    borderWidth: 2,
+    borderColor: palette.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  triageBtnPressed: { backgroundColor: '#10241D' },
+  triageBtnDisabled: { borderColor: palette.line },
+  triageBtnText: { color: palette.green, fontSize: 18, fontWeight: '800', letterSpacing: 2 },
+  rejectCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.line,
+    padding: 14,
+  },
+  rejectTitle: { color: palette.dim, fontSize: 13, fontWeight: '800', letterSpacing: 2 },
+  matchCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: palette.amber,
+    padding: 14,
+  },
+  matchTitle: { color: palette.amber, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
+  matchCue: { color: palette.text, fontSize: 16, lineHeight: 22, marginTop: 8 },
+  haltCard: {
+    backgroundColor: '#2A1416',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: palette.red,
+    padding: 16,
+  },
+  haltTitle: { color: palette.red, fontSize: 18, fontWeight: '800', letterSpacing: 2 },
+  haltCue: { color: palette.text, fontSize: 16, lineHeight: 22, marginTop: 8 },
+  followUp: { color: palette.text, fontSize: 15, fontStyle: 'italic', marginTop: 8 },
 });

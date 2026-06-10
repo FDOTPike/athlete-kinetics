@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { palette, useStore } from './state/useStore';
+import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
 import PrescriptionScreen from './screens/PrescriptionScreen';
@@ -31,6 +32,11 @@ export default function App(): React.JSX.Element {
 
   useEffect(() => {
     boot();
+    // Async, optional: wires subjective-report triage when the embedding
+    // model is reachable; the app is fully functional without it.
+    void tryCreateDeviceEmbedder().then((e) => {
+      useStore.getState().setEmbedder(e);
+    });
   }, [boot]);
 
   return (
