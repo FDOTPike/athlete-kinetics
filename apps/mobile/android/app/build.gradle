@@ -13,6 +13,9 @@ react {
     reactNativeDir = file("../../../../node_modules/react-native")
     codegenDir = file("../../../../node_modules/@react-native/codegen")
     cliFile = file("../../../../node_modules/react-native/cli.js")
+    // hermesc lookup does NOT follow reactNativeDir (it probes the app-root
+    // node_modules, empty under workspace hoisting) — point it explicitly.
+    hermesCommand = "$rootDir/../../../node_modules/react-native/sdks/hermesc/%OS-BIN%/hermesc"
 
     /* Variants */
     //   The list of variants to that are debuggable. For those we're going to
