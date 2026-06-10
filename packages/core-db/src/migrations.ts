@@ -10,9 +10,11 @@ import { type DB } from '@op-engineering/op-sqlite';
 import m001 from './schema/001_mechanical_input.sql';
 import m002 from './schema/002_telemetry.sql';
 import m003 from './schema/003_state_vector.sql';
+import m005 from './schema/005_subjective_report.sql';
 
-/** Ordered, append-only. Never edit a shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003];
+/** Ordered, append-only. Never edit a shipped entry — add a new one.
+ *  (004 is the parameterized daily upsert, not a migration.) */
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005];
 
 export function migrate(db: DB): void {
   const row = db.executeSync('PRAGMA user_version;').rows[0] as {

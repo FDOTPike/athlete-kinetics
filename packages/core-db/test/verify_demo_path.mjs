@@ -40,7 +40,8 @@ const adapter = {
 const today = new Date().toISOString().slice(0, 10);
 
 console.log('[1] boot path on an EMPTY database');
-for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql']) {
+for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
+  '005_subjective_report.sql']) {
   raw.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 for (const date of demo.demoDates(today, 7)) adapter.run(MATERIALIZE, [date]);

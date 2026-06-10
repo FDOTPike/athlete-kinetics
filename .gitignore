@@ -4,7 +4,8 @@ node_modules/
 packages/inference/test/.build/
 packages/core-db/test/.build/
 athlete_kinetics.seed.db
-models/*.gguf
+packages/inference/assets/minilm/*.onnx
+packages/inference/assets/minilm/tokenizer.full.json
 apps/mobile/ios/Pods/
 apps/mobile/android/.gradle/
 apps/mobile/android/app/build/

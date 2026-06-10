@@ -37,7 +37,8 @@ def check(label, ok, detail=""):
 # --- 1. migrations -----------------------------------------------------------
 print(f"SQLite {sqlite3.sqlite_version}")
 print("\n[1] schema files execute cleanly")
-for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql"]:
+for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql",
+          "005_subjective_report.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -135,6 +136,28 @@ check("trend scan: index-ordered, no USE TEMP B-TREE", "TEMP B-TREE" not in txt,
 plan = con.execute("EXPLAIN QUERY PLAN SELECT * FROM spo2_sample WHERE epoch_ms BETWEEN ? AND ?", (base_ms, base_ms + 10**6)).fetchall()
 txt = " ".join(r["detail"] for r in plan)
 check("raw stream range: clustered PK search", "SEARCH" in txt and "PRIMARY KEY" in txt, txt)
+
+# --- 6. subjective report log -------------------------------------------------
+print("\n[6] subjective_report (005)")
+con.execute(
+    "INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id,"
+    " similarity, halt, load_modifier, set_modifier, rpe_cap)"
+    " VALUES (?, 0, 'knee a bit sore', 'pain-mild', 0.72, 0, 0.7, 0, 7.0)",
+    (days[-1].isoformat(),))
+con.execute(
+    "INSERT INTO subjective_report (date, reported_at_ms, raw_text) VALUES (?, 1, 'gibberish input')",
+    (days[-1].isoformat(),))
+rows = con.execute("SELECT * FROM subjective_report WHERE date=? ORDER BY report_id",
+                   (days[-1].isoformat(),)).fetchall()
+check("matched + rejected rows both persist", len(rows) == 2)
+check("rejected row has NULL routing fields",
+      rows[1]["matched_entry_id"] is None and rows[1]["similarity"] is None)
+try:
+    con.execute("INSERT INTO subjective_report (date, reported_at_ms, raw_text, halt)"
+                " VALUES (?, 0, 'x', 2)", (days[-1].isoformat(),))
+    check("halt CHECK rejects non-boolean", False)
+except sqlite3.IntegrityError:
+    check("halt CHECK rejects non-boolean", True)
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)
