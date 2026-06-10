@@ -1,0 +1,18 @@
+**PROMPT FOR FABLE:**
+
+The APK built successfully and installed, but the app crashes immediately upon opening. We are halting the transition to Phase 8.
+
+To maximize token efficiency, we are using a separate AI (Gemini Pro) to translate your technical jargon for my conceptual approval. Follow this strict workflow:
+
+1. **Investigate the Crash:** The app crashes on boot. Inspect the codebase for common startup failure points. Pay specific attention to:
+   - Database initialization (`packages/core-db` / `demoData.ts` loading).
+   - The device embedder adapter (`apps/mobile/src/inference/deviceEmbedder.ts`) attempting to access `MODEL_PATH` too early or incorrectly.
+   - Any React Native native-module linking issues or missing Android permissions.
+2. **Request Logs (if necessary):** If you cannot find the definitive cause of the crash through code inspection alone, stop and give me the exact `adb logcat` command I need to run on my computer (with my phone plugged in) to capture the crash logs for you. 
+3. **Fix the Issue:** If you *can* identify the issue, apply the necessary code changes.
+4. **Create a Technical Handover File:** Once you believe the crash is fixed, do NOT start Phase 8. Create a new file in `Project Overview/Phase manager/` named `Gemini_Handover_Crash_Fix.txt` using the template format.
+5. **Format the Handover File:** This file is exclusively for Gemini to read. Make it extremely dense and technical. It must include:
+   - **Root Cause:** The exact technical reason the app was crashing on boot.
+   - **Changes Made:** A concise list of the core components, modules, or build settings you modified to fix it.
+   - **Next Phase Objective:** Note that we must rebuild the APK and verify the fix on-device before we can generate the prompt for Phase 8.
+6. **Final Output:** In your chat response to me, just say "Crash fix applied (or logs requested). Handover file generated. Awaiting conceptual approval." Do not explain the changes or root cause in the chat interface.

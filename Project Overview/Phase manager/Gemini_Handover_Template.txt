@@ -1,0 +1,13 @@
+# Gemini Handover Template
+
+**Root Cause / Current State:**
+[Highly technical description of the current state, or the exact technical reason for the issue/crash. Include specific file paths, variables, or missing constraints.]
+
+**Changes Made:**
+[Concise, dense list of core components, DB schemas, modules, or build settings modified during this session. Do not explain simply; assume the reader is a senior engineer.]
+
+**Next Phase Objective:**
+[Strict technical requirements for the next phase or the next immediate step. If blocked, state the required manual testing or manual commands (e.g., rebuilding the APK).]
+
+**Architectural Constraints:**
+[Reminder of non-negotiable rules applicable to the upcoming work. Example: Local SQLite only, Vector-Heuristic pipeline, no LLMs, zero cloud.]
