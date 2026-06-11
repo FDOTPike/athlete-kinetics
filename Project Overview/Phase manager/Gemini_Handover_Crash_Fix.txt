@@ -1,5 +1,22 @@
 # Gemini Handover — Crash Fix (boot crash, APK r6)
 
+**STATUS UPDATE (post-retest): LOGS REQUESTED.** User reports the containment
+build (run 27314918490, artifact 2026-06-11T00:21:37Z) still crashes on open.
+JS-level containment surviving the crash implies a NATIVE-level failure
+(SoLoader/.so load, TurboModule registration, or a native abort in a module's
+JSI install under bridgeless) — not catchable from JS, not resolvable by
+inspection. Hypothesis ranking: (1) onnxruntime-react-native bridgeless
+incompatibility at native registration; (2) react-native-blob-util new-arch
+interop; (3) op-sqlite JSI under 0.81 bridgeless (least likely; widely used).
+Caveat: artifact download timing was ~4 min after publication — user must
+confirm the installed APK came from the run titled "Boot-crash containment",
+not an earlier run. Definitive triage requires the adb logcat capture defined
+in Next Phase Objective item 4; adb itself via `winget install -e --id
+Google.PlatformTools` (~10 MB, not the full SDK). Likely remediation once
+confirmed: set `newArchEnabled=false` in apps/mobile/android/gradle.properties
+(verify installed op-sqlite major supports legacy arch first) OR
+upgrade/replace the incompatible module.
+
 **Root Cause / Current State:**
 Crash-on-open caused by native-module initialization executed at JS module-evaluation time (bundle init), i.e. before any try/catch or React error boundary can exist. Three import-time initializers sat in the boot chain:
 1. `@op-engineering/op-sqlite` (`src/functions.ts`): top-level `NativeModules.OPSQLite.install()` with explicit `throw new Error(...)` on null module / failed JSI install / missing `global.__OPSQLiteProxy`. Reached via `App.tsx -> useStore.ts -> @ak/core-db pragmas.ts` static import.
