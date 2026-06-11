@@ -22,6 +22,7 @@ import {
   View,
 } from 'react-native';
 import { palette, useStore, type LoggedSet, type Movement } from '../state/useStore';
+import InfoTip from '../components/InfoTip';
 
 // ---------------------------------------------------------------------------
 // Stepper — the only numeric input primitive on this screen
@@ -31,11 +32,18 @@ interface StepperProps {
   display: string;
   onDec: () => void;
   onInc: () => void;
+  /** Glossary key — renders an ⓘ tooltip next to the label. */
+  tip?: string;
+  /** Render the value in red (e.g. RPE at an absolute 10). */
+  danger?: boolean;
 }
-function Stepper({ label, display, onDec, onInc }: StepperProps): React.JSX.Element {
+function Stepper({ label, display, onDec, onInc, tip, danger }: StepperProps): React.JSX.Element {
   return (
     <View style={styles.stepper}>
-      <Text style={styles.stepperLabel}>{label}</Text>
+      <View style={styles.stepperLabelRow}>
+        <Text style={styles.stepperLabel}>{label}</Text>
+        {tip !== undefined && <InfoTip term={tip} />}
+      </View>
       <View style={styles.stepperRow}>
         <Pressable
           onPress={onDec}
@@ -47,9 +55,9 @@ function Stepper({ label, display, onDec, onInc }: StepperProps): React.JSX.Elem
           <Text style={styles.stepBtnText}>−</Text>
         </Pressable>
         <Text
-          style={styles.stepperValue}
+          style={[styles.stepperValue, danger === true && styles.stepperValueDanger]}
           accessibilityRole="text"
-          accessibilityLabel={`${label} ${display}`}
+          accessibilityLabel={`${label} ${display}${danger === true ? ', maximal effort' : ''}`}
         >
           {display}
         </Text>
@@ -254,6 +262,8 @@ export default function SessionScreen(): React.JSX.Element {
       <Stepper
         label="RPE"
         display={rpe.toFixed(1)}
+        tip="RPE"
+        danger={rpe >= 10}
         onDec={() => setRpe((v) => clamp(v - 0.5, 5, 10))}
         onInc={() => setRpe((v) => clamp(v + 0.5, 5, 10))}
       />
@@ -410,7 +420,8 @@ const styles = StyleSheet.create({
   pickCancelText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
 
   stepper: { marginTop: 10 },
-  stepperLabel: { color: palette.dim, fontSize: 12, letterSpacing: 2, marginBottom: 4 },
+  stepperLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  stepperLabel: { color: palette.dim, fontSize: 12, letterSpacing: 2 },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stepBtn: {
     width: 72,
@@ -432,6 +443,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },
+  stepperValueDanger: { color: palette.red },
 
   logBtn: {
     height: 84,

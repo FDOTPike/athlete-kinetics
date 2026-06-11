@@ -5,6 +5,8 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
   StatusBar,
@@ -82,12 +84,15 @@ function AppShell(): React.JSX.Element {
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
-      <View style={styles.body}>
+      <KeyboardAvoidingView
+        style={styles.body}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {tab === 'readiness' && <ReadinessScreen />}
         {tab === 'session' && <SessionScreen />}
         {tab === 'coach' && <PrescriptionScreen />}
         {tab === 'athlete' && <ProfileScreen />}
-      </View>
+      </KeyboardAvoidingView>
       <View style={styles.tabBar} accessibilityRole="tablist">
         {TABS.map((t) => {
           const active = t.key === tab;
@@ -111,7 +116,13 @@ function AppShell(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: palette.bg },
+  root: {
+    flex: 1,
+    backgroundColor: palette.bg,
+    // RN's SafeAreaView only pads on iOS; on Android the status bar overlaps
+    // content (seen on hardware) — pad the real inset ourselves.
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0,
+  },
   body: { flex: 1 },
   tabBar: {
     flexDirection: 'row',

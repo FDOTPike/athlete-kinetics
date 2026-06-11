@@ -17,6 +17,7 @@ import {
   type UserProfile,
 } from '@ak/inference';
 import { palette, useStore } from '../state/useStore';
+import InfoTip from '../components/InfoTip';
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -26,11 +27,16 @@ interface ChipRowProps<T extends string> {
   options: readonly T[];
   value: T;
   onSelect: (v: T) => void;
+  /** Glossary key — renders an ⓘ tooltip next to the label. */
+  tip?: string;
 }
-function ChipRow<T extends string>({ label, options, value, onSelect }: ChipRowProps<T>): React.JSX.Element {
+function ChipRow<T extends string>({ label, options, value, onSelect, tip }: ChipRowProps<T>): React.JSX.Element {
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.fieldLabelRow}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        {tip !== undefined && <InfoTip term={tip} />}
+      </View>
       <View style={styles.chipWrap}>
         {options.map((opt) => {
           const active = opt === value;
@@ -59,11 +65,15 @@ interface NumberRowProps {
   display: string;
   onDec: () => void;
   onInc: () => void;
+  tip?: string;
 }
-function NumberRow({ label, display, onDec, onInc }: NumberRowProps): React.JSX.Element {
+function NumberRow({ label, display, onDec, onInc, tip }: NumberRowProps): React.JSX.Element {
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.fieldLabelRow}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        {tip !== undefined && <InfoTip term={tip} />}
+      </View>
       <View style={styles.numberRow}>
         <Pressable
           onPress={onDec}
@@ -128,6 +138,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
       <ChipRow
         label="1 · OBJECTIVE"
+        tip="GPP"
         options={OBJECTIVES}
         value={profile.objective}
         onSelect={(objective) => saveProfile({ objective })}
@@ -158,12 +169,14 @@ export default function ProfileScreen(): React.JSX.Element {
       />
       <NumberRow
         label="6 · BASE EFFORT CEILING (RPE)"
+        tip="RPE"
         display={profile.base_rpe_cap.toFixed(1)}
         onDec={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap - 0.5 })}
         onInc={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap + 0.5 })}
       />
       <ChipRow
         label="7 · TARGET ENERGY SYSTEM"
+        tip="ATP-PC"
         options={ENERGY_SYSTEMS}
         value={profile.target_energy_system}
         onSelect={(target_energy_system) => saveProfile({ target_energy_system })}
@@ -218,7 +231,8 @@ const styles = StyleSheet.create({
   heading: { color: palette.text, fontSize: 22, fontWeight: '800', letterSpacing: 2 },
   subheading: { color: palette.dim, fontSize: 13, lineHeight: 19, marginTop: 6, marginBottom: 18 },
   field: { marginBottom: 18 },
-  fieldLabel: { color: palette.dim, fontSize: 12, letterSpacing: 1.5, marginBottom: 8 },
+  fieldLabel: { color: palette.dim, fontSize: 12, letterSpacing: 1.5 },
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     minHeight: 48,

@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MOVEMENT_PATTERNS, type MovementPattern } from '@ak/inference';
 import { palette, useStore } from '../state/useStore';
+import InfoTip from '../components/InfoTip';
 
 const PATTERN_LABELS: Record<MovementPattern, string> = {
   squat: 'SQUAT',
@@ -126,15 +127,26 @@ export default function PrescriptionScreen(): React.JSX.Element {
           <View style={styles.bigRow}>
             <View style={styles.bigCell}>
               <Text style={styles.bigValue}>×{current.vector.load_modifier.toFixed(2)}</Text>
-              <Text style={styles.bigLabel}>LOAD</Text>
+              <View style={styles.bigLabelRow}>
+                <Text style={styles.bigLabel}>LOAD</Text>
+                <InfoTip term="LOAD" />
+              </View>
             </View>
             <View style={styles.bigCell}>
               <Text style={styles.bigValue}>{signed(current.vector.set_modifier)}</Text>
-              <Text style={styles.bigLabel}>SETS</Text>
+              <View style={styles.bigLabelRow}>
+                <Text style={styles.bigLabel}>SETS</Text>
+                <InfoTip term="SETS" />
+              </View>
             </View>
             <View style={styles.bigCell}>
-              <Text style={styles.bigValue}>{current.vector.rpe_cap.toFixed(1)}</Text>
-              <Text style={styles.bigLabel}>RPE CAP</Text>
+              <Text style={[styles.bigValue, current.vector.rpe_cap >= 10 && styles.bigValueDanger]}>
+                {current.vector.rpe_cap.toFixed(1)}
+              </Text>
+              <View style={styles.bigLabelRow}>
+                <Text style={styles.bigLabel}>RPE CAP</Text>
+                <InfoTip term="RPE" />
+              </View>
             </View>
           </View>
 
@@ -294,7 +306,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  bigLabel: { color: palette.dim, fontSize: 11, letterSpacing: 2, marginTop: 4 },
+  bigLabel: { color: palette.dim, fontSize: 11, letterSpacing: 2 },
+  bigLabelRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  bigValueDanger: { color: palette.red },
   cue: { color: palette.text, fontSize: 16, lineHeight: 23 },
   profileNote: { color: palette.amber, fontSize: 13, lineHeight: 19, marginTop: 8 },
   errorTitle: { color: palette.red, fontSize: 20, fontWeight: '800', letterSpacing: 2 },
