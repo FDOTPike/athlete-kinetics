@@ -39,7 +39,8 @@ interface Db extends DemoSql {
 function openDb(path: string): Db {
   const raw = new DatabaseSync(path);
   raw.exec('PRAGMA foreign_keys = ON;');
-  // op-sqlite builds carry SQLITE_ENABLE_MATH_FUNCTIONS; node:sqlite may not.
+  // Math fns (ln/sqrt) need SQLITE_ENABLE_MATH_FUNCTIONS: the app build gets
+  // it via the op-sqlite sqliteFlags config; node:sqlite may lack it -> shim.
   try {
     raw.prepare('SELECT ln(2.0), sqrt(2.0)').get();
   } catch {

@@ -10,9 +10,12 @@
 -- for a 14-day trend window). Zero joins, zero window functions at inference
 -- time.
 --
--- Requires SQLite built-in math functions (ln, sqrt) — enabled in op-sqlite
--- builds (SQLITE_ENABLE_MATH_FUNCTIONS). Window RANGE frames require
--- SQLite >= 3.28; op-sqlite ships >= 3.45.
+-- Requires SQLite built-in math functions (ln, sqrt): NOT in op-sqlite's
+-- default build — the app MUST set "op-sqlite": { "sqliteFlags":
+-- "-DSQLITE_ENABLE_MATH_FUNCTIONS=1" } in apps/mobile/package.json
+-- (proven on-device 2026-06-11: CREATE VIEW fails with "no such function:
+-- ln" without it). Node verifiers register JS fallbacks. Window RANGE
+-- frames require SQLite >= 3.28; op-sqlite ships >= 3.45.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------

@@ -2,6 +2,9 @@
   "name": "@ak/mobile",
   "version": "0.1.0",
   "private": true,
+  "op-sqlite": {
+    "sqliteFlags": "-DSQLITE_ENABLE_MATH_FUNCTIONS=1"
+  },
   "scripts": {
     "start": "react-native start",
     "android": "react-native run-android",
