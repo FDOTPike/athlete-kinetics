@@ -13,9 +13,7 @@
  * react-native-blob-util. Any failure -> null -> policy-only mode with the
  * triage UI showing its inactive state; never a crash, never silent.
  */
-import ReactNativeBlobUtil from 'react-native-blob-util';
 import { Platform } from 'react-native';
-import { InferenceSession, Tensor } from 'onnxruntime-react-native';
 import {
   createMiniLmEmbedder,
   type Embedder,
@@ -29,27 +27,37 @@ import tokenizerJson from '../../../../packages/inference/assets/minilm/tokenize
 
 const MODEL_ASSET = 'minilm.onnx';
 
-/** Copy the bundled model out of the APK once; return its filesystem path. */
-async function ensureModelFile(): Promise<string> {
-  const dest = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${MODEL_ASSET}`;
-  if (await ReactNativeBlobUtil.fs.exists(dest)) return dest;
-  // 'bundle-assets://' resolves to android/app/src/main/assets on Android
-  // and the main bundle on iOS (where the model must be added as a resource).
-  await ReactNativeBlobUtil.fs.cp(ReactNativeBlobUtil.fs.asset(MODEL_ASSET), dest);
-  return dest;
-}
-
+/**
+ * Everything native is deferred-required INSIDE the try/catch, never imported
+ * at module level: onnxruntime-react-native runs `Module.install()` as an
+ * import side effect (and its Android install path uses the legacy-arch
+ * `getCatalystInstance()`, which cannot succeed under RN 0.81 bridgeless),
+ * and react-native-blob-util touches its native module on import too. A
+ * module-eval throw = instant crash on app open; a throw in here = null ->
+ * policy-only mode with the triage UI showing its inactive state.
+ */
 export async function tryCreateDeviceEmbedder(): Promise<Embedder | null> {
   if (Platform.OS !== 'android' && Platform.OS !== 'ios') return null;
   try {
-    const modelPath = await ensureModelFile();
-    const session = await InferenceSession.create(modelPath);
+    const ReactNativeBlobUtil =
+      (require('react-native-blob-util') as typeof import('react-native-blob-util')).default;
+    const { InferenceSession, Tensor } =
+      require('onnxruntime-react-native') as typeof import('onnxruntime-react-native');
+
+    // Copy the bundled model out of the APK once ('bundle-assets://' is the
+    // Android assets dir; on iOS the model must be a main-bundle resource).
+    const dest = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${MODEL_ASSET}`;
+    if (!(await ReactNativeBlobUtil.fs.exists(dest))) {
+      await ReactNativeBlobUtil.fs.cp(ReactNativeBlobUtil.fs.asset(MODEL_ASSET), dest);
+    }
+
+    const session = await InferenceSession.create(dest);
     return createMiniLmEmbedder({
       session: session as unknown as OrtSessionLike,
       Tensor: Tensor as unknown as OrtTensorCtor,
       tokenizer: tokenizerJson as TokenizerSpec,
     });
   } catch {
-    return null; // missing/corrupt model -> policy-only mode, never a crash
+    return null; // missing module/model, JSI install failure -> policy-only
   }
 }

@@ -26,7 +26,45 @@ const TABS: readonly { key: Tab; label: string }[] = [
   { key: 'coach', label: 'COACH' },
 ];
 
+/** Root boundary: a render-time throw becomes a readable screen with the
+ *  actual error message — release builds otherwise die silently. */
+interface BoundaryState {
+  error: Error | null;
+}
+class RootErrorBoundary extends React.Component<React.PropsWithChildren, BoundaryState> {
+  state: BoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): BoundaryState {
+    return { error };
+  }
+
+  render(): React.ReactNode {
+    if (this.state.error !== null) {
+      return (
+        <SafeAreaView style={styles.root}>
+          <View style={styles.crashBox}>
+            <Text style={styles.crashTitle}>APP ERROR</Text>
+            <Text style={styles.crashText}>{String(this.state.error.message)}</Text>
+            <Text style={styles.crashHint}>
+              Screenshot this and report it. Your data is untouched.
+            </Text>
+          </View>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App(): React.JSX.Element {
+  return (
+    <RootErrorBoundary>
+      <AppShell />
+    </RootErrorBoundary>
+  );
+}
+
+function AppShell(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('readiness');
   const boot = useStore((s) => s.boot);
 
@@ -89,4 +127,8 @@ const styles = StyleSheet.create({
   tabTextActive: { color: palette.green },
   tabIndicator: { height: 3, width: 36, borderRadius: 2, backgroundColor: 'transparent' },
   tabIndicatorActive: { backgroundColor: palette.green },
+  crashBox: { flex: 1, justifyContent: 'center', padding: 28, gap: 12 },
+  crashTitle: { color: palette.red, fontSize: 22, fontWeight: '800', letterSpacing: 3 },
+  crashText: { color: palette.text, fontSize: 15, lineHeight: 21 },
+  crashHint: { color: palette.dim, fontSize: 13, lineHeight: 19 },
 });

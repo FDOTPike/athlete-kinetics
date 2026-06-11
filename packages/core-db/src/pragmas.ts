@@ -5,7 +5,7 @@
  * the DB must stay fast WITHOUT competing with SLM weight pages for the OS
  * page cache (verified budget: <= 50 MB for the entire SQLite layer).
  */
-import { open, type DB } from '@op-engineering/op-sqlite';
+import type { DB } from '@op-engineering/op-sqlite';
 
 export const DB_NAME = 'athlete_kinetics.db';
 
@@ -33,6 +33,13 @@ const BOOT_PRAGMAS: readonly string[] = [
 ];
 
 export function openKineticsDb(): DB {
+  // Deferred require, NOT a top-level import: op-sqlite installs its JSI
+  // bindings as an import side effect and THROWS on failure. At module-eval
+  // time that's an uncaught exception during bundle init — an instant
+  // crash-on-open with no UI. Deferring into this call site moves any
+  // failure inside the caller's try/catch (boot() renders it as a readable
+  // DB BOOT FAILED screen instead).
+  const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
   const db = open({ name: DB_NAME });
   for (const pragma of BOOT_PRAGMAS) db.executeSync(pragma);
   return db;

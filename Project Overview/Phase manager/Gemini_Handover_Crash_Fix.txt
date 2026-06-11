@@ -1,0 +1,26 @@
+# Gemini Handover — Crash Fix (boot crash, APK r6)
+
+**Root Cause / Current State:**
+Crash-on-open caused by native-module initialization executed at JS module-evaluation time (bundle init), i.e. before any try/catch or React error boundary can exist. Three import-time initializers sat in the boot chain:
+1. `@op-engineering/op-sqlite` (`src/functions.ts`): top-level `NativeModules.OPSQLite.install()` with explicit `throw new Error(...)` on null module / failed JSI install / missing `global.__OPSQLiteProxy`. Reached via `App.tsx -> useStore.ts -> @ak/core-db pragmas.ts` static import.
+2. `onnxruntime-react-native@1.24.3` (`lib/binding.ts`): top-level side effect `Module.install()`; TypeError if `NativeModules.Onnxruntime` is null. Additionally its Android `OnnxruntimeModule.install()` calls `getReactApplicationContext().getCatalystInstance().getJSCallInvokerHolder()` — a legacy-architecture API unavailable under RN 0.81 bridgeless (`newArchEnabled=true` in `apps/mobile/android/gradle.properties`), so its JSI install cannot succeed on this build regardless; failure mode is contained (returns false -> throwing Proxy) only if the NativeModules lookup itself succeeds.
+3. `react-native-blob-util@0.24.9`: native-module access on import (same class of hazard).
+Exact culprit on-device not yet confirmed by logcat; all three are eliminated as crash vectors by the fix below. Exclusions: closed PR `copilot/optimize-fable-5-performance` was never merged (`master` == APK commit 5d71f0f); JS-bundle content verified complete (schema SQL, policy, codebase, vectors, tokenizer present in 1.7 MB Hermes-input bundle).
+
+**Changes Made:**
+- `packages/core-db/src/pragmas.ts`: op-sqlite import converted to type-only; runtime `require()` deferred into `openKineticsDb()` body. Install failures now surface inside `boot()`'s existing try/catch as the DB BOOT FAILED screen (visible message), not a process kill.
+- `apps/mobile/src/inference/deviceEmbedder.ts`: `onnxruntime-react-native` and `react-native-blob-util` imports converted to deferred `require()` inside `tryCreateDeviceEmbedder()`'s try/catch; any module/JSI/model failure -> `null` -> policy-only mode (triage UI shows inactive state). No native code runs at module-eval anywhere in the app now except RN core.
+- `apps/mobile/src/App.tsx`: added `RootErrorBoundary` (class component, `getDerivedStateFromError`) rendering APP ERROR + `error.message` + screenshot instruction; covers render-time throws in release.
+- Verification: typecheck 0 errors; Metro release bundle builds; full 8-gate `verify:all` green. Commit pushed -> CI rebuilds APK artifact.
+
+**Next Phase Objective:**
+Do NOT start Phase 8. Required sequence:
+1. Wait for CI green on the fix commit; download fresh `athlete-kinetics-apk` artifact (repo -> Actions -> newest run).
+2. Uninstall old build, install new APK, reopen.
+3. Expected outcomes: (a) app boots to dashboard -> proceed with Phase manager step-4 smoke checklist; (b) DB BOOT FAILED screen -> op-sqlite JSI is the root cause; screenshot message, escalate (likely arch/JSI config); (c) boots but COACH triage shows inactive state -> ORT bridgeless incompatibility confirmed; remediation options: pin/upgrade onnxruntime-react-native to a bridgeless-compatible release, or set `newArchEnabled=false` (verify op-sqlite version compatibility first — recent majors are new-arch-first).
+4. If the app STILL closes instantly: plug phone in with USB debugging enabled and run exactly:
+   `adb logcat -b crash,main -d AndroidRuntime:E ReactNativeJS:E ReactNative:E *:S > crash.txt`
+   immediately after reproducing the crash; provide crash.txt.
+
+**Architectural Constraints:**
+Local SQLite (op-sqlite, WAL) only; deterministic policy engine is the sole numeric authority; Vector-Heuristic triage (MiniLM embeddings + cosine + hardcoded conservative guardrails), no generative LLMs; zero cloud/API at runtime; subjective reports may only make sessions more conservative; every change lands only with `npm run verify:all` (8 gates) green; CI is the build machine (no local Android toolchain), physical device is the test bench.
