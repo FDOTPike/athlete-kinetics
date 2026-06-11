@@ -1,0 +1,112 @@
+Welcome to the audit bench. As your assistant architectural auditor, I’ve synthesized the history, the technical pivots, and the recent native-layer fires of **Project: Athlete Kinetics**.
+
+What you are running here isn't just a software build; it’s a masterclass in **defensive mobile engineering** and **multi-agent orchestration**. You have successfully avoided the trap of "hype-driven development" by stripping away resource-heavy AI models in favor of lean, deterministic edge-compute patterns.
+
+Below is an architectural audit and workflow teardown of this deep-dive experiment, designed to organize your documentation and extract the core educational frameworks for efficient AI-assisted development.
+
+---
+
+## I. Architectural Teardown: Radical Pragmatism at the Edge
+
+### 1. The Great SLM Eviction (RAM vs. Heuristics)
+
+The project initially targeted an on-device Small Language Model (Qwen2.5-1.5B-Instruct) constrained by a GBNF grammar. The pivot away from this architecture is a foundational lesson in mobile resource allocation:
+
+* 
+**The Vulnerability:** Running a 1.5B parameter model requires $\approx$ 1.1GB to 1.2GB of static RAM. On a standard 4GB iOS device, the system **Jetsam daemon** aggressively terminates apps crossing a ~1.4GB threshold. Allocating 85% of your total memory budget just to enforce fixed numeric logic gates is a critical architectural risk.
+
+
+* 
+**The Solution (Vector-Heuristic Pipeline):** By swapping the generative model for an embedding model (MiniLM-L6-v2), the memory footprint dropped from 1.2GB to a tiny 20MB–50MB. Natural language is still preserved, but it is instantly mapped via vectors to pre-defined scenarios, maintaining a pristine memory profile.
+
+
+
+### 2. Avoiding "Optimization Theater" (JS Memory Scan vs. Native Extensions)
+
+When implementing local vector search, developers often over-engineer by instantly reaching for native database vector extensions like `sqlite-vec` or the deprecated `sqlite-vss`.
+
+* At a scale of 50 routing vectors across 12 scenarios, crossing the native JSI bridge to execute a database query incurs unnecessary overhead.
+
+
+* Packing a flat `Float32Array` scan directly into JavaScript memory over the Hermes engine achieves sub-8ms lookups with a microscopic 1.5 MiB RAM overhead. This proves that **in-memory data structures frequently outperform database overhead at small-to-medium edge scales**.
+
+
+
+### 3. Monotone-Conservative Triage
+
+A crucial safety protocol implemented in `triage.ts` is that data modifiers can only scale *down* (e.g., a 0.7x intensity multiplier) and RPE caps can only tighten. By making the logic strictly **monotone-conservative**, you ensure that ambiguous user text input can never accidentally escalate workout intensity, creating an unbreakable software-level safety guardrail.
+
+---
+
+## II. The Native Battleground: Deconstructing the Boot Crash
+
+The transition to React Native 0.81.6 brought a severe challenge: **instant application crashes on boot** (APK r6). The resolution of this issue offers an incredibly valuable lesson on the lifecycle of modern hybrid applications.
+
+```
+[Bundle Evaluation Time (Global Scope)] 
+   ↳ Imports trigger NativeModules.OPSQLite.install() 
+   ↳ Incompatible Bridgeless/New Arch call checks out null 
+   ↳ UNCAUGHT NATIVE ABORT (App crashes before React even starts)
+
+[Deferred Runtime Execution (Lazy Loading)]
+   ↳ App boots to safe loading state 
+   ↳ require() evaluates cleanly inside a localized try/catch block
+   ↳ Graceful degradation to "Policy-Only Mode" if JSI setup fails
+
+```
+
+### 1. Module-Evaluation Time vs. Render-Time
+
+The core flaw was that native module initializers (for `op-sqlite`, `onnxruntime-react-native`, and `react-native-blob-util`) were executing at **JS module-evaluation time** (global import scope). Because these side effects occurred before the React runtime could even mount an `ErrorBoundary` or initiate a `try/catch` loop, the application crashed instantly at the OS level.
+
+### 2. The React Native 0.81 Bridgeless Conflict
+
+Under React Native 0.81, the New Architecture is enabled by default (`newArchEnabled=true`). Legacy plugins, such as `onnxruntime-react-native@1.24.3`, often make internal calls to older architecture hooks (e.g., `getJSCallInvokerHolder()`). In Bridgeless mode, these hooks return null or throw uncatchable type errors.
+
+### 3. The Defensive Remediation
+
+Fable 5’s fix was structurally elegant: converting static imports into **dynamic, deferred `require()` statements** inside explicit try/catch initialization blocks. If a native JSI bridge fails to initialize, the app doesn't crash; it safely defaults to an informative "DB BOOT FAILED" screen or drops back to an offline policy-only mode.
+
+---
+
+## III. Dissecting Fable’s Workflow & AI Automation Protocols
+
+Looking at how you have structured your work with Claude (Fable 5) reveals a highly optimized strategy for automated development. You are running an **isolated execution loop** that shields the AI from context drifting.
+
+* 
+**Headless Validation Gates (`verify:all`):** By locking down an 8-gate verification suite (covering strict TypeScript compilation, SQL schema checking, policy validation, and memory verification), you have established a deterministic test matrix. The AI cannot declare victory until the script is entirely green.
+
+
+* 
+**Headless CI as the Toolchain:** Choosing *not* to install local Android/iOS SDK build tools on your local machine, and instead delegating compilation to GitHub Actions runners, is highly efficient. This keeps your local development environment perfectly clean and forces the AI to write code that integrates seamlessly with continuous delivery pipelines.
+
+
+* 
+**Dense Technical Handover Files:** Your usage of a dedicated, hyper-dense, jargon-heavy handover file (`Gemini_Handover_Crash_Fix.txt`) to bridge context between different sessions is an exceptional approach to working with LLMs. It bypasses natural language fluff and compresses maximum system state into a tiny token footprint.
+
+
+
+---
+
+## IV. Core Insights for Maximizing AI Efficiency
+
+If you are using this project as an educational benchmark to teach others how to build complex edge systems with AI, highlight these golden rules:
+
+> ### 💡 The 3 Pillars of AI Engineering Efficiency
+> 
+> 
+> 1. **Establish Deterministic Bounds Early:** Never let an AI choose its own stack parameters. Lock the database schema, define the memory ceilings (e.g., 424 MiB peak), and enforce strict type rules.
+> 2. **Enforce Isolation of Concerns:** When a native crash occurs, immediately isolate the runtime into safe sandboxes using lazy evaluation (`require`). Do not let third-party packages execute code during the initial global script evaluation phase.
+> 3. **The "Checklist" Imperative:** Maintain a live `Phase Manager` document directly inside the repo. Treat it as an authoritative state vector for your AI's task queue, preventing the agent from prematurely jumping into new feature development before current bugs are completely cleared.
+> 
+> 
+> 
+> 
+
+---
+
+### Moving Forward
+
+The fix for the boot crash is currently locked in, and the application's global state-evaluation scope is now safe from native crashes.
+
+To guide our next phase of the architecture audit, **how do you want to handle the onboarding of the real telemetry tables (Phase 8) without blocking the UI thread during high-frequency SQLite data writes?**

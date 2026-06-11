@@ -1,0 +1,778 @@
+﻿--------- beginning of crash
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: Process: com.athletekinetics, PID: 16803
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: anonymous@1:1130008
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: anonymous@1:1126952
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: anonymous@1:1126024
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: anonymous@1:707679
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: anonymous@1:178912
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 09:40:09.496 16803 16828 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: Process: com.athletekinetics, PID: 16850
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: anonymous@1:1130008
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: anonymous@1:1126952
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: anonymous@1:1126024
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: anonymous@1:707679
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: anonymous@1:178912
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 09:40:10.702 16850 16873 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: Process: com.athletekinetics, PID: 16895
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: anonymous@1:1130008
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: anonymous@1:1126952
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: anonymous@1:1126024
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: metroRequire@1:18093
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: anonymous@1:707679
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: anonymous@1:178912
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 09:40:13.124 16895 16919 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: Process: com.athletekinetics, PID: 17444
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: anonymous@1:1130008
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: metroRequire@1:18093
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: anonymous@1:1126952
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: metroRequire@1:18093
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: anonymous@1:1126024
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: metroRequire@1:18093
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: anonymous@1:707679
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: anonymous@1:178912
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 09:41:35.326 17444 17468 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: Process: com.athletekinetics, PID: 22920
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: anonymous@1:1130008
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: metroRequire@1:18093
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: anonymous@1:1126952
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: metroRequire@1:18093
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: anonymous@1:1126024
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: metroRequire@1:18093
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: anonymous@1:707679
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: anonymous@1:178912
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 10:22:00.948 22920 22944 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: Process: com.athletekinetics, PID: 22961
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: anonymous@1:1130008
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: metroRequire@1:18093
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: anonymous@1:1126952
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: metroRequire@1:18093
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: anonymous@1:1126024
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: metroRequire@1:18093
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: anonymous@1:707679
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: anonymous@1:178912
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 10:22:02.115 22961 22985 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: Process: com.athletekinetics, PID: 23432
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: anonymous@1:1130008
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: metroRequire@1:18093
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: anonymous@1:1126952
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: metroRequire@1:18093
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: anonymous@1:1126024
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: metroRequire@1:18093
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: anonymous@1:707679
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: anonymous@1:178912
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 10:23:58.849 23432 23455 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: Process: com.athletekinetics, PID: 23470
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: anonymous@1:1130008
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: metroRequire@1:18093
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: anonymous@1:1126952
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: metroRequire@1:18093
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: anonymous@1:1126024
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: metroRequire@1:18093
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: anonymous@1:707679
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: anonymous@1:178912
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 10:23:59.971 23470 23495 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: Process: com.athletekinetics, PID: 24013
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: anonymous@1:1130008
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: metroRequire@1:18093
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: anonymous@1:1126952
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: metroRequire@1:18093
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: anonymous@1:1126024
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: metroRequire@1:18093
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: anonymous@1:707679
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: anonymous@1:178912
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 10:24:22.675 24013 24037 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: Process: com.athletekinetics, PID: 24052
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: anonymous@1:1130008
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: metroRequire@1:18093
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: anonymous@1:1126952
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: metroRequire@1:18093
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: anonymous@1:1126024
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: metroRequire@1:18093
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: anonymous@1:707679
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: commitHookEffectListMount@1:163952
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: commitPassiveMountOnFiber@1:170851
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: commitPassiveMountOnFiber@1:170823
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: commitPassiveMountOnFiber@1:170881
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169965
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: commitPassiveMountOnFiber@1:170651
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: flushPassiveEffects@1:180251
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: anonymous@1:178912
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 10:24:23.786 24052 24075 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+--------- beginning of main
+06-11 10:42:43.764  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:42:43.764  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:42:45.712  1005  3293 E WifiHAL : wifi_reset_tx_power_scenario
+06-11 10:42:46.956  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 106 ms
+06-11 10:42:46.957  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:42:50.149  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 111 ms
+06-11 10:42:50.150  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:42:53.342  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 106 ms
+06-11 10:42:53.342  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:42:56.535  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 106 ms
+06-11 10:42:56.536  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:42:59.725  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:42:59.725  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:02.908  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:43:02.909  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:06.106  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 109 ms
+06-11 10:43:06.107  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:09.203  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 108 ms
+06-11 10:43:09.204  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:09.328  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:43:09.330  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:11.041  2544  2544 E TelephonyConfigUpdateInstallReceiver: Failed to read current content : /data/misc/telephonyconfig/valid_telephony_config.pb
+06-11 10:43:11.042  2544  2544 E TelephonyConfigUpdateInstallReceiver: Failed to read current content : /data/misc/telephonyconfig/valid_telephony_config.pb
+06-11 10:43:11.329  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:11.342  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 130 ms
+06-11 10:43:11.663  2668  5443 E ndroid.settings: Can't find memory status under: /sys/block/zram0/
+06-11 10:43:12.515  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:43:12.516  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:12.616  2544  2544 E TelephonyConfigUpdateInstallReceiver: Failed to read current content : /data/misc/telephonyconfig/valid_telephony_config.pb
+06-11 10:43:12.617  2544  2544 E TelephonyConfigUpdateInstallReceiver: Failed to read current content : /data/misc/telephonyconfig/valid_telephony_config.pb
+06-11 10:43:12.759  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:12.771  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 111 ms
+06-11 10:43:15.725  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 111 ms
+06-11 10:43:15.725  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:18.906  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 104 ms
+06-11 10:43:18.906  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:22.094  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 105 ms
+06-11 10:43:22.094  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:23.497  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 110 ms
+06-11 10:43:23.497  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:25.285  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 109 ms
+06-11 10:43:25.286  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:28.472  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 105 ms
+06-11 10:43:28.473  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:28.514  1005  3293 E WifiHAL : wifi_select_tx_power_scenario
+06-11 10:43:31.665  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:31.676  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:43:31.860  2799 28517 E m55.rjk : *~*~*~ Previous channel {0} was garbage collected without being shut down! ~*~*~*
+06-11 10:43:31.860  2799 28517 E m55.rjk :     Make sure to call shutdown()/shutdownNow()
+06-11 10:43:31.860  2799 28517 E m55.rjk : java.lang.RuntimeException: ManagedChannel allocation site
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.rjj.<init>(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):21)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.rjk.<init>(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):10)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.qtt.a(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):322)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.iln.a(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):159)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.ncx.a(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):200)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.kte.a(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):13)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.mse.a(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):3)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.mrh.run(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):19)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.msg.run(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):5)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.akv.c(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):50)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at m55.akv.run(:com.google.android.gms.optional_play_cloud_search@262031017@26.20.31 (100000-0):73)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at bkvz.run(:com.google.android.gms@262031035@26.20.31 (260400-919905943):8)
+06-11 10:43:31.860  2799 28517 E m55.rjk : 	at java.lang.Thread.run(Thread.java:1572)
+06-11 10:43:34.837  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 108 ms
+06-11 10:43:34.837  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:38.026  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 111 ms
+06-11 10:43:38.027  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:41.205  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:44.360  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:47.199 19027 22718 E qzh     : Trace finish timed out after 1325751 ms. Complete trace: # qzu@e5443217
+06-11 10:43:47.199 19027 22718 E qzh     : raa: 
+06-11 10:43:47.199 19027 22718 E qzh     : 	at tk_trace.SubscriptionCallbacks.onNewData(Started After:1)
+06-11 10:43:47.199 19027 22718 E qzh     : 	at tk_trace.onPostResume(Started After:0)
+06-11 10:43:47.199 19027 22718 E qzh     : 	at tk_trace.finish(Started After:0)
+06-11 10:43:47.547  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 114 ms
+06-11 10:43:47.548  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:47.686  1498 28714 E FileSystemUtils: fallocate failed to punch hole: Operation not supported on transport endpoint
+06-11 10:43:47.686  1498 28714 E FileSystemUtils: fallocate failed to punch hole: Operation not supported on transport endpoint
+06-11 10:43:47.687  1498 28714 E FileSystemUtils: fallocate failed to punch hole: Operation not supported on transport endpoint
+06-11 10:43:47.687  1498 28714 E FileSystemUtils: fallocate failed to punch hole: Operation not supported on transport endpoint
+06-11 10:43:47.688  1498 28714 E FileSystemUtils: fallocate failed to punch hole: Operation not supported on transport endpoint
+06-11 10:43:47.688  1498 28714 E FileSystemUtils: fallocate failed to punch hole: Operation not supported on transport endpoint
+06-11 10:43:47.689  1498 28714 E FileSystemUtils: fallocate failed to punch hole: Operation not supported on transport endpoint
+06-11 10:43:47.705   685  2283 E powerhal-libperfmgr: Error: shouldn't report duration during pause state.
+06-11 10:43:47.939  6434 28699 E AbstractLogEventBuilder: The provided ProductIdOrigin 3 is not one of the process-level expected values: 1 or 2
+06-11 10:43:48.228  6434  6796 E AbstractLogEventBuilder: The provided ProductIdOrigin 3 is not one of the process-level expected values: 1 or 2
+06-11 10:43:49.374  6434  6434 E AbstractLogEventBuilder: The provided ProductIdOrigin 3 is not one of the process-level expected values: 1 or 2
+06-11 10:43:49.748  6434  6796 E Finsky  : [56] Gil log event does not have a valid logging context key.
+06-11 10:43:50.723  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:50.737  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 120 ms
+06-11 10:43:53.192  6434  6795 E Finsky  : [55] Gil log event does not have a valid logging context key.
+06-11 10:43:53.709  6434  6757 E Finsky  : [54] Gil log event does not have a valid logging context key.
+06-11 10:43:53.906  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:43:53.914  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 114 ms
+06-11 10:43:54.941  1169  2325 E MetadataRetrieverClient: offset (0) bigger than file size (0)
+06-11 10:43:54.973  1169  2325 E MetadataRetrieverClient: offset (0) bigger than file size (0)
+06-11 10:43:55.013  1169  2325 E MetadataRetrieverClient: offset (0) bigger than file size (0)
+06-11 10:43:57.008  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:00.091  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:03.178  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:03.938  3394  3527 E TraceManagerImpl: Trace api_call timed out after 1199224 ms. Complete trace: # nus@e7a61097
+06-11 10:44:03.938  3394  3527 E TraceManagerImpl: nux: 
+06-11 10:44:03.938  3394  3527 E TraceManagerImpl: 	at tk_trace.AppUsageEvents getUsage(Started After:0)
+06-11 10:44:03.938  3394  3527 E TraceManagerImpl: 	at tk_trace.AppUsageServiceImpl.getUsageUncached()(Started After:0)
+06-11 10:44:03.938  3394  3527 E TraceManagerImpl: 	at tk_trace.AppUsageServiceImpl.getUsage()(Started After:0)
+06-11 10:44:03.938  3394  3527 E TraceManagerImpl: 	at tk_trace.api_call(Started After:0)
+06-11 10:44:03.938  3394  3526 E TraceManagerImpl: Trace api_call timed out after 1178846 ms. Complete trace: # nus@cf318d20
+06-11 10:44:03.938  3394  3526 E TraceManagerImpl: nux: 
+06-11 10:44:03.938  3394  3526 E TraceManagerImpl: 	at tk_trace.AppUsageEvents getUsage(Started After:0)
+06-11 10:44:03.938  3394  3526 E TraceManagerImpl: 	at tk_trace.AppUsageServiceImpl.getUsageUncached()(Started After:0)
+06-11 10:44:03.938  3394  3526 E TraceManagerImpl: 	at tk_trace.AppUsageServiceImpl.getUsage()(Started After:0)
+06-11 10:44:03.938  3394  3526 E TraceManagerImpl: 	at tk_trace.api_call(Started After:0)
+06-11 10:44:03.940  3394  3521 E TraceManagerImpl: Trace Broadcast to com.google.android.apps.wellbeing.common.receiver.coalescedreceivers.PackageFullyRemovedCoalescedBroadcast_Receiver android.intent.action.PACKAGE_FULLY_REMOVED timed out after 1195891 ms. Complete trace: # nus@cb32deee
+06-11 10:44:03.940  3394  3521 E TraceManagerImpl: nux: 
+06-11 10:44:03.940  3394  3521 E TraceManagerImpl: 	at tk_trace.UPDATE WHERE package_name=?(Started After:1)
+06-11 10:44:03.940  3394  3521 E TraceManagerImpl: 	at tk_trace.Transaction(Started After:1)
+06-11 10:44:03.940  3394  3521 E TraceManagerImpl: 	at tk_trace.Processing on the broadcast queue workerId PACKAGE_FULLY_REMOVED_COALESCED_BROADCAST_WORKER_ID(Started After:0)
+06-11 10:44:03.940  3394  3521 E TraceManagerImpl: 	at tk_trace.handleBroadcast(Started After:0)
+06-11 10:44:03.940  3394  3521 E TraceManagerImpl: 	at tk_trace.Broadcast to com.google.android.apps.wellbeing.common.receiver.coalescedreceivers.PackageFullyRemovedCoalescedBroadcast_Receiver android.intent.action.PACKAGE_FULLY_REMOVED(Started After:0)
+06-11 10:44:03.941  3394  3440 E TraceManagerImpl: Trace Broadcast to com.google.android.apps.wellbeing.common.receiver.coalescedreceivers.PackageFullyRemovedCoalescedBroadcast_Receiver android.intent.action.PACKAGE_FULLY_REMOVED timed out after 1171538 ms. Complete trace: # nus@5f07de65
+06-11 10:44:03.941  3394  3440 E TraceManagerImpl: nux: 
+06-11 10:44:03.941  3394  3440 E TraceManagerImpl: 	at tk_trace.execSQL: REPLACE INTO auxiliary_app_data(package_id,storage_id,data) VALUES (?, ?, ?)(Started After:1)
+06-11 10:44:03.941  3394  3440 E TraceManagerImpl: 	at tk_trace.Transaction(Started After:1)
+06-11 10:44:03.941  3394  3440 E TraceManagerImpl: 	at tk_trace.Processing on the broadcast queue workerId PACKAGE_FULLY_REMOVED_COALESCED_BROADCAST_WORKER_ID(Started After:0)
+06-11 10:44:03.941  3394  3440 E TraceManagerImpl: 	at tk_trace.handleBroadcast(Started After:0)
+06-11 10:44:03.941  3394  3440 E TraceManagerImpl: 	at tk_trace.Broadcast to com.google.android.apps.wellbeing.common.receiver.coalescedreceivers.PackageFullyRemovedCoalescedBroadcast_Receiver android.intent.action.PACKAGE_FULLY_REMOVED(Started After:0)
+06-11 10:44:06.324  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:44:06.324  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:09.502  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:11.115  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 116 ms
+06-11 10:44:11.115  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:11.182  2835  2845 E IpSecManager: Failed to close SecurityParameterIndex{spi=129172224,resourceId=-1}, Exception=java.lang.IllegalArgumentException: No such SpiRecord found for given id: -1
+06-11 10:44:11.183  2835  2845 E IpSecManager: Failed to close SecurityParameterIndex{spi=169341164,resourceId=-1}, Exception=java.lang.IllegalArgumentException: No such SpiRecord found for given id: -1
+06-11 10:44:11.184  2835  2845 E IpSecManager: Failed to close SecurityParameterIndex{spi=1184346875,resourceId=-1}, Exception=java.lang.IllegalArgumentException: No such SpiRecord found for given id: -1
+06-11 10:44:11.185  2835  2845 E IpSecManager: Failed to close SecurityParameterIndex{spi=1031514543,resourceId=-1}, Exception=java.lang.IllegalArgumentException: No such SpiRecord found for given id: -1
+06-11 10:44:11.186  2835  2845 E IpSecManager: Failed to close UdpEncapsulationSocket{port=35444,resourceId=-1}, Exception=java.lang.IllegalArgumentException: No such EncapSocketRecord found for given id: -1
+06-11 10:44:11.189  2835  2845 E IpSecManager: Failed to close IpSecTunnelInterface{ifname=ipsec65,resourceId=-1}, Exception=java.lang.IllegalArgumentException: No such TunnelInterfaceRecord found for given id: -1
+06-11 10:44:12.669  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:13.198  6434  6757 E Finsky  : [54] Gil log event does not have a valid logging context key.
+06-11 10:44:14.947  6434  6796 E Finsky  : [56] Gil log event does not have a valid logging context key.
+06-11 10:44:14.988  6434  6434 E AbstractLogEventBuilder: The provided ProductIdOrigin 3 is not one of the process-level expected values: 1 or 2
+06-11 10:44:14.989  6434  6434 E AbstractLogEventBuilder: The provided ProductIdOrigin 3 is not one of the process-level expected values: 1 or 2
+06-11 10:44:15.026   685  2283 E powerhal-libperfmgr: Error: shouldn't report duration during pause state.
+06-11 10:44:15.044  6434 28699 E AbstractLogEventBuilder: The provided ProductIdOrigin 3 is not one of the process-level expected values: 1 or 2
+06-11 10:44:15.579  6434  6795 E Finsky  : [55] Gil log event does not have a valid logging context key.
+06-11 10:44:15.806  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:15.817  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 105 ms
+06-11 10:44:16.299  1498  3528 E RoleControllerServiceImpl: Default/fallback role holder package doesn't qualify for the role, package: com.google.android.retaildemo, role: android.app.role.RETAIL_DEMO, user: 0
+06-11 10:44:16.300  1498  3528 E RoleControllerServiceImpl: Default/fallback role holder package doesn't qualify for the role, package: com.google.android.gms.supervision, role: android.app.role.SYSTEM_SUPERVISION, user: 0
+06-11 10:44:16.337  1498  3528 E RoleControllerServiceImpl: Default/fallback role holder package doesn't qualify for the role, package: com.google.android.gms, role: android.app.role.SYSTEM_DEPENDENCY_INSTALLER, user: 0
+06-11 10:44:16.372  6434  6796 E Finsky  : [56] [Counters] attempted to use a non-positive increment for: 4752
+06-11 10:44:16.389  6434  6796 E Finsky  : [56] [Counters] attempted to use a non-positive increment for: 4753
+06-11 10:44:16.394  1498  3528 E ApduServiceInfo: Not adding <aid-group> with empty or invalid AIDs
+06-11 10:44:16.493  6434  6757 E Finsky  : [54] [Counters] attempted to use a non-positive increment for: 4752
+06-11 10:44:16.495  6434  6757 E Finsky  : [54] [Counters] attempted to use a non-positive increment for: 4752
+06-11 10:44:16.497  6434  6757 E Finsky  : [54] [Counters] attempted to use a non-positive increment for: 4753
+06-11 10:44:16.498  6434  6757 E Finsky  : [54] [Counters] attempted to use a non-positive increment for: 4753
+06-11 10:44:16.503  6434  6803 E Finsky  : [59] [Counters] attempted to use a non-positive increment for: 4752
+06-11 10:44:16.511  6434  6757 E Finsky  : [54] [Counters] attempted to use a non-positive increment for: 4753
+06-11 10:44:16.931  5617  5782 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.932  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.932  5617  5782 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.932  5617  5782 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.932  5617  5782 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.932  5617  5782 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.933  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.934  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.934  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.934  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.934  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.939  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.942  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.942  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:16.942  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.068  5617  5755 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.087  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.091  5617  5789 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.097  5617  5802 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.099  5617  5789 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.099  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.099  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.099  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.099  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.099  5617  5789 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.099  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.099  5617  5789 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.100  5617  5789 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.103  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.104  5617  5802 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.104  5617  5802 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.104  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.104  5617  5802 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.105  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.105  5617  5802 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.105  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.105  5617  5798 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.105  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.105  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.105  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.105  5617  5780 E exgc    : (REDACTED) Unrecognized recognizer for [%s, %d]: %d. Ignoring it and its associated features.
+06-11 10:44:17.674  6434  6434 E Finsky  : [2] Failed to load an Item com.android.vending, missing shared fields: [4], missing type-specific fields: [0, 0, 0, 0, 0, 0, 0, 0, 64]
+06-11 10:44:17.674  6434  6434 E Finsky  : [2] Failed to load an Item com.microsoft.office.officelens, no data available.
+06-11 10:44:17.677  6434  6434 E Finsky  : [2] Required items [com.android.vending, com.microsoft.office.officelens]
+06-11 10:44:17.678  6434  6434 E Finsky  : [2] Requested items [[com.android.vending, com.microsoft.office.officelens]]
+06-11 10:44:17.678  6434  6434 E Finsky  : [2] Retrieved items []
+06-11 10:44:18.978  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 102 ms
+06-11 10:44:18.978  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:19.187  6434  6803 E AbstractLogEventBuilder: The provided ProductIdOrigin 3 is not one of the process-level expected values: 1 or 2
+06-11 10:44:19.187  6434 28717 E AbstractLogEventBuilder: The provided ProductIdOrigin 3 is not one of the process-level expected values: 1 or 2
+06-11 10:44:21.114 28844 28867 E ReactNativeJS: [TypeError: Cannot read property 'getConstants' of null]
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: Process: com.athletekinetics, PID: 28844
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: com.facebook.react.common.JavascriptException: TypeError: Cannot read property 'getConstants' of null, stack:
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: anonymous@1:1131029
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: guardedLoadModule@1:18497
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: metroRequire@1:18093
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: anonymous@1:1127973
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: loadModuleImplementation@1:18973
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: guardedLoadModule@1:18454
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: metroRequire@1:18093
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: ?anon_0_@1:1127329
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: asyncGeneratorStep@1:579252
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: _next@1:579509
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: anonymous@1:579461
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: anonymous@1:579382
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: _tryCreateDeviceEmbedder@1:1127274
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: tryCreateDeviceEmbedder@1:1127222
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: anonymous@1:708286
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitHookEffectListMount@1:163951
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170850
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169964
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170794
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169964
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170822
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169964
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170880
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169964
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170822
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169964
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170880
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169964
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170822
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169964
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170880
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: recursivelyTraversePassiveMountEffects@1:169964
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: commitPassiveMountOnFiber@1:170650
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: flushPassiveEffects@1:180250
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: anonymous@1:178911
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(MessageQueueThreadImpl.kt:0)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+06-11 10:44:21.123 28844 28868 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1572)
+06-11 10:44:21.143  1498  2037 E InputDispatcher: channel 'cbd4c4c com.athletekinetics/com.athletekinetics.MainActivity' ~ Channel is unrecoverably broken and will be disposed!
+06-11 10:44:21.516  1498  1540 E libbinder.IPCThreadState: Binder transaction failure. id: 2099267, cmd: BR_DEAD_REPLY (29189), error: -22 (Invalid argument)
+06-11 10:44:21.554   513   513 E BpTransactionCompletedListener: Failed to transact (-32)
+06-11 10:44:22.163  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:22.175  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 114 ms
+06-11 10:44:25.347  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:44:25.348  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:27.117  5617  5780 E ffcc    : (REDACTED) Trace %s timed out after %d ms. Complete trace: %s
+06-11 10:44:27.117  5617  5780 E ffcc    : ffdl: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 	at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerService/Session-server(Started After:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	at tk_trace.PropagatingContext(Started After:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerService/Session(Started After:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.GET_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.GET_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.GET_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.GET_FILE_GROUP_START(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.GET_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.GET_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.ADD_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.ADD_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.ADD_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.ADD_FILE_GROUP_FINISHED(unfinished)(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.PropagatingContext 121 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.com.google.android.libraries.search.soda.services.AccountScopedSodaResourceManagerServiceSession 7 ms(Unknown Source:0)
+06-11 10:44:27.117  5617  5780 E ffcc    : 	Suppressed: ffdk: 
+06-11 10:44:27.117  5617  5780 E ffcc    : 		at tk_trace.Suppressed exceptions exceeds the limit 10, additional unfinished spans will not be reported(Unknown Source:0)
+06-11 10:44:28.526  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:28.532  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 110 ms
+06-11 10:44:31.675  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 110 ms
+06-11 10:44:31.675  1005  3293 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:34.865  1005  3293 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:44:34.865  1005  1005 E WifiHAL : Creating message to get cached scan results
+06-11 10:44:38.055  1005  1005 E libbinder.IPCThreadState: binder thread pool (1 threads) starved for 107 ms
+06-11 10:44:38.055  1005  3293 E WifiHAL : Creating message to get cached scan results
