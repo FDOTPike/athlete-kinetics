@@ -1,0 +1,57 @@
+# Gemini Handover — Phase 8 (profiles, triage override, session UI)
+
+**Root Cause / Current State:**
+Prior session resolved: on-device smoke test PASSED on the migration-runner
+build (boot -> demo athlete -> dashboard -> logging -> triage all functional).
+Phase 8 mandate (update.txt) implemented in full this session. The
+prescription pipeline is now three deterministic, monotone-conservative
+layers: evaluatePolicy(state_vector) -> applyProfileLimits(user_profile,
+{sessionsToday, trainedDaysLast7}) -> most-conservative persisted
+subjective_report guardrail for today. The operative prescription is a pure
+derivation from persisted state recomputed on boot — guardrail halts survive
+app restart; profile edits can never resurrect a damped prescription.
+
+**Changes Made:**
+- 006_user_profile.sql: single-row STRICT, 10 PT categories, CHECK-constrained
+  (incl. json_valid on injury/mobility JSON), idempotent; wired to runner
+  SENTINELS + all schema verifiers.
+- packages/inference: types.ts (UserProfile + enum tables + DEFAULT_PROFILE);
+  profileLimits.ts (base_rpe_cap hard min; beginner<=8.5; rehab<=7.0; daily
+  session cap -> load x0.85, sets-1, rpe<=7.0; weekly frequency -> load x0.9,
+  rpe<=7.5; notes channel separate from coaching_cue); semantic/redFlag.ts
+  (exact-token two-tier scan + chest bigrams + negation lookbehind;
+  RED_FLAG_SYSTEMIC halt + RED_FLAG_PAIN floor 0.6/-1/6.0; resolveReport
+  category-aware arbitration, embedder-independent); triage.moreConservative
+  exported; AdjustmentSource += 'profile'.
+- useStore: profile slice (load on boot, saveProfile clamps + updated_at_ms);
+  computePrescription rewritten as the pure three-layer derivation (SQL counts
+  exclude the active session); reportSubjective uses resolveReport with
+  semantic=null fallback; session plan slice (seed from last completed
+  session, plannedSets = clamp(3 + set_modifier, 1, 6), add/swap with
+  no-duplicate rule).
+- Screens: ProfileScreen (new ATHLETE tab, chips/steppers, save-on-change);
+  PrescriptionScreen (similarity % removed from both cards, PROFILE badge,
+  profile-limit notes); SessionScreen (workout-overview nav with
+  logged/planned badges, out-of-order select, swap/add picker, duration
+  elapsed/cap readout, restart-surviving halt banner).
+- Verification: verify:policy +10 checks (10,368-combination never-raise
+  sweep + pinned rules); verify:semantic +19 (scanner precision incl.
+  stability/chest-press/feeling-sharp non-flags, negation, keyword-only path,
+  live arbitration quadrants); verify:db +5 (profile CHECKs); 9 gates all
+  green; Metro bundle contains both new screens. DEVIATION_LOG.md created
+  (8 entries) per mandate.
+
+**Next Phase Objective:**
+Rebuild APK via CI (push pending this commit), install on device, and verify
+on hardware: (1) ATHLETE tab edits persist and the COACH card shows PROFILE
+badge + notes when caps bind; (2) "my back hurts" produces the safety card
+even in policy-only mode; (3) halt persists across app kill; (4) plan nav
+select/swap/out-of-order logging; (5) second session same day gets damped
+prescription. Then Phase 8 (real telemetry: Health Connect) per the phase
+manager.
+
+**Architectural Constraints:**
+Local SQLite only; deterministic policy is sole numeric authority; subjective
+input and profile may only make sessions more conservative; no generative
+LLMs; zero cloud at runtime; RN core components only, no animation libs;
+every change lands with npm run verify:all (9 gates) green.

@@ -10,7 +10,7 @@ import { evaluatePolicy } from './policyReference';
 import type { AdjustmentVector } from './outputSchema';
 import type { StateVectorRow } from './types';
 
-export type AdjustmentSource = 'policy' | 'guardrail';
+export type AdjustmentSource = 'policy' | 'profile' | 'guardrail';
 
 export interface Prescription {
   vector: AdjustmentVector;

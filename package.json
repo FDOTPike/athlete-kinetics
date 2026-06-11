@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "typecheck": "tsc -p apps/mobile/tsconfig.json",
-    "build:inference-test": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/inference/test/.build packages/inference/src/outputSchema.ts packages/inference/src/types.ts packages/inference/src/policyReference.ts packages/inference/src/prescribe.ts packages/inference/src/semantic/cosine.ts packages/inference/src/semantic/codebase.ts packages/inference/src/semantic/triage.ts packages/inference/src/semantic/wordpiece.ts packages/inference/src/semantic/onnxEmbedder.ts packages/inference/src/semantic/embedder.ts",
+    "build:inference-test": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/inference/test/.build packages/inference/src/outputSchema.ts packages/inference/src/types.ts packages/inference/src/policyReference.ts packages/inference/src/prescribe.ts packages/inference/src/profileLimits.ts packages/inference/src/semantic/cosine.ts packages/inference/src/semantic/codebase.ts packages/inference/src/semantic/triage.ts packages/inference/src/semantic/redFlag.ts packages/inference/src/semantic/wordpiece.ts packages/inference/src/semantic/onnxEmbedder.ts packages/inference/src/semantic/embedder.ts",
     "verify:db": "python packages/core-db/test/verify_schema.py",
     "verify:demo": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/demoData.ts && node packages/core-db/test/verify_demo_path.mjs",
     "verify:migrations": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/migrationRunner.ts && node packages/core-db/test/verify_migrations.mjs",

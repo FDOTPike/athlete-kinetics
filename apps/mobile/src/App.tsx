@@ -17,13 +17,15 @@ import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
 import PrescriptionScreen from './screens/PrescriptionScreen';
+import ProfileScreen from './screens/ProfileScreen';
 
-type Tab = 'readiness' | 'session' | 'coach';
+type Tab = 'readiness' | 'session' | 'coach' | 'athlete';
 
 const TABS: readonly { key: Tab; label: string }[] = [
-  { key: 'readiness', label: 'READINESS' },
+  { key: 'readiness', label: 'READY' },
   { key: 'session', label: 'SESSION' },
   { key: 'coach', label: 'COACH' },
+  { key: 'athlete', label: 'ATHLETE' },
 ];
 
 /** Root boundary: a render-time throw becomes a readable screen with the
@@ -84,6 +86,7 @@ function AppShell(): React.JSX.Element {
         {tab === 'readiness' && <ReadinessScreen />}
         {tab === 'session' && <SessionScreen />}
         {tab === 'coach' && <PrescriptionScreen />}
+        {tab === 'athlete' && <ProfileScreen />}
       </View>
       <View style={styles.tabBar} accessibilityRole="tablist">
         {TABS.map((t) => {
@@ -123,7 +126,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  tabText: { color: palette.dim, fontSize: 13, fontWeight: '800', letterSpacing: 2 },
+  tabText: { color: palette.dim, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
   tabTextActive: { color: palette.green },
   tabIndicator: { height: 3, width: 36, borderRadius: 2, backgroundColor: 'transparent' },
   tabIndicatorActive: { backgroundColor: palette.green },

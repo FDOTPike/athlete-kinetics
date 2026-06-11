@@ -14,6 +14,8 @@ const require = createRequire(import.meta.url);
 
 const out = require('./.build/outputSchema.js');
 const policy = require('./.build/policyReference.js');
+const limits = require('./.build/profileLimits.js');
+const { DEFAULT_PROFILE } = require('./.build/types.js');
 
 let fail = 0;
 const check = (label, ok, detail = '') => {
@@ -89,6 +91,78 @@ check('all-NA telemetry at R=90 -> hold (1.00 load, 0 sets), never boost',
 const boost = policy.evaluatePolicy(row(90, 1.0, 0.5, 90));
 check('verified-good day -> 1.05 load, +1 set, RPE 9.5',
   boost.load_modifier === 1.05 && boost.set_modifier === 1 && boost.rpe_cap === 9.5);
+
+// --- 4. profile limits: monotone conservative, rules pinned --------------------
+console.log('[4] applyProfileLimits');
+const baseVectors = [
+  policy.evaluatePolicy(row(90, 1.0, 0.5, 90)),   // boost day 1.05/+1/9.5
+  policy.evaluatePolicy(row(75, 1.0, 0, 88)),     // hold day
+  policy.evaluatePolicy(row(30, 1.7, -2, 78)),    // hard-cut day
+];
+const profiles = [];
+for (const base_rpe_cap of [6.0, 7.5, 9.0, 10.0])
+  for (const training_age of ['beginner', 'intermediate', 'elite'])
+    for (const objective of ['rehab', 'strength', 'gpp'])
+      for (const max_sessions_per_day of [1, 2])
+        for (const weekly_frequency of [2, 4, 7])
+          profiles.push({ ...DEFAULT_PROFILE, base_rpe_cap, training_age, objective,
+            max_sessions_per_day, weekly_frequency });
+const contexts = [];
+for (const sessionsToday of [0, 1, 2, 3])
+  for (const trainedDaysLast7 of [0, 2, 4, 7])
+    contexts.push({ sessionsToday, trainedDaysLast7 });
+let raised = null;
+let cueTouched = null;
+let noteless = null;
+let n4 = 0;
+for (const v of baseVectors)
+  for (const p of profiles)
+    for (const c of contexts) {
+      const r = limits.applyProfileLimits(v, p, c);
+      n4 += 1;
+      if (r.vector.load_modifier > v.load_modifier + 1e-9 ||
+          r.vector.set_modifier > v.set_modifier ||
+          r.vector.rpe_cap > v.rpe_cap + 1e-9) raised = { v, p, c, r };
+      if (r.vector.coaching_cue !== v.coaching_cue) cueTouched = { p, c };
+      const changed = r.vector.load_modifier !== v.load_modifier ||
+        r.vector.set_modifier !== v.set_modifier || r.vector.rpe_cap !== v.rpe_cap;
+      if (changed && r.notes.length === 0) noteless = { p, c };
+    }
+check(`never raises load/sets/RPE across ${n4} combinations`, raised === null,
+  raised ? JSON.stringify(raised).slice(0, 100) : `${n4} cases`);
+check('never touches the coaching cue', cueTouched === null);
+check('every numeric change carries a note', noteless === null);
+const boostV = baseVectors[0];
+const capped = limits.applyProfileLimits(boostV, { ...DEFAULT_PROFILE, base_rpe_cap: 7.0 },
+  { sessionsToday: 0, trainedDaysLast7: 0 });
+check('base RPE ceiling is a hard min', capped.vector.rpe_cap === 7.0 &&
+  capped.vector.load_modifier === boostV.load_modifier);
+const overCap = limits.applyProfileLimits(boostV, DEFAULT_PROFILE,
+  { sessionsToday: 1, trainedDaysLast7: 0 });
+check('daily session cap damps extra-session work',
+  overCap.vector.load_modifier === Math.round(boostV.load_modifier * 0.85 * 100) / 100 &&
+  overCap.vector.set_modifier === boostV.set_modifier - 1 && overCap.vector.rpe_cap === 7.0);
+const overWeek = limits.applyProfileLimits(boostV, DEFAULT_PROFILE,
+  { sessionsToday: 0, trainedDaysLast7: 4 });
+check('weekly frequency forces maintenance load',
+  overWeek.vector.load_modifier === Math.round(boostV.load_modifier * 0.9 * 100) / 100 &&
+  overWeek.vector.rpe_cap === 7.5);
+const rehab = limits.applyProfileLimits(boostV, { ...DEFAULT_PROFILE, objective: 'rehab' },
+  { sessionsToday: 0, trainedDaysLast7: 0 });
+check('rehab objective caps RPE at 7.0', rehab.vector.rpe_cap === 7.0);
+// Default ceiling (9.0) intentionally trims a 9.5 boost-day prescription —
+// the "balanced PT" posture: pushing past 9 requires an explicit profile edit.
+const trimmed = limits.applyProfileLimits(boostV, DEFAULT_PROFILE,
+  { sessionsToday: 0, trainedDaysLast7: 0 });
+check('default profile trims boost-day RPE 9.5 -> 9.0 (and only that)',
+  trimmed.vector.rpe_cap === 9.0 && trimmed.vector.load_modifier === boostV.load_modifier &&
+  trimmed.vector.set_modifier === boostV.set_modifier && trimmed.notes.length === 1);
+const holdV = baseVectors[1]; // rpe 9.0 already within every default cap
+const noop = limits.applyProfileLimits(holdV, DEFAULT_PROFILE,
+  { sessionsToday: 0, trainedDaysLast7: 0 });
+check('default profile on a hold day changes nothing',
+  noop.notes.length === 0 && noop.vector.load_modifier === holdV.load_modifier &&
+  noop.vector.rpe_cap === holdV.rpe_cap);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

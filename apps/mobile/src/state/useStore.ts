@@ -26,16 +26,25 @@ import {
 } from '@ak/core-db';
 import {
   applyGuardrail,
+  applyProfileLimits,
+  DEFAULT_PROFILE,
   getPrescription,
   loadCodebase,
+  moreConservative,
+  RED_FLAG_PAIN,
+  RED_FLAG_SYSTEMIC,
+  resolveReport,
   triage,
   type Embedder,
   type LoadedCodebase,
   type MovementPattern,
   type PhraseCodebase,
+  type PhraseEntry,
   type Prescription,
   type SessionDirective,
   type StateVectorRow,
+  type TriageResult,
+  type UserProfile,
 } from '@ak/inference';
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
@@ -91,8 +100,14 @@ export interface TrendPoint {
 export type BootStatus = 'booting' | 'ready' | 'error';
 
 export type TriageOutcome =
-  | { kind: 'rejected'; similarity: number }
+  | { kind: 'rejected' }
   | { kind: 'matched'; directive: SessionDirective };
+
+/** One slot in the active session's workout plan. */
+export interface PlanSlot {
+  movementId: number;
+  plannedSets: number;
+}
 
 interface KineticsStore {
   status: BootStatus;
@@ -103,14 +118,24 @@ interface KineticsStore {
   movements: Movement[];
   session: ActiveSession | null;
   prescription: (Prescription & { forDate: string }) | null;
-  /** True when an on-device embedder is wired (policy-only mode otherwise). */
+  /** Profile-limit notes attached to the current prescription. */
+  profileNotes: string[];
+  profile: UserProfile;
+  /** True when the semantic embedder is wired; the keyword safety layer
+   *  works regardless. */
   triageReady: boolean;
   triaging: boolean;
   lastTriage: TriageOutcome | null;
+  sessionPlan: PlanSlot[];
+  activeMovementId: number | null;
 
   boot: () => void;
   setEmbedder: (e: Embedder | null) => void;
+  saveProfile: (patch: Partial<UserProfile>) => void;
   reportSubjective: (text: string) => Promise<void>;
+  selectMovement: (movementId: number) => void;
+  addPlanSlot: (movementId: number) => void;
+  swapMovement: (oldMovementId: number, newMovementId: number) => void;
   refreshVector: () => void;
   startSession: () => void;
   logSet: (movementId: number, reps: number, loadKg: number, rpe: number) => void;
@@ -159,6 +184,46 @@ const getCodebase = (): LoadedCodebase => {
   return codebaseCache;
 };
 
+/** matched_entry_id -> entry, covering curated entries AND the deterministic
+ *  red-flag overrides (so persisted reports re-resolve after restart). */
+let entryIndexCache: Map<string, PhraseEntry> | null = null;
+const entryById = (id: string): PhraseEntry | undefined => {
+  if (entryIndexCache === null) {
+    entryIndexCache = new Map(getCodebase().entries.map((e) => [e.id, e]));
+    entryIndexCache.set(RED_FLAG_PAIN.id, RED_FLAG_PAIN);
+    entryIndexCache.set(RED_FLAG_SYSTEMIC.id, RED_FLAG_SYSTEMIC);
+  }
+  return entryIndexCache.get(id);
+};
+
+// --- profile row <-> object mapping ------------------------------------------
+interface ProfileRow {
+  objective: string; training_age: string; weekly_frequency: number;
+  max_sessions_per_day: number; session_duration_cap_min: number;
+  base_rpe_cap: number; target_energy_system: string;
+  progression_methodology: string; injury_flags: string;
+  mobility_limits: string; equipment_access: string;
+}
+const parseBodyNotes = (json: string): UserProfile['injury_flags'] => {
+  try {
+    const v = JSON.parse(json) as unknown;
+    return Array.isArray(v)
+      ? v.filter((x): x is { region: string; note: string } =>
+          typeof x === 'object' && x !== null &&
+          typeof (x as { region?: unknown }).region === 'string' &&
+          typeof (x as { note?: unknown }).note === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+};
+const profileFromRow = (r: ProfileRow): UserProfile => ({
+  ...(DEFAULT_PROFILE as UserProfile),
+  ...r,
+  injury_flags: parseBodyNotes(r.injury_flags),
+  mobility_limits: parseBodyNotes(r.mobility_limits),
+} as UserProfile);
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -171,9 +236,13 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   movements: [],
   session: null,
   prescription: null,
+  profileNotes: [],
+  profile: DEFAULT_PROFILE,
   triageReady: false,
   triaging: false,
   lastTriage: null,
+  sessionPlan: [],
+  activeMovementId: null,
 
   boot: () => {
     if (get().status === 'ready') return;
@@ -191,11 +260,51 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           'SELECT movement_id, name, pattern FROM movement ORDER BY movement_id',
         ),
       );
-      set({ status: 'ready', error: null, movements, today: localToday() });
+      const profileRow = rowsOf<ProfileRow>(
+        getDb().executeSync('SELECT * FROM user_profile WHERE profile_id = 1'),
+      )[0];
+      set({
+        status: 'ready',
+        error: null,
+        movements,
+        today: localToday(),
+        profile: profileRow !== undefined ? profileFromRow(profileRow) : DEFAULT_PROFILE,
+      });
       get().refreshVector();
+      // Prescription is a pure derivation over persisted state (profile +
+      // today's reports), so a halt logged yesterday evening survives an
+      // app restart this morning.
+      get().computePrescription([]);
     } catch (e) {
       set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
     }
+  },
+
+  saveProfile: (patch) => {
+    const merged: UserProfile = { ...get().profile, ...patch };
+    // Clamp numerics to the 006 CHECK domains (UI bugs must never throw).
+    merged.weekly_frequency = Math.round(clamp(merged.weekly_frequency, 1, 7));
+    merged.max_sessions_per_day = Math.round(clamp(merged.max_sessions_per_day, 1, 3));
+    merged.session_duration_cap_min = Math.round(clamp(merged.session_duration_cap_min, 15, 240));
+    merged.base_rpe_cap = clamp(Math.round(merged.base_rpe_cap * 2) / 2, 5, 10);
+    getDb().executeSync(
+      `UPDATE user_profile SET
+         objective = ?, training_age = ?, weekly_frequency = ?,
+         max_sessions_per_day = ?, session_duration_cap_min = ?, base_rpe_cap = ?,
+         target_energy_system = ?, progression_methodology = ?,
+         injury_flags = ?, mobility_limits = ?, equipment_access = ?, updated_at_ms = ?
+       WHERE profile_id = 1`,
+      [
+        merged.objective, merged.training_age, merged.weekly_frequency,
+        merged.max_sessions_per_day, merged.session_duration_cap_min, merged.base_rpe_cap,
+        merged.target_energy_system, merged.progression_methodology,
+        JSON.stringify(merged.injury_flags), JSON.stringify(merged.mobility_limits),
+        merged.equipment_access, Date.now(),
+      ],
+    );
+    set({ profile: merged });
+    // Re-derive: profile clamps may have changed the operative prescription.
+    if (get().prescription !== null) get().computePrescription([]);
   },
 
   refreshVector: () => {
@@ -220,6 +329,28 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const today = localToday();
     const startedAtMs = Date.now();
     const d = getDb();
+    // Seed the workout plan from the most recent completed session, BEFORE
+    // creating the new row. Planned sets fold in today's set_modifier — the
+    // first place the prescription's set delta becomes actionable UI.
+    const { prescription } = get();
+    const plannedSets = Math.round(clamp(
+      3 + (prescription !== null && prescription.forDate === today
+        ? prescription.vector.set_modifier
+        : 0),
+      1, 6,
+    ));
+    const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
+      `SELECT movement_id FROM set_record
+       WHERE session_id = (
+         SELECT s.session_id FROM session s
+         JOIN set_record r ON r.session_id = s.session_id
+         ORDER BY s.session_id DESC LIMIT 1)
+       GROUP BY movement_id ORDER BY MIN(set_id)`,
+    ));
+    const sessionPlan: PlanSlot[] = lastMovements.map((m) => ({
+      movementId: m.movement_id,
+      plannedSets,
+    }));
     d.executeSync(
       'INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, ?, ?)',
       [today, startedAtMs],
@@ -227,7 +358,41 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const sessionId = rowsOf<{ id: number }>(
       d.executeSync('SELECT last_insert_rowid() AS id'),
     )[0]!.id;
-    set({ session: { sessionId, date: today, startedAtMs, sets: [] } });
+    set({
+      session: { sessionId, date: today, startedAtMs, sets: [] },
+      sessionPlan,
+      activeMovementId: sessionPlan.length > 0 ? sessionPlan[0].movementId : null,
+    });
+  },
+
+  selectMovement: (movementId) => {
+    set({ activeMovementId: movementId });
+  },
+
+  addPlanSlot: (movementId) => {
+    const { sessionPlan, prescription, today } = get();
+    if (sessionPlan.some((s) => s.movementId === movementId)) return; // no duplicates
+    const plannedSets = Math.round(clamp(
+      3 + (prescription !== null && prescription.forDate === today
+        ? prescription.vector.set_modifier
+        : 0),
+      1, 6,
+    ));
+    set({
+      sessionPlan: [...sessionPlan, { movementId, plannedSets }],
+      activeMovementId: movementId,
+    });
+  },
+
+  swapMovement: (oldMovementId, newMovementId) => {
+    const { sessionPlan, activeMovementId } = get();
+    if (sessionPlan.some((s) => s.movementId === newMovementId)) return; // no duplicates
+    set({
+      // Logged sets stay as history; only the slot's identity changes.
+      sessionPlan: sessionPlan.map((s) =>
+        s.movementId === oldMovementId ? { ...s, movementId: newMovementId } : s),
+      activeMovementId: activeMovementId === oldMovementId ? newMovementId : activeMovementId,
+    });
   },
 
   logSet: (movementId, reps, loadKg, rpe) => {
@@ -288,21 +453,72 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         'UPDATE session SET session_rpe = ?, duration_min = ? WHERE session_id = ?',
         [avgRpe, durationMin, s.sessionId],
       );
-      // Load changed -> re-materialize today's State Vector (the SLM and the
-      // dashboard both read the result; triggers already updated mech_daily).
+      // Load changed -> re-materialize today's State Vector (the dashboard
+      // reads the result; triggers already updated mech_daily).
       d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [s.date]);
     }
-    set({ session: null });
+    set({ session: null, sessionPlan: [], activeMovementId: null });
     get().refreshVector();
+    // Session count changed: the daily/weekly profile clamps may now bind.
+    get().computePrescription([]);
   },
 
   computePrescription: (_patterns) => {
-    const { vector, today } = get();
+    const { vector, today, profile, session } = get();
     if (vector === null) return;
-    // Deterministic policy table — synchronous, infallible, zero downloads.
-    // Subjective-report guardrails (semantic triage) refine this vector once
-    // the on-device embedder adapter lands; the pipeline is already verified.
-    set({ prescription: { ...getPrescription(vector), forDate: today } });
+    const d = getDb();
+
+    // Layer 1: deterministic policy from the state vector.
+    const base = getPrescription(vector);
+
+    // Layer 2: profile clamps (overtraining prevention), driven by actual
+    // training history. The active session must not count against itself.
+    const sessionsToday = Number(rowsOf<{ c: number }>(d.executeSync(
+      `SELECT count(DISTINCT s.session_id) AS c
+       FROM session s JOIN set_record sr ON sr.session_id = s.session_id
+       WHERE s.session_date = ? AND s.session_id != ?`,
+      [today, session !== null ? session.sessionId : -1],
+    ))[0]?.c ?? 0);
+    const trainedDaysLast7 = Number(rowsOf<{ c: number }>(d.executeSync(
+      `SELECT count(DISTINCT s.session_date) AS c
+       FROM session s JOIN set_record sr ON sr.session_id = s.session_id
+       WHERE s.session_date >= date(?, '-6 days') AND s.session_date <= ?`,
+      [today, today],
+    ))[0]?.c ?? 0);
+    const limited = applyProfileLimits(base.vector, profile, { sessionsToday, trainedDaysLast7 });
+
+    // Layer 3: the most conservative of TODAY'S PERSISTED reports. Deriving
+    // from the database (not cached zustand state) means a halt survives an
+    // app kill and a profile edit can never resurrect a damped prescription.
+    const reportIds = rowsOf<{ matched_entry_id: string }>(d.executeSync(
+      'SELECT matched_entry_id FROM subjective_report WHERE date = ? AND matched_entry_id IS NOT NULL',
+      [today],
+    ));
+    let operative: PhraseEntry | null = null;
+    for (const r of reportIds) {
+      const e = entryById(r.matched_entry_id);
+      if (e !== undefined && (operative === null || moreConservative(e.guardrail, operative.guardrail))) {
+        operative = e;
+      }
+    }
+
+    if (operative !== null) {
+      const directive = applyGuardrail(limited.vector, operative, 1);
+      set({
+        prescription: { vector: directive.vector, source: 'guardrail', forDate: today },
+        profileNotes: limited.notes,
+        lastTriage: { kind: 'matched', directive },
+      });
+      return;
+    }
+    set({
+      prescription: {
+        vector: limited.vector,
+        source: limited.notes.length > 0 ? 'profile' : 'policy',
+        forDate: today,
+      },
+      profileNotes: limited.notes,
+    });
   },
 
   setEmbedder: (e) => {
@@ -311,46 +527,55 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   reportSubjective: async (text) => {
-    const { vector, today, prescription, triaging } = get();
+    const { vector, today, triaging } = get();
     const raw = text.trim();
-    if (embedder === null || vector === null || triaging) return;
+    if (vector === null || triaging) return;
     if (raw.length === 0 || raw.length > 500) return;
     set({ triaging: true });
     try {
-      const query = await embedder.embed(raw);
-      const result = triage(query, getCodebase());
+      // Semantic routing is OPTIONAL; the keyword safety layer inside
+      // resolveReport works with `null` (embedder absent or failed).
+      let semantic: TriageResult | null = null;
+      if (embedder !== null) {
+        try {
+          semantic = triage(await embedder.embed(raw), getCodebase());
+        } catch {
+          semantic = null;
+        }
+      }
+      const resolved = resolveReport(raw, semantic);
       const d = getDb();
-      if (!result.confident || result.entry === null) {
-        // Rejected by the confidence gate: log it (codebase curation data),
+      if (!resolved.confident || resolved.entry === null) {
+        // No curated match, no red-flag language: log for codebase curation,
         // change NOTHING about the prescription.
         d.executeSync(
           `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
            VALUES (?, ?, ?, NULL, ?, 0, NULL, NULL, NULL)`,
-          [today, Date.now(), raw, result.similarity],
+          [today, Date.now(), raw, resolved.similarity],
         );
-        set({ lastTriage: { kind: 'rejected', similarity: result.similarity } });
+        set({ lastTriage: { kind: 'rejected' } });
         return;
       }
-      // Guardrails compose onto today's operative prescription (or the
-      // policy's, when none was computed yet) — monotone conservative.
-      const base =
-        prescription !== null && prescription.forDate === today
-          ? prescription.vector
-          : getPrescription(vector).vector;
-      const directive = applyGuardrail(base, result.entry, result.similarity);
+      // Persist the routing outcome; the applied numbers recorded here are
+      // an audit snapshot (the operative prescription itself re-derives from
+      // this row via computePrescription).
+      const audit = applyGuardrail(
+        get().prescription?.vector ?? getPrescription(vector).vector,
+        resolved.entry,
+        resolved.similarity ?? 1,
+      );
       d.executeSync(
         `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          today, Date.now(), raw, result.entry.id, result.similarity,
-          directive.halt ? 1 : 0, directive.vector.load_modifier,
-          directive.vector.set_modifier, directive.vector.rpe_cap,
+          today, Date.now(), raw, resolved.entry.id, resolved.similarity,
+          audit.halt ? 1 : 0, audit.vector.load_modifier,
+          audit.vector.set_modifier, audit.vector.rpe_cap,
         ],
       );
-      set({
-        lastTriage: { kind: 'matched', directive },
-        prescription: { vector: directive.vector, source: 'guardrail', forDate: today },
-      });
+      // Re-derive the operative prescription from persistence (single source
+      // of truth; also sets lastTriage to the now-operative directive).
+      get().computePrescription([]);
     } finally {
       set({ triaging: false });
     }

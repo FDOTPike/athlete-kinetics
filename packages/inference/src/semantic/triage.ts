@@ -43,7 +43,10 @@ export function triage(query: Float32Array, cb: LoadedCodebase): TriageResult {
   return { entry, similarity: first.score, confident: true };
 }
 
-function moreConservative(a: Guardrail, b: Guardrail): boolean {
+/** True when guardrail `a` is strictly the more conservative of the pair.
+ *  Exported: the store reuses it to pick the operative entry when several
+ *  reports exist for one day. */
+export function moreConservative(a: Guardrail, b: Guardrail): boolean {
   if (a.halt !== b.halt) return a.halt;
   if (a.load_multiplier !== b.load_multiplier) return a.load_multiplier < b.load_multiplier;
   return a.set_delta < b.set_delta;

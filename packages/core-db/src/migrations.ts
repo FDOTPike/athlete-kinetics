@@ -13,11 +13,12 @@ import m001 from './schema/001_mechanical_input.sql';
 import m002 from './schema/002_telemetry.sql';
 import m003 from './schema/003_state_vector.sql';
 import m005 from './schema/005_subjective_report.sql';
+import m006 from './schema/006_user_profile.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

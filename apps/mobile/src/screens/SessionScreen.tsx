@@ -1,15 +1,17 @@
 /**
- * SessionScreen.tsx — active set logging, built for mid-session speed.
+ * SessionScreen.tsx — active set logging around a workout-overview plan nav.
  *
  * Interaction contract:
- *   * No keyboard, ever: reps/load/RPE are steppers with 64pt+ targets that
- *     work with chalked or sweaty hands; values persist between sets because
- *     consecutive sets are usually identical.
- *   * LOG SET is one tap and synchronously durable (op-sqlite JSI insert hits
- *     the WAL before the press state clears); mech_daily updates via trigger.
- *   * Zero animations. Pressed state is a flat color change only.
+ *   * The whole session is visible at a glance: a compact horizontal nav of
+ *     planned movements with logged/planned badges. Tap any slot to work it
+ *     out of order; SWAP replaces the active slot's movement (logged sets
+ *     stand as history); + ADD appends from the library. No duplicates.
+ *   * No keyboard, ever: reps/load/RPE are steppers with 64pt+ targets;
+ *     values persist between sets because consecutive sets usually match.
+ *   * LOG SET is one tap and synchronously durable (op-sqlite JSI insert).
+ *   * Zero animations; pressed state is a flat color change. RN core only.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -22,7 +24,7 @@ import {
 import { palette, useStore, type LoggedSet, type Movement } from '../state/useStore';
 
 // ---------------------------------------------------------------------------
-// Stepper — the only input primitive on this screen
+// Stepper — the only numeric input primitive on this screen
 // ---------------------------------------------------------------------------
 interface StepperProps {
   label: string;
@@ -65,26 +67,39 @@ function Stepper({ label, display, onDec, onInc }: StepperProps): React.JSX.Elem
   );
 }
 
+const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
+const shortName = (name: string): string => (name.length > 12 ? `${name.slice(0, 11)}…` : name);
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
-const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
-
 export default function SessionScreen(): React.JSX.Element {
   const movements = useStore((s) => s.movements);
   const session = useStore((s) => s.session);
+  const sessionPlan = useStore((s) => s.sessionPlan);
+  const activeMovementId = useStore((s) => s.activeMovementId);
+  const profile = useStore((s) => s.profile);
+  const lastTriage = useStore((s) => s.lastTriage);
   const startSession = useStore((s) => s.startSession);
+  const selectMovement = useStore((s) => s.selectMovement);
+  const addPlanSlot = useStore((s) => s.addPlanSlot);
+  const swapMovement = useStore((s) => s.swapMovement);
   const logSet = useStore((s) => s.logSet);
   const endSession = useStore((s) => s.endSession);
 
-  const [movementId, setMovementId] = useState<number | null>(
-    movements.length > 0 ? movements[0].movement_id : null,
-  );
   const [reps, setReps] = useState(5);
   const [loadKg, setLoadKg] = useState(100);
   const [rpe, setRpe] = useState(8);
+  /** 'plan' = normal nav; 'add'/'swap' = picking from the library. */
+  const [pickMode, setPickMode] = useState<'plan' | 'add' | 'swap'>('plan');
+  // Elapsed-time readout against the profile's duration cap (display only).
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    if (session === null) return;
+    const t = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [session]);
 
-  // ---- idle state: one giant start target ---------------------------------
   if (session === null) {
     return (
       <View style={styles.center}>
@@ -100,8 +115,16 @@ export default function SessionScreen(): React.JSX.Element {
     );
   }
 
-  const canLog = movementId !== null;
+  const byId = new Map(movements.map((m) => [m.movement_id, m]));
+  const loggedFor = (movementId: number): number =>
+    session.sets.filter((s) => s.movement_id === movementId).length;
   const tonnage = session.sets.reduce((a, s) => a + s.tonnage_kg, 0);
+  const elapsedMin = Math.floor((nowMs - session.startedAtMs) / 60_000);
+  const overTime = elapsedMin > profile.session_duration_cap_min;
+  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+  const inLibraryNotPlanned = movements.filter(
+    (m) => !sessionPlan.some((s) => s.movementId === m.movement_id),
+  );
 
   const confirmEnd = (): void => {
     Alert.alert(
@@ -116,31 +139,106 @@ export default function SessionScreen(): React.JSX.Element {
 
   return (
     <View style={styles.screen}>
-      {/* movement selector: large chips, horizontal scroll */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipStrip}
-        contentContainerStyle={styles.chipStripContent}
-      >
-        {movements.map((m: Movement) => {
-          const active = m.movement_id === movementId;
-          return (
-            <Pressable
-              key={m.movement_id}
-              onPress={() => setMovementId(m.movement_id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`Select ${m.name}`}
-              style={[styles.chip, active && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{m.name}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {halted && (
+        <View style={styles.haltBanner}>
+          <Text style={styles.haltBannerText}>
+            STOP — today&apos;s report ended this session. {lastTriage.directive.vector.coaching_cue}
+          </Text>
+        </View>
+      )}
 
-      {/* input steppers */}
+      {/* ---- workout overview nav / library picker ---- */}
+      {pickMode === 'plan' ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.navStrip}
+          contentContainerStyle={styles.navStripContent}
+        >
+          {sessionPlan.map((slot) => {
+            const m = byId.get(slot.movementId);
+            const logged = loggedFor(slot.movementId);
+            const active = slot.movementId === activeMovementId;
+            const done = logged >= slot.plannedSets;
+            return (
+              <Pressable
+                key={slot.movementId}
+                onPress={() => selectMovement(slot.movementId)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${m?.name ?? 'movement'}, ${logged} of ${slot.plannedSets} sets logged`}
+                style={[styles.navSlot, active && styles.navSlotActive]}
+              >
+                <Text style={[styles.navSlotName, active && styles.navSlotNameActive]}>
+                  {shortName(m?.name ?? '?')}
+                </Text>
+                <Text style={[styles.navSlotBadge, done && styles.navSlotBadgeDone]}>
+                  {logged}/{slot.plannedSets}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            onPress={() => setPickMode('add')}
+            accessibilityRole="button"
+            accessibilityLabel="Add a movement to the plan"
+            style={styles.navAction}
+          >
+            <Text style={styles.navActionText}>+ ADD</Text>
+          </Pressable>
+          {activeMovementId !== null && (
+            <Pressable
+              onPress={() => setPickMode('swap')}
+              accessibilityRole="button"
+              accessibilityLabel="Swap the selected movement"
+              style={styles.navAction}
+            >
+              <Text style={styles.navActionText}>SWAP</Text>
+            </Pressable>
+          )}
+        </ScrollView>
+      ) : (
+        <View style={styles.pickPanel}>
+          <Text style={styles.pickTitle}>
+            {pickMode === 'swap'
+              ? `SWAP ${shortName(byId.get(activeMovementId ?? -1)?.name ?? '?')} FOR:`
+              : 'ADD MOVEMENT:'}
+          </Text>
+          <View style={styles.pickWrap}>
+            {inLibraryNotPlanned.map((m: Movement) => (
+              <Pressable
+                key={m.movement_id}
+                onPress={() => {
+                  if (pickMode === 'swap' && activeMovementId !== null) {
+                    swapMovement(activeMovementId, m.movement_id);
+                  } else {
+                    addPlanSlot(m.movement_id);
+                  }
+                  setPickMode('plan');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${pickMode === 'swap' ? 'Swap to' : 'Add'} ${m.name}`}
+                style={styles.pickChip}
+              >
+                <Text style={styles.pickChipText}>{m.name}</Text>
+              </Pressable>
+            ))}
+            {inLibraryNotPlanned.length === 0 && (
+              <Text style={styles.dimText}>Every movement is already in the plan.</Text>
+            )}
+          </View>
+          <Pressable
+            onPress={() => setPickMode('plan')}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel picking"
+            style={styles.pickCancel}
+          >
+            <Text style={styles.pickCancelText}>CANCEL</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* ---- input steppers ---- */}
       <Stepper
         label="REPS"
         display={String(reps)}
@@ -160,24 +258,26 @@ export default function SessionScreen(): React.JSX.Element {
         onInc={() => setRpe((v) => clamp(v + 0.5, 5, 10))}
       />
 
-      {/* primary action */}
+      {/* ---- primary action ---- */}
       <Pressable
-        disabled={!canLog}
+        disabled={activeMovementId === null}
         onPress={() => {
-          if (movementId !== null) logSet(movementId, reps, loadKg, rpe);
+          if (activeMovementId !== null) logSet(activeMovementId, reps, loadKg, rpe);
         }}
         accessibilityRole="button"
         accessibilityLabel={`Log set: ${reps} reps at ${loadKg.toFixed(1)} kilograms, RPE ${rpe.toFixed(1)}`}
         style={({ pressed }) => [
           styles.logBtn,
           pressed && styles.logBtnPressed,
-          !canLog && styles.logBtnDisabled,
+          activeMovementId === null && styles.logBtnDisabled,
         ]}
       >
-        <Text style={styles.logBtnText}>LOG SET</Text>
+        <Text style={styles.logBtnText}>
+          {activeMovementId === null ? 'PICK A MOVEMENT' : 'LOG SET'}
+        </Text>
       </Pressable>
 
-      {/* session log, newest first */}
+      {/* ---- session log, newest first ---- */}
       <FlatList
         data={session.sets}
         keyExtractor={(s: LoggedSet) => String(s.set_id)}
@@ -195,11 +295,17 @@ export default function SessionScreen(): React.JSX.Element {
         )}
       />
 
-      {/* footer: running tonnage + end */}
+      {/* ---- footer: tonnage, duration vs cap, end ---- */}
       <View style={styles.footer}>
         <View>
           <Text style={styles.footerLabel}>TONNAGE</Text>
           <Text style={styles.footerValue}>{Math.round(tonnage)} kg</Text>
+        </View>
+        <View>
+          <Text style={styles.footerLabel}>TIME</Text>
+          <Text style={[styles.footerValue, overTime && styles.footerOver]}>
+            {elapsedMin}/{profile.session_duration_cap_min}m
+          </Text>
         </View>
         <Pressable
           onPress={confirmEnd}
@@ -234,28 +340,81 @@ const styles = StyleSheet.create({
   startBtnPressed: { backgroundColor: '#26C28F' },
   startBtnText: { color: '#06251B', fontSize: 24, fontWeight: '800', letterSpacing: 2 },
 
-  chipStrip: { flexGrow: 0, marginBottom: 8 },
-  chipStripContent: { gap: 8, paddingVertical: 4 },
-  chip: {
-    minHeight: 56,
-    paddingHorizontal: 18,
+  haltBanner: {
+    backgroundColor: '#2A1416',
+    borderWidth: 2,
+    borderColor: palette.red,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  haltBannerText: { color: palette.red, fontSize: 14, fontWeight: '700', lineHeight: 20 },
+
+  navStrip: { flexGrow: 0, marginBottom: 8 },
+  navStripContent: { gap: 8, paddingVertical: 4, alignItems: 'stretch' },
+  navSlot: {
+    minHeight: 60,
+    minWidth: 92,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 12,
     backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    justifyContent: 'center',
+  },
+  navSlotActive: { borderColor: palette.green, backgroundColor: '#10241D' },
+  navSlotName: { color: palette.dim, fontSize: 14, fontWeight: '700' },
+  navSlotNameActive: { color: palette.green },
+  navSlotBadge: {
+    color: palette.dim,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  navSlotBadgeDone: { color: palette.green },
+  navAction: {
+    minHeight: 60,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navActionText: { color: palette.amber, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+
+  pickPanel: {
+    backgroundColor: palette.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.amber,
+    padding: 12,
+    marginBottom: 8,
+  },
+  pickTitle: { color: palette.amber, fontSize: 13, fontWeight: '800', letterSpacing: 1.5, marginBottom: 10 },
+  pickWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pickChip: {
+    minHeight: 52,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: palette.bg,
     borderWidth: 1,
     borderColor: palette.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipActive: { borderColor: palette.green, backgroundColor: '#10241D' },
-  chipText: { color: palette.dim, fontSize: 16, fontWeight: '700' },
-  chipTextActive: { color: palette.green },
+  pickChipText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  pickCancel: { marginTop: 10, alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center' },
+  pickCancelText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
 
   stepper: { marginTop: 10 },
   stepperLabel: { color: palette.dim, fontSize: 12, letterSpacing: 2, marginBottom: 4 },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stepBtn: {
     width: 72,
-    height: 64,
+    height: 60,
     borderRadius: 12,
     backgroundColor: palette.surface,
     borderWidth: 1,
@@ -264,37 +423,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepBtnPressed: { backgroundColor: '#22222A' },
-  stepBtnText: { color: palette.text, fontSize: 34, fontWeight: '700', lineHeight: 38 },
+  stepBtnText: { color: palette.text, fontSize: 32, fontWeight: '700', lineHeight: 36 },
   stepperValue: {
     flex: 1,
     color: palette.text,
-    fontSize: 40,
+    fontSize: 36,
     fontWeight: '800',
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },
 
   logBtn: {
-    height: 88,
+    height: 84,
     borderRadius: 16,
     backgroundColor: palette.green,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 18,
+    marginTop: 16,
   },
   logBtnPressed: { backgroundColor: '#26C28F' },
   logBtnDisabled: { backgroundColor: palette.line },
-  logBtnText: { color: '#06251B', fontSize: 26, fontWeight: '800', letterSpacing: 3 },
+  logBtnText: { color: '#06251B', fontSize: 24, fontWeight: '800', letterSpacing: 3 },
 
-  setList: { flex: 1, marginTop: 14 },
+  setList: { flex: 1, marginTop: 12 },
   emptyText: { color: palette.dim, textAlign: 'center', marginTop: 24, fontSize: 14 },
+  dimText: { color: palette.dim, fontSize: 14 },
   setRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: palette.surface,
     borderRadius: 10,
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 16,
     marginBottom: 6,
   },
@@ -317,13 +477,14 @@ const styles = StyleSheet.create({
   footerLabel: { color: palette.dim, fontSize: 11, letterSpacing: 2 },
   footerValue: {
     color: palette.text,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
+  footerOver: { color: palette.red },
   endBtn: {
-    minHeight: 64,
-    minWidth: 120,
+    minHeight: 60,
+    minWidth: 110,
     borderRadius: 14,
     borderWidth: 2,
     borderColor: palette.red,

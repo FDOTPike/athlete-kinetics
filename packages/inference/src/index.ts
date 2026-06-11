@@ -10,8 +10,38 @@ export {
   validateAdjustment,
   type AdjustmentVector,
 } from './outputSchema';
-export { MOVEMENT_PATTERNS, type MovementPattern, type StateVectorRow } from './types';
+export {
+  DEFAULT_PROFILE,
+  ENERGY_SYSTEMS,
+  EQUIPMENT_ACCESS,
+  MOVEMENT_PATTERNS,
+  OBJECTIVES,
+  PROGRESSION_METHODS,
+  TRAINING_AGES,
+  type BodyNote,
+  type EnergySystem,
+  type EquipmentAccess,
+  type MovementPattern,
+  type Objective,
+  type ProgressionMethod,
+  type StateVectorRow,
+  type TrainingAge,
+  type UserProfile,
+} from './types';
 export { evaluatePolicy } from './policyReference';
+export {
+  applyProfileLimits,
+  type ProfileContext,
+  type ProfileLimitedPrescription,
+} from './profileLimits';
+export {
+  RED_FLAG_PAIN,
+  RED_FLAG_SYSTEMIC,
+  resolveReport,
+  scanRedFlags,
+  type RedFlagScan,
+  type ResolvedReport,
+} from './semantic/redFlag';
 export { getPrescription, type AdjustmentSource, type Prescription } from './prescribe';
 export { normalize, packVectors, topK, type Match } from './semantic/cosine';
 export {
@@ -34,6 +64,7 @@ export {
   AMBIGUITY_MARGIN,
   CONFIDENCE_THRESHOLD,
   applyGuardrail,
+  moreConservative,
   triage,
   type SessionDirective,
   type TriageResult,

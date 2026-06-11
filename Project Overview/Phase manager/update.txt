@@ -1,0 +1,39 @@
+CONTEXT SYNC & MANDATE: EXPANDED PROFILES & UI OVERHAUL
+
+Fable, the core logic is functional, but the user experience and coaching parameters are currently too rigid. I need you to execute three major structural updates to the application. Do not wait for conversational feedback between steps. Implement, run the verification gates, and confirm.
+
+​STEP 1: Expand the User Profile Schema (Zustand Store)
+
+We need to evolve the user profile from a basic baseline into a comprehensive, 10-category athlete questionnaire. Update the Zustand store to capture specific body systems and training methodologies. Ensure this remains a lightweight object.
+
+​Add fields for Training Frequency/Routine and Base Effort/RPE Level.
+
+​Add Target Energy System (String Enum: Aerobic, Anaerobic, ATP-PC, Hybrid).
+
+​Add Progression Methodology (String Enum: Linear Periodization, Undulating Periodization, Conjugate, Auto-regulated).
+
+​Include placeholders for standard PT questionnaire flags (e.g., historical injuries, mobility limits).
+
+​STEP 2: The Triage Override (Vector-Heuristic Layer)
+
+The current cosine similarity score is exposing raw vector math to the user. When a user inputs a red-flag phrase (e.g., "my back hurts"), returning a "55% accuracy" score is unacceptable UX.
+
+​Implement a Hard Override Heuristic in the TypeScript logic.
+
+​If the user's input contains critical keywords (e.g., "hurt", "pain", "tweak", "sharp"), it must bypass the standard 0.55 confidence gate and immediately trigger a 1.0 (100%) deterministic safety multiplier, severely capping RPE and suggesting a load reduction.
+
+​STEP 3: Session UI Redesign (SessionScreen.tsx)
+
+The current swiping mechanism for movements is clunky. We need to overhaul the visual layout of the active workout while strictly keeping our Jetsam memory limits intact.
+
+​Remove the swipeable movement cards.
+
+​Implement a Horizontal Scrollable Sidebar (or a compact top-nav list) that displays the entire workout overview at a glance.
+
+​The user must be able to scroll through the full list of exercises, select one out of order, and adapt/swap movements on the fly.
+
+​Keep the UI brutally simple and native-feeling—do not import heavy external carousel libraries.
+
+​Write the code, ensure the npm run verify:all checks stay green, and log any architectural adjustments in DEVIATION_LOG.md.
+
+​Before you hand this off to Fable, do you want to define the exact options for those 10 profile categories yourself, or should we just let Fable draft a standard advanced PT questionnaire baseline for you to tweak once it's built?

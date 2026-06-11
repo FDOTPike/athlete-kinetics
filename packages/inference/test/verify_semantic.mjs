@@ -18,6 +18,7 @@ const require = createRequire(import.meta.url);
 const cosine = require('./.build/semantic/cosine.js');
 const cbMod = require('./.build/semantic/codebase.js');
 const triageMod = require('./.build/semantic/triage.js');
+const redFlag = require('./.build/semantic/redFlag.js');
 
 const ASSETS = join(import.meta.dirname, '..', 'assets');
 const codebase = JSON.parse(readFileSync(join(ASSETS, 'phrase-codebase.json'), 'utf-8'));
@@ -120,6 +121,78 @@ check('positive report never raises anything above policy',
   d3.vector.load_modifier <= base.load_modifier &&
   d3.vector.set_modifier <= base.set_modifier &&
   d3.vector.rpe_cap <= base.rpe_cap);
+
+// --- 5. red-flag lexical override -------------------------------------------------
+console.log('[5] red-flag override (scan + arbitration with live embeddings)');
+
+// 5a. scanner precision: gym vocabulary must NOT trigger
+const noFlag = [
+  'working on shoulder stability drills',
+  'did chest press today, felt strong',
+  'feeling sharp and fast today',
+  'popped my headphones in and trained',
+  'snapped the bar off the floor fast',  // 'snap' negation-free but... see 5b
+];
+// 'snapped' IS a tier-1 token — that line SHOULD flag (documented conservative
+// false positive). Keep it out of the no-flag set:
+noFlag.pop();
+for (const text of noFlag) {
+  const s = redFlag.scanRedFlags(text);
+  check(`no flag: "${text.slice(0, 40)}"`, !s.pain && !s.systemic,
+    s.matched.join(','));
+}
+check('negation suppresses: "feeling strong, no pain at all"',
+  !redFlag.scanRedFlags('feeling strong, no pain at all').pain);
+check('flags: "my back hurts"', redFlag.scanRedFlags('my back hurts').pain);
+check('flags via tier2+region: "sharp twinge in my knee"',
+  redFlag.scanRedFlags('sharp twinge in my knee').pain);
+check('systemic bigram: "chest pressure on the last set"',
+  redFlag.scanRedFlags('chest pressure on the last set').systemic);
+check('documented conservative FP: "snapped the bar off the floor"',
+  redFlag.scanRedFlags('snapped the bar off the floor').pain);
+
+// 5b. keyword-only path (embedder absent)
+const koPain = redFlag.resolveReport('my knee hurts', null);
+check('embedder-null + pain language -> red-flag-pain, confident',
+  koPain.confident && koPain.entry.id === 'red-flag-pain' && koPain.similarity === null &&
+  koPain.overrideApplied);
+const koClean = redFlag.resolveReport('solid session, all moving well', null);
+check('embedder-null + clean language -> not confident, no override',
+  !koClean.confident && koClean.entry === null && !koClean.overrideApplied);
+check('halt override carries zero load and zero cap (invariant)',
+  redFlag.RED_FLAG_SYSTEMIC.guardrail.halt &&
+  redFlag.RED_FLAG_SYSTEMIC.guardrail.load_multiplier === 0 &&
+  redFlag.RED_FLAG_SYSTEMIC.guardrail.rpe_cap_max === 0);
+check('pain override is conservative (mult<=1, delta<=0)',
+  redFlag.RED_FLAG_PAIN.guardrail.load_multiplier <= 1 &&
+  redFlag.RED_FLAG_PAIN.guardrail.set_delta <= 0);
+
+// 5c. arbitration with live semantic triage
+const resolveLive = async (text) =>
+  redFlag.resolveReport(text, triageMod.triage(await embedOne(text), loaded));
+let r5 = await resolveLive('my back hurts');
+check('"my back hurts" -> confident conservative outcome (floor or curated pain)',
+  r5.confident && r5.entry !== null &&
+  (r5.entry.category === 'pain') && r5.entry.guardrail.rpe_cap_max <= 7.0,
+  `${r5.entry?.id} override=${r5.overrideApplied}`);
+r5 = await resolveLive('felt a sharp pop in my knee mid set');
+check('curated halt keeps supremacy over the floor',
+  r5.entry?.id === 'pain-sharp' && !r5.overrideApplied);
+r5 = await resolveLive('quads still hurt from the last squat day');
+check('confident body-state match NOT degraded to the floor',
+  r5.confident && !r5.overrideApplied &&
+  ['soreness-doms', 'pain-mild', 'pain-moderate', 'fatigue-heavy'].includes(r5.entry?.id),
+  r5.entry?.id);
+r5 = await resolveLive('weights are flying up but my elbow hurts');
+check('mixed report misrouted to positive gets overridden',
+  r5.confident && r5.entry.guardrail.rpe_cap_max <= 7.0,
+  `${r5.entry?.id} override=${r5.overrideApplied}`);
+r5 = await resolveLive('bit woozy and lightheaded after that set');
+check('systemic language ends in a halt (curated or override)',
+  r5.confident && r5.entry.guardrail.halt === true, r5.entry?.id);
+r5 = await resolveLive('feeling amazing, weights are flying up');
+check('clean positive report untouched by the override layer',
+  !r5.overrideApplied && r5.entry?.id === 'positive-strong');
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}  (routing ${routedOk}/${CASES.length})`);
 process.exit(fail ? 1 : 0);

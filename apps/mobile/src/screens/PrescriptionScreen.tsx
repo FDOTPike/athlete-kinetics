@@ -35,6 +35,7 @@ export default function PrescriptionScreen(): React.JSX.Element {
   const triageReady = useStore((s) => s.triageReady);
   const triaging = useStore((s) => s.triaging);
   const lastTriage = useStore((s) => s.lastTriage);
+  const profileNotes = useStore((s) => s.profileNotes);
   const reportSubjective = useStore((s) => s.reportSubjective);
 
   const [selected, setSelected] = useState<readonly MovementPattern[]>(['squat', 'push_h']);
@@ -104,16 +105,20 @@ export default function PrescriptionScreen(): React.JSX.Element {
             <View
               style={[
                 styles.sourceBadge,
-                { borderColor: current.source === 'guardrail' ? palette.amber : palette.green },
+                { borderColor: current.source === 'policy' ? palette.green : palette.amber },
               ]}
             >
               <Text
                 style={[
                   styles.sourceBadgeText,
-                  { color: current.source === 'guardrail' ? palette.amber : palette.green },
+                  { color: current.source === 'policy' ? palette.green : palette.amber },
                 ]}
               >
-                {current.source === 'guardrail' ? 'GUARDRAIL' : 'POLICY'}
+                {current.source === 'guardrail'
+                  ? 'GUARDRAIL'
+                  : current.source === 'profile'
+                    ? 'PROFILE'
+                    : 'POLICY'}
               </Text>
             </View>
           </View>
@@ -134,6 +139,11 @@ export default function PrescriptionScreen(): React.JSX.Element {
           </View>
 
           <Text style={styles.cue}>{current.vector.coaching_cue}</Text>
+          {profileNotes.map((note) => (
+            <Text key={note} style={styles.profileNote}>
+              {note}
+            </Text>
+          ))}
         </View>
       )}
 
@@ -145,15 +155,16 @@ export default function PrescriptionScreen(): React.JSX.Element {
         </Text>
       )}
 
-      {/* ---- subjective report triage ---- */}
+      {/* ---- subjective report triage (keyword safety layer always active;
+            semantic matching requires the embedder) ---- */}
       <Text style={[styles.sectionLabel, styles.reportLabel]}>SUBJECTIVE REPORT</Text>
-      {!triageReady ? (
-        <Text style={styles.dimText}>
-          On-device triage is inactive in this build (embedding model not wired yet).
-          Prescriptions stay policy-driven.
+      {!triageReady && (
+        <Text style={styles.dimTextLeft}>
+          Semantic matching is unavailable in this build — injury-language safety
+          checks remain fully active.
         </Text>
-      ) : (
-        <>
+      )}
+      <>
           <TextInput
             style={styles.reportInput}
             value={reportText}
@@ -182,10 +193,10 @@ export default function PrescriptionScreen(): React.JSX.Element {
 
           {lastTriage !== null && lastTriage.kind === 'rejected' && (
             <View style={styles.rejectCard}>
-              <Text style={styles.rejectTitle}>NO CONFIDENT MATCH</Text>
+              <Text style={styles.rejectTitle}>NOTED — NO CHANGE</Text>
               <Text style={styles.dimTextLeft}>
-                Closest cue scored {(lastTriage.similarity * 100).toFixed(0)}% — below the
-                threshold, so nothing changed. Rephrase with how it feels during movement.
+                That didn&apos;t match a known scenario, so the prescription is unchanged.
+                It&apos;s logged. Rephrase with how it feels during movement if something is off.
               </Text>
             </View>
           )}
@@ -200,20 +211,18 @@ export default function PrescriptionScreen(): React.JSX.Element {
           )}
           {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
             <View style={styles.matchCard}>
-              <Text style={styles.matchTitle}>
-                GUARDRAIL APPLIED · {(lastTriage.directive.similarity * 100).toFixed(0)}% MATCH
-              </Text>
+              <Text style={styles.matchTitle}>GUARDRAIL APPLIED</Text>
               <Text style={styles.matchCue}>{lastTriage.directive.vector.coaching_cue}</Text>
               {lastTriage.directive.followUp !== null && (
                 <Text style={styles.followUp}>{lastTriage.directive.followUp}</Text>
               )}
               <Text style={styles.dimTextLeft}>
-                The prescription above now reflects this report.
+                The prescription above now reflects this report. It stays in force for the
+                rest of the day, even if the app restarts.
               </Text>
             </View>
           )}
-        </>
-      )}
+      </>
     </ScrollView>
   );
 }
@@ -287,6 +296,7 @@ const styles = StyleSheet.create({
   },
   bigLabel: { color: palette.dim, fontSize: 11, letterSpacing: 2, marginTop: 4 },
   cue: { color: palette.text, fontSize: 16, lineHeight: 23 },
+  profileNote: { color: palette.amber, fontSize: 13, lineHeight: 19, marginTop: 8 },
   errorTitle: { color: palette.red, fontSize: 20, fontWeight: '800', letterSpacing: 2 },
   dimText: { color: palette.dim, fontSize: 14, textAlign: 'center', lineHeight: 20 },
   dimTextLeft: { color: palette.dim, fontSize: 14, lineHeight: 20, marginTop: 8 },

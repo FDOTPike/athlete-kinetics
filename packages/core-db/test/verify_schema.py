@@ -38,7 +38,7 @@ def check(label, ok, detail=""):
 print(f"SQLite {sqlite3.sqlite_version}")
 print("\n[1] schema files execute cleanly")
 for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql",
-          "005_subjective_report.sql"]:
+          "005_subjective_report.sql", "006_user_profile.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -158,6 +158,31 @@ try:
     check("halt CHECK rejects non-boolean", False)
 except sqlite3.IntegrityError:
     check("halt CHECK rejects non-boolean", True)
+
+# --- 7. user profile (006) -----------------------------------------------------
+print("\n[7] user_profile (006)")
+row = con.execute("SELECT * FROM user_profile WHERE profile_id = 1").fetchone()
+check("seed row exists with safe defaults",
+      row is not None and row["max_sessions_per_day"] == 1 and row["base_rpe_cap"] == 9.0)
+con.execute("UPDATE user_profile SET objective='strength', weekly_frequency=5,"
+            " injury_flags='[{\"region\":\"knee\",\"note\":\"old MCL\"}]' WHERE profile_id=1")
+row = con.execute("SELECT objective, injury_flags FROM user_profile").fetchone()
+check("update + JSON flags round-trip", row["objective"] == "strength" and "MCL" in row["injury_flags"])
+try:
+    con.execute("UPDATE user_profile SET base_rpe_cap = 11 WHERE profile_id = 1")
+    check("CHECK rejects rpe cap > 10", False)
+except sqlite3.IntegrityError:
+    check("CHECK rejects rpe cap > 10", True)
+try:
+    con.execute("UPDATE user_profile SET injury_flags = 'not json' WHERE profile_id = 1")
+    check("CHECK rejects malformed JSON", False)
+except sqlite3.IntegrityError:
+    check("CHECK rejects malformed JSON", True)
+try:
+    con.execute("INSERT INTO user_profile (profile_id) VALUES (2)")
+    check("single-row constraint holds", False)
+except sqlite3.IntegrityError:
+    check("single-row constraint holds", True)
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

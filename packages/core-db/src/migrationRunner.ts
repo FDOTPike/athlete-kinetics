@@ -32,6 +32,7 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'state_vector' },        // 003
   { type: 'view', name: 'v_readiness_inputs' },   // 003
   { type: 'table', name: 'subjective_report' },   // 005
+  { type: 'table', name: 'user_profile' },        // 006
 ];
 
 function userVersion(db: MigrationDb): number {
