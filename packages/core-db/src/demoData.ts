@@ -155,8 +155,10 @@ export function generateDemoHistory(
   WEEK_PLAN.forEach((w, gw) =>
     db.run('INSERT INTO micro_cycle (micro_cycle_id, macro_cycle_id, week_index, phase) VALUES (?,?,?,?)',
       [gw + 1, gw < 13 ? 1 : 2, (gw % 13) + 1, w.phase]));
+  // OR IGNORE: migration 007 seeds the movement library with ids 1..7
+  // byte-identical to this list, so both paths coexist on any install.
   for (const m of [...LIFTS, BJJ]) {
-    db.run('INSERT INTO movement (movement_id, name, pattern) VALUES (?,?,?)',
+    db.run('INSERT OR IGNORE INTO movement (movement_id, name, pattern) VALUES (?,?,?)',
       [m.id, m.name, m.pattern]);
   }
 

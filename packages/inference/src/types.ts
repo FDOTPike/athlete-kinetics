@@ -29,11 +29,11 @@ export const MOVEMENT_PATTERNS = [
 export type MovementPattern = (typeof MOVEMENT_PATTERNS)[number];
 
 // ---------------------------------------------------------------------------
-// Athlete profile — mirrors the CHECK constraints in 006_user_profile.sql.
-// Field names match column names so the store maps rows 1:1.
+// Athlete profile — mirrors the CHECK constraints in 007_program_engine.sql
+// (athlete_profile). Field names match column names so the store maps rows 1:1.
 // ---------------------------------------------------------------------------
 export const OBJECTIVES = [
-  'strength', 'hypertrophy', 'power', 'endurance', 'gpp', 'rehab', 'weight_loss',
+  'strength', 'hypertrophy', 'power', 'endurance', 'gpp', 'hybrid', 'rehab', 'weight_loss',
 ] as const;
 export type Objective = (typeof OBJECTIVES)[number];
 
@@ -48,8 +48,21 @@ export const PROGRESSION_METHODS = [
 ] as const;
 export type ProgressionMethod = (typeof PROGRESSION_METHODS)[number];
 
-export const EQUIPMENT_ACCESS = ['full_gym', 'home_basic', 'minimal'] as const;
-export type EquipmentAccess = (typeof EQUIPMENT_ACCESS)[number];
+/** Equipment inventory items — order and spelling MUST mirror the
+ *  movement_equipment.item CHECK and the athlete_profile default in
+ *  007_program_engine.sql (machine-checked by verify:blocks). */
+export const EQUIPMENT_ITEMS = [
+  'barbell', 'squat_rack', 'bench', 'dumbbells', 'kettlebell',
+  'pullup_bar', 'nordic_bench', 'bands', 'cable_machine', 'mats',
+] as const;
+export type EquipmentItem = (typeof EQUIPMENT_ITEMS)[number];
+
+/** UI presets; bundles MUST mirror 007's legacy equipment_access CASE map. */
+export const EQUIPMENT_PRESETS: Record<'full_gym' | 'home_basic' | 'minimal', readonly EquipmentItem[]> = {
+  full_gym: EQUIPMENT_ITEMS,
+  home_basic: ['dumbbells', 'kettlebell', 'pullup_bar', 'bands', 'mats'],
+  minimal: ['bands', 'mats'],
+};
 
 /** One historical-injury or mobility-limit note (stored as JSON in 006). */
 export interface BodyNote {
@@ -68,7 +81,9 @@ export interface UserProfile {
   progression_methodology: ProgressionMethod;
   injury_flags: BodyNote[];
   mobility_limits: BodyNote[];
-  equipment_access: EquipmentAccess;
+  /** Items the athlete actually owns/can reach — a movement is available iff
+   *  ALL its required items are present (strict boolean filter). */
+  equipment_inventory: EquipmentItem[];
 }
 
 /** Mirrors the SQL column defaults — a fresh install is safe pre-questionnaire. */
@@ -83,5 +98,5 @@ export const DEFAULT_PROFILE: UserProfile = Object.freeze({
   progression_methodology: 'autoregulated',
   injury_flags: [],
   mobility_limits: [],
-  equipment_access: 'full_gym',
+  equipment_inventory: [...EQUIPMENT_ITEMS],
 });

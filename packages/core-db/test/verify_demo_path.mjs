@@ -41,7 +41,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 console.log('[1] boot path on an EMPTY database');
 for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
-  '005_subjective_report.sql', '006_user_profile.sql']) {
+  '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql']) {
   raw.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 for (const date of demo.demoDates(today, 7)) adapter.run(MATERIALIZE, [date]);
@@ -72,8 +72,14 @@ const trend = raw.prepare(
 check('14-day trend query returns 14 rows', trend.length === 14, String(trend.length));
 const movements = raw.prepare(
   'SELECT movement_id, name, pattern FROM movement ORDER BY movement_id').all();
-check('movement library populated for SessionScreen', movements.length === 7,
-  String(movements.length));
+check('movement library populated for SessionScreen (007 seed = 30)',
+  movements.length === 30, String(movements.length));
+// 007 and the demo loader both write movements 1..7 (OR IGNORE) — prove the
+// coexistence holds: ids 1..7 carry the demo names, not duplicates.
+check('demo ids 1..7 identical to 007 seed (no duplicate library)',
+  movements[0].name === 'Competition Squat' &&
+  movements[6].name === 'BJJ Sparring Round' &&
+  movements.filter((m) => m.name === 'Competition Squat').length === 1);
 
 console.log('[4] guards and idempotency');
 check('guard now refuses a second demo load',

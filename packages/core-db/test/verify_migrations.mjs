@@ -23,7 +23,7 @@ const { runMigrations, sentinelsMissing, SENTINELS } = require('./.build/migrati
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', 'src', 'schema');
 const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
-  '005_subjective_report.sql', '006_user_profile.sql'];
+  '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -94,6 +94,39 @@ check('failed migration rolled back atomically', (() => {
 runMigrations(c, MIGRATIONS); // "next app update ships the fixed migration"
 check('retry with fixed migration completes the chain',
   uv(c) === MIGRATIONS.length && sentinelsMissing(c).length === 0);
+
+// --- 4. 006 -> 007 upgrade: data lands in athlete_profile and SURVIVES self-heal -
+console.log('[4] upgrade path: user_profile data -> athlete_profile (007)');
+const d = freshDb();
+// A device on the 006 build (raw exec: the current runner's SENTINELS already
+// expect 007's tables, so the historical state must be staged without it).
+for (let i = 0; i < 5; i++) d.executeSync(MIGRATIONS[i]);
+d.executeSync('PRAGMA user_version = 5;');
+d.executeSync(`UPDATE user_profile SET objective = 'strength', base_rpe_cap = 8.0,
+  equipment_access = 'home_basic',
+  injury_flags = '[{"region":"knee","note":"old MCL"}]' WHERE profile_id = 1`);
+runMigrations(d, MIGRATIONS); // the app update ships 007
+const migrated = d.raw.prepare('SELECT * FROM athlete_profile WHERE profile_id = 1').get();
+check('customized row copied into athlete_profile',
+  migrated.objective === 'strength' && migrated.base_rpe_cap === 8.0 &&
+  migrated.injury_flags.includes('MCL'));
+check('legacy equipment_access mapped to home inventory bundle',
+  migrated.equipment_inventory === '["dumbbells","kettlebell","pullup_bar","bands","mats"]',
+  migrated.equipment_inventory);
+check('legacy user_profile dropped',
+  d.raw.prepare("SELECT 1 FROM sqlite_master WHERE name='user_profile'").get() === undefined);
+// Now the athlete sets 'hybrid' + a custom inventory, then the DB self-heals
+// (sentinel missing) — the re-applied 006+007 must NOT reset either field.
+d.executeSync(`UPDATE athlete_profile SET objective = 'hybrid',
+  equipment_inventory = '["barbell","mats"]' WHERE profile_id = 1`);
+d.executeSync('DROP VIEW v_readiness_inputs;'); // poison: forces full re-apply
+runMigrations(d, MIGRATIONS);
+const healed = d.raw.prepare('SELECT * FROM athlete_profile WHERE profile_id = 1').get();
+check('self-heal re-apply preserves hybrid objective + custom inventory',
+  healed.objective === 'hybrid' && healed.equipment_inventory === '["barbell","mats"]',
+  `${healed.objective} / ${healed.equipment_inventory}`);
+check('self-heal restored the dropped view',
+  sentinelsMissing(d).length === 0 && uv(d) === MIGRATIONS.length);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

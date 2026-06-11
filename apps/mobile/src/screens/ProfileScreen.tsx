@@ -10,10 +10,12 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   ENERGY_SYSTEMS,
-  EQUIPMENT_ACCESS,
+  EQUIPMENT_ITEMS,
+  EQUIPMENT_PRESETS,
   OBJECTIVES,
   PROGRESSION_METHODS,
   TRAINING_AGES,
+  type EquipmentItem,
   type UserProfile,
 } from '@ak/inference';
 import { palette, useStore } from '../state/useStore';
@@ -214,12 +216,52 @@ export default function ProfileScreen(): React.JSX.Element {
           accessibilityLabel="Mobility limitations, one per line"
         />
       </View>
-      <ChipRow
-        label="EQUIPMENT ACCESS"
-        options={EQUIPMENT_ACCESS}
-        value={profile.equipment_access}
-        onSelect={(equipment_access) => saveProfile({ equipment_access })}
-      />
+      <View style={styles.field}>
+        <View style={styles.fieldLabelRow}>
+          <Text style={styles.fieldLabel}>EQUIPMENT INVENTORY</Text>
+        </View>
+        <Text style={styles.fieldHint}>
+          Workouts only ever prescribe movements your equipment can support.
+        </Text>
+        <View style={styles.chipWrap}>
+          {(Object.keys(EQUIPMENT_PRESETS) as (keyof typeof EQUIPMENT_PRESETS)[]).map((preset) => (
+            <Pressable
+              key={preset}
+              onPress={() => saveProfile({ equipment_inventory: [...EQUIPMENT_PRESETS[preset]] })}
+              accessibilityRole="button"
+              accessibilityLabel={`Use ${preset.replace(/_/g, ' ')} equipment preset`}
+              style={styles.presetChip}
+            >
+              <Text style={styles.presetChipText}>{preset.replace(/_/g, ' ').toUpperCase()}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={[styles.chipWrap, styles.inventoryWrap]}>
+          {EQUIPMENT_ITEMS.map((item: EquipmentItem) => {
+            const owned = profile.equipment_inventory.includes(item);
+            return (
+              <Pressable
+                key={item}
+                onPress={() =>
+                  saveProfile({
+                    equipment_inventory: owned
+                      ? profile.equipment_inventory.filter((i) => i !== item)
+                      : [...profile.equipment_inventory, item],
+                  })
+                }
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: owned }}
+                accessibilityLabel={`${item.replace(/_/g, ' ')}, ${owned ? 'owned' : 'not owned'}`}
+                style={[styles.chip, owned && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, owned && styles.chipTextActive]}>
+                  {item.replace(/_/g, ' ').toUpperCase()}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -233,6 +275,18 @@ const styles = StyleSheet.create({
   field: { marginBottom: 18 },
   fieldLabel: { color: palette.dim, fontSize: 12, letterSpacing: 1.5 },
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  fieldHint: { color: palette.dim, fontSize: 12, lineHeight: 17, marginBottom: 10 },
+  presetChip: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetChipText: { color: palette.amber, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  inventoryWrap: { marginTop: 10 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     minHeight: 48,

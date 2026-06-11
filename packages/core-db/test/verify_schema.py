@@ -38,7 +38,7 @@ def check(label, ok, detail=""):
 print(f"SQLite {sqlite3.sqlite_version}")
 print("\n[1] schema files execute cleanly")
 for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql",
-          "005_subjective_report.sql", "006_user_profile.sql"]:
+          "005_subjective_report.sql", "006_user_profile.sql", "007_program_engine.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -49,7 +49,7 @@ D0 = date(2026, 5, 11)
 days = [D0 + timedelta(days=i) for i in range(30)]
 con.execute("INSERT INTO macro_cycle (macro_cycle_id, name, goal, start_date) VALUES (1,'Block 1','strength',?)", (days[0].isoformat(),))
 con.execute("INSERT INTO micro_cycle (micro_cycle_id, macro_cycle_id, week_index, phase) VALUES (1,1,1,'accumulation')")
-con.execute("INSERT INTO movement (movement_id, name, pattern) VALUES (1,'Back Squat','squat')")
+# movement_id 1 ('Competition Squat') comes from the 007 library seed.
 
 sid = 0
 for i, d in enumerate(days):
@@ -159,30 +159,99 @@ try:
 except sqlite3.IntegrityError:
     check("halt CHECK rejects non-boolean", True)
 
-# --- 7. user profile (006) -----------------------------------------------------
-print("\n[7] user_profile (006)")
-row = con.execute("SELECT * FROM user_profile WHERE profile_id = 1").fetchone()
+# --- 7. athlete profile (007 supersedes 006) ------------------------------------
+print("\n[7] athlete_profile (007)")
+legacy = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_profile'").fetchone()
+check("legacy user_profile dropped by 007", legacy is None)
+row = con.execute("SELECT * FROM athlete_profile WHERE profile_id = 1").fetchone()
 check("seed row exists with safe defaults",
       row is not None and row["max_sessions_per_day"] == 1 and row["base_rpe_cap"] == 9.0)
-con.execute("UPDATE user_profile SET objective='strength', weekly_frequency=5,"
+check("default inventory is the full equipment list",
+      row is not None and '"barbell"' in row["equipment_inventory"]
+      and '"mats"' in row["equipment_inventory"])
+con.execute("UPDATE athlete_profile SET objective='hybrid', weekly_frequency=5,"
             " injury_flags='[{\"region\":\"knee\",\"note\":\"old MCL\"}]' WHERE profile_id=1")
-row = con.execute("SELECT objective, injury_flags FROM user_profile").fetchone()
-check("update + JSON flags round-trip", row["objective"] == "strength" and "MCL" in row["injury_flags"])
+row = con.execute("SELECT objective, injury_flags FROM athlete_profile").fetchone()
+check("'hybrid' objective accepted + JSON flags round-trip",
+      row["objective"] == "hybrid" and "MCL" in row["injury_flags"])
 try:
-    con.execute("UPDATE user_profile SET base_rpe_cap = 11 WHERE profile_id = 1")
+    con.execute("UPDATE athlete_profile SET base_rpe_cap = 11 WHERE profile_id = 1")
     check("CHECK rejects rpe cap > 10", False)
 except sqlite3.IntegrityError:
     check("CHECK rejects rpe cap > 10", True)
 try:
-    con.execute("UPDATE user_profile SET injury_flags = 'not json' WHERE profile_id = 1")
+    con.execute("UPDATE athlete_profile SET injury_flags = 'not json' WHERE profile_id = 1")
     check("CHECK rejects malformed JSON", False)
 except sqlite3.IntegrityError:
     check("CHECK rejects malformed JSON", True)
 try:
-    con.execute("INSERT INTO user_profile (profile_id) VALUES (2)")
+    con.execute("UPDATE athlete_profile SET equipment_inventory = 'not json' WHERE profile_id = 1")
+    check("CHECK rejects malformed inventory JSON", False)
+except sqlite3.IntegrityError:
+    check("CHECK rejects malformed inventory JSON", True)
+try:
+    con.execute("INSERT INTO athlete_profile (profile_id) VALUES (2)")
     check("single-row constraint holds", False)
 except sqlite3.IntegrityError:
     check("single-row constraint holds", True)
+
+# --- 8. movement library + equipment requirements (007) -------------------------
+print("\n[8] movement library + movement_equipment (007)")
+n_mov = con.execute("SELECT count(*) c FROM movement").fetchone()["c"]
+check("library seeded (30 movements)", n_mov == 30, str(n_mov))
+nordic = con.execute(
+    "SELECT me.item FROM movement_equipment me JOIN movement m USING (movement_id)"
+    " WHERE m.name = 'Nordic Curl'").fetchall()
+check("Nordic Curl requires nordic_bench", [r["item"] for r in nordic] == ["nordic_bench"])
+bw = con.execute(
+    "SELECT count(*) c FROM movement m WHERE NOT EXISTS"
+    " (SELECT 1 FROM movement_equipment me WHERE me.movement_id = m.movement_id)").fetchone()["c"]
+check("bodyweight movements need nothing (Push-up, Plank, ...)", bw >= 5, str(bw))
+try:
+    con.execute("INSERT INTO movement_equipment (movement_id, item) VALUES (1, 'flux_capacitor')")
+    check("item CHECK rejects unknown equipment", False)
+except sqlite3.IntegrityError:
+    check("item CHECK rejects unknown equipment", True)
+# re-running the seed block is a no-op (idempotency contract)
+before = con.execute("SELECT count(*) c FROM movement_equipment").fetchone()["c"]
+con.executescript((SCHEMA_DIR / "007_program_engine.sql").read_text(encoding="utf-8"))
+after = con.execute("SELECT count(*) c FROM movement_equipment").fetchone()["c"]
+check("007 re-apply is a no-op (idempotent)", before == after, f"{before} == {after}")
+row = con.execute("SELECT objective FROM athlete_profile WHERE profile_id = 1").fetchone()
+check("007 re-apply preserves customized profile (objective stays 'hybrid')",
+      row["objective"] == "hybrid")
+
+# --- 9. block engine tables (007) ------------------------------------------------
+print("\n[9] training_block / planned_session / planned_slot (007)")
+con.execute("INSERT INTO training_block (block_id, start_date, objective, created_at_ms)"
+            " VALUES (1, '2026-06-12', 'hybrid', 0)")
+con.execute("INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index,"
+            " focus, phase, session_date) VALUES (1, 1, 1, 1, 'lower', 'accumulation', '2026-06-12')")
+con.execute("INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps,"
+            " target_rpe) VALUES (1, 1, 1, 4, 5, 7.5)")
+check("block -> session -> slot inserts commit", True)
+try:
+    con.execute("INSERT INTO planned_session (block_id, week_index, day_index, focus, phase,"
+                " session_date) VALUES (1, 5, 1, 'lower', 'deload', '2026-07-10')")
+    check("week_index CHECK rejects week 5", False)
+except sqlite3.IntegrityError:
+    check("week_index CHECK rejects week 5", True)
+try:
+    con.execute("INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets,"
+                " reps, target_rpe) VALUES (1, 2, 1, 4, 5, 4.5)")
+    check("target_rpe CHECK rejects < 5.0", False)
+except sqlite3.IntegrityError:
+    check("target_rpe CHECK rejects < 5.0", True)
+try:
+    con.execute("INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index,"
+                " focus, phase, session_date) VALUES (2, 1, 1, 1, 'upper', 'accumulation', '2026-06-12')")
+    check("UNIQUE(block, week, day) holds", False)
+except sqlite3.IntegrityError:
+    check("UNIQUE(block, week, day) holds", True)
+con.execute("DELETE FROM training_block WHERE block_id = 1")
+orphans = con.execute("SELECT (SELECT count(*) FROM planned_session) +"
+                      " (SELECT count(*) FROM planned_slot) AS c").fetchone()["c"]
+check("block delete cascades sessions + slots", orphans == 0, str(orphans))
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

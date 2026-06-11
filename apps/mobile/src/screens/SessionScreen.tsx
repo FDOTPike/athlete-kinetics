@@ -21,7 +21,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { palette, useStore, type LoggedSet, type Movement } from '../state/useStore';
+import {
+  isMovementAvailable,
+  palette,
+  useStore,
+  type LoggedSet,
+  type Movement,
+} from '../state/useStore';
 import InfoTip from '../components/InfoTip';
 
 // ---------------------------------------------------------------------------
@@ -130,8 +136,12 @@ export default function SessionScreen(): React.JSX.Element {
   const elapsedMin = Math.floor((nowMs - session.startedAtMs) / 60_000);
   const overTime = elapsedMin > profile.session_duration_cap_min;
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+  // Library pickers honor the strict equipment filter: a movement the
+  // athlete's inventory cannot support is never offered.
   const inLibraryNotPlanned = movements.filter(
-    (m) => !sessionPlan.some((s) => s.movementId === m.movement_id),
+    (m) =>
+      !sessionPlan.some((s) => s.movementId === m.movement_id) &&
+      isMovementAvailable(m, profile.equipment_inventory),
   );
 
   const confirmEnd = (): void => {
@@ -232,7 +242,10 @@ export default function SessionScreen(): React.JSX.Element {
               </Pressable>
             ))}
             {inLibraryNotPlanned.length === 0 && (
-              <Text style={styles.dimText}>Every movement is already in the plan.</Text>
+              <Text style={styles.dimText}>
+                Nothing left to offer — every movement your equipment supports is
+                already in the plan. Add gear under ATHLETE to widen the pool.
+              </Text>
             )}
           </View>
           <Pressable

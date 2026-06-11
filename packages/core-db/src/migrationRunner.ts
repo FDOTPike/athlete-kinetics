@@ -32,7 +32,10 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'state_vector' },        // 003
   { type: 'view', name: 'v_readiness_inputs' },   // 003
   { type: 'table', name: 'subjective_report' },   // 005
-  { type: 'table', name: 'user_profile' },        // 006
+  // 006's user_profile is intentionally NOT a sentinel: 007 supersedes it
+  // (drops it after copying into athlete_profile).
+  { type: 'table', name: 'athlete_profile' },     // 007
+  { type: 'table', name: 'training_block' },      // 007
 ];
 
 function userVersion(db: MigrationDb): number {

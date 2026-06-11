@@ -28,6 +28,7 @@ import {
   applyGuardrail,
   applyProfileLimits,
   DEFAULT_PROFILE,
+  EQUIPMENT_ITEMS,
   getPrescription,
   loadCodebase,
   moreConservative,
@@ -72,7 +73,17 @@ export interface Movement {
   movement_id: number;
   name: string;
   pattern: string;
+  is_compound: boolean;
+  /** Equipment items this movement needs (movement_equipment rows). */
+  required: string[];
 }
+
+/** STRICT boolean equipment filter: available iff every required item is in
+ *  the athlete's inventory. No-equipment movements are always available. */
+export const isMovementAvailable = (
+  m: Movement,
+  inventory: readonly string[],
+): boolean => m.required.every((item) => inventory.includes(item));
 
 export interface LoggedSet {
   set_id: number;
@@ -196,13 +207,32 @@ const entryById = (id: string): PhraseEntry | undefined => {
   return entryIndexCache.get(id);
 };
 
+// --- movement row <-> object mapping ------------------------------------------
+interface MovementRow {
+  movement_id: number; name: string; pattern: string;
+  is_compound: number; required_json: string | null;
+}
+const movementFromRow = (r: MovementRow): Movement => {
+  let required: string[] = [];
+  try {
+    const v = JSON.parse(r.required_json ?? '[]') as unknown;
+    if (Array.isArray(v)) required = v.filter((x): x is string => typeof x === 'string');
+  } catch {
+    /* unreadable requirement rows fail toward "needs nothing" */
+  }
+  return {
+    movement_id: r.movement_id, name: r.name, pattern: r.pattern,
+    is_compound: r.is_compound === 1, required,
+  };
+};
+
 // --- profile row <-> object mapping ------------------------------------------
 interface ProfileRow {
   objective: string; training_age: string; weekly_frequency: number;
   max_sessions_per_day: number; session_duration_cap_min: number;
   base_rpe_cap: number; target_energy_system: string;
   progression_methodology: string; injury_flags: string;
-  mobility_limits: string; equipment_access: string;
+  mobility_limits: string; equipment_inventory: string;
 }
 const parseBodyNotes = (json: string): UserProfile['injury_flags'] => {
   try {
@@ -217,11 +247,22 @@ const parseBodyNotes = (json: string): UserProfile['injury_flags'] => {
     return [];
   }
 };
+const parseInventory = (json: string): UserProfile['equipment_inventory'] => {
+  try {
+    const v = JSON.parse(json) as unknown;
+    if (!Array.isArray(v)) return [...EQUIPMENT_ITEMS];
+    const seen = new Set(v.filter((x): x is string => typeof x === 'string'));
+    return EQUIPMENT_ITEMS.filter((i) => seen.has(i)); // canonical order, known items
+  } catch {
+    return [...EQUIPMENT_ITEMS];
+  }
+};
 const profileFromRow = (r: ProfileRow): UserProfile => ({
   ...(DEFAULT_PROFILE as UserProfile),
   ...r,
   injury_flags: parseBodyNotes(r.injury_flags),
   mobility_limits: parseBodyNotes(r.mobility_limits),
+  equipment_inventory: parseInventory(r.equipment_inventory),
 } as UserProfile);
 
 // ---------------------------------------------------------------------------
@@ -255,13 +296,13 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       for (const date of demoDates(localToday(), 7)) {
         db.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
       }
-      const movements = rowsOf<Movement>(
+      const movements = rowsOf<MovementRow>(
         getDb().executeSync(
-          'SELECT movement_id, name, pattern FROM movement ORDER BY movement_id',
+          'SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json FROM movement m ORDER BY m.movement_id',
         ),
-      );
+      ).map(movementFromRow);
       const profileRow = rowsOf<ProfileRow>(
-        getDb().executeSync('SELECT * FROM user_profile WHERE profile_id = 1'),
+        getDb().executeSync('SELECT * FROM athlete_profile WHERE profile_id = 1'),
       )[0];
       set({
         status: 'ready',
@@ -287,19 +328,23 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     merged.max_sessions_per_day = Math.round(clamp(merged.max_sessions_per_day, 1, 3));
     merged.session_duration_cap_min = Math.round(clamp(merged.session_duration_cap_min, 15, 240));
     merged.base_rpe_cap = clamp(Math.round(merged.base_rpe_cap * 2) / 2, 5, 10);
+    // Canonical inventory: dedupe, drop unknown items, EQUIPMENT_ITEMS order
+    // (the block generator's determinism depends on a stable order).
+    const owned = new Set(merged.equipment_inventory);
+    merged.equipment_inventory = EQUIPMENT_ITEMS.filter((i) => owned.has(i));
     getDb().executeSync(
-      `UPDATE user_profile SET
+      `UPDATE athlete_profile SET
          objective = ?, training_age = ?, weekly_frequency = ?,
          max_sessions_per_day = ?, session_duration_cap_min = ?, base_rpe_cap = ?,
          target_energy_system = ?, progression_methodology = ?,
-         injury_flags = ?, mobility_limits = ?, equipment_access = ?, updated_at_ms = ?
+         injury_flags = ?, mobility_limits = ?, equipment_inventory = ?, updated_at_ms = ?
        WHERE profile_id = 1`,
       [
         merged.objective, merged.training_age, merged.weekly_frequency,
         merged.max_sessions_per_day, merged.session_duration_cap_min, merged.base_rpe_cap,
         merged.target_energy_system, merged.progression_methodology,
         JSON.stringify(merged.injury_flags), JSON.stringify(merged.mobility_limits),
-        merged.equipment_access, Date.now(),
+        JSON.stringify(merged.equipment_inventory), Date.now(),
       ],
     );
     set({ profile: merged });
@@ -609,9 +654,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    const movements = rowsOf<Movement>(
-      d.executeSync('SELECT movement_id, name, pattern FROM movement ORDER BY movement_id'),
-    );
+    const movements = rowsOf<MovementRow>(
+      d.executeSync('SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json FROM movement m ORDER BY m.movement_id'),
+    ).map(movementFromRow);
     set({ movements });
     get().refreshVector();
   },
