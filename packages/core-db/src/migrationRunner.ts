@@ -36,6 +36,7 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   // (drops it after copying into athlete_profile).
   { type: 'table', name: 'athlete_profile' },     // 007
   { type: 'table', name: 'training_block' },      // 007
+  { type: 'table', name: 'movement_taxonomy' },   // 008
 ];
 
 function userVersion(db: MigrationDb): number {

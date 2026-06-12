@@ -41,6 +41,13 @@ export interface PhraseCodebase {
   entries: readonly PhraseEntry[];
 }
 
+/** A guardrail that changes nothing (positive-sentiment entries). Such an
+ *  entry must NEVER present as a safety intervention: the derivation skips
+ *  it when picking the operative report, and the UI shows a positive
+ *  acknowledgment instead of "guardrail applied". */
+export const isNoOpGuardrail = (g: Guardrail): boolean =>
+  !g.halt && g.load_multiplier >= 1 && g.set_delta >= 0 && g.rpe_cap_max >= 10;
+
 /** Deterministic embed order: entry text, then aliases, per entry.
  *  scripts/embed-codebase.mjs and loadCodebase() must both use this. */
 export function flattenTexts(cb: PhraseCodebase): { text: string; entryIndex: number }[] {

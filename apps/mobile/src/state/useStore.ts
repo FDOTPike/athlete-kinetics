@@ -29,6 +29,7 @@ import {
   derivePrescription,
   EQUIPMENT_ITEMS,
   generateBlock,
+  isNoOpGuardrail,
   loadCodebase,
   RED_FLAG_PAIN,
   RED_FLAG_SYSTEMIC,
@@ -112,6 +113,9 @@ export type BootStatus = 'booting' | 'ready' | 'error';
 
 export type TriageOutcome =
   | { kind: 'rejected' }
+  /** Positive sentiment: identity pass-through, nothing changes — the UI
+   *  shows a minimal acknowledgment, never a guardrail card. */
+  | { kind: 'positive'; cue: string }
   | { kind: 'matched'; directive: SessionDirective };
 
 /** One slot in the active session's workout plan. */
@@ -604,6 +608,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // Past midnight, todayPlan/prescription may be yesterday's — re-sync
     // before seeding so the athlete gets TODAY'S planned session.
     get().rolloverDay();
+    // Safety floor (gate-independent): an operative halt refuses to start a
+    // session no matter which button asked.
+    const triageNow = get().lastTriage;
+    if (triageNow !== null && triageNow.kind === 'matched' && triageNow.directive.halt) return;
     const today = localToday();
     const startedAtMs = Date.now();
     const d = getDb();
@@ -848,6 +856,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // Re-derive the operative prescription from persistence (single source
       // of truth; also sets lastTriage to the now-operative directive).
       get().computePrescription([]);
+      // Positive identity pass-through: a no-op entry never reads as a
+      // guardrail. Acknowledge it — unless a restrictive report from earlier
+      // today still governs, in which case the honest card is the directive.
+      if (isNoOpGuardrail(resolved.entry.guardrail) && get().lastTriage === null) {
+        set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue } });
+      }
     } finally {
       set({ triaging: false });
     }

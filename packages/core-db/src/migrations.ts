@@ -15,11 +15,12 @@ import m003 from './schema/003_state_vector.sql';
 import m005 from './schema/005_subjective_report.sql';
 import m006 from './schema/006_user_profile.sql';
 import m007 from './schema/007_program_engine.sql';
+import m008 from './schema/008_taxonomy.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

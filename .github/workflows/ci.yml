@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -13,7 +13,7 @@ env:
 
 jobs:
   verify:
-    name: Verification suite (7 gates)
+    name: Verification suite (10 gates)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +36,9 @@ jobs:
       # Hugging Face download on a cold cache).
       - name: Fetch embedder assets
         run: npm run fetch:embedder
-      - name: verify:all (8 gates)
+      - name: verify:all (10 gates)
         run: npm run verify:all
-      - name: Seeder physiology — pinned alignment + today's alignment
+      - name: Seeder physiology â€” pinned alignment + today's alignment
         run: |
           node scripts/seed-db.ts --end=2026-06-10 --db=/tmp/pinned.db
           node scripts/seed-db.ts --db=/tmp/today.db

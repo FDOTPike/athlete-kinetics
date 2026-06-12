@@ -26,8 +26,8 @@ import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso } = require('./.build/blockGenerator.js');
-const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES } =
-  require('./.build/types.js');
+const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
+  TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS } = require('./.build/types.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', '..', 'core-db', 'src', 'schema');
 const START = '2026-06-15';
@@ -46,7 +46,8 @@ try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
   db.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
 }
 for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
-  '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql']) {
+  '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
+  '008_taxonomy.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 const movements = db.prepare(
@@ -217,6 +218,24 @@ const sqlItems = itemList === null ? [] : [...itemList.matchAll(/'([a-z_]+)'/g)]
 check('movement_equipment item CHECK == EQUIPMENT_ITEMS (set equality)',
   sqlItems.length === EQUIPMENT_ITEMS.length &&
   EQUIPMENT_ITEMS.every((i) => sqlItems.includes(i)));
+const sql008 = readFileSync(join(SCHEMA_DIR, '008_taxonomy.sql'), 'utf-8');
+const grab008 = (re) => { const m = sql008.match(re); return m === null ? '' : m[1]; };
+const sqlCats = [...grab008(/category\s+TEXT NOT NULL CHECK \(category IN\s*\(([\s\S]*?)\)\)/)
+  .matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+check('008 taxonomy category CHECK == TAXONOMY_CATEGORIES (set equality)',
+  sqlCats.length === TAXONOMY_CATEGORIES.length &&
+  TAXONOMY_CATEGORIES.every((c) => sqlCats.includes(c)));
+const sqlImps = [...grab008(/implement\s+TEXT NOT NULL DEFAULT 'bodyweight' CHECK \(implement IN\s*\(([\s\S]*?)\)\)/)
+  .matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+check('008 taxonomy implement CHECK == TAXONOMY_IMPLEMENTS (set equality)',
+  sqlImps.length === TAXONOMY_IMPLEMENTS.length &&
+  TAXONOMY_IMPLEMENTS.every((i) => sqlImps.includes(i)));
+check('taxonomy skeleton: one row per category in the live schema',
+  (() => {
+    const rows = db.prepare(
+      'SELECT category, count(*) AS c FROM movement_taxonomy GROUP BY category').all();
+    return rows.length === TAXONOMY_CATEGORIES.length && rows.every((r) => Number(r.c) === 1);
+  })());
 
 // --- [6] persistence round-trip with the store's literal SQL --------------------
 console.log('[6] persistence round-trip (007 tables, FK cascade)');

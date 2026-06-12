@@ -20,7 +20,7 @@ import {
   scaleGuardrailForExperience,
   type ProfileContext,
 } from './profileLimits';
-import type { PhraseEntry } from './semantic/codebase';
+import { isNoOpGuardrail, type PhraseEntry } from './semantic/codebase';
 import {
   applyGuardrail,
   moreConservative,
@@ -53,10 +53,13 @@ export function derivePrescription(input: DeriveInput): DerivedPrescription {
   const base = getPrescription(vector);
   const limited = applyProfileLimits(base.vector, profile, ctx);
 
-  // Layer 3: the single most conservative of today's reports (total order —
-  // halt, then load, then sets, then RPE cap), experience-scaled, applied.
+  // Layer 3: the single most conservative of today's RESTRICTIVE reports
+  // (total order — halt, then load, then sets, then RPE cap), experience-
+  // scaled, applied. Positive no-op entries are identity by definition: they
+  // never become operative, so "it felt good" can never read as a guardrail.
   let operative: PhraseEntry | null = null;
   for (const e of reports) {
+    if (isNoOpGuardrail(e.guardrail)) continue;
     if (operative === null || moreConservative(e.guardrail, operative.guardrail)) {
       operative = e;
     }

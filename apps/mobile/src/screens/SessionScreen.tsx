@@ -87,12 +87,7 @@ const shortName = (name: string): string => (name.length > 12 ? `${name.slice(0,
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
-interface SessionScreenProps {
-  /** Routes to the COACH tab — session starts go through its safety gate. */
-  onGoCoach?: () => void;
-}
-
-export default function SessionScreen({ onGoCoach }: SessionScreenProps): React.JSX.Element {
+export default function SessionScreen(): React.JSX.Element {
   const movements = useStore((s) => s.movements);
   const session = useStore((s) => s.session);
   const sessionPlan = useStore((s) => s.sessionPlan);
@@ -120,21 +115,28 @@ export default function SessionScreen({ onGoCoach }: SessionScreenProps): React.
   }, [session]);
 
   if (session === null) {
-    // Session starts route through COACH's pre-session check-in (the safety
-    // gate). The direct path only remains when the shell gives no router.
+    // Instant start — no forced check-in (field-tested as friction). An
+    // operative halt still blocks here AND inside the store action.
+    const startHalted =
+      lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
     return (
       <View style={styles.center}>
-        <Pressable
-          onPress={onGoCoach ?? startSession}
-          accessibilityRole="button"
-          accessibilityLabel="Start a session via the coach check-in"
-          style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
-        >
-          <Text style={styles.startBtnText}>START IN COACH</Text>
-        </Pressable>
-        <Text style={styles.startHint}>
-          Every session opens with a 10-second body check-in on the COACH tab.
-        </Text>
+        {startHalted ? (
+          <View style={styles.haltBanner}>
+            <Text style={styles.haltBannerText}>
+              STOP — today&apos;s report ended training. Rest, and report again tomorrow.
+            </Text>
+          </View>
+        ) : (
+          <Pressable
+            onPress={startSession}
+            accessibilityRole="button"
+            accessibilityLabel="Start a new workout session"
+            style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
+          >
+            <Text style={styles.startBtnText}>START SESSION</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -197,7 +199,10 @@ export default function SessionScreen({ onGoCoach }: SessionScreenProps): React.
                 accessibilityLabel={`${m?.name ?? 'movement'}, ${logged} of ${slot.plannedSets} sets logged`}
                 style={[styles.navSlot, active && styles.navSlotActive]}
               >
-                <Text style={[styles.navSlotName, active && styles.navSlotNameActive]}>
+                <Text
+                  style={[styles.navSlotName, active && styles.navSlotNameActive]}
+                  numberOfLines={1}
+                >
                   {shortName(m?.name ?? '?')}
                 </Text>
                 <Text style={[styles.navSlotBadge, done && styles.navSlotBadgeDone]}>
@@ -227,7 +232,7 @@ export default function SessionScreen({ onGoCoach }: SessionScreenProps): React.
         </ScrollView>
       ) : (
         <View style={styles.pickPanel}>
-          <Text style={styles.pickTitle}>
+          <Text style={styles.pickTitle} numberOfLines={1}>
             {pickMode === 'swap'
               ? `SWAP ${shortName(byId.get(activeMovementId ?? -1)?.name ?? '?')} FOR:`
               : 'ADD MOVEMENT:'}
@@ -372,14 +377,6 @@ const styles = StyleSheet.create({
   },
   startBtnPressed: { backgroundColor: '#26C28F' },
   startBtnText: { color: '#06251B', fontSize: 24, fontWeight: '800', letterSpacing: 2 },
-  startHint: {
-    color: palette.dim,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
-    marginTop: 14,
-    paddingHorizontal: 36,
-  },
 
   haltBanner: {
     backgroundColor: '#2A1416',
@@ -396,6 +393,7 @@ const styles = StyleSheet.create({
   navSlot: {
     minHeight: 60,
     minWidth: 92,
+    maxWidth: 150,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,

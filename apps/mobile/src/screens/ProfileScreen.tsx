@@ -195,26 +195,38 @@ export default function ProfileScreen(): React.JSX.Element {
         <TextInput
           style={styles.notesInput}
           value={injuryText}
-          onChangeText={setInjuryText}
-          onEndEditing={() => saveProfile({ injury_flags: parseNotes(injuryText) })}
+          // Saved on every keystroke: blur/tab-switch ordering can never
+          // drop the text (field-tested: onEndEditing alone lost input).
+          onChangeText={(t) => {
+            setInjuryText(t);
+            saveProfile({ injury_flags: parseNotes(t) });
+          }}
           placeholder="knee: old MCL strain 2024"
           placeholderTextColor={palette.dim}
           multiline
           accessibilityLabel="Historical injuries, one per line"
         />
+        <Text style={styles.fieldHint}>
+          Example — knee: old MCL strain 2024. Saved as you type.
+        </Text>
       </View>
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>10 · MOBILITY LIMITS (one per line)</Text>
         <TextInput
           style={styles.notesInput}
           value={mobilityText}
-          onChangeText={setMobilityText}
-          onEndEditing={() => saveProfile({ mobility_limits: parseNotes(mobilityText) })}
+          onChangeText={(t) => {
+            setMobilityText(t);
+            saveProfile({ mobility_limits: parseNotes(t) });
+          }}
           placeholder="ankle: limited dorsiflexion"
           placeholderTextColor={palette.dim}
           multiline
           accessibilityLabel="Mobility limitations, one per line"
         />
+        <Text style={styles.fieldHint}>
+          Example — ankle: limited dorsiflexion. Saved as you type.
+        </Text>
       </View>
       <View style={styles.field}>
         <View style={styles.fieldLabelRow}>

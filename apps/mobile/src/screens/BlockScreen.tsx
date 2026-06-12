@@ -57,8 +57,6 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const startSession = useStore((s) => s.startSession);
 
   const [reportText, setReportText] = useState('');
-  const [gateOpen, setGateOpen] = useState(false);
-  const [gateText, setGateText] = useState('');
   const [detail, setDetail] = useState<{ s: BlockSessionSummary; slots: TodaySlot[] } | null>(null);
 
   if (vector === null) {
@@ -91,21 +89,11 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     );
   };
 
+  // Instant start (no forced check-in — field-tested as friction). The
+  // store itself refuses to start while an operative halt is in force.
   const beginSession = (): void => {
     startSession();
-    setGateOpen(false);
-    setGateText('');
     if (onSessionStarted !== undefined) onSessionStarted();
-  };
-
-  const submitGateReport = (): void => {
-    void reportSubjective(gateText).then(() => {
-      setGateText('');
-      const fresh = useStore.getState().lastTriage;
-      const nowHalted = fresh !== null && fresh.kind === 'matched' && fresh.directive.halt;
-      // A halting report keeps the gate closed — the STOP card explains why.
-      if (!nowHalted) beginSession();
-    });
   };
 
   const weekRows: { week: number; phase: string; cells: (BlockSessionSummary | null)[] }[] = [];
@@ -328,7 +316,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         </View>
       )}
 
-      {/* ---- pre-session safety gate ---- */}
+      {/* ---- start session (instant; halts still block) ---- */}
       {session !== null ? (
         <Pressable
           onPress={() => { if (onSessionStarted !== undefined) onSessionStarted(); }}
@@ -344,65 +332,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             STARTING IS BLOCKED — today&apos;s report ended training. Rest, and report again tomorrow.
           </Text>
         </View>
-      ) : !gateOpen ? (
+      ) : (
         <Pressable
-          onPress={() => setGateOpen(true)}
+          onPress={beginSession}
           accessibilityRole="button"
-          accessibilityLabel="Start a session, beginning with the body check-in"
+          accessibilityLabel="Start a new workout session"
           style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
         >
           <Text style={styles.startBtnText}>START SESSION</Text>
         </Pressable>
-      ) : (
-        <View style={styles.gatePanel}>
-          <Text style={styles.gateTitle}>PRE-SESSION CHECK-IN</Text>
-          <Text style={styles.dimTextLeft}>
-            How does your body feel right now? Anything sore, painful, or off — say it
-            before you load it.
-          </Text>
-          <TextInput
-            style={styles.reportInput}
-            value={gateText}
-            onChangeText={setGateText}
-            placeholder="e.g. left knee a bit stiff from Tuesday"
-            placeholderTextColor={palette.dim}
-            maxLength={500}
-            multiline
-            accessibilityLabel="Pre-session body check-in"
-          />
-          <Pressable
-            disabled={gateText.trim().length === 0 || triaging}
-            onPress={submitGateReport}
-            accessibilityRole="button"
-            accessibilityLabel="Submit the check-in and start the session"
-            style={({ pressed }) => [
-              styles.gateBtn,
-              pressed && styles.gateBtnPressed,
-              (gateText.trim().length === 0 || triaging) && styles.gateBtnDisabled,
-            ]}
-          >
-            <Text style={styles.gateBtnText}>
-              {triaging ? 'CHECKING…' : 'SUBMIT & START'}
-            </Text>
-          </Pressable>
-          <Pressable
-            disabled={triaging}
-            onPress={beginSession}
-            accessibilityRole="button"
-            accessibilityLabel="Nothing to report, start the session"
-            style={styles.gateClear}
-          >
-            <Text style={styles.gateClearText}>ALL CLEAR — START</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setGateOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel starting a session"
-            style={styles.gateCancel}
-          >
-            <Text style={styles.gateCancelText}>CANCEL</Text>
-          </Pressable>
-        </View>
       )}
 
       {/* ---- ad-hoc subjective report (always-on safety layer) ---- */}
@@ -439,6 +377,12 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         <Text style={styles.triageBtnText}>{triaging ? 'MATCHING…' : 'TRIAGE'}</Text>
       </Pressable>
 
+      {lastTriage !== null && lastTriage.kind === 'positive' && (
+        <View style={styles.positiveCard}>
+          <Text style={styles.positiveTitle}>NOTED — ALL SYSTEMS GO</Text>
+          <Text style={styles.dimTextLeft}>{lastTriage.cue}</Text>
+        </View>
+      )}
       {lastTriage !== null && lastTriage.kind === 'rejected' && (
         <View style={styles.rejectCard}>
           <Text style={styles.rejectTitle}>NOTED — NO CHANGE</Text>
@@ -609,38 +553,14 @@ const styles = StyleSheet.create({
   },
   startBlockedText: { color: palette.red, fontSize: 14, fontWeight: '700', lineHeight: 20 },
 
-  gatePanel: {
+  positiveCard: {
     backgroundColor: palette.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: palette.amber,
-    padding: 14,
-    marginTop: 22,
-  },
-  gateTitle: { color: palette.amber, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
-  gateBtn: {
-    height: 60,
-    borderRadius: 12,
-    backgroundColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  gateBtnPressed: { backgroundColor: '#26C28F' },
-  gateBtnDisabled: { backgroundColor: palette.line },
-  gateBtnText: { color: '#06251B', fontSize: 16, fontWeight: '800', letterSpacing: 2 },
-  gateClear: {
-    minHeight: 52,
-    borderRadius: 12,
-    borderWidth: 1,
     borderColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
+    padding: 14,
   },
-  gateClearText: { color: palette.green, fontSize: 14, fontWeight: '800', letterSpacing: 1.5 },
-  gateCancel: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginTop: 4 },
-  gateCancelText: { color: palette.dim, fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  positiveTitle: { color: palette.green, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
 
   reportInput: {
     minHeight: 64,

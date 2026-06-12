@@ -18,6 +18,8 @@ export {
   MOVEMENT_PATTERNS,
   OBJECTIVES,
   PROGRESSION_METHODS,
+  TAXONOMY_CATEGORIES,
+  TAXONOMY_IMPLEMENTS,
   TRAINING_AGES,
   type BodyNote,
   type EnergySystem,
@@ -26,6 +28,8 @@ export {
   type Objective,
   type ProgressionMethod,
   type StateVectorRow,
+  type TaxonomyCategory,
+  type TaxonomyImplement,
   type TrainingAge,
   type UserProfile,
 } from './types';
@@ -67,6 +71,7 @@ export { getPrescription, type AdjustmentSource, type Prescription } from './pre
 export { normalize, packVectors, topK, type Match } from './semantic/cosine';
 export {
   flattenTexts,
+  isNoOpGuardrail,
   loadCodebase,
   type Guardrail,
   type LoadedCodebase,

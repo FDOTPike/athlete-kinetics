@@ -64,6 +64,20 @@ export const EQUIPMENT_PRESETS: Record<'full_gym' | 'home_basic' | 'minimal', re
   minimal: ['bands', 'mats'],
 };
 
+/** ExRx-style biomechanical taxonomy — mirrors the movement_taxonomy CHECKs
+ *  in 008_taxonomy.sql (machine-checked by verify:blocks). Schema scaffold
+ *  for Phase 10's external training laws; the block generator does not read
+ *  these yet. */
+export const TAXONOMY_CATEGORIES = [
+  'push', 'row', 'hinge', 'squat', 'core', 'unilateral', 'accessory', 'cardio',
+] as const;
+export type TaxonomyCategory = (typeof TAXONOMY_CATEGORIES)[number];
+
+export const TAXONOMY_IMPLEMENTS = [
+  'barbell', 'dumbbell', 'kettlebell', 'bodyweight', 'band', 'cable', 'machine', 'other',
+] as const;
+export type TaxonomyImplement = (typeof TAXONOMY_IMPLEMENTS)[number];
+
 /** One historical-injury or mobility-limit note (stored as JSON in 006). */
 export interface BodyNote {
   region: string;

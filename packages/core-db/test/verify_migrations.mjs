@@ -23,7 +23,8 @@ const { runMigrations, sentinelsMissing, SENTINELS } = require('./.build/migrati
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', 'src', 'schema');
 const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
-  '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql'];
+  '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
+  '008_taxonomy.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;

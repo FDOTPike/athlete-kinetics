@@ -96,7 +96,7 @@ function AppShell(): React.JSX.Element {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {tab === 'readiness' && <ReadinessScreen />}
-        {tab === 'session' && <SessionScreen onGoCoach={() => setTab('coach')} />}
+        {tab === 'session' && <SessionScreen />}
         {tab === 'coach' && <BlockScreen onSessionStarted={() => setTab('session')} />}
         {tab === 'athlete' && <ProfileScreen />}
       </KeyboardAvoidingView>

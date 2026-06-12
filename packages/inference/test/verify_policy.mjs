@@ -289,6 +289,16 @@ check('experience scaling is INSIDE the derivation (beginner stricter than inter
 const noReports = dp([]);
 check('no reports: no directive, source stays policy/profile',
   noReports.directive === null && noReports.source !== 'guardrail');
+// Positive identity pass-through: "it felt good" must be a no-op, never a
+// guardrail; and it must never mask a restrictive report from the same day.
+const positiveOnly = dp([entryOf('positive-strong')]);
+check('positive sentiment is identity pass-through (no guardrail, base unchanged)',
+  positiveOnly.directive === null && positiveOnly.source !== 'guardrail' &&
+  JSON.stringify(positiveOnly.vector) === JSON.stringify(noReports.vector));
+const mixedPositive = dp([entryOf('positive-strong'), entryOf('soreness-doms')]);
+check('a positive report never masks a restrictive one',
+  mixedPositive.directive !== null && mixedPositive.source === 'guardrail' &&
+  mixedPositive.vector.rpe_cap <= 8.0, `cap ${mixedPositive.vector.rpe_cap}`);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

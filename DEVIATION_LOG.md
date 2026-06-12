@@ -2,6 +2,39 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-06-12 — Pre-Phase-10 polish (positive triage, gate removal, taxonomy)
+
+1. **The forced pre-session check-in gate is REMOVED (supersedes Phase 9
+   entry 3).** Field testing showed it as logging friction. START SESSION is
+   instant again on both COACH and SESSION. The safety floor is preserved at
+   a deeper layer than the old gate ever was: an operative halt blocks
+   starting inside the STORE ACTION itself (plus both UIs), and the ad-hoc
+   subjective report remains one tap away on COACH.
+
+2. **Positive sentiment is an identity pass-through by construction.**
+   No-op guardrails (load ≥ 1, sets ≥ 0, cap ≥ 10, no halt) are skipped when
+   selecting the operative report inside `derivePrescription` — "it felt
+   good" can never present as GUARDRAIL APPLIED. The UI acknowledges with a
+   minimal positive card, and only when no restrictive report from earlier
+   the same day still governs (a positive afternoon report must not mask a
+   morning DOMS damping). Machine-pinned in verify:policy [6].
+
+3. **ExRx taxonomy is a side-car table (008), not a movement.pattern
+   rewrite.** The shipped pattern CHECK cannot be widened (append-only
+   chain). `movement_taxonomy(category, implement, family)` scaffolds
+   Phase 10's external training laws; the block generator intentionally does
+   not read it yet.
+
+4. **"One generic exercise per category" = taxonomy rows mapped onto EIGHT
+   EXISTING canonical movements** (Competition Bench→push, Barbell Row→row,
+   Deadlift→hinge, Competition Squat→squat, Plank→core, Walking
+   Lunge→unilateral, Band Pull-Apart→accessory, Road Run→cardio) — no
+   placeholder "Generic Push" names polluting the user-facing library.
+
+5. **Injury/mobility notes now persist on every keystroke** (field-tested:
+   blur/tab-switch ordering could drop input committed only on end-editing),
+   with the example text rendered as a permanent hint below each box.
+
 ## 2026-06-12 — Phase 9 mandate (hybrid profile, equipment filters, block engine)
 
 1. **`user_profile` superseded by a NEW `athlete_profile` table, not widened

@@ -38,7 +38,8 @@ def check(label, ok, detail=""):
 print(f"SQLite {sqlite3.sqlite_version}")
 print("\n[1] schema files execute cleanly")
 for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql",
-          "005_subjective_report.sql", "006_user_profile.sql", "007_program_engine.sql"]:
+          "005_subjective_report.sql", "006_user_profile.sql", "007_program_engine.sql",
+          "008_taxonomy.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -252,6 +253,39 @@ con.execute("DELETE FROM training_block WHERE block_id = 1")
 orphans = con.execute("SELECT (SELECT count(*) FROM planned_session) +"
                       " (SELECT count(*) FROM planned_slot) AS c").fetchone()["c"]
 check("block delete cascades sessions + slots", orphans == 0, str(orphans))
+
+# --- 10. movement_taxonomy skeleton (008) ----------------------------------------
+print("\n[10] movement_taxonomy (008) — ExRx skeleton")
+tax = con.execute("SELECT category, count(*) AS c FROM movement_taxonomy"
+                  " GROUP BY category ORDER BY category").fetchall()
+check("exactly ONE exercise per category, all 8 categories",
+      len(tax) == 8 and all(r["c"] == 1 for r in tax),
+      ",".join(r["category"] for r in tax))
+bench = con.execute(
+    "SELECT mt.category, mt.implement, mt.family FROM movement_taxonomy mt"
+    " JOIN movement m ON m.movement_id = mt.movement_id"
+    " WHERE m.name = 'Competition Bench'").fetchone()
+check("Competition Bench -> push / barbell / bench_press",
+      bench is not None and bench["category"] == "push"
+      and bench["implement"] == "barbell" and bench["family"] == "bench_press")
+# movement_id 6 (Weighted Pull-up) is NOT in the skeleton — the rejections
+# below exercise the CHECKs, not the primary key.
+try:
+    con.execute("INSERT INTO movement_taxonomy (movement_id, category) VALUES (6, 'yoga')")
+    check("category CHECK rejects unknown class", False)
+except sqlite3.IntegrityError:
+    check("category CHECK rejects unknown class", True)
+try:
+    con.execute("INSERT INTO movement_taxonomy (movement_id, category, implement)"
+                " VALUES (6, 'row', 'trapbar')")
+    check("implement CHECK rejects unknown implement", False)
+except sqlite3.IntegrityError:
+    check("implement CHECK rejects unknown implement", True)
+before_tax = con.execute("SELECT count(*) c FROM movement_taxonomy").fetchone()["c"]
+con.executescript((SCHEMA_DIR / "008_taxonomy.sql").read_text(encoding="utf-8"))
+after_tax = con.execute("SELECT count(*) c FROM movement_taxonomy").fetchone()["c"]
+check("008 re-apply is a no-op (idempotent)", before_tax == after_tax == 8,
+      f"{before_tax} == {after_tax}")
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)
