@@ -15,6 +15,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { tryCreateHealthConnectBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import ReadinessScreen from './screens/ReadinessScreen';
@@ -80,10 +81,18 @@ function AppShell(): React.JSX.Element {
     void tryCreateDeviceEmbedder().then((e) => {
       useStore.getState().setEmbedder(e);
     });
-    // Date rollover: an app foregrounded the morning after stays correct —
-    // yesterday's halt clears, today's planned session takes over.
+    // Health Connect is optional by contract: a null bridge (APK missing,
+    // permission machinery broken, non-Android) costs nothing but telemetry.
+    void tryCreateHealthConnectBridge().then((bridge) => {
+      void useStore.getState().connectBiometrics(bridge);
+    });
+    // Foreground lifecycle: date rollover + biometric ingestion. No
+    // background polling — nothing for Jetsam to kill mid-write.
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') useStore.getState().rolloverDay();
+      if (state === 'active') {
+        useStore.getState().rolloverDay();
+        void useStore.getState().syncBiometrics();
+      }
     });
     return () => sub.remove();
   }, [boot]);

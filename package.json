@@ -14,11 +14,12 @@
     "verify:migrations": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/migrationRunner.ts && node packages/core-db/test/verify_migrations.mjs",
     "verify:policy": "npm run build:inference-test && node packages/inference/test/verify_policy.mjs",
     "verify:blocks": "npm run build:inference-test && node packages/inference/test/verify_blocks.mjs",
+    "verify:biometrics": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/biometrics/test/.build packages/biometrics/src/aggregate.ts && node packages/biometrics/test/verify_biometrics.mjs",
     "verify:semantic": "npm run build:inference-test && node packages/inference/test/verify_semantic.mjs",
     "verify:embedder": "npm run build:inference-test && node packages/inference/test/verify_embedder.mjs",
     "verify:store": "node apps/mobile/test/verify_store_sql.mjs",
     "verify:memory": "node tools/memory-audit/audit.mjs",
-    "verify:all": "npm run typecheck && npm run verify:db && npm run verify:demo && npm run verify:migrations && npm run verify:policy && npm run verify:blocks && npm run verify:semantic && npm run verify:embedder && npm run verify:store && npm run verify:memory",
+    "verify:all": "npm run typecheck && npm run verify:db && npm run verify:demo && npm run verify:migrations && npm run verify:policy && npm run verify:blocks && npm run verify:biometrics && npm run verify:semantic && npm run verify:embedder && npm run verify:store && npm run verify:memory",
     "fetch:embedder": "node scripts/fetch-embedder.mjs",
     "embed:codebase": "node scripts/embed-codebase.mjs",
     "bench:cosine": "node scripts/bench-cosine.mjs",
@@ -30,6 +31,7 @@
     "react": "^19.1.0",
     "react-native": "^0.81.0",
     "react-native-blob-util": "^0.24.9",
+    "react-native-health-connect": "^3.3.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

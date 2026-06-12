@@ -11,6 +11,7 @@ module.exports = {
         alias: {
           '@ak/core-db': '../../packages/core-db/src',
           '@ak/inference': '../../packages/inference/src',
+          '@ak/biometrics': '../../packages/biometrics/src',
         },
       },
     ],

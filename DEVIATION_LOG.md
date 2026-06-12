@@ -2,6 +2,31 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-06-12 — Phase 11 step 1 (Health Connect telemetry)
+
+1. **RHR lands in the EXISTING `hrv_daily.resting_hr` column** — no new
+   table; 002 already modeled it. Consequence: a day with an RHR reading but
+   no HRV sample can only update an existing row (rmssd_ms is NOT NULL by
+   CHECK); RHR-only days are dropped by design rather than fabricating an
+   HRV value.
+
+2. **Unstaged sleep is estimated at 92% efficiency, not 100%**
+   (`UNSTAGED_SLEEP_EFFICIENCY = 0.92`, population median). A session with
+   no stage data treated as fully asleep would flatter the sleep component
+   of readiness — against the conservative house posture. Staged sessions
+   use real stage math (awake/out-of-bed/awake-in-bed excluded).
+
+3. **Android minSdkVersion 24 → 26**: the Health Connect client library's
+   floor. Drops support for Android 7.x devices (≈2016-era); Health Connect
+   itself needs Android 9+ anyway, and 26 keeps 8.x users on the
+   subjective-only path rather than excluding them.
+
+4. **Read-only health scopes.** The manifest declares only READ permissions
+   for HRV / resting HR / sleep; the app never writes health data. The
+   aggregation layer is pure TS exercised by gate 11 (verify:biometrics) —
+   the native adapter is a thin wrapper whose every failure path returns
+   null/false/[] (graceful degradation by construction).
+
 ## 2026-06-12 — Phase 10 (multi-schema generator, absolute loads, cost matrix)
 
 1. **"Migration 008" landed as 009** — 008 shipped as the taxonomy scaffold

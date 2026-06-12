@@ -52,6 +52,7 @@ import {
 } from '@ak/inference';
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
+import type { BiometricsBridge } from '@ak/biometrics';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 
@@ -205,6 +206,8 @@ interface KineticsStore {
   oneRepMaxes: Record<number, number>;
   /** Most recently completed session (post-session note target). */
   lastEndedSessionId: number | null;
+  /** Health Connect state: 'off' until probed; never blocks anything. */
+  biometricsStatus: 'off' | 'unavailable' | 'denied' | 'ready';
 
   boot: () => void;
   /** Re-sync everything date-derived when the calendar day has changed since
@@ -219,6 +222,13 @@ interface KineticsStore {
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Attach/replace a free-text note on the last completed session. */
   saveSessionNote: (text: string) => void;
+  /** Wire the Health Connect bridge (null = unavailable) and request
+   *  permissions; on grant, runs the first sync. Never throws. */
+  connectBiometrics: (bridge: BiometricsBridge | null) => Promise<void>;
+  /** Foreground-only ingestion: compacted trailing-week biometrics upserted
+   *  into the 002 rollups, then the state vector re-materializes. Silent
+   *  no-op on any failure (subjective-only fallback). */
+  syncBiometrics: () => Promise<void>;
   /** Re-read active block + grid + today's plan from persistence. */
   refreshBlock: () => void;
   /** Synchronous read of a planned session's slots (grid detail view). */
@@ -287,6 +297,9 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 // Semantic triage singletons (native-adjacent, non-serializable: module level)
 // ---------------------------------------------------------------------------
 let embedder: Embedder | null = null;
+/** Health Connect bridge; null = device cannot serve biometrics (by design,
+ *  nothing else in the app changes — subjective-triage-only routing). */
+let biometrics: BiometricsBridge | null = null;
 let codebaseCache: LoadedCodebase | null = null;
 const getCodebase = (): LoadedCodebase => {
   if (codebaseCache === null) {
@@ -393,6 +406,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   todayPlan: null,
   oneRepMaxes: {},
   lastEndedSessionId: null,
+  biometricsStatus: 'off',
 
   boot: () => {
     if (get().status === 'ready') return;
@@ -623,6 +637,72 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       blockSessions,
       todayPlan,
     });
+  },
+
+  connectBiometrics: async (bridge) => {
+    biometrics = bridge;
+    if (bridge === null) {
+      // Health Connect APK missing / not Android / native module failed:
+      // the Phase 8 subjective-triage-only path is the whole product here.
+      set({ biometricsStatus: 'unavailable' });
+      return;
+    }
+    try {
+      const granted = await bridge.requestPermissions();
+      if (!granted) {
+        set({ biometricsStatus: 'denied' });
+        return;
+      }
+      set({ biometricsStatus: 'ready' });
+      await get().syncBiometrics();
+    } catch {
+      set({ biometricsStatus: 'unavailable' });
+    }
+  },
+
+  syncBiometrics: async () => {
+    // Foreground-lifecycle only (boot / AppState 'active' / manual SYNC) —
+    // no background workers, nothing for Jetsam to kill mid-write.
+    if (get().status !== 'ready' || get().biometricsStatus !== 'ready' || biometrics === null) {
+      return;
+    }
+    try {
+      const days = await biometrics.readDaily(7);
+      if (days.length === 0) return;
+      const d = getDb();
+      for (const r of days) {
+        // One compacted row per day per table — raw ticks never reach SQLite.
+        if (r.rmssdMs !== null) {
+          d.executeSync(
+            "INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source) VALUES (?, ?, ?, 'health_connect') ON CONFLICT(date) DO UPDATE SET rmssd_ms = excluded.rmssd_ms, resting_hr = COALESCE(excluded.resting_hr, resting_hr), source = excluded.source",
+            [r.date, r.rmssdMs, r.restingHrBpm],
+          );
+        } else if (r.restingHrBpm !== null) {
+          // RHR without HRV: hrv_daily requires rmssd_ms, so only an
+          // existing row can absorb it (no-op otherwise, by design).
+          d.executeSync(
+            'UPDATE hrv_daily SET resting_hr = ? WHERE date = ?',
+            [r.restingHrBpm, r.date],
+          );
+        }
+        if (r.inBedMin !== null && r.inBedMin > 0) {
+          d.executeSync(
+            'INSERT INTO sleep_daily (date, in_bed_min, asleep_min, deep_min, rem_min, light_min) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET in_bed_min = excluded.in_bed_min, asleep_min = excluded.asleep_min, deep_min = excluded.deep_min, rem_min = excluded.rem_min, light_min = excluded.light_min',
+            [r.date, r.inBedMin, r.asleepMin ?? 0, r.deepMin, r.remMin, r.lightMin],
+          );
+        }
+      }
+      // New telemetry -> the trailing week's readiness re-materializes and
+      // today's prescription re-derives from the fresh state vector.
+      for (const date of demoDates(localToday(), 7)) {
+        d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
+      }
+      get().refreshVector();
+      get().computePrescription([]);
+    } catch {
+      // Silent fallback: a biometric failure must never degrade the app
+      // below its Phase 8 baseline (training data + subjective reports).
+    }
   },
 
   saveOneRepMax: (movementId, kg) => {

@@ -113,6 +113,8 @@ export default function ProfileScreen(): React.JSX.Element {
   const movements = useStore((s) => s.movements);
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const saveOneRepMax = useStore((s) => s.saveOneRepMax);
+  const biometricsStatus = useStore((s) => s.biometricsStatus);
+  const syncBiometrics = useStore((s) => s.syncBiometrics);
 
   // Free-text notes are committed on end-editing, not per keystroke.
   const [injuryText, setInjuryText] = useState(
@@ -232,6 +234,32 @@ export default function ProfileScreen(): React.JSX.Element {
           Example — ankle: limited dorsiflexion. Saved as you type.
         </Text>
       </View>
+      <View style={styles.field}>
+        <View style={styles.fieldLabelRow}>
+          <Text style={styles.fieldLabel}>BIOMETRICS — HEALTH CONNECT</Text>
+          <InfoTip term="HRV" />
+        </View>
+        <Text style={styles.fieldHint}>
+          {biometricsStatus === 'ready'
+            ? 'Connected. Overnight HRV, resting heart rate, and sleep feed your readiness score automatically — synced when the app comes to the foreground.'
+            : biometricsStatus === 'denied'
+              ? 'Permission not granted. The coach still works fully from training data and your reports. Grant read access in Health Connect settings, then reopen the app.'
+              : biometricsStatus === 'unavailable'
+                ? 'Health Connect is not available on this device. The coach runs on training data and your reports — nothing else changes.'
+                : 'Checking Health Connect…'}
+        </Text>
+        {biometricsStatus === 'ready' && (
+          <Pressable
+            onPress={() => { void syncBiometrics(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Sync biometrics from Health Connect now"
+            style={styles.presetChip}
+          >
+            <Text style={styles.presetChipText}>SYNC NOW</Text>
+          </Pressable>
+        )}
+      </View>
+
       <View style={styles.field}>
         <View style={styles.fieldLabelRow}>
           <Text style={styles.fieldLabel}>ONE-REP MAXES (KG)</Text>

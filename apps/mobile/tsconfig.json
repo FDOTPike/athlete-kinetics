@@ -13,12 +13,14 @@
     "baseUrl": ".",
     "paths": {
       "@ak/core-db": ["../../packages/core-db/src/index.ts"],
-      "@ak/inference": ["../../packages/inference/src/index.ts"]
+      "@ak/inference": ["../../packages/inference/src/index.ts"],
+      "@ak/biometrics": ["../../packages/biometrics/src/index.ts"]
     }
   },
   "include": [
     "src",
     "../../packages/core-db/src",
-    "../../packages/inference/src"
+    "../../packages/inference/src",
+    "../../packages/biometrics/src"
   ]
 }
