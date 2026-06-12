@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
+  BIG4_LIFTS,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
   EQUIPMENT_PRESETS,
@@ -109,6 +110,9 @@ function NumberRow({ label, display, onDec, onInc, tip }: NumberRowProps): React
 export default function ProfileScreen(): React.JSX.Element {
   const profile = useStore((s) => s.profile);
   const saveProfile = useStore((s) => s.saveProfile);
+  const movements = useStore((s) => s.movements);
+  const oneRepMaxes = useStore((s) => s.oneRepMaxes);
+  const saveOneRepMax = useStore((s) => s.saveOneRepMax);
 
   // Free-text notes are committed on end-editing, not per keystroke.
   const [injuryText, setInjuryText] = useState(
@@ -228,6 +232,34 @@ export default function ProfileScreen(): React.JSX.Element {
           Example — ankle: limited dorsiflexion. Saved as you type.
         </Text>
       </View>
+      <View style={styles.field}>
+        <View style={styles.fieldLabelRow}>
+          <Text style={styles.fieldLabel}>ONE-REP MAXES (KG)</Text>
+          <InfoTip term="1RM" />
+        </View>
+        <Text style={styles.fieldHint}>
+          With a max set, SESSION shows real target kilograms for every planned
+          lift. Steps of 2.5 kg; step below 20 to clear.
+        </Text>
+        {BIG4_LIFTS.map(({ name, label }) => {
+          const m = movements.find((x) => x.name === name);
+          if (m === undefined) return null;
+          const cur = oneRepMaxes[m.movement_id] as number | undefined;
+          return (
+            <NumberRow
+              key={name}
+              label={label}
+              display={cur !== undefined ? cur.toFixed(1) : '—'}
+              onDec={() => {
+                if (cur === undefined) return;
+                saveOneRepMax(m.movement_id, cur - 2.5 < 20 ? null : cur - 2.5);
+              }}
+              onInc={() => saveOneRepMax(m.movement_id, (cur ?? 57.5) + 2.5)}
+            />
+          );
+        })}
+      </View>
+
       <View style={styles.field}>
         <View style={styles.fieldLabelRow}>
           <Text style={styles.fieldLabel}>EQUIPMENT INVENTORY</Text>

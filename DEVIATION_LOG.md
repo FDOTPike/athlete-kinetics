@@ -2,6 +2,42 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-06-12 — Phase 10 (multi-schema generator, absolute loads, cost matrix)
+
+1. **"Migration 008" landed as 009** — 008 shipped as the taxonomy scaffold
+   in v0.9.1 before this mandate arrived; the chain is append-only.
+
+2. **`schema_type` lives in a `block_meta` side-car, not on `training_block`.**
+   ALTER TABLE ADD COLUMN is not idempotent under the runner's self-heal
+   re-apply, and rebuilding training_block would cascade-drop every planned
+   session. block_meta also carries the 32-week macro position
+   (macro_block_index/macro_phase) and the peak_shifted flag.
+
+3. **1RMs are movement-keyed, not a fixed Big-4 enum.** `one_rep_max` keys on
+   movement_id (any movement can carry a max — APRE needs that); the ATHLETE
+   UI exposes exactly the Big 4. RPE/reps → %1RM is pure TS (Epley:
+   pct = 1/(1 + totalReps/30), 2.5 kg rounding) — no percentage column on
+   planned_slot; absolute APRE adjustments persist in `slot_override` with a
+   mandatory human-readable reason the UI shows verbatim.
+
+4. **APRE reactive mutation requires a 1RM for the movement.** Without an
+   absolute base the "increase the target load" instruction has no defined
+   arithmetic; movements without a max are skipped (the athlete sees targets
+   only where maxes exist). +2.5 kg per 2 surplus reps, capped +7.5/week,
+   never fires from week 4 (the next block re-derives from scratch).
+
+5. **The deadlift auto-regulation gate shifts the whole peak block** (deload
+   inserted week 1, peak realization week 4), not a deadlift-only lane —
+   peaking the hinge on an overreached athlete while squatting heavy in the
+   same week would be incoherent. Gate: ACWR > 1.5 at PEAK-phase generation
+   time only; null telemetry never shifts.
+
+6. **The hybrid tax generalizes beyond the mandated hybrid+APRE pair**: any
+   schema whose fatigue cost reaches the threshold (WAVE/STEP in their hot
+   phases) pays the same 1-set accessory tax; APRE pays 1-2 everywhere.
+   Machine-pinned: hybrid APRE < hybrid LINEAR accessory sets, strength
+   unaffected.
+
 ## 2026-06-12 — Pre-Phase-10 polish (positive triage, gate removal, taxonomy)
 
 1. **The forced pre-session check-in gate is REMOVED (supersedes Phase 9

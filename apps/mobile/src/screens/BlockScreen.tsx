@@ -9,6 +9,7 @@
  */
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SCHEMA_TYPES, targetLoadKg, type SchemaType } from '@ak/inference';
 import {
   palette,
   useStore,
@@ -48,6 +49,8 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const triaging = useStore((s) => s.triaging);
   const lastTriage = useStore((s) => s.lastTriage);
   const block = useStore((s) => s.block);
+  const blockMeta = useStore((s) => s.blockMeta);
+  const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const blockSessions = useStore((s) => s.blockSessions);
   const todayPlan = useStore((s) => s.todayPlan);
   const session = useStore((s) => s.session);
@@ -57,6 +60,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const startSession = useStore((s) => s.startSession);
 
   const [reportText, setReportText] = useState('');
+  const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<{ s: BlockSessionSummary; slots: TodaySlot[] } | null>(null);
 
   if (vector === null) {
@@ -75,19 +79,41 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
   const confirmRegenerate = (): void => {
     Alert.alert(
-      'Regenerate block?',
-      'The current 4-week block is archived and a new one starts today from your profile and equipment.',
+      'Generate next block?',
+      `The current block is archived and a new ${schema} block starts today, continuing the 32-week cycle.`,
       [
         { text: 'KEEP CURRENT', style: 'cancel' },
         {
-          text: 'REGENERATE',
+          text: 'GENERATE',
           style: 'destructive',
           // Close any open detail card — it snapshots the OLD block's session.
-          onPress: () => { setDetail(null); generateNewBlock(); },
+          onPress: () => { setDetail(null); generateNewBlock(schema); },
         },
       ],
     );
   };
+
+  const schemaPicker = (
+    <View style={styles.schemaRow}>
+      {SCHEMA_TYPES.map((t) => {
+        const active = t === schema;
+        return (
+          <Pressable
+            key={t}
+            onPress={() => setSchema(t)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={`${t} loading schema`}
+            style={[styles.schemaChip, active && styles.schemaChipActive]}
+          >
+            <Text style={[styles.schemaChipText, active && styles.schemaChipTextActive]}>
+              {t}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 
   // Instant start (no forced check-in — field-tested as friction). The
   // store itself refuses to start while an operative halt is in force.
@@ -188,10 +214,12 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.dimTextLeft}>
             No block yet. Generation is deterministic: your objective
             ({profile.objective.replace(/_/g, ' ')}), {profile.weekly_frequency} days/week,
-            and your equipment inventory decide every session. Nothing leaves the phone.
+            your equipment, and the loading schema below decide every session.
+            Nothing leaves the phone.
           </Text>
+          {schemaPicker}
           <Pressable
-            onPress={generateNewBlock}
+            onPress={() => generateNewBlock(schema)}
             accessibilityRole="button"
             accessibilityLabel="Generate a 4 week training block"
             style={({ pressed }) => [styles.generateBtn, pressed && styles.generateBtnPressed]}
@@ -203,7 +231,16 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         <View>
           <Text style={styles.blockMeta}>
             {block.objective.replace(/_/g, ' ').toUpperCase()} · started {block.startDate}
+            {blockMeta !== null
+              ? ` · ${blockMeta.schemaType} · BLOCK ${blockMeta.macroBlockIndex}/8 · ${blockMeta.macroPhase.toUpperCase()}`
+              : ''}
           </Text>
+          {blockMeta !== null && blockMeta.peakShifted && (
+            <Text style={styles.peakShiftNote}>
+              Auto-regulation: fatigue (ACWR) was high when this peak block was
+              generated — a deload week was inserted and the peak moved back one week.
+            </Text>
+          )}
           {weekRows.map((row) => (
             <View key={row.week} style={styles.weekRow}>
               <View style={styles.weekLabelBox}>
@@ -269,13 +306,14 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               </Pressable>
             </View>
           )}
+          {schemaPicker}
           <Pressable
             onPress={confirmRegenerate}
             accessibilityRole="button"
-            accessibilityLabel="Regenerate the training block"
+            accessibilityLabel="Generate the next block in the macro cycle"
             style={styles.regenBtn}
           >
-            <Text style={styles.regenBtnText}>REGENERATE FROM PROFILE</Text>
+            <Text style={styles.regenBtnText}>NEXT BLOCK ({schema})</Text>
           </Pressable>
         </View>
       )}
@@ -287,14 +325,26 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.todayFocus}>
             {todayPlan.focus.toUpperCase()} · {PHASE_ABBREV[todayPlan.phase] ?? todayPlan.phase}
           </Text>
-          {todayPlan.slots.map((sl) => (
-            <View key={sl.slotIndex} style={styles.slotRow}>
-              <Text style={styles.slotName} numberOfLines={1}>{sl.movementName}</Text>
-              <Text style={styles.slotData}>
-                {sl.sets}×{sl.reps} @ {sl.targetRpe.toFixed(1)}
-              </Text>
-            </View>
-          ))}
+          {todayPlan.slots.map((sl) => {
+            const oneRm = oneRepMaxes[sl.movementId] as number | undefined;
+            const target = sl.overrideLoadKg ?? (oneRm !== undefined
+              ? targetLoadKg(oneRm, sl.reps, sl.targetRpe)
+              : null);
+            return (
+              <View key={sl.slotIndex}>
+                <View style={styles.slotRow}>
+                  <Text style={styles.slotName} numberOfLines={1}>{sl.movementName}</Text>
+                  <Text style={styles.slotData}>
+                    {sl.sets}×{sl.reps} @ {sl.targetRpe.toFixed(1)}
+                    {target !== null ? ` · ${target.toFixed(1)}kg` : ''}
+                  </Text>
+                </View>
+                {sl.overrideReason !== null && (
+                  <Text style={styles.overrideReason}>{sl.overrideReason}</Text>
+                )}
+              </View>
+            );
+          })}
           {current !== null && !halted && (
             <Text style={styles.dimTextLeft}>
               Today&apos;s adjustment applies on top: ×{current.vector.load_modifier.toFixed(2)} load,
@@ -453,6 +503,22 @@ const styles = StyleSheet.create({
   profileNote: { color: palette.amber, fontSize: 13, lineHeight: 19, marginTop: 8 },
 
   blockMeta: { color: palette.dim, fontSize: 13, letterSpacing: 1, marginBottom: 10 },
+  peakShiftNote: { color: palette.amber, fontSize: 13, lineHeight: 19, marginBottom: 10 },
+  schemaRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 2 },
+  schemaChip: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  schemaChipActive: { borderColor: palette.green, backgroundColor: '#10241D' },
+  schemaChipText: { color: palette.dim, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  schemaChipTextActive: { color: palette.green },
+  overrideReason: { color: palette.amber, fontSize: 12, lineHeight: 17, marginBottom: 6 },
   weekRow: { flexDirection: 'row', alignItems: 'stretch', gap: 4, marginBottom: 4 },
   weekLabelBox: { width: 78, justifyContent: 'center' },
   weekLabel: { color: palette.text, fontSize: 14, fontWeight: '800' },

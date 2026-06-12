@@ -12,6 +12,7 @@ import { palette } from '../state/useStore';
 /** The glossary is the single source of tooltip copy — add terms here. */
 export const GLOSSARY: Record<string, string> = {
   RPE: 'Rate of Perceived Exertion, 1–10. 10 = no reps left in the tank; 8 = two reps in reserve. The cap is a ceiling, not a target.',
+  '1RM': 'One-rep max — the heaviest load you can lift once with solid form. Target weights are calculated from it, so keep it honest and current.',
   GPP: 'General Physical Preparedness — broad, balanced fitness (strength, conditioning, mobility) rather than peaking for one quality.',
   ACWR: 'Acute:Chronic Workload Ratio — this week’s training load versus your 4-week average. Above ~1.5 means load is spiking faster than your body has adapted to.',
   HRV: 'Heart Rate Variability — beat-to-beat variation in heart rhythm. Higher than your baseline usually means recovered; suppressed means accumulated stress.',

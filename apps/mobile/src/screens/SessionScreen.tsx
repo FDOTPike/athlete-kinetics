@@ -19,8 +19,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
+import { targetLoadKg } from '@ak/inference';
 import {
   isMovementAvailable,
   palette,
@@ -94,6 +96,10 @@ export default function SessionScreen(): React.JSX.Element {
   const activeMovementId = useStore((s) => s.activeMovementId);
   const profile = useStore((s) => s.profile);
   const lastTriage = useStore((s) => s.lastTriage);
+  const todayPlan = useStore((s) => s.todayPlan);
+  const oneRepMaxes = useStore((s) => s.oneRepMaxes);
+  const lastEndedSessionId = useStore((s) => s.lastEndedSessionId);
+  const saveSessionNote = useStore((s) => s.saveSessionNote);
   const startSession = useStore((s) => s.startSession);
   const selectMovement = useStore((s) => s.selectMovement);
   const addPlanSlot = useStore((s) => s.addPlanSlot);
@@ -104,6 +110,8 @@ export default function SessionScreen(): React.JSX.Element {
   const [reps, setReps] = useState(5);
   const [loadKg, setLoadKg] = useState(100);
   const [rpe, setRpe] = useState(8);
+  const [noteText, setNoteText] = useState('');
+  const [noteSaved, setNoteSaved] = useState(false);
   /** 'plan' = normal nav; 'add'/'swap' = picking from the library. */
   const [pickMode, setPickMode] = useState<'plan' | 'add' | 'swap'>('plan');
   // Elapsed-time readout against the profile's duration cap (display only).
@@ -136,6 +144,30 @@ export default function SessionScreen(): React.JSX.Element {
           >
             <Text style={styles.startBtnText}>START SESSION</Text>
           </Pressable>
+        )}
+        {lastEndedSessionId !== null && (
+          <View style={styles.noteBox}>
+            <Text style={styles.noteLabel}>NOTES ON LAST SESSION</Text>
+            <TextInput
+              style={styles.noteInput}
+              value={noteText}
+              onChangeText={(t) => { setNoteText(t); setNoteSaved(false); }}
+              placeholder="e.g. grip was the limiter on pulls"
+              placeholderTextColor={palette.dim}
+              maxLength={1000}
+              multiline
+              accessibilityLabel="Free-text notes on the last session"
+            />
+            <Pressable
+              disabled={noteText.trim().length === 0}
+              onPress={() => { saveSessionNote(noteText); setNoteSaved(true); }}
+              accessibilityRole="button"
+              accessibilityLabel="Save the session note"
+              style={[styles.noteSaveBtn, noteText.trim().length === 0 && styles.noteSaveBtnDisabled]}
+            >
+              <Text style={styles.noteSaveText}>{noteSaved ? 'SAVED' : 'SAVE NOTE'}</Text>
+            </Pressable>
+          </View>
         )}
       </View>
     );
@@ -274,6 +306,29 @@ export default function SessionScreen(): React.JSX.Element {
         </View>
       )}
 
+      {/* ---- planned target for the active movement (1RM translation) ---- */}
+      {(() => {
+        const slot = todayPlan !== null && activeMovementId !== null
+          ? todayPlan.slots.find((sl) => sl.movementId === activeMovementId) ?? null
+          : null;
+        if (slot === null) return null;
+        const oneRm = oneRepMaxes[slot.movementId] as number | undefined;
+        const target = slot.overrideLoadKg ?? (oneRm !== undefined
+          ? targetLoadKg(oneRm, slot.reps, slot.targetRpe)
+          : null);
+        return (
+          <View style={styles.targetRow}>
+            <Text style={styles.targetText}>
+              TARGET {slot.sets}×{slot.reps} @ RPE {slot.targetRpe.toFixed(1)}
+              {target !== null ? ` · ${target.toFixed(1)} kg` : ''}
+            </Text>
+            {slot.overrideReason !== null && (
+              <Text style={styles.targetReason}>{slot.overrideReason}</Text>
+            )}
+          </View>
+        );
+      })()}
+
       {/* ---- input steppers ---- */}
       <Stepper
         label="REPS"
@@ -387,6 +442,50 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   haltBannerText: { color: palette.red, fontSize: 14, fontWeight: '700', lineHeight: 20 },
+
+  targetRow: {
+    backgroundColor: palette.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.line,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  targetText: {
+    color: palette.green,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  targetReason: { color: palette.amber, fontSize: 12, lineHeight: 17, marginTop: 4 },
+
+  noteBox: { alignSelf: 'stretch', paddingHorizontal: 24, marginTop: 26 },
+  noteLabel: { color: palette.dim, fontSize: 12, letterSpacing: 2, marginBottom: 8 },
+  noteInput: {
+    minHeight: 64,
+    borderRadius: 12,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    color: palette.text,
+    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlignVertical: 'top',
+  },
+  noteSaveBtn: {
+    minHeight: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  noteSaveBtnDisabled: { borderColor: palette.line },
+  noteSaveText: { color: palette.green, fontSize: 14, fontWeight: '800', letterSpacing: 1.5 },
 
   navStrip: { flexGrow: 0, marginBottom: 8 },
   navStripContent: { gap: 8, paddingVertical: 4, alignItems: 'stretch' },

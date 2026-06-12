@@ -41,8 +41,10 @@ import {
   type MovementPattern,
   type PhraseCodebase,
   type PhraseEntry,
+  targetLoadKg,
   type Prescription,
   type ProfileContext,
+  type SchemaType,
   type SessionDirective,
   type StateVectorRow,
   type TriageResult,
@@ -147,11 +149,24 @@ export interface BlockSessionSummary {
 
 export interface TodaySlot {
   slotIndex: number;
+  plannedSlotId: number;
   movementId: number;
   movementName: string;
   sets: number;
   reps: number;
   targetRpe: number;
+  /** APRE reactive load (slot_override), null when none applies. */
+  overrideLoadKg: number | null;
+  /** WHY the load moved — rendered verbatim as a badge. */
+  overrideReason: string | null;
+}
+
+/** The active block's periodization metadata (block_meta side-car). */
+export interface BlockMeta {
+  schemaType: SchemaType;
+  macroBlockIndex: number;
+  macroPhase: string;
+  peakShifted: boolean;
 }
 
 /** Today's planned session, null on rest days (the UI renders that state). */
@@ -183,8 +198,13 @@ interface KineticsStore {
   activeMovementId: number | null;
   /** Active 4-week block, its grid, and today's planned session. */
   block: ActiveBlock | null;
+  blockMeta: BlockMeta | null;
   blockSessions: BlockSessionSummary[];
   todayPlan: TodayPlan | null;
+  /** Absolute 1RMs by movement_id (one_rep_max rows). */
+  oneRepMaxes: Record<number, number>;
+  /** Most recently completed session (post-session note target). */
+  lastEndedSessionId: number | null;
 
   boot: () => void;
   /** Re-sync everything date-derived when the calendar day has changed since
@@ -192,8 +212,13 @@ interface KineticsStore {
    *  Cheap no-op when the date is unchanged. */
   rolloverDay: () => void;
   /** Archive any active block and persist a freshly generated one (single
-   *  SQLite transaction). Deterministic: profile + equipment + today. */
-  generateNewBlock: () => void;
+   *  SQLite transaction). Deterministic: profile + equipment + schema +
+   *  macro position + today. Continues the 32-week macro-cycle. */
+  generateNewBlock: (schemaType?: SchemaType) => void;
+  /** Upsert (or clear with null) an absolute 1RM for a movement. */
+  saveOneRepMax: (movementId: number, kg: number | null) => void;
+  /** Attach/replace a free-text note on the last completed session. */
+  saveSessionNote: (text: string) => void;
   /** Re-read active block + grid + today's plan from persistence. */
   refreshBlock: () => void;
   /** Synchronous read of a planned session's slots (grid detail view). */
@@ -363,8 +388,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   sessionPlan: [],
   activeMovementId: null,
   block: null,
+  blockMeta: null,
   blockSessions: [],
   todayPlan: null,
+  oneRepMaxes: {},
+  lastEndedSessionId: null,
 
   boot: () => {
     if (get().status === 'ready') return;
@@ -385,7 +413,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       const profileRow = rowsOf<ProfileRow>(
         getDb().executeSync('SELECT * FROM athlete_profile WHERE profile_id = 1'),
       )[0];
+      const rms = rowsOf<{ movement_id: number; load_kg: number }>(
+        getDb().executeSync('SELECT movement_id, load_kg FROM one_rep_max'),
+      );
       set({
+        oneRepMaxes: Object.fromEntries(rms.map((r) => [r.movement_id, r.load_kg])),
         status: 'ready',
         error: null,
         movements,
@@ -449,9 +481,18 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().computePrescription([]);
   },
 
-  generateNewBlock: () => {
-    const { profile, movements, status } = get();
+  generateNewBlock: (schemaType = 'LINEAR') => {
+    const { profile, movements, status, vector } = get();
     if (status !== 'ready') return;
+    const d = getDb();
+    // Macro continuation: the next block advances through the 32-week cycle
+    // (8 positions, wrapping) from wherever the last generated block sat.
+    const lastMeta = rowsOf<{ macro_block_index: number }>(d.executeSync(
+      'SELECT macro_block_index FROM block_meta ORDER BY block_id DESC LIMIT 1',
+    ))[0];
+    const macroBlockIndex = lastMeta !== undefined
+      ? (lastMeta.macro_block_index % 8) + 1
+      : 1;
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
@@ -465,8 +506,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       profile,
       movements: genMovements,
       startDate: localToday(),
+      schemaType,
+      macroBlockIndex,
+      recentAcwr: vector !== null ? vector.acwr : null,
     });
-    const d = getDb();
     d.executeSync('BEGIN');
     try {
       d.executeSync(
@@ -479,6 +522,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       const blockId = rowsOf<{ id: number }>(
         d.executeSync('SELECT last_insert_rowid() AS id'),
       )[0]!.id;
+      d.executeSync(
+        'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
+        [blockId, plan.macroBlockIndex, plan.macroPhase, plan.schemaType, plan.peakShifted ? 1 : 0],
+      );
       for (const s of plan.sessions) {
         d.executeSync(
           'INSERT INTO planned_session (block_id, week_index, day_index, focus, phase, session_date) VALUES (?, ?, ?, ?, ?, ?)',
@@ -512,9 +559,15 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       "SELECT block_id, start_date, objective, created_at_ms FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
     ))[0];
     if (blockRow === undefined) {
-      set({ block: null, blockSessions: [], todayPlan: null });
+      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null });
       return;
     }
+    const metaRow = rowsOf<{
+      macro_block_index: number; macro_phase: string; schema_type: string; peak_shifted: number;
+    }>(d.executeSync(
+      'SELECT macro_block_index, macro_phase, schema_type, peak_shifted FROM block_meta WHERE block_id = ?',
+      [blockRow.block_id],
+    ))[0];
     const sessions = rowsOf<{
       planned_session_id: number; week_index: number; day_index: number;
       focus: string; phase: string; session_date: string; slot_count: number;
@@ -559,30 +612,72 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         objective: blockRow.objective,
         createdAtMs: blockRow.created_at_ms,
       },
+      blockMeta: metaRow !== undefined
+        ? {
+            schemaType: metaRow.schema_type as SchemaType,
+            macroBlockIndex: metaRow.macro_block_index,
+            macroPhase: metaRow.macro_phase,
+            peakShifted: metaRow.peak_shifted === 1,
+          }
+        : null, // pre-009 blocks have no meta; UI treats them as LINEAR-era
       blockSessions,
       todayPlan,
     });
   },
 
+  saveOneRepMax: (movementId, kg) => {
+    const d = getDb();
+    if (kg === null) {
+      d.executeSync('DELETE FROM one_rep_max WHERE movement_id = ?', [movementId]);
+    } else {
+      const safe = clamp(Math.round(kg / 2.5) * 2.5, 20, 500);
+      d.executeSync(
+        'INSERT INTO one_rep_max (movement_id, load_kg, updated_at_ms) VALUES (?, ?, ?) ON CONFLICT(movement_id) DO UPDATE SET load_kg = excluded.load_kg, updated_at_ms = excluded.updated_at_ms',
+        [movementId, safe, Date.now()],
+      );
+    }
+    const rms = rowsOf<{ movement_id: number; load_kg: number }>(
+      d.executeSync('SELECT movement_id, load_kg FROM one_rep_max'),
+    );
+    set({ oneRepMaxes: Object.fromEntries(rms.map((r) => [r.movement_id, r.load_kg])) });
+  },
+
+  saveSessionNote: (text) => {
+    const sessionId = get().lastEndedSessionId;
+    const raw = text.trim().slice(0, 1000);
+    if (sessionId === null || raw.length === 0) return;
+    getDb().executeSync(
+      'INSERT INTO session_note (session_id, note, created_at_ms) VALUES (?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET note = excluded.note, created_at_ms = excluded.created_at_ms',
+      [sessionId, raw, Date.now()],
+    );
+  },
+
   loadSessionSlots: (plannedSessionId) => {
     const slots = rowsOf<{
-      slot_index: number; movement_id: number; movement_name: string;
-      sets: number; reps: number; target_rpe: number;
+      slot_index: number; planned_slot_id: number; movement_id: number;
+      movement_name: string; sets: number; reps: number; target_rpe: number;
+      override_load_kg: number | null; override_reason: string | null;
     }>(getDb().executeSync(
-      `SELECT sl.slot_index, sl.movement_id, m.name AS movement_name,
-              sl.sets, sl.reps, sl.target_rpe
-       FROM planned_slot sl JOIN movement m ON m.movement_id = sl.movement_id
+      `SELECT sl.slot_index, sl.planned_slot_id, sl.movement_id, m.name AS movement_name,
+              sl.sets, sl.reps, sl.target_rpe,
+              so.target_load_kg AS override_load_kg, so.reason AS override_reason
+       FROM planned_slot sl
+       JOIN movement m ON m.movement_id = sl.movement_id
+       LEFT JOIN slot_override so ON so.planned_slot_id = sl.planned_slot_id
        WHERE sl.planned_session_id = ?
        ORDER BY sl.slot_index`,
       [plannedSessionId],
     ));
     return slots.map((sl) => ({
       slotIndex: sl.slot_index,
+      plannedSlotId: sl.planned_slot_id,
       movementId: sl.movement_id,
       movementName: sl.movement_name,
       sets: sl.sets,
       reps: sl.reps,
       targetRpe: sl.target_rpe,
+      overrideLoadKg: sl.override_load_kg,
+      overrideReason: sl.override_reason,
     }));
   },
 
@@ -748,8 +843,60 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // Load changed -> re-materialize today's State Vector (the dashboard
       // reads the result; triggers already updated mech_daily).
       d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [s.date]);
+
+      // APRE reactive mutation: in an APRE block, beating a slot's rep
+      // target raises the SAME movement's load next week (slot_override,
+      // +2.5 kg per 2 surplus reps, capped +7.5) with a reason the UI shows
+      // verbatim — the athlete must never wonder why the bar got heavier.
+      const { todayPlan, blockMeta, oneRepMaxes } = get();
+      if (blockMeta !== null && blockMeta.schemaType === 'APRE' && todayPlan !== null) {
+        const weekRow = rowsOf<{ week_index: number; block_id: number }>(d.executeSync(
+          'SELECT week_index, block_id FROM planned_session WHERE planned_session_id = ?',
+          [todayPlan.plannedSessionId],
+        ))[0];
+        if (weekRow !== undefined && weekRow.week_index < 4) {
+          for (const slot of todayPlan.slots) {
+            const oneRm = oneRepMaxes[slot.movementId];
+            if (oneRm === undefined) continue; // no absolute base to progress
+            const bestReps = s.sets
+              .filter((x) => x.movement_id === slot.movementId)
+              .reduce((m, x) => Math.max(m, x.reps), 0);
+            const surplus = bestReps - slot.reps;
+            if (surplus <= 0) continue;
+            const nextSlot = rowsOf<{
+              planned_slot_id: number; reps: number; target_rpe: number;
+            }>(d.executeSync(
+              'SELECT sl.planned_slot_id, sl.reps, sl.target_rpe FROM planned_slot sl JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id WHERE ps.block_id = ? AND ps.week_index = ? AND sl.movement_id = ? ORDER BY ps.day_index LIMIT 1',
+              [weekRow.block_id, weekRow.week_index + 1, slot.movementId],
+            ))[0];
+            if (nextSlot === undefined) continue;
+            const deltaKg = Math.min(7.5, Math.ceil(surplus / 2) * 2.5);
+            const existing = rowsOf<{ target_load_kg: number }>(d.executeSync(
+              'SELECT target_load_kg FROM slot_override WHERE planned_slot_id = ?',
+              [nextSlot.planned_slot_id],
+            ))[0];
+            const base = existing !== undefined
+              ? existing.target_load_kg
+              : targetLoadKg(oneRm, nextSlot.reps, nextSlot.target_rpe);
+            d.executeSync(
+              'INSERT INTO slot_override (planned_slot_id, target_load_kg, reason, created_at_ms) VALUES (?, ?, ?, ?) ON CONFLICT(planned_slot_id) DO UPDATE SET target_load_kg = excluded.target_load_kg, reason = excluded.reason, created_at_ms = excluded.created_at_ms',
+              [
+                nextSlot.planned_slot_id,
+                clamp(base + deltaKg, 2.5, 600),
+                `APRE: +${deltaKg} kg, beat the ${slot.reps}-rep target by ${surplus} last week`,
+                Date.now(),
+              ],
+            );
+          }
+        }
+      }
     }
-    set({ session: null, sessionPlan: [], activeMovementId: null });
+    set({
+      session: null,
+      sessionPlan: [],
+      activeMovementId: null,
+      lastEndedSessionId: s.sets.length > 0 ? s.sessionId : null,
+    });
     get().refreshVector();
     // Logged work changes the grid's trained markers.
     get().refreshBlock();
