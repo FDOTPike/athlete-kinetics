@@ -31,6 +31,19 @@ export {
 } from './types';
 export { evaluatePolicy } from './policyReference';
 export {
+  addDaysIso,
+  availableMovements,
+  BLOCK_WEEKS,
+  generateBlock,
+  type BlockFocus,
+  type BlockInput,
+  type BlockPhase,
+  type BlockPlan,
+  type GeneratorMovement,
+  type PlannedSessionPlan,
+  type PlannedSlotPlan,
+} from './blockGenerator';
+export {
   applyProfileLimits,
   type ProfileContext,
   type ProfileLimitedPrescription,
