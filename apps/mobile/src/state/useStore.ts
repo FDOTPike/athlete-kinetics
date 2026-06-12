@@ -36,6 +36,7 @@ import {
   RED_FLAG_PAIN,
   RED_FLAG_SYSTEMIC,
   resolveReport,
+  scaleGuardrailForExperience,
   triage,
   type Embedder,
   type GeneratorMovement,
@@ -190,6 +191,8 @@ interface KineticsStore {
   generateNewBlock: () => void;
   /** Re-read active block + grid + today's plan from persistence. */
   refreshBlock: () => void;
+  /** Synchronous read of a planned session's slots (grid detail view). */
+  loadSessionSlots: (plannedSessionId: number) => TodaySlot[];
   setEmbedder: (e: Embedder | null) => void;
   saveProfile: (patch: Partial<UserProfile>) => void;
   reportSubjective: (text: string) => Promise<void>;
@@ -501,33 +504,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // Rest-day fallback: no planned session today is a normal, renderable
     // state (todayPlan null) — never an error.
     const todayRow = blockSessions.find((s) => s.sessionDate === today);
-    let todayPlan: TodayPlan | null = null;
-    if (todayRow !== undefined) {
-      const slots = rowsOf<{
-        slot_index: number; movement_id: number; movement_name: string;
-        sets: number; reps: number; target_rpe: number;
-      }>(d.executeSync(
-        `SELECT sl.slot_index, sl.movement_id, m.name AS movement_name,
-                sl.sets, sl.reps, sl.target_rpe
-         FROM planned_slot sl JOIN movement m ON m.movement_id = sl.movement_id
-         WHERE sl.planned_session_id = ?
-         ORDER BY sl.slot_index`,
-        [todayRow.plannedSessionId],
-      ));
-      todayPlan = {
-        plannedSessionId: todayRow.plannedSessionId,
-        focus: todayRow.focus,
-        phase: todayRow.phase,
-        slots: slots.map((sl) => ({
-          slotIndex: sl.slot_index,
-          movementId: sl.movement_id,
-          movementName: sl.movement_name,
-          sets: sl.sets,
-          reps: sl.reps,
-          targetRpe: sl.target_rpe,
-        })),
-      };
-    }
+    const todayPlan: TodayPlan | null = todayRow === undefined
+      ? null
+      : {
+          plannedSessionId: todayRow.plannedSessionId,
+          focus: todayRow.focus,
+          phase: todayRow.phase,
+          slots: get().loadSessionSlots(todayRow.plannedSessionId),
+        };
     set({
       block: {
         blockId: blockRow.block_id,
@@ -538,6 +522,28 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       blockSessions,
       todayPlan,
     });
+  },
+
+  loadSessionSlots: (plannedSessionId) => {
+    const slots = rowsOf<{
+      slot_index: number; movement_id: number; movement_name: string;
+      sets: number; reps: number; target_rpe: number;
+    }>(getDb().executeSync(
+      `SELECT sl.slot_index, sl.movement_id, m.name AS movement_name,
+              sl.sets, sl.reps, sl.target_rpe
+       FROM planned_slot sl JOIN movement m ON m.movement_id = sl.movement_id
+       WHERE sl.planned_session_id = ?
+       ORDER BY sl.slot_index`,
+      [plannedSessionId],
+    ));
+    return slots.map((sl) => ({
+      slotIndex: sl.slot_index,
+      movementId: sl.movement_id,
+      movementName: sl.movement_name,
+      sets: sl.sets,
+      reps: sl.reps,
+      targetRpe: sl.target_rpe,
+    }));
   },
 
   refreshVector: () => {
@@ -744,7 +750,13 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
 
     if (operative !== null) {
-      const directive = applyGuardrail(limited.vector, operative, 1);
+      // Experience-weighted severity: the same report damps a beginner harder
+      // than an elite. Halts and no-op guardrails pass through unchanged.
+      const scaled: PhraseEntry = {
+        ...operative,
+        guardrail: scaleGuardrailForExperience(operative.guardrail, profile.training_age),
+      };
+      const directive = applyGuardrail(limited.vector, scaled, 1);
       set({
         prescription: { vector: directive.vector, source: 'guardrail', forDate: today },
         profileNotes: limited.notes,
@@ -799,10 +811,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
       // Persist the routing outcome; the applied numbers recorded here are
       // an audit snapshot (the operative prescription itself re-derives from
-      // this row via computePrescription).
+      // this row via computePrescription, with the same experience scaling).
       const audit = applyGuardrail(
         get().prescription?.vector ?? getPrescription(vector).vector,
-        resolved.entry,
+        {
+          ...resolved.entry,
+          guardrail: scaleGuardrailForExperience(
+            resolved.entry.guardrail,
+            get().profile.training_age,
+          ),
+        },
         resolved.similarity ?? 1,
       );
       d.executeSync(

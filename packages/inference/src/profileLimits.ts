@@ -9,7 +9,8 @@
  * itself is never modified (140-char contract stays with its author).
  */
 import type { AdjustmentVector } from './outputSchema';
-import type { UserProfile } from './types';
+import type { Guardrail } from './semantic/codebase';
+import type { TrainingAge, UserProfile } from './types';
 
 export interface ProfileContext {
   /** Completed sessions today (>=1 logged set), excluding any active one. */
@@ -70,5 +71,54 @@ export function applyProfileLimits(
   return {
     vector: { load_modifier: load, set_modifier: sets, rpe_cap: rpe, coaching_cue: base.coaching_cue },
     notes,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Experience-weighted triage scaling
+// ---------------------------------------------------------------------------
+/** How training age rescales a RESTRICTIVE triage guardrail before it is
+ *  applied. A beginner reporting pain/fatigue gets a more severe damping
+ *  (lower work capacity, higher injury naivety); an advanced/elite athlete
+ *  gets a milder one (higher baseline tolerance, better interoception).
+ *  Severity is monotone in experience — machine-verified. */
+export const EXPERIENCE_TRIAGE: Record<
+  TrainingAge,
+  { loadScale: number; capDelta: number; extraSetCut: number }
+> = {
+  beginner: { loadScale: 0.85, capDelta: -1.0, extraSetCut: 1 },
+  intermediate: { loadScale: 1.0, capDelta: 0.0, extraSetCut: 0 },
+  advanced: { loadScale: 1.1, capDelta: 1.0, extraSetCut: 0 },
+  elite: { loadScale: 1.2, capDelta: 1.5, extraSetCut: 0 },
+};
+
+/** Hard ceiling for ANY flagged (restrictive) report, every training age:
+ *  a body complaint never trains above RPE 8. */
+const FLAGGED_RPE_CEILING = 8.0;
+
+/**
+ * Rescale a triage guardrail for the athlete's training age.
+ *
+ * Safety bounds, none negotiable:
+ *   - halt guardrails are returned UNCHANGED (a hard stop never relaxes);
+ *   - no-op guardrails (positive reports) are returned UNCHANGED — scaling
+ *     must never tighten a healthy report nor loosen anything;
+ *   - load_multiplier never exceeds 1.0, set_delta never exceeds 0;
+ *   - the scaled RPE cap stays inside [5.0, 8.0].
+ * Composed through applyGuardrail this remains monotone conservative with
+ * respect to the operative base prescription at every training age.
+ */
+export function scaleGuardrailForExperience(g: Guardrail, age: TrainingAge): Guardrail {
+  const restrictive = g.load_multiplier < 1 || g.set_delta < 0 || g.rpe_cap_max < 10;
+  if (g.halt || !restrictive) return g;
+  const t = EXPERIENCE_TRIAGE[age];
+  return {
+    ...g,
+    load_multiplier: Math.min(1, round2(g.load_multiplier * t.loadScale)),
+    set_delta: Math.min(0, g.set_delta - t.extraSetCut),
+    rpe_cap_max: Math.min(
+      FLAGGED_RPE_CEILING,
+      Math.max(5.0, Math.round((g.rpe_cap_max + t.capDelta) * 2) / 2),
+    ),
   };
 }

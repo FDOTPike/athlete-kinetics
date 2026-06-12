@@ -45,6 +45,8 @@ export {
 } from './blockGenerator';
 export {
   applyProfileLimits,
+  EXPERIENCE_TRIAGE,
+  scaleGuardrailForExperience,
   type ProfileContext,
   type ProfileLimitedPrescription,
 } from './profileLimits';

@@ -18,7 +18,7 @@ import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
-import PrescriptionScreen from './screens/PrescriptionScreen';
+import BlockScreen from './screens/BlockScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
 type Tab = 'readiness' | 'session' | 'coach' | 'athlete';
@@ -89,8 +89,8 @@ function AppShell(): React.JSX.Element {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {tab === 'readiness' && <ReadinessScreen />}
-        {tab === 'session' && <SessionScreen />}
-        {tab === 'coach' && <PrescriptionScreen />}
+        {tab === 'session' && <SessionScreen onGoCoach={() => setTab('coach')} />}
+        {tab === 'coach' && <BlockScreen onSessionStarted={() => setTab('session')} />}
         {tab === 'athlete' && <ProfileScreen />}
       </KeyboardAvoidingView>
       <View style={styles.tabBar} accessibilityRole="tablist">

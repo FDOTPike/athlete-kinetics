@@ -87,7 +87,12 @@ const shortName = (name: string): string => (name.length > 12 ? `${name.slice(0,
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
-export default function SessionScreen(): React.JSX.Element {
+interface SessionScreenProps {
+  /** Routes to the COACH tab — session starts go through its safety gate. */
+  onGoCoach?: () => void;
+}
+
+export default function SessionScreen({ onGoCoach }: SessionScreenProps): React.JSX.Element {
   const movements = useStore((s) => s.movements);
   const session = useStore((s) => s.session);
   const sessionPlan = useStore((s) => s.sessionPlan);
@@ -115,16 +120,21 @@ export default function SessionScreen(): React.JSX.Element {
   }, [session]);
 
   if (session === null) {
+    // Session starts route through COACH's pre-session check-in (the safety
+    // gate). The direct path only remains when the shell gives no router.
     return (
       <View style={styles.center}>
         <Pressable
-          onPress={startSession}
+          onPress={onGoCoach ?? startSession}
           accessibilityRole="button"
-          accessibilityLabel="Start a new workout session"
+          accessibilityLabel="Start a session via the coach check-in"
           style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
         >
-          <Text style={styles.startBtnText}>START SESSION</Text>
+          <Text style={styles.startBtnText}>START IN COACH</Text>
         </Pressable>
+        <Text style={styles.startHint}>
+          Every session opens with a 10-second body check-in on the COACH tab.
+        </Text>
       </View>
     );
   }
@@ -362,6 +372,14 @@ const styles = StyleSheet.create({
   },
   startBtnPressed: { backgroundColor: '#26C28F' },
   startBtnText: { color: '#06251B', fontSize: 24, fontWeight: '800', letterSpacing: 2 },
+  startHint: {
+    color: palette.dim,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginTop: 14,
+    paddingHorizontal: 36,
+  },
 
   haltBanner: {
     backgroundColor: '#2A1416',

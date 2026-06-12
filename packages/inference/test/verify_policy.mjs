@@ -164,5 +164,57 @@ check('default profile on a hold day changes nothing',
   noop.notes.length === 0 && noop.vector.load_modifier === holdV.load_modifier &&
   noop.vector.rpe_cap === holdV.rpe_cap);
 
+// --- 5. experience-weighted triage scaling -------------------------------------
+console.log('[5] scaleGuardrailForExperience');
+const { scaleGuardrailForExperience } = limits;
+const { applyGuardrail } = require('./.build/semantic/triage.js');
+const AGES = ['beginner', 'intermediate', 'advanced', 'elite'];
+const painFloor = { load_multiplier: 0.6, set_delta: -1, rpe_cap_max: 6.0, halt: false, follow_up: null };
+const fatigue = { load_multiplier: 0.9, set_delta: -1, rpe_cap_max: 7.5, halt: false, follow_up: null };
+const haltG = { load_multiplier: 0, set_delta: -2, rpe_cap_max: 0, halt: true, follow_up: 'Stop now.' };
+const noopG = { load_multiplier: 1.0, set_delta: 0, rpe_cap_max: 10.0, halt: false, follow_up: null };
+
+check('intermediate is the identity on a restrictive guardrail',
+  JSON.stringify(scaleGuardrailForExperience(painFloor, 'intermediate')) === JSON.stringify(painFloor));
+const scaledPain = AGES.map((a) => scaleGuardrailForExperience(painFloor, a));
+check('severity strictly monotone with experience (load multiplier)',
+  scaledPain[0].load_multiplier < scaledPain[1].load_multiplier &&
+  scaledPain[1].load_multiplier < scaledPain[2].load_multiplier &&
+  scaledPain[2].load_multiplier < scaledPain[3].load_multiplier,
+  scaledPain.map((g) => g.load_multiplier).join(' < '));
+check('severity monotone with experience (RPE cap)',
+  scaledPain[0].rpe_cap_max < scaledPain[1].rpe_cap_max &&
+  scaledPain[1].rpe_cap_max < scaledPain[2].rpe_cap_max &&
+  scaledPain[2].rpe_cap_max < scaledPain[3].rpe_cap_max,
+  scaledPain.map((g) => g.rpe_cap_max).join(' < '));
+check('beginner pain: severe (load 0.51, extra set cut, cap 5.0)',
+  scaledPain[0].load_multiplier === 0.51 && scaledPain[0].set_delta === -2 &&
+  scaledPain[0].rpe_cap_max === 5.0);
+check('elite pain: milder (load 0.72, cap 7.5)',
+  scaledPain[3].load_multiplier === 0.72 && scaledPain[3].rpe_cap_max === 7.5);
+const eliteFatigue = scaleGuardrailForExperience(fatigue, 'elite');
+check('flagged RPE ceiling 8.0 binds (elite fatigue 7.5+1.5 -> 8.0)',
+  eliteFatigue.rpe_cap_max === 8.0);
+check('load multiplier never exceeds 1.0 (elite fatigue 0.9x1.2 -> 1.0)',
+  eliteFatigue.load_multiplier === 1.0);
+check('halt guardrails are untouched at every age',
+  AGES.every((a) => JSON.stringify(scaleGuardrailForExperience(haltG, a)) === JSON.stringify(haltG)));
+check('no-op (positive) guardrails are untouched at every age',
+  AGES.every((a) => JSON.stringify(scaleGuardrailForExperience(noopG, a)) === JSON.stringify(noopG)));
+// Composition law: scaled guardrails stay monotone conservative vs the base.
+let composedRaise = null;
+for (const a of AGES) {
+  for (const g of [painFloor, fatigue, haltG, noopG]) {
+    const entry = { id: 'scale-test', category: 'pain', text: 't', aliases: [],
+      cue: 'Scaling composition check cue.', guardrail: scaleGuardrailForExperience(g, a) };
+    const dirv = applyGuardrail(boostV, entry, 1);
+    if (dirv.vector.load_modifier > boostV.load_modifier + 1e-9 ||
+        dirv.vector.set_modifier > boostV.set_modifier ||
+        dirv.vector.rpe_cap > boostV.rpe_cap + 1e-9) composedRaise = { a, g };
+  }
+}
+check('composed with applyGuardrail: never above the base at any age',
+  composedRaise === null, composedRaise ? JSON.stringify(composedRaise) : '16 combos');
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);
