@@ -1,4 +1,4 @@
-﻿/**
+/**
  * verify_store_sql.mjs â€” extracts every SQL literal from useStore.ts and
  * PREPARES it against the real migrated schema. sqlite3_prepare validates
  * tables, columns, and syntax, so a typo'd column in the store's DAO layer

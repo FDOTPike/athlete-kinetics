@@ -1,4 +1,4 @@
-﻿/**
+/**
  * verify_demo_path.mjs â€” simulates the app's first-run path EXACTLY as
  * useStore executes it (same statements, same order, same adapter shape):
  *   migrate -> boot catch-up materialize -> guard check -> loadDemoAthlete

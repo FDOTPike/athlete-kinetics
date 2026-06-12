@@ -1,4 +1,4 @@
-﻿"""
+"""
 verify_schema.py â€” executes the real schema files against a real SQLite engine,
 loads 30 days of synthetic athlete data, and asserts the full pipeline:
 raw sets -> trigger rollup -> windowed view -> materialized state_vector.

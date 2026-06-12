@@ -1,4 +1,4 @@
-﻿/**
+/**
  * verify_migrations.mjs â€” runs the PRODUCTION migration runner
  * (migrationRunner.ts, compiled) against real SQLite in the three scenarios
  * that exist in the field:

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * verify_blocks.mjs â€” boundary invariants of the deterministic block engine.
  *
  * The generator was written to satisfy THESE laws, not vice versa:
