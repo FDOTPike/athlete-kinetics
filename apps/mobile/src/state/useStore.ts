@@ -29,6 +29,7 @@ import {
   applyProfileLimits,
   DEFAULT_PROFILE,
   EQUIPMENT_ITEMS,
+  generateBlock,
   getPrescription,
   loadCodebase,
   moreConservative,
@@ -37,6 +38,7 @@ import {
   resolveReport,
   triage,
   type Embedder,
+  type GeneratorMovement,
   type LoadedCodebase,
   type MovementPattern,
   type PhraseCodebase,
@@ -120,6 +122,44 @@ export interface PlanSlot {
   plannedSets: number;
 }
 
+// --- 4-week block (007 tables) ----------------------------------------------
+export interface ActiveBlock {
+  blockId: number;
+  startDate: string;
+  objective: string;
+  createdAtMs: number;
+}
+
+/** One cell of the block grid (a planned training day). */
+export interface BlockSessionSummary {
+  plannedSessionId: number;
+  weekIndex: number;
+  dayIndex: number;
+  focus: string;
+  phase: string;
+  sessionDate: string;
+  slotCount: number;
+  /** A real session with logged sets exists on this date. */
+  trained: boolean;
+}
+
+export interface TodaySlot {
+  slotIndex: number;
+  movementId: number;
+  movementName: string;
+  sets: number;
+  reps: number;
+  targetRpe: number;
+}
+
+/** Today's planned session, null on rest days (the UI renders that state). */
+export interface TodayPlan {
+  plannedSessionId: number;
+  focus: string;
+  phase: string;
+  slots: TodaySlot[];
+}
+
 interface KineticsStore {
   status: BootStatus;
   error: string | null;
@@ -139,8 +179,17 @@ interface KineticsStore {
   lastTriage: TriageOutcome | null;
   sessionPlan: PlanSlot[];
   activeMovementId: number | null;
+  /** Active 4-week block, its grid, and today's planned session. */
+  block: ActiveBlock | null;
+  blockSessions: BlockSessionSummary[];
+  todayPlan: TodayPlan | null;
 
   boot: () => void;
+  /** Archive any active block and persist a freshly generated one (single
+   *  SQLite transaction). Deterministic: profile + equipment + today. */
+  generateNewBlock: () => void;
+  /** Re-read active block + grid + today's plan from persistence. */
+  refreshBlock: () => void;
   setEmbedder: (e: Embedder | null) => void;
   saveProfile: (patch: Partial<UserProfile>) => void;
   reportSubjective: (text: string) => Promise<void>;
@@ -284,6 +333,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   lastTriage: null,
   sessionPlan: [],
   activeMovementId: null,
+  block: null,
+  blockSessions: [],
+  todayPlan: null,
 
   boot: () => {
     if (get().status === 'ready') return;
@@ -312,6 +364,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         profile: profileRow !== undefined ? profileFromRow(profileRow) : DEFAULT_PROFILE,
       });
       get().refreshVector();
+      // The block lives only in SQLite; the store is a read surface over it.
+      get().refreshBlock();
       // Prescription is a pure derivation over persisted state (profile +
       // today's reports), so a halt logged yesterday evening survives an
       // app restart this morning.
@@ -352,6 +406,140 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     if (get().prescription !== null) get().computePrescription([]);
   },
 
+  generateNewBlock: () => {
+    const { profile, movements, status } = get();
+    if (status !== 'ready') return;
+    // The generator is pure; everything stateful happens in ONE transaction
+    // below so a mid-write crash leaves the previous block fully active.
+    const genMovements: GeneratorMovement[] = movements.map((m) => ({
+      movement_id: m.movement_id,
+      name: m.name,
+      pattern: m.pattern as MovementPattern,
+      is_compound: m.is_compound,
+      required: m.required,
+    }));
+    const plan = generateBlock({
+      profile,
+      movements: genMovements,
+      startDate: localToday(),
+    });
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        "UPDATE training_block SET status = 'archived' WHERE status = 'active'",
+      );
+      d.executeSync(
+        'INSERT INTO training_block (start_date, objective, created_at_ms) VALUES (?, ?, ?)',
+        [plan.start_date, plan.objective, Date.now()],
+      );
+      const blockId = rowsOf<{ id: number }>(
+        d.executeSync('SELECT last_insert_rowid() AS id'),
+      )[0]!.id;
+      for (const s of plan.sessions) {
+        d.executeSync(
+          'INSERT INTO planned_session (block_id, week_index, day_index, focus, phase, session_date) VALUES (?, ?, ?, ?, ?, ?)',
+          [blockId, s.week_index, s.day_index, s.focus, s.phase, s.session_date],
+        );
+        const sessionId = rowsOf<{ id: number }>(
+          d.executeSync('SELECT last_insert_rowid() AS id'),
+        )[0]!.id;
+        for (const sl of s.slots) {
+          d.executeSync(
+            'INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, ?, ?, ?, ?)',
+            [sessionId, sl.slot_index, sl.movement_id, sl.sets, sl.reps, sl.target_rpe],
+          );
+        }
+      }
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    get().refreshBlock();
+  },
+
+  refreshBlock: () => {
+    const d = getDb();
+    const today = localToday();
+    const blockRow = rowsOf<{
+      block_id: number; start_date: string; objective: string; created_at_ms: number;
+    }>(d.executeSync(
+      "SELECT block_id, start_date, objective, created_at_ms FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
+    ))[0];
+    if (blockRow === undefined) {
+      set({ block: null, blockSessions: [], todayPlan: null });
+      return;
+    }
+    const sessions = rowsOf<{
+      planned_session_id: number; week_index: number; day_index: number;
+      focus: string; phase: string; session_date: string; slot_count: number;
+      trained: number;
+    }>(d.executeSync(
+      `SELECT ps.planned_session_id, ps.week_index, ps.day_index, ps.focus, ps.phase,
+              ps.session_date, count(sl.planned_slot_id) AS slot_count,
+              EXISTS (SELECT 1 FROM session s JOIN set_record sr ON sr.session_id = s.session_id
+                      WHERE s.session_date = ps.session_date) AS trained
+       FROM planned_session ps
+       LEFT JOIN planned_slot sl ON sl.planned_session_id = ps.planned_session_id
+       WHERE ps.block_id = ?
+       GROUP BY ps.planned_session_id
+       ORDER BY ps.week_index, ps.day_index`,
+      [blockRow.block_id],
+    ));
+    const blockSessions: BlockSessionSummary[] = sessions.map((s) => ({
+      plannedSessionId: s.planned_session_id,
+      weekIndex: s.week_index,
+      dayIndex: s.day_index,
+      focus: s.focus,
+      phase: s.phase,
+      sessionDate: s.session_date,
+      slotCount: s.slot_count,
+      trained: s.trained === 1,
+    }));
+    // Rest-day fallback: no planned session today is a normal, renderable
+    // state (todayPlan null) — never an error.
+    const todayRow = blockSessions.find((s) => s.sessionDate === today);
+    let todayPlan: TodayPlan | null = null;
+    if (todayRow !== undefined) {
+      const slots = rowsOf<{
+        slot_index: number; movement_id: number; movement_name: string;
+        sets: number; reps: number; target_rpe: number;
+      }>(d.executeSync(
+        `SELECT sl.slot_index, sl.movement_id, m.name AS movement_name,
+                sl.sets, sl.reps, sl.target_rpe
+         FROM planned_slot sl JOIN movement m ON m.movement_id = sl.movement_id
+         WHERE sl.planned_session_id = ?
+         ORDER BY sl.slot_index`,
+        [todayRow.plannedSessionId],
+      ));
+      todayPlan = {
+        plannedSessionId: todayRow.plannedSessionId,
+        focus: todayRow.focus,
+        phase: todayRow.phase,
+        slots: slots.map((sl) => ({
+          slotIndex: sl.slot_index,
+          movementId: sl.movement_id,
+          movementName: sl.movement_name,
+          sets: sl.sets,
+          reps: sl.reps,
+          targetRpe: sl.target_rpe,
+        })),
+      };
+    }
+    set({
+      block: {
+        blockId: blockRow.block_id,
+        startDate: blockRow.start_date,
+        objective: blockRow.objective,
+        createdAtMs: blockRow.created_at_ms,
+      },
+      blockSessions,
+      todayPlan,
+    });
+  },
+
   refreshVector: () => {
     if (get().status !== 'ready') return;
     const today = localToday();
@@ -374,28 +562,34 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const today = localToday();
     const startedAtMs = Date.now();
     const d = getDb();
-    // Seed the workout plan from the most recent completed session, BEFORE
-    // creating the new row. Planned sets fold in today's set_modifier — the
-    // first place the prescription's set delta becomes actionable UI.
-    const { prescription } = get();
-    const plannedSets = Math.round(clamp(
-      3 + (prescription !== null && prescription.forDate === today
-        ? prescription.vector.set_modifier
-        : 0),
-      1, 6,
-    ));
-    const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
-      `SELECT movement_id FROM set_record
-       WHERE session_id = (
-         SELECT s.session_id FROM session s
-         JOIN set_record r ON r.session_id = s.session_id
-         ORDER BY s.session_id DESC LIMIT 1)
-       GROUP BY movement_id ORDER BY MIN(set_id)`,
-    ));
-    const sessionPlan: PlanSlot[] = lastMovements.map((m) => ({
-      movementId: m.movement_id,
-      plannedSets,
-    }));
+    // Seed the workout plan BEFORE creating the new row. Source of truth, in
+    // order: today's planned block session (slot sets + today's set_modifier),
+    // else the most recent completed session (pre-block behavior).
+    const { prescription, todayPlan } = get();
+    const setDelta = prescription !== null && prescription.forDate === today
+      ? prescription.vector.set_modifier
+      : 0;
+    let sessionPlan: PlanSlot[];
+    if (todayPlan !== null) {
+      sessionPlan = todayPlan.slots.map((sl) => ({
+        movementId: sl.movementId,
+        plannedSets: Math.round(clamp(sl.sets + setDelta, 1, 6)),
+      }));
+    } else {
+      const plannedSets = Math.round(clamp(3 + setDelta, 1, 6));
+      const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
+        `SELECT movement_id FROM set_record
+         WHERE session_id = (
+           SELECT s.session_id FROM session s
+           JOIN set_record r ON r.session_id = s.session_id
+           ORDER BY s.session_id DESC LIMIT 1)
+         GROUP BY movement_id ORDER BY MIN(set_id)`,
+      ));
+      sessionPlan = lastMovements.map((m) => ({
+        movementId: m.movement_id,
+        plannedSets,
+      }));
+    }
     d.executeSync(
       'INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, ?, ?)',
       [today, startedAtMs],
@@ -504,6 +698,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
     set({ session: null, sessionPlan: [], activeMovementId: null });
     get().refreshVector();
+    // Logged work changes the grid's trained markers.
+    get().refreshBlock();
     // Session count changed: the daily/weekly profile clamps may now bind.
     get().computePrescription([]);
   },

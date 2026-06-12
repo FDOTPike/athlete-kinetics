@@ -24,8 +24,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
 }
 
 const src = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
-const statements = [...src.matchAll(/executeSync\(\s*(?:'([^']+)'|`([^`]+)`)/g)]
-  .map((m) => m[1] ?? m[2]);
+const statements = [...src.matchAll(/executeSync\(\s*(?:'([^']+)'|`([^`]+)`|"([^"]+)")/g)]
+  .map((m) => m[1] ?? m[2] ?? m[3]);
 // The store also executes MATERIALIZE_STATE_VECTOR_SQL from @ak/core-db.
 statements.push(
   readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8')
