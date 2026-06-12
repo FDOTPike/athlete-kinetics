@@ -6,7 +6,7 @@
  * button to forget). Keyboard-light: chips for enums, ±steppers for numbers;
  * free text only for injury/mobility notes.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
@@ -95,6 +95,67 @@ function NumberRow({ label, display, onDec, onInc, tip }: NumberRowProps): React
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={`Increase ${label}`}
+          style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
+        >
+          <Text style={styles.numBtnText}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// One-rep-max row: type the number directly (a 300 kg deadlifter must not
+// tap +2.5 a hundred times); ± buttons remain for fine adjustment.
+// ---------------------------------------------------------------------------
+interface OneRmRowProps {
+  label: string;
+  valueKg: number | undefined;
+  onChange: (kg: number | null) => void;
+}
+function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Element {
+  const [text, setText] = useState(valueKg !== undefined ? valueKg.toFixed(1) : '');
+  useEffect(() => {
+    setText(valueKg !== undefined ? valueKg.toFixed(1) : '');
+  }, [valueKg]);
+  const commitText = (): void => {
+    const parsed = Number.parseFloat(text.replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed < 20) {
+      onChange(null); // empty/garbage/sub-20 clears the max
+      setText('');
+      return;
+    }
+    onChange(parsed); // store snaps to 2.5 and clamps 20..500
+  };
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.numberRow}>
+        <Pressable
+          onPress={() => { if (valueKg !== undefined) onChange(valueKg - 2.5 < 20 ? null : valueKg - 2.5); }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Decrease ${label} one rep max`}
+          style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
+        >
+          <Text style={styles.numBtnText}>−</Text>
+        </Pressable>
+        <TextInput
+          style={styles.oneRmInput}
+          value={text}
+          onChangeText={setText}
+          onEndEditing={commitText}
+          keyboardType="numeric"
+          placeholder="—"
+          placeholderTextColor={palette.dim}
+          maxLength={6}
+          accessibilityLabel={`${label} one rep max in kilograms, type to set`}
+        />
+        <Pressable
+          onPress={() => onChange((valueKg ?? 57.5) + 2.5)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Increase ${label} one rep max`}
           style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
         >
           <Text style={styles.numBtnText}>+</Text>
@@ -267,22 +328,18 @@ export default function ProfileScreen(): React.JSX.Element {
         </View>
         <Text style={styles.fieldHint}>
           With a max set, SESSION shows real target kilograms for every planned
-          lift. Steps of 2.5 kg; step below 20 to clear.
+          lift. Type the number directly (snapped to 2.5 kg); ± fine-tunes.
+          Clear it by typing 0.
         </Text>
         {BIG4_LIFTS.map(({ name, label }) => {
           const m = movements.find((x) => x.name === name);
           if (m === undefined) return null;
-          const cur = oneRepMaxes[m.movement_id] as number | undefined;
           return (
-            <NumberRow
+            <OneRmRow
               key={name}
               label={label}
-              display={cur !== undefined ? cur.toFixed(1) : '—'}
-              onDec={() => {
-                if (cur === undefined) return;
-                saveOneRepMax(m.movement_id, cur - 2.5 < 20 ? null : cur - 2.5);
-              }}
-              onInc={() => saveOneRepMax(m.movement_id, (cur ?? 57.5) + 2.5)}
+              valueKg={oneRepMaxes[m.movement_id] as number | undefined}
+              onChange={(kg) => saveOneRepMax(m.movement_id, kg)}
             />
           );
         })}
@@ -393,6 +450,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
+  },
+  oneRmInput: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 10,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    color: palette.text,
+    fontSize: 26,
+    fontWeight: '800',
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+    paddingVertical: 6,
   },
   notesInput: {
     minHeight: 72,

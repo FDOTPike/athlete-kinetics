@@ -96,6 +96,7 @@ export default function SessionScreen(): React.JSX.Element {
   const activeMovementId = useStore((s) => s.activeMovementId);
   const profile = useStore((s) => s.profile);
   const lastTriage = useStore((s) => s.lastTriage);
+  const block = useStore((s) => s.block);
   const todayPlan = useStore((s) => s.todayPlan);
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const lastEndedSessionId = useStore((s) => s.lastEndedSessionId);
@@ -124,9 +125,26 @@ export default function SessionScreen(): React.JSX.Element {
 
   if (session === null) {
     // Instant start — no forced check-in (field-tested as friction). An
-    // operative halt still blocks here AND inside the store action.
+    // operative halt still blocks here AND inside the store action; a
+    // plan-less start (no block / rest day) needs explicit confirmation.
     const startHalted =
       lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+    const requestStart = (): void => {
+      if (block === null || todayPlan === null) {
+        Alert.alert(
+          block === null ? 'No training block yet' : 'Rest day',
+          block === null
+            ? 'Generate a 4-week block on COACH first so sessions follow a plan. Start an unplanned session anyway?'
+            : 'Today is a rest day in your block. Start an unplanned session anyway?',
+          [
+            { text: 'CANCEL', style: 'cancel' },
+            { text: 'START ANYWAY', onPress: startSession },
+          ],
+        );
+        return;
+      }
+      startSession();
+    };
     return (
       <View style={styles.center}>
         {startHalted ? (
@@ -137,7 +155,7 @@ export default function SessionScreen(): React.JSX.Element {
           </View>
         ) : (
           <Pressable
-            onPress={startSession}
+            onPress={requestStart}
             accessibilityRole="button"
             accessibilityLabel="Start a new workout session"
             style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
@@ -189,6 +207,19 @@ export default function SessionScreen(): React.JSX.Element {
   );
 
   const confirmEnd = (): void => {
+    if (session.sets.length === 0) {
+      // Accidental starts back out cleanly: an empty session is deleted,
+      // never recorded — no rollups touched, no prescription penalty.
+      Alert.alert(
+        'Discard empty session?',
+        'Nothing was logged. Discarding leaves no trace and no penalty.',
+        [
+          { text: 'KEEP LIFTING', style: 'cancel' },
+          { text: 'DISCARD', style: 'destructive', onPress: endSession },
+        ],
+      );
+      return;
+    }
     Alert.alert(
       'End session?',
       `${session.sets.length} sets · ${Math.round(tonnage)} kg total`,

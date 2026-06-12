@@ -121,6 +121,25 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     startSession();
     if (onSessionStarted !== undefined) onSessionStarted();
   };
+  // Field-tested trap: tapping START before any block existed silently
+  // created an unplanned session. Plan-less starts now require an explicit
+  // confirmation instead of an accidental commitment.
+  const requestStart = (): void => {
+    if (block === null || todayPlan === null) {
+      Alert.alert(
+        block === null ? 'No training block yet' : 'Rest day',
+        block === null
+          ? 'Generate a 4-week block below first so sessions follow a plan. Start an unplanned session anyway?'
+          : 'Today is a rest day in your block. Start an unplanned session anyway?',
+        [
+          { text: 'CANCEL', style: 'cancel' },
+          { text: 'START ANYWAY', onPress: beginSession },
+        ],
+      );
+      return;
+    }
+    beginSession();
+  };
 
   const weekRows: { week: number; phase: string; cells: (BlockSessionSummary | null)[] }[] = [];
   if (block !== null) {
@@ -384,7 +403,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         </View>
       ) : (
         <Pressable
-          onPress={beginSession}
+          onPress={requestStart}
           accessibilityRole="button"
           accessibilityLabel="Start a new workout session"
           style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}

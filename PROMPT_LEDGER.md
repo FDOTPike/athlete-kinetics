@@ -321,3 +321,45 @@ If CI is green, generate the Phase 11 Step 1 Handover document.
 - `Gemini_Handover_Phase11_Step1.txt` generated (dense format), including
   the tooling rule: never write Groovy-parsed files with PS5.1
   Set-Content -Encoding utf8.
+
+---
+
+## Entry 0008 — 2026-06-12 (night) · Overnight autonomous fixes: 1RM input friction + no-block session trap
+
+### Input G(x)
+
+```
+ringcon is on my finger but it hasnt been taking any data as its flat, is it
+working , I want to sleep soon so can i just let claude do its thing> i
+noticed a few things on the app i want claude to fix as well
+- Incremental 1RM adjustment requires too much effort for high level athletes
+  as i had to go all the way up to 300kg in 2.5kg increments
+- Before loading the block i clicked on start session and it automatically
+  started a session. No cancel option, requires to end the session and it then
+  applied a .77 multiple since it took it as a missed session, couldved been
+  avoid with a simple error prompt ( no block created yet)
+```
+
+### Output F(G(x))
+
+- **RingConn answer (no code change possible):** a flat ring records nothing —
+  the data chain is ring → RingConn app → Health Connect → this app, and it
+  starts at the battery. App-side ingestion is verified green (gate 11 + CI);
+  it degrades gracefully on missing days. Charge the ring + enable RingConn's
+  Health Connect sharing.
+- **1RM input friction:** ATHLETE Big-4 rows became OneRmRow — type the
+  number directly (numeric keyboard, comma tolerated, snapped to 2.5 kg,
+  clamped 20-500, type 0/clear to unset) with ± retained for fine-tuning.
+  300 kg is now four keystrokes, not ~100 taps.
+- **No-block session trap:** START SESSION on both COACH and SESSION now
+  raises a confirmation when no block exists ("No training block yet …
+  Start an unplanned session anyway?") or on a planned rest day — CANCEL /
+  START ANYWAY. Ending a zero-set session shows "Discard empty session?
+  … leaves no trace and no penalty" (it always deleted cleanly; the copy now
+  says so). Note: the observed ×0.77 was not a missed-session penalty — it
+  was the daily-session-cap (×0.85) and weekly-frequency (×0.9) profile
+  clamps composing (0.85×0.9 = 0.765 → ×0.77) because the demo history
+  already held training that day/week; the confirmation prompt prevents the
+  accidental entry into that state.
+- All 11 gates green; commit is this entry's containing commit; pushed, CI
+  watched, release v0.11.0 cut with the Health Connect APK + these fixes.
