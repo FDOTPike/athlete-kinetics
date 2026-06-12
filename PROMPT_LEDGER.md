@@ -308,4 +308,16 @@ If CI is green, generate the Phase 11 Step 1 Handover document.
 
 ### Output F(G(x))
 
-*(pending — completed when CI concludes)*
+- Push `77b919c` → CI run 27416002602: verification job GREEN (11 gates on
+  CI), **APK job FAILED in 1m44s — NOT the Health Connect dependency**:
+  Gradle parse error "Unexpected character '﻿' @ line 1" in
+  android/build.gradle — a UTF-8 BOM written by PowerShell 5.1's
+  `Set-Content -Encoding utf8` during the minSdk bump. Groovy rejects BOMs;
+  Node/Python had silently tolerated theirs.
+- Fix `10bd340`: BOMs stripped from all 7 files that cmdlet touched
+  (build.gradle, ci.yml, 5 verifiers); 11 gates re-verified green locally.
+- Re-push → CI run 27416301899: **both jobs SUCCESS** — the Health Connect
+  Gradle seam held on its first real test (autolinking + minSdk 26 compile).
+- `Gemini_Handover_Phase11_Step1.txt` generated (dense format), including
+  the tooling rule: never write Groovy-parsed files with PS5.1
+  Set-Content -Encoding utf8.

@@ -1,0 +1,90 @@
+# Gemini Handover — Phase 11 Step 1 (Health Connect telemetry)
+
+**Root Cause / Current State:**
+Phase 10 verified on hardware (APRE reactivity, Epley rounding, wave schemas).
+Phase 11 Step 1 executed under the anti-loop protocol and is GREEN end to end:
+11 local gates + CI run 27416301899 (verification + APK both success on
+10bd340). The APK job was the first true test of a new native dependency
+since the autolinking crash saga — it passed on the second push; the first
+push (run 27416002602) failed BEFORE Gradle configuration with "Unexpected
+character '﻿' @ line 1" in android/build.gradle: PowerShell 5.1's
+Set-Content -Encoding utf8 writes a UTF-8 BOM, Groovy rejects it. Fix:
+stripped BOMs from all 7 files that cmdlet had touched (Node/Python tolerate
+a BOM; Groovy does not). The Health Connect dependency itself compiled clean.
+
+**Changes Made:**
+- packages/biometrics (new workspace member, wired into tsconfig paths +
+  babel module-resolver + Metro-watched root):
+  - src/aggregate.ts — PURE daily compaction (the memory guardrail): raw
+    minute-tick arrays collapse to ONE row per local date BEFORE SQLite.
+    HRV = overnight average (0 < x <= 500 ms physiology filter); RHR =
+    daily average clamped to the hrv_daily CHECK domain [20,150]; sleep
+    sessions bucket to their WAKE morning, stage math excludes
+    AWAKE/OUT_OF_BED/AWAKE_IN_BED (androidx stage ids 1/3/7), deep/rem/light
+    split preserved; UNSTAGED_SLEEP_EFFICIENCY = 0.92 (population median)
+    when no stage data — never a flattering 100%. asleep clamped <= in_bed
+    (generated efficiency_pct CHECK <= 100). Malformed records skipped;
+    never throws. localDateOf is injected (device-local in prod, fixed UTC
+    in tests).
+  - src/healthConnect.ts — thin adapter over react-native-health-connect:
+    require() INSIDE tryCreateHealthConnectBridge (never module scope — the
+    import-side-effect crash lesson), Platform/Android check, getSdkStatus
+    must equal SDK_AVAILABLE(3), initialize() guarded. requestPermissions ->
+    boolean, readDaily -> [] on ANY failure, per-record-type reads
+    individually guarded. Local structural interface for the module — our
+    typecheck never depends on the lib's types.
+- Store (useStore.ts):
+  - connectBiometrics(bridge|null): null -> 'unavailable'; permission flow ->
+    'denied' | 'ready' (+first sync). biometricsStatus drives the ATHLETE
+    status row; nothing anywhere blocks on it.
+  - syncBiometrics(): foreground-only (boot, AppState 'active' alongside
+    rolloverDay, manual SYNC NOW). Upserts: hrv_daily (rmssd + resting_hr,
+    source 'health_connect', COALESCE keeps an existing RHR when a new
+    sample lacks one); RHR-without-HRV can only UPDATE an existing row
+    (rmssd_ms NOT NULL by CHECK — RHR-only days drop by design);
+    sleep_daily (in_bed/asleep/deep/rem/light). Then trailing-week
+    re-materialization + refreshVector + computePrescription. WHOLE body
+    fail-silent: a biometric failure can never degrade below the Phase 8
+    baseline (training data + subjective reports).
+- Native: AndroidManifest gains READ_HEART_RATE_VARIABILITY /
+  READ_RESTING_HEART_RATE / READ_SLEEP (read-only by design) + the
+  ACTION_SHOW_PERMISSIONS_RATIONALE intent-filter + the Android 14
+  ViewPermissionUsageActivity alias. minSdkVersion 24 -> 26 (Health Connect
+  client floor; 8.x devices stay on the subjective-only path).
+  react-native-health-connect ^3.3.0 declared in BOTH apps/mobile and root
+  package.json (autolinking reads the app manifest); package-lock
+  regenerated for npm ci.
+- NEW GATE 11 — verify:biometrics (compiles the production aggregate.ts):
+  [1] compaction (240 ticks -> 2 rows, averages pinned), [2] stage math
+  (480 in-bed -> 420 asleep with 90/90/240 split; unstaged 0.92 pinned),
+  [3] bucketing (wake-morning; no cross-midnight merging), [4] garbage
+  tolerance (never throws; only physiologic rows survive), [5] SQL
+  round-trip with the store's EXACT literals through real 002 CHECKs,
+  idempotent re-ingest, AND the materializer consuming a telemetry-only day
+  (the v_readiness_inputs date spine UNIONs hrv/sleep tables — rest-day
+  biometrics genuinely move readiness).
+- PROMPT_LEDGER.md initialized (entries 0001-0007) per the meta-logging
+  mandate; standing rule persisted to agent memory.
+- DEVIATION_LOG +4 (RHR reuses hrv_daily.resting_hr; 0.92 unstaged
+  efficiency; minSdk consequence; read-only scopes).
+
+**Next Phase Objective:**
+On-device verification: (1) fresh install on the physical phone (Health
+Connect present): ATHLETE shows CONNECTED after the permission sheet; SYNC
+NOW pulls last night's HRV/RHR/sleep and READY's readiness shifts
+accordingly; (2) deny permissions -> 'denied' status, app fully functional;
+(3) a device/emulator without Health Connect -> 'unavailable', no crash at
+boot (the graceful-degradation bound on real hardware); (4) overnight test:
+foreground the app in the morning -> auto-sync + rollover together. Then
+Phase 11 Step 2 per the phase manager (candidates: readiness trend surfacing
+of HRV/RHR, SpO2 sources, historical backfill window > 7 days).
+
+**Architectural Constraints:**
+Local SQLite only; biometrics are an ENHANCEMENT, never a dependency — every
+failure path lands on subjective-triage-only routing; compaction before
+persistence (no tick arrays in the DB); foreground-lifecycle sync only
+(nothing for Jetsam to kill); read-only health scopes; migrations untouched
+(002 already modeled RHR); every change lands with npm run verify:all
+(11 gates) green. Tooling note for future sessions: NEVER write
+Gradle/Groovy-parsed files with PS5.1 Set-Content -Encoding utf8 (BOM) — use
+[IO.File]::WriteAllText with UTF8Encoding($false).
