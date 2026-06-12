@@ -25,18 +25,14 @@ import {
   type DemoSql,
 } from '@ak/core-db';
 import {
-  applyGuardrail,
-  applyProfileLimits,
   DEFAULT_PROFILE,
+  derivePrescription,
   EQUIPMENT_ITEMS,
   generateBlock,
-  getPrescription,
   loadCodebase,
-  moreConservative,
   RED_FLAG_PAIN,
   RED_FLAG_SYSTEMIC,
   resolveReport,
-  scaleGuardrailForExperience,
   triage,
   type Embedder,
   type GeneratorMovement,
@@ -45,6 +41,7 @@ import {
   type PhraseCodebase,
   type PhraseEntry,
   type Prescription,
+  type ProfileContext,
   type SessionDirective,
   type StateVectorRow,
   type TriageResult,
@@ -186,6 +183,10 @@ interface KineticsStore {
   todayPlan: TodayPlan | null;
 
   boot: () => void;
+  /** Re-sync everything date-derived when the calendar day has changed since
+   *  the last read (overnight backgrounding, app left open past midnight).
+   *  Cheap no-op when the date is unchanged. */
+  rolloverDay: () => void;
   /** Archive any active block and persist a freshly generated one (single
    *  SQLite transaction). Deterministic: profile + equipment + today. */
   generateNewBlock: () => void;
@@ -229,6 +230,27 @@ const localToday = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+/** Layer-2 inputs from real training history, always for the CURRENT date —
+ *  the active session never counts against itself. */
+const profileCtx = (
+  d: DB,
+  today: string,
+  activeSessionId: number,
+): ProfileContext => ({
+  sessionsToday: Number(rowsOf<{ c: number }>(d.executeSync(
+    `SELECT count(DISTINCT s.session_id) AS c
+     FROM session s JOIN set_record sr ON sr.session_id = s.session_id
+     WHERE s.session_date = ? AND s.session_id != ?`,
+    [today, activeSessionId],
+  ))[0]?.c ?? 0),
+  trainedDaysLast7: Number(rowsOf<{ c: number }>(d.executeSync(
+    `SELECT count(DISTINCT s.session_date) AS c
+     FROM session s JOIN set_record sr ON sr.session_id = s.session_id
+     WHERE s.session_date >= date(?, '-6 days') AND s.session_date <= ?`,
+    [today, today],
+  ))[0]?.c ?? 0),
+});
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
 
@@ -409,6 +431,20 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     if (get().prescription !== null) get().computePrescription([]);
   },
 
+  rolloverDay: () => {
+    if (get().status !== 'ready') return;
+    if (localToday() === get().today) return;
+    // New calendar day: yesterday's reports no longer govern, today's plan
+    // cell moves, the trailing-week materialization may be missing a day.
+    const d = getDb();
+    for (const date of demoDates(localToday(), 7)) {
+      d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
+    }
+    get().refreshVector();   // also advances store.today
+    get().refreshBlock();
+    get().computePrescription([]);
+  },
+
   generateNewBlock: () => {
     const { profile, movements, status } = get();
     if (status !== 'ready') return;
@@ -565,6 +601,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   startSession: () => {
+    // Past midnight, todayPlan/prescription may be yesterday's — re-sync
+    // before seeding so the athlete gets TODAY'S planned session.
+    get().rolloverDay();
     const today = localToday();
     const startedAtMs = Date.now();
     const d = getDb();
@@ -711,66 +750,38 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   computePrescription: (_patterns) => {
-    const { vector, today, profile, session } = get();
+    const { vector, profile, session } = get();
     if (vector === null) return;
     const d = getDb();
+    // ALWAYS the real current date — a store snapshot can be yesterday's
+    // (app open past midnight) and would re-read yesterday's reports.
+    const today = localToday();
 
-    // Layer 1: deterministic policy from the state vector.
-    const base = getPrescription(vector);
-
-    // Layer 2: profile clamps (overtraining prevention), driven by actual
-    // training history. The active session must not count against itself.
-    const sessionsToday = Number(rowsOf<{ c: number }>(d.executeSync(
-      `SELECT count(DISTINCT s.session_id) AS c
-       FROM session s JOIN set_record sr ON sr.session_id = s.session_id
-       WHERE s.session_date = ? AND s.session_id != ?`,
-      [today, session !== null ? session.sessionId : -1],
-    ))[0]?.c ?? 0);
-    const trainedDaysLast7 = Number(rowsOf<{ c: number }>(d.executeSync(
-      `SELECT count(DISTINCT s.session_date) AS c
-       FROM session s JOIN set_record sr ON sr.session_id = s.session_id
-       WHERE s.session_date >= date(?, '-6 days') AND s.session_date <= ?`,
-      [today, today],
-    ))[0]?.c ?? 0);
-    const limited = applyProfileLimits(base.vector, profile, { sessionsToday, trainedDaysLast7 });
-
-    // Layer 3: the most conservative of TODAY'S PERSISTED reports. Deriving
-    // from the database (not cached zustand state) means a halt survives an
-    // app kill and a profile edit can never resurrect a damped prescription.
-    const reportIds = rowsOf<{ matched_entry_id: string }>(d.executeSync(
-      'SELECT matched_entry_id FROM subjective_report WHERE date = ? AND matched_entry_id IS NOT NULL',
+    // The whole three-layer derivation is the pure, machine-verified
+    // derivePrescription (verify:policy [6]); this is only its SQL adapter.
+    // Deriving from the database means a halt survives an app kill and a
+    // profile edit can never resurrect a damped prescription.
+    const reports = rowsOf<{ matched_entry_id: string }>(d.executeSync(
+      'SELECT matched_entry_id FROM subjective_report WHERE date = ? AND matched_entry_id IS NOT NULL ORDER BY report_id',
       [today],
-    ));
-    let operative: PhraseEntry | null = null;
-    for (const r of reportIds) {
-      const e = entryById(r.matched_entry_id);
-      if (e !== undefined && (operative === null || moreConservative(e.guardrail, operative.guardrail))) {
-        operative = e;
-      }
-    }
-
-    if (operative !== null) {
-      // Experience-weighted severity: the same report damps a beginner harder
-      // than an elite. Halts and no-op guardrails pass through unchanged.
-      const scaled: PhraseEntry = {
-        ...operative,
-        guardrail: scaleGuardrailForExperience(operative.guardrail, profile.training_age),
-      };
-      const directive = applyGuardrail(limited.vector, scaled, 1);
-      set({
-        prescription: { vector: directive.vector, source: 'guardrail', forDate: today },
-        profileNotes: limited.notes,
-        lastTriage: { kind: 'matched', directive },
-      });
-      return;
-    }
+    ))
+      .map((r) => entryById(r.matched_entry_id))
+      .filter((e): e is PhraseEntry => e !== undefined);
+    const derived = derivePrescription({
+      vector,
+      profile,
+      ctx: profileCtx(d, today, session !== null ? session.sessionId : -1),
+      reports,
+    });
     set({
-      prescription: {
-        vector: limited.vector,
-        source: limited.notes.length > 0 ? 'profile' : 'policy',
-        forDate: today,
-      },
-      profileNotes: limited.notes,
+      prescription: { vector: derived.vector, source: derived.source, forDate: today },
+      profileNotes: derived.notes,
+      // Mirror persistence exactly: no operative report today means no
+      // banner — a stale in-memory halt must never outlive its day.
+      lastTriage: derived.directive !== null
+        ? { kind: 'matched', directive: derived.directive }
+        : null,
+      today,
     });
   },
 
@@ -780,7 +791,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   reportSubjective: async (text) => {
-    const { vector, today, triaging } = get();
+    // A report typed after midnight must land on the NEW day — persisting it
+    // under a stale date would make the resulting halt vanish on restart.
+    get().rolloverDay();
+    const { vector, triaging } = get();
+    const today = localToday();
     const raw = text.trim();
     if (vector === null || triaging) return;
     if (raw.length === 0 || raw.length > 500) return;
@@ -809,26 +824,24 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         set({ lastTriage: { kind: 'rejected' } });
         return;
       }
-      // Persist the routing outcome; the applied numbers recorded here are
-      // an audit snapshot (the operative prescription itself re-derives from
-      // this row via computePrescription, with the same experience scaling).
-      const audit = applyGuardrail(
-        get().prescription?.vector ?? getPrescription(vector).vector,
-        {
-          ...resolved.entry,
-          guardrail: scaleGuardrailForExperience(
-            resolved.entry.guardrail,
-            get().profile.training_age,
-          ),
-        },
-        resolved.similarity ?? 1,
-      );
+      // Persist the routing outcome. The audit snapshot uses the SAME pure
+      // derivation as the operative path (this entry alone on today's
+      // profile-limited base) — never the current prescription, which may
+      // already carry another guardrail (compounding) or yesterday's date.
+      const activeSession = get().session;
+      const audit = derivePrescription({
+        vector,
+        profile: get().profile,
+        ctx: profileCtx(d, today, activeSession !== null ? activeSession.sessionId : -1),
+        reports: [resolved.entry],
+      });
+      const auditHalt = audit.directive !== null && audit.directive.halt;
       d.executeSync(
         `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           today, Date.now(), raw, resolved.entry.id, resolved.similarity,
-          audit.halt ? 1 : 0, audit.vector.load_modifier,
+          auditHalt ? 1 : 0, audit.vector.load_modifier,
           audit.vector.set_modifier, audit.vector.rpe_cap,
         ],
       );

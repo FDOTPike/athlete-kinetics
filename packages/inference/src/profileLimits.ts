@@ -81,7 +81,9 @@ export function applyProfileLimits(
  *  applied. A beginner reporting pain/fatigue gets a more severe damping
  *  (lower work capacity, higher injury naivety); an advanced/elite athlete
  *  gets a milder one (higher baseline tolerance, better interoception).
- *  Severity is monotone in experience — machine-verified. */
+ *  Severity is weakly monotone in experience (the 8.0 ceiling and 5.0 floor
+ *  can bind for adjacent ages) — machine-verified across the REAL codebase
+ *  entries in verify:policy [5]. */
 export const EXPERIENCE_TRIAGE: Record<
   TrainingAge,
   { loadScale: number; capDelta: number; extraSetCut: number }

@@ -69,24 +69,28 @@ const gen = (over = {}) => generateBlock({ profile: prof(over), movements, start
 console.log('[1] determinism bound');
 let detOk = true;
 for (const objective of OBJECTIVES) {
-  for (const weekly_frequency of [1, 4, 7]) {
+  for (let weekly_frequency = 1; weekly_frequency <= 7; weekly_frequency++) {
     const a = JSON.stringify(gen({ objective, weekly_frequency }));
     const b = JSON.stringify(gen({ objective, weekly_frequency }));
     if (a !== b) detOk = false;
   }
 }
-check('double-run deep-equality across all objectives x freq {1,4,7}', detOk,
-  `${OBJECTIVES.length * 3} pairs`);
+check('double-run deep-equality across all objectives x all 7 frequencies', detOk,
+  `${OBJECTIVES.length * 7} pairs`);
 
 // --- [2] structural bound -----------------------------------------------------
 console.log('[2] structural bound');
 let weeks4 = true, endsDeload = true, counts = true, domains = true, capped = true,
-  dupFree = true, datesOk = true, indexed = true, warnFree = true;
+  dupFree = true, datesOk = true, indexed = true, warnFree = true, deloadAll = true;
 let nPlans = 0;
 for (const objective of OBJECTIVES) {
   for (let f = 1; f <= 7; f++) {
     const plan = gen({ objective, weekly_frequency: f });
     nPlans += 1;
+    // Deload law holds for EVERY plan, not just the strength default.
+    const weekSets = (w) => plan.sessions.filter((s) => s.week_index === w)
+      .reduce((a, s) => a + s.slots.reduce((b, sl) => b + sl.sets, 0), 0);
+    if (!(weekSets(4) < weekSets(1))) deloadAll = false;
     if (plan.weeks !== 4) weeks4 = false;
     if (plan.warnings.length !== 0) warnFree = false; // full inventory: nothing missing
     if (plan.sessions.length !== f * 4) counts = false;
@@ -131,9 +135,14 @@ const setsOf = (plan) =>
 const w1 = (plan) => plan.sessions.filter((s) => s.week_index === 1);
 const w4 = (plan) => plan.sessions.filter((s) => s.week_index === 4);
 const strengthPlan = gen({ objective: 'strength' });
-check('deload volume strictly below week 1',
+check('deload volume strictly below week 1 (EVERY objective x frequency)', deloadAll,
+  `${nPlans} plans`);
+check('deload volume strictly below week 1 (strength pin)',
   setsOf({ sessions: w4(strengthPlan) }) < setsOf({ sessions: w1(strengthPlan) }),
   `${setsOf({ sessions: w4(strengthPlan) })} < ${setsOf({ sessions: w1(strengthPlan) })}`);
+const floorCap = gen({ objective: 'strength', base_rpe_cap: 5.0 });
+check('base_rpe_cap 5.0 (the CHECK floor): every slot exactly RPE 5.0',
+  floorCap.sessions.every((s) => s.slots.every((sl) => sl.target_rpe === 5.0)));
 const beginner = gen({ objective: 'strength', training_age: 'beginner' });
 const elite = gen({ objective: 'strength', training_age: 'elite' });
 check('beginner block carries strictly less volume than elite',

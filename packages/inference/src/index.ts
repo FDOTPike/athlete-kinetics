@@ -31,6 +31,11 @@ export {
 } from './types';
 export { evaluatePolicy } from './policyReference';
 export {
+  derivePrescription,
+  type DeriveInput,
+  type DerivedPrescription,
+} from './derivePrescription';
+export {
   addDaysIso,
   availableMovements,
   BLOCK_WEEKS,

@@ -44,5 +44,16 @@ for (const sql of statements) {
     fail += 1;
   }
 }
+// Wiring tripwires: mutation testing (2026-06-12) proved the layer-3 chain
+// could be silently unwired with every gate green. The pure derivation is
+// verified in verify:policy [6]; these assert the store actually routes
+// through it and guards date rollover.
+console.log('[store wiring]');
+for (const needle of ['derivePrescription(', 'rolloverDay', 'localToday()']) {
+  const ok = src.includes(needle);
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  store references ${needle}`);
+  if (!ok) fail += 1;
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

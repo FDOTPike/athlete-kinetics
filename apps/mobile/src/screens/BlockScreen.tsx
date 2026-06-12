@@ -81,7 +81,12 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
       'The current 4-week block is archived and a new one starts today from your profile and equipment.',
       [
         { text: 'KEEP CURRENT', style: 'cancel' },
-        { text: 'REGENERATE', style: 'destructive', onPress: generateNewBlock },
+        {
+          text: 'REGENERATE',
+          style: 'destructive',
+          // Close any open detail card — it snapshots the OLD block's session.
+          onPress: () => { setDetail(null); generateNewBlock(); },
+        },
       ],
     );
   };

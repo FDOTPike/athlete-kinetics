@@ -10,6 +10,8 @@
  * Run AFTER tsc emits to test/.build (npm run verify:policy does both).
  */
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 
 const out = require('./.build/outputSchema.js');
@@ -215,6 +217,78 @@ for (const a of AGES) {
 }
 check('composed with applyGuardrail: never above the base at any age',
   composedRaise === null, composedRaise ? JSON.stringify(composedRaise) : '16 combos');
+// The REAL codebase, not synthetic shapes: weak monotonicity (the 8.0
+// ceiling / 5.0 floor may bind for adjacent ages) + hard bounds.
+const cbJson = JSON.parse(readFileSync(
+  join(import.meta.dirname, '..', 'assets', 'phrase-codebase.json'), 'utf-8'));
+const restrictiveEntries = cbJson.entries.filter((e) => !e.guardrail.halt &&
+  (e.guardrail.load_multiplier < 1 || e.guardrail.set_delta < 0 || e.guardrail.rpe_cap_max < 10));
+let realViol = null;
+for (const e of restrictiveEntries) {
+  const seq = AGES.map((a) => scaleGuardrailForExperience(e.guardrail, a));
+  for (let i = 1; i < seq.length; i++) {
+    if (seq[i].load_multiplier < seq[i - 1].load_multiplier - 1e-9 ||
+        seq[i].rpe_cap_max < seq[i - 1].rpe_cap_max - 1e-9 ||
+        seq[i].set_delta < seq[i - 1].set_delta) realViol = { id: e.id, at: i, why: 'monotone' };
+  }
+  for (const g of seq) {
+    if (g.load_multiplier > 1 || g.set_delta > 0 ||
+        g.rpe_cap_max > 8.0 || g.rpe_cap_max < 5.0) realViol = { id: e.id, why: 'bounds' };
+  }
+}
+check('every restrictive REAL codebase entry: weakly monotone + bounded across ages',
+  realViol === null, realViol ? JSON.stringify(realViol) : `${restrictiveEntries.length} entries x 4 ages`);
+
+// --- 6. derivePrescription: the full layer-3 chain over the REAL codebase -------
+console.log('[6] derivePrescription (rows -> most-conservative -> scaling -> guardrail)');
+const { derivePrescription } = require('./.build/derivePrescription.js');
+const entryOf = (id) => {
+  const e = cbJson.entries.find((x) => x.id === id);
+  if (e === undefined) throw new Error(`codebase entry missing: ${id}`);
+  return e;
+};
+const boostRow = row(90, 1.0, 0.5, 90);
+const ctx0 = { sessionsToday: 0, trainedDaysLast7: 0 };
+const dp = (reports, over = {}) => derivePrescription({
+  vector: boostRow, profile: { ...DEFAULT_PROFILE, ...over }, ctx: ctx0, reports,
+});
+
+const tieA1 = dp([entryOf('positive-strong'), entryOf('equipment-improvised')]);
+const tieA2 = dp([entryOf('equipment-improvised'), entryOf('positive-strong')]);
+check('tie pair (positive-strong vs equipment-improvised) is order-independent, restrictive wins',
+  JSON.stringify(tieA1.vector) === JSON.stringify(tieA2.vector) && tieA1.vector.rpe_cap <= 8.0,
+  `cap ${tieA1.vector.rpe_cap}`);
+const tieB1 = dp([entryOf('soreness-doms'), entryOf('technique-breakdown')]);
+const tieB2 = dp([entryOf('technique-breakdown'), entryOf('soreness-doms')]);
+check('tie pair (soreness-doms vs technique-breakdown) picks the 7.5 cap either order',
+  JSON.stringify(tieB1.vector) === JSON.stringify(tieB2.vector) && tieB1.vector.rpe_cap <= 7.5,
+  `cap ${tieB1.vector.rpe_cap}`);
+
+const haltMix1 = dp([entryOf('pain-mild'), entryOf('pain-sharp')]);
+const haltMix2 = dp([entryOf('pain-sharp'), entryOf('pain-mild')]);
+check('a halt row halts regardless of order; re-derivation is restart-stable',
+  haltMix1.directive !== null && haltMix1.directive.halt &&
+  JSON.stringify(haltMix1) === JSON.stringify(haltMix2) &&
+  JSON.stringify(haltMix1) === JSON.stringify(dp([entryOf('pain-mild'), entryOf('pain-sharp')])));
+check('halt survives every training-age edit (profile cannot resurrect the session)',
+  AGES.every((a) => {
+    const r = dp([entryOf('pain-sharp')], { training_age: a });
+    return r.directive !== null && r.directive.halt && r.vector.load_modifier === 0;
+  }));
+
+const begiPain = dp([entryOf('pain-mild')], { training_age: 'beginner' });
+const elitPain = dp([entryOf('pain-mild')], { training_age: 'elite' });
+check('training-age flip relaxes a damped day only within bounds',
+  begiPain.vector.load_modifier < elitPain.vector.load_modifier &&
+  begiPain.vector.rpe_cap < elitPain.vector.rpe_cap &&
+  elitPain.vector.rpe_cap <= 8.0 &&
+  elitPain.vector.load_modifier <= 1.05,
+  `${begiPain.vector.load_modifier}/${begiPain.vector.rpe_cap} -> ${elitPain.vector.load_modifier}/${elitPain.vector.rpe_cap}`);
+check('experience scaling is INSIDE the derivation (beginner stricter than intermediate)',
+  begiPain.vector.rpe_cap < dp([entryOf('pain-mild')]).vector.rpe_cap);
+const noReports = dp([]);
+check('no reports: no directive, source stays policy/profile',
+  noReports.directive === null && noReports.source !== 'guardrail');
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

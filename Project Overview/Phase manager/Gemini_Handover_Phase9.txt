@@ -1,0 +1,110 @@
+# Gemini Handover — Phase 9 (hybrid profile, equipment filters, 4-week block engine)
+
+**Root Cause / Current State:**
+Phase 8 shipped; on-device build green. Phase 9 mandate executed in full under
+the anti-loop protocol: every step passed its single permitted verify:all run
+first try. The suite is now TEN gates (verify:blocks added). Methodology was
+contravariant generation: boundary invariants were authored as machine checks
+first; the engine exists to satisfy them, not vice versa.
+
+**Changes Made:**
+- 007_program_engine.sql (migration 6 in the chain, user_version=6):
+  athlete_profile v2 SUPERSEDES user_profile (CHECK widening impossible in
+  place; append-only chain) — objective gains 'hybrid', equipment_access enum
+  replaced by equipment_inventory JSON (10 items, default = full set); legacy
+  row copied once (INSERT OR IGNORE, enum→bundle CASE), legacy table dropped;
+  defensive 006-shape shim guards poisoned field DBs. 30-movement library
+  seed (ids 1..7 byte-identical to the demo loader, which is now OR IGNORE).
+  movement_equipment join table (STRICT, WITHOUT ROWID, item CHECK) — a
+  movement is available iff required ⊆ inventory, no rows = bodyweight.
+  training_block / planned_session / planned_slot (STRICT, FK CASCADE,
+  CHECK-pinned: weeks=4, week_index 1-4, focus enum, sets 1-10, reps 1-30,
+  target_rpe 5-10). SENTINELS: user_profile → athlete_profile +
+  training_block.
+- packages/inference/src/blockGenerator.ts: pure deterministic template
+  engine generateBlock({profile, movements, startDate}) → BlockPlan. Data
+  tables only: DAY_SPREAD per frequency, FOCUS_PATTERNS (lower/upper/full/
+  conditioning/bjj), per-objective SPLITS (hybrid alternates lifting and bjj;
+  f=1 is sport-only), SCHEMES (reps/sets/RPE wave w1<w2<w3, week 4 deload =
+  sets ceil(×0.5), RPE wave[0]−1 floor 5.0), slot budget ≈ duration_cap/22
+  clamp 2..5, hybrid strength days sets−1 (interference damping), beginner −1
+  elite +1, base_rpe_cap and rehab≤7 clamp every target. Movement pick:
+  equipment-filtered pool, is_compound DESC then movement_id ASC, no
+  duplicates per session, missing pattern → slot dropped + warning (never
+  substitutes upward).
+- packages/inference/src/profileLimits.ts: scaleGuardrailForExperience —
+  EXPERIENCE_TRIAGE rescales RESTRICTIVE triage guardrails by training_age
+  (beginner loadScale .85/capΔ −1.0/extra set cut; intermediate identity;
+  advanced 1.1/+1.0; elite 1.2/+1.5). Hard bounds: halts unchanged at every
+  age; no-op (positive) guardrails identity; multiplier ≤1.0; flagged-report
+  RPE ceiling 8.0; composition through applyGuardrail never exceeds the base.
+  Pain floor 0.6/6.0 → beginner 0.51/5.0, elite 0.72/7.5.
+- apps/mobile/src/state/useStore.ts: athlete_profile DAO (inventory
+  canonicalized to EQUIPMENT_ITEMS order); movements query carries
+  is_compound + required (json_group_array subquery); block slice —
+  generateNewBlock (pure plan → ONE BEGIN/COMMIT txn: archive active block,
+  insert block/sessions/slots; ROLLBACK leaves prior block live),
+  refreshBlock on boot/endSession (active block, 28-cell grid w/ trained
+  markers via EXISTS, todayPlan null on rest days), loadSessionSlots
+  synchronous detail read; startSession seeds sessionPlan from todayPlan
+  slots (sets + daily set_modifier, clamp 1-6) with legacy last-session
+  fallback; experience scaling applied at BOTH the operative derivation
+  (computePrescription) and the audit snapshot (reportSubjective).
+- Screens: BlockScreen.tsx replaces PrescriptionScreen.tsx (deleted) on
+  COACH — today's adjustment strip (source badge POLICY/PROFILE/GUARDRAIL),
+  4×7 grid (RN core Views, trained green, today amber, tap → slot detail),
+  TODAY'S PLAN with clean REST DAY state, GENERATE/REGENERATE (Alert
+  confirm), pre-session check-in gate (SUBMIT & START runs full triage and
+  refuses on halt; ALL CLEAR — START is the explicit bypass; operative halt
+  blocks starting outright), ad-hoc SUBJECTIVE REPORT retained. SessionScreen
+  empty state routes to COACH (side door closed); add/swap pickers filter by
+  inventory. ProfileScreen: HYBRID objective chip (auto from OBJECTIVES),
+  equipment inventory checklist + FULL GYM/HOME GYM/MINIMAL presets.
+- Verification (10 gates green; key numbers): verify:blocks — determinism 24
+  double-run pairs byte-equal; 56-plan structural grid (4 weeks, deload only
+  week 4, CHECK domains, caps); equipment strictness 8,192 plans (ALL 1024
+  inventory subsets × 8 objectives) 0 violations; hybrid balance (bjj present
+  at every frequency, strength sets strictly < pure strength at every
+  frequency; mats removed → fallback without BJJ Sparring Round); 007 SQL
+  literals byte-equal to TS constants (default inventory, preset bundles,
+  item CHECK); SQLite round-trip value-identical + cascade clean.
+  verify:migrations [4] — 006→007 upgrade carries customized data, forced
+  self-heal preserves hybrid + custom inventory. verify:policy [5] —
+  experience scaling monotone, halts/no-ops untouched, ceiling 8.0,
+  composition conservative (16 combos). verify:store — 36 statements prepare
+  (extractor now also captures double-quoted literals). verify:db [7]-[9],
+  verify:demo movement coexistence. DEVIATION_LOG.md +7 entries.
+
+**Step-5 Adversarial Audit (post-feature, pre-release):**
+13-agent review of the phase diff; 9 confirmed findings, all fixed: date
+rollover (store froze at boot date — overnight halt lockout + reports
+persisted under yesterday's date defeating halt persistence; fixed via
+rolloverDay() + AppState listener + localToday() at persistence points +
+lastTriage mirroring persistence), moreConservative total order (rpe_cap_max
+tiebreaker — real tie pairs were insertion-order-dependent), audit-snapshot
+parity (was composing onto the current prescription: compounding/staleness/
+missing clamps), and the structural one: derivePrescription() extracted as a
+pure function (mutation testing had proven the store's layer-3 wiring was
+machine-unverified) now exercised against the REAL codebase in verify:policy
+[6] + wiring tripwires in verify:store. BlockScreen detail card reset on
+regenerate. Coverage folds: deload law all 56 plans, determinism all 7
+frequencies, RPE-5.0 floor, real-entry scaling monotonicity (weak).
+
+**Next Phase Objective:**
+On-device verification of Phase 9 (APK via CI): (1) ATHLETE → set objective
+HYBRID, toggle inventory, confirm 007 upgrade preserved Phase-8 profile data;
+(2) COACH → GENERATE block, grid renders, rest day clean; (3) pre-session
+check-in: "knee hurts" damps (beginner vs elite severity differs), dizziness
+halts and blocks START across app restart; (4) session seeding matches
+today's planned slots; movement pickers hide equipment the inventory lacks;
+(5) REGENERATE archives and replaces. Then the phase-manager roadmap: real
+telemetry (Health Connect → packages/biometrics), movement library add/edit
+UI, history/trends + e1RM, F-Droid submission.
+
+**Architectural Constraints:**
+Local SQLite only; deterministic policy is the sole numeric authority; the
+block engine is pure TS over template tables (no generative LLM, no RNG);
+subjective input/profile/experience scaling only ever make sessions more
+conservative relative to the operative base; halts never relax; migrations
+append-only + idempotent + self-heal data-preserving; RN core components
+only; every change lands with npm run verify:all (10 gates) green.

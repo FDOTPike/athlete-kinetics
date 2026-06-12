@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
+  AppState,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -79,6 +80,12 @@ function AppShell(): React.JSX.Element {
     void tryCreateDeviceEmbedder().then((e) => {
       useStore.getState().setEmbedder(e);
     });
+    // Date rollover: an app foregrounded the morning after stays correct —
+    // yesterday's halt clears, today's planned session takes over.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') useStore.getState().rolloverDay();
+    });
+    return () => sub.remove();
   }, [boot]);
 
   return (

@@ -45,11 +45,16 @@ export function triage(query: Float32Array, cb: LoadedCodebase): TriageResult {
 
 /** True when guardrail `a` is strictly the more conservative of the pair.
  *  Exported: the store reuses it to pick the operative entry when several
- *  reports exist for one day. */
+ *  reports exist for one day. Total order over all four fields — real
+ *  codebase pairs tie on (halt, load, sets) and differ only on the RPE cap
+ *  (e.g. soreness-doms 8.0 vs technique-breakdown 7.5), and an
+ *  insertion-order-dependent winner would silently discard the more
+ *  restrictive report. */
 export function moreConservative(a: Guardrail, b: Guardrail): boolean {
   if (a.halt !== b.halt) return a.halt;
   if (a.load_multiplier !== b.load_multiplier) return a.load_multiplier < b.load_multiplier;
-  return a.set_delta < b.set_delta;
+  if (a.set_delta !== b.set_delta) return a.set_delta < b.set_delta;
+  return a.rpe_cap_max < b.rpe_cap_max;
 }
 
 // ---------------------------------------------------------------------------

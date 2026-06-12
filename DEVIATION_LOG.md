@@ -2,6 +2,83 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-06-12 — Phase 9 mandate (hybrid profile, equipment filters, block engine)
+
+1. **`user_profile` superseded by a NEW `athlete_profile` table, not widened
+   in place.** SQLite cannot alter a CHECK constraint and shipped migrations
+   are append-only by contract. Every in-place rebuild pattern
+   (CREATE v2 → copy → DROP → RENAME) is either non-idempotent under the
+   runner's self-heal re-apply or silently resets new columns. Migration 007
+   creates `athlete_profile` (objective CHECK gains `'hybrid'`,
+   `equipment_access` enum replaced by an `equipment_inventory` JSON list),
+   copies the legacy row once via INSERT OR IGNORE (legacy enum mapped to an
+   inventory bundle), and drops `user_profile`. Machine-verified: upgrade
+   carries customized data; a forced self-heal preserves a hybrid objective
+   and custom inventory byte-identical (verify:migrations [4]).
+
+2. **Hard halts never scale with experience.** The Step-4 mandate ordered
+   triage severity scaled by training_age ("milder reduction" for advanced/
+   elite). Implemented for DAMPING guardrails only: halt guardrails (sharp
+   pain, dizziness, chest symptoms) pass through `scaleGuardrailForExperience`
+   unchanged at every age — a hard stop is a medical posture, not a tunable.
+   Also beyond the mandate's letter: positive no-op guardrails are identity
+   (an elite's "feeling great" must not be tightened by the 8.0 ceiling), and
+   any flagged report ceilings at RPE 8.0 regardless of age. All pinned in
+   verify:policy [5], including composition never exceeding the base.
+
+3. **The SessionScreen "side door" is closed.** The mandate gated only the
+   BlockScreen's Start Session behind the pre-session check-in. Leaving
+   SessionScreen's empty-state START as a direct path would have made the
+   gate decorative; that button now routes to COACH (the gate), with the
+   direct call kept only as a no-router fallback. One start path, one gate.
+
+4. **Block engine lives in new tables; `macro_cycle`/`micro_cycle` are
+   untouched.** Their CHECK enums are shipped (goal lacks 'hybrid' et al.)
+   and they are the demo athlete's historical periodization record. The
+   4-week macro-cycle maps to `training_block`/`planned_session`/
+   `planned_slot` (STRICT, FK cascade, CHECK-pinned domains).
+
+5. **Strictness over substitution in generation.** When the inventory cannot
+   support a pattern, the slot is dropped and a warning recorded — the
+   generator never substitutes a movement whose equipment the athlete lacks.
+   Swept across all 1024 inventory subsets × 8 objectives (8,192 plans,
+   0 violations; verify:blocks [3]).
+
+6. **Movement library is seeded by migration 007 (30 movements), ids 1–7
+   byte-identical to the demo loader's list** (the loader now uses INSERT OR
+   IGNORE). Without this a real (non-demo) install had an empty movement
+   table and the block engine would generate nothing.
+
+7. **Hybrid at weekly_frequency 1 is sport-only (`['bjj']`).** Concurrent
+   training needs at least two days; the strength side returns at frequency
+   2+. Keeps the machine-verified law "every hybrid block contains bjj
+   sessions" true at every frequency.
+
+8. **Step-5 adversarial audit (13 agents, 9 confirmed findings) drove a
+   structural fix: the three-layer derivation is now a pure function.**
+   Confirmed majors, all fixed pre-release: (a) the store's date froze at
+   boot — an app left open/backgrounded past midnight kept yesterday's halt
+   latched (lockout) AND persisted new reports under yesterday's date (a 7am
+   red-flag halt silently vanished on the next restart). Fixed with
+   `rolloverDay()` (AppState foreground listener + guards in
+   startSession/reportSubjective) and `localToday()` at every persistence
+   point; `lastTriage` now mirrors persistence exactly (cleared when no
+   report is operative). (b) `moreConservative` ignored `rpe_cap_max`, so
+   real codebase tie pairs (soreness-doms vs technique-breakdown,
+   positive-strong vs equipment-improvised) resolved by insertion order —
+   the restrictive report could be silently discarded; the comparator is now
+   a total order and the store query is ORDER BY report_id. (c) The audit
+   snapshot composed onto the CURRENT prescription (compounding two
+   guardrails, or yesterday's vector); it now derives from the same pure
+   function as the operative path. (d) Mutation testing proved the layer-3
+   store wiring had zero machine coverage — `derivePrescription()` is
+   extracted into packages/inference, exercised against the REAL phrase
+   codebase in verify:policy [6] (tie ordering, restart stability, halt
+   surviving training-age edits, scaling bounds), with wiring tripwires in
+   verify:store. Coverage folds: deload law now swept across all 56 plans,
+   determinism across all 7 frequencies, RPE 5.0 floor pinned, scaling
+   monotonicity swept over real entries (weak — the 8.0 ceiling binds).
+
 ## 2026-06-11 — Phase 8 mandate (update.txt: profiles, triage override, session UI)
 
 1. **Profile persisted in SQLite, not Zustand-only.** The mandate says "update
