@@ -176,6 +176,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const saveOneRepMax = useStore((s) => s.saveOneRepMax);
   const biometricsStatus = useStore((s) => s.biometricsStatus);
   const syncBiometrics = useStore((s) => s.syncBiometrics);
+  const requestBiometricsAccess = useStore((s) => s.requestBiometricsAccess);
 
   // Free-text notes are committed on end-editing, not per keystroke.
   const [injuryText, setInjuryText] = useState(
@@ -303,12 +304,26 @@ export default function ProfileScreen(): React.JSX.Element {
         <Text style={styles.fieldHint}>
           {biometricsStatus === 'ready'
             ? 'Connected. Overnight HRV, resting heart rate, and sleep feed your readiness score automatically — synced when the app comes to the foreground.'
-            : biometricsStatus === 'denied'
-              ? 'Permission not granted. The coach still works fully from training data and your reports. Grant read access in Health Connect settings, then reopen the app.'
-              : biometricsStatus === 'unavailable'
-                ? 'Health Connect is not available on this device. The coach runs on training data and your reports — nothing else changes.'
-                : 'Checking Health Connect…'}
+            : biometricsStatus === 'idle'
+              ? 'Health Connect is available. Tap CONNECT to grant read access to overnight HRV, resting heart rate, and sleep — the coach works fully without it.'
+              : biometricsStatus === 'denied'
+                ? 'Permission not granted. The coach still works fully from training data and your reports. Tap TRY AGAIN, or grant read access in Health Connect settings.'
+                : biometricsStatus === 'unavailable'
+                  ? 'Health Connect is not available on this device. The coach runs on training data and your reports — nothing else changes.'
+                  : 'Checking Health Connect…'}
         </Text>
+        {(biometricsStatus === 'idle' || biometricsStatus === 'denied') && (
+          <Pressable
+            onPress={() => { void requestBiometricsAccess(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Connect Health Connect and grant read permissions"
+            style={styles.presetChip}
+          >
+            <Text style={styles.presetChipText}>
+              {biometricsStatus === 'idle' ? 'CONNECT' : 'TRY AGAIN'}
+            </Text>
+          </Pressable>
+        )}
         {biometricsStatus === 'ready' && (
           <Pressable
             onPress={() => { void syncBiometrics(); }}

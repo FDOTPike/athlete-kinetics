@@ -363,3 +363,38 @@ noticed a few things on the app i want claude to fix as well
   accidental entry into that state.
 - All 11 gates green; commit is this entry's containing commit; pushed, CI
   watched, release v0.11.0 cut with the Health Connect APK + these fixes.
+  (Release upload completed the following morning after a network timeout.)
+
+---
+
+## Entry 0009 — 2026-06-13 · v0.11.0 crash report (pre-training)
+
+### Input G(x)
+
+```
+the app is crashing
+```
+
+### Output F(G(x))
+
+- **Root cause (found by inspection, confirmed in the library source):**
+  react-native-health-connect stores its permission launcher as a Kotlin
+  `lateinit` that MUST be registered via
+  `HealthConnectPermissionDelegate.setPermissionDelegate(this)` in
+  MainActivity.onCreate. v0.11.0 never registered it AND requested
+  permissions automatically at boot → `launchPermissionsDialog` hits the
+  uninitialized launcher inside a Dispatchers.IO coroutine →
+  UninitializedPropertyAccessException outside any promise guard → process
+  death seconds after launch on any device where Health Connect is present.
+  Unreachable by JS try/catch — this is exactly the native-seam class the
+  local gates cannot see.
+- **Fix, two layers:** (1) MainActivity.kt registers the delegate in
+  onCreate (wrapped in runCatching so registration failure degrades instead
+  of crashing); (2) boot is now READ-ONLY by construction —
+  connectBiometrics only checks `getGrantedPermissions` (new
+  `hasGrantedPermissions` on the bridge, no launcher involved); the
+  permission sheet moved behind an explicit CONNECT/TRY AGAIN button on
+  ATHLETE (new status 'idle', new store action requestBiometricsAccess).
+  Even a future delegate regression can no longer kill boot.
+- 11 gates green; commit is this entry's containing commit; pushed; CI APK
+  job (which compiles MainActivity.kt) watched; release v0.11.1 cut.

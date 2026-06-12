@@ -206,8 +206,9 @@ interface KineticsStore {
   oneRepMaxes: Record<number, number>;
   /** Most recently completed session (post-session note target). */
   lastEndedSessionId: number | null;
-  /** Health Connect state: 'off' until probed; never blocks anything. */
-  biometricsStatus: 'off' | 'unavailable' | 'denied' | 'ready';
+  /** Health Connect state: 'off' until probed; 'idle' = available but not
+   *  yet authorized (CONNECT shown). Never blocks anything. */
+  biometricsStatus: 'off' | 'unavailable' | 'idle' | 'denied' | 'ready';
 
   boot: () => void;
   /** Re-sync everything date-derived when the calendar day has changed since
@@ -222,9 +223,13 @@ interface KineticsStore {
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Attach/replace a free-text note on the last completed session. */
   saveSessionNote: (text: string) => void;
-  /** Wire the Health Connect bridge (null = unavailable) and request
-   *  permissions; on grant, runs the first sync. Never throws. */
+  /** Wire the Health Connect bridge (null = unavailable). READ-ONLY at
+   *  boot: checks existing grants, NEVER opens a permission sheet (the
+   *  v0.11.0 boot crash lived in an automatic boot-time request). */
   connectBiometrics: (bridge: BiometricsBridge | null) => Promise<void>;
+  /** Explicit user action (CONNECT on ATHLETE): opens the system permission
+   *  sheet, then syncs on grant. Never throws. */
+  requestBiometricsAccess: () => Promise<void>;
   /** Foreground-only ingestion: compacted trailing-week biometrics upserted
    *  into the 002 rollups, then the state vector re-materializes. Silent
    *  no-op on any failure (subjective-only fallback). */
@@ -648,7 +653,23 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     try {
-      const granted = await bridge.requestPermissions();
+      // Boot is READ-ONLY: already-granted -> sync; otherwise wait for the
+      // athlete to tap CONNECT. No automatic permission sheet, ever.
+      if (await bridge.hasGrantedPermissions()) {
+        set({ biometricsStatus: 'ready' });
+        await get().syncBiometrics();
+      } else {
+        set({ biometricsStatus: 'idle' });
+      }
+    } catch {
+      set({ biometricsStatus: 'unavailable' });
+    }
+  },
+
+  requestBiometricsAccess: async () => {
+    if (biometrics === null) return;
+    try {
+      const granted = await biometrics.requestPermissions();
       if (!granted) {
         set({ biometricsStatus: 'denied' });
         return;
@@ -656,7 +677,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ biometricsStatus: 'ready' });
       await get().syncBiometrics();
     } catch {
-      set({ biometricsStatus: 'unavailable' });
+      set({ biometricsStatus: 'denied' });
     }
   },
 

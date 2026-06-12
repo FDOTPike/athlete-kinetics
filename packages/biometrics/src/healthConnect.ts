@@ -46,7 +46,13 @@ const READ_PERMISSIONS: { accessType: 'read'; recordType: string }[] = [
 ];
 
 export interface BiometricsBridge {
-  /** Ask for read permissions; true when at least one was granted. */
+  /** READ-ONLY check of already-granted permissions — never opens a sheet,
+   *  never touches the native permission launcher. Safe at boot. */
+  hasGrantedPermissions(): Promise<boolean>;
+  /** Ask for read permissions (opens the system sheet). Must only run from
+   *  an explicit user action: the launcher is registered in
+   *  MainActivity.onCreate, and requesting outside a user flow gives the
+   *  athlete a permission sheet they never asked for. */
   requestPermissions(): Promise<boolean>;
   /** Compacted one-row-per-day biometrics for the trailing window.
    *  Empty array on ANY failure — never throws. */
@@ -74,6 +80,13 @@ export async function tryCreateHealthConnectBridge(): Promise<BiometricsBridge |
     if (!(await hc.initialize())) return null;
 
     return {
+      hasGrantedPermissions: async (): Promise<boolean> => {
+        try {
+          return (await hc.getGrantedPermissions()).length > 0;
+        } catch {
+          return false;
+        }
+      },
       requestPermissions: async (): Promise<boolean> => {
         try {
           await hc.requestPermission(READ_PERMISSIONS);
