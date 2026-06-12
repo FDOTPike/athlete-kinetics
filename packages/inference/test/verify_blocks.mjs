@@ -25,9 +25,11 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
-const { generateBlock, addDaysIso } = require('./.build/blockGenerator.js');
+const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
+  SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS } = require('./.build/blockGenerator.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
-  TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS } = require('./.build/types.js');
+  SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS } =
+  require('./.build/types.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', '..', 'core-db', 'src', 'schema');
 const START = '2026-06-15';
@@ -273,10 +275,132 @@ const flat = plan.sessions.flatMap((s) =>
 check('read-back is value-identical to the generated plan',
   JSON.stringify(back.map((r) => [Number(r.week_index), Number(r.day_index), Number(r.slot_index),
     Number(r.movement_id), Number(r.sets), Number(r.reps), Number(r.target_rpe)])) === JSON.stringify(flat));
+// block_meta rides along with the same literal SQL the store will use.
+db.prepare(
+  'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)')
+  .run(blockId, plan.macroBlockIndex, plan.macroPhase, plan.schemaType, plan.peakShifted ? 1 : 0);
+const metaBack = db.prepare('SELECT * FROM block_meta WHERE block_id = ?').get(blockId);
+check('block_meta persists schema/macro position through the 009 CHECKs',
+  metaBack.schema_type === plan.schemaType &&
+  Number(metaBack.macro_block_index) === plan.macroBlockIndex &&
+  metaBack.macro_phase === plan.macroPhase);
 db.prepare('DELETE FROM training_block WHERE block_id = ?').run(blockId);
 const orphans = Number(db.prepare(
-  'SELECT (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM planned_slot) AS c').get().c);
-check('block delete cascades sessions + slots (no orphans)', orphans === 0, String(orphans));
+  `SELECT (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM planned_slot) +
+          (SELECT count(*) FROM block_meta) AS c`).get().c);
+check('block delete cascades sessions + slots + meta (no orphans)', orphans === 0, String(orphans));
+
+// --- [7] multi-schema strategy bound --------------------------------------------
+console.log('[7] multi-schema strategies (LINEAR / WAVE / STEP / APRE)');
+// Weekly loading signature: (sets, reps, rpe) of the first strength slot for
+// weeks 1..3. Distinct signatures => mathematically distinct progressions
+// (and distinct target weights, since load = 1RM x pct(reps, rpe)).
+const signatureOf = (plan) => [1, 2, 3].map((w) => {
+  const s = plan.sessions.find((x) => x.week_index === w && x.focus !== 'bjj' && x.focus !== 'conditioning');
+  const sl = s.slots[0];
+  return `${sl.sets}x${sl.reps}@${sl.target_rpe}`;
+}).join('|');
+const sigs = SCHEMA_TYPES.map((schemaType) =>
+  signatureOf(generateBlock({ profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType })));
+let distinct = true;
+for (let i = 0; i < sigs.length; i++) {
+  for (let j = i + 1; j < sigs.length; j++) if (sigs[i] === sigs[j]) distinct = false;
+}
+check('all four schema types yield pairwise-distinct load progressions', distinct,
+  sigs.join('  vs  '));
+let schemaLaws = true, schemaDet = true;
+let nSchemaPlans = 0;
+for (const schemaType of SCHEMA_TYPES) {
+  for (let macroBlockIndex = 1; macroBlockIndex <= 8; macroBlockIndex++) {
+    const mk = () => generateBlock({
+      profile: prof({ objective: 'hybrid' }), movements, startDate: START,
+      schemaType, macroBlockIndex,
+    });
+    const p = mk();
+    nSchemaPlans += 1;
+    if (JSON.stringify(p) !== JSON.stringify(mk())) schemaDet = false;
+    if (p.macroPhase !== macroPhaseOf(macroBlockIndex)) schemaLaws = false;
+    for (const s of p.sessions) {
+      for (const sl of s.slots) {
+        if (!Number.isInteger(sl.sets) || sl.sets < 1 || sl.sets > 10 ||
+            !Number.isInteger(sl.reps) || sl.reps < 1 || sl.reps > 30 ||
+            sl.target_rpe < 5.0 || sl.target_rpe > 10.0 ||
+            sl.target_rpe > prof().base_rpe_cap) schemaLaws = false;
+      }
+    }
+  }
+}
+check('every schema x macro block: deterministic + CHECK domains + rpe caps hold',
+  schemaDet && schemaLaws, `${nSchemaPlans} plans`);
+check('32-week macro = 8 blocks, two per phase (gpp,hypertrophy,volume,peak)',
+  MACRO_TOTAL_WEEKS === 32 &&
+  [1, 2, 3, 4, 5, 6, 7, 8].map(macroPhaseOf).join(',') ===
+  'gpp,gpp,hypertrophy,hypertrophy,volume,volume,peak,peak');
+
+// --- [8] 1RM translation matrix --------------------------------------------------
+console.log('[8] RPE/rep -> %1RM translation (Epley)');
+check('100 kg 1RM, 5 reps @ RPE 8.0 -> 80.0 kg', targetLoadKg(100, 5, 8.0) === 80.0,
+  String(targetLoadKg(100, 5, 8.0)));
+check('140 kg 1RM, 3 reps @ RPE 9.0 -> 122.5 kg', targetLoadKg(140, 3, 9.0) === 122.5,
+  String(targetLoadKg(140, 3, 9.0)));
+check('60 kg 1RM, 12 reps @ RPE 6.5 -> 40.0 kg', targetLoadKg(60, 12, 6.5) === 40.0,
+  String(targetLoadKg(60, 12, 6.5)));
+check('pct rises with RPE at fixed reps', targetPct(5, 9.0) > targetPct(5, 7.0));
+check('pct falls as reps rise at fixed RPE', targetPct(3, 8.0) > targetPct(10, 8.0));
+check('1 rep @ RPE 10 approaches the 1RM', targetPct(1, 10) > 0.95 && targetPct(1, 10) <= 1.0);
+
+// --- [9] the hybrid tax -----------------------------------------------------------
+console.log('[9] hybrid tax (schema fatigue cost matrix)');
+const accessorySets = (plan) => plan.sessions
+  .filter((s) => ['lower', 'upper', 'full'].includes(s.focus))
+  .reduce((a, s) => a + s.slots.filter((sl) => sl.slot_index >= 3).reduce((b, sl) => b + sl.sets, 0), 0);
+const hybridApre = generateBlock({
+  profile: prof({ objective: 'hybrid' }), movements, startDate: START, schemaType: 'APRE' });
+const hybridLinear = generateBlock({
+  profile: prof({ objective: 'hybrid' }), movements, startDate: START, schemaType: 'LINEAR' });
+check('hybrid APRE block has strictly fewer accessory sets than hybrid LINEAR',
+  accessorySets(hybridApre) < accessorySets(hybridLinear),
+  `${accessorySets(hybridApre)} < ${accessorySets(hybridLinear)}`);
+const strengthApre = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType: 'APRE' });
+const strengthLinear = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType: 'LINEAR' });
+check('the tax fires ONLY for hybrid (strength APRE keeps its accessory sets)',
+  accessorySets(strengthApre) === accessorySets(strengthLinear),
+  `${accessorySets(strengthApre)} == ${accessorySets(strengthLinear)}`);
+check('cost matrix: APRE outweighs LINEAR in every macro phase',
+  MACRO_PHASES.every((p) => SCHEMA_FATIGUE_COST.APRE[p] > SCHEMA_FATIGUE_COST.LINEAR[p]));
+check('hybrid APRE accessories never fall below one working set',
+  hybridApre.sessions.every((s) => s.slots.every((sl) => sl.sets >= 1)));
+
+// --- [10] deadlift auto-regulation (peak shift) -----------------------------------
+console.log('[10] deadlift auto-regulation (ACWR gate on the peak block)');
+const peakCalm = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: 1.0 });
+const peakHot = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: 1.7 });
+const gppHot = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  schemaType: 'LINEAR', macroBlockIndex: 1, recentAcwr: 1.7 });
+check('calm ACWR: peak block keeps the normal shape (deload week 4)',
+  !peakCalm.peakShifted &&
+  peakCalm.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
+check('overreached ACWR: deload inserted week 1, peak shifted to week 4',
+  peakHot.peakShifted &&
+  peakHot.sessions.filter((s) => s.week_index === 1).every((s) => s.phase === 'deload') &&
+  peakHot.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'realization'));
+const wkSets = (plan, w) => plan.sessions.filter((s) => s.week_index === w)
+  .reduce((a, s) => a + s.slots.reduce((b, sl) => b + sl.sets, 0), 0);
+check('shifted block: week 1 (deload) volume strictly below week 2',
+  wkSets(peakHot, 1) < wkSets(peakHot, 2), `${wkSets(peakHot, 1)} < ${wkSets(peakHot, 2)}`);
+check('the gate only guards the peak phase (gpp ignores hot ACWR)',
+  !gppHot.peakShifted &&
+  gppHot.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
+check('null ACWR (no telemetry) never shifts the peak',
+  !generateBlock({ profile: prof({ objective: 'strength' }), movements, startDate: START,
+    schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: null }).peakShifted);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);
