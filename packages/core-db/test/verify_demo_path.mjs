@@ -1,5 +1,5 @@
-/**
- * verify_demo_path.mjs — simulates the app's first-run path EXACTLY as
+﻿/**
+ * verify_demo_path.mjs â€” simulates the app's first-run path EXACTLY as
  * useStore executes it (same statements, same order, same adapter shape):
  *   migrate -> boot catch-up materialize -> guard check -> loadDemoAthlete
  *   (generate + fold + trim + materialize-all in one transaction) -> reload.
@@ -42,7 +42,7 @@ const today = new Date().toISOString().slice(0, 10);
 console.log('[1] boot path on an EMPTY database');
 for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
-  '008_taxonomy.sql']) {
+  '008_taxonomy.sql', '009_periodization.sql']) {
   raw.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 for (const date of demo.demoDates(today, 7)) adapter.run(MATERIALIZE, [date]);
@@ -75,7 +75,7 @@ const movements = raw.prepare(
   'SELECT movement_id, name, pattern FROM movement ORDER BY movement_id').all();
 check('movement library populated for SessionScreen (007 seed = 30)',
   movements.length === 30, String(movements.length));
-// 007 and the demo loader both write movements 1..7 (OR IGNORE) — prove the
+// 007 and the demo loader both write movements 1..7 (OR IGNORE) â€” prove the
 // coexistence holds: ids 1..7 carry the demo names, not duplicates.
 check('demo ids 1..7 identical to 007 seed (no duplicate library)',
   movements[0].name === 'Competition Squat' &&

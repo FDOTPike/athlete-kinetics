@@ -1,5 +1,5 @@
-"""
-verify_schema.py — executes the real schema files against a real SQLite engine,
+﻿"""
+verify_schema.py â€” executes the real schema files against a real SQLite engine,
 loads 30 days of synthetic athlete data, and asserts the full pipeline:
 raw sets -> trigger rollup -> windowed view -> materialized state_vector.
 
@@ -39,7 +39,7 @@ print(f"SQLite {sqlite3.sqlite_version}")
 print("\n[1] schema files execute cleanly")
 for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql",
           "005_subjective_report.sql", "006_user_profile.sql", "007_program_engine.sql",
-          "008_taxonomy.sql"]:
+          "008_taxonomy.sql", "009_periodization.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -255,7 +255,7 @@ orphans = con.execute("SELECT (SELECT count(*) FROM planned_session) +"
 check("block delete cascades sessions + slots", orphans == 0, str(orphans))
 
 # --- 10. movement_taxonomy skeleton (008) ----------------------------------------
-print("\n[10] movement_taxonomy (008) — ExRx skeleton")
+print("\n[10] movement_taxonomy (008) â€” ExRx skeleton")
 tax = con.execute("SELECT category, count(*) AS c FROM movement_taxonomy"
                   " GROUP BY category ORDER BY category").fetchall()
 check("exactly ONE exercise per category, all 8 categories",
@@ -268,7 +268,7 @@ bench = con.execute(
 check("Competition Bench -> push / barbell / bench_press",
       bench is not None and bench["category"] == "push"
       and bench["implement"] == "barbell" and bench["family"] == "bench_press")
-# movement_id 6 (Weighted Pull-up) is NOT in the skeleton — the rejections
+# movement_id 6 (Weighted Pull-up) is NOT in the skeleton â€” the rejections
 # below exercise the CHECKs, not the primary key.
 try:
     con.execute("INSERT INTO movement_taxonomy (movement_id, category) VALUES (6, 'yoga')")
@@ -286,6 +286,66 @@ con.executescript((SCHEMA_DIR / "008_taxonomy.sql").read_text(encoding="utf-8"))
 after_tax = con.execute("SELECT count(*) c FROM movement_taxonomy").fetchone()["c"]
 check("008 re-apply is a no-op (idempotent)", before_tax == after_tax == 8,
       f"{before_tax} == {after_tax}")
+
+# --- 11. periodization side-cars (009) -------------------------------------------
+print("\n[11] one_rep_max / block_meta / slot_override / session_note (009)")
+con.execute("INSERT INTO one_rep_max (movement_id, load_kg, updated_at_ms) VALUES (1, 150.0, 0)")
+con.execute("INSERT INTO one_rep_max (movement_id, load_kg, updated_at_ms) VALUES (1, 155.0, 1)"
+            " ON CONFLICT(movement_id) DO UPDATE SET load_kg = excluded.load_kg,"
+            " updated_at_ms = excluded.updated_at_ms")
+rm = con.execute("SELECT load_kg FROM one_rep_max WHERE movement_id = 1").fetchone()
+check("1RM upsert round-trips (150 -> 155)", rm is not None and rm["load_kg"] == 155.0)
+try:
+    con.execute("INSERT INTO one_rep_max (movement_id, load_kg) VALUES (2, 10.0)")
+    check("1RM CHECK rejects implausible load (< 20 kg)", False)
+except sqlite3.IntegrityError:
+    check("1RM CHECK rejects implausible load (< 20 kg)", True)
+con.execute("INSERT INTO training_block (block_id, start_date, objective, created_at_ms)"
+            " VALUES (50, '2026-06-15', 'hybrid', 0)")
+con.execute("INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type)"
+            " VALUES (50, 7, 'peak', 'APRE')")
+check("block_meta row commits (peak / APRE)", True)
+try:
+    con.execute("UPDATE block_meta SET schema_type = 'DUP' WHERE block_id = 50")
+    check("schema_type CHECK rejects unknown schema", False)
+except sqlite3.IntegrityError:
+    check("schema_type CHECK rejects unknown schema", True)
+try:
+    con.execute("UPDATE block_meta SET macro_phase = 'taper' WHERE block_id = 50")
+    check("macro_phase CHECK rejects unknown phase", False)
+except sqlite3.IntegrityError:
+    check("macro_phase CHECK rejects unknown phase", True)
+try:
+    con.execute("UPDATE block_meta SET macro_block_index = 9 WHERE block_id = 50")
+    check("macro_block_index CHECK rejects > 8 (32-week cycle)", False)
+except sqlite3.IntegrityError:
+    check("macro_block_index CHECK rejects > 8 (32-week cycle)", True)
+con.execute("INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index,"
+            " focus, phase, session_date) VALUES (50, 50, 2, 1, 'lower', 'intensification', '2026-06-22')")
+con.execute("INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index,"
+            " movement_id, sets, reps, target_rpe) VALUES (50, 50, 1, 1, 4, 5, 8.0)")
+con.execute("INSERT INTO slot_override (planned_slot_id, target_load_kg, reason, created_at_ms)"
+            " VALUES (50, 125.0, 'APRE: +2.5 kg, beat rep target by 2', 0)")
+try:
+    con.execute("UPDATE slot_override SET reason = '' WHERE planned_slot_id = 50")
+    check("slot_override requires a human-readable reason", False)
+except sqlite3.IntegrityError:
+    check("slot_override requires a human-readable reason", True)
+con.execute("DELETE FROM training_block WHERE block_id = 50")
+left = con.execute("SELECT (SELECT count(*) FROM block_meta WHERE block_id = 50) +"
+                   " (SELECT count(*) FROM slot_override WHERE planned_slot_id = 50) AS c").fetchone()["c"]
+check("block delete cascades block_meta + slot_override", left == 0, str(left))
+# 9999: session_id 999 is section [3]'s rollup fixture — do not touch it.
+con.execute("INSERT INTO session (session_id, session_date) VALUES (9999, '2026-06-12')")
+con.execute("INSERT INTO session_note (session_id, note, created_at_ms)"
+            " VALUES (9999, 'solid session, grip was the limiter', 0)")
+con.execute("DELETE FROM session WHERE session_id = 9999")
+notes = con.execute("SELECT count(*) c FROM session_note WHERE session_id = 9999").fetchone()["c"]
+check("session delete cascades its note", notes == 0)
+before9 = con.execute("SELECT count(*) c FROM one_rep_max").fetchone()["c"]
+con.executescript((SCHEMA_DIR / "009_periodization.sql").read_text(encoding="utf-8"))
+after9 = con.execute("SELECT count(*) c FROM one_rep_max").fetchone()["c"]
+check("009 re-apply is a no-op (idempotent)", before9 == after9, f"{before9} == {after9}")
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

@@ -1,5 +1,5 @@
-/**
- * verify_migrations.mjs — runs the PRODUCTION migration runner
+﻿/**
+ * verify_migrations.mjs â€” runs the PRODUCTION migration runner
  * (migrationRunner.ts, compiled) against real SQLite in the three scenarios
  * that exist in the field:
  *   1. fresh install: all migrations apply synchronously, user_version
@@ -24,7 +24,7 @@ const { runMigrations, sentinelsMissing, SENTINELS } = require('./.build/migrati
 const SCHEMA_DIR = join(import.meta.dirname, '..', 'src', 'schema');
 const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
-  '008_taxonomy.sql'];
+  '008_taxonomy.sql', '009_periodization.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -117,7 +117,7 @@ check('legacy equipment_access mapped to home inventory bundle',
 check('legacy user_profile dropped',
   d.raw.prepare("SELECT 1 FROM sqlite_master WHERE name='user_profile'").get() === undefined);
 // Now the athlete sets 'hybrid' + a custom inventory, then the DB self-heals
-// (sentinel missing) — the re-applied 006+007 must NOT reset either field.
+// (sentinel missing) â€” the re-applied 006+007 must NOT reset either field.
 d.executeSync(`UPDATE athlete_profile SET objective = 'hybrid',
   equipment_inventory = '["barbell","mats"]' WHERE profile_id = 1`);
 d.executeSync('DROP VIEW v_readiness_inputs;'); // poison: forces full re-apply

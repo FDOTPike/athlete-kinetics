@@ -78,6 +78,26 @@ export const TAXONOMY_IMPLEMENTS = [
 ] as const;
 export type TaxonomyImplement = (typeof TAXONOMY_IMPLEMENTS)[number];
 
+// ---------------------------------------------------------------------------
+// Periodization (Phase 10) — mirrors the block_meta CHECKs in
+// 009_periodization.sql (machine-checked by verify:blocks).
+// ---------------------------------------------------------------------------
+/** Loading-schema strategies for a 4-week block. */
+export const SCHEMA_TYPES = ['LINEAR', 'WAVE', 'STEP', 'APRE'] as const;
+export type SchemaType = (typeof SCHEMA_TYPES)[number];
+
+/** The 32-week macro-cycle: 8 blocks x 4 weeks, two blocks per phase. */
+export const MACRO_PHASES = ['gpp', 'hypertrophy', 'volume', 'peak'] as const;
+export type MacroPhase = (typeof MACRO_PHASES)[number];
+
+/** Big-4 lifts (one_rep_max UI surface); names match the 007 movement seed. */
+export const BIG4_LIFTS = [
+  { name: 'Competition Squat', label: 'SQUAT' },
+  { name: 'Competition Bench', label: 'BENCH' },
+  { name: 'Deadlift', label: 'DEADLIFT' },
+  { name: 'Overhead Press', label: 'OHP' },
+] as const;
+
 /** One historical-injury or mobility-limit note (stored as JSON in 006). */
 export interface BodyNote {
   region: string;

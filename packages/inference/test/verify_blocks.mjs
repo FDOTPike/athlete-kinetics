@@ -1,20 +1,20 @@
-/**
- * verify_blocks.mjs — boundary invariants of the deterministic block engine.
+﻿/**
+ * verify_blocks.mjs â€” boundary invariants of the deterministic block engine.
  *
  * The generator was written to satisfy THESE laws, not vice versa:
- *   [1] Determinism bound — double-run deep-equality, no RNG.
- *   [2] Structural bound — exactly 4 weeks ending in deload; planned_slot
+ *   [1] Determinism bound â€” double-run deep-equality, no RNG.
+ *   [2] Structural bound â€” exactly 4 weeks ending in deload; planned_slot
  *       CHECK domains; target RPE strictly within base_rpe_cap (rehab <= 7);
  *       deload volume strictly below week 1; duration cap bounds slots.
- *   [3] Equipment strictness bound — across ALL 1024 inventory subsets x all
+ *   [3] Equipment strictness bound â€” across ALL 1024 inventory subsets x all
  *       8 objectives, no emitted movement's required set escapes the
  *       inventory (subset law, no upward substitution).
- *   [4] Hybrid balance bound — every hybrid frequency contains bjj sessions
+ *   [4] Hybrid balance bound â€” every hybrid frequency contains bjj sessions
  *       AND carries strictly less raw strength set volume than the pure
  *       strength block.
- *   [5] SQL contract — 007's inventory default / preset bundles / item CHECK
+ *   [5] SQL contract â€” 007's inventory default / preset bundles / item CHECK
  *       are byte-equal to the TS constants (one source of truth, verified).
- *   [6] Persistence — the plan round-trips through the real 007 tables with
+ *   [6] Persistence â€” the plan round-trips through the real 007 tables with
  *       the store's literal SQL; cascade delete leaves no orphans.
  *
  * Run:  npm run verify:blocks
@@ -47,7 +47,7 @@ try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
 }
 for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
-  '008_taxonomy.sql']) {
+  '008_taxonomy.sql', '009_periodization.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 const movements = db.prepare(
@@ -170,7 +170,7 @@ for (const objective of OBJECTIVES) {
     }
   }
 }
-check('required ⊆ inventory for every emitted slot', violations === 0,
+check('required âŠ† inventory for every emitted slot', violations === 0,
   `${sweepPlans} plans, ${violations} violations`);
 const bare = gen({ equipment_inventory: [] });
 check('empty inventory still yields a bodyweight-only plan',
