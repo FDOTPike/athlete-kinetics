@@ -39,7 +39,7 @@ print(f"SQLite {sqlite3.sqlite_version}")
 print("\n[1] schema files execute cleanly")
 for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql",
           "005_subjective_report.sql", "006_user_profile.sql", "007_program_engine.sql",
-          "008_taxonomy.sql", "009_periodization.sql"]:
+          "008_taxonomy.sql", "009_periodization.sql", "010_movement_library.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -346,6 +346,56 @@ before9 = con.execute("SELECT count(*) c FROM one_rep_max").fetchone()["c"]
 con.executescript((SCHEMA_DIR / "009_periodization.sql").read_text(encoding="utf-8"))
 after9 = con.execute("SELECT count(*) c FROM one_rep_max").fetchone()["c"]
 check("009 re-apply is a no-op (idempotent)", before9 == after9, f"{before9} == {after9}")
+
+# --- 12. movement library detail + sentiment (010) -------------------------------
+print("\n[12] movement_detail / movement_preference (010) — Phase 12")
+n_detail = con.execute("SELECT count(*) c FROM movement_detail").fetchone()["c"]
+check("every movement has a detail row (30)", n_detail == 30, str(n_detail))
+bench = con.execute(
+    "SELECT md.base_name, md.difficulty_rating, md.supported_prefixes FROM movement_detail md"
+    " JOIN movement m USING (movement_id) WHERE m.name = 'Dumbbell Bench Press'").fetchone()
+comp = con.execute(
+    "SELECT md.base_name FROM movement_detail md JOIN movement m USING (movement_id)"
+    " WHERE m.name = 'Competition Bench'").fetchone()
+check("DB Bench + Competition Bench share base_name 'Bench Press' (stored once)",
+      bench["base_name"] == "Bench Press" and comp["base_name"] == "Bench Press")
+check("supported_prefixes carries implement tokens as JSON",
+      '"DB"' in bench["supported_prefixes"] and '"BB"' in bench["supported_prefixes"])
+n_pref = con.execute("SELECT count(*) c FROM movement_preference").fetchone()["c"]
+check("movement_preference empty by default (neutral == no row)", n_pref == 0, str(n_pref))
+
+# Throwaway movement to exercise CHECK domains without the block-engine FKs.
+con.execute("INSERT INTO movement (movement_id, name, pattern) VALUES (9001, 'Temp Move', 'squat')")
+try:
+    con.execute("INSERT INTO movement_detail (movement_id, base_name, difficulty_rating)"
+                " VALUES (9001, 'X', 'Elite')")
+    check("difficulty_rating CHECK rejects unknown tier", False)
+except sqlite3.IntegrityError:
+    check("difficulty_rating CHECK rejects unknown tier", True)
+try:
+    con.execute("INSERT INTO movement_detail (movement_id, base_name, supported_prefixes)"
+                " VALUES (9001, 'X', 'not json')")
+    check("supported_prefixes CHECK rejects malformed JSON", False)
+except sqlite3.IntegrityError:
+    check("supported_prefixes CHECK rejects malformed JSON", True)
+for bad in (2, -2):
+    try:
+        con.execute("INSERT INTO movement_preference (movement_id, preference) VALUES (9001, ?)", (bad,))
+        check(f"preference CHECK rejects {bad}", False)
+    except sqlite3.IntegrityError:
+        check(f"preference CHECK rejects {bad}", True)
+con.execute("INSERT INTO movement_preference (movement_id, preference) VALUES (9001, 1)")
+got = con.execute("SELECT preference FROM movement_preference WHERE movement_id = 9001").fetchone()
+check("thumbs-up registers +1 (Prioritize)", got["preference"] == 1)
+con.execute("INSERT INTO movement_detail (movement_id, base_name) VALUES (9001, 'Temp')")
+con.execute("DELETE FROM movement WHERE movement_id = 9001")
+left = con.execute("SELECT (SELECT count(*) FROM movement_detail WHERE movement_id = 9001) +"
+                   " (SELECT count(*) FROM movement_preference WHERE movement_id = 9001) AS c").fetchone()["c"]
+check("movement delete cascades detail + preference", left == 0, str(left))
+before10 = con.execute("SELECT count(*) c FROM movement_detail").fetchone()["c"]
+con.executescript((SCHEMA_DIR / "010_movement_library.sql").read_text(encoding="utf-8"))
+after10 = con.execute("SELECT count(*) c FROM movement_detail").fetchone()["c"]
+check("010 re-apply is a no-op (idempotent)", before10 == after10 == 30, f"{before10} == {after10}")
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

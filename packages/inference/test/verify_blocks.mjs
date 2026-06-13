@@ -27,9 +27,11 @@ import { DatabaseSync } from 'node:sqlite';
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
   SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS } = require('./.build/blockGenerator.js');
+const { computeSubstitutions } = require('./.build/substitution.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
-  SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS } =
-  require('./.build/types.js');
+  SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
+  MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
+  PATTERN_TO_CATEGORY } = require('./.build/types.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', '..', 'core-db', 'src', 'schema');
 const START = '2026-06-15';
@@ -49,7 +51,7 @@ try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
 }
 for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
-  '008_taxonomy.sql', '009_periodization.sql']) {
+  '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 const movements = db.prepare(
@@ -401,6 +403,135 @@ check('the gate only guards the peak phase (gpp ignores hot ACWR)',
 check('null ACWR (no telemetry) never shifts the peak',
   !generateBlock({ profile: prof({ objective: 'strength' }), movements, startDate: START,
     schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: null }).peakShifted);
+
+// --- [11] 010 movement library contract (types.ts <-> 010 SQL/seed) --------------
+console.log('[11] 010 movement library contract (Phase 12)');
+const sql010 = readFileSync(join(SCHEMA_DIR, '010_movement_library.sql'), 'utf-8');
+const grab010 = (re) => { const m = sql010.match(re); return m === null ? '' : m[1]; };
+const sqlDiff = [...grab010(/difficulty_rating[\s\S]*?CHECK \(difficulty_rating IN\s*\(([\s\S]*?)\)\)/)
+  .matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]);
+check('010 difficulty_rating CHECK == DIFFICULTY_RATINGS (set equality)',
+  sqlDiff.length === DIFFICULTY_RATINGS.length &&
+  DIFFICULTY_RATINGS.every((d) => sqlDiff.includes(d)), sqlDiff.join(','));
+const sqlPref = [...grab010(/preference\s+INTEGER NOT NULL DEFAULT 0 CHECK \(preference IN\s*\(([\s\S]*?)\)\)/)
+  .matchAll(/-?\d+/g)].map((m) => Number(m[0]));
+const prefVals = Object.values(MOVEMENT_PREFERENCE);
+check('010 preference CHECK == MOVEMENT_PREFERENCE domain (set equality)',
+  sqlPref.length === prefVals.length && prefVals.every((v) => sqlPref.includes(v)),
+  sqlPref.join(','));
+const detailRows = db.prepare('SELECT supported_prefixes FROM movement_detail').all();
+const prefixSet = new Set(MOVEMENT_PREFIXES);
+const seenPrefixes = new Set();
+let prefixOk = detailRows.length === 30;
+for (const r of detailRows) {
+  for (const p of JSON.parse(r.supported_prefixes)) {
+    seenPrefixes.add(p);
+    if (!prefixSet.has(p)) prefixOk = false;
+  }
+}
+check('every seeded supported_prefixes token is a MOVEMENT_PREFIXES member',
+  prefixOk, `${seenPrefixes.size} distinct tokens over ${detailRows.length} rows`);
+check('movement_detail seeded for all 30 movements (base stored once per pattern)',
+  Number(db.prepare('SELECT count(*) c FROM movement_detail').get().c) === 30 &&
+  Number(db.prepare("SELECT count(DISTINCT base_name) c FROM movement_detail").get().c) < 30);
+check('PATTERN_TO_CATEGORY total over MOVEMENT_PATTERNS -> TAXONOMY_CATEGORIES',
+  Object.keys(PATTERN_TO_CATEGORY).length === MOVEMENT_PATTERNS.length &&
+  MOVEMENT_PATTERNS.every((p) => TAXONOMY_CATEGORIES.includes(PATTERN_TO_CATEGORY[p])));
+
+// --- [12] 3-tier substitution engine --------------------------------------------
+console.log('[12] 3-tier substitution engine (regression / day-swap / triage)');
+const detailById = new Map(db.prepare(
+  'SELECT movement_id, base_name, difficulty_rating FROM movement_detail').all()
+  .map((r) => [Number(r.movement_id), r]));
+const subLib = movements.map((m) => ({
+  movement_id: m.movement_id,
+  name: m.name,
+  pattern: m.pattern,
+  is_compound: m.is_compound,
+  difficulty: detailById.get(m.movement_id).difficulty_rating,
+  family: detailById.get(m.movement_id).base_name,
+  required: m.required,
+  preference: 0,
+}));
+const byName = (n) => subLib.find((m) => m.name === n);
+const idOf = (n) => byName(n).movement_id;
+const RANK = { Beginner: 0, Intermediate: 1, Advanced: 2 };
+const baseInput = {
+  target: byName('Competition Squat'), library: subLib,
+  inventory: [...EQUIPMENT_ITEMS], niggles: [], futureSlots: [], currentDayIndex: 1,
+};
+
+// determinism
+check('substitution double-run deep-equality (no RNG, no clock)',
+  JSON.stringify(computeSubstitutions(baseInput)) === JSON.stringify(computeSubstitutions(baseInput)));
+let subDet = true;
+const detFuture = [{ plannedSlotId: 77, dayIndex: 5, movement: byName('Cable Row'), sets: 4 }];
+for (const m of subLib) {
+  const inp = { target: m, library: subLib, inventory: [...EQUIPMENT_ITEMS],
+    niggles: [{ region: 'knee', severity: 4 }], futureSlots: detFuture, currentDayIndex: 2 };
+  if (JSON.stringify(computeSubstitutions(inp)) !== JSON.stringify(computeSubstitutions(inp))) subDet = false;
+}
+check('determinism across all 30 targets (niggle + future slots)', subDet, `${subLib.length} targets`);
+
+// Layer 1 regression (green)
+const squat = computeSubstitutions(baseInput).layer1Regression;
+const squatNames = squat.options.map((o) => o.name);
+check('Layer 1 colour is green', squat.color === 'green');
+check('Competition Squat regresses to Front Squat AND Goblet Squat',
+  squatNames.includes('Front Squat') && squatNames.includes('Goblet Squat'), squatNames.join(', '));
+check('Layer 1 options are same-pattern (squat) and ordered easiest-first',
+  squat.options.every((o) => byName(o.name).pattern === 'squat') &&
+  squat.options.every((o, i) => i === 0 || RANK[squat.options[i - 1].difficulty] <= RANK[o.difficulty]));
+const fsq = computeSubstitutions({ ...baseInput, target: byName('Front Squat') }).layer1Regression.options;
+check('regression never offers a HARDER variant (Front Squat omits Competition Squat)',
+  fsq.every((o) => o.difficulty !== 'Advanced') && !fsq.map((o) => o.name).includes('Competition Squat'),
+  fsq.map((o) => `${o.name}:${o.difficulty}`).join(', '));
+const bwOnly = computeSubstitutions({ ...baseInput, inventory: [] }).layer1Regression.options;
+check('empty inventory: Layer 1 yields only no-equipment movements (strict subset law)',
+  bwOnly.length > 0 && bwOnly.every((o) => byName(o.name).required.length === 0),
+  bwOnly.map((o) => o.name).join(', '));
+
+// injury guardrail + Layer 3 (orange)
+const knee = computeSubstitutions({ ...baseInput, niggles: [{ region: 'left knee', severity: 4 }] });
+check('knee niggle bars every knee-loading squat regression from Layer 1 (guardrail)',
+  knee.layer1Regression.options.length === 0 &&
+  knee.blockedByGuardrail.includes(idOf('Goblet Squat')) &&
+  knee.blockedByGuardrail.includes(idOf('Front Squat')));
+check('Layer 3 colour is orange and the niggle triggers a cluster',
+  knee.layer3Triage.color === 'orange' && knee.layer3Triage.cluster !== null);
+check('Layer 3 cluster is CNS-capped at 3 (ratio == cluster size)',
+  knee.layer3Triage.cluster.movements.length <= 3 &&
+  knee.layer3Triage.cluster.cnsTaxRatio === knee.layer3Triage.cluster.movements.length);
+check('Layer 3 accessories are all non-compound and none guardrail-blocked',
+  knee.layer3Triage.cluster.movements.every((mm) =>
+    byName(mm.name).is_compound === false && !knee.blockedByGuardrail.includes(mm.movement_id)));
+const calm = computeSubstitutions({ ...baseInput, target: byName('Competition Bench'),
+  niggles: [{ region: 'knee', severity: 2 }] });
+check('sub-threshold niggle (severity 2) does NOT trigger Layer 3', calm.layer3Triage.cluster === null);
+
+// Layer 2 day-swap + conservation of volume (purple)
+const futureSlots = [
+  { plannedSlotId: 77, dayIndex: 5, movement: byName('Cable Row'), sets: 4 },              // row, later
+  { plannedSlotId: 78, dayIndex: 5, movement: byName('Front Squat'), sets: 3 },            // wrong category
+  { plannedSlotId: 79, dayIndex: 1, movement: byName('Single-Arm Dumbbell Row'), sets: 5 }, // row but not later
+];
+const ds = computeSubstitutions({ target: byName('Barbell Row'), library: subLib,
+  inventory: [...EQUIPMENT_ITEMS], niggles: [], futureSlots, currentDayIndex: 2 }).layer2DaySwap;
+check('Layer 2 colour is purple', ds.color === 'purple');
+check('Layer 2 pulls only same-category, strictly-later slots',
+  ds.options.length === 1 && ds.options[0].name === 'Cable Row' && ds.options[0].fromDayIndex === 5,
+  ds.options.map((o) => `${o.name}@${o.fromDayIndex}`).join(', '));
+check('conservation of volume: setsConserved == origin slot sets, origin slot identified',
+  ds.options[0].setsConserved === 4 && ds.options[0].plannedSlotId === 77);
+
+// sentiment routing
+const avoidLib = subLib.map((m) => m.name === 'Goblet Squat' ? { ...m, preference: -1 } : m);
+const avoid = computeSubstitutions({ ...baseInput, library: avoidLib }).layer1Regression.options.map((o) => o.name);
+check('Avoid (-1) hard-excludes a movement from Layer 1', !avoid.includes('Goblet Squat'), avoid.join(', '));
+const prioLib = subLib.map((m) => m.name === 'Bodyweight Squat' ? { ...m, preference: 1 } : m);
+const prio = computeSubstitutions({ ...baseInput, library: prioLib }).layer1Regression.options.map((o) => o.name);
+check('Prioritize (+1) outranks a neutral same-difficulty peer with a lower id',
+  prio.indexOf('Bodyweight Squat') < prio.indexOf('Goblet Squat'), prio.join(', '));
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

@@ -17,11 +17,12 @@ import m006 from './schema/006_user_profile.sql';
 import m007 from './schema/007_program_engine.sql';
 import m008 from './schema/008_taxonomy.sql';
 import m009 from './schema/009_periodization.sql';
+import m010 from './schema/010_movement_library.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

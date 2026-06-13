@@ -39,6 +39,8 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'movement_taxonomy' },   // 008
   { type: 'table', name: 'one_rep_max' },         // 009
   { type: 'table', name: 'block_meta' },          // 009
+  { type: 'table', name: 'movement_detail' },     // 010
+  { type: 'table', name: 'movement_preference' }, // 010
 ];
 
 function userVersion(db: MigrationDb): number {

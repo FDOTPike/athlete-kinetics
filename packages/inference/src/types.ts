@@ -79,6 +79,71 @@ export const TAXONOMY_IMPLEMENTS = [
 export type TaxonomyImplement = (typeof TAXONOMY_IMPLEMENTS)[number];
 
 // ---------------------------------------------------------------------------
+// Movement library (Phase 12) — dynamic prefix engine, difficulty, and the
+// thumbs sentiment map. Mirrors the CHECK domains / seed vocabulary in
+// 010_movement_library.sql (machine-checked by verify:blocks).
+// ---------------------------------------------------------------------------
+
+/** Implement prefixes the UI prepends to a base movement name via a dropdown.
+ *  The token rides into the session-log payload as metadata — an implement
+ *  variant is a display-time prepend, never a duplicated library row. Every
+ *  token stored in movement_detail.supported_prefixes MUST be a member here. */
+export const MOVEMENT_PREFIXES = [
+  'DB', 'BB', 'KB', 'Free Weight', 'Banded', 'Bodyweight', 'Cable',
+] as const;
+export type MovementPrefix = (typeof MOVEMENT_PREFIXES)[number];
+
+/** Reconciles a display prefix onto the canonical implement vocabulary
+ *  (TAXONOMY_IMPLEMENTS) so prefix selection stays consistent with the
+ *  equipment/taxonomy model — one source of truth, not a third vocabulary. */
+export const PREFIX_TO_IMPLEMENT: Record<MovementPrefix, TaxonomyImplement> = {
+  DB: 'dumbbell',
+  BB: 'barbell',
+  KB: 'kettlebell',
+  'Free Weight': 'other',
+  Banded: 'band',
+  Bodyweight: 'bodyweight',
+  Cable: 'cable',
+};
+
+/** movement_detail.difficulty_rating CHECK domain (ascending difficulty). */
+export const DIFFICULTY_RATINGS = ['Beginner', 'Intermediate', 'Advanced'] as const;
+export type DifficultyRating = (typeof DIFFICULTY_RATINGS)[number];
+/** Ordinal rank for "regression" comparisons (lower == easier). */
+export const DIFFICULTY_RANK: Record<DifficultyRating, number> = {
+  Beginner: 0, Intermediate: 1, Advanced: 2,
+};
+
+/** movement_preference.preference CHECK domain — the thumbs sentiment map.
+ *  -1 Avoid (hard-exclude) / 0 Neutral (default, represented by no row) /
+ *  +1 Prioritize (bias the deterministic substitution router toward it). */
+export const MOVEMENT_PREFERENCE = {
+  AVOID: -1,
+  NEUTRAL: 0,
+  PRIORITIZE: 1,
+} as const;
+export type MovementPreference =
+  (typeof MOVEMENT_PREFERENCE)[keyof typeof MOVEMENT_PREFERENCE];
+
+/** Complete ExRx classification of every shipped movement, derived from its
+ *  001 `pattern`. movement_taxonomy (008) seeds only one row per category;
+ *  the substitution router needs the WHOLE library classified, so this total,
+ *  deterministic map is the engine's category source. */
+export const PATTERN_TO_CATEGORY: Record<MovementPattern, TaxonomyCategory> = {
+  squat: 'squat',
+  hinge: 'hinge',
+  push_h: 'push',
+  push_v: 'push',
+  pull_h: 'row',
+  pull_v: 'row',
+  lunge: 'unilateral',
+  carry: 'accessory',
+  rotation: 'core',
+  isolation: 'accessory',
+  locomotion: 'cardio',
+};
+
+// ---------------------------------------------------------------------------
 // Periodization (Phase 10) — mirrors the block_meta CHECKs in
 // 009_periodization.sql (machine-checked by verify:blocks).
 // ---------------------------------------------------------------------------
