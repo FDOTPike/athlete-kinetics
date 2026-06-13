@@ -20,7 +20,7 @@ try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
 }
 for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
-  '008_taxonomy.sql', '009_periodization.sql']) {
+  '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 

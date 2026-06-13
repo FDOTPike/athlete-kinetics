@@ -31,14 +31,19 @@ import {
   generateBlock,
   isNoOpGuardrail,
   loadCodebase,
+  MOVEMENT_PREFERENCE,
+  MOVEMENT_PREFIXES,
   RED_FLAG_PAIN,
   RED_FLAG_SYSTEMIC,
   resolveReport,
   triage,
+  type DifficultyRating,
   type Embedder,
   type GeneratorMovement,
   type LoadedCodebase,
   type MovementPattern,
+  type MovementPrefix,
+  type MovementPreference,
   type PhraseCodebase,
   type PhraseEntry,
   targetLoadKg,
@@ -80,6 +85,18 @@ export interface Movement {
   is_compound: boolean;
   /** Equipment items this movement needs (movement_equipment rows). */
   required: string[];
+  /** movement_detail.base_name — the normalized pattern the prefix engine
+   *  prepends onto (e.g. 'Bench Press'); falls back to `name` when no 010
+   *  detail row exists. */
+  baseName: string;
+  /** movement_detail.supported_prefixes — the per-movement implement dropdown
+   *  (a subset of MOVEMENT_PREFIXES). Empty when bodyweight/undetailed. */
+  supportedPrefixes: MovementPrefix[];
+  /** movement_detail.difficulty_rating; defaults to Intermediate. */
+  difficulty: DifficultyRating;
+  /** movement_preference.preference — thumbs sentiment. 0/neutral when no row
+   *  exists (the 010 invariant: neutral is the ABSENCE of a row). */
+  preference: MovementPreference;
 }
 
 /** STRICT boolean equipment filter: available iff every required item is in
@@ -244,9 +261,25 @@ interface KineticsStore {
   selectMovement: (movementId: number) => void;
   addPlanSlot: (movementId: number) => void;
   swapMovement: (oldMovementId: number, newMovementId: number) => void;
+  /** Thumbs sentiment for a movement. NEUTRAL (0) DELETEs the row (the 010
+   *  invariant: neutral == no row); AVOID (-1) / PRIORITIZE (+1) upsert it.
+   *  The deterministic substitution router reads this map. */
+  setMovementPreference: (movementId: number, preference: MovementPreference) => void;
   refreshVector: () => void;
   startSession: () => void;
-  logSet: (movementId: number, reps: number, loadKg: number, rpe: number) => void;
+  /** Append a logged set. `displayName` carries the prefix-engine
+   *  concatenation (e.g. 'DB Bench Press') into the in-memory log payload;
+   *  falls back to the movement's canonical name when absent. */
+  logSet: (movementId: number, reps: number, loadKg: number, rpe: number, displayName?: string) => void;
+  /** Hard-delete one logged set. The 001 AFTER DELETE trigger
+   *  (trg_set_record_ad) drains mech_daily by this row's exact contribution;
+   *  the in-memory list drops the row. */
+  deleteSet: (setId: number) => void;
+  /** Edit one logged set's reps/load/RPE in place. The 001 AFTER UPDATE
+   *  trigger (trg_set_record_au) re-deltas mech_daily. NOTE: "sets" is not a
+   *  per-row attribute — each set_record row IS one set; change the count by
+   *  adding/deleting rows, not by editing one. */
+  editSet: (setId: number, reps: number, loadKg: number, rpe: number) => void;
   endSession: () => void;
   computePrescription: (patterns: readonly MovementPattern[]) => void;
   /** First-run affordance: 180-day deterministic demo athlete. Refuses to run
@@ -332,7 +365,28 @@ const entryById = (id: string): PhraseEntry | undefined => {
 interface MovementRow {
   movement_id: number; name: string; pattern: string;
   is_compound: number; required_json: string | null;
+  // 010 LEFT JOINs — null when no movement_detail / movement_preference row.
+  base_name: string | null; supported_prefixes: string | null;
+  difficulty_rating: string | null; preference: number | null;
 }
+const PREFIX_SET = new Set<string>(MOVEMENT_PREFIXES);
+/** Parse movement_detail.supported_prefixes, keeping only canonical tokens —
+ *  an unknown/garbage token is dropped rather than offered in the dropdown. */
+const parsePrefixes = (json: string | null): MovementPrefix[] => {
+  try {
+    const v = JSON.parse(json ?? '[]') as unknown;
+    return Array.isArray(v)
+      ? v.filter((x): x is MovementPrefix => typeof x === 'string' && PREFIX_SET.has(x))
+      : [];
+  } catch {
+    return [];
+  }
+};
+/** Coerce a raw preference cell to the {-1,0,1} domain (null/garbage -> 0). */
+const toPreference = (n: number | null): MovementPreference =>
+  n === MOVEMENT_PREFERENCE.AVOID || n === MOVEMENT_PREFERENCE.PRIORITIZE
+    ? n
+    : MOVEMENT_PREFERENCE.NEUTRAL;
 const movementFromRow = (r: MovementRow): Movement => {
   let required: string[] = [];
   try {
@@ -344,6 +398,10 @@ const movementFromRow = (r: MovementRow): Movement => {
   return {
     movement_id: r.movement_id, name: r.name, pattern: r.pattern,
     is_compound: r.is_compound === 1, required,
+    baseName: r.base_name ?? r.name,
+    supportedPrefixes: parsePrefixes(r.supported_prefixes),
+    difficulty: (r.difficulty_rating ?? 'Intermediate') as DifficultyRating,
+    preference: toPreference(r.preference),
   };
 };
 
@@ -426,7 +484,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
       const movements = rowsOf<MovementRow>(
         getDb().executeSync(
-          'SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json FROM movement m ORDER BY m.movement_id',
+          'SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id ORDER BY m.movement_id',
         ),
       ).map(movementFromRow);
       const profileRow = rowsOf<ProfileRow>(
@@ -883,7 +941,26 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     });
   },
 
-  logSet: (movementId, reps, loadKg, rpe) => {
+  setMovementPreference: (movementId, preference) => {
+    const d = getDb();
+    // The 010 invariant: NEUTRAL is the ABSENCE of a row, so toggling back to
+    // neutral DELETEs; AVOID/PRIORITIZE upsert. Keeps the table empty until
+    // used and never dirties the immutable movement_detail cache.
+    if (preference === MOVEMENT_PREFERENCE.NEUTRAL) {
+      d.executeSync('DELETE FROM movement_preference WHERE movement_id = ?', [movementId]);
+    } else {
+      d.executeSync(
+        'INSERT INTO movement_preference (movement_id, preference, updated_at_ms) VALUES (?, ?, ?) ON CONFLICT(movement_id) DO UPDATE SET preference = excluded.preference, updated_at_ms = excluded.updated_at_ms',
+        [movementId, preference, Date.now()],
+      );
+    }
+    set({
+      movements: get().movements.map((m) =>
+        m.movement_id === movementId ? { ...m, preference } : m),
+    });
+  },
+
+  logSet: (movementId, reps, loadKg, rpe, displayName) => {
     const s = get().session;
     if (s === null) return;
     const movement = get().movements.find((m) => m.movement_id === movementId);
@@ -916,7 +993,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const logged: LoggedSet = {
       set_id: setId,
       movement_id: movementId,
-      movement_name: movement.name,
+      // Prefix-engine payload: the implement-prefixed display name when the UI
+      // supplied one (e.g. 'DB Bench Press'), else the canonical movement name.
+      movement_name:
+        displayName !== undefined && displayName.length > 0 ? displayName : movement.name,
       set_index: setIndex,
       reps: safeReps,
       load_kg: safeLoad,
@@ -924,6 +1004,41 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       tonnage_kg: safeReps * safeLoad,
     };
     set({ session: { ...s, sets: [logged, ...s.sets] } });
+  },
+
+  deleteSet: (setId) => {
+    const s = get().session;
+    if (s === null) return;
+    // Hard delete: trg_set_record_ad (001) drains mech_daily by this row's
+    // exact contribution, so no re-aggregation is needed. Mirrors logSet —
+    // state_vector re-materializes at endSession, not per row mutation.
+    getDb().executeSync('DELETE FROM set_record WHERE set_id = ?', [setId]);
+    set({ session: { ...s, sets: s.sets.filter((x) => x.set_id !== setId) } });
+  },
+
+  editSet: (setId, reps, loadKg, rpe) => {
+    const s = get().session;
+    if (s === null) return;
+    // Same CHECK-domain clamps as logSet: a UI bug must never throw mid-edit.
+    const safeReps = Math.round(clamp(reps, 1, 50));
+    const safeLoad = clamp(Math.round(loadKg / 2.5) * 2.5, 0, 500);
+    const safeRpe = clamp(Math.round(rpe * 2) / 2, 5, 10);
+    // UPDATE OF reps, load_kg, rpe fires trg_set_record_au, which re-deltas
+    // mech_daily (old contribution out, new in). tonnage_kg is a GENERATED
+    // STORED column — SQLite recomputes it; we mirror it in memory below.
+    getDb().executeSync(
+      'UPDATE set_record SET reps = ?, load_kg = ?, rpe = ? WHERE set_id = ?',
+      [safeReps, safeLoad, safeRpe, setId],
+    );
+    set({
+      session: {
+        ...s,
+        sets: s.sets.map((x) =>
+          x.set_id === setId
+            ? { ...x, reps: safeReps, load_kg: safeLoad, rpe: safeRpe, tonnage_kg: safeReps * safeLoad }
+            : x),
+      },
+    });
   },
 
   endSession: () => {
@@ -1144,7 +1259,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     const movements = rowsOf<MovementRow>(
-      d.executeSync('SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json FROM movement m ORDER BY m.movement_id'),
+      d.executeSync('SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id ORDER BY m.movement_id'),
     ).map(movementFromRow);
     set({ movements });
     get().refreshVector();

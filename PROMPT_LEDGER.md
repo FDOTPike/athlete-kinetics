@@ -398,3 +398,87 @@ the app is crashing
   Even a future delegate regression can no longer kill boot.
 - 11 gates green; commit is this entry's containing commit; pushed; CI APK
   job (which compiles MainActivity.kt) watched; release v0.11.1 cut.
+
+---
+
+## Entry 0010 — 2026-06-14 · Phase 12, Step 2 (UI wiring & local state: CRUD, ExRx collapsible, prefix engine, sentiment)
+
+### Input G(x)
+
+```
+### SYSTEM INSTRUCTION: PHASE 12, STEP 2 — UI WIRING & STATE MANAGEMENT
+You are the Lead Systems Engineer for "Athlete Kinetics". In Step 1, you
+successfully compiled the deterministic substitution engine (`substitution.ts`)
+and the SQLite schema (`010_movement_library.sql`). You are now executing Step
+2: The User Interface and Local State Integration. Adhere strictly to the 450MB
+RAM threshold.
+
+### ARCHITECTURAL TARGETS: `SessionScreen.tsx` & `useStore.ts`
+
+1. UI LOGGING & SESSION EDITING (CRUD)
+   - Implement a long-press gesture handler on the active logged exercise rows
+     within the Session tab.
+   - Long-press must reveal a clean, inline context seam with two options:
+     * Delete: Execute a hard delete (to ensure the `mech_daily` trigger drains
+       correctly). Provide a contextual trash icon.
+     * Edit: Open an inline numeric input mechanism for reps, sets, and load to
+       modify the log without breaking SQLite sync.
+
+2. EXRX TAXONOMY COLLAPSIBLE LISTING
+   - Refactor the movement selection dropdown. Group the 30 base movements
+     hierarchically into the 8 ExRx categories (Push, Row, Hinge, Squat, Core,
+     Unilateral, Accessory, Cardio).
+   - Use standard React Native layout primitives to create collapsible section
+     headers for performance and memory efficiency.
+
+3. PREFIX ENGINE & SENTIMENT TOGGLES
+   - Integrate the UI dropdown directly preceding the movement base name to
+     select the mechanical implement (`DB`, `BB`, `KB`, `Free Weight`, etc.).
+   - Bind this dropdown so the selected prefix dynamically concatenates with the
+     base movement when committing the log payload.
+   - Implement the "Thumbs Up / Thumbs Down" binary toggle next to the movement
+     listing. Map these interactions to trigger updates in the
+     `movement_preference` table (-1 for Down, 1 for Up, 0 for Neutral).
+
+### UNIDIRECTIONAL LEDGER ENGAGEMENT MANDATE
+Run continuously until the UI pass is fully type-safe and integrated. Conclude
+your output with the standard transaction block: [MASTER LEDGER ENTRY: PHASE 12,
+STEP 2].
+
+(model set to claude-opus-4-8[1m] for this run)
+```
+
+### Output F(G(x))
+
+- **`apps/mobile/src/state/useStore.ts`** — `Movement` gains `baseName` /
+  `supportedPrefixes` / `difficulty` / `preference`; both movement `SELECT`s
+  now `LEFT JOIN movement_detail + movement_preference` (null preference → 0);
+  `parsePrefixes` / `toPreference` coerce to the canonical domains. New actions:
+  `setMovementPreference` (NEUTRAL `DELETE`s the row — the 010 "neutral == no
+  row" invariant — else upsert); `deleteSet` (hard `DELETE FROM set_record` →
+  `trg_set_record_ad` drains `mech_daily`); `editSet` (`UPDATE … reps,load_kg,
+  rpe` → `trg_set_record_au` re-deltas). `logSet` gains an optional
+  `displayName` carrying the prefix-engine concatenation into the in-memory
+  payload.
+- **`apps/mobile/src/screens/SessionScreen.tsx`** (full rewrite) — long-press
+  context seam on logged rows: EDIT (inline `MiniStepper` reps/load/RPE,
+  honoring the no-keyboard contract) + 🗑 hard-DELETE. ExRx collapsible picker:
+  8 categories via `PATTERN_TO_CATEGORY`, collapsed by default (children
+  unmount). Implement-prefix selector from `supported_prefixes`, concatenated
+  onto `baseName`, reset on active-movement change. `ThumbToggle` 👍/👎 → the
+  `movement_preference` map (+1/0/−1).
+- **`apps/mobile/test/verify_store_sql.mjs`** — loads `010_movement_library.sql`
+  so the new `movement_detail` / `movement_preference` DAOs prepare against the
+  live schema (gate gap from Step 1: the verifier loaded only 001–009).
+- **Reconciliations (mandate vs shipped ground truth):** "edit reps, *sets*,
+  and load" → "sets" is not a per-row attribute (each `set_record` IS one set);
+  the inline editor covers reps/load/RPE. "0 for Neutral" → the ABSENCE of a
+  row (`DELETE`), per 010. The prefix is display-time metadata (no `set_record`
+  column by 010 design) — it rides the in-memory log payload only.
+- **Gates:** `npm run verify:all` — all 11 green (typecheck; store DAO SQL 55
+  statements; 010 contracts via verify:blocks; memory 450.1 MiB peak ≤ 1280 MiB
+  3GB-Android, 65% headroom).
+- **Adversarial pass:** 5-dimension review fan-out (triggers/`mech_daily`,
+  preference invariant, prefix engine, RN/hooks, regression), every finding
+  independently verified — **0 confirmed issues**.
+- Not committed (no push/commit requested) — changes staged in the working tree.
