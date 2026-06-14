@@ -286,8 +286,10 @@ interface KineticsStore {
   switchProfile: (slotId: number) => void;
   /** Hard physical-state wipe (Phase 12 Step 7): one transaction that DELETEs the
    *  active block (+ cascade), the ENTIRE injury history (all subjective_report +
-   *  report_severity + niggle, not just today's), and resets injury_flags to []
-   *  on athlete_profile and every saved profile_slot. set_record + the mech_daily
+   *  report_severity + niggle, not just today's), resets injury_flags to [] on
+   *  athlete_profile and every saved profile_slot, and resets the readiness
+   *  baseline by clearing the biometric inputs (hrv/sleep/spo2) + state_vector,
+   *  then re-materializing from the preserved load. set_record + the mech_daily
    *  triggers are untouched: mechanical volume history is preserved. */
   wipeActiveBlockState: () => void;
   /** Triage a free-text complaint with a forced 1-10 severity (Phase 12 Step
@@ -773,15 +775,32 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // json_set only writes into a JSON object; the guard makes the skip on a
       // (corrupt) non-object profile_json deterministic rather than a silent pass.
       d.executeSync("UPDATE profile_slot SET profile_json = json_set(profile_json, '$.injury_flags', json('[]')) WHERE json_type(profile_json) = 'object'");
+      // Reset the readiness baseline: clear the biometric inputs + the
+      // materialized state_vector so a switched-to profile no longer shows the
+      // previous athlete's readiness. set_record / mech_daily (logged volume) are
+      // preserved, so on re-materialization below the load component re-derives
+      // while HRV/sleep/SpO2 fall back to neutral (50).
+      d.executeSync('DELETE FROM spo2_sample');
+      d.executeSync('DELETE FROM spo2_daily');
+      d.executeSync('DELETE FROM hrv_daily');
+      d.executeSync('DELETE FROM sleep_daily');
+      d.executeSync('DELETE FROM state_vector');
       d.executeSync('COMMIT');
     } catch (e) {
       d.executeSync('ROLLBACK');
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
+    // Re-materialize the trailing week from the PRESERVED load so READY shows the
+    // fresh biometric-neutral baseline (or the "no data yet" state on days with no
+    // load) instead of the previous athlete's score. Mirrors boot's catch-up.
+    for (const date of demoDates(localToday(), 7)) {
+      d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
+    }
     set({
       profile: { ...get().profile, injury_flags: [] },
       block: null, blockMeta: null, blockSessions: [], todayPlan: null, niggles: [], lastTriage: null,
+      vector: null, trend: [],
     });
     get().refreshProfileSlots();
     get().refreshNiggles();

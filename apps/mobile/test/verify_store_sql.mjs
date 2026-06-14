@@ -57,14 +57,38 @@ for (const needle of ['derivePrescription(', 'rolloverDay', 'localToday()']) {
   if (!ok) fail += 1;
 }
 // Scope tripwires (Phase 12 Step 7): the hard physical-state wipe must purge the
-// ENTIRE injury history, not just today's. These assert the UNCONDITIONAL delete
-// forms survive as exact literals — re-narrowing any to a date/time scope (e.g.
-// "DELETE FROM subjective_report WHERE date = ?") changes the literal and trips
-// this gate, catching the scope-regression the inline verify_schema [15] copy cannot.
+// ENTIRE injury history (not just today's) and reset the readiness baseline by
+// clearing the biometric inputs + state_vector. These assert the UNCONDITIONAL
+// delete forms survive as exact literals — re-narrowing any to a date/time scope
+// (e.g. "DELETE FROM subjective_report WHERE date = ?") changes the literal and
+// trips this gate, catching the scope-regression the inline verify_schema [15]
+// copy cannot.
+// Isolate wipeActiveBlockState's body by brace-matching from its implementation
+// signature (NOT the interface decl `=> void;`), so the tripwires assert each
+// purge lives INSIDE the hard wipe — catching a delete relocated to a dead helper
+// or moved out of the transaction, which a file-wide check would miss.
+const wipeSig = 'wipeActiveBlockState: () => {';
+const wipeSigAt = src.indexOf(wipeSig);
+let wipeBody = '';
+if (wipeSigAt !== -1) {
+  let depth = 0;
+  for (let i = wipeSigAt + wipeSig.length - 1; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1;
+    else if (src[i] === '}') { depth -= 1; if (depth === 0) { wipeBody = src.slice(wipeSigAt, i + 1); break; } }
+  }
+}
 console.log('[hard-wipe scope]');
-for (const literal of ['DELETE FROM subjective_report', 'DELETE FROM niggle', 'DELETE FROM report_severity']) {
-  const ok = statements.includes(literal);
-  console.log(`  ${ok ? 'PASS' : 'FAIL'}  wipe purges all rows: ${literal}`);
+if (wipeBody === '') { console.log('  FAIL  could not locate wipeActiveBlockState body'); fail += 1; }
+// Checking the QUOTED exact literal inside the wipe body catches BOTH a
+// scope-narrowing regression (a trailing WHERE breaks the closing quote) AND a
+// relocation out of the wipe (the literal no longer appears in this body).
+for (const literal of [
+  'DELETE FROM subjective_report', 'DELETE FROM niggle', 'DELETE FROM report_severity',
+  'DELETE FROM state_vector', 'DELETE FROM hrv_daily', 'DELETE FROM sleep_daily',
+  'DELETE FROM spo2_daily', 'DELETE FROM spo2_sample',
+]) {
+  const ok = wipeBody.includes(`'${literal}'`);
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  wipe purges all rows (in wipeActiveBlockState): ${literal}`);
   if (!ok) fail += 1;
 }
 

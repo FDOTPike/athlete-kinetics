@@ -501,6 +501,16 @@ con.execute("INSERT INTO report_severity (report_id, severity) VALUES (701, 4)")
 con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('w0', 'shoulder', 3, 1)")
 con.execute("UPDATE athlete_profile SET injury_flags = '[{\"region\":\"knee\"}]' WHERE profile_id = 1")
 con.execute("UPDATE profile_slot SET profile_json = json_set(profile_json, '$.injury_flags', json('[{\"region\":\"knee\"}]'))")
+# Biometric inputs + the previous athlete's materialized readiness row that the
+# Step 7 readiness reset must clear (the keep-sets choice resets biometrics only).
+con.execute("INSERT OR REPLACE INTO hrv_daily (date, rmssd_ms, resting_hr) VALUES (?, 45.0, 55.0)", (TODAY,))
+con.execute("INSERT OR REPLACE INTO sleep_daily (date, in_bed_min, asleep_min) VALUES (?, 480.0, 420.0)", (TODAY,))
+con.execute("INSERT OR REPLACE INTO spo2_daily (date, mean_pct, min_pct, pct_time_below_90, sample_count) VALUES (?, 96.0, 92.0, 1.0, 200)", (TODAY,))
+con.execute("INSERT OR REPLACE INTO spo2_sample (epoch_ms, source, spo2_pct) VALUES (1, 'wearable', 96.0)")
+con.execute("INSERT OR REPLACE INTO state_vector (date, readiness_score, hrv_component, load_component,"
+            " sleep_component, spo2_component, computed_at_ms) VALUES (?, 88.0, 80.0, 80.0, 90.0, 95.0, 0)", (TODAY,))
+BIO_TABLES = ["hrv_daily", "sleep_daily", "spo2_daily", "spo2_sample", "state_vector"]
+bio_before = {t: con.execute(f"SELECT count(*) c FROM {t}").fetchone()["c"] for t in BIO_TABLES}
 sets_before = con.execute("SELECT count(*) c FROM set_record").fetchone()["c"]
 # The hard wipe (mirrors wipeActiveBlockState): active block (cascades) + the
 # ENTIRE injury history + injury_flags reset on the live profile and every slot.
@@ -510,6 +520,11 @@ con.execute("DELETE FROM subjective_report")
 con.execute("DELETE FROM niggle")
 con.execute("UPDATE athlete_profile SET injury_flags = '[]' WHERE profile_id = 1")
 con.execute("UPDATE profile_slot SET profile_json = json_set(profile_json, '$.injury_flags', json('[]')) WHERE json_type(profile_json) = 'object'")
+con.execute("DELETE FROM spo2_sample")
+con.execute("DELETE FROM spo2_daily")
+con.execute("DELETE FROM hrv_daily")
+con.execute("DELETE FROM sleep_daily")
+con.execute("DELETE FROM state_vector")
 orphans = con.execute(
     "SELECT (SELECT count(*) FROM planned_session WHERE block_id = 700) +"
     " (SELECT count(*) FROM planned_slot WHERE planned_slot_id = 700) +"
@@ -525,6 +540,24 @@ slot_dirty = con.execute("SELECT count(*) c FROM profile_slot"
                          " WHERE json_array_length(json_extract(profile_json, '$.injury_flags')) > 0").fetchone()["c"]
 check("hard wipe resets injury_flags to [] on athlete_profile AND all 4 slots",
       prof_flags == "[]" and slot_dirty == 0, f"profile={prof_flags} dirty_slots={slot_dirty}")
+bio_after = {t: con.execute(f"SELECT count(*) c FROM {t}").fetchone()["c"] for t in BIO_TABLES}
+check("hard wipe resets readiness — each biometric table + state_vector seeded then cleared (load/set_record kept)",
+      all(bio_before[t] > 0 for t in BIO_TABLES) and all(bio_after[t] == 0 for t in BIO_TABLES),
+      f"before={bio_before} after={bio_after}")
+# Prove the SECOND half of the fix (what actually reinstates a usable score):
+# re-materialize from the PRESERVED load, exactly as wipeActiveBlockState does
+# post-commit. With biometrics gone the HRV/sleep/SpO2 components COALESCE to a
+# neutral 50 and the load component re-derives — a fresh baseline, NOT the old 88.
+con.execute(sql_004, (TODAY,))
+sv_reset = con.execute("SELECT readiness_score, hrv_component, sleep_component, spo2_component, load_component"
+                       " FROM state_vector WHERE date = ?", (TODAY,)).fetchone()
+check("readiness re-materializes to a biometric-neutral baseline (HRV/sleep/SpO2 -> 50, load kept, not the old 88)",
+      sv_reset is not None
+      and sv_reset["hrv_component"] == 50.0
+      and sv_reset["sleep_component"] == 50.0
+      and sv_reset["spo2_component"] == 50.0
+      and sv_reset["readiness_score"] != 88.0,
+      str(dict(sv_reset)) if sv_reset is not None else "no row")
 # Edge: a json_valid but NON-object slot (corrupt / hand-edited DB) must not crash
 # the guarded reset and must not be counted as carrying injuries. Cleaned up after
 # so the 013 idempotency count below still sees the canonical four slots.

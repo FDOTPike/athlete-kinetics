@@ -820,4 +820,34 @@ with the standard MASTER LEDGER ENTRY block.
   (1) verifier inline-copy drift risk → scope tripwires; (2) `json_set` silent no-op
   on non-object JSON → `json_type(profile_json) = 'object'` guard + edge test.
 - **Gates:** `npm run verify:all` — all 11 green (memory ~450 MiB).
-- Not committed — held pending the on-device check (push gated on it).
+- Committed `e6ddf3c` on branch `phase-12-step-7`; opened PR #3 → CI built the
+  `athlete-kinetics-apk` artifact for the on-device check (origin/master untouched).
+
+#### Follow-up (on-device feedback) — readiness reset
+
+On-device the wipe worked, but the **readiness score stayed at the previous
+athlete's value** after wiping (READY shows the global `state_vector`). Root cause:
+readiness is global (no `profile_id`) and derived from biometrics + load, neither of
+which the wipe touched. Operator chose (AskUserQuestion) **"Biometrics + readiness,
+keep sets"** — reset the biometric inputs, keep logged volume.
+
+- **`wipeActiveBlockState`** now also clears the biometric inputs (`spo2_sample`,
+  `spo2_daily`, `hrv_daily`, `sleep_daily`) + `state_vector` inside the transaction,
+  then re-materializes the trailing week from the PRESERVED `mech_daily`/`set_record`
+  load (mirrors boot's catch-up). Result: HRV/sleep/SpO2 components fall back to
+  neutral (50) while the load component re-derives — a fresh biometric-neutral
+  baseline, not the old athlete's score. `set_record` + `mech_daily` still untouched.
+  Confined to `wipeActiveBlockState` (not the shared `runBlockWipe`), so a normal
+  `switchProfile` does NOT nuke biometrics. JSDoc updated.
+- **`verify_schema.py [15]`** — seeds biometrics + a stale `state_vector` row, mirrors
+  the new clears, asserts (per-table) biometrics + `state_vector` cleared while
+  `set_record` is preserved, AND re-runs `sql_004` to prove readiness re-materializes
+  to a biometric-neutral baseline (HRV/sleep/SpO2 → 50, load kept, not the old score).
+  **`verify_store_sql.mjs`** — `[hard-wipe scope]` tripwires (8 deletes) now bound to
+  the `wipeActiveBlockState` body (brace-matched), catching relocation + narrowing.
+- **Adversarial review** (`p12s7-readiness-reset-review`, 6 agents / 3 dimensions):
+  3 findings, **all confirmed (1 MEDIUM, 2 LOW), 0 in production code** — all verifier
+  completeness gaps, all fixed: (MED) `[15]` proved the clear but not the
+  re-materialization → added the `sql_004` re-derivation assertion; (LOW) aggregate
+  seed/clear count → per-table; (LOW) file-wide tripwire → scoped to the wipe body.
+- **Gates:** `npm run verify:all` — all 11 green.
