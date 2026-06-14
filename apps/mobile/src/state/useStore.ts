@@ -284,8 +284,11 @@ interface KineticsStore {
    *  new profile regenerates cleanly). Destructive — clears the active block +
    *  today's reports/niggles. */
   switchProfile: (slotId: number) => void;
-  /** Hard-DELETE the active block (+ cascade) and today's volatile reports +
-   *  niggles, in one transaction. Training history (set_record) is preserved. */
+  /** Hard physical-state wipe (Phase 12 Step 7): one transaction that DELETEs the
+   *  active block (+ cascade), the ENTIRE injury history (all subjective_report +
+   *  report_severity + niggle, not just today's), and resets injury_flags to []
+   *  on athlete_profile and every saved profile_slot. set_record + the mech_daily
+   *  triggers are untouched: mechanical volume history is preserved. */
   wipeActiveBlockState: () => void;
   /** Triage a free-text complaint with a forced 1-10 severity (Phase 12 Step
    *  5). The severity gates the matched guardrail by training age. */
@@ -755,14 +758,32 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
     d.executeSync('BEGIN');
     try {
+      // Active block (+ cascade) and today's volatile rows.
       runBlockWipe(d, localToday());
+      // Phase 12 Step 7 — hard physical-state purge: the ENTIRE injury history,
+      // not just today's, so any profile switched to afterward starts physically
+      // clean. report_severity is cleared explicitly (it also cascades from
+      // subjective_report); niggle history is purged whole; injury_flags is reset
+      // on the live profile AND every saved slot. set_record + the mech_daily
+      // triggers are deliberately left alone — mechanical volume is preserved.
+      d.executeSync('DELETE FROM report_severity');
+      d.executeSync('DELETE FROM subjective_report');
+      d.executeSync('DELETE FROM niggle');
+      d.executeSync("UPDATE athlete_profile SET injury_flags = '[]' WHERE profile_id = 1");
+      // json_set only writes into a JSON object; the guard makes the skip on a
+      // (corrupt) non-object profile_json deterministic rather than a silent pass.
+      d.executeSync("UPDATE profile_slot SET profile_json = json_set(profile_json, '$.injury_flags', json('[]')) WHERE json_type(profile_json) = 'object'");
       d.executeSync('COMMIT');
     } catch (e) {
       d.executeSync('ROLLBACK');
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, niggles: [], lastTriage: null });
+    set({
+      profile: { ...get().profile, injury_flags: [] },
+      block: null, blockMeta: null, blockSessions: [], todayPlan: null, niggles: [], lastTriage: null,
+    });
+    get().refreshProfileSlots();
     get().refreshNiggles();
     get().refreshBlock();
     get().refreshVector();

@@ -456,7 +456,7 @@ after12 = con.execute("SELECT count(*) c FROM report_severity").fetchone()["c"]
 check("012 re-apply is a no-op (idempotent)", before12 == after12, f"{before12} == {after12}")
 
 # --- 15. profile_slot (013) + wipeActiveBlockState cascade ------------------------
-print("\n[15] profile_slot (013) + safe state wipe — Phase 12 Step 6")
+print("\n[15] profile_slot (013) + hard physical-state wipe — Phase 12 Steps 6-7")
 slots = con.execute("SELECT slot_id, name, json_extract(profile_json, '$.training_age') AS ta, is_active"
                     " FROM profile_slot ORDER BY slot_id").fetchall()
 check("four training-age profile slots seeded",
@@ -475,8 +475,11 @@ try:
 except sqlite3.IntegrityError:
     check("profile_json CHECK rejects malformed JSON", True)
 
-# wipeActiveBlockState cascade — seed an active block + today's reports/niggle.
+# wipeActiveBlockState — seed an active block + today's reports/niggle, PLUS
+# historical (non-today) injury rows and dirty injury_flags everywhere. The
+# Phase 12 Step 7 hard purge must clear the ENTIRE injury history, not just today.
 TODAY = days[-1].isoformat()
+PAST = days[0].isoformat()
 con.execute("INSERT INTO training_block (block_id, start_date, objective, status, created_at_ms)"
             " VALUES (700, ?, 'hybrid', 'active', 0)", (TODAY,))
 con.execute("INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type)"
@@ -491,20 +494,50 @@ con.execute("INSERT INTO subjective_report (report_id, date, reported_at_ms, raw
             " VALUES (700, ?, 0, 'knee sore', 'pain-mild', 1)", (TODAY,))
 con.execute("INSERT INTO report_severity (report_id, severity) VALUES (700, 6)")
 con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('w1', 'knee', 5, 9999999999999)")
+# Historical physical state the OLD today-scoped wipe would have left behind:
+con.execute("INSERT INTO subjective_report (report_id, date, reported_at_ms, raw_text, matched_entry_id, halt)"
+            " VALUES (701, ?, 0, 'old tweak', 'pain-mild', 0)", (PAST,))
+con.execute("INSERT INTO report_severity (report_id, severity) VALUES (701, 4)")
+con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('w0', 'shoulder', 3, 1)")
+con.execute("UPDATE athlete_profile SET injury_flags = '[{\"region\":\"knee\"}]' WHERE profile_id = 1")
+con.execute("UPDATE profile_slot SET profile_json = json_set(profile_json, '$.injury_flags', json('[{\"region\":\"knee\"}]'))")
 sets_before = con.execute("SELECT count(*) c FROM set_record").fetchone()["c"]
-# The wipe: active block (cascades) + today's subjective reports (cascades) + niggles.
+# The hard wipe (mirrors wipeActiveBlockState): active block (cascades) + the
+# ENTIRE injury history + injury_flags reset on the live profile and every slot.
 con.execute("DELETE FROM training_block WHERE status = 'active'")
-con.execute("DELETE FROM subjective_report WHERE date = ?", (TODAY,))
-con.execute("DELETE FROM niggle WHERE reported_at_ms >= 0")
+con.execute("DELETE FROM report_severity")
+con.execute("DELETE FROM subjective_report")
+con.execute("DELETE FROM niggle")
+con.execute("UPDATE athlete_profile SET injury_flags = '[]' WHERE profile_id = 1")
+con.execute("UPDATE profile_slot SET profile_json = json_set(profile_json, '$.injury_flags', json('[]')) WHERE json_type(profile_json) = 'object'")
 orphans = con.execute(
     "SELECT (SELECT count(*) FROM planned_session WHERE block_id = 700) +"
     " (SELECT count(*) FROM planned_slot WHERE planned_slot_id = 700) +"
     " (SELECT count(*) FROM slot_override WHERE planned_slot_id = 700) +"
     " (SELECT count(*) FROM block_meta WHERE block_id = 700) +"
-    " (SELECT count(*) FROM report_severity WHERE report_id = 700) AS c").fetchone()["c"]
-check("state wipe cascades cleanly — no orphaned session/slot/override/meta/severity", orphans == 0, str(orphans))
+    " (SELECT count(*) FROM report_severity) AS c").fetchone()["c"]
+check("hard wipe cascades cleanly — no orphaned session/slot/override/meta + report_severity emptied", orphans == 0, str(orphans))
+remaining = con.execute(
+    "SELECT (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) AS c").fetchone()["c"]
+check("hard wipe purges the ENTIRE injury history (all dates, not just today)", remaining == 0, str(remaining))
+prof_flags = con.execute("SELECT injury_flags FROM athlete_profile WHERE profile_id = 1").fetchone()["injury_flags"]
+slot_dirty = con.execute("SELECT count(*) c FROM profile_slot"
+                         " WHERE json_array_length(json_extract(profile_json, '$.injury_flags')) > 0").fetchone()["c"]
+check("hard wipe resets injury_flags to [] on athlete_profile AND all 4 slots",
+      prof_flags == "[]" and slot_dirty == 0, f"profile={prof_flags} dirty_slots={slot_dirty}")
+# Edge: a json_valid but NON-object slot (corrupt / hand-edited DB) must not crash
+# the guarded reset and must not be counted as carrying injuries. Cleaned up after
+# so the 013 idempotency count below still sees the canonical four slots.
+con.execute("INSERT INTO profile_slot (slot_id, name, profile_json) VALUES (98, 'corrupt', '[1,2,3]')")
+con.execute("UPDATE profile_slot SET profile_json = json_set(profile_json, '$.injury_flags', json('[]')) WHERE json_type(profile_json) = 'object'")
+nonobj = con.execute("SELECT profile_json FROM profile_slot WHERE slot_id = 98").fetchone()["profile_json"]
+dirty2 = con.execute("SELECT count(*) c FROM profile_slot"
+                     " WHERE json_array_length(json_extract(profile_json, '$.injury_flags')) > 0").fetchone()["c"]
+check("guarded slot reset skips a non-object profile_json without error or false-dirty",
+      nonobj == "[1,2,3]" and dirty2 == 0, f"slot98={nonobj} dirty={dirty2}")
+con.execute("DELETE FROM profile_slot WHERE slot_id = 98")
 sets_after = con.execute("SELECT count(*) c FROM set_record").fetchone()["c"]
-check("state wipe PRESERVES training history (set_record + mech_daily triggers untouched)",
+check("hard wipe PRESERVES training history (set_record + mech_daily triggers untouched)",
       sets_after == sets_before)
 before13 = con.execute("SELECT count(*) c FROM profile_slot").fetchone()["c"]
 con.executescript((SCHEMA_DIR / "013_profile_slot.sql").read_text(encoding="utf-8"))

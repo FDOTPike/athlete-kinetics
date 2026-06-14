@@ -56,6 +56,17 @@ for (const needle of ['derivePrescription(', 'rolloverDay', 'localToday()']) {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  store references ${needle}`);
   if (!ok) fail += 1;
 }
+// Scope tripwires (Phase 12 Step 7): the hard physical-state wipe must purge the
+// ENTIRE injury history, not just today's. These assert the UNCONDITIONAL delete
+// forms survive as exact literals — re-narrowing any to a date/time scope (e.g.
+// "DELETE FROM subjective_report WHERE date = ?") changes the literal and trips
+// this gate, catching the scope-regression the inline verify_schema [15] copy cannot.
+console.log('[hard-wipe scope]');
+for (const literal of ['DELETE FROM subjective_report', 'DELETE FROM niggle', 'DELETE FROM report_severity']) {
+  const ok = statements.includes(literal);
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  wipe purges all rows: ${literal}`);
+  if (!ok) fail += 1;
+}
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

@@ -743,3 +743,81 @@ Conclude with the standard MASTER LEDGER ENTRY block.
   resync. 0 rejected.
 - **Gates:** `npm run verify:all` — all 11 green (memory 450.1 MiB).
 - Not committed — Steps 3-6 held in the working tree pending the on-device check.
+  (Update: Steps 1-6 merged to `master` as `c355b79` after the on-device check, via
+  PR #2 fast-forward; `phase-12` branch deleted.)
+
+## Entry 0015 — 2026-06-14 · Phase 12, Step 7 (hard physical state wipe)
+
+### Input G(x)
+
+```
+SYSTEM ARCHITECTURE MANDATE: Phase 12, Step 7 (Hard Physical State Wipe)
+
+Opus, the on-device testing for the block wipe was successful, but the scope of
+the wipe is too narrow for seamless profile testing. Currently,
+wipeActiveBlockState() only deletes today's subjective reports and niggles. This
+leaves historical injury data in the DB, which bleeds into the math when the user
+tries to test a fresh block for a new profile.
+
+THE BOUNDARY INVARIANTS:
+
+Modify the Wipe Transaction: Update the wipeActiveBlockState() SQLite transaction
+in the store.
+
+Expand the Purge Scope: Remove the date = today restriction for injuries. The
+transaction must DELETE FROM subjective_report and DELETE FROM report_severity
+completely, effectively purging the athlete's entire physical injury history.
+
+Clear Profile Flags: Ensure that the injury_flags array on the active
+athlete_profile (and the saved profile_slot) is reset to empty [].
+
+Preserve Volume: Do NOT touch set_record or the mech_daily triggers. We are only
+nuking the physical injury state, not the mechanical volume history.
+
+EXECUTION:
+Write the pure TypeScript store updates. Run the 11-Gate CI verify:all suite to
+ensure the broader cascade delete doesn't orphan any unexpected tables. Conclude
+with the standard MASTER LEDGER ENTRY block.
+```
+
+### Output F(G(x))
+
+- **Premise correction (surfaced + confirmed before building):** `computePrescription`
+  reads `subjective_report` TODAY-scoped (`useStore.ts:1504`, `WHERE sr.date = ?`),
+  so *historical* subjective reports never fed the math — the real cross-profile
+  bleed vector is **`injury_flags`** (a persistent `athlete_profile` field applied
+  all-time by the guardrail), which the old wipe never touched. So the `injury_flags`
+  reset is what actually fixes the symptom; the full `subjective_report` purge is for
+  a clean test slate. Operator chose (AskUserQuestion) to reset `injury_flags` on
+  **all 4 saved slots**, not just the active one — matching the "seamless testing for
+  a new profile" goal.
+- **Shared-helper hazard avoided:** `runBlockWipe` is shared with `switchProfile`
+  (which calls it right after loading the target profile). The Step 7 hard-purge
+  statements live **only** in `wipeActiveBlockState`, so a normal profile switch still
+  keeps the just-loaded profile's `injury_flags` — `runBlockWipe` is unchanged.
+- **`useStore.ts` — `wipeActiveBlockState`** now, in one `BEGIN/COMMIT` (ROLLBACK on
+  error): `runBlockWipe` (active block + cascade + today's volatile rows) → `DELETE
+  FROM report_severity` → `DELETE FROM subjective_report` (full; cascades severity) →
+  `DELETE FROM niggle` (full) → reset `injury_flags='[]'` on `athlete_profile` and
+  every **object-shaped** `profile_slot` (`json_type` guard). In-memory `profile
+  .injury_flags` synced + `refreshProfileSlots`. `set_record` + the `mech_daily`
+  triggers are untouched (mechanical volume preserved). JSDoc updated.
+- **Niggle scope (intent-based extension, flagged):** the mandate enumerated
+  `subjective_report`/`report_severity`/`injury_flags`, but its own words said
+  "entire physical injury history"; niggles are physical injury state, so they are
+  full-purged too. Zero math impact either way (niggle reads are today-scoped).
+- **`verify_schema.py [15]`** — extended: seeds *historical* (non-today) injury rows
+  + dirty `injury_flags` on all slots, mirrors the hard wipe, and asserts no orphans
+  + `report_severity` emptied + the ENTIRE injury history gone + `injury_flags='[]'`
+  on the profile and all 4 slots + `set_record` preserved + 013 idempotent. Added a
+  non-object-slot edge case (guarded skip — no crash, no false-dirty).
+- **`verify_store_sql.mjs`** — new `[hard-wipe scope]` tripwires assert the three
+  UNCONDITIONAL `DELETE` literals survive verbatim, so a future regression that
+  re-narrows a purge to a date/time scope trips a gate (the inline `[15]` copy can't
+  catch that, since it duplicates the SQL rather than executing production's).
+- **Adversarial review** (`p12s7-hardwipe-review`, 9 agents across 5 dimensions):
+  4 findings, **2 confirmed (both LOW), 2 refuted, 0 HIGH/MED**. Both LOW fixed —
+  (1) verifier inline-copy drift risk → scope tripwires; (2) `json_set` silent no-op
+  on non-object JSON → `json_type(profile_json) = 'object'` guard + edge test.
+- **Gates:** `npm run verify:all` — all 11 green (memory ~450 MiB).
+- Not committed — held pending the on-device check (push gated on it).
