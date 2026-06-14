@@ -482,3 +482,264 @@ STEP 2].
   preference invariant, prefix engine, RN/hooks, regression), every finding
   independently verified — **0 confirmed issues**.
 - Not committed (no push/commit requested) — changes staged in the working tree.
+
+---
+
+## Entry 0011 — 2026-06-14 · Phase 12, Step 3 (wire the substitution engine into SWAP)
+
+### Input G(x)
+
+```
+all systems good to go, proceed to the next stage after finishing
+
+[resolved via clarifying question]
+- Git: commit both (Step 1 engine/schema + Step 2 UI) locally, NO push.
+- Next stage: "Wire substitution into SWAP" — computeSubstitutions (Step 1) is
+  built but unwired; SWAP still does a flat replace. Build the 3-tier
+  regression / day-swap / triage picker (green/purple/orange) that consumes the
+  engine + the new sentiment map.
+```
+
+### Output F(G(x))
+
+- **`apps/mobile/src/state/useStore.ts`** — SWAP now runs `computeSubstitutions`.
+  New state `substitution: {targetId, result} | null`; `toSubMovement` projects a
+  store `Movement` → `SubstitutionMovement`. `openSubstitution` assembles the
+  engine input: full library, `profile.equipment_inventory`, the active block's
+  future slots (a `planned_slot`⋈`planned_session` query with `session_date >
+  today`, `dayIndex`/`currentDayIndex` via `julianday`), and `niggles=[]`.
+  `applyRegression` (Layer 1) and `applyDaySwap` (Layer 2: deletes the origin
+  future `planned_slot` — `slot_override` cascades — and folds the moved volume
+  into today).
+- **`apps/mobile/src/screens/SessionScreen.tsx`** — SWAP → `openSubstitution`; a
+  Modal sheet renders the 3 tiers (green regression / purple day-swap / orange
+  triage), each option tappable; day-swap is confirm-gated (`Alert`, destructive);
+  `BROWSE ALL` falls back to the Step-2 collapsible library. Triage renders only
+  when it has options (dormant under `niggles=[]`).
+- **Scoping (schema ground truth):** Layers 1 & 2 wire fully. Layer 3 + the
+  injury guardrail need niggle `severity 1..10`, which NO column provides
+  (`injury_flags`/`mobility_limits` are `{region,note}`; `subjective_report` has
+  no joint+severity) → fed `niggles=[]` (dormant), surfaced not guessed. Awaiting
+  a niggle-source decision.
+- **Adversarial review (10 agents, find→verify):** 5 confirmed bugs, all in the
+  two apply actions — day-swap **replaced** instead of accumulating moved volume,
+  **clamped** moved sets to 6 (vs the 1..10 `planned_slot.sets` domain), and
+  **left the target behind** when the pulled/chosen movement was already planned
+  (both day-swap and regression). All fixed: target always removed; volume
+  accumulated; `movedSets` uncapped. One dissent (claiming "replace" was intended
+  transfer semantics) was rejected on verification. A second targeted pass
+  (4/4 day-swap cases pass; regression hardened to focus the chosen movement)
+  found no residual issues.
+- **Gates:** `npm run verify:all` — all 11 green after fixes.
+- Not committed (Step 1+2 committed locally per the prior directive; Step 3 held
+  in the working tree pending the on-device UI check).
+
+---
+
+## Entry 0012 — 2026-06-14 · Phase 12, Step 4 (the niggle-severity source: schema + UI + Layer 3 wakeup)
+
+### Input G(x)
+
+```
+### SYSTEM INSTRUCTION: PHASE 12, STEP 4 — THE NIGGLE-SEVERITY SOURCE
+In Step 3 you wired the 3-Tier SWAP engine but correctly noted Layer 3 (Orange
+Triage) remains dormant because we lack a severity source. We are now building
+that source to complete the contravariant routing loop. Adhere to the 450MB
+envelope.
+
+ARCHITECTURAL TARGETS
+1. THE SCHEMA: 011_niggle_tracking.sql
+   - STRICT, append-only table to log joint/muscle pain.
+   - Fields: id (TEXT PRIMARY KEY), region (TEXT - must map to the existing
+     JOINTS array in substitution.ts), severity (INTEGER 1-10),
+     reported_at_ms (INTEGER).
+2. THE UI: THE SUBJECTIVE TRIAGE SEAM
+   - "Report Niggle" interaction on the active Session UI (low-profile icon/
+     button, e.g. medical cross or warning triangle). Opens a fast lightweight
+     bottom-sheet/modal. Inputs: a picker mapping to the JOINTS array; a 1-10
+     slider/stepper for severity. Submission writes to SQLite and updates the
+     active Zustand session state.
+3. ENGINE WAKEUPS
+   - Wire the active niggles array from the store directly into SubstitutionInput
+     so computeSubstitutions() un-hides the Orange Triage layer for affected
+     compound movements.
+
+Run continuously until DB, UI, and state are integrated and type-safe. Run the
+11-Gate CI suite. Conclude with [MASTER LEDGER ENTRY: PHASE 12, STEP 4].
+```
+
+### Output F(G(x))
+
+- **`packages/core-db/src/schema/011_niggle_tracking.sql`** (new) — STRICT
+  append-only `niggle` table: `id` TEXT PK (`<ms>-<seq>-<rand>`), `region` TEXT
+  CHECK over the 9 `JOINTS` tokens, `severity` INTEGER 1–10, `reported_at_ms`;
+  `idx_niggle_reported` for the today-window read.
+- **Registration** — `migrations.ts` (m011), `migrationRunner.ts` (`niggle`
+  sentinel), and all four verifiers (`verify_schema.py`, `verify_migrations.mjs`,
+  `verify_blocks.mjs`, `verify_store_sql.mjs`). `index.ts` keeps no second list;
+  `verify_demo_path` intentionally subsets to 009 (demo data uses no 010/011
+  table) — matching the Step-1 precedent.
+- **`useStore.ts`** — `niggles: NiggleInput[]` state; `reportNiggle` (validates
+  region ∈ JOINTS, clamps 1–10, collision-proof TEXT id, INSERT + in-memory
+  append); `refreshNiggles` (today-scoped via `startOfTodayMs()`); wired into
+  `boot` + `rolloverDay`; `openSubstitution` re-reads niggles fresh then feeds
+  `get().niggles` into `computeSubstitutions` (was `[]`).
+- **`SessionScreen.tsx`** — footer ⚠ button (active-count badge) opens a Modal:
+  `JOINTS` chip picker + 1–10 severity `Stepper` (red ≥8) + REPORT (disabled
+  until a region is picked) → `reportNiggle`.
+- **Contract** — `verify:blocks [13]` mirrors the 011 region CHECK against
+  `JOINTS` (set equality) AND proves a niggle stored under a JOINTS token reaches
+  the guardrail; `verify:schema [13]` exercises the CHECK domains + indexed read.
+- **Adversarial review (7 agents, find→verify):** 3 confirmed, all fixed —
+  (HIGH) `openSubstitution` could feed stale in-memory niggles across a midnight
+  crossing → now re-reads from 011 each open; (MED) niggle id could collide after
+  a restart reset the counter → added a random suffix; (LOW) stale JSDoc claiming
+  `niggles=[]` → corrected. 0 rejected.
+- **Gates:** `npm run verify:all` — all 11 green (incl. memory 450.1 MiB peak).
+- Not committed — Steps 3 + 4 held in the working tree pending the on-device UI
+  check.
+
+---
+
+## Entry 0013 — 2026-06-14 · Phase 12, Bug Fix 3 / Step 5 (experience-weighted triage + non-compounding "most severe" clamp)
+
+### Input G(x)
+
+```
+### SYSTEM INSTRUCTION: PHASE 12, BUG FIX 3 — EXPERIENCE-WEIGHTED TRIAGE & MULTIPLIER CLAMPING
+During physical QA, logging multiple subjective complaints ("knee sore" +
+"fatigued") caused the engine to stack penalties multiplicatively/additively,
+driving prescribed sets into the negatives. The engine also lacks subjective
+relativity: a beginner's pain report (often DOMS) must be evaluated differently
+than an elite athlete's (often structural).
+
+ARCHITECTURAL TARGETS: profileLimits.ts & substitution.ts
+1. ENFORCE THE "MOST SEVERE" LAW (NON-COMPOUNDING)
+   - Safety multipliers and set deductions MUST NOT stack. Parse all active
+     niggles + subjective state flags, compute each penalty, then apply ONLY the
+     single most conservative (lowest) multiplier / highest set-deduction.
+   - Apply a strict Math.max(0, sets) floor clamp across the prescription output.
+2. EXPERIENCE-WEIGHTED SEVERITY MATRIX
+   - user_profile must contain a training_age/experience_level enum
+     (Beginner, Intermediate, Advanced, Elite).
+   - Rewrite the triage threshold logic to scale with experience.
+   - Rule A (Beginners): higher tolerance (assume DOMS). Severity 1-4 triggers
+     only minor load reduction (Layer 1 Regression). Triage (Layer 3) only at 5+.
+   - Rule B (Elite): high pain tolerance assumed. Severity 3-4 from an Elite =
+     Code Red, trigger Layer 3 immediately. Severity 6+ = full session halt/skip.
+3. MANDATORY UI THRESHOLD
+   - SessionScreen subjective reporting must force a 1-10 severity score before
+     the engine processes any textual complaint.
+
+Run continuously until the logic is fixed and strictly typed. Run the 11-Gate CI
+suite to prove the math never drops below zero. Conclude with [MASTER LEDGER
+ENTRY: PHASE 12, STEP 5].
+```
+
+### Output F(G(x))
+
+- **Premise audit (surfaced to the operator before any rewrite):** (1) the
+  "compounding → negative sets" bug was NOT reproducible — `derivePrescription`
+  already selects the SINGLE most-conservative report, and `set_modifier` is
+  floored at -3 everywhere with the store clamping live sets to [1,6]; (2) the
+  engine did NOT "lack subjective relativity" — `EXPERIENCE_TRIAGE` existed but
+  with the OPPOSITE (protect-the-beginner) philosophy; (3) the textual report is
+  severity-agnostic by design (semantic embedding), and the Step-4 niggle flow
+  already captured severity. The operator chose: invert to DOMS/structural, add
+  an explicit floor + proof, and add a forced severity to the textual report.
+- **`profileLimits.ts` / `types.ts`** — `EXPERIENCE_TRIAGE` INVERTED (beginner
+  damped less / DOMS, elite more / structural); new `EXPERIENCE_SEVERITY` matrix
+  (triageMin/haltMin per age) in types.ts; `applySeverityToGuardrail` (de-escalate
+  below triageMin, escalate to halt at/above haltMin, never relax a red-flag halt).
+- **`outputSchema.ts`** — `SET_MODIFIER_FLOOR` (-3) + `clampAdjustment` (the
+  proven Math.max(0,…) floor); applied at every `derivePrescription` return.
+- **`derivePrescription.ts`** — reports are `{entry, severity, wasHalt}`; each is
+  severity-gated then the SINGLE most-conservative survives (no compounding); a
+  RECORDED halt (`wasHalt`) is re-imposed so toggling training age can never
+  un-halt a session.
+- **`substitution.ts`** — niggle thresholds are now `EXPERIENCE_SEVERITY[age]`
+  (default intermediate); new `haltAdvised` result field.
+- **`012_report_severity.sql`** (new side-car) registered everywhere; `useStore`
+  persists severity + feeds the audit, `computePrescription` joins severity + the
+  recorded halt, `openSubstitution` passes `trainingAge`.
+- **UI** — BlockScreen forces a 1-10 severity before TRIAGE; SessionScreen shows a
+  halt-advised banner in the substitution sheet.
+- **Verifiers** — `verify:policy [5]/[6]` re-pinned to the inverted (decreasing)
+  direction WITHOUT weakening any bound; new `[7]` proves the -3 floor under
+  stacking all reports, the experience-weighted severity gate, and the
+  recorded-halt-survives-age-change invariant. `verify:blocks [14]` pins the
+  experience niggle thresholds; `verify:schema [14]` the 012 side-car.
+- **Adversarial review (8 agents):** 3 findings, 2 confirmed → fixed. HIGH: a
+  severity-escalated halt could be lost on a profile change → recorded-halt floor
+  (`wasHalt`) added + pinned. MED: missing coverage → recorded-halt test added.
+  1 rejected (a `last_insert_rowid()` "empty result" that SQLite can't produce).
+- **Gates:** `npm run verify:all` — all 11 green (memory 450.1 MiB).
+- Not committed — Steps 3-5 held in the working tree pending the on-device check.
+
+---
+
+## Entry 0014 — 2026-06-14 · Phase 12, Step 6 (local multi-tenancy + safe state wipe)
+
+### Input G(x)
+
+```
+SYSTEM ARCHITECTURE MANDATE: Phase 12, Step 6 (Multi-Tenancy & State Wiping)
+On-device testing revealed state-leakage: because the SQLite DB is a singleton,
+logging an injury report prevents testing new block generations for different
+athletic profiles (e.g. switching to Elite). The user is forced to
+uninstall/reinstall. Implement Local Multi-Tenancy and a safe State Wipe.
+
+BOUNDARY INVARIANTS:
+1. The Block Wipe Transaction: new DB method wipeActiveBlockState(). Hard DELETE
+   on all rows in planned_sessions, planned_slots, and volatile/unresolved
+   entries in 012_report_severity and the subjective logs.
+2. Multi-Profile Support: user_profile table must hold multiple rows; add an
+   is_active boolean so the app knows which profile's math to use.
+3. Debug/Settings UI: a "Profile Management" section with a "Switch Profile"
+   button (Beginner -> Elite) and a high-contrast "Delete Current Block & State"
+   button hooked to wipeActiveBlockState().
+
+Write the store updates, the SQLite transaction logic, and the UI updates. Run
+verify:all to ensure the wipe doesn't orphan triggers or break the schema.
+Conclude with the standard MASTER LEDGER ENTRY block.
+```
+
+### Output F(G(x))
+
+- **Premise corrections (surfaced + confirmed before building):** the mandate's
+  table names were wrong (real: `planned_session` / `planned_slot` /
+  `report_severity` / `subjective_report`); `user_profile` was DROPPED by 007;
+  the live `athlete_profile` is single-row-locked (`CHECK profile_id = 1`, pinned
+  by verify:db [7]). Operator chose persistent profiles via a side-car (not an
+  ALTER) and the block + today's-reports wipe scope (preserving training history).
+- **`013_profile_slot.sql`** (new) — `profile_slot(slot_id PK, name, profile_json
+  CHECK json_valid, is_active, updated_at_ms)`, seeded with the four training-age
+  presets (Beginner/Intermediate/Advanced/Elite) via `json_object`/`json_set`/
+  `json()` from the live `athlete_profile`, the matching slot marked active.
+  Registered in migrations.ts, runner `SENTINELS`, and verify_schema/migrations/
+  store/blocks.
+- **`useStore.ts`** — `profileSlots` state + `ProfileSlot`; helpers
+  `persistProfileFields` (the shared `athlete_profile` writer — `saveProfile`
+  refactored onto it, column/param-identical), `profileToJsonString` /
+  `profileFromJsonString` (slot JSON round-trip, **enum-validated + clamped**),
+  `runBlockWipe` (the DELETEs). Actions: `refreshProfileSlots`; `switchProfile`
+  (ONE transaction: snapshot live profile → its slot, flip `is_active`, load
+  target into `athlete_profile`, wipe — fully atomic); `wipeActiveBlockState`.
+- **`wipeActiveBlockState`** — deletes the active `training_block` (FK-cascades
+  `planned_session`→`planned_slot`→`slot_override`, and `block_meta`) + today's
+  `subjective_report` (cascades `report_severity`) + today's niggles. `set_record`
+  + the `mech_daily` triggers are untouched (history preserved).
+- **`ProfileScreen.tsx`** — a PROFILE MANAGEMENT section: Alert-confirmed slot
+  switcher + a high-contrast "DELETE CURRENT BLOCK & STATE" button; a slot-keyed
+  `useEffect` resyncs the free-text fields on switch.
+- **`verify:db [15]`** — *executes* the wipe and asserts ZERO orphans across
+  session/slot/override/meta/severity AND that `set_record` is preserved; plus
+  the 4-slot seed (one active), the CHECK, and 013 idempotency.
+- **Adversarial review (8 agents):** 3 confirmed HIGH, all fixed — (1) switch
+  atomicity gap → the `athlete_profile` load moved INTO the transaction; (2)
+  `profileFromJsonString` accepted out-of-domain enums → now validated against
+  the enum tables; (3) ProfileScreen injury/mobility text went stale after a
+  switch (would write the old profile's notes into the new one) → slot-keyed
+  resync. 0 rejected.
+- **Gates:** `npm run verify:all` — all 11 green (memory 450.1 MiB).
+- Not committed — Steps 3-6 held in the working tree pending the on-device check.

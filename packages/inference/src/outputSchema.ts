@@ -71,3 +71,26 @@ export const NEUTRAL_ADJUSTMENT: AdjustmentVector = Object.freeze({
   rpe_cap: 9.0,
   coaching_cue: 'No valid state vector; execute the plan as written.',
 });
+
+/** The deepest single-step set deduction. Penalties do NOT stack below this —
+ *  the "most severe" law picks ONE operative report, and applyGuardrail /
+ *  applyProfileLimits each floor at it. The athlete-facing Math.max(0, sets)
+ *  floor follows: any plan of >= 3 working sets minus a -3 modifier stays >= 0
+ *  (the store further clamps live sets to [1,6]). */
+export const SET_MODIFIER_FLOOR = -3;
+
+/**
+ * Final defensive clamp on a (possibly guardrail-modified) prescription vector,
+ * so no composition can drive an output past the safe envelope: load_modifier
+ * floored at 0, set_modifier floored at SET_MODIFIER_FLOOR, rpe_cap held in
+ * [0, 10]. Idempotent and a no-op on any already-valid vector — it exists to
+ * make "the math never drops below zero" a proven invariant, not a comment.
+ */
+export function clampAdjustment(v: AdjustmentVector): AdjustmentVector {
+  return {
+    load_modifier: Math.max(0, v.load_modifier),
+    set_modifier: Math.max(SET_MODIFIER_FLOOR, v.set_modifier),
+    rpe_cap: Math.min(10, Math.max(0, v.rpe_cap)),
+    coaching_cue: v.coaching_cue,
+  };
+}

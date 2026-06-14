@@ -27,7 +27,7 @@ import { DatabaseSync } from 'node:sqlite';
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
   SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS } = require('./.build/blockGenerator.js');
-const { computeSubstitutions } = require('./.build/substitution.js');
+const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
   SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
   MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
@@ -51,7 +51,8 @@ try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
 }
 for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
-  '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql']) {
+  '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
+  '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 const movements = db.prepare(
@@ -532,6 +533,49 @@ const prioLib = subLib.map((m) => m.name === 'Bodyweight Squat' ? { ...m, prefer
 const prio = computeSubstitutions({ ...baseInput, library: prioLib }).layer1Regression.options.map((o) => o.name);
 check('Prioritize (+1) outranks a neutral same-difficulty peer with a lower id',
   prio.indexOf('Bodyweight Squat') < prio.indexOf('Goblet Squat'), prio.join(', '));
+
+// --- [13] 011 niggle region CHECK == JOINTS (engine severity source) -------------
+console.log('[13] 011 niggle region contract (011 SQL <-> substitution.ts JOINTS)');
+const sql011 = readFileSync(join(SCHEMA_DIR, '011_niggle_tracking.sql'), 'utf-8');
+const regionMatch = sql011.match(/region\s+TEXT NOT NULL CHECK \(region IN\s*\(([\s\S]*?)\)\)/);
+const sqlRegions = regionMatch === null ? []
+  : [...regionMatch[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+check('011 region CHECK == JOINTS (set equality)',
+  sqlRegions.length === JOINTS.length && JOINTS.every((j) => sqlRegions.includes(j)),
+  sqlRegions.join(','));
+// The engine actually routes a niggle stored under each JOINTS token: a
+// severity-4 niggle on a knee-loading compound must trip the guardrail.
+const kneeNiggle = computeSubstitutions({ ...baseInput,
+  niggles: [{ region: 'knee', severity: 4 }] });
+check('a niggle stored under a JOINTS token reaches the guardrail',
+  kneeNiggle.blockedByGuardrail.length > 0);
+
+// --- [14] experience-weighted niggle thresholds (Phase 12 Step 5) -------------
+console.log('[14] experience-weighted niggle thresholds (DOMS-vs-structural)');
+const sub = (severity, trainingAge) => computeSubstitutions({ ...baseInput,
+  niggles: [{ region: 'knee', severity }], trainingAge });
+// Beginner tolerates more (assume DOMS): severity 4 is inert; 5 trips both.
+check('beginner severity 4: no triage, no guardrail, no halt (benign DOMS)',
+  sub(4, 'beginner').layer3Triage.cluster === null &&
+  sub(4, 'beginner').blockedByGuardrail.length === 0 &&
+  sub(4, 'beginner').haltAdvised === false);
+check('beginner severity 5: triage fires + guardrail bars the knee',
+  sub(5, 'beginner').layer3Triage.cluster !== null &&
+  sub(5, 'beginner').blockedByGuardrail.length > 0);
+// Elite reacts sooner (assume structural): severity 3 trips; 6 is halt territory.
+check('elite severity 3: triage fires (structural)',
+  sub(3, 'elite').layer3Triage.cluster !== null &&
+  sub(3, 'elite').blockedByGuardrail.length > 0);
+check('elite severity 6: halt advised, no triage cluster, guardrail still bars',
+  sub(6, 'elite').haltAdvised === true &&
+  sub(6, 'elite').layer3Triage.cluster === null &&
+  sub(6, 'elite').blockedByGuardrail.length > 0);
+// Default (no trainingAge) == intermediate baseline: trips at 4, not at 3.
+check('default trainingAge == intermediate (severity 4 trips, 3 does not)',
+  computeSubstitutions({ ...baseInput, niggles: [{ region: 'knee', severity: 4 }] })
+    .layer3Triage.cluster !== null &&
+  computeSubstitutions({ ...baseInput, niggles: [{ region: 'knee', severity: 3 }] })
+    .layer3Triage.cluster === null);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

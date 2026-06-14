@@ -25,11 +25,17 @@ import {
   type DemoSql,
 } from '@ak/core-db';
 import {
+  computeSubstitutions,
   DEFAULT_PROFILE,
   derivePrescription,
+  ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
   generateBlock,
+  OBJECTIVES,
+  PROGRESSION_METHODS,
+  TRAINING_AGES,
   isNoOpGuardrail,
+  JOINTS,
   loadCodebase,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
@@ -37,14 +43,19 @@ import {
   RED_FLAG_SYSTEMIC,
   resolveReport,
   triage,
+  type DaySwapOption,
   type DifficultyRating,
   type Embedder,
+  type FutureSlot,
   type GeneratorMovement,
   type LoadedCodebase,
   type MovementPattern,
   type MovementPrefix,
   type MovementPreference,
+  type NiggleInput,
   type PhraseCodebase,
+  type SubstitutionMovement,
+  type SubstitutionResult,
   type PhraseEntry,
   targetLoadKg,
   type Prescription,
@@ -207,6 +218,9 @@ interface KineticsStore {
   /** Profile-limit notes attached to the current prescription. */
   profileNotes: string[];
   profile: UserProfile;
+  /** Saved profile snapshots (013 multi-tenancy); exactly one is active and
+   *  mirrors `profile` / athlete_profile. */
+  profileSlots: ProfileSlot[];
   /** True when the semantic embedder is wired; the keyword safety layer
    *  works regardless. */
   triageReady: boolean;
@@ -214,6 +228,12 @@ interface KineticsStore {
   lastTriage: TriageOutcome | null;
   sessionPlan: PlanSlot[];
   activeMovementId: number | null;
+  /** Open substitution sheet: the deterministic engine's 3-tier result for a
+   *  SWAP target (null = closed). */
+  substitution: { targetId: number; result: SubstitutionResult } | null;
+  /** Today's active niggles (region + severity), fed verbatim into
+   *  computeSubstitutions — they drive the injury guardrail and Layer 3. */
+  niggles: NiggleInput[];
   /** Active 4-week block, its grid, and today's planned session. */
   block: ActiveBlock | null;
   blockMeta: BlockMeta | null;
@@ -257,7 +277,19 @@ interface KineticsStore {
   loadSessionSlots: (plannedSessionId: number) => TodaySlot[];
   setEmbedder: (e: Embedder | null) => void;
   saveProfile: (patch: Partial<UserProfile>) => void;
-  reportSubjective: (text: string) => Promise<void>;
+  /** Re-read the saved profile slots (013) into state. */
+  refreshProfileSlots: () => void;
+  /** Switch the active profile: snapshot the live profile back into its slot,
+   *  load the chosen slot into athlete_profile, then wipe block state (so the
+   *  new profile regenerates cleanly). Destructive — clears the active block +
+   *  today's reports/niggles. */
+  switchProfile: (slotId: number) => void;
+  /** Hard-DELETE the active block (+ cascade) and today's volatile reports +
+   *  niggles, in one transaction. Training history (set_record) is preserved. */
+  wipeActiveBlockState: () => void;
+  /** Triage a free-text complaint with a forced 1-10 severity (Phase 12 Step
+   *  5). The severity gates the matched guardrail by training age. */
+  reportSubjective: (text: string, severity: number) => Promise<void>;
   selectMovement: (movementId: number) => void;
   addPlanSlot: (movementId: number) => void;
   swapMovement: (oldMovementId: number, newMovementId: number) => void;
@@ -265,6 +297,24 @@ interface KineticsStore {
    *  invariant: neutral == no row); AVOID (-1) / PRIORITIZE (+1) upsert it.
    *  The deterministic substitution router reads this map. */
   setMovementPreference: (movementId: number, preference: MovementPreference) => void;
+  /** Open the deterministic substitution sheet for a SWAP target: assembles the
+   *  engine inputs (library projection + the active block's future slots +
+   *  today's active niggles, re-read fresh) and runs computeSubstitutions. The
+   *  niggles drive the injury guardrail and Layer 3 triage. */
+  openSubstitution: (targetMovementId: number) => void;
+  closeSubstitution: () => void;
+  /** Apply a Layer-1 regression: swap the target slot for the chosen movement
+   *  (logged sets stand as history). */
+  applyRegression: (targetMovementId: number, optionMovementId: number) => void;
+  /** Apply a Layer-2 day-swap: replace today's target with the pulled movement
+   *  AND delete its origin future planned_slot (conservation of volume — the
+   *  moved work is performed today instead of on its scheduled day). */
+  applyDaySwap: (targetMovementId: number, option: DaySwapOption) => void;
+  /** Log a niggle (append-only to 011) and add it to the active niggle set so
+   *  the next SWAP un-hides Layer 3 / activates the guardrail. */
+  reportNiggle: (region: string, severity: number) => void;
+  /** Reload today's niggles from 011 into state (boot + day rollover). */
+  refreshNiggles: () => void;
   refreshVector: () => void;
   startSession: () => void;
   /** Append a logged set. `displayName` carries the prefix-engine
@@ -307,6 +357,19 @@ const localToday = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+/** Local-midnight epoch ms — the lower bound for "today's" (active) niggles. */
+const startOfTodayMs = (): number => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+
+/** Valid niggle regions (the engine's structural joints). */
+const JOINT_SET = new Set<string>(JOINTS);
+/** Per-process monotonic counter feeding the niggle TEXT id (combined with a
+ *  random suffix so a restart that resets it to 0 can never collide). */
+let niggleSeq = 0;
 
 /** Layer-2 inputs from real training history, always for the CURRENT date —
  *  the active session never counts against itself. */
@@ -405,6 +468,19 @@ const movementFromRow = (r: MovementRow): Movement => {
   };
 };
 
+/** Project a store Movement onto the substitution engine's input shape. The
+ *  engine never reads SQL; the store assembles this from 001 + 010 columns. */
+const toSubMovement = (m: Movement): SubstitutionMovement => ({
+  movement_id: m.movement_id,
+  name: m.name,
+  pattern: m.pattern as MovementPattern,
+  is_compound: m.is_compound,
+  difficulty: m.difficulty,
+  family: m.baseName,
+  required: m.required,
+  preference: m.preference,
+});
+
 // --- profile row <-> object mapping ------------------------------------------
 interface ProfileRow {
   objective: string; training_age: string; weekly_frequency: number;
@@ -444,6 +520,91 @@ const profileFromRow = (r: ProfileRow): UserProfile => ({
   equipment_inventory: parseInventory(r.equipment_inventory),
 } as UserProfile);
 
+// --- profile slots (013) + state wipe ----------------------------------------
+/** A saved profile snapshot (profile_slot row), projected for the UI. */
+export interface ProfileSlot {
+  slotId: number;
+  name: string;
+  trainingAge: string;
+  isActive: boolean;
+}
+
+/** Write a profile into the single athlete_profile row (shared by saveProfile
+ *  and the profile switch). */
+const persistProfileFields = (d: DB, p: UserProfile): void => {
+  d.executeSync(
+    `UPDATE athlete_profile SET
+       objective = ?, training_age = ?, weekly_frequency = ?,
+       max_sessions_per_day = ?, session_duration_cap_min = ?, base_rpe_cap = ?,
+       target_energy_system = ?, progression_methodology = ?,
+       injury_flags = ?, mobility_limits = ?, equipment_inventory = ?, updated_at_ms = ?
+     WHERE profile_id = 1`,
+    [
+      p.objective, p.training_age, p.weekly_frequency,
+      p.max_sessions_per_day, p.session_duration_cap_min, p.base_rpe_cap,
+      p.target_energy_system, p.progression_methodology,
+      JSON.stringify(p.injury_flags), JSON.stringify(p.mobility_limits),
+      JSON.stringify(p.equipment_inventory), Date.now(),
+    ],
+  );
+};
+
+/** Serialize a profile to the profile_slot JSON snapshot shape. */
+const profileToJsonString = (p: UserProfile): string => JSON.stringify({
+  objective: p.objective, training_age: p.training_age,
+  weekly_frequency: p.weekly_frequency, max_sessions_per_day: p.max_sessions_per_day,
+  session_duration_cap_min: p.session_duration_cap_min, base_rpe_cap: p.base_rpe_cap,
+  target_energy_system: p.target_energy_system, progression_methodology: p.progression_methodology,
+  injury_flags: p.injury_flags, mobility_limits: p.mobility_limits,
+  equipment_inventory: p.equipment_inventory,
+});
+
+/** Coerce a value into an enum, falling back to a default when it is not a
+ *  member — so a corrupt/hand-edited slot can NEVER carry an out-of-domain enum
+ *  into the athlete_profile CHECKs. */
+const inEnum = <T extends string>(v: unknown, arr: readonly T[], d: T): T =>
+  typeof v === 'string' && (arr as readonly string[]).includes(v) ? (v as T) : d;
+
+/** Parse a profile_slot snapshot back to a UserProfile. Fully VALIDATED +
+ *  CLAMPED here (enum membership + numeric domains) so the result always
+ *  satisfies the athlete_profile CHECKs — the switch persists it atomically and
+ *  must never throw on a malformed slot. Falls back to DEFAULT_PROFILE on any
+ *  parse failure. */
+const profileFromJsonString = (json: string): UserProfile => {
+  try {
+    const o = JSON.parse(json) as Record<string, unknown>;
+    const num = (k: string, lo: number, hi: number, d: number): number =>
+      clamp(typeof o[k] === 'number' ? (o[k] as number) : d, lo, hi);
+    return {
+      ...DEFAULT_PROFILE,
+      objective: inEnum(o.objective, OBJECTIVES, DEFAULT_PROFILE.objective),
+      training_age: inEnum(o.training_age, TRAINING_AGES, DEFAULT_PROFILE.training_age),
+      weekly_frequency: Math.round(num('weekly_frequency', 1, 7, DEFAULT_PROFILE.weekly_frequency)),
+      max_sessions_per_day: Math.round(num('max_sessions_per_day', 1, 3, DEFAULT_PROFILE.max_sessions_per_day)),
+      session_duration_cap_min: Math.round(num('session_duration_cap_min', 15, 240, DEFAULT_PROFILE.session_duration_cap_min)),
+      base_rpe_cap: clamp(Math.round(num('base_rpe_cap', 5, 10, DEFAULT_PROFILE.base_rpe_cap) * 2) / 2, 5, 10),
+      target_energy_system: inEnum(o.target_energy_system, ENERGY_SYSTEMS, DEFAULT_PROFILE.target_energy_system),
+      progression_methodology: inEnum(o.progression_methodology, PROGRESSION_METHODS, DEFAULT_PROFILE.progression_methodology),
+      injury_flags: parseBodyNotes(JSON.stringify(o.injury_flags ?? [])),
+      mobility_limits: parseBodyNotes(JSON.stringify(o.mobility_limits ?? [])),
+      equipment_inventory: parseInventory(JSON.stringify(o.equipment_inventory ?? [])),
+    };
+  } catch {
+    return DEFAULT_PROFILE;
+  }
+};
+
+/** The block-wipe DELETEs (no transaction — the caller wraps them). Removes the
+ *  ACTIVE block (FK-cascades planned_session -> planned_slot -> slot_override,
+ *  and block_meta) plus today's volatile subjective reports (cascades
+ *  report_severity) and niggles. set_record + the mech_daily triggers are
+ *  untouched: logged training history is preserved. */
+const runBlockWipe = (d: DB, today: string): void => {
+  d.executeSync("DELETE FROM training_block WHERE status = 'active'");
+  d.executeSync('DELETE FROM subjective_report WHERE date = ?', [today]);
+  d.executeSync('DELETE FROM niggle WHERE reported_at_ms >= ?', [startOfTodayMs()]);
+};
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -463,6 +624,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   lastTriage: null,
   sessionPlan: [],
   activeMovementId: null,
+  substitution: null,
+  niggles: [],
   block: null,
   blockMeta: null,
   blockSessions: [],
@@ -470,6 +633,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   oneRepMaxes: {},
   lastEndedSessionId: null,
   biometricsStatus: 'off',
+  profileSlots: [],
 
   boot: () => {
     if (get().status === 'ready') return;
@@ -502,6 +666,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         profile: profileRow !== undefined ? profileFromRow(profileRow) : DEFAULT_PROFILE,
       });
       get().refreshVector();
+      // Today's active niggles (drive the substitution guardrail / Layer 3).
+      get().refreshNiggles();
+      // Saved profile slots (local multi-tenancy).
+      get().refreshProfileSlots();
       // The block lives only in SQLite; the store is a read surface over it.
       get().refreshBlock();
       // Prescription is a pure derivation over persisted state (profile +
@@ -524,24 +692,81 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // (the block generator's determinism depends on a stable order).
     const owned = new Set(merged.equipment_inventory);
     merged.equipment_inventory = EQUIPMENT_ITEMS.filter((i) => owned.has(i));
-    getDb().executeSync(
-      `UPDATE athlete_profile SET
-         objective = ?, training_age = ?, weekly_frequency = ?,
-         max_sessions_per_day = ?, session_duration_cap_min = ?, base_rpe_cap = ?,
-         target_energy_system = ?, progression_methodology = ?,
-         injury_flags = ?, mobility_limits = ?, equipment_inventory = ?, updated_at_ms = ?
-       WHERE profile_id = 1`,
-      [
-        merged.objective, merged.training_age, merged.weekly_frequency,
-        merged.max_sessions_per_day, merged.session_duration_cap_min, merged.base_rpe_cap,
-        merged.target_energy_system, merged.progression_methodology,
-        JSON.stringify(merged.injury_flags), JSON.stringify(merged.mobility_limits),
-        JSON.stringify(merged.equipment_inventory), Date.now(),
-      ],
-    );
+    persistProfileFields(getDb(), merged);
     set({ profile: merged });
     // Re-derive: profile clamps may have changed the operative prescription.
     if (get().prescription !== null) get().computePrescription([]);
+  },
+
+  refreshProfileSlots: () => {
+    const rows = rowsOf<{ slot_id: number; name: string; training_age: string; is_active: number }>(
+      getDb().executeSync(
+        "SELECT slot_id, name, json_extract(profile_json, '$.training_age') AS training_age, is_active FROM profile_slot ORDER BY slot_id",
+      ),
+    );
+    set({
+      profileSlots: rows.map((r) => ({
+        slotId: r.slot_id, name: r.name, trainingAge: r.training_age, isActive: r.is_active === 1,
+      })),
+    });
+  },
+
+  switchProfile: (slotId) => {
+    const d = getDb();
+    const target = rowsOf<{ profile_json: string }>(
+      d.executeSync('SELECT profile_json FROM profile_slot WHERE slot_id = ?', [slotId]),
+    )[0];
+    if (target === undefined) return;
+    // Validated + clamped here, so the athlete_profile UPDATE below can never
+    // throw on a malformed slot (the whole switch stays atomic).
+    const loaded = profileFromJsonString(target.profile_json);
+    // ONE transaction: snapshot the live profile back into the active slot, move
+    // the active flag to the target, LOAD the target into athlete_profile, and
+    // wipe block state. Either all of it commits or none does — is_active and
+    // athlete_profile can never disagree.
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        'UPDATE profile_slot SET profile_json = ?, updated_at_ms = ? WHERE is_active = 1',
+        [profileToJsonString(get().profile), Date.now()],
+      );
+      d.executeSync('UPDATE profile_slot SET is_active = CASE WHEN slot_id = ? THEN 1 ELSE 0 END', [slotId]);
+      persistProfileFields(d, loaded);
+      runBlockWipe(d, localToday());
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    set({
+      profile: loaded,
+      block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+      niggles: [], lastTriage: null,
+    });
+    get().refreshProfileSlots();
+    get().refreshNiggles();
+    get().refreshBlock();
+    get().refreshVector();
+    get().computePrescription([]);
+  },
+
+  wipeActiveBlockState: () => {
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      runBlockWipe(d, localToday());
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, niggles: [], lastTriage: null });
+    get().refreshNiggles();
+    get().refreshBlock();
+    get().refreshVector();
+    get().computePrescription([]);
   },
 
   rolloverDay: () => {
@@ -554,6 +779,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
     }
     get().refreshVector();   // also advances store.today
+    get().refreshNiggles();  // yesterday's niggles drop out of the active set
     get().refreshBlock();
     get().computePrescription([]);
   },
@@ -960,6 +1186,143 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     });
   },
 
+  openSubstitution: (targetMovementId) => {
+    const { movements, profile, block } = get();
+    const target = movements.find((m) => m.movement_id === targetMovementId);
+    if (target === undefined) return;
+    // Re-read today's niggles from 011 so a midnight crossing while the app sat
+    // foregrounded (no AppState 'active' -> no rolloverDay) can't feed the
+    // engine yesterday's niggles. set() is synchronous, so get().niggles below
+    // is the fresh set.
+    get().refreshNiggles();
+    const d = getDb();
+    const today = localToday();
+    const byId = new Map(movements.map((m) => [m.movement_id, m]));
+    let futureSlots: FutureSlot[] = [];
+    let currentDayIndex = 0;
+    // Layer 2 (day-swap) needs the active block's later days. With no block,
+    // futureSlots stays empty and only Layer 1 (regression) can yield options.
+    if (block !== null) {
+      currentDayIndex = Number(
+        rowsOf<{ d: number }>(
+          d.executeSync('SELECT CAST(julianday(?) - julianday(?) AS INTEGER) AS d', [today, block.startDate]),
+        )[0]?.d ?? 0,
+      );
+      const rows = rowsOf<{
+        planned_slot_id: number; session_date: string; movement_id: number;
+        sets: number; day_index: number;
+      }>(
+        d.executeSync(
+          `SELECT sl.planned_slot_id, ps.session_date, sl.movement_id, sl.sets,
+                  CAST(julianday(ps.session_date) - julianday(?) AS INTEGER) AS day_index
+           FROM planned_slot sl
+           JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+           WHERE ps.block_id = ? AND ps.session_date > ?
+           ORDER BY ps.session_date, sl.slot_index`,
+          [block.startDate, block.blockId, today],
+        ),
+      );
+      futureSlots = rows.flatMap((r) => {
+        const mv = byId.get(r.movement_id);
+        return mv === undefined
+          ? []
+          : [{ plannedSlotId: r.planned_slot_id, dayIndex: r.day_index, movement: toSubMovement(mv), sets: r.sets }];
+      });
+    }
+    const result = computeSubstitutions({
+      target: toSubMovement(target),
+      library: movements.map(toSubMovement),
+      inventory: profile.equipment_inventory,
+      niggles: get().niggles, // active niggles drive the guardrail + Layer 3
+      futureSlots,
+      currentDayIndex,
+      trainingAge: profile.training_age, // experience-weighted severity thresholds
+    });
+    set({ substitution: { targetId: targetMovementId, result } });
+  },
+
+  closeSubstitution: () => set({ substitution: null }),
+
+  reportNiggle: (region, severity) => {
+    // Region must be a JOINTS member or the engine can't route it; the UI only
+    // offers valid joints, but guard the store boundary anyway.
+    if (!JOINT_SET.has(region)) return;
+    const safe = Math.round(clamp(severity, 1, 10));
+    const ms = Date.now();
+    // ms + per-process counter (monotonic within a ms) + random suffix (so a
+    // restart that resets the counter still can't collide on the TEXT PK).
+    const id = `${ms}-${niggleSeq++}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+    getDb().executeSync(
+      'INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES (?, ?, ?, ?)',
+      [id, region, safe, ms],
+    );
+    set({ niggles: [...get().niggles, { region, severity: safe }] });
+  },
+
+  refreshNiggles: () => {
+    const rows = rowsOf<{ region: string; severity: number }>(
+      getDb().executeSync(
+        'SELECT region, severity FROM niggle WHERE reported_at_ms >= ? ORDER BY reported_at_ms',
+        [startOfTodayMs()],
+      ),
+    );
+    set({ niggles: rows.map((r) => ({ region: r.region, severity: r.severity })) });
+  },
+
+  applyRegression: (targetMovementId, optionMovementId) => {
+    // SWAP semantics: the target is replaced. Layer 1 guarantees the chosen
+    // movement differs from the target. If it is ALREADY in today's plan, drop
+    // the target slot and focus the existing one (never leave both); otherwise
+    // swap the target slot's movement in place.
+    const plan = get().sessionPlan;
+    if (plan.some((s) => s.movementId === optionMovementId)) {
+      set({
+        sessionPlan: plan.filter((s) => s.movementId !== targetMovementId),
+        activeMovementId: optionMovementId,
+      });
+    } else {
+      get().swapMovement(targetMovementId, optionMovementId);
+      // Focus the chosen movement explicitly (swapMovement only moves focus
+      // when the swapped slot was already active — true here, but don't rely
+      // on the SWAP-target-equals-active invariant).
+      set({ activeMovementId: optionMovementId });
+    }
+    set({ substitution: null });
+  },
+
+  applyDaySwap: (targetMovementId, option) => {
+    // Conservation of volume: the pulled movement's future slot is deleted so
+    // it is never done twice, and its volume is performed TODAY. planned_slot.sets
+    // cannot be 0 (CHECK >= 1), so the whole future slot is removed.
+    getDb().executeSync('DELETE FROM planned_slot WHERE planned_slot_id = ?', [option.plannedSlotId]);
+    // setsConserved is the origin slot's FULL set count (1..10) — it is NOT
+    // clamped to the plan's display range, or moved volume would be lost.
+    const movedSets = Math.max(1, Math.round(option.setsConserved));
+    const plan = get().sessionPlan;
+    let next: PlanSlot[];
+    if (plan.some((s) => s.movementId === option.movement_id)) {
+      // Pulled movement is ALSO planned today (a different movement than the
+      // target): drop the swapped-away target slot, then ADD the moved volume
+      // to the existing slot — today's pre-planned volume is conserved.
+      next = plan
+        .filter((s) => s.movementId !== targetMovementId)
+        .map((s) =>
+          s.movementId === option.movement_id
+            ? { ...s, plannedSets: s.plannedSets + movedSets }
+            : s);
+    } else if (plan.some((s) => s.movementId === targetMovementId)) {
+      // Replace the target's slot in place with the pulled movement.
+      next = plan.map((s) =>
+        s.movementId === targetMovementId
+          ? { movementId: option.movement_id, plannedSets: movedSets }
+          : s);
+    } else {
+      next = [...plan, { movementId: option.movement_id, plannedSets: movedSets }];
+    }
+    set({ sessionPlan: next, activeMovementId: option.movement_id, substitution: null });
+    get().refreshBlock(); // the future grid lost a slot
+  },
+
   logSet: (movementId, reps, loadKg, rpe, displayName) => {
     const s = get().session;
     if (s === null) return;
@@ -1132,12 +1495,20 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // derivePrescription (verify:policy [6]); this is only its SQL adapter.
     // Deriving from the database means a halt survives an app kill and a
     // profile edit can never resurrect a damped prescription.
-    const reports = rowsOf<{ matched_entry_id: string }>(d.executeSync(
-      'SELECT matched_entry_id FROM subjective_report WHERE date = ? AND matched_entry_id IS NOT NULL ORDER BY report_id',
+    // Each matched report carries its persisted 1-10 severity (012 side-car;
+    // null for pre-severity rows) — derivePrescription severity-gates the
+    // matched guardrail by it + training age (DOMS-vs-structural).
+    // `halt` is the RECORDED halt for the row — a fact re-derivation must honor
+    // even if the athlete's training age later changes (a halt is never relaxed).
+    const reports = rowsOf<{ matched_entry_id: string; severity: number | null; halt: number }>(d.executeSync(
+      'SELECT sr.matched_entry_id, sr.halt, rs.severity FROM subjective_report sr LEFT JOIN report_severity rs ON rs.report_id = sr.report_id WHERE sr.date = ? AND sr.matched_entry_id IS NOT NULL ORDER BY sr.report_id',
       [today],
     ))
-      .map((r) => entryById(r.matched_entry_id))
-      .filter((e): e is PhraseEntry => e !== undefined);
+      .map((r) => {
+        const entry = entryById(r.matched_entry_id);
+        return entry === undefined ? null : { entry, severity: r.severity, wasHalt: r.halt === 1 };
+      })
+      .filter((r): r is { entry: PhraseEntry; severity: number | null; wasHalt: boolean } => r !== null);
     const derived = derivePrescription({
       vector,
       profile,
@@ -1161,7 +1532,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     set({ triageReady: e !== null });
   },
 
-  reportSubjective: async (text) => {
+  reportSubjective: async (text, severity) => {
     // A report typed after midnight must land on the NEW day — persisting it
     // under a stale date would make the resulting halt vanish on restart.
     get().rolloverDay();
@@ -1170,6 +1541,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const raw = text.trim();
     if (vector === null || triaging) return;
     if (raw.length === 0 || raw.length > 500) return;
+    // The UI forces a 1-10 severity before processing; clamp at the boundary.
+    const safeSeverity = Math.round(clamp(severity, 1, 10));
     set({ triaging: true });
     try {
       // Semantic routing is OPTIONAL; the keyword safety layer inside
@@ -1204,7 +1577,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         vector,
         profile: get().profile,
         ctx: profileCtx(d, today, activeSession !== null ? activeSession.sessionId : -1),
-        reports: [resolved.entry],
+        reports: [{ entry: resolved.entry, severity: safeSeverity }],
       });
       const auditHalt = audit.directive !== null && audit.directive.halt;
       d.executeSync(
@@ -1216,13 +1589,25 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           audit.vector.set_modifier, audit.vector.rpe_cap,
         ],
       );
+      // Persist the severity (012 side-car) so the pure re-derivation survives a
+      // restart with the severity gate intact.
+      const reportId = rowsOf<{ id: number }>(
+        d.executeSync('SELECT last_insert_rowid() AS id'),
+      )[0]?.id;
+      if (reportId !== undefined) {
+        d.executeSync(
+          'INSERT INTO report_severity (report_id, severity) VALUES (?, ?)',
+          [reportId, safeSeverity],
+        );
+      }
       // Re-derive the operative prescription from persistence (single source
       // of truth; also sets lastTriage to the now-operative directive).
       get().computePrescription([]);
-      // Positive identity pass-through: a no-op entry never reads as a
-      // guardrail. Acknowledge it — unless a restrictive report from earlier
-      // today still governs, in which case the honest card is the directive.
-      if (isNoOpGuardrail(resolved.entry.guardrail) && get().lastTriage === null) {
+      // Acknowledge a confident match that did NOT become operative — either
+      // positive sentiment OR a complaint the severity gate de-escalated to
+      // benign (DOMS) — unless a restrictive report from earlier today still
+      // governs, in which case computePrescription kept that honest directive.
+      if (get().lastTriage === null) {
         set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue } });
       }
     } finally {

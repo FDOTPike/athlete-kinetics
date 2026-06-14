@@ -1,11 +1,13 @@
 export {
   AdjustmentValidationError,
+  clampAdjustment,
   CUE_MAX_CHARS,
   CUE_MIN_CHARS,
   CUE_RE,
   LOAD_MODIFIER_LITERALS,
   NEUTRAL_ADJUSTMENT,
   RPE_CAP_LITERALS,
+  SET_MODIFIER_FLOOR,
   SET_MODIFIER_LITERALS,
   validateAdjustment,
   type AdjustmentVector,
@@ -17,6 +19,7 @@ export {
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
   EQUIPMENT_PRESETS,
+  EXPERIENCE_SEVERITY,
   MOVEMENT_PATTERNS,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
@@ -52,6 +55,7 @@ export {
   derivePrescription,
   type DeriveInput,
   type DerivedPrescription,
+  type ReportInput,
 } from './derivePrescription';
 export {
   addDaysIso,
@@ -76,6 +80,7 @@ export {
 } from './blockGenerator';
 export {
   applyProfileLimits,
+  applySeverityToGuardrail,
   EXPERIENCE_TRIAGE,
   scaleGuardrailForExperience,
   type ProfileContext,

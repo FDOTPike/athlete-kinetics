@@ -19,6 +19,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,9 +28,12 @@ import {
   View,
 } from 'react-native';
 import {
+  JOINTS,
   PATTERN_TO_CATEGORY,
   TAXONOMY_CATEGORIES,
   targetLoadKg,
+  type DaySwapOption,
+  type Joint,
   type MovementPattern,
   type MovementPrefix,
   type MovementPreference,
@@ -191,6 +195,19 @@ const CATEGORY_LABEL: Record<TaxonomyCategory, string> = {
 const categoryOf = (pattern: string): TaxonomyCategory =>
   PATTERN_TO_CATEGORY[pattern as MovementPattern] ?? 'accessory';
 
+/** Substitution-tier presentation. Colors mirror SUBSTITUTION_COLORS in the
+ *  engine (green = regression, purple = day-swap, orange = triage); green
+ *  reuses the palette, the other two are local since the dark theme has no
+ *  purple/orange token. */
+const TIER = {
+  regression: { color: palette.green, hint: 'Easier · same pattern' },
+  day_swap: { color: '#A98EFF', hint: 'Pull from a later day' },
+  triage: { color: '#FF9F45', hint: 'Train around a niggle' },
+} as const;
+
+/** 'lower_back' -> 'LOWER BACK' for the joint picker. */
+const jointLabel = (j: Joint): string => j.replace(/_/g, ' ').toUpperCase();
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
@@ -211,6 +228,13 @@ export default function SessionScreen(): React.JSX.Element {
   const addPlanSlot = useStore((s) => s.addPlanSlot);
   const swapMovement = useStore((s) => s.swapMovement);
   const setMovementPreference = useStore((s) => s.setMovementPreference);
+  const substitution = useStore((s) => s.substitution);
+  const openSubstitution = useStore((s) => s.openSubstitution);
+  const closeSubstitution = useStore((s) => s.closeSubstitution);
+  const applyRegression = useStore((s) => s.applyRegression);
+  const applyDaySwap = useStore((s) => s.applyDaySwap);
+  const niggles = useStore((s) => s.niggles);
+  const reportNiggle = useStore((s) => s.reportNiggle);
   const logSet = useStore((s) => s.logSet);
   const deleteSet = useStore((s) => s.deleteSet);
   const editSet = useStore((s) => s.editSet);
@@ -235,6 +259,10 @@ export default function SessionScreen(): React.JSX.Element {
   const [editReps, setEditReps] = useState(5);
   const [editLoad, setEditLoad] = useState(100);
   const [editRpe, setEditRpe] = useState(8);
+  /** Report-niggle bottom sheet. */
+  const [niggleOpen, setNiggleOpen] = useState(false);
+  const [niggleRegion, setNiggleRegion] = useState<Joint | null>(null);
+  const [niggleSeverity, setNiggleSeverity] = useState(4);
   // Elapsed-time readout against the profile's duration cap (display only).
   const [nowMs, setNowMs] = useState(Date.now());
   useEffect(() => {
@@ -375,6 +403,27 @@ export default function SessionScreen(): React.JSX.Element {
     setEditSetId(item.set_id);
   };
 
+  // A day-swap is destructive (it deletes a future planned slot to conserve
+  // volume), so it confirms first — showing the engine's own rationale.
+  const confirmDaySwap = (option: DaySwapOption): void => {
+    const targetId = substitution?.targetId ?? null;
+    if (targetId === null) return;
+    Alert.alert(
+      'Pull forward?',
+      `${option.rationale}\n\nThis replaces today's movement and removes that future slot.`,
+      [
+        { text: 'CANCEL', style: 'cancel' },
+        { text: 'PULL FORWARD', onPress: () => applyDaySwap(targetId, option) },
+      ],
+    );
+  };
+
+  const openNiggle = (): void => {
+    setNiggleRegion(null);
+    setNiggleSeverity(4);
+    setNiggleOpen(true);
+  };
+
   const confirmEnd = (): void => {
     if (session.sets.length === 0) {
       // Accidental starts back out cleanly: an empty session is deleted,
@@ -453,9 +502,9 @@ export default function SessionScreen(): React.JSX.Element {
           </Pressable>
           {activeMovementId !== null && (
             <Pressable
-              onPress={() => setPickMode('swap')}
+              onPress={() => openSubstitution(activeMovementId)}
               accessibilityRole="button"
-              accessibilityLabel="Swap the selected movement"
+              accessibilityLabel="Find substitutions for the selected movement"
               style={styles.navAction}
             >
               <Text style={styles.navActionText}>SWAP</Text>
@@ -731,8 +780,23 @@ export default function SessionScreen(): React.JSX.Element {
         }}
       />
 
-      {/* ---- footer: tonnage, duration vs cap, end ---- */}
+      {/* ---- footer: niggle report, tonnage, duration vs cap, end ---- */}
       <View style={styles.footer}>
+        <Pressable
+          onPress={openNiggle}
+          accessibilityRole="button"
+          accessibilityLabel={
+            niggles.length > 0
+              ? `Report a niggle. ${niggles.length} active today`
+              : 'Report a niggle'
+          }
+          style={[styles.niggleBtn, niggles.length > 0 && styles.niggleBtnActive]}
+        >
+          <Text style={styles.niggleBtnIcon}>⚠</Text>
+          {niggles.length > 0 && (
+            <Text style={styles.niggleBtnCount}>{niggles.length}</Text>
+          )}
+        </Pressable>
         <View>
           <Text style={styles.footerLabel}>TONNAGE</Text>
           <Text style={styles.footerValue}>{Math.round(tonnage)} kg</Text>
@@ -752,6 +816,206 @@ export default function SessionScreen(): React.JSX.Element {
           <Text style={styles.endBtnText}>END</Text>
         </Pressable>
       </View>
+
+      {/* ---- deterministic substitution sheet (SWAP) ---- */}
+      {substitution !== null && (() => {
+        const targetName = byId.get(substitution.targetId)?.name ?? 'movement';
+        const reg = substitution.result.layer1Regression.options;
+        const day = substitution.result.layer2DaySwap.options;
+        const tri = substitution.result.layer3Triage.cluster;
+        const haltAdvised = substitution.result.haltAdvised;
+        const empty = reg.length === 0 && day.length === 0 && tri === null;
+        return (
+          <Modal visible transparent animationType="none" onRequestClose={closeSubstitution}>
+            <Pressable
+              style={styles.subBackdrop}
+              onPress={closeSubstitution}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss substitutions"
+            >
+              {/* Inner Pressable swallows taps so the card doesn't dismiss. */}
+              <Pressable style={styles.subCard} onPress={() => undefined}>
+                <Text style={styles.subTitle} numberOfLines={2}>SUBSTITUTE {targetName}</Text>
+                {haltAdvised && (
+                  <View style={styles.subHalt}>
+                    <Text style={styles.subHaltText}>
+                      A niggle hit your halt threshold — too severe to train around.
+                      Consider ending the session and reporting it on COACH.
+                    </Text>
+                  </View>
+                )}
+                <ScrollView style={styles.subScroll} keyboardShouldPersistTaps="handled">
+                  {reg.length > 0 && (
+                    <View style={styles.subTier}>
+                      <View style={[styles.subTierBar, { backgroundColor: TIER.regression.color }]} />
+                      <View style={styles.subTierBody}>
+                        <Text style={[styles.subTierLabel, { color: TIER.regression.color }]}>
+                          REGRESSION · {TIER.regression.hint}
+                        </Text>
+                        {reg.map((o) => (
+                          <Pressable
+                            key={o.movement_id}
+                            onPress={() => applyRegression(substitution.targetId, o.movement_id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Regress to ${o.name}, ${o.difficulty}`}
+                            style={styles.subOption}
+                          >
+                            <View style={styles.subOptionHead}>
+                              <Text style={styles.subOptionName} numberOfLines={1}>{o.name}</Text>
+                              <Text style={styles.subOptionTag}>{o.difficulty}</Text>
+                            </View>
+                            <Text style={styles.subOptionWhy} numberOfLines={2}>{o.rationale}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  {day.length > 0 && (
+                    <View style={styles.subTier}>
+                      <View style={[styles.subTierBar, { backgroundColor: TIER.day_swap.color }]} />
+                      <View style={styles.subTierBody}>
+                        <Text style={[styles.subTierLabel, { color: TIER.day_swap.color }]}>
+                          DAY SWAP · {TIER.day_swap.hint}
+                        </Text>
+                        {day.map((o) => (
+                          <Pressable
+                            key={o.plannedSlotId}
+                            onPress={() => confirmDaySwap(o)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Pull ${o.name} forward from day ${o.fromDayIndex}`}
+                            style={styles.subOption}
+                          >
+                            <View style={styles.subOptionHead}>
+                              <Text style={styles.subOptionName} numberOfLines={1}>{o.name}</Text>
+                              <Text style={styles.subOptionTag}>day {o.fromDayIndex} · −{o.setsConserved}</Text>
+                            </View>
+                            <Text style={styles.subOptionWhy} numberOfLines={2}>{o.rationale}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  {tri !== null && (
+                    <View style={styles.subTier}>
+                      <View style={[styles.subTierBar, { backgroundColor: TIER.triage.color }]} />
+                      <View style={styles.subTierBody}>
+                        <Text style={[styles.subTierLabel, { color: TIER.triage.color }]}>
+                          TRIAGE · {TIER.triage.hint}
+                        </Text>
+                        <Text style={styles.subOptionWhy}>{tri.rationale}</Text>
+                        <View style={styles.triCluster}>
+                          {tri.movements.map((m) => (
+                            <Text key={m.movement_id} style={styles.triChip}>{m.name}</Text>
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                  {empty && (
+                    <Text style={styles.subEmpty}>
+                      No engine substitutions for this movement right now — its
+                      pattern has no available regression and no later block day
+                      offers the same category. Browse the full library instead.
+                    </Text>
+                  )}
+                </ScrollView>
+                <View style={styles.subActions}>
+                  <Pressable
+                    onPress={() => { closeSubstitution(); setPickMode('swap'); }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Browse the full movement library"
+                    style={styles.subBrowse}
+                  >
+                    <Text style={styles.subBrowseText}>BROWSE ALL</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={closeSubstitution}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel substitution"
+                    style={styles.subCancel}
+                  >
+                    <Text style={styles.subCancelText}>CANCEL</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        );
+      })()}
+
+      {/* ---- report-niggle sheet (the Layer 3 / guardrail severity source) ---- */}
+      {niggleOpen && (
+        <Modal visible transparent animationType="none" onRequestClose={() => setNiggleOpen(false)}>
+          <Pressable
+            style={styles.subBackdrop}
+            onPress={() => setNiggleOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss niggle report"
+          >
+            <Pressable style={styles.niggleCard} onPress={() => undefined}>
+              <Text style={styles.subTitle}>REPORT NIGGLE</Text>
+              <Text style={styles.niggleHint}>Where does it hurt?</Text>
+              <View style={styles.jointWrap}>
+                {JOINTS.map((j) => {
+                  const on = niggleRegion === j;
+                  return (
+                    <Pressable
+                      key={j}
+                      onPress={() => setNiggleRegion(j)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={jointLabel(j)}
+                      style={[styles.jointChip, on && styles.jointChipOn]}
+                    >
+                      <Text style={[styles.jointChipText, on && styles.jointChipTextOn]}>
+                        {jointLabel(j)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Stepper
+                label="SEVERITY 1–10"
+                display={String(niggleSeverity)}
+                danger={niggleSeverity >= 8}
+                onDec={() => setNiggleSeverity((v) => clamp(v - 1, 1, 10))}
+                onInc={() => setNiggleSeverity((v) => clamp(v + 1, 1, 10))}
+              />
+              <Text style={styles.niggleScale}>
+                3–5 reroutes a compound to accessories · 6+ also bars that joint
+              </Text>
+              <View style={styles.subActions}>
+                <Pressable
+                  onPress={() => setNiggleOpen(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel niggle report"
+                  style={styles.subCancel}
+                >
+                  <Text style={styles.subCancelText}>CANCEL</Text>
+                </Pressable>
+                <Pressable
+                  disabled={niggleRegion === null}
+                  onPress={() => {
+                    if (niggleRegion !== null) {
+                      reportNiggle(niggleRegion, niggleSeverity);
+                      setNiggleOpen(false);
+                    }
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    niggleRegion === null
+                      ? 'Pick a region first'
+                      : `Report ${jointLabel(niggleRegion)} severity ${niggleSeverity}`
+                  }
+                  style={[styles.niggleReport, niggleRegion === null && styles.niggleReportDisabled]}
+                >
+                  <Text style={styles.niggleReportText}>REPORT</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -1105,6 +1369,157 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   editSaveText: { color: '#06251B', fontSize: 14, fontWeight: '800', letterSpacing: 1.5 },
+
+  subBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  subCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '82%',
+    backgroundColor: palette.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.line,
+    padding: 16,
+  },
+  subTitle: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  subScroll: { flexGrow: 0 },
+  subHalt: {
+    backgroundColor: '#2A1416',
+    borderWidth: 1,
+    borderColor: palette.red,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  subHaltText: { color: palette.red, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  subTier: { flexDirection: 'row', marginBottom: 14 },
+  subTierBar: { width: 4, borderRadius: 2, marginRight: 10 },
+  subTierBody: { flex: 1 },
+  subTierLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
+  subOption: {
+    minHeight: 56,
+    backgroundColor: palette.bg,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.line,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  subOptionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  subOptionName: { color: palette.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
+  subOptionTag: {
+    color: palette.dim,
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 8,
+    fontVariant: ['tabular-nums'],
+  },
+  subOptionWhy: { color: palette.dim, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  triCluster: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  triChip: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '700',
+    backgroundColor: palette.bg,
+    borderWidth: 1,
+    borderColor: palette.line,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  subEmpty: { color: palette.dim, fontSize: 14, lineHeight: 20, paddingVertical: 8 },
+  subActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  subBrowse: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subBrowseText: { color: palette.amber, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  subCancel: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subCancelText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+
+  niggleBtn: {
+    minWidth: 52,
+    minHeight: 52,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.line,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  niggleBtnActive: { borderColor: palette.amber, backgroundColor: '#2A210F' },
+  niggleBtnIcon: { fontSize: 20, color: palette.amber },
+  niggleBtnCount: {
+    color: palette.amber,
+    fontSize: 14,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  niggleCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '82%',
+    backgroundColor: palette.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.amber,
+    padding: 16,
+  },
+  niggleHint: { color: palette.dim, fontSize: 13, marginBottom: 10 },
+  jointWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  jointChip: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.line,
+    backgroundColor: palette.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jointChipOn: { borderColor: palette.amber, backgroundColor: '#2A210F' },
+  jointChipText: { color: palette.dim, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  jointChipTextOn: { color: palette.amber },
+  niggleScale: { color: palette.dim, fontSize: 12, lineHeight: 17, marginTop: 8, marginBottom: 4 },
+  niggleReport: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 12,
+    backgroundColor: palette.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  niggleReportDisabled: { backgroundColor: palette.line },
+  niggleReportText: { color: '#2A1A06', fontSize: 14, fontWeight: '800', letterSpacing: 1.5 },
 
   footer: {
     flexDirection: 'row',

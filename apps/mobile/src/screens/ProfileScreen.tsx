@@ -7,7 +7,7 @@
  * free text only for injury/mobility notes.
  */
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -177,6 +177,9 @@ export default function ProfileScreen(): React.JSX.Element {
   const biometricsStatus = useStore((s) => s.biometricsStatus);
   const syncBiometrics = useStore((s) => s.syncBiometrics);
   const requestBiometricsAccess = useStore((s) => s.requestBiometricsAccess);
+  const profileSlots = useStore((s) => s.profileSlots);
+  const switchProfile = useStore((s) => s.switchProfile);
+  const wipeActiveBlockState = useStore((s) => s.wipeActiveBlockState);
 
   // Free-text notes are committed on end-editing, not per keystroke.
   const [injuryText, setInjuryText] = useState(
@@ -185,6 +188,16 @@ export default function ProfileScreen(): React.JSX.Element {
   const [mobilityText, setMobilityText] = useState(
     profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'),
   );
+  // Resync the free-text fields ONLY when the active profile slot changes (a
+  // switch) — NOT on per-keystroke saves (those keep the same active slot), so
+  // typing is never reformatted mid-edit. Without this, editing after a switch
+  // would persist the previous profile's notes into the newly loaded one.
+  const activeSlotId = profileSlots.find((p) => p.isActive)?.slotId ?? null;
+  useEffect(() => {
+    setInjuryText(profile.injury_flags.map((f) => `${f.region}: ${f.note}`).join('\n'));
+    setMobilityText(profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'));
+    // Intentionally keyed on the active slot, not `profile` (see comment above).
+  }, [activeSlotId]);
 
   const parseNotes = (text: string): UserProfile['injury_flags'] =>
     text
@@ -406,6 +419,60 @@ export default function ProfileScreen(): React.JSX.Element {
           })}
         </View>
       </View>
+
+      {/* ---- Profile Management (local multi-tenancy + state wipe) ---- */}
+      <View style={styles.mgmtSection}>
+        <Text style={styles.mgmtHeading}>PROFILE MANAGEMENT</Text>
+        <Text style={styles.fieldHint}>
+          Switch the active profile to test how the coach plans for a different
+          athlete. Switching saves the current profile, loads the chosen one, and
+          WIPES the active block + today&apos;s reports so a fresh block generates.
+          Logged training history is kept.
+        </Text>
+        <View style={styles.chipWrap}>
+          {profileSlots.map((slot) => (
+            <Pressable
+              key={slot.slotId}
+              onPress={() => {
+                if (slot.isActive) return;
+                Alert.alert(
+                  `Switch to ${slot.name}?`,
+                  'Saves your current profile, loads this one, and wipes the active block and today’s reports/niggles. Training history is kept.',
+                  [
+                    { text: 'CANCEL', style: 'cancel' },
+                    { text: 'SWITCH', style: 'destructive', onPress: () => switchProfile(slot.slotId) },
+                  ],
+                );
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: slot.isActive }}
+              accessibilityLabel={`${slot.name} profile${slot.isActive ? ', active' : ''}`}
+              style={[styles.chip, slot.isActive && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, slot.isActive && styles.chipTextActive]}>
+                {slot.name.toUpperCase()}{slot.isActive ? ' ✓' : ''}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Pressable
+          onPress={() => {
+            Alert.alert(
+              'Delete current block & state?',
+              'Hard-deletes the active 4-week block and today’s injury reports/niggles so you can regenerate a fresh block. Logged sessions and history are kept. This cannot be undone.',
+              [
+                { text: 'CANCEL', style: 'cancel' },
+                { text: 'DELETE', style: 'destructive', onPress: wipeActiveBlockState },
+              ],
+            );
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Delete the current block and today's state"
+          style={styles.wipeBtn}
+        >
+          <Text style={styles.wipeBtnText}>DELETE CURRENT BLOCK &amp; STATE</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
@@ -415,6 +482,24 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.bg },
   content: { padding: 20, paddingBottom: 48 },
   heading: { color: palette.text, fontSize: 22, fontWeight: '800', letterSpacing: 2 },
+  mgmtSection: {
+    marginTop: 12,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: palette.line,
+  },
+  mgmtHeading: { color: palette.text, fontSize: 16, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
+  wipeBtn: {
+    minHeight: 60,
+    borderRadius: 12,
+    backgroundColor: '#2A1416',
+    borderWidth: 2,
+    borderColor: palette.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  wipeBtnText: { color: palette.red, fontSize: 15, fontWeight: '800', letterSpacing: 1.5 },
   subheading: { color: palette.dim, fontSize: 13, lineHeight: 19, marginTop: 6, marginBottom: 18 },
   field: { marginBottom: 18 },
   fieldLabel: { color: palette.dim, fontSize: 12, letterSpacing: 1.5 },

@@ -40,6 +40,21 @@ export type Objective = (typeof OBJECTIVES)[number];
 export const TRAINING_AGES = ['beginner', 'intermediate', 'advanced', 'elite'] as const;
 export type TrainingAge = (typeof TRAINING_AGES)[number];
 
+/** Experience-weighted severity (1-10) bands — the DOMS-vs-structural model
+ *  (Phase 12 Step 5). `triageMin` is the severity at/above which a complaint
+ *  becomes operative (injury guardrail + Layer 3 triage / restrictive report);
+ *  `haltMin` is the severity at/above which it forces a session halt. A beginner
+ *  tolerates more (benign DOMS); an elite reacts sooner (structural). Shared by
+ *  the subjective-report path (profileLimits.applySeverityToGuardrail) and the
+ *  substitution engine (substitution.ts) so both surfaces agree. Machine-checked
+ *  in verify:policy and verify:blocks. */
+export const EXPERIENCE_SEVERITY: Record<TrainingAge, { triageMin: number; haltMin: number }> = {
+  beginner: { triageMin: 5, haltMin: 8 },
+  intermediate: { triageMin: 4, haltMin: 8 },
+  advanced: { triageMin: 3, haltMin: 7 },
+  elite: { triageMin: 3, haltMin: 6 },
+};
+
 export const ENERGY_SYSTEMS = ['aerobic', 'anaerobic', 'atp_pc', 'hybrid'] as const;
 export type EnergySystem = (typeof ENERGY_SYSTEMS)[number];
 

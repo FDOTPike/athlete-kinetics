@@ -60,6 +60,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const startSession = useStore((s) => s.startSession);
 
   const [reportText, setReportText] = useState('');
+  /** Forced 1-10 severity (null until chosen) — the engine won't process a
+   *  textual complaint without it (Phase 12 Step 5). */
+  const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<{ s: BlockSessionSummary; slots: TodaySlot[] } | null>(null);
 
@@ -424,26 +427,55 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         style={styles.reportInput}
         value={reportText}
         onChangeText={setReportText}
-        placeholder="How does it feel? e.g. knee a bit sore, 3/10"
+        placeholder="How does it feel? e.g. knee a bit sore"
         placeholderTextColor={palette.dim}
         maxLength={500}
         multiline
         accessibilityLabel="Describe how your body feels today"
       />
+      {/* Forced severity: the engine scales the guardrail by this + your
+          training age (a 4/10 is benign DOMS for a novice, a red flag for elite). */}
+      <Text style={styles.sevPrompt}>RATE THE SEVERITY (1–10) — REQUIRED</Text>
+      <View style={styles.sevRow}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
+          const on = reportSeverity === n;
+          return (
+            <Pressable
+              key={n}
+              onPress={() => setReportSeverity(n)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`Severity ${n} of 10`}
+              style={[styles.sevChip, on && (n >= 7 ? styles.sevChipHigh : styles.sevChipOn)]}
+            >
+              <Text style={[styles.sevChipText, on && styles.sevChipTextOn]}>{n}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <Pressable
-        disabled={reportText.trim().length === 0 || triaging}
+        disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
         onPress={() => {
-          void reportSubjective(reportText).then(() => setReportText(''));
+          if (reportSeverity === null) return;
+          void reportSubjective(reportText, reportSeverity).then(() => {
+            setReportText('');
+            setReportSeverity(null);
+          });
         }}
         accessibilityRole="button"
-        accessibilityLabel="Triage this report"
+        accessibilityLabel={
+          reportSeverity === null ? 'Rate the severity first' : 'Triage this report'
+        }
         style={({ pressed }) => [
           styles.triageBtn,
           pressed && styles.triageBtnPressed,
-          (reportText.trim().length === 0 || triaging) && styles.triageBtnDisabled,
+          (reportText.trim().length === 0 || reportSeverity === null || triaging) &&
+            styles.triageBtnDisabled,
         ]}
       >
-        <Text style={styles.triageBtnText}>{triaging ? 'MATCHING…' : 'TRIAGE'}</Text>
+        <Text style={styles.triageBtnText}>
+          {triaging ? 'MATCHING…' : reportSeverity === null ? 'RATE SEVERITY FIRST' : 'TRIAGE'}
+        </Text>
       </Pressable>
 
       {lastTriage !== null && lastTriage.kind === 'positive' && (
@@ -661,6 +693,22 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 10,
   },
+  sevPrompt: { color: palette.amber, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
+  sevRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  sevChip: {
+    width: 44,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.line,
+    backgroundColor: palette.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sevChipOn: { borderColor: palette.amber, backgroundColor: '#2A210F' },
+  sevChipHigh: { borderColor: palette.red, backgroundColor: '#2A1416' },
+  sevChipText: { color: palette.dim, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  sevChipTextOn: { color: palette.text },
   triageBtn: {
     height: 64,
     borderRadius: 12,

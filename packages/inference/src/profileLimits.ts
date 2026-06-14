@@ -10,7 +10,7 @@
  */
 import type { AdjustmentVector } from './outputSchema';
 import type { Guardrail } from './semantic/codebase';
-import type { TrainingAge, UserProfile } from './types';
+import { EXPERIENCE_SEVERITY, type TrainingAge, type UserProfile } from './types';
 
 export interface ProfileContext {
   /** Completed sessions today (>=1 logged set), excluding any active one. */
@@ -78,20 +78,23 @@ export function applyProfileLimits(
 // Experience-weighted triage scaling
 // ---------------------------------------------------------------------------
 /** How training age rescales a RESTRICTIVE triage guardrail before it is
- *  applied. A beginner reporting pain/fatigue gets a more severe damping
- *  (lower work capacity, higher injury naivety); an advanced/elite athlete
- *  gets a milder one (higher baseline tolerance, better interoception).
- *  Severity is weakly monotone in experience (the 8.0 ceiling and 5.0 floor
- *  can bind for adjacent ages) — machine-verified across the REAL codebase
- *  entries in verify:policy [5]. */
+ *  applied — the DOMS-vs-structural model (Phase 12 Step 5). A BEGINNER's
+ *  complaint is assumed benign DOMS and damped LESS (relaxed toward the matched
+ *  baseline); an ELITE's complaint skews structural and is damped MORE. This is
+ *  the INVERSE of the original "protect the naive beginner" weighting; the hard
+ *  bounds in scaleGuardrailForExperience (load <= 1, set <= 0, RPE in [5,8])
+ *  keep every age monotone conservative — a relaxed beginner can only approach
+ *  the base, never train above it. Severity is weakly monotone in experience
+ *  (the 8.0 ceiling / 5.0 floor can bind for adjacent ages) — machine-verified
+ *  across the REAL codebase entries in verify:policy [5]. */
 export const EXPERIENCE_TRIAGE: Record<
   TrainingAge,
   { loadScale: number; capDelta: number; extraSetCut: number }
 > = {
-  beginner: { loadScale: 0.85, capDelta: -1.0, extraSetCut: 1 },
+  beginner: { loadScale: 1.2, capDelta: 2.0, extraSetCut: 0 },
   intermediate: { loadScale: 1.0, capDelta: 0.0, extraSetCut: 0 },
-  advanced: { loadScale: 1.1, capDelta: 1.0, extraSetCut: 0 },
-  elite: { loadScale: 1.2, capDelta: 1.5, extraSetCut: 0 },
+  advanced: { loadScale: 0.9, capDelta: -0.5, extraSetCut: 0 },
+  elite: { loadScale: 0.8, capDelta: -1.0, extraSetCut: 1 },
 };
 
 /** Hard ceiling for ANY flagged (restrictive) report, every training age:
@@ -123,4 +126,49 @@ export function scaleGuardrailForExperience(g: Guardrail, age: TrainingAge): Gua
       Math.max(5.0, Math.round((g.rpe_cap_max + t.capDelta) * 2) / 2),
     ),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Experience-weighted severity gating (Phase 12 Step 5)
+// (EXPERIENCE_SEVERITY itself lives in types.ts — shared with substitution.ts.)
+// ---------------------------------------------------------------------------
+const HALT_GUARDRAIL = (followUp: string | null): Guardrail => ({
+  load_multiplier: 0,
+  set_delta: -2,
+  rpe_cap_max: 0,
+  halt: true,
+  follow_up: followUp,
+});
+const NOOP_GUARDRAIL = (followUp: string | null): Guardrail => ({
+  load_multiplier: 1,
+  set_delta: 0,
+  rpe_cap_max: 10,
+  halt: false,
+  follow_up: followUp,
+});
+
+/**
+ * Gate a matched guardrail by the athlete's reported severity (1-10), scaled by
+ * training age. This is the THRESHOLD axis (does it trigger / halt?), distinct
+ * from scaleGuardrailForExperience's MAGNITUDE axis (how hard, once triggered).
+ *
+ * Safety: a red-flag HALT entry is NEVER relaxed — structural language overrides
+ * any severity. Otherwise:
+ *   severity >= haltMin(age)   -> escalate to a full halt (e.g. an elite at 6);
+ *   severity <  triageMin(age) -> de-escalate to a no-op (benign / DOMS, e.g. a
+ *                                 beginner at 4);
+ *   in-band                    -> keep the matched guardrail unchanged (its
+ *                                 magnitude is then experience-scaled).
+ */
+export function applySeverityToGuardrail(
+  g: Guardrail,
+  severity: number,
+  age: TrainingAge,
+): Guardrail {
+  if (g.halt) return g;
+  const sev = Math.min(10, Math.max(1, Math.round(severity)));
+  const { triageMin, haltMin } = EXPERIENCE_SEVERITY[age];
+  if (sev >= haltMin) return HALT_GUARDRAIL(g.follow_up);
+  if (sev < triageMin) return NOOP_GUARDRAIL(g.follow_up);
+  return g;
 }

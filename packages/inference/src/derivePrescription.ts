@@ -13,14 +13,15 @@
  * Purity is the restart-survival proof: same persisted inputs in, same
  * prescription out — there is nothing in memory to lose.
  */
-import type { AdjustmentVector } from './outputSchema';
+import { clampAdjustment, type AdjustmentVector } from './outputSchema';
 import { getPrescription, type AdjustmentSource } from './prescribe';
 import {
   applyProfileLimits,
+  applySeverityToGuardrail,
   scaleGuardrailForExperience,
   type ProfileContext,
 } from './profileLimits';
-import { isNoOpGuardrail, type PhraseEntry } from './semantic/codebase';
+import { isNoOpGuardrail, type Guardrail, type PhraseEntry } from './semantic/codebase';
 import {
   applyGuardrail,
   moreConservative,
@@ -28,13 +29,26 @@ import {
 } from './semantic/triage';
 import type { StateVectorRow, UserProfile } from './types';
 
+/** A resolved subjective report: the matched codebase entry plus the athlete's
+ *  reported severity (1-10), or null when no severity was captured (legacy
+ *  rows / pre-severity reports — the matched guardrail is then used as-is). */
+export interface ReportInput {
+  entry: PhraseEntry;
+  severity: number | null;
+  /** True when this report was RECORDED as a halt (subjective_report.halt). A
+   *  recorded halt is a FACT — re-derivation never relaxes it, even if the
+   *  athlete's training age (and thus the severity gate) later changes. Without
+   *  this floor, toggling training age could un-halt a session. */
+  wasHalt?: boolean;
+}
+
 export interface DeriveInput {
   vector: StateVectorRow;
   profile: UserProfile;
   ctx: ProfileContext;
-  /** Resolved entries of today's persisted subjective_report rows, in
-   *  report_id order (order must not matter — verified). */
-  reports: readonly PhraseEntry[];
+  /** Today's persisted subjective_report rows, in report_id order (order must
+   *  not matter — verified). */
+  reports: readonly ReportInput[];
 }
 
 export interface DerivedPrescription {
@@ -54,33 +68,45 @@ export function derivePrescription(input: DeriveInput): DerivedPrescription {
   const limited = applyProfileLimits(base.vector, profile, ctx);
 
   // Layer 3: the single most conservative of today's RESTRICTIVE reports
-  // (total order — halt, then load, then sets, then RPE cap), experience-
-  // scaled, applied. Positive no-op entries are identity by definition: they
-  // never become operative, so "it felt good" can never read as a guardrail.
-  let operative: PhraseEntry | null = null;
-  for (const e of reports) {
-    if (isNoOpGuardrail(e.guardrail)) continue;
-    if (operative === null || moreConservative(e.guardrail, operative.guardrail)) {
-      operative = e;
+  // (total order — halt, then load, then sets, then RPE cap), each first
+  // severity-gated by the athlete's reported severity + training age (DOMS-vs-
+  // structural), then experience-magnitude-scaled, then applied. Penalties NEVER
+  // compound: exactly one operative report survives. Positive no-op entries —
+  // and reports the severity gate de-escalates to no-op — are identity, so "it
+  // felt good" (or a benign sub-threshold complaint) can never read as a guardrail.
+  let operative: { entry: PhraseEntry; guardrail: Guardrail } | null = null;
+  for (const r of reports) {
+    const gated: Guardrail = r.severity === null
+      ? r.entry.guardrail
+      : applySeverityToGuardrail(r.entry.guardrail, r.severity, profile.training_age);
+    // A recorded halt is never relaxed by a later profile / severity re-gating —
+    // re-impose the halt the report originally produced.
+    const effective: Guardrail = r.wasHalt === true && !gated.halt ? { ...gated, halt: true } : gated;
+    if (isNoOpGuardrail(effective)) continue;
+    if (operative === null || moreConservative(effective, operative.guardrail)) {
+      operative = { entry: r.entry, guardrail: effective };
     }
   }
   if (operative === null) {
     return {
-      vector: limited.vector,
+      vector: clampAdjustment(limited.vector),
       source: limited.notes.length > 0 ? 'profile' : 'policy',
       notes: limited.notes,
       directive: null,
     };
   }
   const scaled: PhraseEntry = {
-    ...operative,
+    ...operative.entry,
     guardrail: scaleGuardrailForExperience(operative.guardrail, profile.training_age),
   };
   const directive = applyGuardrail(limited.vector, scaled, 1);
+  // Final floor: penalties can never push the prescription below the safe
+  // envelope (set_modifier >= -3, load >= 0, rpe in [0,10]).
+  const flooredVector = clampAdjustment(directive.vector);
   return {
-    vector: directive.vector,
+    vector: flooredVector,
     source: 'guardrail',
     notes: limited.notes,
-    directive,
+    directive: { ...directive, vector: flooredVector },
   };
 }

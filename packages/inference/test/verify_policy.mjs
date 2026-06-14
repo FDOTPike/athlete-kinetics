@@ -179,26 +179,29 @@ const noopG = { load_multiplier: 1.0, set_delta: 0, rpe_cap_max: 10.0, halt: fal
 check('intermediate is the identity on a restrictive guardrail',
   JSON.stringify(scaleGuardrailForExperience(painFloor, 'intermediate')) === JSON.stringify(painFloor));
 const scaledPain = AGES.map((a) => scaleGuardrailForExperience(painFloor, a));
-check('severity strictly monotone with experience (load multiplier)',
-  scaledPain[0].load_multiplier < scaledPain[1].load_multiplier &&
-  scaledPain[1].load_multiplier < scaledPain[2].load_multiplier &&
-  scaledPain[2].load_multiplier < scaledPain[3].load_multiplier,
-  scaledPain.map((g) => g.load_multiplier).join(' < '));
-check('severity monotone with experience (RPE cap)',
-  scaledPain[0].rpe_cap_max < scaledPain[1].rpe_cap_max &&
-  scaledPain[1].rpe_cap_max < scaledPain[2].rpe_cap_max &&
-  scaledPain[2].rpe_cap_max < scaledPain[3].rpe_cap_max,
-  scaledPain.map((g) => g.rpe_cap_max).join(' < '));
-check('beginner pain: severe (load 0.51, extra set cut, cap 5.0)',
-  scaledPain[0].load_multiplier === 0.51 && scaledPain[0].set_delta === -2 &&
-  scaledPain[0].rpe_cap_max === 5.0);
-check('elite pain: milder (load 0.72, cap 7.5)',
-  scaledPain[3].load_multiplier === 0.72 && scaledPain[3].rpe_cap_max === 7.5);
-const eliteFatigue = scaleGuardrailForExperience(fatigue, 'elite');
-check('flagged RPE ceiling 8.0 binds (elite fatigue 7.5+1.5 -> 8.0)',
-  eliteFatigue.rpe_cap_max === 8.0);
-check('load multiplier never exceeds 1.0 (elite fatigue 0.9x1.2 -> 1.0)',
-  eliteFatigue.load_multiplier === 1.0);
+// DOMS-vs-structural (Step 5): damping is now strictly DECREASING in experience
+// — a beginner's complaint is relaxed (benign DOMS), an elite's is tightened.
+check('severity strictly monotone with experience (load multiplier, decreasing)',
+  scaledPain[0].load_multiplier > scaledPain[1].load_multiplier &&
+  scaledPain[1].load_multiplier > scaledPain[2].load_multiplier &&
+  scaledPain[2].load_multiplier > scaledPain[3].load_multiplier,
+  scaledPain.map((g) => g.load_multiplier).join(' > '));
+check('severity monotone with experience (RPE cap, decreasing)',
+  scaledPain[0].rpe_cap_max > scaledPain[1].rpe_cap_max &&
+  scaledPain[1].rpe_cap_max > scaledPain[2].rpe_cap_max &&
+  scaledPain[2].rpe_cap_max > scaledPain[3].rpe_cap_max,
+  scaledPain.map((g) => g.rpe_cap_max).join(' > '));
+check('beginner pain: mild/DOMS (load 0.72, set -1, cap 8.0)',
+  scaledPain[0].load_multiplier === 0.72 && scaledPain[0].set_delta === -1 &&
+  scaledPain[0].rpe_cap_max === 8.0);
+check('elite pain: structural/severe (load 0.48, extra set cut, cap 5.0)',
+  scaledPain[3].load_multiplier === 0.48 && scaledPain[3].set_delta === -2 &&
+  scaledPain[3].rpe_cap_max === 5.0);
+const beginnerFatigue = scaleGuardrailForExperience(fatigue, 'beginner');
+check('flagged RPE ceiling 8.0 binds (beginner fatigue 7.5+2.0 -> 8.0)',
+  beginnerFatigue.rpe_cap_max === 8.0);
+check('load multiplier never exceeds 1.0 (beginner fatigue 0.9x1.2 -> 1.0)',
+  beginnerFatigue.load_multiplier === 1.0);
 check('halt guardrails are untouched at every age',
   AGES.every((a) => JSON.stringify(scaleGuardrailForExperience(haltG, a)) === JSON.stringify(haltG)));
 check('no-op (positive) guardrails are untouched at every age',
@@ -227,16 +230,17 @@ let realViol = null;
 for (const e of restrictiveEntries) {
   const seq = AGES.map((a) => scaleGuardrailForExperience(e.guardrail, a));
   for (let i = 1; i < seq.length; i++) {
-    if (seq[i].load_multiplier < seq[i - 1].load_multiplier - 1e-9 ||
-        seq[i].rpe_cap_max < seq[i - 1].rpe_cap_max - 1e-9 ||
-        seq[i].set_delta < seq[i - 1].set_delta) realViol = { id: e.id, at: i, why: 'monotone' };
+    // Weakly DECREASING in experience now (beginner relaxed, elite tightened).
+    if (seq[i].load_multiplier > seq[i - 1].load_multiplier + 1e-9 ||
+        seq[i].rpe_cap_max > seq[i - 1].rpe_cap_max + 1e-9 ||
+        seq[i].set_delta > seq[i - 1].set_delta) realViol = { id: e.id, at: i, why: 'monotone' };
   }
   for (const g of seq) {
     if (g.load_multiplier > 1 || g.set_delta > 0 ||
         g.rpe_cap_max > 8.0 || g.rpe_cap_max < 5.0) realViol = { id: e.id, why: 'bounds' };
   }
 }
-check('every restrictive REAL codebase entry: weakly monotone + bounded across ages',
+check('every restrictive REAL codebase entry: weakly monotone (decreasing) + bounded across ages',
   realViol === null, realViol ? JSON.stringify(realViol) : `${restrictiveEntries.length} entries x 4 ages`);
 
 // --- 6. derivePrescription: the full layer-3 chain over the REAL codebase -------
@@ -249,8 +253,12 @@ const entryOf = (id) => {
 };
 const boostRow = row(90, 1.0, 0.5, 90);
 const ctx0 = { sessionsToday: 0, trainedDaysLast7: 0 };
+// Reports are passed as bare entries; wrap them in the ReportInput shape with
+// severity=null (legacy/no-severity -> matched guardrail used as-is). Severity-
+// gated cases pass {entry, severity} objects through directly.
 const dp = (reports, over = {}) => derivePrescription({
-  vector: boostRow, profile: { ...DEFAULT_PROFILE, ...over }, ctx: ctx0, reports,
+  vector: boostRow, profile: { ...DEFAULT_PROFILE, ...over }, ctx: ctx0,
+  reports: reports.map((r) => (r.entry !== undefined ? r : { entry: r, severity: null })),
 });
 
 const tieA1 = dp([entryOf('positive-strong'), entryOf('equipment-improvised')]);
@@ -278,14 +286,14 @@ check('halt survives every training-age edit (profile cannot resurrect the sessi
 
 const begiPain = dp([entryOf('pain-mild')], { training_age: 'beginner' });
 const elitPain = dp([entryOf('pain-mild')], { training_age: 'elite' });
-check('training-age flip relaxes a damped day only within bounds',
-  begiPain.vector.load_modifier < elitPain.vector.load_modifier &&
-  begiPain.vector.rpe_cap < elitPain.vector.rpe_cap &&
-  elitPain.vector.rpe_cap <= 8.0 &&
-  elitPain.vector.load_modifier <= 1.05,
-  `${begiPain.vector.load_modifier}/${begiPain.vector.rpe_cap} -> ${elitPain.vector.load_modifier}/${elitPain.vector.rpe_cap}`);
-check('experience scaling is INSIDE the derivation (beginner stricter than intermediate)',
-  begiPain.vector.rpe_cap < dp([entryOf('pain-mild')]).vector.rpe_cap);
+check('training-age flip: beginner relaxed (DOMS), elite tightened, within bounds',
+  begiPain.vector.load_modifier > elitPain.vector.load_modifier &&
+  begiPain.vector.rpe_cap > elitPain.vector.rpe_cap &&
+  begiPain.vector.rpe_cap <= 8.0 &&
+  begiPain.vector.load_modifier <= 1.05,
+  `beginner ${begiPain.vector.load_modifier}/${begiPain.vector.rpe_cap} > elite ${elitPain.vector.load_modifier}/${elitPain.vector.rpe_cap}`);
+check('experience scaling is INSIDE the derivation (elite stricter than intermediate)',
+  elitPain.vector.rpe_cap < dp([entryOf('pain-mild')]).vector.rpe_cap);
 const noReports = dp([]);
 check('no reports: no directive, source stays policy/profile',
   noReports.directive === null && noReports.source !== 'guardrail');
@@ -299,6 +307,58 @@ const mixedPositive = dp([entryOf('positive-strong'), entryOf('soreness-doms')])
 check('a positive report never masks a restrictive one',
   mixedPositive.directive !== null && mixedPositive.source === 'guardrail' &&
   mixedPositive.vector.rpe_cap <= 8.0, `cap ${mixedPositive.vector.rpe_cap}`);
+
+// --- 7. non-compounding floor + experience-weighted severity gating (Step 5) ---
+console.log('[7] most-severe floor + severity gating');
+const SET_FLOOR = out.SET_MODIFIER_FLOOR;
+check('SET_MODIFIER_FLOOR is -3', SET_FLOOR === -3, String(SET_FLOOR));
+const clampedWorst = out.clampAdjustment(
+  { load_modifier: -5, set_modifier: -9, rpe_cap: 99, coaching_cue: 'x'.repeat(20) });
+check('clampAdjustment floors set>=-3, load>=0, rpe<=10',
+  clampedWorst.set_modifier === -3 && clampedWorst.load_modifier === 0 && clampedWorst.rpe_cap === 10);
+// Non-compounding: stacking EVERY restrictive report never drops set_modifier
+// below the single-step floor, and Math.max(0, plannedSets + mod) stays >= 0.
+let floorViol = null;
+const worstCtx = { sessionsToday: 3, trainedDaysLast7: 7 };
+for (const age of AGES) {
+  for (const anyRow of [row(30, 1.7, -2, 78), boostRow]) {
+    const reports = restrictiveEntries.map((e) => ({ entry: e, severity: null }));
+    const d = derivePrescription({ vector: anyRow,
+      profile: { ...DEFAULT_PROFILE, training_age: age }, ctx: worstCtx, reports });
+    if (d.vector.set_modifier < SET_FLOOR) floorViol = { age, sm: d.vector.set_modifier };
+    for (let planned = 1; planned <= 6; planned++) {
+      if (Math.max(0, planned + d.vector.set_modifier) < 0) floorViol = { age, planned };
+    }
+  }
+}
+check('stacking ALL restrictive reports never breaches the -3 floor (no compounding)',
+  floorViol === null, floorViol ? JSON.stringify(floorViol) : `${AGES.length} ages x 2 days`);
+// Experience-weighted severity gating (DOMS-vs-structural) on a non-halt entry.
+const sevEntry = entryOf('soreness-doms');
+const sev = (s, age) => derivePrescription({ vector: boostRow,
+  profile: { ...DEFAULT_PROFILE, training_age: age }, ctx: ctx0,
+  reports: [{ entry: sevEntry, severity: s }] });
+check('beginner severity 4 is benign (DOMS) -> no directive', sev(4, 'beginner').directive === null);
+check('beginner severity 5 is operative', sev(5, 'beginner').directive !== null);
+check('elite severity 3 is operative (structural)', sev(3, 'elite').directive !== null);
+check('elite severity 6 forces a halt',
+  sev(6, 'elite').directive?.halt === true && sev(6, 'elite').vector.load_modifier === 0);
+check('beginner severity 8 forces a halt', sev(8, 'beginner').directive?.halt === true);
+check('severity null leaves the matched guardrail unchanged',
+  JSON.stringify(sev(null, 'intermediate').vector) ===
+  JSON.stringify(dp([entryOf('soreness-doms')]).vector));
+// Recorded-halt floor: a halt, once recorded (subjective_report.halt), is a fact
+// re-derivation must honor at EVERY training age — toggling age can never relax
+// a halt. (An elite at sev 6 escalates 'soreness-doms' to halt; switching to a
+// beginner whose haltMin is higher must NOT un-halt the recorded session.)
+const recordedHalt = (age) => derivePrescription({ vector: boostRow,
+  profile: { ...DEFAULT_PROFILE, training_age: age }, ctx: ctx0,
+  reports: [{ entry: entryOf('soreness-doms'), severity: 4, wasHalt: true }] });
+check('a recorded halt survives every training-age change (never relaxed)',
+  AGES.every((a) => { const r = recordedHalt(a); return r.directive?.halt === true && r.vector.load_modifier === 0; }));
+check('control: the same report WITHOUT the recorded-halt flag does not halt a tolerant age',
+  derivePrescription({ vector: boostRow, profile: { ...DEFAULT_PROFILE, training_age: 'beginner' },
+    ctx: ctx0, reports: [{ entry: entryOf('soreness-doms'), severity: 4, wasHalt: false }] }).directive === null);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

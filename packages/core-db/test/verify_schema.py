@@ -39,7 +39,8 @@ print(f"SQLite {sqlite3.sqlite_version}")
 print("\n[1] schema files execute cleanly")
 for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql",
           "005_subjective_report.sql", "006_user_profile.sql", "007_program_engine.sql",
-          "008_taxonomy.sql", "009_periodization.sql", "010_movement_library.sql"]:
+          "008_taxonomy.sql", "009_periodization.sql", "010_movement_library.sql",
+          "011_niggle_tracking.sql", "012_report_severity.sql", "013_profile_slot.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -396,6 +397,119 @@ before10 = con.execute("SELECT count(*) c FROM movement_detail").fetchone()["c"]
 con.executescript((SCHEMA_DIR / "010_movement_library.sql").read_text(encoding="utf-8"))
 after10 = con.execute("SELECT count(*) c FROM movement_detail").fetchone()["c"]
 check("010 re-apply is a no-op (idempotent)", before10 == after10 == 30, f"{before10} == {after10}")
+
+# --- 13. niggle tracking (011) ---------------------------------------------------
+print("\n[13] niggle tracking (011) — Phase 12 Step 4")
+con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('n1','knee',4,1000)")
+con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('n2','lower_back',7,2000)")
+nig = con.execute("SELECT region, severity FROM niggle ORDER BY reported_at_ms").fetchall()
+check("niggle rows persist (append-only log)",
+      len(nig) == 2 and nig[0]["region"] == "knee" and nig[1]["severity"] == 7)
+for bad in (0, 11, -1):
+    try:
+        con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES (?, 'knee', ?, 0)",
+                    (f"b{bad}", bad))
+        check(f"severity CHECK rejects {bad}", False)
+    except sqlite3.IntegrityError:
+        check(f"severity CHECK rejects {bad}", True)
+try:
+    con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('bx','elbowww',4,0)")
+    check("region CHECK rejects a non-JOINT region", False)
+except sqlite3.IntegrityError:
+    check("region CHECK rejects a non-JOINT region", True)
+try:
+    con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('n1','hip',3,0)")
+    check("id PRIMARY KEY rejects a duplicate", False)
+except sqlite3.IntegrityError:
+    check("id PRIMARY KEY rejects a duplicate", True)
+plan_n = con.execute("EXPLAIN QUERY PLAN SELECT region, severity FROM niggle"
+                     " WHERE reported_at_ms >= ? ORDER BY reported_at_ms", (0,)).fetchall()
+check("today's-niggles read uses idx_niggle_reported (no TEMP B-TREE)",
+      "TEMP B-TREE" not in " ".join(r["detail"] for r in plan_n))
+before11 = con.execute("SELECT count(*) c FROM niggle").fetchone()["c"]
+con.executescript((SCHEMA_DIR / "011_niggle_tracking.sql").read_text(encoding="utf-8"))
+after11 = con.execute("SELECT count(*) c FROM niggle").fetchone()["c"]
+check("011 re-apply is a no-op (idempotent)", before11 == after11 == 2, f"{before11} == {after11}")
+
+# --- 14. report severity side-car (012) ------------------------------------------
+print("\n[14] report_severity (012) — Phase 12 Step 5")
+con.execute("INSERT INTO subjective_report (report_id, date, reported_at_ms, raw_text,"
+            " matched_entry_id) VALUES (7001, '2026-06-14', 0, 'knee sore', 'pain-mild')")
+con.execute("INSERT INTO report_severity (report_id, severity) VALUES (7001, 6)")
+joined = con.execute(
+    "SELECT sr.matched_entry_id, rs.severity FROM subjective_report sr"
+    " LEFT JOIN report_severity rs ON rs.report_id = sr.report_id"
+    " WHERE sr.report_id = 7001").fetchone()
+check("severity joins back to its report", joined["matched_entry_id"] == "pain-mild" and joined["severity"] == 6)
+for bad in (0, 11):
+    try:
+        con.execute("INSERT INTO report_severity (report_id, severity) VALUES (?, ?)", (8000 + bad, bad))
+        check(f"severity CHECK rejects {bad}", False)
+    except sqlite3.IntegrityError:
+        check(f"severity CHECK rejects {bad}", True)
+con.execute("DELETE FROM subjective_report WHERE report_id = 7001")
+orphan = con.execute("SELECT count(*) c FROM report_severity WHERE report_id = 7001").fetchone()["c"]
+check("report delete cascades its severity row", orphan == 0)
+before12 = con.execute("SELECT count(*) c FROM report_severity").fetchone()["c"]
+con.executescript((SCHEMA_DIR / "012_report_severity.sql").read_text(encoding="utf-8"))
+after12 = con.execute("SELECT count(*) c FROM report_severity").fetchone()["c"]
+check("012 re-apply is a no-op (idempotent)", before12 == after12, f"{before12} == {after12}")
+
+# --- 15. profile_slot (013) + wipeActiveBlockState cascade ------------------------
+print("\n[15] profile_slot (013) + safe state wipe — Phase 12 Step 6")
+slots = con.execute("SELECT slot_id, name, json_extract(profile_json, '$.training_age') AS ta, is_active"
+                    " FROM profile_slot ORDER BY slot_id").fetchall()
+check("four training-age profile slots seeded",
+      len(slots) == 4 and [s["ta"] for s in slots] == ["beginner", "intermediate", "advanced", "elite"])
+active_ta = con.execute("SELECT training_age FROM athlete_profile WHERE profile_id = 1").fetchone()["training_age"]
+check("exactly one slot active, matching the live athlete_profile training age",
+      sum(s["is_active"] for s in slots) == 1 and
+      next(s["ta"] for s in slots if s["is_active"] == 1) == active_ta)
+check("a slot's profile_json carries a full profile snapshot",
+      con.execute("SELECT json_extract(profile_json, '$.objective') AS o,"
+                  " json_extract(profile_json, '$.base_rpe_cap') AS r FROM profile_slot WHERE slot_id = 4")
+      .fetchone()["o"] is not None)
+try:
+    con.execute("INSERT INTO profile_slot (slot_id, name, profile_json) VALUES (99, 'x', 'not json')")
+    check("profile_json CHECK rejects malformed JSON", False)
+except sqlite3.IntegrityError:
+    check("profile_json CHECK rejects malformed JSON", True)
+
+# wipeActiveBlockState cascade — seed an active block + today's reports/niggle.
+TODAY = days[-1].isoformat()
+con.execute("INSERT INTO training_block (block_id, start_date, objective, status, created_at_ms)"
+            " VALUES (700, ?, 'hybrid', 'active', 0)", (TODAY,))
+con.execute("INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type)"
+            " VALUES (700, 1, 'gpp', 'LINEAR')")
+con.execute("INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index,"
+            " focus, phase, session_date) VALUES (700, 700, 1, 1, 'lower', 'accumulation', ?)", (TODAY,))
+con.execute("INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id,"
+            " sets, reps, target_rpe) VALUES (700, 700, 1, 1, 4, 5, 8.0)")
+con.execute("INSERT INTO slot_override (planned_slot_id, target_load_kg, reason, created_at_ms)"
+            " VALUES (700, 120.0, 'test override', 0)")
+con.execute("INSERT INTO subjective_report (report_id, date, reported_at_ms, raw_text, matched_entry_id, halt)"
+            " VALUES (700, ?, 0, 'knee sore', 'pain-mild', 1)", (TODAY,))
+con.execute("INSERT INTO report_severity (report_id, severity) VALUES (700, 6)")
+con.execute("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('w1', 'knee', 5, 9999999999999)")
+sets_before = con.execute("SELECT count(*) c FROM set_record").fetchone()["c"]
+# The wipe: active block (cascades) + today's subjective reports (cascades) + niggles.
+con.execute("DELETE FROM training_block WHERE status = 'active'")
+con.execute("DELETE FROM subjective_report WHERE date = ?", (TODAY,))
+con.execute("DELETE FROM niggle WHERE reported_at_ms >= 0")
+orphans = con.execute(
+    "SELECT (SELECT count(*) FROM planned_session WHERE block_id = 700) +"
+    " (SELECT count(*) FROM planned_slot WHERE planned_slot_id = 700) +"
+    " (SELECT count(*) FROM slot_override WHERE planned_slot_id = 700) +"
+    " (SELECT count(*) FROM block_meta WHERE block_id = 700) +"
+    " (SELECT count(*) FROM report_severity WHERE report_id = 700) AS c").fetchone()["c"]
+check("state wipe cascades cleanly — no orphaned session/slot/override/meta/severity", orphans == 0, str(orphans))
+sets_after = con.execute("SELECT count(*) c FROM set_record").fetchone()["c"]
+check("state wipe PRESERVES training history (set_record + mech_daily triggers untouched)",
+      sets_after == sets_before)
+before13 = con.execute("SELECT count(*) c FROM profile_slot").fetchone()["c"]
+con.executescript((SCHEMA_DIR / "013_profile_slot.sql").read_text(encoding="utf-8"))
+after13 = con.execute("SELECT count(*) c FROM profile_slot").fetchone()["c"]
+check("013 re-apply is a no-op (idempotent)", before13 == after13 == 4, f"{before13} == {after13}")
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

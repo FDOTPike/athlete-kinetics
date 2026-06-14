@@ -32,11 +32,13 @@
  */
 import {
   DIFFICULTY_RANK,
+  EXPERIENCE_SEVERITY,
   MOVEMENT_PREFERENCE,
   PATTERN_TO_CATEGORY,
   type DifficultyRating,
   type MovementPattern,
   type MovementPreference,
+  type TrainingAge,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -67,10 +69,14 @@ export const PATTERN_JOINTS: Record<MovementPattern, readonly Joint[]> = {
 // ---------------------------------------------------------------------------
 // Tunables
 // ---------------------------------------------------------------------------
-/** Subjective niggle band that triggers Layer 3 (inclusive). Below = ignore;
- *  above = a halt the prescription engine owns, not a swap. */
-export const NIGGLE_MIN = 3;
-export const NIGGLE_MAX = 5;
+/** The niggle severity band is EXPERIENCE-WEIGHTED (Phase 12 Step 5): the live
+ *  thresholds come from EXPERIENCE_SEVERITY[trainingAge]. These exported consts
+ *  remain the INTERMEDIATE baseline (the default when no training age is given):
+ *  a niggle at/above NIGGLE_MIN is operative, the Layer-3 triage band is
+ *  [NIGGLE_MIN, NIGGLE_MAX], and severity above NIGGLE_MAX is halt territory the
+ *  prescription engine owns, not a swap. */
+export const NIGGLE_MIN = EXPERIENCE_SEVERITY.intermediate.triageMin;
+export const NIGGLE_MAX = EXPERIENCE_SEVERITY.intermediate.haltMin - 1;
 /** CNS tax: at most this many accessories may replace one primary. */
 export const DEFAULT_ACCESSORY_RATIO = 3;
 
@@ -133,6 +139,9 @@ export interface SubstitutionInput {
   currentDayIndex: number;
   /** CNS tax cap override (clamped 1..DEFAULT_ACCESSORY_RATIO). */
   maxAccessoryRatio?: number;
+  /** Athlete training age — scales the niggle severity thresholds via
+   *  EXPERIENCE_SEVERITY (DOMS-vs-structural). Defaults to 'intermediate'. */
+  trainingAge?: TrainingAge;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +181,10 @@ export interface SubstitutionResult {
   layer3Triage: { color: typeof SUBSTITUTION_COLORS.triage; cluster: TriageCluster | null };
   /** movement_ids the injury guardrail removed (structural joint overlap). */
   blockedByGuardrail: number[];
+  /** True when a niggle reached the athlete's HALT threshold
+   *  (EXPERIENCE_SEVERITY[age].haltMin): too severe to train around — the UI
+   *  should advise ending the session rather than substituting. */
+  haltAdvised: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,11 +196,12 @@ const clampInt = (x: number, lo: number, hi: number): number =>
 const jointsOf = (m: SubstitutionMovement): readonly Joint[] =>
   m.joints ?? PATTERN_JOINTS[m.pattern];
 
-/** Joints with a non-trivial reported niggle (severity >= NIGGLE_MIN). */
-const injuredJoints = (niggles: readonly NiggleInput[]): Set<Joint> => {
+/** Joints with a niggle at/above the athlete's operative threshold (the
+ *  experience-weighted `triageMin`). */
+const injuredJoints = (niggles: readonly NiggleInput[], triageMin: number): Set<Joint> => {
   const out = new Set<Joint>();
   for (const n of niggles) {
-    if (n.severity < NIGGLE_MIN) continue;
+    if (n.severity < triageMin) continue;
     const region = n.region.toLowerCase();
     for (const j of JOINTS) {
       if (region.includes(j) || region.includes(j.replace('_', ' '))) out.add(j);
@@ -220,8 +234,12 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   const ratio = clampInt(input.maxAccessoryRatio ?? DEFAULT_ACCESSORY_RATIO, 1, DEFAULT_ACCESSORY_RATIO);
   const inventory = new Set(input.inventory);
   const niggles = input.niggles ?? [];
-  const injured = injuredJoints(niggles);
+  // Experience-weighted thresholds (DOMS-vs-structural): a beginner tolerates
+  // more before a niggle bars a joint or triages; an elite reacts sooner.
+  const { triageMin, haltMin } = EXPERIENCE_SEVERITY[input.trainingAge ?? 'intermediate'];
+  const injured = injuredJoints(niggles, triageMin);
   const guarded = injured.size > 0;
+  const haltAdvised = niggles.some((n) => n.severity >= haltMin);
   const targetCategory = PATTERN_TO_CATEGORY[input.target.pattern];
   const targetRank = DIFFICULTY_RANK[input.target.difficulty];
   const blocked = new Set<number>();
@@ -287,10 +305,11 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   layer2.sort(byDaySwap);
 
   // --- LAYER 3: niggle / injury accessory triage (orange) ------------------
-  // A niggle in [NIGGLE_MIN, NIGGLE_MAX] converts ONE compound/supplementary
-  // movement into <= ratio joint-safe accessory movements.
+  // A niggle in the experience-weighted triage band [triageMin, haltMin)
+  // converts ONE compound/supplementary movement into <= ratio joint-safe
+  // accessory movements. Above haltMin is halt territory (haltAdvised), not a swap.
   let cluster: TriageCluster | null = null;
-  const niggleTripped = niggles.some((n) => n.severity >= NIGGLE_MIN && n.severity <= NIGGLE_MAX);
+  const niggleTripped = niggles.some((n) => n.severity >= triageMin && n.severity < haltMin);
   if (niggleTripped && input.target.is_compound) {
     const pool: SubstitutionMovement[] = [];
     for (const m of input.library) {
@@ -320,5 +339,6 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     layer2DaySwap: { color: SUBSTITUTION_COLORS.day_swap, options: layer2 },
     layer3Triage: { color: SUBSTITUTION_COLORS.triage, cluster },
     blockedByGuardrail: [...blocked].sort((a, b) => a - b),
+    haltAdvised,
   };
 }
