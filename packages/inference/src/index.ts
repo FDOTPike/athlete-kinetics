@@ -39,6 +39,7 @@ export {
   type EquipmentItem,
   type MovementPattern,
   type MovementPrefix,
+  type MovementPrefixCondition,
   type MovementPreference,
   type Objective,
   type MacroPhase,
@@ -78,6 +79,11 @@ export {
   type PlannedSessionPlan,
   type PlannedSlotPlan,
 } from './blockGenerator';
+export {
+  calculateEffectiveLoad,
+  NEUTRAL_PREFIX_MODIFIER,
+  type EffectiveLoad,
+} from './conditionEngine';
 export {
   applyProfileLimits,
   applySeverityToGuardrail,

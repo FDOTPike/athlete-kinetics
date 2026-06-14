@@ -28,6 +28,7 @@ const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
   SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
+const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
   SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
   MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
@@ -52,7 +53,8 @@ try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
 for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
   '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
-  '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql']) {
+  '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
+  '014_movement_prefixes.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 const movements = db.prepare(
@@ -576,6 +578,42 @@ check('default trainingAge == intermediate (severity 4 trips, 3 does not)',
     .layer3Triage.cluster !== null &&
   computeSubstitutions({ ...baseInput, niggles: [{ region: 'knee', severity: 3 }] })
     .layer3Triage.cluster === null);
+
+console.log('[15] condition multipliers (014 movement_prefix + conditionEngine)');
+const r2 = (n) => Math.round(n * 100) / 100;
+const r4 = (n) => Math.round(n * 10000) / 10000;
+const prefRows = db.prepare('SELECT prefix_name, cns_load_modifier AS cns,'
+  + ' stability_requirement_modifier AS stab, difficulty_modifier AS diff FROM movement_prefix').all();
+check('movement_prefix seeded (5 baseline conditions)', prefRows.length === 5,
+  prefRows.map((r) => r.prefix_name).join(','));
+check('every movement_prefix.prefix_name is a MOVEMENT_PREFIXES member (unified vocabulary)',
+  prefRows.every((r) => prefixSet.has(r.prefix_name)),
+  prefRows.map((r) => r.prefix_name).join(','));
+const cond = (r) => ({ prefixName: r.prefix_name, cnsLoadModifier: r.cns,
+  stabilityRequirementModifier: r.stab, difficultyModifier: r.diff });
+const idn = calculateEffectiveLoad(100, []);
+check('calculateEffectiveLoad([]) is identity (100 / 100 / 1.0)',
+  idn.baseLoad === 100 && idn.effectiveLoad === 100 && idn.cnsLoad === 100 && idn.stabilityDemand === 1,
+  `${idn.effectiveLoad}/${idn.cnsLoad}/${idn.stabilityDemand}`);
+const kb = prefRows.find((r) => r.prefix_name === 'KB');
+const one = calculateEffectiveLoad(100, [cond(kb)]);
+check('single KB prefix folds the seeded weights (cns/eff/stab)',
+  one.cnsLoad === r2(100 * kb.cns) && one.effectiveLoad === r2(100 * kb.diff)
+  && one.stabilityDemand === r4(kb.stab),
+  `${one.cnsLoad}/${one.effectiveLoad}/${one.stabilityDemand}`);
+const ch = prefRows.find((r) => r.prefix_name === 'Chains');
+const ab = calculateEffectiveLoad(100, [cond(kb), cond(ch)]);
+const ba = calculateEffectiveLoad(100, [cond(ch), cond(kb)]);
+check('two prefixes compound multiplicatively and are order-independent',
+  ab.cnsLoad === ba.cnsLoad && ab.effectiveLoad === ba.effectiveLoad
+  && ab.stabilityDemand === ba.stabilityDemand
+  && ab.cnsLoad === r2(100 * kb.cns * ch.cns)
+  && ab.effectiveLoad === r2(100 * kb.diff * ch.diff)
+  && ab.stabilityDemand === r4(kb.stab * ch.stab),
+  `${ab.cnsLoad} == ${ba.cnsLoad}`);
+check('non-positive / non-finite base load clamps to 0',
+  calculateEffectiveLoad(-50, [cond(kb)]).effectiveLoad === 0
+  && calculateEffectiveLoad(NaN, [cond(kb)]).cnsLoad === 0);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

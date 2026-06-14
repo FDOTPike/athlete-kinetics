@@ -44,6 +44,7 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'niggle' },              // 011
   { type: 'table', name: 'report_severity' },     // 012
   { type: 'table', name: 'profile_slot' },        // 013
+  { type: 'table', name: 'movement_prefix' },     // 014
 ];
 
 function userVersion(db: MigrationDb): number {

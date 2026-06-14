@@ -105,6 +105,9 @@ export type TaxonomyImplement = (typeof TAXONOMY_IMPLEMENTS)[number];
  *  token stored in movement_detail.supported_prefixes MUST be a member here. */
 export const MOVEMENT_PREFIXES = [
   'DB', 'BB', 'KB', 'Free Weight', 'Banded', 'Bodyweight', 'Cable',
+  // Phase 13: condition prefixes that carry CNS/stability/difficulty weights
+  // (movement_prefix, 014). Unified into the ONE vocabulary — not a third.
+  'Earthquake Bar', 'Chains', 'Bottom-Up',
 ] as const;
 export type MovementPrefix = (typeof MOVEMENT_PREFIXES)[number];
 
@@ -119,7 +122,23 @@ export const PREFIX_TO_IMPLEMENT: Record<MovementPrefix, TaxonomyImplement> = {
   Banded: 'band',
   Bodyweight: 'bodyweight',
   Cable: 'cable',
+  'Earthquake Bar': 'barbell',
+  Chains: 'barbell',
+  'Bottom-Up': 'kettlebell',
 };
+
+/** A prefix's mathematical condition weights (movement_prefix, 014). Each
+ *  modifier is a positive multiplier (1.0 = neutral / a standard barbell); > 1.0
+ *  amplifies. `prefixName` is a MOVEMENT_PREFIXES member (the unified vocabulary,
+ *  machine-checked by verify:blocks). Pure inference reads these via
+ *  conditionEngine.calculateEffectiveLoad. Distinct from the implement-token
+ *  type `MovementPrefix` — this is the weight row that hangs off a prefix. */
+export interface MovementPrefixCondition {
+  prefixName: MovementPrefix;
+  cnsLoadModifier: number;
+  stabilityRequirementModifier: number;
+  difficultyModifier: number;
+}
 
 /** movement_detail.difficulty_rating CHECK domain (ascending difficulty). */
 export const DIFFICULTY_RATINGS = ['Beginner', 'Intermediate', 'Advanced'] as const;

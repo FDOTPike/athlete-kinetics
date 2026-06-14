@@ -14,7 +14,7 @@
  *      strictly less raw strength set volume than the pure strength block
  *      (concurrent-training interference damping).
  */
-import type { MacroPhase, MovementPattern, Objective, SchemaType, UserProfile } from './types';
+import type { MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
 
 // ---------------------------------------------------------------------------
 // Inputs / outputs (mirror the 007 block tables 1:1)
@@ -37,6 +37,10 @@ export interface PlannedSlotPlan {
   sets: number;         // 1..10 (schema CHECK)
   reps: number;         // 1..30
   target_rpe: number;   // 5.0..10.0
+  /** Phase 13: optional implement/loading conditions applied to this slot
+   *  (MOVEMENT_PREFIXES members). TS-only for now — not persisted, not set by
+   *  the generator; conditionEngine folds their movement_prefix weights in. */
+  applied_prefixes?: readonly MovementPrefix[];
 }
 
 export interface PlannedSessionPlan {

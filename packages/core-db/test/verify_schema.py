@@ -40,7 +40,8 @@ print("\n[1] schema files execute cleanly")
 for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql",
           "005_subjective_report.sql", "006_user_profile.sql", "007_program_engine.sql",
           "008_taxonomy.sql", "009_periodization.sql", "010_movement_library.sql",
-          "011_niggle_tracking.sql", "012_report_severity.sql", "013_profile_slot.sql"]:
+          "011_niggle_tracking.sql", "012_report_severity.sql", "013_profile_slot.sql",
+          "014_movement_prefixes.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -510,6 +511,31 @@ before13 = con.execute("SELECT count(*) c FROM profile_slot").fetchone()["c"]
 con.executescript((SCHEMA_DIR / "013_profile_slot.sql").read_text(encoding="utf-8"))
 after13 = con.execute("SELECT count(*) c FROM profile_slot").fetchone()["c"]
 check("013 re-apply is a no-op (idempotent)", before13 == after13 == 4, f"{before13} == {after13}")
+
+# --- 16. movement_prefix (014) — Phase 13 Step 1 condition multipliers --------
+print("\n[16] movement_prefix (014) — Phase 13 Step 1 condition multipliers")
+prefRows = con.execute("SELECT prefix_name, cns_load_modifier, stability_requirement_modifier,"
+                       " difficulty_modifier FROM movement_prefix ORDER BY prefix_name").fetchall()
+check("five baseline condition prefixes seeded", len(prefRows) == 5,
+      ",".join(r["prefix_name"] for r in prefRows))
+check("all modifiers are positive multipliers (> 0)",
+      all(r["cns_load_modifier"] > 0 and r["stability_requirement_modifier"] > 0
+          and r["difficulty_modifier"] > 0 for r in prefRows))
+for col in ("cns_load_modifier", "stability_requirement_modifier", "difficulty_modifier"):
+    try:
+        con.execute(f"INSERT INTO movement_prefix (prefix_name, {col}) VALUES ('Bad', 0)")
+        check(f"CHECK rejects a non-positive {col}", False)
+    except sqlite3.IntegrityError:
+        check(f"CHECK rejects a non-positive {col}", True)
+try:
+    con.execute("INSERT INTO movement_prefix (prefix_name) VALUES ('KB')")
+    check("prefix_name PRIMARY KEY rejects a duplicate", False)
+except sqlite3.IntegrityError:
+    check("prefix_name PRIMARY KEY rejects a duplicate", True)
+before14 = con.execute("SELECT count(*) c FROM movement_prefix").fetchone()["c"]
+con.executescript((SCHEMA_DIR / "014_movement_prefixes.sql").read_text(encoding="utf-8"))
+after14 = con.execute("SELECT count(*) c FROM movement_prefix").fetchone()["c"]
+check("014 re-apply is a no-op (idempotent)", before14 == after14 == 5, f"{before14} == {after14}")
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

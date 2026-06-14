@@ -743,3 +743,70 @@ Conclude with the standard MASTER LEDGER ENTRY block.
   resync. 0 rejected.
 - **Gates:** `npm run verify:all` — all 11 green (memory 450.1 MiB).
 - Not committed — Steps 3-6 held in the working tree pending the on-device check.
+  (Committed `c355b79`, merged to master via PR #2 after the on-device check.)
+
+## Entry 0015 — 2026-06-15 · Phase 13, Step 1 (condition multipliers & schema)
+
+> Note: a provisional Phase 12 Step 7 (hard wipe) was committed on `phase-12-step-7`
+> with working ledger entries 0015/0016, then ROLLED BACK (PR #3 closed, never merged).
+> master's stable boundary is Step 6 (`c355b79`), so this Phase 13 entry reuses 0015.
+
+### Input G(x)
+
+```
+SYSTEM ARCHITECTURE MANDATE: PHASE 13, STEP 1 (Condition Multipliers & Schema)
+Opus, we are officially initiating Phase 13: The Movement Directory & Condition Weights. The Lead Architect has identified that the physical implement used (e.g., Kettlebells, Earthquake bars, Bands) mathematically alters the difficulty curve, stability requirement, and CNS load of a base movement.
+We must build the data and inference layer for this before touching the UI.
+THE BOUNDARY INVARIANTS:
+1. Additive Schema (Migration 014): Create a new SQLite migration `014_movement_prefixes.sql`. Define a strict `movement_prefix` table. It must include fields for `prefix_name` (e.g., "Kettlebell", "Banded", "Bottom-Up"), `cns_load_modifier` (REAL, e.g., 1.2 for higher CNS tax), and `stability_requirement_modifier` (REAL).
+2. Seed the Table: Include a SQL seed script within the migration to populate 4-5 baseline prefixes based on the Architect's examples (Kettlebell, Banded, Earthquake Bar, Chains).
+3. The Pure Math Engine: In the `inference` package, create a pure TypeScript utility (e.g., `conditionEngine.ts`). Write a deterministic function `calculateEffectiveLoad(baseLoad, prefixModifiers)` that takes a base movement's metrics and multiplies them by the applied prefix constraints.
+4. Type Definitions: Update `types.ts` to include the `MovementPrefix` interface and ensure `PlannedSession` movement slots can optionally accept an array of `applied_prefixes`.
+
+EXECUTION:
+Write the SQL migration, update the TS schemas, and build the inference utility. Do NOT build the React Native UI for this yet. Run the 11-Gate CI `verify:all` suite to ensure the new schema and types do not break existing block generation. Conclude with the MASTER LEDGER ENTRY.
+```
+
+### Output F(G(x))
+
+- **Premise corrections (surfaced + confirmed before building):**
+  - `MovementPrefix` already exists as a string-union TYPE (`types.ts`, the implement
+    tokens). The mandate's "`MovementPrefix` interface" would be a duplicate identifier
+    → the new interface is **`MovementPrefixCondition`** (prefixName + the 3 modifiers).
+  - The codebase already has a prefix/implement model (`MOVEMENT_PREFIXES`,
+    `PREFIX_TO_IMPLEMENT`, `movement_detail.supported_prefixes`) with an explicit
+    "one source of truth, not a third vocabulary" rule (010). Operator chose
+    (AskUserQuestion) the **unified** model: `MOVEMENT_PREFIXES` EXTENDED with
+    `'Earthquake Bar'`,`'Chains'`,`'Bottom-Up'`; `movement_prefix.prefix_name` ∈ that
+    one vocabulary (machine-checked). KB(=Kettlebell)/Banded gain weights too.
+  - The slot type is `PlannedSlotPlan` (not `PlannedSession`) — got an OPTIONAL,
+    TS-only, non-persisted `applied_prefixes?: readonly MovementPrefix[]`.
+  - Added a third `difficulty_modifier` beyond the two named modifiers, because the
+    mandate prose calls out the "difficulty curve" as a third amplified dimension.
+- **`014_movement_prefixes.sql`** (new) — STRICT `movement_prefix(prefix_name PK,
+  cns_load_modifier, stability_requirement_modifier, difficulty_modifier)`, each
+  `REAL NOT NULL DEFAULT 1.0 CHECK (> 0)`; seeds 5 conditions (KB, Banded, Earthquake
+  Bar, Chains, Bottom-Up). Additive + idempotent. Registered in `migrations.ts`,
+  runner `SENTINELS`, and the load lists of verify_schema/store/migrations/blocks.
+- **`conditionEngine.ts`** (new, inference) — pure deterministic
+  `calculateEffectiveLoad(baseLoad, prefixModifiers)` → `{baseLoad, effectiveLoad =
+  base × Πdifficulty, cnsLoad = base × Πcns, stabilityDemand = Πstability,
+  appliedPrefixes}`. Total/safe (empty → identity; non-finite/negative base → 0;
+  modifier ≤ 0 guarded). Fixed rounding (load 2dp, stability 4dp). **Standalone — NOT
+  wired into block generation**, so existing generation is untouched. Exported in
+  `index.ts`.
+- **`types.ts`** — `MOVEMENT_PREFIXES` + `PREFIX_TO_IMPLEMENT` extended (Earthquake
+  Bar→barbell, Chains→barbell, Bottom-Up→kettlebell); `MovementPrefixCondition` added.
+- **Verifiers** — `verify:db [16]` (seed=5, all 3 CHECK(>0) exercised, PK rejects dup,
+  014 idempotent) and `verify:blocks [15]` (5 seeded, every prefix_name ∈
+  MOVEMENT_PREFIXES, conditionEngine identity / single-prefix fold / 2-prefix
+  order-independent compound pinned to seeds / negative+NaN clamp). `conditionEngine.ts`
+  added to `build:inference-test`.
+- **Adversarial review** (`p13s1-condition-engine-review`, 7 agents / 4 dimensions):
+  3 findings, **all confirmed (1 MEDIUM, 2 LOW), 0 in production code** — all
+  verifier-completeness gaps, all fixed: (MED) [16] only exercised the cns CHECK →
+  now all 3; (LOW) compound difficulty not pinned to seeds → pinned; (LOW) duplicate
+  `[13]` section label → renumbered `[15]`.
+- **Gates:** `npm run verify:all` — all 11 green on the first run; still green after the
+  verifier hardening. Existing block generation unaffected (conditionEngine standalone).
+- Not committed / not pushed — no UI yet (Step 2), and the push gate stands.
