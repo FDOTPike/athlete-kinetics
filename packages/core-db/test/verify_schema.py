@@ -41,7 +41,7 @@ for f in ["001_mechanical_input.sql", "002_telemetry.sql", "003_state_vector.sql
           "005_subjective_report.sql", "006_user_profile.sql", "007_program_engine.sql",
           "008_taxonomy.sql", "009_periodization.sql", "010_movement_library.sql",
           "011_niggle_tracking.sql", "012_report_severity.sql", "013_profile_slot.sql",
-          "014_movement_prefixes.sql"]:
+          "014_movement_prefixes.sql", "015_set_prefix.sql"]:
     con.executescript((SCHEMA_DIR / f).read_text(encoding="utf-8"))
     check(f, True)
 con.execute("PRAGMA foreign_keys = ON")
@@ -536,6 +536,40 @@ before14 = con.execute("SELECT count(*) c FROM movement_prefix").fetchone()["c"]
 con.executescript((SCHEMA_DIR / "014_movement_prefixes.sql").read_text(encoding="utf-8"))
 after14 = con.execute("SELECT count(*) c FROM movement_prefix").fetchone()["c"]
 check("014 re-apply is a no-op (idempotent)", before14 == after14 == 5, f"{before14} == {after14}")
+
+# --- 17. set_prefix (015) — Phase 13 Step 2 historical persistence -----------
+print("\n[17] set_prefix (015) — Phase 13 Step 2 historical persistence")
+sp_ids = [r["set_id"] for r in con.execute(
+    "SELECT set_id FROM set_record ORDER BY set_id LIMIT 6").fetchall()]
+check("set_record rows exist to attach side-cars to", len(sp_ids) >= 6, str(len(sp_ids)))
+con.execute("INSERT INTO set_prefix (set_id, applied_prefixes, cns_load_modifier,"
+            " stability_requirement_modifier, difficulty_modifier, effective_load_kg)"
+            " VALUES (?, '[\"KB\"]', 1.15, 1.30, 1.10, 161.0)", (sp_ids[0],))
+row = con.execute("SELECT applied_prefixes, effective_load_kg FROM set_prefix WHERE set_id = ?",
+                  (sp_ids[0],)).fetchone()
+check("side-car persists applied_prefixes + effective load",
+      row is not None and row["applied_prefixes"] == '["KB"]' and row["effective_load_kg"] == 161.0)
+for i, col in enumerate(("cns_load_modifier", "stability_requirement_modifier", "difficulty_modifier")):
+    try:
+        con.execute(f"INSERT INTO set_prefix (set_id, {col}, effective_load_kg) VALUES (?, 0, 10)",
+                    (sp_ids[1 + i],))
+        check(f"CHECK rejects a non-positive {col} in set_prefix", False)
+    except sqlite3.IntegrityError:
+        check(f"CHECK rejects a non-positive {col} in set_prefix", True)
+try:
+    con.execute("INSERT INTO set_prefix (set_id, effective_load_kg) VALUES (?, -1)", (sp_ids[4],))
+    check("CHECK rejects a negative effective_load_kg", False)
+except sqlite3.IntegrityError:
+    check("CHECK rejects a negative effective_load_kg", True)
+try:
+    con.execute("INSERT INTO set_prefix (set_id, applied_prefixes, effective_load_kg) VALUES (?, 'not json', 10)",
+                (sp_ids[5],))
+    check("json_valid CHECK rejects malformed applied_prefixes", False)
+except sqlite3.IntegrityError:
+    check("json_valid CHECK rejects malformed applied_prefixes", True)
+con.execute("DELETE FROM set_record WHERE set_id = ?", (sp_ids[0],))
+orphan_sp = con.execute("SELECT count(*) c FROM set_prefix WHERE set_id = ?", (sp_ids[0],)).fetchone()["c"]
+check("set_record delete cascades its set_prefix side-car (no orphan)", orphan_sp == 0)
 
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

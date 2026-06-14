@@ -22,11 +22,12 @@ import m011 from './schema/011_niggle_tracking.sql';
 import m012 from './schema/012_report_severity.sql';
 import m013 from './schema/013_profile_slot.sql';
 import m014 from './schema/014_movement_prefixes.sql';
+import m015 from './schema/015_set_prefix.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

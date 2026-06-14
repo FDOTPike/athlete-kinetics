@@ -810,3 +810,68 @@ Write the SQL migration, update the TS schemas, and build the inference utility.
 - **Gates:** `npm run verify:all` — all 11 green on the first run; still green after the
   verifier hardening. Existing block generation unaffected (conditionEngine standalone).
 - Not committed / not pushed — no UI yet (Step 2), and the push gate stands.
+  (Update: committed `91a1eef` on branch `phase-13` at the start of Step 2.)
+
+## Entry 0016 — 2026-06-15 · Phase 13, Step 2 (prefix UI & dynamic execution)
+
+### Input G(x)
+
+```
+SYSTEM ARCHITECTURE MANDATE: PHASE 13, STEP 2 (Prefix UI & Dynamic Execution)
+
+Opus, excellent work on Step 1. The structural invariants and premise corrections (MovementPrefixCondition, PlannedSlotPlan, and the difficulty_modifier) are approved.
+
+First, commit Step 1 locally to seal the foundation. Then, execute Step 2: wiring the mathematical condition engine into the Active Session UI.
+
+THE BOUNDARY INVARIANTS:
+
+State Hydration: Update the Zustand store to load the movement_prefix table into memory at boot, storing them strictly as MovementPrefixCondition objects.
+
+Session UI Integration: In the Active Session screen, add a lightweight, high-contrast selector to the active movement slot (working off PlannedSlotPlan). It must allow the user to toggle prefixes (e.g., KB, Banded).
+
+Dynamic Math Execution: When a prefix is toggled, instantly pass the base movement data through calculateEffectiveLoad() in conditionEngine.ts. The UI must dynamically display the three altered vectors: Effective Load, CNS Load, and Stability Demand.
+
+Historical Persistence: Update the set_record schema/insert logic. When a set is logged, the applied_prefixes array AND the resulting mathematical multipliers MUST be persisted to the historical record to ensure Conservation of Volume is accurately tracked over time.
+
+EXECUTION:
+Write the pure TypeScript React Native component updates, Zustand store actions, and set_record insertion logic. Rely exclusively on the types established in Step 1. Run the 11-Gate CI verify:all suite to ensure no strict type bounds are violated. Conclude with the MASTER LEDGER ENTRY.
+```
+
+### Output F(G(x))
+
+- Committed Step 1 first (`91a1eef`, branch `phase-13`) as instructed, then built Step 2.
+- **Premise corrections (surfaced):** (1) `set_record` (001) is shipped + append-only
+  with a GENERATED `tonnage_kg` + the `mech_daily` rollup triggers feeding readiness;
+  `ALTER ADD COLUMN` breaks self-heal — so "update the set_record schema" became a 1:1
+  **side-car** (the 009/010 precedent), not new columns. (2) **`mech_daily` /
+  readiness left untouched** — "Conservation of Volume" is satisfied by persisting
+  `effective_load_kg` (+ compound multipliers) per set (recoverable); baking effective
+  volume into the readiness rollup would be a separate, higher-risk change, not made.
+- **`015_set_prefix.sql`** (new) — STRICT `set_prefix(set_id PK REFERENCES set_record
+  ON DELETE CASCADE, applied_prefixes TEXT CHECK json_valid, cns/stability/difficulty
+  modifiers REAL CHECK > 0, effective_load_kg REAL CHECK >= 0)`. Additive + idempotent.
+  Registered in `migrations.ts`, runner `SENTINELS`, and all four verifier loaders.
+- **`useStore.ts`** — `movementPrefixes: MovementPrefixCondition[]` hydrated at boot
+  (validated against `PREFIX_SET`, mirroring the other row mappers); `logSet` gained
+  `appliedPrefixes?` → routes the base load through `calculateEffectiveLoad` and writes
+  the compound multipliers + effective load to `set_prefix`; **`editSet` re-syncs the
+  side-car** from the persisted token list so effective volume stays accurate after an
+  edit (raw `mech_daily` already corrected by `trg_set_record_au`).
+- **`SessionScreen.tsx`** — a high-contrast **CONDITIONS** multi-toggle row (separate
+  from the existing single-select IMPLEMENT row) over the hydrated prefixes; a live
+  **Effective Load / CNS Load / Stability** vector readout via `calculateEffectiveLoad`;
+  LOG passes the toggled conditions to `logSet` then clears them; reset on movement
+  switch. Design-system primitives only, no new libs.
+- **`verify:db [17]`** — side-car persistence, all 3 modifier `CHECK(>0)` + the
+  `effective_load_kg >= 0` floor + `json_valid`, and the FK `ON DELETE CASCADE`.
+- **Adversarial review** (`p13s2-prefix-ui-review`, 8 agents / 4 dimensions): 4 findings,
+  **all confirmed (1 MEDIUM production, 1 LOW, 2 verifier), all fixed** — (MED) `editSet`
+  left the side-car stale → re-sync added; (LOW) hydration cast unvalidated → `PREFIX_SET`
+  filter; (verifier) `[17]` only probed the cns CHECK and never the `effective_load_kg`
+  floor → now all four CHECKs exercised.
+- **Gates:** `npm run verify:all` — all 11 green on the first run; still green after fixes.
+- **Lock & Build (Phase 13 Step 2 deploy mandate):** Step 2 committed to `phase-13`
+  and pushed; PR opened to trigger CI + the `athlete-kinetics-apk` build for the
+  on-device check. **ACWR/volume bifurcation ratified** — Raw Tonnage = Structural
+  Load (`mech_daily`, untouched), Effective Tonnage = CNS/Stability Load (`set_prefix`).
+  Do NOT alter the ACWR/readiness math yet; Readiness integration is **Phase 13 Step 3**.

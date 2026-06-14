@@ -31,6 +31,7 @@ import {
   JOINTS,
   PATTERN_TO_CATEGORY,
   TAXONOMY_CATEGORIES,
+  calculateEffectiveLoad,
   targetLoadKg,
   type DaySwapOption,
   type Joint,
@@ -235,6 +236,7 @@ export default function SessionScreen(): React.JSX.Element {
   const applyDaySwap = useStore((s) => s.applyDaySwap);
   const niggles = useStore((s) => s.niggles);
   const reportNiggle = useStore((s) => s.reportNiggle);
+  const movementPrefixes = useStore((s) => s.movementPrefixes);
   const logSet = useStore((s) => s.logSet);
   const deleteSet = useStore((s) => s.deleteSet);
   const editSet = useStore((s) => s.editSet);
@@ -252,6 +254,9 @@ export default function SessionScreen(): React.JSX.Element {
   const [expandedCats, setExpandedCats] = useState<Set<TaxonomyCategory>>(new Set());
   /** Selected implement prefix for the active movement (null == base name). */
   const [prefix, setPrefix] = useState<MovementPrefix | null>(null);
+  /** Phase 13: toggled condition prefixes (KB/Banded/...) whose movement_prefix
+   *  weights amplify the active set and persist to set_prefix on log. */
+  const [appliedConditions, setAppliedConditions] = useState<MovementPrefix[]>([]);
   /** Logged-set row whose long-press context seam is open. */
   const [menuSetId, setMenuSetId] = useState<number | null>(null);
   /** Logged-set row currently in inline-edit mode (mutually exclusive w/ menu). */
@@ -274,6 +279,7 @@ export default function SessionScreen(): React.JSX.Element {
   // previous movement may not be in this one's supported set).
   useEffect(() => {
     setPrefix(null);
+    setAppliedConditions([]);
   }, [activeMovementId]);
 
   if (session === null) {
@@ -633,6 +639,36 @@ export default function SessionScreen(): React.JSX.Element {
         </Text>
       )}
 
+      {/* ---- condition prefixes: weighted toggles (Phase 13 Step 2) ---- */}
+      {activeMovement !== null && movementPrefixes.length > 0 && (
+        <View style={styles.prefixRow}>
+          <Text style={styles.prefixLabel}>CONDITIONS</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.prefixChips}
+            keyboardShouldPersistTaps="handled"
+          >
+            {movementPrefixes.map((c) => {
+              const on = appliedConditions.includes(c.prefixName);
+              return (
+                <Pressable
+                  key={c.prefixName}
+                  onPress={() => setAppliedConditions((prev) =>
+                    on ? prev.filter((p) => p !== c.prefixName) : [...prev, c.prefixName])}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={`Condition ${c.prefixName}${on ? ', applied' : ''}`}
+                  style={[styles.condChip, on && styles.condChipOn]}
+                >
+                  <Text style={[styles.condChipText, on && styles.condChipTextOn]}>{c.prefixName}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {/* ---- input steppers ---- */}
       <Stepper
         label="REPS"
@@ -655,11 +691,37 @@ export default function SessionScreen(): React.JSX.Element {
         onInc={() => setRpe((v) => clamp(v + 0.5, 5, 10))}
       />
 
+      {/* ---- condition-adjusted vectors (Phase 13 dynamic math) ---- */}
+      {(() => {
+        const activeConds = movementPrefixes.filter((c) => appliedConditions.includes(c.prefixName));
+        if (activeConds.length === 0) return null;
+        const eff = calculateEffectiveLoad(loadKg, activeConds);
+        return (
+          <View style={styles.condVectors}>
+            <View style={styles.condVec}>
+              <Text style={styles.condVecVal}>{eff.effectiveLoad.toFixed(1)}</Text>
+              <Text style={styles.condVecLabel}>EFFECTIVE KG</Text>
+            </View>
+            <View style={styles.condVec}>
+              <Text style={styles.condVecVal}>{eff.cnsLoad.toFixed(1)}</Text>
+              <Text style={styles.condVecLabel}>CNS LOAD</Text>
+            </View>
+            <View style={styles.condVec}>
+              <Text style={styles.condVecVal}>×{eff.stabilityDemand.toFixed(2)}</Text>
+              <Text style={styles.condVecLabel}>STABILITY</Text>
+            </View>
+          </View>
+        );
+      })()}
+
       {/* ---- primary action ---- */}
       <Pressable
         disabled={activeMovementId === null}
         onPress={() => {
-          if (activeMovementId !== null) logSet(activeMovementId, reps, loadKg, rpe, loggedName);
+          if (activeMovementId !== null) {
+            logSet(activeMovementId, reps, loadKg, rpe, loggedName, appliedConditions);
+            setAppliedConditions([]);
+          }
         }}
         accessibilityRole="button"
         accessibilityLabel={`Log set: ${reps} reps at ${loadKg.toFixed(1)} kilograms, RPE ${rpe.toFixed(1)}`}
@@ -1211,6 +1273,31 @@ const styles = StyleSheet.create({
   prefixChipOn: { borderColor: palette.green, backgroundColor: '#10241D' },
   prefixChipText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   prefixChipTextOn: { color: palette.green },
+  condChip: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.line,
+    backgroundColor: palette.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  condChipOn: { borderColor: palette.amber, backgroundColor: '#2A210F' },
+  condChipText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  condChipTextOn: { color: palette.amber },
+  condVectors: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  condVec: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.amber,
+    backgroundColor: '#2A210F',
+  },
+  condVecVal: { color: palette.amber, fontSize: 20, fontWeight: '800' },
+  condVecLabel: { color: palette.dim, fontSize: 10, letterSpacing: 1.5, marginTop: 2 },
   loggingName: {
     color: palette.text,
     fontSize: 13,

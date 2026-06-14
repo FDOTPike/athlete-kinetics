@@ -51,12 +51,14 @@ import {
   type LoadedCodebase,
   type MovementPattern,
   type MovementPrefix,
+  type MovementPrefixCondition,
   type MovementPreference,
   type NiggleInput,
   type PhraseCodebase,
   type SubstitutionMovement,
   type SubstitutionResult,
   type PhraseEntry,
+  calculateEffectiveLoad,
   targetLoadKg,
   type Prescription,
   type ProfileContext,
@@ -221,6 +223,9 @@ interface KineticsStore {
   /** Saved profile snapshots (013 multi-tenancy); exactly one is active and
    *  mirrors `profile` / athlete_profile. */
   profileSlots: ProfileSlot[];
+  /** Phase 13: movement_prefix (014) hydrated at boot as MovementPrefixCondition
+   *  objects — the condition weights the Session tab folds via conditionEngine. */
+  movementPrefixes: MovementPrefixCondition[];
   /** True when the semantic embedder is wired; the keyword safety layer
    *  works regardless. */
   triageReady: boolean;
@@ -319,8 +324,10 @@ interface KineticsStore {
   startSession: () => void;
   /** Append a logged set. `displayName` carries the prefix-engine
    *  concatenation (e.g. 'DB Bench Press') into the in-memory log payload;
-   *  falls back to the movement's canonical name when absent. */
-  logSet: (movementId: number, reps: number, loadKg: number, rpe: number, displayName?: string) => void;
+   *  falls back to the movement's canonical name when absent. `appliedPrefixes`
+   *  (Phase 13) are the toggled condition tokens; their compound multipliers +
+   *  effective load are persisted to the set_prefix side-car. */
+  logSet: (movementId: number, reps: number, loadKg: number, rpe: number, displayName?: string, appliedPrefixes?: readonly MovementPrefix[]) => void;
   /** Hard-delete one logged set. The 001 AFTER DELETE trigger
    *  (trg_set_record_ad) drains mech_daily by this row's exact contribution;
    *  the in-memory list drops the row. */
@@ -634,6 +641,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   lastEndedSessionId: null,
   biometricsStatus: 'off',
   profileSlots: [],
+  movementPrefixes: [],
 
   boot: () => {
     if (get().status === 'ready') return;
@@ -657,6 +665,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       const rms = rowsOf<{ movement_id: number; load_kg: number }>(
         getDb().executeSync('SELECT movement_id, load_kg FROM one_rep_max'),
       );
+      const prefixRows = rowsOf<{
+        prefix_name: string; cns_load_modifier: number;
+        stability_requirement_modifier: number; difficulty_modifier: number;
+      }>(getDb().executeSync(
+        'SELECT prefix_name, cns_load_modifier, stability_requirement_modifier, difficulty_modifier FROM movement_prefix',
+      ));
       set({
         oneRepMaxes: Object.fromEntries(rms.map((r) => [r.movement_id, r.load_kg])),
         status: 'ready',
@@ -664,6 +678,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         movements,
         today: localToday(),
         profile: profileRow !== undefined ? profileFromRow(profileRow) : DEFAULT_PROFILE,
+        movementPrefixes: prefixRows
+          .filter((r) => PREFIX_SET.has(r.prefix_name))
+          .map((r) => ({
+            prefixName: r.prefix_name as MovementPrefix,
+            cnsLoadModifier: r.cns_load_modifier,
+            stabilityRequirementModifier: r.stability_requirement_modifier,
+            difficultyModifier: r.difficulty_modifier,
+          })),
       });
       get().refreshVector();
       // Today's active niggles (drive the substitution guardrail / Layer 3).
@@ -1323,7 +1345,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshBlock(); // the future grid lost a slot
   },
 
-  logSet: (movementId, reps, loadKg, rpe, displayName) => {
+  logSet: (movementId, reps, loadKg, rpe, displayName, appliedPrefixes) => {
     const s = get().session;
     if (s === null) return;
     const movement = get().movements.find((m) => m.movement_id === movementId);
@@ -1352,6 +1374,26 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const setId = rowsOf<{ id: number }>(
       d.executeSync('SELECT last_insert_rowid() AS id'),
     )[0]!.id;
+
+    // Phase 13 Step 2: persist applied condition prefixes + their compound
+    // multipliers + the effective load to the set_prefix side-car (set_record
+    // can't gain columns idempotently). mech_daily (raw tonnage -> readiness) is
+    // deliberately untouched; effective volume is tracked here, per set.
+    const applied = (appliedPrefixes ?? []).filter((p, i, a) => a.indexOf(p) === i);
+    if (applied.length > 0) {
+      const conds = get().movementPrefixes.filter((c) => applied.includes(c.prefixName));
+      if (conds.length > 0) {
+        const eff = calculateEffectiveLoad(safeLoad, conds);
+        const cnsMod = conds.reduce((p, c) => p * c.cnsLoadModifier, 1);
+        const diffMod = conds.reduce((p, c) => p * c.difficultyModifier, 1);
+        d.executeSync(
+          `INSERT INTO set_prefix (set_id, applied_prefixes, cns_load_modifier,
+             stability_requirement_modifier, difficulty_modifier, effective_load_kg)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [setId, JSON.stringify(eff.appliedPrefixes), cnsMod, eff.stabilityDemand, diffMod, eff.effectiveLoad],
+        );
+      }
+    }
 
     const logged: LoggedSet = {
       set_id: setId,
@@ -1389,10 +1431,38 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // UPDATE OF reps, load_kg, rpe fires trg_set_record_au, which re-deltas
     // mech_daily (old contribution out, new in). tonnage_kg is a GENERATED
     // STORED column — SQLite recomputes it; we mirror it in memory below.
-    getDb().executeSync(
+    const dEdit = getDb();
+    dEdit.executeSync(
       'UPDATE set_record SET reps = ?, load_kg = ?, rpe = ? WHERE set_id = ?',
       [safeReps, safeLoad, safeRpe, setId],
     );
+    // Phase 13: a prefixed set's effective load depends on the (edited) base
+    // load, so re-sync the set_prefix side-car from its persisted token list —
+    // else effective_load_kg goes stale and effective volume is unrecoverable.
+    // mech_daily is already corrected by trg_set_record_au above (untouched).
+    const sp = rowsOf<{ applied_prefixes: string }>(
+      dEdit.executeSync('SELECT applied_prefixes FROM set_prefix WHERE set_id = ?', [setId]),
+    )[0];
+    if (sp !== undefined) {
+      let tokens: MovementPrefix[] = [];
+      try {
+        const parsed = JSON.parse(sp.applied_prefixes);
+        if (Array.isArray(parsed)) {
+          tokens = parsed.filter((x): x is MovementPrefix => typeof x === 'string');
+        }
+      } catch {
+        tokens = [];
+      }
+      const conds = get().movementPrefixes.filter((c) => tokens.includes(c.prefixName));
+      const eff = calculateEffectiveLoad(safeLoad, conds);
+      const cnsMod = conds.reduce((p, c) => p * c.cnsLoadModifier, 1);
+      const diffMod = conds.reduce((p, c) => p * c.difficultyModifier, 1);
+      dEdit.executeSync(
+        `UPDATE set_prefix SET cns_load_modifier = ?, stability_requirement_modifier = ?,
+           difficulty_modifier = ?, effective_load_kg = ? WHERE set_id = ?`,
+        [cnsMod, eff.stabilityDemand, diffMod, eff.effectiveLoad, setId],
+      );
+    }
     set({
       session: {
         ...s,
