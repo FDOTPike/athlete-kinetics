@@ -1,6 +1,8 @@
 node_modules/
 .claude/settings.local.json
 *.tsbuildinfo
+.vs/
+dist/
 packages/inference/test/.build/
 packages/core-db/test/.build/
 athlete_kinetics.seed.db

@@ -2,6 +2,118 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-06-15 — Phase 13 Step 4 (Autopilot Integration & Block Wiring)
+
+1. **`mech_daily` is NOT the per-pattern flaw source (the mandate said "pull from
+   mech_daily and 015_set_prefix").** `mech_daily` is a DATE-keyed cross-movement
+   rollup with a single weighted RPE — it has no pattern dimension and cannot
+   yield per-pattern ΔE. Per the derivation's §1 read budget ("windowed
+   set_record/niggle aggregates"), the per-pattern signal is sourced from
+   `set_record ⋈ session(date) ⋈ movement(pattern) ⋈ planned_slot(target_rpe) ⋈
+   set_prefix(effective_load_kg)` + `niggle`. `mech_daily`/`state_vector` provide
+   the calendar + ACWR context only, and stay **read-only** (invariant 6 held).
+
+2. **ΔE join is by `(session_date, movement_id)`** — there is no FK linking a
+   logged `session` (001) to a prescribed `planned_session` (007). The store's
+   derived table dedups multiple matching slots with `MIN(target_rpe)`
+   (deterministic; the conservative pick). Attenuation base is
+   `set_record.load_kg` (`set_prefix` stores only the effective load).
+   **Accepted limitation (adversarial review):** if a block is REGENERATED
+   mid-cycle, two blocks can hold plans on the same past window date, and
+   `MIN(target_rpe)` may match a set against a stale block's target — bounded
+   impact given the controller's ±0.5 RPE / ±1 set authority, the φ deadband,
+   and the `MIN_OBSERVATIONS` gate; exact per-block targeting is a future
+   refinement.
+
+2b. **The flaw window is the FIXED 21-CALENDAR-day grid, not the sparse set of
+   materialized `state_vector` dates** (adversarial-review fix). Using only
+   days that have a `state_vector` row would (a) DROP a niggle reported on a
+   pure rest day and (b) collapse the EMA recency grid to per-observed-day
+   instead of per-calendar-day. The store now builds the window from
+   `demoDates(today, 21)` and fills rest days with a neutral `state_vector`
+   placeholder (F reads only the window length). Niggle days are bucketed in
+   LOCAL JS (`localDateOf`, mirroring `startOfTodayMs`), never SQLite UTC
+   `date()`, so they agree with session/state_vector dates and the halt gate.
+
+3. **Halt → recovery = every week deloaded** (reuses the verified deload math:
+   sets ≈ halved, RPE = wave[0]−1.0, schema heat ignored), `phase='deload'`,
+   and ALL per-pattern corrections suppressed. This "snaps to the neutral
+   recovery template, drops volume, bypasses progressive overload" without new
+   untested code. The block-level halt fires on a severe ACTIVE niggle
+   (`severity ≥ EXPERIENCE_SEVERITY[age].haltMin`).
+
+4. **Per-pattern set deltas: −1 on every occurrence, +1 ONCE per pattern.** A
+   capacity-deficit reduction applies to every non-deload slot of the pattern
+   (conservative, floored at 1 set); a latent-headroom addition applies to the
+   pattern's first occurrence only — so the controller's block-wide `+2` cap
+   (`blockAddedSets`) is preserved even though a pattern recurs across sessions.
+   Corrections never touch the deload week (it is sacred) or locomotion rounds.
+
+5. **The daily-grain `deriveDailyAdjustment` composition into the LIVE
+   prescription path is DEFERRED.** Step 4 wires the BLOCK-level corrections
+   (the forward-facing `planned_slot` generation IS the forward write; immutable
+   by construction — the autopilot path only SELECTs history and INSERTs future
+   `planned_*`, never UPDATEs `session`/`set_record`). Folding the autopilot's
+   daily `AdjustmentVector` (load_modifier) into `derivePrescription`'s verified
+   three-layer chain is a separate, higher-risk integration that warrants its
+   own step + safety review — not bundled here. `deriveDailyAdjustment` remains
+   exported and available; today's daily vector still flows through the
+   unchanged `derivePrescription`.
+
+6. **No new CI gate.** Step 4 EXTENDED the existing verifiers (`verify:blocks`
+   [16] block wiring, `verify:autopilot` [11] window projection, `verify:store`
+   SQL + wiring tripwires) rather than adding a gate — `verify:all` stays at 12.
+
+## 2026-06-15 — Phase 13 Step 3 (Kinematic Autopilot)
+
+1. **The autopilot is a NEW isolated module (`packages/inference/src/
+   kinematicAutopilot.ts`), not edits to `conditionEngine.ts` /
+   `blockGenerator.ts`.** The mandate explicitly permitted "the appropriate
+   new isolated modules within /inference." Isolation keeps the verified
+   Step-6 boundary (blockGenerator) untouched and matches the per-engine
+   module pattern (blockGenerator / substitution / conditionEngine /
+   derivePrescription each stand alone). `F` and `u` are pure and standalone,
+   exactly as `conditionEngine` landed in Step 1.
+
+2. **`verify:all` is now 12 gates, not 11.** A new `verify:autopilot` gate
+   was added (the project rule: every layer ships a runnable verifier — the
+   same way `verify:biometrics` made it 11). It proves all six derivation
+   invariants with analytic φ pins. The mandate's "11-Gate" refers to the
+   pre-existing suite; the autopilot gate is additive.
+
+3. **"Step 3" per THIS mandate is the forward-looking PRESCRIPTION autopilot,
+   which explicitly PRESERVES `mech_daily` / ACWR — it is NOT the
+   effective-tonnage→readiness integration.** The mandate forbids editing the
+   backward-looking rollup triggers ("Volume history must remain completely
+   pure"). So `F` reads `effective_load_kg` only as a per-set condition
+   ATTENUATION weight inside the flaw signal; the raw tonnage / ACWR /
+   readiness pipeline is never touched (invariant 6). Folding effective
+   tonnage into readiness remains deferred — the bifurcation stands.
+
+4. **The control action lands STANDALONE; live block-generation wiring is
+   deferred.** `deriveControlAction` / `deriveDailyAdjustment` produce bounded
+   corrections and a daily `AdjustmentVector`, fully verified, but
+   `generateBlock` does not yet consume a `ControlAction` (mirrors Step 1,
+   where `conditionEngine` shipped standalone before being wired). The
+   PDF §2 block-level `target_rpe` clamp to `[5.0, base_rpe_cap]` is the
+   downstream block consumer's job; `deriveControlAction` emits only bounded
+   ±0.5 RPE deltas, and `deriveDailyAdjustment` already clamps the daily
+   `rpe_cap` to `[5.0, 10.0]` — so every emitted delta is bounded today.
+   `deriveControlAction(report, profile, macroPhase)` keeps the mandate's
+   3-arg signature (the PDF folded `objective`/`macroPhase` into `profile`);
+   `profile`/`macroPhase` are part of the operator contract for that future
+   wiring (`void`-marked until then).
+
+5. **Source discrepancies, resolved.** The mandate cited
+   `./docs/Kinematic_Autopilot_Derivation.pdf` (33 pages); the actual file is
+   `docs/Kinematic Autopilot Math Derivation - DeepSeek.pdf` (31 pages). The
+   operator also supplied a clean text mirror
+   (`docs/Kinematic_Autopilot_Derivation.md.txt`) — used as the source of
+   truth, since PDF text-extraction had dropped the reciprocal in the
+   attenuation weight `w_p = mean( 1 / max(1, eff/base) )`. The reciprocal is
+   load-bearing (a hard condition ATTENUATES, not amplifies, the deficit
+   reading) and is implemented per the clean mirror.
+
 ## 2026-06-12 — Phase 11 step 1 (Health Connect telemetry)
 
 1. **RHR lands in the EXISTING `hrv_daily.resting_hr` column** — no new

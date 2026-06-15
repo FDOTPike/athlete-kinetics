@@ -875,3 +875,170 @@ Write the pure TypeScript React Native component updates, Zustand store actions,
   on-device check. **ACWR/volume bifurcation ratified** — Raw Tonnage = Structural
   Load (`mech_daily`, untouched), Effective Tonnage = CNS/Stability Load (`set_prefix`).
   Do NOT alter the ACWR/readiness math yet; Readiness integration is **Phase 13 Step 3**.
+
+
+## Entry 0017 — 2026-06-15 · Phase 13, Step 3 (Kinematic Autopilot Implementation)
+
+### Input G(x)
+
+```
+SYSTEM ARCHITECTURE MANDATE: PHASE 13, STEP 3 (Kinematic Autopilot Implementation)
+
+Opus, we have cleanly merged the Phase 13 Step 2 branch into master. The 015_set_prefix side-car infrastructure is locked down and verified. We are now executing Step 3: compiling the discrete-time Kinematic Autopilot engine into our inference core.
+
+The 33-page mathematical derivation and algorithm blueprint derived by our pure math functor (DeepSeek-R1) is located locally in the workspace at: ./docs/Kinematic_Autopilot_Derivation.pdf. Read it token-for-token.
+
+THE BOUNDARY INVARIANTS:
+
+Implement Trailing Flaw Detection (F): Build the pure TypeScript logic in the inference package to process a 3-week trailing window of logged sets exactly as defined in Section 2 of the PDF. It must calculate the target-vs-actual RPE Error Delta (deltaE) over our compiled pattern matrices, utilizing the effective_load_kg tracked in the 015_set_prefix side-car.
+
+Implement the Bounded Control Action (u_{t+1}): Write the localized code for deriveControlAction(report, profile, macroPhase). You MUST enforce the strict Proportional-Integral (PI) anti-windup bounds from the paper: snap all prescription modifications cleanly to LOAD_MODIFIER_LITERALS, clamp set adjustments to +/-1 per pattern (max +2 sets accumulated overall across the block), and respect Halt Supremacy (dLoad_p = 1.0 if halt === true).
+
+Preserve Database Rollups: You are explicitly prohibited from editing the backward-looking mech_daily database rollup triggers. This autopilot calculates adjustments for the forward-looking prescription layer only. Volume history must remain completely pure.
+
+Edge-Safe Execution: No external libraries or high-overhead array wrappers. It must compile down to raw, lightning-fast JS arithmetic arrays running well within our 450MB Hermes memory ceiling.
+
+EXECUTION:
+Hand-translate the calculus and anti-windup algorithms from the local PDF into conditionEngine.ts and blockGenerator.ts (or the appropriate new isolated modules within /inference). Run the 11-Gate CI verify:all suite to validate type-safety and structural invariance. Output the standard MASTER LEDGER ENTRY block upon successful execution.
+```
+
+### Output F(G(x))
+
+- **Source handling / premise corrections (surfaced):** (1) the cited path
+  `./docs/Kinematic_Autopilot_Derivation.pdf` (33 pages) does not exist — the
+  real file is `docs/Kinematic Autopilot Math Derivation - DeepSeek.pdf` (31
+  pages). (2) This environment can't render PDFs; `pypdf` text-extraction
+  **dropped the reciprocal** in the attenuation weight. The operator supplied a
+  clean mirror `docs/Kinematic_Autopilot_Derivation.md.txt`, used as the source
+  of truth: `w_p = mean( 1 / max(1, eff/base) ) ∈ (0,1]` — a hard condition
+  ATTENUATES (not amplifies) the deficit reading, matching §4.1 intent. (3)
+  **Scope:** this mandate redefines "Step 3" as the forward-looking PRESCRIPTION
+  autopilot that explicitly PRESERVES `mech_daily`/ACWR — NOT the
+  effective→readiness integration (that stays deferred; see DEVIATION_LOG).
+- **`kinematicAutopilot.ts`** (new, isolated inference module — mandate permitted
+  "new isolated modules"; keeps the verified Step-6 boundary untouched, mirrors
+  how `conditionEngine` landed standalone in Step 1). Pure hand-translation of
+  the derivation: **`F` = `detectFlaws`** — per-pattern φ ∈ [−1,1] from an
+  EMA-recency-weighted (`ω_i=λ^(20-i)`, λ=0.88) deficit/headroom accumulation
+  (`P` carries condition-attenuation × capped-ΔE × injury-attenuation
+  `max(0,1−j/10)`; `N` is headroom magnitude with NO injury term), a `D_norm`
+  deadband, a `tanh` trend over disjoint old/recent windows, the 0.7/0.3 blend,
+  and a thin-data/injury classification. **`u_{t+1}` = `deriveControlAction`**
+  (φ-band table → bounded `{dLoad,dSet,dRpe,prefBias}`; 4-trigger monotone
+  override; halt → fully neutral; anti-windup budget ≤ +2 sets to the
+  most-headroom patterns) + **`deriveDailyAdjustment`** (min-composition →
+  `AdjustmentVector`, snapped into the shipped literal domains). Constants
+  (`FLAW_DETECTION_CONSTANTS`, `CONTROL_AUTHORITY`) + `snapToLiteral` exported.
+  Standalone — NOT yet wired into `generateBlock` (deferred, like Step 1).
+  Added to `index.ts` and `build:inference-test`.
+- **`verify:autopilot` (the 12th gate)** — ~60 checks proving all six derivation
+  invariants with analytic φ pins (S_max cancels: constant ΔE=+3→0.7, w=0.5→0.35,
+  injury→0.42/caution, recency-only→0.7009), control-law table incl. inclusive
+  ±0.4/±0.15 boundaries, anti-windup ranking, domain closure, and edge/fail-safe.
+- **Adversarial review** (`p13s3-autopilot-review`, 13 agents / 4 dimensions):
+  the run was **truncated by an Anthropic session limit** (the per-finding
+  verify agents died), so the workflow's `confirmed:[]` was NOT trustworthy —
+  I retrieved the completed reviewers' **17 findings** from the transcripts and
+  self-adjudicated each against code + derivation. **3 genuine PRODUCTION
+  defects, all fixed:** (HIGH, real invariant-2 violation) a severe niggle on
+  `<5` logged days collapsed to flawClass `'neutral'` (thin-data gate precedes
+  the injury gate) and the φ-ladder then RAISED load into the injury → fixed by
+  surfacing `maxJointSev` and applying the §u injury override + confidence
+  pre-gate independently of the class; (HIGH, fail-danger) a non-finite φ fell
+  through the φ-ladder's terminal `else` into the RAISE row → leading
+  `Number.isFinite` fail-safe; (MED) daily `rpe_cap` clamped to `[5,10]` not
+  `base_rpe_cap`, letting headroom push the session ceiling +0.5 over the
+  athlete's configured max → clamped to `base_rpe_cap` (resolves the
+  derivation's §2-vs-§4 inconsistency conservatively). Plus NaN/Inf/negative-w
+  input sanitization in `F`, `tanh` arg-clamp (exp-overflow safe), disjoint
+  trend windows, and ~8 verifier false-confidence gaps closed (tautological
+  subset checks replaced with produced-value assertions; recency direction,
+  deadband, inclusive boundaries, N-asymmetry, and anti-windup ranking now
+  pinned; a behavioural invariant-6 tripwire proving `F` ignores acwr/acute/
+  chronic). The LOW signature-divergence finding was already documented in
+  DEVIATION_LOG.
+- **Gates:** `npm run verify:all` — all **12 green** on the first full run; still
+  12 green after the review-driven hardening. `typecheck` (app strict tsconfig,
+  which compiles the module) and `verify:memory` (450 MB) included.
+- Not committed / not pushed — the on-device-check push gate stands; no UI/block
+  wiring yet (autopilot is standalone, exactly as `conditionEngine` shipped in
+  Step 1).
+
+
+## Entry 0018 — 2026-06-15 · Phase 13, Step 4 (Autopilot Integration & Block Wiring)
+
+### Input G(x)
+
+```
+SYSTEM ARCHITECTURE MANDATE: PHASE 13, STEP 4 (Autopilot Integration & Block Wiring)
+
+Opus, Ledger Entry 0017 is locked, verified, and accepted. Your logic adjudication on the non-finite phi and the thin-data niggle bypass was exceptional defensive engineering.
+
+We are now executing Step 4: Wiring the isolated kinematicAutopilot.ts into our forward-looking block generation engine.
+
+THE BOUNDARY INVARIANTS:
+
+The Block Generator Intercept: Import deriveControlAction into blockGenerator.ts (or the exact module responsible for generating the 4-week JSON plan).
+
+State Hydration: Ensure the detectFlaws (F) trailing 3-week window correctly pulls its history from the mech_daily and 015_set_prefix data stores without triggering a heavy n+1 SQLite query cascade. Use an optimized, flat-array projection if possible to respect the Hermes 450MB limit.
+
+Immutability of History: The wiring MUST NOT alter past completed sessions. The deriveDailyAdjustment modifications must map strictly to the forward-facing AdjustmentVector for future days.
+
+Halt Supremacy Flow: If the autopilot outputs halt === true (from severe joint load or safety overrides), the block generator must instantly snap to the neutral recovery template and drop the athlete's working volume down, bypassing any standard progressive overload loops.
+
+EXECUTION:
+Wire the module. Run the verify:all 12-Gate CI suite. If the determinism bound holds and all 12 gates remain green, output the final diffs and your standard MASTER LEDGER ENTRY for Phase 13, Step 4. Do not touch the React Native UI components yet; limit this strictly to the TS inference pipeline and DB state mapping. Let's prep this for an on-device APK test.
+```
+
+### Output F(G(x))
+
+- **Premise corrections (surfaced):** (1) `mech_daily` is a DATE-keyed
+  cross-movement rollup with no pattern dimension — it CANNOT source per-pattern
+  ΔE. Per the derivation's §1 read budget, the per-pattern signal comes from
+  `set_record ⋈ session(date) ⋈ movement(pattern) ⋈ planned_slot(target_rpe) ⋈
+  set_prefix(effective_load_kg)` + `niggle`; `mech_daily`/`state_vector` are
+  read-only calendar/ACWR context (invariant 6 held). (2) No FK links a logged
+  `session` to a prescribed `planned_session` — ΔE matches by
+  `(session_date, movement_id)`. (3) The daily-grain `deriveDailyAdjustment`
+  composition into the live `derivePrescription` chain is DEFERRED (separate
+  safety review); the BLOCK-level corrections are the forward write.
+- **`blockGenerator.ts` — the Block Generator Intercept** (invariant 1). Imports
+  `deriveControlAction`; `BlockInput` gains an optional `flawReport`. When
+  present the generator derives a bounded `ControlAction` and applies per-pattern
+  `dRpe` (added then re-clamped to `[5, base_rpe_cap]`/rehab≤7/0.5 grid) and
+  `dSet` (−1 on every non-deload slot; +1 ONCE per pattern, so the block-wide
+  `+2` cap holds) — NEVER on the deload week or locomotion. A `globalGuardrail.
+  halt` snaps the block to a **recovery template** (every week deloaded, volume
+  dropped, progressive overload bypassed, all corrections suppressed). New
+  `BlockPlan.recovery` / `autopilotAdjusted`. Absent `flawReport` ⇒ byte-identical
+  to the pre-Step-4 block.
+- **`autopilotProjection.ts` (new) — State Hydration** (invariant 2). Pure
+  `buildPatternWindow(windowDates, setRows, niggleRows)` pivots the flat grouped
+  rows into `PatternDailyDelta` aligned to the calendar, gap-tolerant, O(window).
+- **`useStore.ts` — DB state mapping.** `generateNewBlock` runs a bounded,
+  n+1-free read (ONE grouped per-(date,pattern) set aggregate + ONE windowed
+  niggle scan over the FIXED 21-calendar-day grid), builds the window, derives a
+  niggle-halt guardrail (`severity ≥ haltMin`), `detectFlaws → generateBlock`.
+  Immutability (invariant 3): the path only SELECTs history and INSERTs future
+  `planned_*` — never `session`/`set_record`.
+- **Verification (no new gate; `verify:all` stays 12):** `verify:blocks [16]`
+  (halt recovery + FLAT no-overload, corrections, anti-windup total-set-delta,
+  deload-sacred, backward-compat, thin-data safety), `verify:autopilot [11]`
+  (projection pivot + end-to-end), `verify:store` (EXECUTES the ΔE/attenuation
+  SQL on seeded rows + immutability/n+1/bounded source tripwires).
+- **Adversarial review** (`p13s4-wiring-review`, 3 dims): block-wiring reviewer
+  found **0** issues; the projection/verifier reviewers surfaced findings I
+  adjudicated. **2 real production fixes:** (HIGH) the window was indexed by
+  sparse `state_vector` dates → dropped rest-day niggles and distorted the EMA
+  recency grid → now the FIXED 21-calendar-day grid with neutral placeholders;
+  (HIGH) niggle day-bucketing used SQLite UTC `date()` while the whole pipeline
+  is LOCAL → now `localDateOf`/`startOfTodayMs`, consistent with the
+  active-niggle path. Plus ~5 verifier false-confidence gaps closed (the store
+  ΔE/attenuation/niggle SQL is now EXECUTED against seeded rows, not just
+  PREPARE-checked; immutability + n+1 + recovery-no-overload now machine-pinned).
+  One MEDIUM (`MIN(target_rpe)` cross-block on mid-cycle regeneration) accepted
+  as a bounded limitation (DEVIATION_LOG).
+- **Gates:** `npm run verify:all` — all **12 green** (first full run had the two
+  window bugs latent; green after the review fixes + verifier hardening).
+- Not committed / not pushed — prepped for the on-device APK test; the push gate
+  stands. UI untouched (mandate).
