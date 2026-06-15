@@ -347,6 +347,13 @@ interface KineticsStore {
   /** First-run affordance: 180-day deterministic demo athlete. Refuses to run
    *  unless the database is empty — it must never touch real training data. */
   loadDemoAthlete: () => void;
+  /** DESTRUCTIVE: wipe ALL training history + telemetry + derived state
+   *  (sessions, sets, blocks, cycles, telemetry, state_vector, niggles,
+   *  reports, 1RMs) so the demo athlete can be loaded fresh. KEEPS the
+   *  athlete_profile, the movement library, preferences, and saved profile
+   *  slots. The caller is expected to confirm first (the UI shows an alert).
+   *  Returns true if it actually cleared anything. */
+  resetTrainingData: () => boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1780,6 +1787,48 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     } finally {
       set({ triaging: false });
     }
+  },
+
+  resetTrainingData: () => {
+    const d = getDb();
+    const had = rowsOf<{ c: number }>(d.executeSync('SELECT count(*) AS c FROM session'))[0];
+    d.executeSync('BEGIN');
+    try {
+      // Children before parents, so it is correct whether or not foreign_keys is
+      // ON. KEEPS athlete_profile / movement library / preferences / profile_slot.
+      d.executeSync('DELETE FROM set_prefix');
+      d.executeSync('DELETE FROM set_record');
+      d.executeSync('DELETE FROM session_note');
+      d.executeSync('DELETE FROM report_severity');
+      d.executeSync('DELETE FROM slot_override');
+      d.executeSync('DELETE FROM planned_slot');
+      d.executeSync('DELETE FROM planned_session');
+      d.executeSync('DELETE FROM block_meta');
+      d.executeSync('DELETE FROM session');
+      d.executeSync('DELETE FROM micro_cycle');
+      d.executeSync('DELETE FROM macro_cycle');
+      d.executeSync('DELETE FROM training_block');
+      d.executeSync('DELETE FROM subjective_report');
+      d.executeSync('DELETE FROM niggle');
+      d.executeSync('DELETE FROM one_rep_max');
+      d.executeSync('DELETE FROM hrv_daily');
+      d.executeSync('DELETE FROM sleep_daily');
+      d.executeSync('DELETE FROM spo2_daily');
+      d.executeSync('DELETE FROM spo2_sample');
+      d.executeSync('DELETE FROM mech_daily');
+      d.executeSync('DELETE FROM state_vector');
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    // Reflect the now-empty DB in memory.
+    get().refreshVector();
+    get().refreshBlock();
+    get().refreshNiggles();
+    set({ oneRepMaxes: {} });
+    return (had?.c ?? 0) > 0;
   },
 
   loadDemoAthlete: () => {

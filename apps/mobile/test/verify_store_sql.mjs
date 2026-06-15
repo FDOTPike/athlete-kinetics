@@ -128,5 +128,42 @@ a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSy
 a('bounded: the set-aggregate carries a session_date window predicate', /WHERE s\.session_date >= \? AND s\.session_date <= \?/.test(hyd));
 a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for\s*\(|\.forEach\s*\(|\.map\s*\()[^;{]*executeSync/.test(hyd));
 
+// --- resetTrainingData: EXECUTE the store's wipe on seeded data -----------------
+// Proves the reset clears ALL history (so the demo can re-load) while KEEPING the
+// athlete_profile + movement library (the user's settings survive).
+console.log('[resetTrainingData — executed against seeded rows]');
+const resetBody = (() => {
+  const i = src.indexOf('resetTrainingData: () => {');
+  const j = src.indexOf('loadDemoAthlete: () => {', i);
+  return i >= 0 && j > i ? src.slice(i, j) : '';
+})();
+const resetTables = [...resetBody.matchAll(/DELETE FROM (\w+)'/g)].map((m) => m[1]);
+a('resetTrainingData body found with its unconditional DELETEs', resetTables.length >= 15, `${resetTables.length} tables`);
+a('reset NEVER clears athlete_profile / movement / profile_slot (settings survive)',
+  !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
+if (resetTables.length >= 15) {
+  const MAT = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8').replace(/^--.*$/gm, '');
+  db.exec('BEGIN');
+  db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (701,'2026-06-10',0)");
+  db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (701,701,1,1,5,100,8,0)");
+  db.exec("INSERT INTO set_prefix (set_id,applied_prefixes,cns_load_modifier,stability_requirement_modifier,difficulty_modifier,effective_load_kg) VALUES (701,'[]',1,1,1,100)");
+  db.exec("INSERT INTO niggle (id,region,severity,reported_at_ms) VALUES ('rn1','knee',5,1000)");
+  db.exec("INSERT INTO one_rep_max (movement_id,load_kg,updated_at_ms) VALUES (1,100,0)");
+  db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (701,'2026-06-01','strength',0)");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'lower','accumulation','2026-06-10')");
+  db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
+  db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
+  const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
+  const seeded = ['session', 'set_record', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_slot', 'mech_daily', 'state_vector'];
+  a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
+  const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
+  for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
+  a('reset cleared EVERY history table (demo can re-load)', resetTables.every((t) => cnt(t) === 0), seeded.map((t) => `${t}=${cnt(t)}`).filter((s) => !s.endsWith('=0')).join(',') || 'all empty');
+  a('athlete_profile + movement library SURVIVE the reset',
+    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 30,
+    `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}`);
+  db.exec('ROLLBACK');
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

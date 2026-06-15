@@ -8,6 +8,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -104,6 +105,25 @@ export default function ReadinessScreen(): React.JSX.Element {
   const boot = useStore((s) => s.boot);
   const refreshVector = useStore((s) => s.refreshVector);
   const loadDemoAthlete = useStore((s) => s.loadDemoAthlete);
+  const resetTrainingData = useStore((s) => s.resetTrainingData);
+
+  // The plain "LOAD DEMO ATHLETE" guard silently no-ops if real data already
+  // exists. This explicit, confirmed path wipes the training history first so the
+  // demo can load fresh — the only way to (re)load the demo over existing data.
+  const onResetAndLoadDemo = useCallback(() => {
+    Alert.alert(
+      'Reset & load demo?',
+      'This permanently deletes your training log, telemetry, blocks, and injury data so the 180-day demo athlete can load fresh. Your profile, equipment, and saved profiles are kept.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset & Load',
+          style: 'destructive',
+          onPress: () => { resetTrainingData(); loadDemoAthlete(); },
+        },
+      ],
+    );
+  }, [resetTrainingData, loadDemoAthlete]);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
@@ -155,6 +175,17 @@ export default function ReadinessScreen(): React.JSX.Element {
           accessibilityLabel="Load the 180 day demo athlete"
         >
           <Text style={styles.bigButtonText}>LOAD DEMO ATHLETE</Text>
+        </Pressable>
+        <Text style={styles.dimText}>
+          Already have data and want the demo? Reset clears your log first.
+        </Text>
+        <Pressable
+          style={styles.resetButton}
+          onPress={onResetAndLoadDemo}
+          accessibilityRole="button"
+          accessibilityLabel="Reset all training data and load the demo athlete"
+        >
+          <Text style={styles.resetButtonText}>RESET &amp; LOAD DEMO</Text>
         </Pressable>
         <Pressable
           style={styles.bigButton}
@@ -305,4 +336,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bigButtonText: { color: palette.green, fontSize: 18, fontWeight: '800', letterSpacing: 2 },
+  resetButton: {
+    minHeight: 48,
+    minWidth: 220,
+    borderRadius: 14,
+    backgroundColor: palette.surface,
+    borderWidth: 2,
+    borderColor: palette.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resetButtonText: { color: palette.red, fontSize: 15, fontWeight: '800', letterSpacing: 1.5 },
 });
