@@ -615,5 +615,111 @@ check('non-positive / non-finite base load clamps to 0',
   calculateEffectiveLoad(-50, [cond(kb)]).effectiveLoad === 0
   && calculateEffectiveLoad(NaN, [cond(kb)]).cnsLoad === 0);
 
+// --- [16] Phase 13 Step 4 — autopilot block wiring -------------------------------
+console.log('[16] autopilot block wiring (Phase 13 Step 4)');
+const MK_THRESH = 0.3;
+const makeFlawReport = (phiByPattern = {}, { halt = false } = {}) => {
+  const patterns = {};
+  let maxAbs = 0; let crit = null;
+  for (const p of MOVEMENT_PATTERNS) {
+    const spec = phiByPattern[p] ?? { phi: 0 };
+    const phi = Math.round(spec.phi * 1e4) / 1e4;
+    const flawClass = spec.flawClass ?? (phi >= MK_THRESH ? 'capacity_deficit'
+      : phi <= -MK_THRESH ? 'latent_headroom' : 'neutral');
+    patterns[p] = { pattern: p, phi, flawClass, observations: spec.obs ?? 21, maxJointSev: spec.maxJointSev ?? 0 };
+    if (Math.abs(phi) > maxAbs) { maxAbs = Math.abs(phi); crit = p; }
+  }
+  return {
+    patterns,
+    windowSummary: { dominantFlaw: crit === null ? 'neutral' : patterns[crit].flawClass, maxAbsPhi: Math.round(maxAbs * 1e4) / 1e4, criticalPattern: crit },
+    globalGuardrail: halt ? { load_multiplier: 1, set_delta: 0, rpe_cap_max: 10, halt: true, follow_up: null } : null,
+  };
+};
+const genFR = (over, flawReport) => generateBlock({ profile: prof(over), movements, startDate: START, flawReport });
+const patternOf = (mid) => movements.find((m) => m.movement_id === mid).pattern;
+const ndSlots = (plan, patt) => plan.sessions.filter((s) => s.phase !== 'deload')
+  .flatMap((s) => s.slots.filter((sl) => patternOf(sl.movement_id) === patt));
+
+const plain = gen({ objective: 'strength' });
+check('no flawReport → recovery=false, autopilotAdjusted=[] (backward compatible)',
+  plain.recovery === false && Array.isArray(plain.autopilotAdjusted) && plain.autopilotAdjusted.length === 0);
+const frMix = makeFlawReport({ squat: { phi: 0.5 }, hinge: { phi: -0.5 } });
+check('autopilot block is deterministic (double-run deep-equality)',
+  JSON.stringify(genFR({ objective: 'strength' }, frMix)) === JSON.stringify(genFR({ objective: 'strength' }, frMix)));
+
+// capacity_deficit lowers prescribed effort AND trims sets for the pattern.
+const defPlan = genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: 0.5 } }));
+const baseSq = ndSlots(plain, 'squat');
+const defSq = ndSlots(defPlan, 'squat');
+check('capacity_deficit lowers squat target_rpe vs baseline',
+  defSq.length === baseSq.length && defSq.every((sl, i) => sl.target_rpe <= baseSq[i].target_rpe) && defSq.some((sl, i) => sl.target_rpe < baseSq[i].target_rpe));
+check('capacity_deficit trims squat sets vs baseline',
+  defSq.every((sl, i) => sl.sets <= baseSq[i].sets) && defSq.some((sl, i) => sl.sets < baseSq[i].sets));
+check('the adjusted pattern is recorded in autopilotAdjusted', defPlan.autopilotAdjusted.includes('squat') && defPlan.recovery === false);
+
+// latent_headroom raises prescribed effort (bounded by base_rpe_cap).
+const upPlan = genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: -0.5 } }));
+const upSq = ndSlots(upPlan, 'squat');
+check('latent_headroom raises squat target_rpe vs baseline (≤ base_rpe_cap)',
+  upSq.some((sl, i) => sl.target_rpe > baseSq[i].target_rpe) && upSq.every((sl) => sl.target_rpe <= prof().base_rpe_cap));
+
+// halt supremacy: recovery template — every week deload, volume dropped, no corrections.
+const haltPlan = genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: 0.5 }, hinge: { phi: -0.5 } }, { halt: true }));
+check('halt → recovery=true and EVERY session phase is deload',
+  haltPlan.recovery === true && haltPlan.sessions.every((s) => s.phase === 'deload'));
+check('halt recovery drops total volume strictly below the normal block',
+  setsOf(haltPlan) < setsOf(plain), `${setsOf(haltPlan)} < ${setsOf(plain)}`);
+check('halt suppresses all per-pattern corrections (autopilotAdjusted empty)', haltPlan.autopilotAdjusted.length === 0);
+// recovery must BYPASS progressive overload — every strength slot shares the
+// SAME (deload) target_rpe, so there is no week-over-week effort ramp. (Volume
+// alone is blind to this: overload is carried by RPE, not set count.)
+const haltRpes = haltPlan.sessions.filter((s) => ['lower', 'upper', 'full'].includes(s.focus))
+  .flatMap((s) => s.slots.map((sl) => sl.target_rpe));
+check('halt recovery is FLAT: no week-over-week RPE ramp (overload bypassed)',
+  haltRpes.length > 0 && Math.max(...haltRpes) === Math.min(...haltRpes), `rpe range ${Math.min(...haltRpes)}..${Math.max(...haltRpes)}`);
+const normRpes = plain.sessions.filter((s) => s.week_index <= 3 && ['lower', 'upper', 'full'].includes(s.focus))
+  .flatMap((s) => s.slots.map((sl) => sl.target_rpe));
+check('halt recovery effort sits below the normal block (deloaded)',
+  Math.max(...haltRpes) < Math.max(...normRpes), `${Math.max(...haltRpes)} < ${Math.max(...normRpes)}`);
+
+// the deload week is SACRED — corrections never touch it.
+const wk4 = (plan) => plan.sessions.filter((s) => s.week_index === 4)
+  .flatMap((s) => s.slots.map((sl) => [sl.movement_id, sl.sets, sl.reps, sl.target_rpe]));
+check('deload week (4) is byte-identical with vs without corrections',
+  JSON.stringify(wk4(plain)) === JSON.stringify(wk4(genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: 0.5 }, hinge: { phi: -0.5 } })))));
+
+// corrected slots still satisfy the planned_slot CHECK domains.
+let corrDomains = true;
+for (const s of defPlan.sessions) for (const sl of s.slots) {
+  if (!Number.isInteger(sl.sets) || sl.sets < 1 || sl.sets > 10) corrDomains = false;
+  if (sl.target_rpe < 5.0 || sl.target_rpe > 10.0 || sl.target_rpe > prof().base_rpe_cap) corrDomains = false;
+}
+check('corrected slots hold the planned_slot CHECK domains (sets 1-10, rpe ≤ cap)', corrDomains);
+
+// anti-windup: across the whole block, at most MAX_ADDED_SETS (2) patterns gain a set.
+const plainGpp = gen({ objective: 'gpp', weekly_frequency: 6 });
+const allUp = genFR({ objective: 'gpp', weekly_frequency: 6 },
+  makeFlawReport(Object.fromEntries(MOVEMENT_PATTERNS.map((p) => [p, { phi: -0.5 }]))));
+const firstSets = (plan, patt) => { const s = ndSlots(plan, patt)[0]; return s ? s.sets : null; };
+let gained = 0;
+for (const p of MOVEMENT_PATTERNS) {
+  const b = firstSets(plainGpp, p); const u = firstSets(allUp, p);
+  if (b !== null && u !== null && u > b) gained += 1;
+}
+check('anti-windup: ≤ MAX_ADDED_SETS (2) patterns gain a set across the whole block', gained <= 2, `gained=${gained}`);
+// stronger: the TOTAL non-deload set count added vs baseline is ≤ 2 — catches a
+// mutant that applies +1 to EVERY occurrence of a budgeted pattern (not just once).
+const ndTotalSets = (plan) => plan.sessions.filter((s) => s.phase !== 'deload')
+  .reduce((a, s) => a + s.slots.reduce((b, sl) => b + sl.sets, 0), 0);
+const setDelta = ndTotalSets(allUp) - ndTotalSets(plainGpp);
+check('anti-windup: TOTAL block set additions ≤ MAX_ADDED_SETS (2)', setDelta >= 0 && setDelta <= 2, `delta=${setDelta}`);
+
+// thin-data / injury safety propagates through the generator (Step-3 R2#1 fix).
+const injuredThin = genFR({ objective: 'strength' },
+  makeFlawReport({ squat: { phi: -0.6, flawClass: 'neutral', obs: 4, maxJointSev: 9 } }));
+const injSq = ndSlots(injuredThin, 'squat');
+check('thin-data severe-niggle headroom never raises squat in the block',
+  injSq.every((sl, i) => sl.target_rpe <= baseSq[i].target_rpe && sl.sets <= baseSq[i].sets));
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

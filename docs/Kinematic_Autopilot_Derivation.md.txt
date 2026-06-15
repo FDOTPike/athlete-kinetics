@@ -1,0 +1,444 @@
+<thinking>
+We need to design the flaw detector F and controller u_{t+1} under all constraints. Let's derive closed-form math.
+
+First, model the per-pattern daily ΔE and condition weighting.
+
+For each movement pattern p, over the trailing 21-day window (days t-20 through t, inclusive), we collect all set records. For each day d (0 = oldest, 20 = most recent), define:
+
+- n_p(d) = number of sets logged for pattern p on day d.
+- If n_p(d) > 0:
+    e_p(d) = (1 / n_p(d)) * Σ_{set} (rpe_actual - target_rpe)   (ΔE, signed)
+    eff_ratio(set) = effective_load_kg / base_load_kg if base_load_kg > 0 else 1
+    w_p(d) = (1 / n_p(d)) * Σ_{set} 1 / max(1, eff_ratio(set))   (attenuation weight)
+  else: e_p(d) = null, w_p(d) = 0.
+- j_p(d) = max severity among niggle rows with region ∈ PATTERN_JOINTS[p] on day d, or 0 if none.
+
+We'll compute φ_p in several steps.
+
+### F – Flaw Detection closed-form
+
+1. Exponential decay weights:
+   λ ∈ (0,1) fixed constant. For day index i=0..20, weight ω_i = λ^(20-i).
+   S_max = Σ_{i=0}^{20} λ^i = (1 - λ^21) / (1 - λ).
+
+2. Accumulation:
+   P_p = Σ_{i=0}^{20} [if e_p(i) > 0] ω_i * w_p(i) * min(e_p(i), E_max) * max(0, 1 - j_p(i)/J_max)
+   N_p = Σ_{i=0}^{20} [if e_p(i) < 0] ω_i * w_p(i) * min(|e_p(i)|, E_max)
+   (N_p is positive magnitude of headroom; no injury attenuation for headroom.)
+
+3. Normalized base signal:
+   D_p = P_p - N_p
+   D_norm = D_p / (E_max * S_max)   (ranges roughly [-1,1])
+   Apply deadband: if |D_norm| < δ → D_norm := 0.
+   φ_base = D_norm
+
+4. Trend:
+   Compute mean e over oldest 7 days (i=0..6, where n>0) as e_old (if none, 0).
+   Compute mean e over newest 7 days (i=14..20, where n>0) as e_recent (if none, 0).
+   trend_raw = e_recent - e_old
+   t_p = tanh(trend_raw / T_scale)   // tanh(x) = (exp(2x)-1)/(exp(2x)+1)
+
+5. Combine:
+   φ_p = clamp(w_base * φ_base + w_trend * t_p, -1, 1)
+   Round to 4 decimal places: round4(φ_p).
+
+6. Observations count:
+   obs_p = number of days in window with n_p(i) > 0.
+
+7. Flaw classification:
+   If obs_p < MIN_OBSERVATIONS → flawClass = 'neutral'
+   Else if max_{i} j_p(i) ≥ triageMin (from EXPERIENCE_SEVERITY[trainingAge]) → flawClass = 'caution'
+   Else if φ_p ≥ θ_def → 'capacity_deficit'
+   Else if φ_p ≤ -θ_headroom → 'latent_headroom'
+   Else → 'neutral'
+
+All arithmetic uses the allowed primitives and fixed rounding where required (round4 for φ_p). The per-pattern ΔE aggregation is a simple scan over a bounded number of set rows; we pre‑compute daily arrays for each pattern.
+
+### u_{t+1} – Control Action
+
+We derive per-pattern corrections u_p = { dLoad_p, dSet_p, dRpe_p, prefBias_p } from φ_p and flaw class, then enforce safety limits.
+
+First, determine base target RPE for the pattern from the current objective and macroPhase:
+   base_rpe_wave = SCHEMES[objective].rpeWave   // [w1,w2,w3]
+   phase_rpe_mod = PHASE_MODS[macroPhase].rpe
+   The block’s prescribed RPE for each week w = base_rpe_wave[w] + phase_rpe_mod (clamped later).
+We'll treat the correction dRpe_p as a delta added to those values before clamping.
+
+Controller mapping (using φ_p thresholds):
+
+If flawClass is 'caution' or an active restrictive guardrail exists (load_multiplier < 1, set_delta < 0, rpe_cap_max < 10) or halt flag true:
+   // only reductions allowed
+   dRpe_p = min(0, raw_dRpe)
+   dSet_p = min(0, raw_dSet)
+   dLoad_target = min(1.0, raw_dLoad_target)
+   prefBias_p = min(0, raw_prefBias)
+Else, raw deltas from φ_p via deadband and thresholds:
+
+- If |φ_p| < 0.15 → no action: raw_dRpe=0, raw_dSet=0, raw_dLoad_target=1.0, raw_prefBias=0.
+- Else if φ_p ≥ 0.4: raw_dRpe = -0.5, raw_dSet = -1, raw_dLoad_target = 0.95, raw_prefBias = -1.
+- Else if φ_p ≥ 0.15: raw_dRpe = -0.5, raw_dSet = -1, raw_dLoad_target = 1.0,  raw_prefBias = -1.
+- Else if φ_p ≤ -0.4: raw_dRpe = +0.5, raw_dSet = +1, raw_dLoad_target = 1.05, raw_prefBias = +1.
+- Else if φ_p ≤ -0.15: raw_dRpe = +0.5, raw_dSet = +1, raw_dLoad_target = 1.0,  raw_prefBias = +1.
+
+After safety cap, snap dLoad_target to nearest literal in LOAD_MODIFIER_LITERALS (choose lower if tie) → dLoad_p.
+dSet_p = clamped raw_dSet (already integer, but ensure max −1).
+dRpe_p = clamp(raw_dRpe) to ±0.5, and further clamped so that final target_rpe ∈ [5.0, base_rpe_cap], where base_rpe_cap from profile.
+prefBias_p = raw_prefBias.
+
+Global volume budget: let PosSetPatterns = { p | dSet_p > 0 }. If Σ dSet_p > MAX_ADDED_SETS, sort PosSetPatterns by φ_p ascending (most negative first) and set dSet_p = 0 for patterns beyond the first MAX_ADDED_SETS (keep only up to 2 additions).
+
+Daily AdjustmentVector projection:
+Given the set of movement patterns scheduled on a specific day (DayPatterns ⊆ MovementPattern), derive a session-level AdjustmentVector:
+   load_mod = min_{p ∈ DayPatterns} dLoad_p   (if none, 1.0)
+   set_mod  = min_{p ∈ DayPatterns} dSet_p
+   rpe_cap  = min_{p ∈ DayPatterns} clamp( base_rpe_cap + dRpe_p, 5.0, 10.0 )
+             then round to nearest 0.5 (round(value*2)/2) and snap to nearest literal in RPE_CAP_LITERALS.
+   coaching_cue = deterministic text from the most severe active flaw (e.g., "Reduce effort on hinge due to persistent overexertion."). Use pattern with max |φ_p|.
+
+ClampAdjustment is applied as defined, but our derived values already lie in the literal sets.
+
+Now, compile constants and invariants.
+</thinking>
+
+# F — Flaw-Detection Operator
+
+## Closed-Form Formulas
+
+Let \( W = 21 \) trailing calendar days, indexed \( i = 0,1,\dots,20 \) where \( i=0 \) is the oldest day and \( i=20 \) is the current day \( t \).  
+For each movement pattern \( p \in \text{MOVEMENT\_PATTERNS} \), define the following daily arrays from the window:
+
+- \( n_p(i) \) = number of sets logged for pattern \( p \) on day \( i \) (0 if no session).
+- If \( n_p(i) > 0 \):
+  \[
+  e_p(i) = \frac{1}{n_p(i)}\sum_{\text{sets on day } i} \bigl(\text{rpe\_actual} - \text{target\_rpe}\bigr)
+  \]
+  \[
+  w_p(i) = \frac{1}{n_p(i)}\sum_{\text{sets on day } i} \frac{1}{\max\!\bigl(1,\; \text{effective\_load\_kg} / \max(\text{base\_load\_kg},\,0.01)\bigr)}
+  \]
+  If base_load_kg ≤ 0 the ratio is taken as 1.
+- \( j_p(i) \) = maximum severity over niggle rows on day \( i \) with `region ∈ PATTERN_JOINTS[p]`, or 0 if none.
+
+### 1. Exponential Moving Sum (EMA)
+Choose decay factor \( \lambda \in (0,1) \).  
+Weight for day \( i \): \( \omega_i = \lambda^{20-i} \).
+
+Normalization constant:
+\[
+S_{\max} = \sum_{k=0}^{20} \lambda^k = \frac{1-\lambda^{21}}{1-\lambda}
+\]
+
+### 2. Deficit / Headroom Accumulation
+\[
+\begin{aligned}
+P_p &= \sum_{\substack{i=0 \\ e_p(i)>0}}^{20} \omega_i \cdot w_p(i) \cdot \min(e_p(i),\, E_{\max}) \cdot \max\!\bigl(0,\; 1 - \frac{j_p(i)}{J_{\max}}\bigr) \\[4pt]
+N_p &= \sum_{\substack{i=0 \\ e_p(i)<0}}^{20} \omega_i \cdot w_p(i) \cdot \min(|e_p(i)|,\, E_{\max})
+\end{aligned}
+\]
+\( E_{\max} \) caps the RPE error magnitude; \( J_{\max}=10 \) (max niggle severity).
+
+### 3. Base Deficit Score
+\[
+D_p = P_p - N_p, \qquad 
+D_{\text{norm}} = \frac{D_p}{E_{\max} \cdot S_{\max}}
+\]
+Apply deadband:
+\[
+\phi_{\text{base}} = \begin{cases}
+0, & |D_{\text{norm}}| < \delta \\
+D_{\text{norm}}, & \text{otherwise}
+\end{cases}
+\]
+
+### 4. Trend Signal
+\[
+e_{\text{old}} = \frac{1}{|\{i\in[0,6]\mid n_p(i)>0\}|}\sum_{\substack{i=0\\ n_p(i)>0}}^{6} e_p(i), \quad
+e_{\text{recent}} = \frac{1}{|\{i\in[14,20]\mid n_p(i)>0\}|}\sum_{\substack{i=14\\ n_p(i)>0}}^{20} e_p(i)
+\]
+(empty sets → 0).
+
+\[
+t_p = \tanh\!\left(\frac{e_{\text{recent}} - e_{\text{old}}}{T_{\text{scale}}}\right)
+\quad \text{with } \tanh(x) = \frac{e^{2x}-1}{e^{2x}+1}
+\]
+
+### 5. Final Flaw Score
+\[
+\phi_p = \operatorname{clamp}\!\bigl(w_{\text{base}}\cdot\phi_{\text{base}} + w_{\text{trend}}\cdot t_p,\; -1,\; 1\bigr)
+\]
+Round to 4 decimal places using `round4`.
+
+### 6. Observations & Classification
+\[
+\text{obs}_p = \bigl|\{i \mid n_p(i) > 0\}\bigr|
+\]
+If \( \text{obs}_p < \text{MIN\_OBSERVATIONS} \) → `flawClass = 'neutral'`.  
+Else if \( \max_i j_p(i) \ge \text{triageMin}(trainingAge) \) → `'caution'`.  
+Else if \( \phi_p \ge \theta_{\text{def}} \) → `'capacity_deficit'`.  
+Else if \( \phi_p \le -\theta_{\text{headroom}} \) → `'latent_headroom'`.  
+Else → `'neutral'`.
+
+---
+
+## TypeScript Interface & Function Signatures
+
+```ts
+/**
+ * Flaw classification per movement pattern.
+ */
+export type FlawClass = 'capacity_deficit' | 'latent_headroom' | 'caution' | 'neutral';
+
+/**
+ * Per-pattern flaw signal produced by the detector.
+ */
+export interface PatternFlaw {
+  pattern: MovementPattern;
+  phi: number;                // round4, ∈ [-1, 1]
+  flawClass: FlawClass;
+  observations: number;       // count of days with ≥1 set in window
+}
+
+/**
+ * Top-level flaw report.
+ */
+export interface FlawReport {
+  patterns: Record<MovementPattern, PatternFlaw>;
+  windowSummary: {
+    dominantFlaw: FlawClass;
+    maxAbsPhi: number;
+    // The pattern with the largest |phi|
+    criticalPattern: MovementPattern | null;
+  };
+  // Any active global guardrail from the most recent restrictive report.
+  globalGuardrail: Guardrail | null;
+}
+
+/**
+ * Deterministic Flaw-Detection Operator F.
+ * Consumes at most 21 daily StateVectorRows, per-pattern ΔE summaries,
+ * niggle rows, and the athlete's training age for triage thresholds.
+ *
+ * @param stateVectors - 21 consecutive daily rows (oldest first).
+ * @param patternDailyDelta - per pattern, per day, {avgDeltaRPE: number|null, avgAttenuation: number, setCount: number, maxJointSev: number}.
+ * @param trainingAge - beginner | intermediate | advanced | elite.
+ * @returns FlawReport with deterministic φ and classes.
+ */
+export function detectFlaws(
+  stateVectors: readonly StateVectorRow[],          // length ≤ 21
+  patternDailyDelta: Record<MovementPattern, {
+    avgDeltaRPE: (number | null)[];   // length = stateVectors.length, null if no sets
+    avgAttenuation: number[];        // 0 if no sets
+    setCount: number[];             // integer
+    maxJointSev: number[];          // 0..10
+  }>,
+  trainingAge: TrainingAge
+): FlawReport;
+```
+
+---
+
+# u_{t+1} — Control Action Operator
+
+## Closed-Form Mapping
+
+Inputs: `FlawReport`, `UserProfile` (containing `trainingAge`, `objective`, `base_rpe_cap`, `macroPhase`), and optionally the set of patterns for a specific day to produce a daily `AdjustmentVector`.
+
+### 1. Per-Pattern Raw Corrections
+
+Let \( \phi = \phi_p \). Determine raw deltas using deadband and thresholds:
+
+| Condition                          | `raw_dRpe` | `raw_dSet` | `raw_dLoad_target` | `raw_prefBias` |
+|------------------------------------|------------|------------|-------------------|----------------|
+| `flawClass == 'caution'` OR any restrictive guardrail OR halt | – | – | – | – |
+| (see safety override below)        |            |            |                   |                |
+| \(|\phi| < 0.15\)                  | 0          | 0          | 1.00              | 0              |
+| \( \phi \ge 0.4 \)                 | –0.5       | –1         | 0.95              | –1             |
+| \( 0.15 \le \phi < 0.4 \)         | –0.5       | –1         | 1.00              | –1             |
+| \( \phi \le -0.4 \)               | +0.5       | +1         | 1.05              | +1             |
+| \(-0.4 < \phi \le -0.15\)         | +0.5       | +1         | 1.00              | +1             |
+
+If `flawClass == 'caution'` or `globalGuardrail` is restrictive (`load_multiplier<1` or `set_delta<0` or `rpe_cap_max<10`) or any loaded joint for pattern has severity ≥ `triageMin` or `halt` true, then force:
+- `dRpe_p = min(0, raw_dRpe)`
+- `dSet_p = min(0, raw_dSet)`
+- `dLoad_target = min(1.0, raw_dLoad_target)`
+- `prefBias_p = min(0, raw_prefBias)`
+
+Otherwise `dRpe_p = raw_dRpe`, etc.
+
+### 2. Snap to Literal Domains
+
+- `dLoad_p = snapToLiteral(dLoad_target, LOAD_MODIFIER_LITERALS)` (nearest, tie → lower).
+- `dSet_p = clamp(raw_dSet, -1, 1)` (already integer).
+- `dRpe_p = clamp(raw_dRpe, -0.5, 0.5)` and further ensure that for each week \( w \in \{1,2,3\} \),
+  \[
+  \text{target\_rpe}_{p,w} = \operatorname{clamp}\!\bigl( \text{SCHEMES[objective].rpeWave}[w] + \text{PHASE\_MODS[macroPhase].rpe} + dRpe_p,\; 5.0,\; \text{base\_rpe\_cap} \bigr)
+  \]
+  Round to 0.5.
+- `prefBias_p = raw_prefBias` (already ∈ {−1,0,1}).
+
+### 3. Global Volume Budget
+
+Let \( \mathcal{P}^+ = \{ p \mid dSet_p > 0 \} \).  
+If \( \sum_{p\in\mathcal{P}^+} dSet_p > \text{MAX\_ADDED\_SETS} \), sort \( \mathcal{P}^+ \) by \( \phi_p \) ascending (most headroom first) and set `dSet_p = 0` for all but the first `MAX_ADDED_SETS` patterns.
+
+### 4. Daily AdjustmentVector Projection
+
+For a given day with scheduled patterns `DayPatterns ⊆ MOVEMENT_PATTERNS`:
+\[
+\begin{aligned}
+\text{load\_mod} &= \min_{p\,\in\,\text{DayPatterns}} dLoad_p \quad (\text{default } 1.0) \\
+\text{set\_mod}  &= \min_{p\,\in\,\text{DayPatterns}} dSet_p  \\
+\text{rpe\_cap}  &= \min_{p\,\in\,\text{DayPatterns}} \operatorname{clamp}\!\bigl( \text{base\_rpe\_cap} + dRpe_p,\; 5.0,\; 10.0 \bigr)
+\end{aligned}
+\]
+Then `rpe_cap = snapToLiteral(roundToHalf(rpe_cap), RPE_CAP_LITERALS)`.  
+`coaching_cue` is generated deterministically from the pattern with maximal \(|\phi_p|\) and its flaw class (e.g., “Reduce effort on hinge – persistent capacity deficit.”).  
+Finally apply `clampAdjustment` (idempotent).
+
+---
+
+## TypeScript Interface & Function Signatures
+
+```ts
+/** Per-pattern corrective perturbations for the next 4‑week block. */
+export interface PatternCorrection {
+  dLoad_p: number;        // snapped to LOAD_MODIFIER_LITERALS
+  dSet_p: number;         // integer ∈ [-1, 1]
+  dRpe_p: number;         // ∈ [-0.5, 0.5]
+  prefBias_p: -1 | 0 | 1; // biases pattern substitution router
+}
+
+/** The full control action for the upcoming block. */
+export interface ControlAction {
+  corrections: Record<MovementPattern, PatternCorrection>;
+  blockAddedSets: number; // total positive set additions (≤ MAX_ADDED_SETS)
+}
+
+/**
+ * Derives the block-level auto‑correction from a FlawReport.
+ *
+ * @param report - deterministic flaw detection output.
+ * @param profile - user’s training age, objective, base_rpe_cap, current macroPhase.
+ * @returns a deterministic ControlAction.
+ */
+export function deriveControlAction(
+  report: FlawReport,
+  profile: UserProfile & { objective: Objective; macroPhase: MacroPhase }
+): ControlAction;
+
+/**
+ * Converts the block corrections into a daily AdjustmentVector for a given day’s pattern list.
+ * Guaranteed to lie inside the literal domains after clampAdjustment.
+ */
+export function deriveDailyAdjustment(
+  action: ControlAction,
+  dayPatterns: readonly MovementPattern[],
+  profile: UserProfile
+): AdjustmentVector;
+```
+
+---
+
+# Constant Tables
+
+All constants are human‑reviewable and mirror the style of `PHASE_MODS` / `EXPERIENCE_TRIAGE`.
+
+```ts
+/**
+ * FLAW_DETECTION_CONSTANTS
+ * ------------------------
+ * Fixed parameters for the flaw‑detection operator F.
+ */
+export const FLAW_DETECTION_CONSTANTS = {
+  /** Decay factor λ for exponential moving sum (0 < λ < 1). */
+  LAMBDA: 0.88,
+  /** Cap on absolute ΔE magnitude (RPE error). */
+  E_MAX: 3.0,
+  /** Maximum niggle severity (joint scale). */
+  J_MAX: 10,
+  /** Deadband for φ_base: |D_norm| < δ → 0. */
+  DELTA: 0.15,
+  /** Weight for the base accumulation term. */
+  W_BASE: 0.7,
+  /** Weight for the trend term. */
+  W_TREND: 0.3,
+  /** Scale factor inside tanh for trend. */
+  T_SCALE: 1.0,
+  /** Minimum days with at least one set to trust the signal. */
+  MIN_OBSERVATIONS: 5,
+  /** φ threshold for 'capacity_deficit' class. */
+  THETA_DEFICIT: 0.3,
+  /** φ threshold for 'latent_headroom' class (absolute value). */
+  THETA_HEADROOM: 0.3,
+} as const;
+
+/**
+ * CONTROL_AUTHORITY_CONSTANTS
+ * ---------------------------
+ * Bounds on how much the autopilot may change the next block.
+ */
+export const CONTROL_AUTHORITY = {
+  /** Maximum total positive set additions across all patterns in one block. */
+  MAX_ADDED_SETS: 2,
+  /** Allowed load modifier step (one literal step up/down). */
+  LOAD_STEP: 0.05,          // derived from LOAD_MODIFIER_LITERALS adjacent differences
+  /** Allowed RPE delta per block. */
+  RPE_STEP: 0.5,
+  /** Allowed set delta per pattern. */
+  SET_STEP: 1,
+  /** Deadband for φ: |φ| < DEADBAND → no action. */
+  DEADBAND: 0.15,
+  /** φ threshold for strong deficit / headroom. */
+  STRONG_THRESHOLD: 0.4,
+} as const;
+
+/**
+ * DEFAULT_LOAD_TARGET
+ * Neutral load modifier literal.
+ */
+export const NEUTRAL_LOAD_MODIFIER = 1.0;
+
+/**
+ * LOAD_MODIFIER_LITERALS (shipped, reused)
+ */
+export const LOAD_MODIFIER_LITERALS = ['0.80','0.85','0.90','0.95','1.00','1.05'] as const;
+
+/**
+ * RPE_CAP_LITERALS (shipped, reused)
+ */
+export const RPE_CAP_LITERALS = ['6.5','7.0','7.5','8.0','8.5','9.0','9.5','10.0'] as const;
+
+/**
+ * Snap a numeric value to the nearest literal in the sorted array (ties → lower).
+ * Pure, deterministic, no library calls.
+ */
+export function snapToLiteral(value: number, literals: readonly string[]): number;
+```
+
+---
+
+# Invariant List (Machine-Checkable Guarantees)
+
+1. **Determinism**  
+   Every arithmetic operation uses only the permitted primitives and fixed rounding rules (`round2`, `round4`, `roundToHalf`). No clock, random, or order‑dependent reduction. Same persisted inputs → byte‑identical `FlawReport` and `ControlAction`.
+
+2. **Monotone-Conservative under Flags**  
+   If any `Guardrail` is restrictive (`load_multiplier < 1`, `set_delta < 0`, `rpe_cap_max < 10`) or any loaded joint has niggle severity ≥ `triageMin`, the control action never increases load, sets, or RPE for the affected patterns. It may only reduce them or leave them neutral.
+
+3. **Domain Closure**  
+   - `dLoad_p` is snapped to one of `LOAD_MODIFIER_LITERALS`.  
+   - `dSet_p` ∈ {−1, 0, 1} (subset of `SET_MODIFIER_LITERALS`).  
+   - Daily `rpe_cap` is rounded to nearest 0.5 and snapped to `RPE_CAP_LITERALS`.  
+   - The final `AdjustmentVector` passes `clampAdjustment` idempotently.
+
+4. **Halt Supremacy**  
+   If `halt` is true, all corrections become neutral (`dLoad_p = 1.0`, `dSet_p = 0`, `dRpe_p = 0`, `prefBias_p = 0`) — no block change is emitted.
+
+5. **Bounded Authority per Block**  
+   - Total positive set additions across all patterns ≤ `MAX_ADDED_SETS` (2).  
+   - Load modifier changes by at most one literal step (0.05) away from 1.0.  
+   - RPE target changes by at most ±0.5.  
+   - Per-pattern set change ≤ ±1.  
+   This ensures the controller cannot windup or oscillate; the existing monotone clamps further limit any daily projection.
+
+6. **Volume Bifurcation**  
+   Corrections act on the prescription (target RPE, sets, load modifier) and use effective tonnage only for condition‑weighting inside F. The raw `mech_daily` tonnage / ACWR pipeline is never altered.

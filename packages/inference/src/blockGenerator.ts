@@ -15,6 +15,10 @@
  *      (concurrent-training interference damping).
  */
 import type { MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
+// Phase 13 Step 4 — the Block Generator Intercept: the generator imports the
+// autopilot controller and applies its forward-looking corrections to the next
+// block (a recorded halt snaps the whole block to a recovery template).
+import { deriveControlAction, type ControlAction, type FlawReport } from './kinematicAutopilot';
 
 // ---------------------------------------------------------------------------
 // Inputs / outputs (mirror the 007 block tables 1:1)
@@ -65,6 +69,12 @@ export interface BlockPlan {
   sessions: PlannedSessionPlan[];
   /** Pattern slots that had no equipment-available movement (deduped). */
   warnings: string[];
+  /** Phase 13 Step 4: a recorded halt snapped the block to the recovery
+   *  template (every week deloaded, no progressive overload). */
+  recovery: boolean;
+  /** Movement patterns the autopilot's ControlAction adjusted (deduped, sorted);
+   *  empty when no flaw report was supplied or nothing crossed the deadband. */
+  autopilotAdjusted: string[];
 }
 
 export interface BlockInput {
@@ -79,6 +89,12 @@ export interface BlockInput {
   /** Rolling fatigue at generation time (state_vector.acwr) — drives the
    *  deadlift auto-regulation gate in the peak phase. */
   recentAcwr?: number | null;
+  /** Phase 13 Step 4: the Kinematic Autopilot's flaw report for the trailing
+   *  3-week window. When present the generator derives a bounded ControlAction
+   *  (deriveControlAction) and applies its per-pattern target_rpe / working-set
+   *  corrections to NON-deload weeks; a `globalGuardrail.halt` snaps the whole
+   *  block to the recovery template. Absent ⇒ the pre-Step-4 block, byte-identical. */
+  flawReport?: FlawReport;
 }
 
 // ---------------------------------------------------------------------------
@@ -325,6 +341,21 @@ export function generateBlock(input: BlockInput): BlockPlan {
   const macroBlockIndex = clamp(Math.round(input.macroBlockIndex ?? 1), 1, MACRO_BLOCKS);
   const macroPhase = macroPhaseOf(macroBlockIndex);
   const recentAcwr = input.recentAcwr ?? null;
+
+  // Phase 13 Step 4 — autopilot intercept. Halt supremacy: a recorded halt snaps
+  // the block to a RECOVERY template (every week deloaded, no progressive
+  // overload) and suppresses ALL per-pattern corrections. Otherwise the bounded
+  // ControlAction supplies the per-pattern target_rpe / set deltas.
+  const flawReport = input.flawReport;
+  const recovery = flawReport?.globalGuardrail?.halt === true;
+  const control: ControlAction | null =
+    flawReport !== undefined && !recovery
+      ? deriveControlAction(flawReport, profile, macroPhase)
+      : null;
+  // Positive set additions are granted ONCE per pattern (the block-wide +2 cap is
+  // already enforced inside deriveControlAction.blockAddedSets).
+  const positiveApplied = new Set<MovementPattern>();
+  const autopilotAdjusted = new Set<MovementPattern>();
   const scheme = SCHEMES[profile.objective];
   const phaseMod = PHASE_MODS[macroPhase];
   const split = SPLITS[profile.objective][clamp(profile.weekly_frequency, 1, 7) - 1];
@@ -357,7 +388,9 @@ export function generateBlock(input: BlockInput): BlockPlan {
 
   for (let week = 1; week <= BLOCK_WEEKS; week++) {
     const phase = phaseByWeek[week - 1];
-    const deload = phase === 'deload';
+    // Recovery (halt) deloads EVERY week; otherwise only the scheduled deload week.
+    const deload = recovery || phase === 'deload';
+    const sessionPhase: BlockPhase = recovery ? 'deload' : phase;
     // Loading row: non-deload weeks advance through the schema's three-week
     // pattern in order (a shifted peak runs it across weeks 2-4).
     const progIdx = clamp((peakShifted ? week - 2 : week - 1), 0, 2);
@@ -410,14 +443,39 @@ export function generateBlock(input: BlockInput): BlockPlan {
         const taxed =
           !deload && accessoryCut > 0 && STRENGTH_FOCI.has(focus) &&
           slotIndex >= ACCESSORY_SLOT_FROM && !locomotion;
+        let slotSets = locomotion
+          ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
+          : Math.max(1, workingSets - (taxed ? accessoryCut : 0));
+        let slotRpe = rpe;
+        // Phase 13 Step 4: apply the autopilot's per-pattern correction. Only on
+        // NON-deload weeks (the deload is sacred) and not locomotion rounds.
+        // dRpe shifts the prescribed effort (re-clamped to [5, base_rpe_cap],
+        // rehab ≤ 7, 0.5 grid); dSet trims on every occurrence but ADDS at most
+        // once per pattern (block-wide +2 cap already held by the controller).
+        if (control !== null && !deload && !locomotion) {
+          const corr = control.corrections[m.pattern];
+          if (corr.dRpe_p !== 0) {
+            let r = slotRpe + corr.dRpe_p;
+            r = Math.min(r, profile.base_rpe_cap);
+            if (profile.objective === 'rehab') r = Math.min(r, 7.0);
+            slotRpe = Math.max(5.0, Math.round(r * 2) / 2);
+            autopilotAdjusted.add(m.pattern);
+          }
+          if (corr.dSet_p < 0) {
+            slotSets = Math.max(1, slotSets + corr.dSet_p);
+            autopilotAdjusted.add(m.pattern);
+          } else if (corr.dSet_p > 0 && !positiveApplied.has(m.pattern)) {
+            slotSets = Math.min(10, slotSets + corr.dSet_p);
+            positiveApplied.add(m.pattern);
+            autopilotAdjusted.add(m.pattern);
+          }
+        }
         slots.push({
           slot_index: slotIndex,
           movement_id: m.movement_id,
-          sets: locomotion
-            ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
-            : Math.max(1, workingSets - (taxed ? accessoryCut : 0)),
+          sets: slotSets,
           reps: locomotion ? LOCOMOTION_REPS : reps,
-          target_rpe: rpe,
+          target_rpe: slotRpe,
         });
       }
       if (slots.length === 0) {
@@ -428,7 +486,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
         week_index: week,
         day_index: dayIndex,
         focus,
-        phase,
+        phase: sessionPhase,
         session_date: addDaysIso(startDate, (week - 1) * 7 + (dayIndex - 1)),
         slots,
       });
@@ -445,5 +503,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
     peakShifted,
     sessions,
     warnings: [...warnings].sort(),
+    recovery,
+    autopilotAdjusted: [...autopilotAdjusted].sort(),
   };
 }

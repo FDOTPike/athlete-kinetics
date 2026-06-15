@@ -25,11 +25,14 @@ import {
   type DemoSql,
 } from '@ak/core-db';
 import {
+  buildPatternWindow,
   computeSubstitutions,
   DEFAULT_PROFILE,
+  detectFlaws,
   derivePrescription,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
+  EXPERIENCE_SEVERITY,
   generateBlock,
   OBJECTIVES,
   PROGRESSION_METHODS,
@@ -48,6 +51,8 @@ import {
   type Embedder,
   type FutureSlot,
   type GeneratorMovement,
+  type Guardrail,
+  type Joint,
   type LoadedCodebase,
   type MovementPattern,
   type MovementPrefix,
@@ -371,6 +376,27 @@ const startOfTodayMs = (): number => {
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 };
+
+/** Local Y-M-D for an epoch-ms instant — mirrors localToday()/startOfTodayMs()
+ *  so the autopilot buckets a niggle on the SAME calendar day as the session /
+ *  state_vector / active-niggle paths (NEVER SQLite's UTC date(), which would
+ *  mis-date an evening niggle in a UTC-negative zone). */
+const localDateOf = (ms: number): string => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** A neutral placeholder state_vector row for a calendar day with no
+ *  materialized row (a pure rest day). The autopilot reads ONLY the window
+ *  length from these, never their fields — they exist so detectFlaws sees a
+ *  fixed 21-CALENDAR-day grid (preserving the per-calendar-day EMA recency),
+ *  not a gap-collapsed list of only training/telemetry days. */
+const blankVector = (date: string): StateVectorRow => ({
+  date, readiness_score: 50, hrv_component: 50, load_component: 50,
+  sleep_component: 50, spo2_component: 50, acwr: null, acute_load_kg: null,
+  chronic_load_kg: null, ln_rmssd: null, hrv_z: null,
+  sleep_efficiency_pct: null, spo2_night_mean: null, computed_at_ms: 0,
+});
 
 /** Valid niggle regions (the engine's structural joints). */
 const JOINT_SET = new Set<string>(JOINTS);
@@ -827,13 +853,84 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       is_compound: m.is_compound,
       required: m.required,
     }));
+    // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
+    // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate
+    // (set_record ⋈ session ⋈ movement ⋈ set_prefix ⋈ the prescribed planned_slot
+    // target) + ONE windowed niggle scan. mech_daily is the cross-movement raw
+    // rollup (no per-pattern dimension) so it is NOT the per-pattern source and
+    // stays untouched; state_vector supplies the calendar. detectFlaws then feeds
+    // the generator, which auto-corrects the next (entirely forward-dated) block.
+    const today = localToday();
+    const AUTOPILOT_WINDOW_DAYS = 21;
+    // The window is the FIXED 21-calendar-day grid (gap-tolerant, oldest first),
+    // NOT the sparse set of materialized state_vector dates — so rest-day niggles
+    // are not dropped and detectFlaws' EMA recency stays per-calendar-day.
+    const winCalendar = demoDates(today, AUTOPILOT_WINDOW_DAYS);
+    const winStart = winCalendar[0];
+    const svByDate = new Map(rowsOf<StateVectorRow>(d.executeSync(
+      'SELECT * FROM state_vector WHERE date >= ? AND date <= ? ORDER BY date',
+      [winStart, today],
+    )).map((r) => [r.date, r] as const));
+    // Align state_vector to the calendar (rest day → neutral placeholder); F reads
+    // only the length, so the placeholders are inert but keep the grid fixed at 21.
+    const windowVectors: StateVectorRow[] = winCalendar.map((dt) => svByDate.get(dt) ?? blankVector(dt));
+    const setAgg = rowsOf<{
+      date: string; pattern: MovementPattern; set_count: number;
+      sum_delta_rpe: number; delta_count: number; sum_attenuation: number;
+    }>(d.executeSync(
+      `SELECT s.session_date AS date, m.pattern AS pattern, COUNT(*) AS set_count,
+              COALESCE(SUM(CASE WHEN sr.rpe IS NOT NULL AND tp.target_rpe IS NOT NULL THEN sr.rpe - tp.target_rpe END), 0) AS sum_delta_rpe,
+              SUM(CASE WHEN sr.rpe IS NOT NULL AND tp.target_rpe IS NOT NULL THEN 1 ELSE 0 END) AS delta_count,
+              SUM(1.0 / MAX(1.0, COALESCE(sp.effective_load_kg, sr.load_kg) / MAX(sr.load_kg, 0.01))) AS sum_attenuation
+       FROM set_record sr
+       JOIN session s ON s.session_id = sr.session_id
+       JOIN movement m ON m.movement_id = sr.movement_id
+       LEFT JOIN set_prefix sp ON sp.set_id = sr.set_id
+       LEFT JOIN (SELECT ps.session_date AS sd, psl.movement_id AS mid, MIN(psl.target_rpe) AS target_rpe
+                  FROM planned_slot psl JOIN planned_session ps ON ps.planned_session_id = psl.planned_session_id
+                  GROUP BY ps.session_date, psl.movement_id) tp
+         ON tp.sd = s.session_date AND tp.mid = sr.movement_id
+       WHERE s.session_date >= ? AND s.session_date <= ?
+       GROUP BY s.session_date, m.pattern`,
+      [winStart, today],
+    ));
+    // Niggles are bucketed to LOCAL calendar days in JS (mirroring startOfTodayMs),
+    // never via SQLite UTC date() — so they agree with session/state_vector dates.
+    // Over-fetch by ms then let buildPatternWindow keep only in-calendar dates.
+    const winStartMs = startOfTodayMs() - (AUTOPILOT_WINDOW_DAYS - 1) * 86_400_000;
+    const niggleRows = rowsOf<{ region: string; severity: number; reported_at_ms: number }>(d.executeSync(
+      'SELECT region, severity, reported_at_ms FROM niggle WHERE reported_at_ms >= ?',
+      [winStartMs],
+    ));
+    const patternWindow = buildPatternWindow(
+      winCalendar,
+      setAgg.map((r) => ({
+        date: r.date, pattern: r.pattern, setCount: r.set_count,
+        sumDeltaRpe: r.sum_delta_rpe, deltaCount: r.delta_count, sumAttenuation: r.sum_attenuation,
+      })),
+      niggleRows.map((r) => ({ date: localDateOf(r.reported_at_ms), region: r.region as Joint, severity: r.severity })),
+    );
+    // Severe ACTIVE joint load (>= the experience-weighted halt threshold) is a
+    // block-level halt → the generator snaps to the recovery template. Uses the
+    // SAME local-midnight bound as the active-niggle path (runBlockWipe).
+    const haltMin = EXPERIENCE_SEVERITY[profile.training_age].haltMin;
+    const maxNiggleToday = rowsOf<{ s: number }>(d.executeSync(
+      'SELECT COALESCE(MAX(severity), 0) AS s FROM niggle WHERE reported_at_ms >= ?',
+      [startOfTodayMs()],
+    ))[0]?.s ?? 0;
+    const autopilotGuardrail: Guardrail | null = maxNiggleToday >= haltMin
+      ? { load_multiplier: 1, set_delta: 0, rpe_cap_max: 10, halt: true, follow_up: null }
+      : null;
+    const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
+
     const plan = generateBlock({
       profile,
       movements: genMovements,
-      startDate: localToday(),
+      startDate: today,
       schemaType,
       macroBlockIndex,
       recentAcwr: vector !== null ? vector.acwr : null,
+      flawReport,
     });
     d.executeSync('BEGIN');
     try {

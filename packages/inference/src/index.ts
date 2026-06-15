@@ -85,6 +85,26 @@ export {
   type EffectiveLoad,
 } from './conditionEngine';
 export {
+  CONTROL_AUTHORITY,
+  deriveControlAction,
+  deriveDailyAdjustment,
+  detectFlaws,
+  FLAW_DETECTION_CONSTANTS,
+  NEUTRAL_LOAD_MODIFIER,
+  snapToLiteral,
+  type ControlAction,
+  type FlawClass,
+  type FlawReport,
+  type PatternCorrection,
+  type PatternDailyDelta,
+  type PatternFlaw,
+} from './kinematicAutopilot';
+export {
+  buildPatternWindow,
+  type WindowNiggleRow,
+  type WindowSetRow,
+} from './autopilotProjection';
+export {
   applyProfileLimits,
   applySeverityToGuardrail,
   EXPERIENCE_TRIAGE,
