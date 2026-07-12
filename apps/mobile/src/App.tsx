@@ -22,6 +22,7 @@ import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
 import BlockScreen from './screens/BlockScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
 
 type Tab = 'readiness' | 'session' | 'coach' | 'athlete';
 
@@ -73,6 +74,11 @@ export default function App(): React.JSX.Element {
 function AppShell(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('readiness');
   const boot = useStore((s) => s.boot);
+  const status = useStore((s) => s.status);
+  const onboarded = useStore((s) => s.onboarded);
+  // First run (or a fresh Coach Mode athlete): the questionnaire replaces the
+  // tabbed app until the profile is saved once. Existing installs never see it.
+  const showOnboarding = status === 'ready' && !onboarded;
 
   useEffect(() => {
     boot();
@@ -104,29 +110,37 @@ function AppShell(): React.JSX.Element {
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {tab === 'readiness' && <ReadinessScreen />}
-        {tab === 'session' && <SessionScreen />}
-        {tab === 'coach' && <BlockScreen onSessionStarted={() => setTab('session')} />}
-        {tab === 'athlete' && <ProfileScreen />}
+        {showOnboarding ? (
+          <OnboardingScreen />
+        ) : (
+          <>
+            {tab === 'readiness' && <ReadinessScreen />}
+            {tab === 'session' && <SessionScreen />}
+            {tab === 'coach' && <BlockScreen onSessionStarted={() => setTab('session')} />}
+            {tab === 'athlete' && <ProfileScreen />}
+          </>
+        )}
       </KeyboardAvoidingView>
-      <View style={styles.tabBar} accessibilityRole="tablist">
-        {TABS.map((t) => {
-          const active = t.key === tab;
-          return (
-            <Pressable
-              key={t.key}
-              onPress={() => setTab(t.key)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`${t.label} tab`}
-              style={styles.tabBtn}
-            >
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
-              <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
-            </Pressable>
-          );
-        })}
-      </View>
+      {!showOnboarding && (
+        <View style={styles.tabBar} accessibilityRole="tablist">
+          {TABS.map((t) => {
+            const active = t.key === tab;
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => setTab(t.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${t.label} tab`}
+                style={styles.tabBtn}
+              >
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+                <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </SafeAreaView>
   );
 }

@@ -180,6 +180,18 @@ export default function ProfileScreen(): React.JSX.Element {
   const profileSlots = useStore((s) => s.profileSlots);
   const switchProfile = useStore((s) => s.switchProfile);
   const wipeActiveBlockState = useStore((s) => s.wipeActiveBlockState);
+  const athletes = useStore((s) => s.athletes);
+  const activeAthleteId = useStore((s) => s.activeAthleteId);
+  const switchAthlete = useStore((s) => s.switchAthlete);
+  const createAthlete = useStore((s) => s.createAthlete);
+  const renameAthleteEntry = useStore((s) => s.renameAthleteEntry);
+  const deleteAthlete = useStore((s) => s.deleteAthlete);
+
+  // Coach Mode local UI state (collapsed by default — a beginner never needs it).
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [newAthleteName, setNewAthleteName] = useState('');
+  const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
+  const [editAthleteName, setEditAthleteName] = useState('');
 
   // Free-text notes are committed on end-editing, not per keystroke.
   const [injuryText, setInjuryText] = useState(
@@ -473,6 +485,159 @@ export default function ProfileScreen(): React.JSX.Element {
           <Text style={styles.wipeBtnText}>DELETE CURRENT BLOCK &amp; STATE</Text>
         </Pressable>
       </View>
+
+      {/* ---- Coach Mode (Phase 15): one database file per athlete ---- */}
+      <View style={styles.mgmtSection}>
+        <Pressable
+          onPress={() => setCoachOpen((o) => !o)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: coachOpen }}
+          accessibilityLabel={`Coach mode, ${athletes.length} athletes, ${coachOpen ? 'expanded' : 'collapsed'}`}
+          style={styles.coachHeader}
+        >
+          <Text style={styles.mgmtHeading}>COACH MODE</Text>
+          <Text style={styles.coachToggle}>
+            {athletes.length} {coachOpen ? '▾' : '▸'}
+          </Text>
+        </Pressable>
+        {coachOpen && (
+          <View>
+            <Text style={styles.fieldHint}>
+              Every athlete here owns a fully separate training database —
+              sessions, readiness, blocks, and profile never mix. Unlike the
+              profile switch above, NOTHING is shared. Built for coaching (or
+              testing) several people on one phone.
+            </Text>
+            {athletes.map((a) => {
+              const isActive = a.id === activeAthleteId;
+              const deletable = !isActive && a.id !== 'default';
+              if (editingAthleteId === a.id) {
+                return (
+                  <View key={a.id} style={styles.athleteRow}>
+                    <TextInput
+                      style={styles.athleteEditInput}
+                      value={editAthleteName}
+                      onChangeText={setEditAthleteName}
+                      maxLength={24}
+                      autoFocus
+                      accessibilityLabel={`New name for ${a.name}`}
+                    />
+                    <Pressable
+                      onPress={() => {
+                        renameAthleteEntry(a.id, editAthleteName);
+                        setEditingAthleteId(null);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Save name"
+                      style={styles.athleteBtn}
+                    >
+                      <Text style={styles.athleteBtnTextGreen}>SAVE</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setEditingAthleteId(null)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Cancel rename"
+                      style={styles.athleteBtn}
+                    >
+                      <Text style={styles.athleteBtnText}>✕</Text>
+                    </Pressable>
+                  </View>
+                );
+              }
+              return (
+                <View key={a.id} style={styles.athleteRow}>
+                  <Pressable
+                    style={styles.athleteMain}
+                    disabled={isActive}
+                    onPress={() =>
+                      Alert.alert(
+                        `Switch to ${a.name}?`,
+                        'Closes the current athlete’s database and opens this one. Each athlete’s history is fully separate. Not possible mid-session.',
+                        [
+                          { text: 'CANCEL', style: 'cancel' },
+                          { text: 'SWITCH', onPress: () => switchAthlete(a.id) },
+                        ],
+                      )
+                    }
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                    accessibilityLabel={`Athlete ${a.name}${isActive ? ', active' : ', tap to switch'}`}
+                  >
+                    <Text style={[styles.athleteName, isActive && styles.athleteNameActive]}>
+                      {a.name.toUpperCase()}{isActive ? '  ✓ ACTIVE' : ''}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setEditingAthleteId(a.id);
+                      setEditAthleteName(a.name);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Rename ${a.name}`}
+                    style={styles.athleteBtn}
+                  >
+                    <Text style={styles.athleteBtnText}>RENAME</Text>
+                  </Pressable>
+                  {deletable && (
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert(
+                          `Delete ${a.name}?`,
+                          'Removes this athlete AND their entire training database. This cannot be undone.',
+                          [
+                            { text: 'CANCEL', style: 'cancel' },
+                            { text: 'DELETE', style: 'destructive', onPress: () => deleteAthlete(a.id) },
+                          ],
+                        )
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${a.name} and their database`}
+                      style={styles.athleteBtn}
+                    >
+                      <Text style={styles.athleteBtnTextRed}>✕</Text>
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+            <View style={styles.athleteRow}>
+              <TextInput
+                style={styles.athleteEditInput}
+                value={newAthleteName}
+                onChangeText={setNewAthleteName}
+                placeholder="New athlete's name"
+                placeholderTextColor={palette.dim}
+                maxLength={24}
+                accessibilityLabel="New athlete's name"
+              />
+              <Pressable
+                onPress={() => {
+                  const trimmed = newAthleteName.trim();
+                  Alert.alert(
+                    `Add ${trimmed.length > 0 ? trimmed : 'a new athlete'}?`,
+                    'Creates a brand-new, empty athlete with their own database and starts their setup questionnaire.',
+                    [
+                      { text: 'CANCEL', style: 'cancel' },
+                      {
+                        text: 'ADD',
+                        onPress: () => {
+                          createAthlete(trimmed);
+                          setNewAthleteName('');
+                        },
+                      },
+                    ],
+                  );
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Add a new athlete"
+                style={[styles.athleteBtn, styles.athleteAddBtn]}
+              >
+                <Text style={styles.athleteBtnTextGreen}>ADD</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -576,5 +741,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     textAlignVertical: 'top',
+  },
+  coachHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 56,
+  },
+  coachToggle: { color: palette.dim, fontSize: 15, fontWeight: '800', letterSpacing: 1 },
+  athleteRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  athleteMain: {
+    flex: 1,
+    minHeight: 56,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+  },
+  athleteName: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  athleteNameActive: { color: palette.green },
+  athleteBtn: {
+    minHeight: 56,
+    minWidth: 56,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  athleteAddBtn: { borderColor: palette.green },
+  athleteBtnText: { color: palette.dim, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  athleteBtnTextGreen: { color: palette.green, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  athleteBtnTextRed: { color: palette.red, fontSize: 14, fontWeight: '800' },
+  athleteEditInput: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 10,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    color: palette.text,
+    fontSize: 15,
+    paddingHorizontal: 12,
   },
 });
