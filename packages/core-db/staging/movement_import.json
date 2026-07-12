@@ -1,7 +1,7 @@
 {
  "source": "https://github.com/yuhonas/free-exercise-db",
  "imported_at": "2026-07-12T02:08:04.446Z",
- "count": 432,
+ "count": 434,
  "movements": [
   {
    "name": "3/4 Sit-Up",
@@ -20,7 +20,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternate Hammer Curl",
@@ -41,7 +43,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternate Incline Dumbbell Curl",
@@ -62,7 +66,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternating Cable Shoulder Press",
@@ -83,7 +89,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternating Deltoid Raise",
@@ -102,7 +110,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternating Floor Press",
@@ -125,7 +135,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternating Hang Clean",
@@ -151,7 +163,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternating Kettlebell Press",
@@ -172,7 +186,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternating Kettlebell Row",
@@ -194,7 +210,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Alternating Renegade Row",
@@ -219,7 +237,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Anti-Gravity Press",
@@ -242,7 +262,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Arnold Press",
@@ -263,7 +285,9 @@
    "video_placeholder_uri": "https://www.youtube.com/watch?v=3ml7BH7mNwQ",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Back Flyes - With Bands",
@@ -285,7 +309,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Band Good Morning",
@@ -307,7 +333,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Band Good Morning (Pull Through)",
@@ -329,7 +357,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Band Pull Apart",
@@ -351,16 +381,18 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Ab Rollout",
-   "base_name": "Barbell Ab Rollout",
+   "base_name": "Ab Rollout",
    "pattern": "core",
    "supported_prefixes": [
     "BB"
    ],
-   "difficulty_rating": "Intermediate",
+   "difficulty_rating": "Advanced",
    "target_muscles": [
     "abdominals"
    ],
@@ -368,12 +400,14 @@
     "lower back",
     "shoulders"
    ],
-   "instructions_raw": "For this exercise you will need to get into a pushup position, but instead of having your hands of the floor, you will be grabbing on to an Olympic barbell (loaded with 5-10 lbs on each side) instead. This will be your starting position. While keeping a slight arch on your back, lift your hips and roll the barbell towards your feet as you exhale. Tip: As you perform the movement, your glutes should be coming up, you should be keeping the abs tight and should maintain your back posture at all times. Also your arms should be staying perpendicular to the floor throughout the movement. If you don't, you will work out your shoulders and back more than the abs. After a second contraction at the top, start to roll the barbell back forward to the starting position slowly as you inhale. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Kneel behind a loaded barbell with small plates and grip it at shoulder width. Brace hard and roll the bar forward as far as you can without your hips sagging. Pull the bar back to your knees using your abs, not your arms.",
+   "cues": "Tuck your pelvis and squeeze your glutes before you move. No sag in the lower back. Shorten the rollout before you lose position.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=O-d6HC9gLcw",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Ab Rollout - On Knees",
@@ -395,7 +429,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Bench Press - Medium Grip",
@@ -417,11 +453,13 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Curl",
-   "base_name": "Barbell Curl",
+   "base_name": "Biceps Curl",
    "pattern": "accessory",
    "supported_prefixes": [
     "BB"
@@ -433,12 +471,14 @@
    "secondary_muscles": [
     "forearms"
    ],
-   "instructions_raw": "Stand up with your torso upright while holding a barbell at a shoulder-width grip. The palm of your hands should be facing forward and the elbows should be close to the torso. This will be your starting position. While holding the upper arms stationary, curl the weights forward while contracting the biceps as you breathe out. Tip: Only the forearms should move. Continue the movement until your biceps are fully contracted and the bar is at shoulder level. Hold the contracted position for a second and squeeze the biceps hard. Slowly begin to bring the bar back to starting position as your breathe in. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Grip the bar at shoulder width with your arms hanging in their natural rest position. Curl to shoulder height with your upper arms pinned, then fight the bar down slower than it went up. Lower under control until your arms are back in the rest position \u2014 a small hip lean on the last rep is honest, a swing from rep one means the bar is too heavy.",
+   "cues": "Elbows stay behind the bar. Lower slower than you lift. Back to rest at the bottom, no bouncing out of it.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=QZEqB6wUPxQ",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Curls Lying Against An Incline",
@@ -457,7 +497,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Deadlift",
@@ -485,7 +527,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Full Squat",
@@ -509,7 +553,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Glute Bridge",
@@ -531,7 +577,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Guillotine Bench Press",
@@ -553,7 +601,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Hack Squat",
@@ -576,7 +626,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Hip Thrust",
@@ -598,7 +650,9 @@
    "video_placeholder_uri": "https://www.youtube.com/watch?v=pF17m_CXfL0",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Incline Bench Press - Medium Grip",
@@ -620,7 +674,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Incline Shoulder Raise",
@@ -641,7 +697,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Lunge",
@@ -664,7 +722,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Rear Delt Row",
@@ -687,7 +747,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Rollout from Bench",
@@ -711,7 +773,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Seated Calf Raise",
@@ -730,7 +794,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Shoulder Press",
@@ -752,7 +818,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Shrug",
@@ -771,7 +839,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Shrug Behind The Back",
@@ -793,7 +863,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Side Split Squat",
@@ -816,7 +888,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Squat",
@@ -840,7 +914,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Squat To A Bench",
@@ -864,7 +940,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Step-Up",
@@ -883,12 +961,14 @@
     "hamstrings",
     "quadriceps"
    ],
-   "instructions_raw": "Set a barbell across your upper back and stand in front of a sturdy box around knee height. Place one whole foot on the box and drive through it to stand up on top. Step down under control and repeat, either alternating legs or finishing a side at a time.",
-   "cues": "Drive through the top leg, do not push off the floor. Stand all the way up. Control the step down.",
+   "instructions_raw": "Set the bar as for a squat and stand close to a box that puts your thigh near parallel when your foot is up. Put the whole foot on the box and stand up through it \u2014 the floor leg hangs, it does not jump. Lower on a controlled count until the floor toe touches, and go again without rocking.",
+   "cues": "Watch the bottom foot: if it springs, you stole the rep. Whole foot on the box. Tall chest all the way up.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=MRtbwZPK7iY",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Barbell Walking Lunge",
@@ -911,7 +991,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bench Dips",
@@ -933,7 +1015,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bench Press - Powerlifting",
@@ -957,7 +1041,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bench Press - With Bands",
@@ -979,7 +1065,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bench Press with Chains",
@@ -1002,7 +1090,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent Over Barbell Row",
@@ -1025,7 +1115,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
@@ -1044,7 +1136,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent Over One-Arm Long Bar Row",
@@ -1068,7 +1162,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent Over Two-Arm Long Bar Row",
@@ -1090,7 +1186,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent Over Two-Dumbbell Row",
@@ -1113,7 +1211,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent Over Two-Dumbbell Row With Palms In",
@@ -1135,7 +1235,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent Press",
@@ -1161,7 +1263,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent-Arm Barbell Pullover",
@@ -1185,7 +1289,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent-Arm Dumbbell Pullover",
@@ -1208,7 +1314,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bent-Knee Hip Raise",
@@ -1227,7 +1335,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Board Press",
@@ -1251,7 +1361,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Body Tricep Press",
@@ -1270,7 +1382,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bodyweight Flyes",
@@ -1293,7 +1407,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bodyweight Walking Lunge",
@@ -1316,7 +1432,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bosu Ball Cable Crunch With Side Bends",
@@ -1335,7 +1453,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bottoms-Up Clean From The Hang Position",
@@ -1357,7 +1477,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Box Squat",
@@ -1382,7 +1504,9 @@
    "video_placeholder_uri": "https://www.youtube.com/watch?v=WGjf5w8iaTM",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Box Squat with Bands",
@@ -1408,7 +1532,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Box Squat with Chains",
@@ -1434,7 +1560,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Bradford/Rocky Presses",
@@ -1455,7 +1583,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Chest Press",
@@ -1477,7 +1607,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Crunch",
@@ -1486,17 +1618,19 @@
    "supported_prefixes": [
     "Cable"
    ],
-   "difficulty_rating": "Beginner",
+   "difficulty_rating": "Intermediate",
    "target_muscles": [
     "abdominals"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Kneel below a high pulley that contains a rope attachment. Grasp cable rope attachment and lower the rope until your hands are placed next to your face. Flex your hips slightly and allow the weight to hyperextend the lower back. This will be your starting position. With the hips stationary, flex the waist as you contract the abs so that the elbows travel towards the middle of the thighs. Exhale as you perform this portion of the movement and hold the contraction for a second. Slowly return to the starting position as you inhale. Tip: Make sure that you keep constant tension on the abs throughout the movement. Also, do not choose a weight so heavy that the lower back handles the brunt of the work. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Kneel far enough from the stack that the cable stays loaded at the top, rope held to your collarbones. Crunch by rounding your upper spine, driving your elbows towards your thighs while your hips stay frozen. Unroll slowly until the abs are on stretch, keeping the rope pinned to your head the whole set.",
+   "cues": "Round the spine \u2014 hinging at the hips gives the rep away. Hips locked. Abs pull, arms just hold rope.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=0KEP6A1deBE",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Deadlifts",
@@ -1520,7 +1654,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Hammer Curls - Rope Attachment",
@@ -1539,7 +1675,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Incline Pushdown",
@@ -1558,7 +1696,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Incline Triceps Extension",
@@ -1577,7 +1717,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Internal Rotation",
@@ -1596,7 +1738,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Lying Triceps Extension",
@@ -1615,7 +1759,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable One Arm Tricep Extension",
@@ -1634,7 +1780,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Preacher Curl",
@@ -1655,7 +1803,33 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Cable Pull-Through",
+   "base_name": "Pull-Through",
+   "pattern": "hinge",
+   "supported_prefixes": [
+    "Cable"
+   ],
+   "difficulty_rating": "Beginner",
+   "target_muscles": [
+    "glutes"
+   ],
+   "secondary_muscles": [
+    "hamstrings",
+    "lower back"
+   ],
+   "instructions_raw": "Face away from a low cable with a rope between your legs, held at your hips. Walk out until the cable is taut, then push your hips back and hinge forward with a flat back. Drive your hips forward to stand tall, squeezing your glutes.",
+   "cues": "Hips do the work, not the arms. Squeeze the glutes at lockout. Flat back the whole rep.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=cXPOYVFjgC8",
+   "is_compound": true,
+   "source": "free-exercise-db",
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Rear Delt Fly",
@@ -1674,7 +1848,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Reverse Crunch",
@@ -1693,7 +1869,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Rope Overhead Triceps Extension",
@@ -1712,7 +1890,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Rope Rear-Delt Rows",
@@ -1734,7 +1914,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Russian Twists",
@@ -1753,7 +1935,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Seated Crunch",
@@ -1772,7 +1956,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Seated Lateral Raise",
@@ -1794,7 +1980,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Shoulder Press",
@@ -1815,7 +2003,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Shrugs",
@@ -1834,7 +2024,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cable Wrist Curl",
@@ -1853,7 +2045,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Calf Raise On A Dumbbell",
@@ -1872,7 +2066,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Calf Raises - With Bands",
@@ -1891,7 +2087,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Clean and Press",
@@ -1921,7 +2119,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Clock Push-Up",
@@ -1943,16 +2143,18 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
-   "name": "Close-Grip Barbell Bench Press",
-   "base_name": "Close-Grip Barbell Bench Press",
+   "name": "Close-Grip Bench Press",
+   "base_name": "Close-Grip Bench Press",
    "pattern": "push",
    "supported_prefixes": [
     "BB"
    ],
-   "difficulty_rating": "Beginner",
+   "difficulty_rating": "Intermediate",
    "target_muscles": [
     "triceps"
    ],
@@ -1960,12 +2162,14 @@
     "chest",
     "shoulders"
    ],
-   "instructions_raw": "Lie back on a flat bench. Using a close grip (around shoulder width), lift the bar from the rack and hold it straight over you with your arms locked. This will be your starting position. As you breathe in, come down slowly until you feel the bar on your middle chest. Tip: Make sure that - as opposed to a regular bench press - you keep the elbows close to the torso at all times in order to maximize triceps involvement. After a second pause, bring the bar back to the starting position as you breathe out and push the bar using your triceps muscles. Lock your arms in the contracted position, hold for a second and then start coming down slowly again. Tip: It should take at least twice as long to go down than to come up. Repeat the movement for the prescribed amount of repetitions. When you are done, place the bar back in the rack.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Lie on a bench and grip the bar at about shoulder width, not narrower. Unrack and lower the bar to your lower chest, elbows staying close to your sides. Press back up to straight arms.",
+   "cues": "Elbows tucked, not flared. Wrists stacked over elbows. Touch low on the chest.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=nEF0bv2FW94",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Close-Grip Dumbbell Press",
@@ -1987,7 +2191,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Close-Grip EZ Bar Curl",
@@ -2008,7 +2214,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Close-Grip EZ-Bar Curl with Band",
@@ -2029,7 +2237,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Close-Grip EZ-Bar Press",
@@ -2051,7 +2261,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Close-Grip Front Lat Pulldown",
@@ -2074,7 +2286,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Close-Grip Push-Up off of a Dumbbell",
@@ -2097,7 +2311,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Close-Grip Standing Barbell Curl",
@@ -2118,7 +2334,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Concentration Curls",
@@ -2139,7 +2357,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cross Body Hammer Curl",
@@ -2160,7 +2380,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cross-Body Crunch",
@@ -2179,7 +2401,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Crunch - Hands Overhead",
@@ -2198,7 +2422,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Crunch - Legs On Exercise Ball",
@@ -2217,7 +2443,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Crunches",
@@ -2236,7 +2464,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Cuban Press",
@@ -2257,7 +2487,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dead Bug",
@@ -2271,12 +2503,14 @@
     "abdominals"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Lie on your back with arms pointing at the ceiling and knees bent over your hips. Press your lower back into the floor. Slowly lower one arm overhead and the opposite leg towards the floor. Return and repeat on the other side.",
-   "cues": "Lower back glued to the floor. Exhale as the limbs lower. Slow beats sloppy.",
+   "instructions_raw": "Lie on your back, arms at the ceiling, knees stacked over your hips. Flatten your lower back into the floor and keep that pressure for the entire set \u2014 that pressure is the exercise. Lower one arm and the opposite leg as far as you can without the back peeling up, exhaling the whole way, then switch sides.",
+   "cues": "The floor pressure is the rep; the limbs are just the test. Exhale like you are fogging a mirror. If the back arches, the rep did not count.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=bxn9FBrt4-A",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Deadlift with Bands",
@@ -2302,7 +2536,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Deadlift with Chains",
@@ -2328,7 +2564,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Barbell Bench Press",
@@ -2350,7 +2588,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Close-Grip Bench To Skull Crusher",
@@ -2372,7 +2612,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Crunch",
@@ -2391,7 +2633,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Dumbbell Bench Press",
@@ -2413,7 +2657,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Dumbbell Flyes",
@@ -2432,7 +2678,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Dumbbell Triceps Extension",
@@ -2451,7 +2699,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline EZ Bar Triceps Extension",
@@ -2470,7 +2720,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Oblique Crunch",
@@ -2489,7 +2741,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Push-Up",
@@ -2511,7 +2765,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Decline Reverse Crunch",
@@ -2530,7 +2786,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Deficit Deadlift",
@@ -2556,7 +2814,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dip",
@@ -2578,7 +2838,9 @@
    "video_placeholder_uri": "https://www.youtube.com/watch?v=wjUmnZH528Y",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Double Kettlebell Alternating Hang Clean",
@@ -2605,7 +2867,33 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Double Kettlebell Front Squat",
+   "base_name": "Front Squat",
+   "pattern": "squat",
+   "supported_prefixes": [
+    "KB"
+   ],
+   "difficulty_rating": "Intermediate",
+   "target_muscles": [
+    "quadriceps"
+   ],
+   "secondary_muscles": [
+    "calves",
+    "glutes"
+   ],
+   "instructions_raw": "Clean two kettlebells into the rack position, resting on your forearms at your chest. Squat down as deep as you can control, keeping your elbows in and chest up. Drive back up to standing without letting the bells pull you forward.",
+   "cues": "Elbows in, bells resting on the forearms. Stay tall, do not fold. Full foot on the floor.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=6XghYOzny8U",
+   "is_compound": true,
+   "source": "free-exercise-db",
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Double Kettlebell Push Press",
@@ -2628,7 +2916,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Double Kettlebell Snatch",
@@ -2651,7 +2941,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Drag Curl",
@@ -2672,7 +2964,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Alternate Bicep Curl",
@@ -2693,7 +2987,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Bench Press with Neutral Grip",
@@ -2715,7 +3011,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Bicep Curl",
@@ -2736,7 +3034,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Clean",
@@ -2763,7 +3063,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Floor Press",
@@ -2785,7 +3087,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Flyes",
@@ -2804,7 +3108,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Incline Row",
@@ -2828,7 +3134,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Incline Shoulder Raise",
@@ -2849,7 +3157,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Lateral Raise",
@@ -2863,16 +3173,18 @@
     "shoulders"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Stand holding a light dumbbell in each hand at your sides. With a slight elbow bend, raise both arms out to the sides until they are about shoulder height. Lower under control back to your sides.",
-   "cues": "Lead with your elbows. No swinging or shrugging. Stop at shoulder height.",
+   "instructions_raw": "Stand with a slight forward lean, dumbbells hanging just off your thighs rather than pinned to your sides. Raise both arms out and slightly forward until your elbows reach shoulder height, leading the whole way with the elbows. Lower on a three-count \u2014 the lowering half builds most of the delt. If you have to swing, the dumbbells are too heavy; this stays lighter than your ego wants.",
+   "cues": "Lead with the elbows, hands stay below them. Lean an inch forward to take the front delts out of it. Three seconds down.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=3VcKaXpzqRo",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
-   "name": "Dumbbell Lunges",
-   "base_name": "Dumbbell Lunges",
+   "name": "Dumbbell Lunge",
+   "base_name": "Lunge",
    "pattern": "unilateral",
    "supported_prefixes": [
     "DB"
@@ -2886,12 +3198,14 @@
     "glutes",
     "hamstrings"
    ],
-   "instructions_raw": "Stand with your torso upright holding two dumbbells in your hands by your sides. This will be your starting position. Step forward with your right leg around 2 feet or so from the foot being left stationary behind and lower your upper body down, while keeping the torso upright and maintaining balance. Inhale as you go down. Note: As in the other exercises, do not allow your knee to go forward beyond your toes as you come down, as this will put undue stress on the knee joint. Make sure that you keep your front shin perpendicular to the ground. Using mainly the heel of your foot, push up and go back to the starting position as you exhale. Repeat the movement for the recommended amount of repetitions and then perform with the left leg.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Step forward far enough that your front shin stays near vertical when you drop. Lower until the back knee hovers just off the floor, torso tall. Drive through the whole front foot to come back up \u2014 the back leg is a kickstand, not an engine.",
+   "cues": "Long step, vertical shin. All the work belongs to the front leg. If you wobble, slow the descent instead of shortening it.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=G4gAK8Bhyro",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Lying One-Arm Rear Lateral Raise",
@@ -2912,7 +3226,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Lying Rear Lateral Raise",
@@ -2931,7 +3247,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell One-Arm Shoulder Press",
@@ -2952,7 +3270,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell One-Arm Triceps Extension",
@@ -2971,7 +3291,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell One-Arm Upright Row",
@@ -2993,7 +3315,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Prone Incline Curl",
@@ -3012,7 +3336,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Raise",
@@ -3033,7 +3359,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Rear Lunge",
@@ -3056,7 +3384,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Seated One-Leg Calf Raise",
@@ -3075,11 +3405,13 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Shrug",
-   "base_name": "Dumbbell Shrug",
+   "base_name": "Shrug",
    "pattern": "row",
    "supported_prefixes": [
     "DB"
@@ -3089,12 +3421,14 @@
     "traps"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Stand erect with a dumbbell on each hand (palms facing your torso), arms extended on the sides. Lift the dumbbells by elevating the shoulders as high as possible while you exhale. Hold the contraction at the top for a second. Tip: The arms should remain extended at all times. Refrain from using the biceps to help lift the dumbbells. Only the shoulders should be moving up and down. Lower the dumbbells back to the original position. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand holding dumbbells at your sides with your arms hanging as dead weight. With intention, pull your shoulder blades up and back behind your ears, as high as the traps will take them. Hold a full second at the top, then lower until you feel the traps stretch \u2014 the rep is the squeeze and the stretch, not the bounce in between.",
+   "cues": "Up and back behind the ears, never rolled forward. Full second at the top. Let the weight pull a stretch at the bottom.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=qvvJUKq7_sU",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Squat",
@@ -3118,7 +3452,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Squat To A Bench",
@@ -3142,11 +3478,13 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
-   "name": "Dumbbell Step Ups",
-   "base_name": "Dumbbell Step Ups",
+   "name": "Dumbbell Step-Up",
+   "base_name": "Step-Up",
    "pattern": "unilateral",
    "supported_prefixes": [
     "DB"
@@ -3160,12 +3498,14 @@
     "glutes",
     "hamstrings"
    ],
-   "instructions_raw": "Stand up straight while holding a dumbbell on each hand (palms facing the side of your legs). Place the right foot on the elevated platform. Step on the platform by extending the hip and the knee of your right leg. Use the heel mainly to lift the rest of your body up and place the foot of the left leg on the platform as well. Breathe out as you execute the force required to come up. Step down with the left leg by flexing the hip and knee of the right leg as you inhale. Return to the original standing position by placing the right foot of to next to the left foot on the initial position. Repeat with the right leg for the recommended amount of repetitions and then perform with the left leg.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Hold a dumbbell in each hand and stand close to a box that puts your thigh near parallel when your foot is up. Put the whole foot on the box and stand up through it \u2014 the floor leg hangs, it does not jump. Lower on a controlled count until the floor toe touches, and go again without rocking.",
+   "cues": "Watch the bottom foot: if it springs, you stole the rep. Whole foot on the box. Let the dumbbells hang quiet, no swing.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=tqECKZxlCKE",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Dumbbell Tricep Extension -Pronated Grip",
@@ -3184,7 +3524,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "EZ-Bar Curl",
@@ -3203,7 +3545,32 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Eccentric Wall Handstand Push-Up",
+   "base_name": "Handstand Push-Up",
+   "pattern": "push",
+   "supported_prefixes": [
+    "Bodyweight"
+   ],
+   "difficulty_rating": "Advanced",
+   "target_muscles": [
+    "shoulders"
+   ],
+   "secondary_muscles": [
+    "triceps"
+   ],
+   "instructions_raw": "Kick up into a handstand with your back to a wall, hands just wider than your shoulders. Lower as slowly as you can \u2014 aim for a full five seconds \u2014 until your head lightly meets the floor. Come down, reset, and kick back up; the lowering IS the rep, there is no press yet. When five-second negatives feel owned, start pressing back out.",
+   "cues": "Five seconds down, no free-fall inches. Glutes squeezed, hips off the wall. The negative is the rep \u2014 do not steal it.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=GGBOX8Byz08",
+   "is_compound": true,
+   "source": "house",
+   "curated": true,
+   "progression_group": "handstand-push-up",
+   "progression_rank": 3
   },
   {
    "name": "Elevated Back Lunge",
@@ -3225,7 +3592,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Elevated Cable Rows",
@@ -3247,7 +3616,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Extended Range One-Arm Kettlebell Floor Press",
@@ -3269,7 +3640,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "External Rotation",
@@ -3288,7 +3661,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "External Rotation with Band",
@@ -3307,7 +3682,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "External Rotation with Cable",
@@ -3326,7 +3703,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Face Pull",
@@ -3343,12 +3722,38 @@
    "secondary_muscles": [
     "middle back"
    ],
-   "instructions_raw": "Set a rope attachment at upper-chest height and take an end in each hand, thumbs pointing back. Step back until the cable is taut. Pull the rope towards your face, splitting your hands past your ears. Return under control.",
-   "cues": "Thumbs to your ears. Squeeze your shoulder blades at the back. Light weight, strict reps.",
+   "instructions_raw": "Set the rope at upper-chest height, grab it thumbs-back, and step away until the stack is live. Pull the rope to the bridge of your nose while splitting your hands past your ears, letting the shoulders rotate back at the end. If you cannot hold a one-second squeeze with the shoulder blades pinned, the weight is wrong \u2014 this never becomes a heavy movement.",
+   "cues": "Thumbs to the ears, elbows high. Squeeze the blades for a full beat. The weight stays humble.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=eTCBSFlCJ_s",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Feet-Elevated Push-Up",
+   "base_name": "Push-Up",
+   "pattern": "push",
+   "supported_prefixes": [
+    "Bodyweight"
+   ],
+   "difficulty_rating": "Beginner",
+   "target_muscles": [
+    "chest"
+   ],
+   "secondary_muscles": [
+    "shoulders",
+    "triceps"
+   ],
+   "instructions_raw": "Set your feet on a box or bench with your hands on the floor just wider than your shoulders. Lower your chest to the floor as one rigid line \u2014 the higher the feet, the more the shoulders take over from the chest. Press back to long arms without the hips piking or sagging. Own strict floor push-ups before you raise the feet.",
+   "cues": "One rigid line, hips neither piked nor sagging. Chest leads, chin does not poke. Raise the feet only when the reps are strict.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=SKPab2YC8BE",
+   "is_compound": true,
+   "source": "free-exercise-db",
+   "curated": true,
+   "progression_group": "handstand-push-up",
+   "progression_rank": 1
   },
   {
    "name": "Finger Curls",
@@ -3367,7 +3772,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Flat Bench Cable Flyes",
@@ -3386,7 +3793,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Flat Bench Leg Pull-In",
@@ -3405,7 +3814,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Flat Bench Lying Leg Raise",
@@ -3424,7 +3835,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Flexor Incline Dumbbell Curls",
@@ -3443,7 +3856,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Floor Glute-Ham Raise",
@@ -3465,7 +3880,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Floor Press",
@@ -3487,7 +3904,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Floor Press with Chains",
@@ -3509,7 +3928,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Freehand Jump Squat",
@@ -3532,7 +3953,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Frog Sit-Ups",
@@ -3551,7 +3974,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Front Barbell Squat",
@@ -3574,7 +3999,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Front Barbell Squat To A Bench",
@@ -3597,7 +4024,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Front Cable Raise",
@@ -3616,7 +4045,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Front Dumbbell Raise",
@@ -3635,7 +4066,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Front Incline Dumbbell Raise",
@@ -3654,7 +4087,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Front Raise And Pullover",
@@ -3677,7 +4112,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Front Squat (Clean Grip)",
@@ -3700,29 +4137,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
-  },
-  {
-   "name": "Front Squats With Two Kettlebells",
-   "base_name": "Front Squats With Two Kettlebells",
-   "pattern": "squat",
-   "supported_prefixes": [
-    "KB"
-   ],
-   "difficulty_rating": "Intermediate",
-   "target_muscles": [
-    "quadriceps"
-   ],
-   "secondary_muscles": [
-    "calves",
-    "glutes"
-   ],
-   "instructions_raw": "Clean two kettlebells to your shoulders. Clean the kettlebells to your shoulders by extending through the legs and hips as you pull the kettlebells towards your shoulders. Rotate your wrists as you do so. Looking straight ahead at all times, squat as low as you can and pause at the bottom. As you squat down, push your knees out. You should squat between your legs, keeping an upright torso, with your head and chest up. Rise back up by driving through your heels and repeat.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": true,
-   "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Front Two-Dumbbell Raise",
@@ -3741,7 +4158,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Full Range-Of-Motion Lat Pulldown",
@@ -3764,7 +4183,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Good Morning",
@@ -3787,7 +4208,9 @@
    "video_placeholder_uri": "https://www.youtube.com/watch?v=0Syp9iyINZ4",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Good Morning off Pins",
@@ -3810,7 +4233,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Gorilla Chin/Crunch",
@@ -3832,7 +4257,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Hammer Curls",
@@ -3851,7 +4278,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Hammer Grip Incline DB Bench Press",
@@ -3873,11 +4302,13 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
-   "name": "Handstand Push-Ups",
-   "base_name": "Handstand Push-Ups",
+   "name": "Handstand Push-Up",
+   "base_name": "Handstand Push-Up",
    "pattern": "push",
    "supported_prefixes": [
     "Bodyweight"
@@ -3889,12 +4320,14 @@
    "secondary_muscles": [
     "triceps"
    ],
-   "instructions_raw": "With your back to the wall bend at the waist and place both hands on the floor at shoulder width. Kick yourself up against the wall with your arms straight. Your body should be upside down with the arms and legs fully extended. Keep your whole body as straight as possible. Tip: If doing this for the first time, have a spotter help you. Also, make sure that you keep facing the wall with your head, rather than looking down. Slowly lower yourself to the ground as you inhale until your head almost touches the floor. Tip: It is of utmost importance that you come down slow in order to avoid head injury. Push yourself back up slowly as you exhale until your elbows are nearly locked. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Kick up into a handstand against a wall, hands just wider than your shoulders. Lower under control until your head lightly touches the floor. Press back up to straight arms. Build up with pike push-ups first if you cannot control the descent.",
+   "cues": "Brace like a plank, no banana back. Control the way down. Head touches, never bounces.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=7wSZnHQZChI",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": "handstand-push-up",
+   "progression_rank": 4
   },
   {
    "name": "Hanging Bar Good Morning",
@@ -3917,7 +4350,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Hanging Leg Raise",
@@ -3936,7 +4371,9 @@
    "video_placeholder_uri": "https://www.youtube.com/watch?v=rbOJSK07AGA",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "High Cable Curls",
@@ -3955,7 +4392,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Hip Extension with Bands",
@@ -3976,7 +4415,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Hyperextensions With No Hyperextension Bench",
@@ -3998,7 +4439,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Barbell Triceps Extension",
@@ -4019,7 +4462,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Bench Pull",
@@ -4041,7 +4486,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Cable Chest Press",
@@ -4063,7 +4510,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Cable Flye",
@@ -4084,7 +4533,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Dumbbell Bench With Palms Facing In",
@@ -4106,7 +4557,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Dumbbell Curl",
@@ -4125,7 +4578,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Dumbbell Flyes",
@@ -4146,7 +4601,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Dumbbell Flyes - With A Twist",
@@ -4167,7 +4624,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Dumbbell Press",
@@ -4184,12 +4643,14 @@
     "shoulders",
     "triceps"
    ],
-   "instructions_raw": "Set a bench to a 30-45 degree incline and sit back with a dumbbell in each hand at shoulder height. Press both dumbbells up until your arms are straight. Lower them under control back to shoulder height. Keep your feet flat on the floor the whole set.",
-   "cues": "Elbows about 45 degrees from your sides. Press up, not forward. Lower slower than you lift.",
+   "instructions_raw": "Set the bench between 30 and 45 degrees \u2014 lower hits more chest, higher bleeds into shoulders. Kick the dumbbells up off your knees one at a time and start from the top. Lower to a deep stretch just outside your chest with your elbows about 45 degrees from your sides, then press up and slightly back so the dumbbells finish over your face, not your belly.",
+   "cues": "Feet planted, upper back tight on the bench. Earn the stretch at the bottom. Press over the face, not the belly.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=8iPEnn-ltC8",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Hammer Curls",
@@ -4208,7 +4669,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Inner Biceps Curl",
@@ -4227,7 +4690,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Push-Up",
@@ -4249,7 +4714,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Push-Up Close-Grip",
@@ -4271,7 +4738,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Push-Up Medium",
@@ -4294,7 +4763,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Push-Up Reverse Grip",
@@ -4317,7 +4788,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Incline Push-Up Wide",
@@ -4340,7 +4813,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Internal Rotation with Band",
@@ -4359,7 +4834,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Inverted Row",
@@ -4375,12 +4852,14 @@
    "secondary_muscles": [
     "lats"
    ],
-   "instructions_raw": "Set a bar around hip height and lie under it. Grab the bar, keep your body in a straight line from heels to head, and pull your chest to the bar. Lower under control until your arms are straight. Walk your feet further under the bar to make it easier, further out to make it harder.",
-   "cues": "Squeeze your glutes so your hips do not sag. Pull with your elbows, not your hands. Touch the bar to the same spot every rep.",
+   "instructions_raw": "Set a bar around hip height and get under it with your body in one rigid line, heels planted. Pull your chest to the bar, leading with the elbows, and touch the same spot every rep. Lower to long arms without letting the hips sag \u2014 the plank is half the exercise. Feet further under the bar makes it easier, feet elevated makes it harder.",
+   "cues": "Glutes squeezed so the hips cannot sag. Pull with the elbows, chest to bar. Same touch point every rep.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=hXTc1mDnZCw",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": "pull-up",
+   "progression_rank": 1
   },
   {
    "name": "Isometric Neck Exercise - Front And Back",
@@ -4399,7 +4878,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Isometric Neck Exercise - Sides",
@@ -4418,7 +4899,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "JM Press",
@@ -4440,7 +4923,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Jackknife Sit-Up",
@@ -4459,7 +4944,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Janda Sit-Up",
@@ -4478,7 +4965,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Jefferson Squats",
@@ -4503,7 +4992,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell Arnold Press",
@@ -4524,7 +5015,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell Dead Clean",
@@ -4549,7 +5042,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell Hang Clean",
@@ -4574,7 +5069,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell One-Legged Deadlift",
@@ -4596,11 +5093,13 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell Pistol Squat",
-   "base_name": "Kettlebell Pistol Squat",
+   "base_name": "Pistol Squat",
    "pattern": "unilateral",
    "supported_prefixes": [
     "KB"
@@ -4615,12 +5114,14 @@
     "hamstrings",
     "shoulders"
    ],
-   "instructions_raw": "Pick up a kettlebell with two hands and hold it by the horns. Hold one leg off of the floor and squat down on the other. Squat down by flexing the knee and sitting back with the hips, holding the kettlebell up in front of you. Hold the bottom position for a second and then reverse the motion, driving through the heel and keeping your head and chest up. Lower yourself again and repeat.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Hold a kettlebell at your chest with both hands and stand on one leg, the other leg extended in front of you. Squat all the way down on the standing leg, keeping the other leg off the floor. Drive back up to standing without touching down. The kettlebell acts as a counterbalance, which makes this easier than an unloaded pistol.",
+   "cues": "Heel stays down. Use the bell as a counterweight. Slow down, strong up.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=3dMMJMSpFV0",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell Seated Press",
@@ -4641,7 +5142,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell Seesaw Press",
@@ -4662,7 +5165,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell Turkish Get-Up (Lunge style)",
@@ -4686,7 +5191,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kettlebell Turkish Get-Up (Squat style)",
@@ -4711,7 +5218,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kneeling Cable Crunch With Alternating Oblique Twists",
@@ -4730,7 +5239,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kneeling Cable Triceps Extension",
@@ -4749,7 +5260,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kneeling High Pulley Row",
@@ -4771,7 +5284,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kneeling Single-Arm High Pulley Row",
@@ -4793,7 +5308,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Kneeling Squat",
@@ -4816,7 +5333,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lateral Raise - With Bands",
@@ -4835,7 +5354,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Leg-Over Floor Press",
@@ -4857,7 +5378,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Low Cable Triceps Extension",
@@ -4876,7 +5399,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Low Pulley Row To Neck",
@@ -4899,7 +5424,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lunge Pass Through",
@@ -4922,7 +5449,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Cable Curl",
@@ -4941,7 +5470,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Cambered Barbell Row",
@@ -4964,7 +5495,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Close-Grip Bar Curl On High Pulley",
@@ -4983,7 +5516,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Close-Grip Barbell Triceps Extension Behind The Head",
@@ -5002,7 +5537,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Close-Grip Barbell Triceps Press To Chin",
@@ -5021,7 +5558,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Dumbbell Tricep Extension",
@@ -5043,7 +5582,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying High Bench Barbell Curl",
@@ -5062,7 +5603,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying One-Arm Lateral Raise",
@@ -5081,7 +5624,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Rear Delt Raise",
@@ -5100,7 +5645,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Supine Dumbbell Curl",
@@ -5119,7 +5666,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Lying Triceps Press",
@@ -5138,7 +5687,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Middle Back Shrug",
@@ -5157,7 +5708,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Narrow Stance Squats",
@@ -5181,7 +5734,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Natural Glute Ham Raise",
@@ -5204,7 +5759,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Neck Press",
@@ -5226,7 +5783,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Oblique Crunches",
@@ -5245,7 +5804,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Oblique Crunches - On The Floor",
@@ -5264,7 +5825,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One Arm Dumbbell Bench Press",
@@ -5286,7 +5849,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One Arm Dumbbell Preacher Curl",
@@ -5305,7 +5870,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One Arm Floor Press",
@@ -5327,7 +5894,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One Arm Lat Pulldown",
@@ -5349,7 +5918,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One Arm Pronated Dumbbell Triceps Extension",
@@ -5368,7 +5939,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One Arm Supinated Dumbbell Triceps Extension",
@@ -5387,7 +5960,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One Leg Barbell Squat",
@@ -5410,7 +5985,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Dumbbell Row",
@@ -5433,7 +6010,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Flat Bench Dumbbell Flye",
@@ -5452,7 +6031,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm High-Pulley Cable Side Bends",
@@ -5471,7 +6052,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Incline Lateral Raise",
@@ -5490,7 +6073,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Clean",
@@ -5514,7 +6099,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Clean and Jerk",
@@ -5533,7 +6120,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Floor Press",
@@ -5554,7 +6143,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Jerk",
@@ -5577,7 +6168,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Military Press To The Side",
@@ -5598,7 +6191,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Para Press",
@@ -5619,7 +6214,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Push Press",
@@ -5642,7 +6239,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Row",
@@ -5664,7 +6263,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Snatch",
@@ -5690,7 +6291,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Split Jerk",
@@ -5714,7 +6317,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Split Snatch",
@@ -5736,7 +6341,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Kettlebell Swings",
@@ -5760,7 +6367,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Long Bar Row",
@@ -5782,7 +6391,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Open Palm Kettlebell Clean",
@@ -5807,7 +6418,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Overhead Kettlebell Squats",
@@ -5831,7 +6444,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Side Deadlift",
@@ -5857,7 +6472,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Arm Side Laterals",
@@ -5876,7 +6493,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "One-Legged Cable Kickback",
@@ -5897,7 +6516,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Open Palm Kettlebell Clean",
@@ -5921,7 +6542,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Overhead Cable Curl",
@@ -5940,7 +6563,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Pallof Press With Rotation",
@@ -5963,7 +6588,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Palms-Down Dumbbell Wrist Curl Over A Bench",
@@ -5982,7 +6609,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Palms-Down Wrist Curl Over A Bench",
@@ -6001,7 +6630,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Palms-Up Barbell Wrist Curl Over A Bench",
@@ -6020,7 +6651,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Palms-Up Dumbbell Wrist Curl Over A Bench",
@@ -6039,7 +6672,33 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Pike Push-Up",
+   "base_name": "Pike Push-Up",
+   "pattern": "push",
+   "supported_prefixes": [
+    "Bodyweight"
+   ],
+   "difficulty_rating": "Intermediate",
+   "target_muscles": [
+    "shoulders"
+   ],
+   "secondary_muscles": [
+    "triceps",
+    "chest"
+   ],
+   "instructions_raw": "Start in a push-up position, then walk your feet in and lift your hips high so your torso points at the floor like an inverted V. Bend your elbows and lower the top of your head towards the floor between your hands. Press back to long arms without the hips drifting forward. Elevate the feet to move it closer to a handstand push-up.",
+   "cues": "Hips stacked high \u2014 if they drift forward it becomes a bad push-up. Head travels to a spot just ahead of the hands. Elbows about 45 degrees, not flared flat.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=lIZ_C4VJnmc",
+   "is_compound": true,
+   "source": "house",
+   "curated": true,
+   "progression_group": "handstand-push-up",
+   "progression_rank": 2
   },
   {
    "name": "Pin Presses",
@@ -6064,7 +6723,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Plie Dumbbell Squat",
@@ -6088,7 +6749,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Plyo Kettlebell Pushups",
@@ -6110,7 +6773,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Power Clean",
@@ -6119,7 +6784,7 @@
    "supported_prefixes": [
     "BB"
    ],
-   "difficulty_rating": "Intermediate",
+   "difficulty_rating": "Advanced",
    "target_muscles": [
     "hamstrings"
    ],
@@ -6134,12 +6799,14 @@
     "traps",
     "triceps"
    ],
-   "instructions_raw": "Stand with your feet slightly wider than shoulder width apart and toes pointing out slightly. Squat down and grasp bar with a closed, pronated grip. Your hands should be slightly wider than shoulder width apart outside knees with elbows fully extended. Place the bar about 1 inch in front of your shins and over the balls of your feet. Your back should be flat or slightly arched, your chest held up and out and your shoulder blades should be retracted. Keep your head in a neutral position (in line with vertebral column and not tilted or rotated) with your eyes focused straight ahead. Inhale during this phase. Lift the bar from the floor by forcefully extending the hips and the knees as you exhale. Tip: The upper torso should maintain the same angle. Do not bend at the waist yet and do not let the hips rise before the shoulders (this would have the effect of pushing the glutes in the air and stretching the hamstrings. Keep elbows fully extended with the head in a neutral position and the shoulders over the bar. As the bar raises keep it as close to the shins as possible. As the bar passes the knees, thrust your hips forward and slightly bend the knees to avoid locking them. Tip: At this point your thighs should be against the bar. Keep the back flat or slightly arched, elbows fully extended and your head neutral. Tip: You will hold your breath until the next phase. Inhale and then forcefully and quickly extend your hips and knees and stand on your toes. Keep the bar as close to your body as possible. Tip: Your back should be flat with the elbows pointed out to the sides and your head in a neutral position. Also, keep your shoulders over the bar and arms straight as long as possible. When your lower body joints are fully extended, shrug the shoulders upward rapidly without letting the elbows flex yet. Exhale during this portion of the movement. As the shoulders reach their highest elevation flex your elbows to begin pulling your body under the bar. Continue to pull the arms as high and as long as possible. Tip: Due to the explosive nature of this phase, your torso will be erect or with an arched back, your head will be tilted back slightly and your feet may lose contact with the floor. After the lower body has fully extended and the bar reaches near maximal height, pull your body under the bar and rotate the arms around and under the bar. Simultaneously, flex the hips and knees into a quarter squat position. Once the arms are under the bar, inhale and then lift your elbows to position the upper arms parallel to the floor. Rack the bar across the front of your collar bones and front shoulder muscles. Catch the bar with an erect and tight torso, a neutral head position and flat feet. Exhale during this movement. Stand up by extending the hips and knees to a fully erect position. Lower the bar by gradually reducing the muscular tension of the arms to allow a controlled descent of the bar to the thighs. Inhale during this movement. Simultaneously flex the hips and knees to cushion the impact of the bar on the thighs. Squat down with the elbows fully extended until the bar touches the floor. Start over at Phase 1 and repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Start with the bar over mid-foot, hips higher than a deadlift setup. Pull the bar from the floor, then explode with your hips when it passes your knees, shrugging hard. Drop under and catch the bar on your front shoulders in a quarter squat, elbows whipped through. Stand up, then lower under control and reset each rep.",
+   "cues": "Slow off the floor, violent at the hips. The arms are ropes until the shrug. Catch with high elbows.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=lI35socHJ4k",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Preacher Curl",
@@ -6158,7 +6825,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Preacher Hammer Dumbbell Curl",
@@ -6179,7 +6848,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Press Sit-Up",
@@ -6202,29 +6873,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
-  },
-  {
-   "name": "Pull Through",
-   "base_name": "Pull Through",
-   "pattern": "hinge",
-   "supported_prefixes": [
-    "Cable"
-   ],
-   "difficulty_rating": "Beginner",
-   "target_muscles": [
-    "glutes"
-   ],
-   "secondary_muscles": [
-    "hamstrings",
-    "lower back"
-   ],
-   "instructions_raw": "Begin standing a few feet in front of a low pulley with a rope or handle attached. Face away from the machine, straddling the cable, with your feet set wide apart. Begin the movement by reaching through your legs as far as possible, bending at the hips. Keep your knees slightly bent. Keeping your arms straight, extend through the hip to stand straight up. Avoid pulling upward through the shoulders; all of the motion should originate through the hips.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": true,
-   "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Pull-Up",
@@ -6241,12 +6892,14 @@
     "biceps",
     "middle back"
    ],
-   "instructions_raw": "Hang from a bar with an overhand grip just wider than your shoulders, arms straight. Pull yourself up until your chin clears the bar. Lower under control back to a full hang.",
-   "cues": "Start each rep from a dead hang. Chest to the bar, not chin poking up. No kicking or swinging.",
+   "instructions_raw": "Take an overhand grip just outside your shoulders and start from a dead hang. Pull your chest towards the bar, driving the elbows down and back, until your chin clears without reaching for it. Lower under full control back to the dead hang \u2014 cutting the bottom quietly steals the range that builds the back.",
+   "cues": "Every rep starts from a dead hang. Drive the elbows down and back. If you are kicking, the rep is already gone.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=vw5Xmu5CIew",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": "pull-up",
+   "progression_rank": 3
   },
   {
    "name": "Push Up to Side Plank",
@@ -6269,7 +6922,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Push-Up Wide",
@@ -6292,7 +6947,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Push-Ups - Close Triceps Position",
@@ -6314,29 +6971,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
-  },
-  {
-   "name": "Push-Ups With Feet Elevated",
-   "base_name": "Push-Ups With Feet Elevated",
-   "pattern": "push",
-   "supported_prefixes": [
-    "Bodyweight"
-   ],
-   "difficulty_rating": "Beginner",
-   "target_muscles": [
-    "chest"
-   ],
-   "secondary_muscles": [
-    "shoulders",
-    "triceps"
-   ],
-   "instructions_raw": "Lie on the floor face down and place your hands about 36 inches apart from each other holding your torso up at arms length. Place your toes on top of a flat bench. This will allow your body to be elevated. Note: The higher the elevation of the flat bench, the higher the resistance of the exercise is. Lower yourself until your chest almost touches the floor as you inhale. Using your pectoral muscles, press your upper body back up to the starting position and squeeze your chest. Breathe out as you perform this step. After a second pause at the contracted position, repeat the movement for the prescribed amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": true,
-   "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Pushups",
@@ -6358,7 +6995,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Pushups (Close and Wide Hand Positions)",
@@ -6380,7 +7019,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Band Bench Press",
@@ -6405,7 +7046,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Band Box Squat",
@@ -6432,7 +7075,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Band Deadlift",
@@ -6458,7 +7103,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Band Power Squat",
@@ -6483,7 +7130,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Band Sumo Deadlift",
@@ -6511,7 +7160,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Barbell Curl",
@@ -6532,7 +7183,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Barbell Preacher Curls",
@@ -6553,7 +7206,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Cable Curl",
@@ -6574,7 +7229,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Crunch",
@@ -6593,7 +7250,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Flyes",
@@ -6612,7 +7271,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Flyes With External Rotation",
@@ -6631,7 +7292,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Grip Bent-Over Rows",
@@ -6654,7 +7317,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Grip Triceps Pushdown",
@@ -6673,7 +7338,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Reverse Triceps Bench Press",
@@ -6695,7 +7362,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Rocking Standing Calf Raise",
@@ -6714,7 +7383,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Rope Crunch",
@@ -6733,7 +7404,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Rope Straight-Arm Pulldown",
@@ -6752,7 +7425,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Russian Twist",
@@ -6761,23 +7436,25 @@
    "supported_prefixes": [
     "Bodyweight"
    ],
-   "difficulty_rating": "Intermediate",
+   "difficulty_rating": "Beginner",
    "target_muscles": [
     "abdominals"
    ],
    "secondary_muscles": [
     "lower back"
    ],
-   "instructions_raw": "Lie down on the floor placing your feet either under something that will not move or by having a partner hold them. Your legs should be bent at the knees. Elevate your upper body so that it creates an imaginary V-shape with your thighs. Your arms should be fully extended in front of you perpendicular to your torso and with the hands clasped. This is the starting position. Twist your torso to the right side until your arms are parallel with the floor while breathing out. Hold the contraction for a second and move back to the starting position while breathing out. Now move to the opposite side performing the same techniques you applied to the right side. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Sit with knees bent and heels lightly touching the floor, torso leaned back to about 45 degrees with a long spine. Rotate your ribcage side to side, eyes and chest travelling together \u2014 the hands only follow. Add weight at the chest or float the feet only once the rotation stays crisp without the lower back rounding.",
+   "cues": "Turn the ribs, not the arms. If the lower back rounds, sit taller. Speed hides weak rotation \u2014 go slower.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=IJDOoVyVjhc",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Scapular Pull-Up",
-   "base_name": "Scapular Pull-Up",
+   "base_name": "Pull-Up",
    "pattern": "row",
    "supported_prefixes": [
     "Bodyweight"
@@ -6790,12 +7467,14 @@
     "lats",
     "middle back"
    ],
-   "instructions_raw": "Take a pronated grip on a pull-up bar. From a hanging position, raise yourself a few inches without using your arms. Do this by depressing your shoulder girdle in a reverse shrugging motion. Pause at the completion of the movement, and then slowly return to the starting position before performing more repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Hang from a pull-up bar with straight arms and let your shoulders rise to your ears. Without bending your elbows, pull your shoulder blades down and back so your body lifts a few inches. Hold the top for a beat, then return to the full hang with control.",
+   "cues": "Arms stay straight \u2014 this is the shoulder blades' job. Small range, done with intention. It is the first inch of every pull-up you will ever do.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=-ZIpSoTRsuE",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": "pull-up",
+   "progression_rank": 2
   },
   {
    "name": "Seated Barbell Military Press",
@@ -6816,7 +7495,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Bent-Over One-Arm Dumbbell Triceps Extension",
@@ -6835,7 +7516,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Bent-Over Rear Delt Raise",
@@ -6854,7 +7537,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Bent-Over Two-Arm Dumbbell Triceps Extension",
@@ -6873,7 +7558,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Cable Rows",
@@ -6896,7 +7583,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Cable Shoulder Press",
@@ -6917,7 +7606,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Close-Grip Concentration Barbell Curl",
@@ -6936,7 +7627,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Dumbbell Curl",
@@ -6955,7 +7648,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Dumbbell Inner Biceps Curl",
@@ -6974,7 +7669,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Dumbbell Palms-Down Wrist Curl",
@@ -6993,7 +7690,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Dumbbell Palms-Up Wrist Curl",
@@ -7012,7 +7711,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Dumbbell Press",
@@ -7033,7 +7734,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Flat Bench Leg Pull-In",
@@ -7052,7 +7755,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Good Mornings",
@@ -7073,7 +7778,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated One-Arm Dumbbell Palms-Down Wrist Curl",
@@ -7092,7 +7799,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated One-Arm Dumbbell Palms-Up Wrist Curl",
@@ -7111,7 +7820,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated One-arm Cable Pulley Rows",
@@ -7134,7 +7845,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Palm-Up Barbell Wrist Curl",
@@ -7153,7 +7866,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Palms-Down Barbell Wrist Curl",
@@ -7172,7 +7887,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Side Lateral Raise",
@@ -7191,7 +7908,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Triceps Press",
@@ -7210,7 +7929,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Seated Two-Arm Palms-Up Low-Pulley Wrist Curl",
@@ -7229,7 +7950,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "See-Saw Press (Alternating Side Press)",
@@ -7251,7 +7974,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Shotgun Row",
@@ -7273,7 +7998,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Shoulder Press - With Bands",
@@ -7294,7 +8021,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Side Laterals to Front Raise",
@@ -7315,7 +8044,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Single Dumbbell Raise",
@@ -7337,7 +8068,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Single-Arm Cable Crossover",
@@ -7356,7 +8089,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Single-Arm Linear Jammer",
@@ -7378,7 +8113,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Single-Arm Push-Up",
@@ -7400,7 +8137,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Single-Leg Glute Bridge",
@@ -7416,12 +8155,14 @@
    "secondary_muscles": [
     "hamstrings"
    ],
-   "instructions_raw": "Lie on your back with one knee bent, foot flat, and the other leg extended. Drive through the planted heel and lift your hips until your body is straight from knee to shoulder. Lower under control without letting your hips tilt. Do all reps, then switch legs.",
-   "cues": "Hips level, no twisting. Squeeze the glute at the top. Push through the heel.",
+   "instructions_raw": "Lie with one foot planted close enough that your fingertips can graze the heel, the other leg extended. Drive through the planted heel to a straight line from knee to shoulder, and hold the top until the glute, not the hamstring, owns it. If the hamstring cramps, the foot is too far out \u2014 pull it in and re-set.",
+   "cues": "Hips dead level \u2014 a dropped hip is a failed rep. Heel in close for glute, further out for hamstring. Own the top before you lower.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=VUl8R0kn6v4",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Sit-Up",
@@ -7440,7 +8181,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Smith Incline Shoulder Raise",
@@ -7461,7 +8204,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Snatch Pull",
@@ -7486,7 +8231,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Speed Band Overhead Triceps",
@@ -7505,7 +8252,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Speed Box Squat",
@@ -7528,7 +8277,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Speed Squats",
@@ -7552,7 +8303,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Spider Curl",
@@ -7571,7 +8324,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Split Squat with Dumbbells",
@@ -7593,7 +8348,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Squat Jerk",
@@ -7618,7 +8375,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Squat with Bands",
@@ -7643,7 +8402,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Squat with Chains",
@@ -7668,7 +8429,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Squat with Plate Movers",
@@ -7693,7 +8456,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Squats - With Bands",
@@ -7717,7 +8482,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Alternating Dumbbell Press",
@@ -7738,7 +8505,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Barbell Calf Raise",
@@ -7757,7 +8526,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Barbell Press Behind Neck",
@@ -7778,7 +8549,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Bent-Over One-Arm Dumbbell Triceps Extension",
@@ -7799,7 +8572,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Bent-Over Two-Arm Dumbbell Triceps Extension",
@@ -7818,7 +8593,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Biceps Cable Curl",
@@ -7837,7 +8614,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Bradford Press",
@@ -7858,7 +8637,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Cable Chest Press",
@@ -7880,7 +8661,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Concentration Curl",
@@ -7901,7 +8684,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Dumbbell Calf Raise",
@@ -7920,7 +8705,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Dumbbell Press",
@@ -7941,7 +8728,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Dumbbell Reverse Curl",
@@ -7962,7 +8751,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Dumbbell Straight-Arm Front Delt Raise Above Head",
@@ -7981,7 +8772,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Dumbbell Triceps Extension",
@@ -8000,7 +8793,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Dumbbell Upright Row",
@@ -8022,7 +8817,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Front Barbell Raise Over Head",
@@ -8041,7 +8838,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Inner-Biceps Curl",
@@ -8060,7 +8859,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Low-Pulley Deltoid Raise",
@@ -8081,7 +8882,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Low-Pulley One-Arm Triceps Extension",
@@ -8103,7 +8906,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Military Press",
@@ -8124,7 +8929,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing One-Arm Cable Curl",
@@ -8143,7 +8950,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing One-Arm Dumbbell Curl Over Incline Bench",
@@ -8162,7 +8971,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing One-Arm Dumbbell Triceps Extension",
@@ -8184,7 +8995,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Overhead Barbell Triceps Extension",
@@ -8205,7 +9018,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Palm-In One-Arm Dumbbell Press",
@@ -8226,7 +9041,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Palms-In Dumbbell Press",
@@ -8247,7 +9064,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Palms-Up Barbell Behind The Back Wrist Curl",
@@ -8266,7 +9085,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Rope Crunch",
@@ -8285,7 +9106,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Standing Towel Triceps Extension",
@@ -8304,7 +9127,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Step-up with Knee Raise",
@@ -8326,7 +9151,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Stiff Leg Barbell Good Morning",
@@ -8348,7 +9175,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Stiff-Legged Barbell Deadlift",
@@ -8370,7 +9199,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Stiff-Legged Dumbbell Deadlift",
@@ -8392,7 +9223,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Straight Bar Bench Mid Rows",
@@ -8414,7 +9247,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Straight Raises on Incline Bench",
@@ -8435,7 +9270,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Straight-Arm Dumbbell Pullover",
@@ -8458,7 +9295,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Straight-Arm Pulldown",
@@ -8467,17 +9306,19 @@
    "supported_prefixes": [
     "Cable"
    ],
-   "difficulty_rating": "Beginner",
+   "difficulty_rating": "Intermediate",
    "target_muscles": [
     "lats"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "You will start by grabbing the wide bar from the top pulley of a pulldown machine and using a wider than shoulder-width pronated (palms down) grip. Step backwards two feet or so. Bend your torso forward at the waist by around 30-degrees with your arms fully extended in front of you and a slight bend at the elbows. If your arms are not fully extended then you need to step a bit more backwards until they are. Once your arms are fully extended and your torso is slightly bent at the waist, tighten the lats and then you are ready to begin. While keeping the arms straight, pull the bar down by contracting the lats until your hands are next to the side of the thighs. Breathe out as you perform this step. While keeping the arms straight, go back to the starting position while breathing in. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand facing a high cable with a straight bar or rope, arms extended in front of you at shoulder height. Keeping a slight elbow bend, pull the attachment down in an arc until your hands reach your thighs. Return under control to shoulder height.",
+   "cues": "Arms long, elbows soft and fixed at that angle. Pull with the elbows, not the hands \u2014 hands wake the biceps, elbows wake the lats. Hinge slightly and stay braced.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=mvgQs3CkgGQ",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Sumo Deadlift",
@@ -8504,7 +9345,9 @@
    "video_placeholder_uri": "https://www.youtube.com/watch?v=1ltxpKdXkG4",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": true
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Sumo Deadlift with Bands",
@@ -8531,7 +9374,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Sumo Deadlift with Chains",
@@ -8559,7 +9404,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "T-Bar Row with Handle",
@@ -8581,7 +9428,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Tate Press",
@@ -8603,7 +9452,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Trail Running/Walking",
@@ -8626,7 +9477,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Triceps Overhead Extension with Rope",
@@ -8645,7 +9498,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Triceps Pushdown",
@@ -8659,12 +9514,14 @@
     "triceps"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Attach a straight or angled bar to a high pulley and grab with an overhand grip (palms facing down) at shoulder width. Standing upright with the torso straight and a very small inclination forward, bring the upper arms close to your body and perpendicular to the floor. The forearms should be pointing up towards the pulley as they hold the bar. This is your starting position. Using the triceps, bring the bar down until it touches the front of your thighs and the arms are fully extended perpendicular to the floor. The upper arms should always remain stationary next to your torso and only the forearms should move. Exhale as you perform this movement. After a second hold at the contracted position, bring the bar slowly up to the starting point. Breathe in as you perform this step. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Pin your elbows to your ribs at a high cable and take a half step back so the stack pulls at a slight angle. Push down to a hard lockout and squeeze for a beat. Ride the cable back up until your forearms pass parallel \u2014 the stretch is half the rep, but the moment your elbows drift forward the lats take over and the triceps get nothing.",
+   "cues": "Elbows glued to the ribs. Squeeze the lockout. Control the cable up, never let it yank you.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=-zLyUAo1gMw",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Triceps Pushdown - Rope Attachment",
@@ -8683,7 +9540,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Triceps Pushdown - V-Bar Attachment",
@@ -8702,7 +9561,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Tuck Crunch",
@@ -8721,7 +9582,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Two-Arm Dumbbell Preacher Curl",
@@ -8740,7 +9603,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Two-Arm Kettlebell Clean",
@@ -8765,7 +9630,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Two-Arm Kettlebell Military Press",
@@ -8786,7 +9653,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Two-Arm Kettlebell Row",
@@ -8808,7 +9677,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Underhand Cable Pulldowns",
@@ -8831,7 +9702,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Upright Barbell Row",
@@ -8852,7 +9725,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Upright Cable Row",
@@ -8873,7 +9748,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Upright Row - With Bands",
@@ -8894,7 +9771,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "V-Bar Pulldown",
@@ -8917,7 +9796,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "V-Bar Pullup",
@@ -8940,7 +9821,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Weighted Jump Squat",
@@ -8964,7 +9847,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Weighted Sissy Squat",
@@ -8987,7 +9872,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wide Stance Barbell Squat",
@@ -9011,7 +9898,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wide-Grip Barbell Bench Press",
@@ -9033,7 +9922,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wide-Grip Decline Barbell Bench Press",
@@ -9055,7 +9946,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wide-Grip Decline Barbell Pullover",
@@ -9077,7 +9970,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wide-Grip Lat Pulldown",
@@ -9100,7 +9995,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wide-Grip Pulldown Behind The Neck",
@@ -9123,7 +10020,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wide-Grip Rear Pull-Up",
@@ -9146,7 +10045,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wide-Grip Standing Barbell Curl",
@@ -9165,7 +10066,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Wrist Rotations with Straight Bar",
@@ -9184,7 +10087,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Zercher Squats",
@@ -9207,7 +10112,9 @@
    "video_placeholder_uri": "",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Zottman Curl",
@@ -9228,7 +10135,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   },
   {
    "name": "Zottman Preacher Curl",
@@ -9249,7 +10158,9 @@
    "video_placeholder_uri": "",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false
+   "curated": false,
+   "progression_group": null,
+   "progression_rank": null
   }
  ]
 }

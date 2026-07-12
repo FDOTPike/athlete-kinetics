@@ -107,6 +107,8 @@ function mapExercise(ex) {
       is_compound: (ex.mechanic ?? '').toLowerCase() === 'compound',
       source: 'free-exercise-db',
       curated: false,
+      progression_group: null,   // chain id, assigned in curation (S3)
+      progression_rank: null,    // ordinal within the chain, gaps legal
     },
   };
 }
