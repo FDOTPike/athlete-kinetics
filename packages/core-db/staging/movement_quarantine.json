@@ -1,0 +1,2931 @@
+{
+ "count": 441,
+ "entries": [
+  {
+   "name": "90/90 Hamstring",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Ab Crunch Machine",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Ab Roller",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Adductor",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Adductor/Groin",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Advanced Kettlebell Windmill",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Air Bike",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "All Fours Quad Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Alternate Heel Touchers",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Alternate Leg Diagonal Bound",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Ankle Circles",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Ankle On The Knee",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Anterior Tibialis-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Arm Circles",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Around The Worlds",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Atlas Stone Trainer",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Atlas Stones",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Axle Deadlift",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Backward Drag",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Backward Medicine Ball Throw",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Balance Board",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Ball Leg Curl",
+   "reasons": [
+    "equipment 'exercise ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Band Assisted Pull-Up",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Band Hip Adductions",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Band Skull Crusher",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Barbell Side Bend",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Battling Ropes",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Bear Crawl Sled Drags",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Behind Head Chest Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Bench Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Bench Sprint",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Bent Over Low-Pulley Side Lateral",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Bicycling",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Bicycling, Stationary",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Body-Up",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Bodyweight Mid Row",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Bodyweight Squat",
+   "reasons": [
+    "collides with a shipped movement (KEEP OURS)"
+   ]
+  },
+  {
+   "name": "Bottoms Up",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Box Jump (Multiple Response)",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Box Skip",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Brachialis-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Butt Lift (Bridge)",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Butt-Ups",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Butterfly",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Cable Crossover",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Cable Hip Adduction",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Cable Iron Cross",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Cable Judo Flip",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Calf Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Calf Press On The Leg Press Machine",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Calf Stretch Elbows Against Wall",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Calf Stretch Hands Against Wall",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Calf-Machine Shoulder Shrug",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Calves-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Car Deadlift",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Car Drivers",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Carioca Quick Step",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Cat Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Catch and Overhead Throw",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Chain Handle Extension",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Chain Press",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Chair Leg Extended Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chair Lower Back Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chair Squat",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Chair Upper Body Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chest And Front Of Shoulder Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chest Push (multiple response)",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chest Push (single response)",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chest Push from 3 point stance",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chest Push with Run Release",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chest Stretch on Stability Ball",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'exercise ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Child's Pose",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chin To Chest Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Chin-Up",
+   "reasons": [
+    "collides with a shipped movement (KEEP OURS)"
+   ]
+  },
+  {
+   "name": "Circus Bell",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Clean",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Clean and Jerk",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Clean Deadlift",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Clean from Blocks",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Clean Pull",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Clean Shrug",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Cocoons",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Conan's Wheel",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Cross Over - With Bands",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Crossover Reverse Lunge",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Crucifix",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dancer's Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Decline Smith Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Depth Jump Leap",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dip Machine",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Dips - Chest Version",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Donkey Calf Raises",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Double Kettlebell Jerk",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Double Kettlebell Windmill",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Double Leg Butt Kick",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Downward Facing Balance",
+   "reasons": [
+    "equipment 'exercise ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Drop Push",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dumbbell Bench Press",
+   "reasons": [
+    "collides with a shipped movement (KEEP OURS)"
+   ]
+  },
+  {
+   "name": "Dumbbell Lying Pronation",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dumbbell Lying Supination",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dumbbell Scaption",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dumbbell Seated Box Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dumbbell Shoulder Press",
+   "reasons": [
+    "collides with a shipped movement (KEEP OURS)"
+   ]
+  },
+  {
+   "name": "Dumbbell Side Bend",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dynamic Back Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Dynamic Chest Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Elbow Circles",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Elbow to Knee",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Elbows Back",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Elliptical Trainer",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Exercise Ball Crunch",
+   "reasons": [
+    "equipment 'exercise ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Exercise Ball Pull-In",
+   "reasons": [
+    "equipment 'exercise ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "EZ-Bar Skullcrusher",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Farmer's Walk",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Fast Skipping",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Flutter Kicks",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Foot-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Forward Drag with Press",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Frankenstein Squat",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Frog Hops",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Front Box Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Front Cone Hops (or hurdle hops)",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Front Leg Raises",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Front Plate Raise",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Gironda Sternum Chins",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Glute Ham Raise",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Glute Kickback",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Goblet Squat",
+   "reasons": [
+    "collides with a shipped movement (KEEP OURS)"
+   ]
+  },
+  {
+   "name": "Groin and Back Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Groiners",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hack Squat",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Hamstring Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hamstring-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hang Clean",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Hang Clean - Below the Knees",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Hang Snatch",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Hang Snatch - Below Knees",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Hanging Pike",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Heaving Snatch Balance",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Heavy Bag Thrust",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hip Circles (prone)",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hip Flexion with Band",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hip Lift with Band",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hug A Ball",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'exercise ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hug Knees To Chest",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hurdle Hops",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Hyperextensions (Back Extensions)",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Iliotibial Tract-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Inchworm",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Incline Push-Up Depth Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Intermediate Groin Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Intermediate Hip Flexor and Quad Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Inverted Row with Straps",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Iron Cross",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Iron Crosses (stretch)",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Isometric Chest Squeezes",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Isometric Wipers",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "IT Band and Glute Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Jerk Balance",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Jerk Dip Squat",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Jogging, Treadmill",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Keg Load",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kettlebell Figure 8",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kettlebell Pass Between The Legs",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kettlebell Pirate Ships",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kettlebell Sumo High Pull",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kettlebell Thruster",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kettlebell Windmill",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kipping Muscle Up",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Knee Across The Body",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Knee Circles",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Knee Tuck Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Knee/Hip Raise On Parallel Bars",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Kneeling Arm Drill",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kneeling Forearm Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Kneeling Hip Flexor",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Kneeling Jump Squat",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Landmine 180's",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Landmine Linear Jammer",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lateral Bound",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lateral Box Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lateral Cone Hops",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Latissimus Dorsi-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Leg Extensions",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leg Lift",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Leg Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leg Pull-In",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Leg-Up Hamstring Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Leverage Chest Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leverage Deadlift",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leverage Decline Chest Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leverage High Row",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leverage Incline Chest Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leverage Iso Row",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leverage Shoulder Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Leverage Shrug",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Linear 3-Part Start Technique",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Linear Acceleration Wall Drill",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Linear Depth Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Log Lift",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "London Bridges",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Looking At Ceiling",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Low Cable Crossover",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lower Back Curl",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Lower Back-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lunge Sprint",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Lying Bent Leg Groin",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lying Crossover",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lying Face Down Plate Neck Resistance",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Lying Face Up Plate Neck Resistance",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Lying Glute",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lying Hamstring",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lying Leg Curls",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Lying Machine Squat",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Lying Prone Quadriceps",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Lying T-Bar Row",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Machine Bench Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Machine Bicep Curl",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Machine Preacher Curls",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Machine Shoulder (Military) Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Machine Triceps Extension",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Medicine Ball Chest Pass",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Medicine Ball Full Twist",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Medicine Ball Scoop Throw",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Middle Back Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Mixed Grip Chin",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Monster Walk",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Mountain Climbers",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Moving Claw Series",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Muscle Snatch",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Muscle Up",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Narrow Stance Hack Squats",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Narrow Stance Leg Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Neck-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Olympic Squat",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "On Your Side Quad Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "On-Your-Back Quad Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "One Arm Against Wall",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "One Arm Chin-Up",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "One Half Locust",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "One Handed Hang",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "One Knee To Chest",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "One-Arm Medicine Ball Slam",
+   "reasons": [
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Otis-Up",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Overhead Lat",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Overhead Slam",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Overhead Squat",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Overhead Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Overhead Triceps",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Pallof Press",
+   "reasons": [
+    "collides with a shipped movement (KEEP OURS)"
+   ]
+  },
+  {
+   "name": "Parallel Bar Dip",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Pelvic Tilt Into Bridge",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Peroneals Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Peroneals-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Physioball Hip Bridge",
+   "reasons": [
+    "equipment 'exercise ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Piriformis-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Plank",
+   "reasons": [
+    "collides with a shipped movement (KEEP OURS)"
+   ]
+  },
+  {
+   "name": "Plate Pinch",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Plate Twist",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Platform Hamstring Slides",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Plyo Push-up",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Posterior Tibialis Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Power Clean from Blocks",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Power Jerk",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Power Partials",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Power Snatch",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Power Snatch from Blocks",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Power Stairs",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Prone Manual Hamstring",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Prowler Sprint",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Push Press",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Push Press - Behind the Neck",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Push-Ups With Feet On An Exercise Ball",
+   "reasons": [
+    "equipment 'exercise ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Pyramid",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'exercise ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Quad Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Quadriceps-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Quick Leap",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rack Delivery",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rack Pull with Bands",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rack Pulls",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rear Leg Raises",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Recumbent Bike",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Return Push from Stance",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Reverse Hyperextension",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Reverse Machine Flyes",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Reverse Plate Curls",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Rhomboids-SMR",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'foam roll' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rickshaw Carry",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rickshaw Deadlift",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Ring Dips",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Rocket Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rocky Pull-Ups/Pulldowns",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Romanian Deadlift",
+   "reasons": [
+    "collides with a shipped movement (KEEP OURS)"
+   ]
+  },
+  {
+   "name": "Romanian Deadlift from Deficit",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Rope Climb",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rope Jumping",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Round The World Shoulder Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Rowing, Stationary",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Runner's Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Running, Treadmill",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Sandbag Load",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Scissor Kick",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Scissors Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Seated Band Hamstring Curl",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Seated Barbell Twist",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Seated Biceps",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Seated Calf Raise",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Seated Calf Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Seated Floor Hamstring Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Seated Front Deltoid",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Seated Glute",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Seated Hamstring",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Seated Hamstring and Calf Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Seated Head Harness Neck Resistance",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Seated Leg Curl",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Seated Leg Tucks",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Seated Overhead Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Shoulder Circles",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Shoulder Raise",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Shoulder Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Side Bridge",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Side Hop-Sprint",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Side Jackknife",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Side Leg Raises",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Side Lying Groin Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Side Neck Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Side Standing Long Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Side to Side Box Shuffle",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Side To Side Chins",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Side Wrist Pull",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Side-Lying Floor Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Single Leg Butt Kick",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Single Leg Push-off",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Single-Cone Sprint Drill",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Single-Leg High Box Squat",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Single-Leg Hop Progression",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Single-Leg Lateral Hop",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Single-Leg Leg Extension",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Single-Leg Stride Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Sit Squats",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Skating",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Sled Drag - Harness",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Sled Overhead Backward Walk",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Sled Overhead Triceps Extension",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Sled Push",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Sled Reverse Flye",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Sled Row",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Sledgehammer Swings",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Behind the Back Shrug",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Bench Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Bent Over Row",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Calf Raise",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Close-Grip Bench Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Decline Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Hang Power Clean",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Hip Raise",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Incline Bench Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Leg Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine One-Arm Upright Row",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Overhead Shoulder Press",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Pistol Squat",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Reverse Calf Raises",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Squat",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Stiff-Legged Deadlift",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Machine Upright Row",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Smith Single-Leg Split Squat",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Snatch",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Snatch Balance",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Snatch Deadlift",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Snatch from Blocks",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Snatch Shrug",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Spell Caster",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Spider Crawl",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Spinal Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Split Clean",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Split Jerk",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Split Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Split Snatch",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Split Squats",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Stairmaster",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Standing Biceps Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Cable Lift",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Cable Wood Chop",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Calf Raises",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Standing Elevated Quad Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Gastrocnemius Calf Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Standing Hamstring and Calf Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Standing Hip Circles",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Hip Flexors",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Lateral Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Leg Curl",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Standing Long Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Olympic Plate Hand Squeeze",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Pelvic Tilt",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Soleus And Achilles Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Toe Touches",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Standing Two-Arm Overhead Throw",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Star Jump",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Step Mill",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Stomach Vacuum",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Stride Jump Crossover",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Superman",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Supine Chest Throw",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Supine One-Arm Overhead Throw",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Supine Two-Arm Overhead Throw",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)",
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Suspended Fallout",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Suspended Push-Up",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Suspended Reverse Crunch",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Suspended Row",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Suspended Split Squat",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Svend Press",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "The Straddle",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Thigh Abductor",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Thigh Adductor",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Tire Flip",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Toe Touchers",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Torso Rotation",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "equipment 'exercise ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Trap Bar Deadlift",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Tricep Dumbbell Kickback",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Tricep Side Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Triceps Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Two-Arm Kettlebell Jerk",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Upper Back Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Upper Back-Leg Grab",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Upward Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Vertical Swing",
+   "reasons": [
+    "category 'plyometrics' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Walking, Treadmill",
+   "reasons": [
+    "equipment 'machine' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Weighted Ball Hyperextension",
+   "reasons": [
+    "equipment 'exercise ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Weighted Ball Side Bend",
+   "reasons": [
+    "equipment 'exercise ball' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Weighted Bench Dip",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Weighted Crunches",
+   "reasons": [
+    "equipment 'medicine ball' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Weighted Pull Ups",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Weighted Sit-Ups - With Bands",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Weighted Squat",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Wide Stance Stiff Legs",
+   "reasons": [
+    "category 'olympic weightlifting' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Wind Sprints",
+   "reasons": [
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Windmills",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "World's Greatest Stretch",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)",
+    "no taxonomy pattern matched"
+   ]
+  },
+  {
+   "name": "Wrist Circles",
+   "reasons": [
+    "category 'stretching' out of v1 scope (curate manually if wanted)"
+   ]
+  },
+  {
+   "name": "Wrist Roller",
+   "reasons": [
+    "equipment 'other' has no prefix token (014)"
+   ]
+  },
+  {
+   "name": "Yoke Walk",
+   "reasons": [
+    "category 'strongman' out of v1 scope (curate manually if wanted)",
+    "equipment 'other' has no prefix token (014)",
+    "no taxonomy pattern matched"
+   ]
+  }
+ ]
+}
