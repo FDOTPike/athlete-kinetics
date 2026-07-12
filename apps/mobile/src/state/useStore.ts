@@ -18,12 +18,22 @@ import {
   MATERIALIZE_STATE_VECTOR_SQL,
   SPO2_FOLD_SQL,
   SPO2_TRIM_SQL,
+  closeKineticsDb,
   demoDates,
   generateDemoHistory,
   migrate,
   openKineticsDb,
   type DemoSql,
 } from '@ak/core-db';
+import {
+  activeEntry,
+  addAthlete,
+  removeAthlete as regRemoveAthlete,
+  renameAthlete as regRenameAthlete,
+  setActiveAthlete,
+  type AthleteEntry,
+} from './athleteRegistryCore';
+import { loadRegistry, saveRegistry } from './athleteRegistry';
 import {
   buildPatternWindow,
   computeSubstitutions,
@@ -256,6 +266,17 @@ interface KineticsStore {
   /** Health Connect state: 'off' until probed; 'idle' = available but not
    *  yet authorized (CONNECT shown). Never blocks anything. */
   biometricsStatus: 'off' | 'unavailable' | 'idle' | 'denied' | 'ready';
+  /** Coach Mode (Phase 15): registered athletes — one SQLite FILE each, so
+   *  sessions/telemetry/blocks never bleed between people. The registry is a
+   *  document-dir JSON side-file (it selects which DB to open, so it cannot
+   *  live inside one). */
+  athletes: AthleteEntry[];
+  activeAthleteId: string;
+  /** False until this athlete's profile has been saved at least once
+   *  (athlete_profile.updated_at_ms > 0) — routes first run to the
+   *  onboarding questionnaire. Defaults true pre-boot to avoid a wizard
+   *  flash on existing installs. */
+  onboarded: boolean;
 
   boot: () => void;
   /** Re-sync everything date-derived when the calendar day has changed since
@@ -297,6 +318,20 @@ interface KineticsStore {
   /** Hard-DELETE the active block (+ cascade) and today's volatile reports +
    *  niggles, in one transaction. Training history (set_record) is preserved. */
   wipeActiveBlockState: () => void;
+  /** Coach Mode: close the current athlete's DB and re-boot against the
+   *  target athlete's file. Refused while a session is active. */
+  switchAthlete: (id: string) => void;
+  /** Coach Mode: register a new athlete (fresh, empty DB file) and switch to
+   *  them — a fresh file has updated_at_ms = 0, so they land in onboarding. */
+  createAthlete: (name: string) => void;
+  /** Coach Mode: rename a registry entry (display name only). */
+  renameAthleteEntry: (id: string, name: string) => void;
+  /** Coach Mode: remove a non-active, non-default athlete from the registry
+   *  and best-effort delete their DB file. */
+  deleteAthlete: (id: string) => void;
+  /** Onboarding completion: persist every answer in ONE save (no partial
+   *  profiles), name the athlete, and enter the app. */
+  completeOnboarding: (patch: Partial<UserProfile>, athleteName: string) => void;
   /** Triage a free-text complaint with a forced 1-10 severity (Phase 12 Step
    *  5). The severity gates the matched guardrail by training age. */
   reportSubjective: (text: string, severity: number) => Promise<void>;
@@ -645,6 +680,18 @@ const runBlockWipe = (d: DB, today: string): void => {
   d.executeSync('DELETE FROM niggle WHERE reported_at_ms >= ?', [startOfTodayMs()]);
 };
 
+/** Everything per-athlete in the store, cleared on a Coach Mode file swap so
+ *  nothing bleeds across athletes (the re-boot re-hydrates all of it from the
+ *  target file). `onboarded: true` here is the no-flash default; boot() then
+ *  reads the real value from the new file. */
+const PER_ATHLETE_RESET: Partial<KineticsStore> = {
+  vector: null, trend: [], session: null, prescription: null,
+  profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
+  sessionPlan: [], activeMovementId: null, substitution: null, niggles: [],
+  block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+  oneRepMaxes: {}, lastEndedSessionId: null, profileSlots: [], onboarded: true,
+};
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -675,11 +722,20 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   biometricsStatus: 'off',
   profileSlots: [],
   movementPrefixes: [],
+  athletes: [],
+  activeAthleteId: 'default',
+  onboarded: true,
 
   boot: () => {
     if (get().status === 'ready') return;
+    // Async wrapper: the athlete-registry read is the only await; everything
+    // after it is the original synchronous boot path against the chosen file.
+    void (async () => {
     try {
-      db = openKineticsDb();
+      const reg = await loadRegistry();
+      const entry = activeEntry(reg);
+      set({ athletes: reg.athletes, activeAthleteId: entry.id });
+      db = openKineticsDb(entry.dbName);
       migrate(db);
       // Catch-up materialization: idempotent upsert over the trailing week so
       // today's state_vector row exists whenever any base data does (a no-op
@@ -704,10 +760,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }>(getDb().executeSync(
         'SELECT prefix_name, cns_load_modifier, stability_requirement_modifier, difficulty_modifier FROM movement_prefix',
       ));
+      // Onboarding trigger: updated_at_ms stays 0 until the FIRST profile
+      // save — a fresh install (or a brand-new Coach Mode athlete file)
+      // routes to the questionnaire; any previously saved profile skips it.
+      const onboardStamp = rowsOf<{ updated_at_ms: number }>(
+        getDb().executeSync('SELECT updated_at_ms FROM athlete_profile WHERE profile_id = 1'),
+      )[0];
       set({
         oneRepMaxes: Object.fromEntries(rms.map((r) => [r.movement_id, r.load_kg])),
         status: 'ready',
         error: null,
+        onboarded: onboardStamp !== undefined && onboardStamp.updated_at_ms > 0,
         movements,
         today: localToday(),
         profile: profileRow !== undefined ? profileFromRow(profileRow) : DEFAULT_PROFILE,
@@ -734,6 +797,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     } catch (e) {
       set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
     }
+    })();
   },
 
   saveProfile: (patch) => {
@@ -822,6 +886,99 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshBlock();
     get().refreshVector();
     get().computePrescription([]);
+  },
+
+  // --- Coach Mode (Phase 15): one DB file per athlete ------------------------
+  switchAthlete: (id) => {
+    if (get().session !== null) {
+      set({ error: 'End the active session before switching athletes.' });
+      return;
+    }
+    if (id === get().activeAthleteId && get().status === 'ready') return;
+    set({ status: 'booting', error: null });
+    void (async () => {
+      try {
+        const reg = setActiveAthlete(await loadRegistry(), id);
+        if (reg.activeId !== id) {
+          set({ status: 'ready', error: 'Unknown athlete.' });
+          return;
+        }
+        await saveRegistry(reg);
+        if (db !== null) {
+          try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
+          db = null;
+        }
+        set({ ...PER_ATHLETE_RESET, athletes: reg.athletes, activeAthleteId: id });
+        get().boot(); // status is 'booting' -> full open/migrate/hydrate path
+      } catch (e) {
+        set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      }
+    })();
+  },
+
+  createAthlete: (name) => {
+    if (get().session !== null) {
+      set({ error: 'End the active session before adding athletes.' });
+      return;
+    }
+    set({ status: 'booting', error: null });
+    void (async () => {
+      try {
+        const { reg, entry } = addAthlete(await loadRegistry(), name, Date.now());
+        await saveRegistry(setActiveAthlete(reg, entry.id));
+        if (db !== null) {
+          try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
+          db = null;
+        }
+        set({
+          ...PER_ATHLETE_RESET,
+          athletes: reg.athletes,
+          activeAthleteId: entry.id,
+        });
+        // Fresh file: migrate() builds the full schema; its athlete_profile
+        // row has updated_at_ms = 0, so this athlete lands in onboarding.
+        get().boot();
+      } catch (e) {
+        set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      }
+    })();
+  },
+
+  renameAthleteEntry: (id, name) => {
+    void (async () => {
+      const reg = regRenameAthlete(await loadRegistry(), id, name);
+      await saveRegistry(reg);
+      set({ athletes: reg.athletes });
+    })();
+  },
+
+  deleteAthlete: (id) => {
+    void (async () => {
+      const { reg, removed } = regRemoveAthlete(await loadRegistry(), id);
+      if (removed === null) {
+        set({ error: 'The active and default athletes cannot be deleted.' });
+        return;
+      }
+      await saveRegistry(reg);
+      // Best-effort file removal; an orphaned file is harmless and invisible.
+      try {
+        const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
+        open({ name: removed.dbName }).delete();
+      } catch { /* orphan tolerated */ }
+      set({ athletes: reg.athletes });
+    })();
+  },
+
+  completeOnboarding: (patch, athleteName) => {
+    // ONE atomic save: clamps + persists + stamps updated_at_ms (the trigger
+    // that marks this athlete onboarded on every future boot).
+    get().saveProfile(patch);
+    set({ onboarded: true });
+    void (async () => {
+      const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
+      await saveRegistry(reg);
+      set({ athletes: reg.athletes });
+    })();
   },
 
   rolloverDay: () => {
