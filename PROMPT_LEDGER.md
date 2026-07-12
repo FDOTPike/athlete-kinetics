@@ -1042,3 +1042,53 @@ Wire the module. Run the verify:all 12-Gate CI suite. If the determinism bound h
   window bugs latent; green after the review fixes + verifier hardening).
 - Not committed / not pushed — prepped for the on-device APK test; the push gate
   stands. UI untouched (mandate).
+
+---
+
+## Entry 0019 — 2026-07-12 · Phase 15 (Onboarding Questionnaire + Coach Mode) — Cowork session
+
+### Input G(x)
+
+```
+New update on plan. Im leaving the forge blue print alone for now. Since ive got
+my you until 5pm tomorrow could we start buliding in co work. I want to use
+cowork and claude code via vscode like we had setup from the start and to push
+from there.
+[Scope answers: Max distance then prepare for handover, the goal is to get the
+most out of your intelligent design. I want it to compete with other coaching
+apps (please view juggernaut ai 2.5 to see our competition)]
+[Governing doc: Project Overview/Phase manager/PHASE_PLAN_rev4_FORGE.md,
+Phase 15 -> P16, FORGE retarget deferred]
+```
+
+### Output F(G(x))
+
+- **Audit finding first:** the update.txt mandate had ALREADY landed (006/007
+  athlete_profile IS the 10-category questionnaire; training_age IS the
+  experience tier; 013 slots = profile presets). P15 S1 rescoped to zero
+  migrations.
+- **Coach Mode = one SQLite FILE per athlete** (true history isolation, the
+  mandate's "different people at the same time"). New: `athleteRegistryCore.ts`
+  (pure, invariant-checked) + `athleteRegistry.ts` (document-dir JSON IO) +
+  `openKineticsDb(dbName)` param + store actions switchAthlete/createAthlete/
+  renameAthleteEntry/deleteAthlete + PER_ATHLETE_RESET state hygiene.
+  DEVIATION_LOG records why this is a side-file, not a migration.
+- **Onboarding questionnaire** (`OnboardingScreen.tsx`): one decision per
+  screen, plain-language copy, tier-aware path — a BEGINNER never sees the
+  energy-system/periodization screens (safe defaults applied); single atomic
+  completeOnboarding() commit; demo-athlete escape hatch. Routed in App.tsx by
+  `updated_at_ms = 0` (never-saved profile). Competitive bar: JuggernautAI 2.5
+  onboarding reviewed 2026-07-12.
+- **Coach Mode UI** in ProfileScreen: collapsed section; per-athlete rows
+  (switch/rename/delete with double-confirm), add-athlete → fresh DB → wizard.
+- **Gates:** verify:all now 13 (new `verify:coach`, 11 registry-invariant
+  checks). Local run: 11/13 green; verify:db green under modern sqlite
+  (sandbox libsqlite pre-3.38 STRICT/REAL quirk documented); semantic/embedder
+  deferred to CI (sandbox blocks the HF model fetch; zero semantic-layer
+  changes in this diff). Log: test/results/p15_local_gates_2026-07-12.md.
+- **Incident (tooling, not code):** the cowork file bridge replayed this
+  session's edits to pre-existing files truncated/duplicated. Recovered
+  deterministically: git restore of the 7 tracked files + idempotent scripted
+  re-patch + full gate re-run. Session-created files were never affected.
+- Committed locally in 4 scoped commits; push = Francis (VS Code), CI must
+  show 13/13 + APK artifact before on-device test.

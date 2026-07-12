@@ -2,6 +2,30 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-07-12 — Phase 15 (Onboarding + Coach Mode)
+
+1. **Coach Mode multi-athlete support is DB-FILE-per-athlete, not a migration.**
+   The mandate ("several profiles running different people at the same time")
+   requires isolated training HISTORY, which 013's profile_slot (profile-only
+   snapshots) cannot provide. Implemented as `openKineticsDb(dbName)` + a
+   document-dir JSON registry (`coach_athletes.json`). The registry selects
+   which database to open, so by construction it cannot live inside one —
+   the same bootstrap reasoning as the embedder MODEL_PATH. profile_slot keeps
+   its shipped semantics (per-athlete profile PRESETS; the debug workflow).
+   Registry invariants are machine-checked by the new `verify:coach` gate
+   (13th gate): default athlete pinned to the legacy file forever, total
+   parse (corrupt registry can never brick boot), no path escapes, active/
+   default/last undeletable.
+
+2. **Onboarding trigger is `athlete_profile.updated_at_ms = 0`, not a new
+   column.** The stamp is set by the FIRST saveProfile and by nothing else, so
+   "never saved a profile" ≡ "never onboarded" — no migration, correct for
+   fresh installs AND brand-new Coach Mode athlete files; existing installs
+   (stamp > 0) never see the wizard. Wizard answers commit in ONE
+   completeOnboarding() save: an abandoned wizard can never persist a partial
+   profile.
+
+
 ## 2026-06-15 — Phase 13 Step 4 (Autopilot Integration & Block Wiring)
 
 1. **`mech_daily` is NOT the per-pattern flaw source (the mandate said "pull from
