@@ -32,7 +32,10 @@ const BOOT_PRAGMAS: readonly string[] = [
   'PRAGMA busy_timeout = 5000;',
 ];
 
-export function openKineticsDb(): DB {
+/** Open a kinetics database. `dbName` defaults to the legacy single-athlete
+ *  file; Coach Mode (Phase 15) passes a per-athlete file name so each athlete
+ *  owns a fully isolated database (same schema, same pragmas, same budgets). */
+export function openKineticsDb(dbName: string = DB_NAME): DB {
   // Deferred require, NOT a top-level import: op-sqlite installs its JSI
   // bindings as an import side effect and THROWS on failure. At module-eval
   // time that's an uncaught exception during bundle init — an instant
@@ -40,7 +43,7 @@ export function openKineticsDb(): DB {
   // failure inside the caller's try/catch (boot() renders it as a readable
   // DB BOOT FAILED screen instead).
   const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
-  const db = open({ name: DB_NAME });
+  const db = open({ name: dbName });
   for (const pragma of BOOT_PRAGMAS) db.executeSync(pragma);
   return db;
 }

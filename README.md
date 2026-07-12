@@ -90,6 +90,7 @@ Every layer ships with a runnable verifier; all must pass before a change lands.
 | `npm run verify:policy`| 10k-row state-space sweep stays inside the output contract          |
 | `npm run verify:semantic` | live routing with the real embedding model (15 query cases incl. off-topic rejection), asset alignment, guardrail conservativeness |
 | `npm run verify:store` | every store SQL statement prepares against the live schema          |
+| `npm run verify:coach` | Coach Mode athlete registry invariants (per-athlete DB isolation)   |
 | `npm run verify:memory`| RAM footprint vs jetsam limits; gates the generative stack out      |
 | `npm run bench:cosine` | the Path A (JS cosine) vs sqlite-vec decision data                  |
 
