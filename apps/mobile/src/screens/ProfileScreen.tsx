@@ -180,6 +180,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const profileSlots = useStore((s) => s.profileSlots);
   const switchProfile = useStore((s) => s.switchProfile);
   const wipeActiveBlockState = useStore((s) => s.wipeActiveBlockState);
+  const session = useStore((s) => s.session);
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
   const switchAthlete = useStore((s) => s.switchAthlete);
@@ -469,6 +470,13 @@ export default function ProfileScreen(): React.JSX.Element {
         </View>
         <Pressable
           onPress={() => {
+            if (session !== null) {
+              Alert.alert(
+                'Session in progress',
+                'End the active session before deleting its block and state.',
+              );
+              return;
+            }
             Alert.alert(
               'Delete current block & state?',
               'Hard-deletes the active 4-week block and today’s injury reports/niggles so you can regenerate a fresh block. Logged sessions and history are kept. This cannot be undone.',

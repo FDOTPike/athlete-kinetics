@@ -877,6 +877,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   wipeActiveBlockState: () => {
+    if (get().session !== null) {
+      set({ error: 'End the active session before deleting the current block.' });
+      return;
+    }
     const d = getDb();
     d.executeSync('BEGIN');
     try {
@@ -887,7 +891,15 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, niggles: [], lastTriage: null });
+    // Clear every volatile derivation before re-reading persistence. In
+    // particular, re-derivation can only recreate a value when a state vector
+    // exists, so retaining the previous value here would leave a stale
+    // PROFILE/GUARDRAIL multiplier on screen after the wipe.
+    set({
+      block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+      niggles: [], prescription: null, profileNotes: [], lastTriage: null,
+      substitution: null,
+    });
     get().refreshNiggles();
     get().refreshBlock();
     get().refreshVector();
@@ -1825,7 +1837,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   computePrescription: (_patterns) => {
     const { vector, profile, session } = get();
-    if (vector === null) return;
+    if (vector === null) {
+      // A missing persisted state is also a state transition. Never let a
+      // multiplier derived from a deleted/reset vector survive in memory.
+      set({ prescription: null, profileNotes: [], lastTriage: null });
+      return;
+    }
     const d = getDb();
     // ALWAYS the real current date — a store snapshot can be yesterday's
     // (app open past midnight) and would re-read yesterday's reports.
@@ -1989,11 +2006,31 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
-    // Reflect the now-empty DB in memory.
+    // Reflect the now-empty DB in memory immediately. refreshVector only owns
+    // vector/trend/today and therefore cannot clear an active session or the
+    // prescription derived from data that has just been deleted.
+    set({
+      vector: null,
+      trend: [],
+      session: null,
+      prescription: null,
+      profileNotes: [],
+      triaging: false,
+      lastTriage: null,
+      sessionPlan: [],
+      activeMovementId: null,
+      substitution: null,
+      niggles: [],
+      block: null,
+      blockMeta: null,
+      blockSessions: [],
+      todayPlan: null,
+      oneRepMaxes: {},
+      lastEndedSessionId: null,
+    });
     get().refreshVector();
     get().refreshBlock();
     get().refreshNiggles();
-    set({ oneRepMaxes: {} });
     return (had?.c ?? 0) > 0;
   },
 
@@ -2030,5 +2067,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     ).map(movementFromRow);
     set({ movements });
     get().refreshVector();
+    // Demo materialization creates a new current vector. Derive from that data
+    // now instead of leaving the reset athlete with a null/stale adjustment.
+    get().computePrescription([]);
   },
 }));
