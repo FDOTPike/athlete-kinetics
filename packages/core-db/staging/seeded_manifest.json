@@ -74,6 +74,29 @@
    "Single-Leg Romanian Deadlift",
    "Sit-Up",
    "Standing Barbell Calf Raise"
+  ],
+  "019": [
+   "Band Good Morning",
+   "Barbell Hack Squat",
+   "Cable Reverse Crunch",
+   "Close-Grip Dumbbell Press",
+   "Cuban Press",
+   "Decline Dumbbell Bench Press",
+   "One Arm Lat Pulldown",
+   "One-Arm Kettlebell Row",
+   "One-Arm Overhead Kettlebell Squat",
+   "Reverse Barbell Curl",
+   "Reverse Grip Bent-Over Rows",
+   "V-Bar Pulldown",
+   "Zottman Curl"
   ]
- }
+ },
+ "do_not_seed": [
+  "Band Pull Apart",
+  "Barbell Deadlift",
+  "Barbell Shoulder Press",
+  "Barbell Squat",
+  "Bodyweight Walking Lunge",
+  "Front Barbell Squat"
+ ]
 }

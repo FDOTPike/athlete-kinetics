@@ -38,6 +38,19 @@ const PATTERN_11 = {
   'Lying Dumbbell Triceps Extension': 'isolation',
   'Cable Glute Kickback': 'isolation',
   'Double Kettlebell Push Press': 'push_v',
+  'Band Good Morning': 'hinge',
+  'Barbell Hack Squat': 'squat',
+  'Cable Reverse Crunch': 'rotation',
+  'Close-Grip Dumbbell Press': 'push_h',
+  'Cuban Press': 'push_v',
+  'Decline Dumbbell Bench Press': 'push_h',
+  'One Arm Lat Pulldown': 'pull_v',
+  'One-Arm Kettlebell Row': 'pull_h',
+  'One-Arm Overhead Kettlebell Squat': 'squat',
+  'Reverse Barbell Curl': 'isolation',
+  'Reverse Grip Bent-Over Rows': 'pull_h',
+  'V-Bar Pulldown': 'pull_v',
+  'Zottman Curl': 'isolation',
 };
 
 /** movement_equipment rows (007 vocabulary) for post-016 records. */
@@ -57,6 +70,19 @@ const EQUIPMENT = {
   'Lying Dumbbell Triceps Extension': ['dumbbells', 'bench'],
   'Cable Glute Kickback': ['cable_machine'],
   'Double Kettlebell Push Press': ['kettlebell'],
+  'Band Good Morning': ['bands'],
+  'Barbell Hack Squat': ['barbell'],
+  'Cable Reverse Crunch': ['cable_machine'],
+  'Close-Grip Dumbbell Press': ['dumbbells', 'bench'],
+  'Cuban Press': ['dumbbells'],
+  'Decline Dumbbell Bench Press': ['dumbbells', 'bench'],
+  'One Arm Lat Pulldown': ['cable_machine'],
+  'One-Arm Kettlebell Row': ['kettlebell'],
+  'One-Arm Overhead Kettlebell Squat': ['kettlebell'],
+  'Reverse Barbell Curl': ['barbell'],
+  'Reverse Grip Bent-Over Rows': ['barbell'],
+  'V-Bar Pulldown': ['cable_machine'],
+  'Zottman Curl': ['dumbbells'],
 };
 
 const IMPLEMENT = {
@@ -71,6 +97,8 @@ const doc = JSON.parse(readFileSync(STAGING, 'utf-8'));
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf-8'));
 const already = new Set([
   ...manifest.prefix_encoded,
+  ...(manifest.do_not_seed ?? []),   // true duplicates of shipped movements —
+                                     // curated text is inert draft, never seeds
   ...Object.values(manifest.slots).flat(),
 ]);
 const fresh = doc.movements

@@ -322,12 +322,12 @@
     "glutes",
     "lower back"
    ],
-   "instructions_raw": "Using a 41 inch band, stand on one end, spreading your feet a small amount. Bend at the hips to loop the end of the band behind your neck. This will be your starting position. Keeping your legs straight, extend through the hips to come to a near vertical position. Ensure that you do not round your back as you go down back to the starting position.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand on the middle of a long band and loop it across the back of your shoulders, clear of the neck. Soften the knees, brace, and push the hips back until the hamstrings load while the band stays over mid-foot. Drive the floor away and squeeze the glutes to stand; shorten the depth the moment the back starts carrying more than the hamstrings.",
+   "cues": "Brace first, then send the hips back. Keep the band stacked over mid-foot. Finish tall through the glutes.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=CTRaCzE8pWU",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -370,9 +370,9 @@
     "middle back",
     "traps"
    ],
-   "instructions_raw": "Begin with your arms extended straight out in front of you, holding the band with both hands. Initiate the movement by performing a reverse fly motion, moving your hands out laterally to your sides. Keep your elbows extended as you perform the movement, bringing the band to your chest. Ensure that you keep your shoulders back during the exercise. Pause as you complete the movement, returning to the starting position under control.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand tall with a light band held at shoulder height, hands just outside shoulder width and elbows softly unlocked. Reach forward enough to let the shoulder blades spread, then pull the band to your chest by driving both hands apart. Pause with the upper back working, then return slowly; if the ribs flare before the band reaches you, the band is too heavy or the grip is too narrow.",
+   "cues": "Reach long before you pull. Drive the hands apart and show the chest to the band. Own the return.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=stwYTTPXubo",
    "is_compound": false,
    "source": "free-exercise-db",
    "curated": false,
@@ -615,12 +615,12 @@
     "forearms",
     "hamstrings"
    ],
-   "instructions_raw": "Stand up straight while holding a barbell behind you at arms length and your feet at shoulder width. Tip: A shoulder width grip is best with the palms of your hands facing back. You can use wrist wraps for this exercise for a better grip. This will be your starting position. While keeping your head and eyes up and back straight, squat until your upper thighs are parallel to the floor. Breathe in as you slowly go down. Pressing mainly with the heel of the foot and squeezing the thighs, go back up as you breathe out. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Set a bar on the floor behind your calves, stand about hip width, then squat down and take a shoulder-width grip with long arms. Brace the trunk and drive the floor away, letting the bar skim up behind the legs as the hips and knees straighten together. Lower along the same close path; when the grip or torso position breaks before the legs tire, that is the load limit for the day.",
+   "cues": "Set the chest proud and the arms long. Push the floor away. Keep the bar close behind the legs.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=EdtaJRBqwes",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -1407,7 +1407,7 @@
   },
   {
    "name": "Bodyweight Walking Lunge",
-   "base_name": "Bodyweight Walking Lunge",
+   "base_name": "Walking Lunge",
    "pattern": "unilateral",
    "supported_prefixes": [
     "Bodyweight"
@@ -1421,9 +1421,9 @@
     "glutes",
     "hamstrings"
    ],
-   "instructions_raw": "Begin standing with your feet shoulder width apart and your hands on your hips. Step forward with one leg, flexing the knees to drop your hips. Descend until your rear knee nearly touches the ground. Your posture should remain upright, and your front knee should stay above the front foot. Drive through the heel of your lead foot and extend both knees to raise yourself back up. Step forward with your rear foot, repeating the lunge on the opposite leg.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand tall with enough clear floor to travel and step forward onto two imaginary rails rather than a tightrope. Lower the rear knee toward the floor while the front foot stays planted and the torso rides straight down. Drive through the whole front foot and bring the rear leg through into the next rep; if the back foot springs you forward, you stole the rep.",
+   "cues": "Step onto two rails. Ride the hips straight down. Own the front foot, then walk through.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=tQNktxPkSeE",
    "is_compound": true,
    "source": "free-exercise-db",
    "curated": false,
@@ -1881,12 +1881,12 @@
     "abdominals"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Connect an ankle strap attachment to a low pulley cable and position a mat on the floor in front of it. Sit down with your feet toward the pulley and attach the cable to your ankles. Lie down, elevate your legs and bend your knees at a 90-degree angle. Your legs and the cable should be aligned. If not, adjust the pulley up or down until they are. With your hands behind your head, bring your knees inward to your torso and elevate your hips off the floor. Pause for a moment and in a slow and controlled manner drop your hips and bring your legs back to the starting 90-degree angle. You should still have tension on your abs in the resting position. Repeat the same movement to failure.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Attach both ankles to a low cable, lie facing away from the stack, and set the hips and knees near 90 degrees with the shoulders heavy on the floor. Tuck the pelvis first, then curl the knees toward the ribs until the tailbone lifts without throwing the legs. Set the hips down slowly while keeping cable tension; if the thighs swing but the pelvis stays put, lower the stack and earn the curl.",
+   "cues": "Start with the pelvis tucked. Curl the knees toward the ribs. Set the hips down on a slow count.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=b8oUb_6POhQ",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -2216,7 +2216,7 @@
   },
   {
    "name": "Close-Grip Dumbbell Press",
-   "base_name": "Close-Grip Dumbbell Press",
+   "base_name": "Crush Press",
    "pattern": "push",
    "supported_prefixes": [
     "DB"
@@ -2229,12 +2229,12 @@
     "chest",
     "shoulders"
    ],
-   "instructions_raw": "Place a dumbbell standing up on a flat bench. Ensuring that the dumbbell stays securely placed at the top of the bench, lie perpendicular to the bench with only your shoulders lying on the surface. Hips should be below the bench and your legs bent with your feet firmly on the floor. Grasp the dumbbell with both hands and hold it straight over your chest at arm's length. Both palms should be pressing against the underside of the sides of the dumbbell. This will be your starting position. Initiate the movement by lowering the dumbbell to your chest. Return to the starting position by extending the elbows.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Lie on a flat bench with two dumbbells pressed together over the middle of the chest, wrists stacked and feet planted. Keep crushing the bells together as you lower them softly to the chest with the elbows close to the ribs. Press the pair back up as one unit; if the bells separate, the close-grip tension disappeared before the rep was finished.",
+   "cues": "Crush the bells together. Stack the wrists over the elbows. Touch softly, then press as one unit.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=lNPH4gf4g08",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -2525,12 +2525,12 @@
    "secondary_muscles": [
     "traps"
    ],
-   "instructions_raw": "Take a dumbbell in each hand with a pronated grip in a standing position. Raise your upper arms so that they are parallel to the floor, allowing your lower arms to hang in the \"scarecrow\" position. This will be your starting position. To initiate the movement, externally rotate the shoulders to move the upper arm 180 degrees. Keep the upper arms in place, rotating the upper arms until the wrists are directly above the elbows, the forearms perpendicular to the floor. Now press the dumbbells by extending at the elbows, straightening your arms overhead. Return to the starting position as you breathe in by reversing the steps. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand with very light dumbbells and raise the elbows wide to shoulder height, forearms hanging below them. Keep the upper arms fixed while rotating the forearms until the wrists stack directly over the elbows, then press to a tall overhead finish. Reverse every stage under control; if the hips have to help, the bells are too heavy for the rotation you are training.",
+   "cues": "Hold the elbows high and wide. Rotate around quiet upper arms. Reverse the path smoothly.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=IyvB-mdKIv4",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -2687,7 +2687,7 @@
    "supported_prefixes": [
     "DB"
    ],
-   "difficulty_rating": "Beginner",
+   "difficulty_rating": "Intermediate",
    "target_muscles": [
     "chest"
    ],
@@ -2695,12 +2695,12 @@
     "shoulders",
     "triceps"
    ],
-   "instructions_raw": "Secure your legs at the end of the decline bench and lie down with a dumbbell on each hand on top of your thighs. The palms of your hand will be facing each other. Once you are laying down, move the dumbbells in front of you at shoulder width. Once at shoulder width, rotate your wrists forward so that the palms of your hands are facing away from you. This will be your starting position. Bring down the weights slowly to your side as you breathe out. Keep full control of the dumbbells at all times. Tip: Throughout the motion, the forearms should always be perpendicular to the floor. As you breathe out, push the dumbbells up using your pectoral muscles. Lock your arms in the contracted position, squeeze your chest, hold for a second and then start coming down slowly. Tip: It should take at least twice as long to go down than to come up.. Repeat the movement for the prescribed amount of repetitions of your training program.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and bring the bells to the chest before pressing them into position. Lower toward the lower chest with the forearms vertical and the shoulder blades pinned into the pad. Press up and slightly inward; when the bells are too heavy to mount cleanly, the setup has already chosen a lighter working load for you.",
+   "cues": "Pin the shoulder blades into the pad. Stack the wrists over the elbows. Press up and slightly in.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=Pf1nDoqx_1A",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -5946,7 +5946,7 @@
   },
   {
    "name": "One Arm Lat Pulldown",
-   "base_name": "One Arm Lat Pulldown",
+   "base_name": "Single-Arm Lat Pulldown",
    "pattern": "unilateral",
    "supported_prefixes": [
     "Cable"
@@ -5959,12 +5959,12 @@
     "biceps",
     "middle back"
    ],
-   "instructions_raw": "Select an appropriate weight and adjust the knee pad to help keep you down. Grasp the handle with a pronated grip. This will be your starting position. Pull the handle down, squeezing your elbow to your side as you flex the elbow. Pause at the bottom of the motion, and then slowly return the handle to the starting position. For multiple repetitions, avoid completely returning the weight to keep tension on the muscles being worked.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Sit or kneel square to a high cable, take one handle, and reach overhead until the shoulder blade can travel without the stack resting. Pull the elbow down toward the hip and pause when the upper arm reaches the ribs, keeping the torso quiet. Return to the full reach slowly; if the hand tires before the lat, soften the grip and let the elbow lead the next rep.",
+   "cues": "Reach long at the top. Drive the elbow toward the hip. Keep the torso square and quiet.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=eM162KNncD8",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -6304,12 +6304,12 @@
     "biceps",
     "lats"
    ],
-   "instructions_raw": "Place a kettlebell in front of your feet. Bend your knees slightly and then push your butt out as much as possible as you bend over to get in the starting position. Grab the kettlebell and pull it to your stomach, retracting your shoulder blade and flexing the elbow. Keep your back straight. Lower and repeat.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Take a staggered stance, hinge until the torso is long and stable, and let the kettlebell hang beneath one shoulder. Row the bell toward the back pocket by driving the elbow past the ribs while the hips stay square to the floor. Lower until the shoulder blade reaches naturally; if the torso opens to finish the pull, the bell is heavier than the row you intended.",
+   "cues": "Set a long, square torso. Drive the elbow toward the back pocket. Reach the shoulder blade at the bottom.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=bZ4h1Bqw-to",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -6469,8 +6469,8 @@
    "progression_rank": null
   },
   {
-   "name": "One-Arm Overhead Kettlebell Squats",
-   "base_name": "One-Arm Overhead Kettlebell Squats",
+   "name": "One-Arm Overhead Kettlebell Squat",
+   "base_name": "Single-Arm Overhead Squat",
    "pattern": "unilateral",
    "supported_prefixes": [
     "KB"
@@ -6485,12 +6485,12 @@
     "hamstrings",
     "shoulders"
    ],
-   "instructions_raw": "Clean and press a kettlebell with one arm. Clean the kettlebell to your shoulder by extending through the legs and hips as you pull the kettlebell towards your shoulder. Rotate your wrist as you do so. Press the weight overhead by extending through the elbow.This will be your starting position. Looking straight ahead and keeping a kettlebell locked out above you, flex the knees and hips and lower your torso between your legs, keeping your head and chest up. Pause at the bottom position for a second before rising back to the top, driving through the heels of your feet.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Clean and press one kettlebell overhead, lock the elbow, and use the free arm forward as a counterbalance. Root the whole foot and sit between the hips while keeping the bell stacked over the shoulder and the eyes forward. Pause at the deepest owned position, then drive to standing; the rep ends where the bell drifts or the ribs flare, not where the hips wish to go.",
+   "cues": "Punch the bell toward the ceiling. Sit between the hips on a rooted foot. Drive up under the bell.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=tpPKyhvf0IA",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -7202,12 +7202,12 @@
    "secondary_muscles": [
     "forearms"
    ],
-   "instructions_raw": "Stand up with your torso upright while holding a barbell at shoulder width with the elbows close to the torso. The palm of your hands should be facing down (pronated grip). This will be your starting position. While holding the upper arms stationary, curl the weights while contracting the biceps as you breathe out. Only the forearms should move. Continue the movement until your biceps are fully contracted and the bar is at shoulder level. Hold the contracted position for a second as you squeeze the muscle. Slowly begin to bring the bar back to starting position as your breathe in. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand with a light bar in an overhand shoulder-width grip, wrists straight and elbows resting beside the ribs. Curl by closing the elbows until the forearms are near vertical, then hold the top without letting the shoulders climb. Lower to the natural long-arm rest; when the wrists fold or the shoulders rise, the load has moved ahead of the forearms.",
+   "cues": "Keep the knuckles long and the wrists stacked. Close the elbows around the bar. Lower all the way under control.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=nRgxYX2Ve9w",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -7322,7 +7322,7 @@
   },
   {
    "name": "Reverse Grip Bent-Over Rows",
-   "base_name": "Reverse Grip Bent-Over Rows",
+   "base_name": "Reverse-Grip Bent-Over Row",
    "pattern": "row",
    "supported_prefixes": [
     "BB"
@@ -7336,12 +7336,12 @@
     "lats",
     "shoulders"
    ],
-   "instructions_raw": "Stand erect while holding a barbell with a supinated grip (palms facing up). Bend your knees slightly and bring your torso forward, by bending at the waist, while keeping the back straight until it is almost parallel to the floor. Tip: Make sure that you keep the head up. The barbell should hang directly in front of you as your arms hang perpendicular to the floor and your torso. This is your starting position. While keeping the torso stationary, lift the barbell as you breathe out, keeping the elbows close to the body and not doing any force with the forearm other than holding the weights. On the top contracted position, squeeze the back muscles and hold for a second. Slowly lower the weight again to the starting position as you inhale. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar hangs below them with the torso braced. Pull the elbows back and row the bar toward the lower ribs, holding the top long enough to feel the shoulder blades finish. Lower to long arms without changing the hinge; if the torso rises on every pull, the bar is borrowing range from the hips.",
+   "cues": "Brace the hinge before the pull. Drive the elbows behind you. Touch the lower ribs and own the way down.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=3gdGSSgDby8",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -9791,12 +9791,12 @@
     "middle back",
     "shoulders"
    ],
-   "instructions_raw": "Sit down on a pull-down machine with a V-Bar attached to the top pulley. Adjust the knee pad of the machine to fit your height. These pads will prevent your body from being raised by the resistance attached to the bar. Grab the V-bar with the palms facing each other (a neutral grip). Stick your chest out and lean yourself back slightly (around 30-degrees) in order to better engage the lats. This will be your starting position. Using your lats, pull the bar down as you squeeze your shoulder blades. Continue until your chest nearly touches the V-bar. Exhale as you execute this motion. Tip: Keep the torso stationary throughout the movement. After a second hold on the contracted position, slowly bring the bar back to the starting position as you breathe in. Repeat for the prescribed number of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Lock the thighs under the pad, take the neutral V-bar, and lean back only enough to keep the chest tall beneath the cable. Pull the elbows down and back until the handle reaches the upper chest, then pause without turning the rep into a row. Return to a full overhead reach without letting the stack settle; if the biceps burn first, soften the hands and lead harder with the elbows.",
+   "cues": "Show the chest to the handle. Drive the elbows down and back. Reach fully at the top.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=LJ5ebC1pWkA",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -10130,12 +10130,12 @@
    "secondary_muscles": [
     "forearms"
    ],
-   "instructions_raw": "Stand up with your torso upright and a dumbbell in each hand being held at arms length. The elbows should be close to the torso. Make sure the palms of the hands are facing each other. This will be your starting position. While holding the upper arm stationary, curl the weights while contracting the biceps as you breathe out. Only the forearms should move. Your wrist should rotate so that you have a supinated (palms up) grip. Continue the movement until your biceps are fully contracted and the dumbbells are at shoulder level. Hold the contracted position for a second as you squeeze the biceps. Now during the contracted position, rotate your wrist until you now have a pronated (palms facing down) grip with the thumb at a higher position than the pinky. Slowly begin to bring the dumbbells back down using the pronated grip. As the dumbbells close your thighs, start rotating the wrist so that you go back to a neutral (palms facing your body) grip. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand with dumbbells at the sides, curl with the palms turning up, and keep the upper arms quiet beside the ribs. At the top, rotate to palms-down while the elbows stay closed, then lower through the overhand grip. Turn back to neutral only at the bottom; this is lighter than the ego wants because the slow overhand descent is the part you came for.",
+   "cues": "Curl palms-up with quiet elbows. Turn the knuckles over at the top. Lower slowly through the overhand grip.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=D7bMA4WEKMI",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
