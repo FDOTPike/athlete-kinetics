@@ -72,3 +72,25 @@ export function calculateEffectiveLoad(
     appliedPrefixes,
   };
 }
+
+// ---------------------------------------------------------------------------
+// P16 T1: condition applicability. A condition multiplier only makes physical
+// sense on the implement it modifies — Earthquake Bar and Chains hang plates
+// on a BARBELL, Bottom-Up inverts a KETTLEBELL, the KB offset-mass weights
+// apply when the implement IS a kettlebell. Banded attaches to anything.
+// Shared by the SessionScreen chips AND the store's logging boundary so an
+// inapplicable condition can never reach set_prefix.
+// ---------------------------------------------------------------------------
+
+const CONDITION_REQUIRES_IMPLEMENT: Readonly<Partial<Record<string, MovementPrefix>>> = {
+  'Earthquake Bar': 'BB',
+  Chains: 'BB',
+  'Bottom-Up': 'KB',
+  KB: 'KB',
+};
+
+/** True when `condition` is meaningful on the (effective) `implement`. */
+export function conditionApplies(condition: MovementPrefix, implement: MovementPrefix): boolean {
+  const required = CONDITION_REQUIRES_IMPLEMENT[condition];
+  return required === undefined || required === implement;
+}

@@ -30,6 +30,7 @@ import {
 import {
   JOINTS,
   PATTERN_TO_CATEGORY,
+  conditionApplies,
   TAXONOMY_CATEGORIES,
   calculateEffectiveLoad,
   targetLoadKg,
@@ -244,6 +245,8 @@ export default function SessionScreen(): React.JSX.Element {
 
   const [reps, setReps] = useState(5);
   const [loadKg, setLoadKg] = useState(100);
+  /** 018 time-mode movements: the dose is seconds, not reps. */
+  const [seconds, setSeconds] = useState(40);
   const [rpe, setRpe] = useState(8);
   const [noteText, setNoteText] = useState('');
   const [noteSaved, setNoteSaved] = useState(false);
@@ -280,7 +283,11 @@ export default function SessionScreen(): React.JSX.Element {
   useEffect(() => {
     setPrefix(null);
     setAppliedConditions([]);
-  }, [activeMovementId]);
+    // Audit B5: bodyweight movements start at 0 added kg — never a phantom
+    // 100 kg dead bug. Loaded movements keep the loaded default.
+    const m = movements.find((x) => x.movement_id === activeMovementId);
+    setLoadKg((m?.supportedPrefixes[0] ?? 'Bodyweight') === 'Bodyweight' ? 0 : 100);
+  }, [activeMovementId, movements]);
 
   if (session === null) {
     // Instant start — no forced check-in (field-tested as friction). An
@@ -357,6 +364,12 @@ export default function SessionScreen(): React.JSX.Element {
     session.sets.filter((s) => s.movement_id === movementId).length;
   const tonnage = session.sets.reduce((a, s) => a + s.tonnage_kg, 0);
   const elapsedMin = Math.floor((nowMs - session.startedAtMs) / 60_000);
+  // P16 T1: the implement the athlete is ACTUALLY using right now — the
+  // selected prefix, else the movement's primary implement, else bodyweight.
+  const effectiveImplement =
+    prefix ?? activeMovement?.supportedPrefixes[0] ?? ('Bodyweight' as const);
+  const bodyweightMode = effectiveImplement === 'Bodyweight';
+  const timeMode = activeMovement?.loggingMode === 'time';
   const overTime = elapsedMin > profile.session_duration_cap_min;
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
   // Library pickers honor the strict equipment filter AND the plan's tier
@@ -624,7 +637,13 @@ export default function SessionScreen(): React.JSX.Element {
               return (
                 <Pressable
                   key={p}
-                  onPress={() => setPrefix(on ? null : p)}
+                  onPress={() => {
+                    const next = on ? null : p;
+                    setPrefix(next);
+                    // Implement changed: drop conditions that no longer apply.
+                    const eff = next ?? activeMovement.supportedPrefixes[0] ?? 'Bodyweight';
+                    setAppliedConditions((prev) => prev.filter((c) => conditionApplies(c, eff)));
+                  }}
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
                   accessibilityLabel={`Implement ${p}${on ? ', selected' : ''}`}
@@ -643,7 +662,8 @@ export default function SessionScreen(): React.JSX.Element {
         </Text>
       )}
 
-      {/* ---- condition prefixes: weighted toggles (Phase 13 Step 2) ---- */}
+      {/* ---- condition prefixes: weighted toggles (Phase 13 Step 2; P16 T1:
+           only conditions that make sense on the SELECTED implement) ---- */}
       {activeMovement !== null && movementPrefixes.length > 0 && (
         <View style={styles.prefixRow}>
           <Text style={styles.prefixLabel}>CONDITIONS</Text>
@@ -653,7 +673,7 @@ export default function SessionScreen(): React.JSX.Element {
             contentContainerStyle={styles.prefixChips}
             keyboardShouldPersistTaps="handled"
           >
-            {movementPrefixes.map((c) => {
+            {movementPrefixes.filter((c) => conditionApplies(c.prefixName, effectiveImplement)).map((c) => {
               const on = appliedConditions.includes(c.prefixName);
               return (
                 <Pressable
@@ -675,13 +695,13 @@ export default function SessionScreen(): React.JSX.Element {
 
       {/* ---- input steppers ---- */}
       <Stepper
-        label="REPS"
-        display={String(reps)}
-        onDec={() => setReps((v) => clamp(v - 1, 1, 50))}
-        onInc={() => setReps((v) => clamp(v + 1, 1, 50))}
+        label={timeMode ? 'SECONDS' : 'REPS'}
+        display={timeMode ? String(seconds) : String(reps)}
+        onDec={() => (timeMode ? setSeconds((v) => clamp(v - 5, 5, 3600)) : setReps((v) => clamp(v - 1, 1, 50)))}
+        onInc={() => (timeMode ? setSeconds((v) => clamp(v + 5, 5, 3600)) : setReps((v) => clamp(v + 1, 1, 50)))}
       />
       <Stepper
-        label="LOAD KG"
+        label={bodyweightMode ? "ADDED KG (0 = bodyweight)" : "LOAD KG"}
         display={loadKg.toFixed(1)}
         onDec={() => setLoadKg((v) => clamp(v - 2.5, 0, 500))}
         onInc={() => setLoadKg((v) => clamp(v + 2.5, 0, 500))}
@@ -723,7 +743,7 @@ export default function SessionScreen(): React.JSX.Element {
         disabled={activeMovementId === null}
         onPress={() => {
           if (activeMovementId !== null) {
-            logSet(activeMovementId, reps, loadKg, rpe, loggedName, appliedConditions);
+            logSet(activeMovementId, timeMode ? 1 : reps, loadKg, rpe, loggedName, appliedConditions, effectiveImplement, timeMode ? { timeS: seconds } : undefined);
             setAppliedConditions([]);
           }
         }}

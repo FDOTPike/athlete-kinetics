@@ -81,6 +81,7 @@ export {
 } from './blockGenerator';
 export {
   calculateEffectiveLoad,
+  conditionApplies,
   NEUTRAL_PREFIX_MODIFIER,
   type EffectiveLoad,
 } from './conditionEngine';
@@ -168,3 +169,23 @@ export {
   type SessionDirective,
   type TriageResult,
 } from './semantic/triage';
+
+// P16 progression ladders + P17 S1 session runner (engine-side; UI lands P17).
+export {
+  DEFAULT_ADVANCEMENT_POLICY,
+  resolveActiveRung,
+  type AdvancementPolicy,
+  type ProgressionRung,
+  type RungResolution,
+  type SessionSets,
+} from './progressionEngine';
+export {
+  advance,
+  nextUp,
+  restSecondsFor,
+  startRunner,
+  type RunnerEvent,
+  type RunnerPhase,
+  type RunnerSlot,
+  type RunnerState,
+} from './sessionRunner';

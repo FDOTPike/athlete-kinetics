@@ -74,6 +74,9 @@ import {
   type SubstitutionResult,
   type PhraseEntry,
   calculateEffectiveLoad,
+  conditionApplies,
+  resolveActiveRung,
+  type RungResolution,
   targetLoadKg,
   type Prescription,
   type ProfileContext,
@@ -114,6 +117,9 @@ export interface Movement {
   /** movement_beginner_whitelist membership — an Intermediate staple a
    *  beginner may see/be prescribed (plan P16 S4). */
   beginnerOk: boolean;
+  /** movement_logging_mode: 'time' movements log seconds, everything else
+   *  logs reps (018; no row = 'reps'). */
+  loggingMode: 'reps' | 'time';
   /** Equipment items this movement needs (movement_equipment rows). */
   required: string[];
   /** movement_detail.base_name — the normalized pattern the prefix engine
@@ -321,6 +327,10 @@ interface KineticsStore {
   /** Hard-DELETE the active block (+ cascade) and today's volatile reports +
    *  niggles, in one transaction. Training history (set_record) is preserved. */
   wipeActiveBlockState: () => void;
+  /** P16 progression: resolve the active rung of a goal-movement chain from
+   *  logged history (pure read — UI consumers land with P17). Null when the
+   *  group has no chain rows. */
+  resolveGoalRung: (progressionGroup: string) => RungResolution | null;
   /** Coach Mode: close the current athlete's DB and re-boot against the
    *  target athlete's file. Refused while a session is active. */
   switchAthlete: (id: string) => void;
@@ -370,7 +380,7 @@ interface KineticsStore {
    *  falls back to the movement's canonical name when absent. `appliedPrefixes`
    *  (Phase 13) are the toggled condition tokens; their compound multipliers +
    *  effective load are persisted to the set_prefix side-car. */
-  logSet: (movementId: number, reps: number, loadKg: number, rpe: number, displayName?: string, appliedPrefixes?: readonly MovementPrefix[]) => void;
+  logSet: (movementId: number, reps: number, loadKg: number, rpe: number, displayName?: string, appliedPrefixes?: readonly MovementPrefix[], implement?: MovementPrefix, metrics?: { timeS?: number; bandLevel?: number }) => void;
   /** Hard-delete one logged set. The 001 AFTER DELETE trigger
    *  (trg_set_record_ad) drains mech_daily by this row's exact contribution;
    *  the in-memory list drops the row. */
@@ -511,6 +521,7 @@ interface MovementRow {
   base_name: string | null; supported_prefixes: string | null;
   difficulty_rating: string | null; preference: number | null;
   beginner_ok: number | null;
+  logging_mode: string | null;
 }
 const PREFIX_SET = new Set<string>(MOVEMENT_PREFIXES);
 /** Parse movement_detail.supported_prefixes, keeping only canonical tokens —
@@ -545,6 +556,7 @@ const movementFromRow = (r: MovementRow): Movement => {
     supportedPrefixes: parsePrefixes(r.supported_prefixes),
     difficulty: (r.difficulty_rating ?? 'Intermediate') as DifficultyRating,
     beginnerOk: r.beginner_ok === 1,
+    loggingMode: r.logging_mode === 'time' ? 'time' : 'reps',
     preference: toPreference(r.preference),
   };
 };
@@ -756,7 +768,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
       const movements = rowsOf<MovementRow>(
         getDb().executeSync(
-          'SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference, (w.movement_id IS NOT NULL) AS beginner_ok FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id ORDER BY m.movement_id',
+          'SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference, (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id ORDER BY m.movement_id',
         ),
       ).map(movementFromRow);
       const profileRow = rowsOf<ProfileRow>(
@@ -801,6 +813,31 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().refreshProfileSlots();
       // The block lives only in SQLite; the store is a read surface over it.
       get().refreshBlock();
+      // Audit B6: an app killed mid-session RESUMES it on restart instead of
+      // permitting a duplicate shell. Unfinished = today's row with no
+      // duration (endSession stamps duration or deletes empty shells).
+      const openSession = rowsOf<{ session_id: number; started_at_ms: number | null }>(
+        db!.executeSync(
+          'SELECT session_id, started_at_ms FROM session WHERE session_date = ? AND duration_min IS NULL AND started_at_ms IS NOT NULL ORDER BY session_id DESC LIMIT 1',
+          [localToday()],
+        ),
+      )[0];
+      if (openSession !== undefined) {
+        const restored = rowsOf<{ set_id: number; movement_id: number; movement_name: string; set_index: number; reps: number; load_kg: number; rpe: number }>(
+          db!.executeSync(
+            'SELECT sr.set_id, sr.movement_id, m.name AS movement_name, sr.set_index, sr.reps, sr.load_kg, sr.rpe FROM set_record sr JOIN movement m ON m.movement_id = sr.movement_id WHERE sr.session_id = ? ORDER BY sr.set_index DESC',
+            [openSession.session_id],
+          ),
+        );
+        set({
+          session: {
+            sessionId: openSession.session_id,
+            date: localToday(),
+            startedAtMs: openSession.started_at_ms ?? Date.now(),
+            sets: restored.map((r) => ({ ...r, tonnage_kg: r.reps * r.load_kg })),
+          },
+        });
+      }
       // Prescription is a pure derivation over persisted state (profile +
       // today's reports), so a halt logged yesterday evening survives an
       // app restart this morning.
@@ -908,6 +945,35 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshBlock();
     get().refreshVector();
     get().computePrescription([]);
+  },
+
+  resolveGoalRung: (progressionGroup) => {
+    const d = getDb();
+    const chain = rowsOf<{ name: string; progression_group: string; progression_rank: number }>(
+      d.executeSync('SELECT m.name, p.progression_group, p.progression_rank FROM movement_progression p JOIN movement m ON m.movement_id = p.movement_id WHERE p.progression_group = ? ORDER BY p.progression_rank', [progressionGroup]),
+    ).map((r) => ({ movementName: r.name, progressionGroup: r.progression_group, progressionRank: r.progression_rank }));
+    if (chain.length === 0) return null;
+    // Per-session set lists at chain movements (same-session 3x8 semantics —
+    // the engine never aggregates across sessions).
+    const rows = rowsOf<{ session_id: number; name: string; reps: number }>(
+      d.executeSync("SELECT sr.session_id, m.name, COALESCE(sm.value, sr.reps) AS reps FROM set_record sr JOIN movement m ON m.movement_id = sr.movement_id JOIN movement_progression p ON p.movement_id = sr.movement_id LEFT JOIN set_metric sm ON sm.set_id = sr.set_id AND sm.metric = 'time_s' WHERE p.progression_group = ? ORDER BY sr.session_id, sr.set_index", [progressionGroup]),
+    );
+    const bySession = new Map<string, { movementName: string; repsPerSet: number[] }>();
+    for (const r of rows) {
+      const key = `${r.session_id}:${r.name}`;
+      const entry = bySession.get(key);
+      if (entry === undefined) bySession.set(key, { movementName: r.name, repsPerSet: [r.reps] });
+      else entry.repsPerSet.push(r.reps);
+    }
+    // Per-chain policy (018 progression_policy): time chains qualify on
+    // seconds, custom rep chains override the 3x8 default.
+    const pol = rowsOf<{ required_sets: number; required_value: number }>(
+      d.executeSync('SELECT required_sets, required_value FROM progression_policy WHERE progression_group = ?', [progressionGroup]),
+    )[0];
+    if (pol !== undefined) {
+      return resolveActiveRung(chain, [...bySession.values()], { requiredSets: pol.required_sets, requiredReps: pol.required_value });
+    }
+    return resolveActiveRung(chain, [...bySession.values()]);
   },
 
   // --- Coach Mode (Phase 15): one DB file per athlete ------------------------
@@ -1659,14 +1725,26 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshBlock(); // the future grid lost a slot
   },
 
-  logSet: (movementId, reps, loadKg, rpe, displayName, appliedPrefixes) => {
+  logSet: (movementId, reps, loadKg, rpe, displayName, appliedPrefixes, implement, metrics) => {
     const s = get().session;
     if (s === null) return;
     const movement = get().movements.find((m) => m.movement_id === movementId);
     if (movement === undefined) return;
+    // 018: a time-mode movement logs ONE set-event whose dose is seconds —
+    // reps are forced to 1 and seconds are REQUIRED (audit B2: the comment
+    // used to promise this without enforcing it).
+    const timeMode = movement.loggingMode === 'time';
+    if (timeMode && (metrics?.timeS === undefined || metrics.timeS <= 0)) {
+      set({ error: `${movement.name} is time-based — log seconds for it.` });
+      return;
+    }
+    // P16 T1 boundary filter: an inapplicable condition (Earthquake Bar on a
+    // bodyweight movement) can never reach set_prefix, whatever the UI sent.
+    const effImplement = implement ?? movement.supportedPrefixes[0] ?? 'Bodyweight';
+    appliedPrefixes = (appliedPrefixes ?? []).filter((c) => conditionApplies(c, effImplement));
 
     // Clamp to the schema CHECK domains: a UI bug must never throw mid-set.
-    const safeReps = Math.round(clamp(reps, 1, 50));
+    const safeReps = timeMode ? 1 : Math.round(clamp(reps, 1, 50));
     const safeLoad = clamp(Math.round(loadKg / 2.5) * 2.5, 0, 500);
     const safeRpe = clamp(Math.round(rpe * 2) / 2, 5, 10);
 
@@ -1688,6 +1766,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const setId = rowsOf<{ id: number }>(
       d.executeSync('SELECT last_insert_rowid() AS id'),
     )[0]!.id;
+
+    // 018: time / band-level measurements (a banded plank carries both).
+    // Time-mode movements log reps=1 in set_record; the seconds live here.
+    if (metrics?.timeS !== undefined && metrics.timeS > 0) {
+      d.executeSync('INSERT INTO set_metric (set_id, metric, value) VALUES (?, ?, ?)',
+        [setId, 'time_s', clamp(Math.round(metrics.timeS), 1, 3600)]);
+    }
+    if (metrics?.bandLevel !== undefined && metrics.bandLevel >= 1) {
+      d.executeSync('INSERT INTO set_metric (set_id, metric, value) VALUES (?, ?, ?)',
+        [setId, 'band_level', Math.round(clamp(metrics.bandLevel, 1, 20))]);
+    }
 
     // Phase 13 Step 2: persist applied condition prefixes + their compound
     // multipliers + the effective load to the set_prefix side-car (set_record
@@ -1869,7 +1958,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   computePrescription: (_patterns) => {
     const { vector, profile, session } = get();
-    if (vector === null) return;
+    // No readiness vector -> no adjustment; NEVER leave yesterday's on screen.
+    if (vector === null) { set({ prescription: null }); return; }
     const d = getDb();
     // ALWAYS the real current date — a store snapshot can be yesterday's
     // (app open past midnight) and would re-read yesterday's reports.
@@ -2033,11 +2123,20 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
-    // Reflect the now-empty DB in memory.
+    // Reflect the now-empty DB in memory — EVERY derived surface, not just
+    // 1RMs (audit B1: stale prescription/session/plan state survived the
+    // reset). profileNotes intentionally stay: athlete_profile — including
+    // injury/mobility notes — is preserved by this wipe and the dialog says so.
+    set({
+      oneRepMaxes: {},
+      session: null, sessionPlan: [], activeMovementId: null,
+      prescription: null, substitution: null, lastTriage: null, niggles: [],
+      block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+      lastEndedSessionId: null,
+    });
     get().refreshVector();
     get().refreshBlock();
     get().refreshNiggles();
-    set({ oneRepMaxes: {} });
     return (had?.c ?? 0) > 0;
   },
 
@@ -2070,7 +2169,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     const movements = rowsOf<MovementRow>(
-      d.executeSync('SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference, (w.movement_id IS NOT NULL) AS beginner_ok FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id ORDER BY m.movement_id'),
+      d.executeSync('SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference, (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id ORDER BY m.movement_id'),
     ).map(movementFromRow);
     set({ movements });
     get().refreshVector();

@@ -32,11 +32,22 @@ const CACHE = join(ROOT, 'node_modules', '@xenova', 'transformers', '.cache', ..
 
 mkdirSync(OUT, { recursive: true });
 
+function verifyArtifact(rel, dest, source) {
+  const sha = createHash('sha256').update(readFileSync(dest)).digest('hex');
+  const expected = KNOWN_SHA256[rel];
+  if (expected !== undefined && sha !== expected) {
+    throw new Error(`CHECKSUM MISMATCH for ${rel} (${source}): got ${sha}, pinned ${expected} — refusing the artifact.`);
+  }
+  console.log(`sha256(${rel}) = ${sha}${expected === undefined ? '  <- unpinned: add to KNOWN_SHA256' : '  (pinned, verified)'}`);
+}
+
 async function materialize(rel, dest) {
   const cached = join(CACHE, rel);
   if (existsSync(cached)) {
     copyFileSync(cached, dest);
     console.log(`from cache: ${rel}`);
+    // Audit B7: the cache is NOT trusted implicitly — same verification path.
+    verifyArtifact(rel, dest, 'cache');
     return;
   }
   const url = `https://huggingface.co/${MODEL_ID}/resolve/${MODEL_REVISION}/${rel}`;
@@ -44,12 +55,7 @@ async function materialize(rel, dest) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   await writeFile(dest, Readable.fromWeb(res.body));
-  const sha = createHash('sha256').update(readFileSync(dest)).digest('hex');
-  const expected = KNOWN_SHA256[rel];
-  if (expected !== undefined && sha !== expected) {
-    throw new Error(`CHECKSUM MISMATCH for ${rel}: got ${sha}, pinned ${expected} — refusing the artifact.`);
-  }
-  console.log(`sha256(${rel}) = ${sha}${expected === undefined ? '  <- unpinned: add to KNOWN_SHA256' : '  (pinned, verified)'}`);
+  verifyArtifact(rel, dest, 'download');
   if (MODEL_REVISION === 'main') {
     console.warn('WARNING: fetched from mutable main — pin AK_EMBEDDER_REVISION / MODEL_REVISION before release (audit A5).');
   }

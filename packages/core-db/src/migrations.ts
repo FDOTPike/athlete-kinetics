@@ -24,11 +24,13 @@ import m013 from './schema/013_profile_slot.sql';
 import m014 from './schema/014_movement_prefixes.sql';
 import m015 from './schema/015_set_prefix.sql';
 import m016 from './schema/016_movement_library_seed.sql';
+import m017 from './schema/017_movement_batch.sql';
+import m018 from './schema/018_logging_modes.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

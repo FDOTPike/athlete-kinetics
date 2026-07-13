@@ -26,7 +26,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
   '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
-  '014_movement_prefixes.sql', '015_set_prefix.sql', '016_movement_library_seed.sql'];
+  '014_movement_prefixes.sql', '015_set_prefix.sql', '016_movement_library_seed.sql', '017_movement_batch.sql',
+  '018_logging_modes.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -85,12 +86,24 @@ check('materialize prepares against healed schema', (() => {
 // --- 2b. poisoned v15: 016 tables missing while user_version claims complete ---
 console.log('[2b] poisoned DB: user_version=15 but 016 never applied (audit A1)');
 const b2 = freshDb();
-for (let i = 0; i < MIGRATIONS.length - 1; i += 1) b2.executeSync(MIGRATIONS[i]);
+for (let i = 0; i < MIGRATIONS.length - 3; i += 1) b2.executeSync(MIGRATIONS[i]); // skip 016..018
 b2.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
 check('precondition: movement_progression missing', sentinelsMissing(b2).includes('movement_progression'));
 runMigrations(b2, MIGRATIONS);
 check('self-heal applied 016 (progression + whitelist sentinels present)', sentinelsMissing(b2).length === 0);
-check('016 seed arrived: 81 movements', Number(b2.raw.prepare('SELECT COUNT(*) c FROM movement').get().c) === 81);
+check('016+017 seeds arrived: 96 movements', Number(b2.raw.prepare('SELECT COUNT(*) c FROM movement').get().c) === 96);
+
+// --- 2c. partial-018 damage: set_metric survives, siblings dropped (audit B4) --
+console.log('[2c] partial 018 damage: movement_logging_mode dropped post-apply');
+const b3 = freshDb();
+runMigrations(b3, MIGRATIONS);
+b3.executeSync('DROP TABLE movement_logging_mode');
+check('precondition: movement_logging_mode missing, set_metric present',
+  sentinelsMissing(b3).includes('movement_logging_mode') && !sentinelsMissing(b3).includes('set_metric'));
+runMigrations(b3, MIGRATIONS);
+check('self-heal restored the dropped 018 sibling', sentinelsMissing(b3).length === 0);
+check('time-mode seeds healed back (5 rows)',
+  Number(b3.raw.prepare('SELECT COUNT(*) c FROM movement_logging_mode').get().c) === 5);
 
 // --- 3. failing migration: fail fast, recover on retry --------------------------
 console.log('[3] failing migration mid-chain (the device "ln" scenario)');

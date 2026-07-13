@@ -48,6 +48,10 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'set_prefix' },          // 015
   { type: 'table', name: 'movement_progression' },       // 016
   { type: 'table', name: 'movement_beginner_whitelist' }, // 016
+  { type: 'table', name: 'set_metric' },                  // 018
+  { type: 'table', name: 'movement_logging_mode' },       // 018
+  { type: 'table', name: 'band_ladder' },                 // 018
+  { type: 'table', name: 'progression_policy' },          // 018
 ];
 
 function userVersion(db: MigrationDb): number {

@@ -23,7 +23,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
   '014_movement_prefixes.sql', '015_set_prefix.sql',
-  '016_movement_library_seed.sql']) {
+  '016_movement_library_seed.sql', '017_movement_batch.sql',
+  '018_logging_modes.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -161,7 +162,7 @@ if (resetTables.length >= 15) {
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
   a('reset cleared EVERY history table (demo can re-load)', resetTables.every((t) => cnt(t) === 0), seeded.map((t) => `${t}=${cnt(t)}`).filter((s) => !s.endsWith('=0')).join(',') || 'all empty');
   a('athlete_profile + movement library SURVIVE the reset',
-    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 81, // P16: 30 shipped + 51 seeded
+    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 96, // 30 shipped + 51 (016) + 15 (017)
     `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}`);
   db.exec('ROLLBACK');
 }
@@ -176,12 +177,22 @@ if (resetTables.length >= 15) {
     console.log(`  ${ok ? 'PASS' : 'FAIL'}  wipe clears stale state: ${key}`);
     if (!ok) fail += 1;
   }
+  const resetStart = src.indexOf('resetTrainingData: () => {');
+  const resetBody = src.slice(resetStart, src.indexOf('loadDemoAthlete:', resetStart));
+  for (const key of ['session: null', 'prescription: null', 'substitution: null', 'sessionPlan: []']) {
+    const ok = resetBody.includes(key);
+    console.log(`  ${ok ? 'PASS' : 'FAIL'}  full reset clears in-memory state: ${key}`);
+    if (!ok) fail += 1;
+  }
   const guards = [
     ['generateNewBlock refuses during an active session', 'End the active session before generating a new block.'],
     ['switchProfile refuses during an active session', 'End the active session before switching profiles.'],
     ['startSession has a duplicate-start guard', 'double-start would orphan'],
     ['boot is single-flight', 'bootInFlight'],
     ['registry write failures surface to the athlete', 'registry write failed'],
+    ['time-mode movements enforce seconds at the log boundary', 'is time-based'],
+    ['boot resumes an unfinished session (crash recovery)', 'RESUMES it on restart'],
+    ['missing readiness vector clears the stale prescription', "vector === null) { set({ prescription: null })"],
   ];
   for (const [label, needle] of guards) {
     const ok = src.includes(needle);

@@ -215,33 +215,6 @@
    "progression_rank": null
   },
   {
-   "name": "Alternating Renegade Row",
-   "base_name": "Alternating Renegade Row",
-   "pattern": "row",
-   "supported_prefixes": [
-    "KB"
-   ],
-   "difficulty_rating": "Advanced",
-   "target_muscles": [
-    "middle back"
-   ],
-   "secondary_muscles": [
-    "abdominals",
-    "biceps",
-    "chest",
-    "lats",
-    "triceps"
-   ],
-   "instructions_raw": "Place two kettlebells on the floor about shoulder width apart. Position yourself on your toes and your hands as though you were doing a pushup, with the body straight and extended. Use the handles of the kettlebells to support your upper body. You may need to position your feet wide for support. Push one kettlebell into the floor and row the other kettlebell, retracting the shoulder blade of the working side as you flex the elbow, pulling it to your side. Then lower the kettlebell to the floor and begin the kettlebell in the opposite hand. Repeat for several reps.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": true,
-   "source": "free-exercise-db",
-   "curated": false,
-   "progression_group": null,
-   "progression_rank": null
-  },
-  {
    "name": "Anti-Gravity Press",
    "base_name": "Anti-Gravity Press",
    "pattern": "push",
@@ -845,7 +818,7 @@
   },
   {
    "name": "Barbell Shrug",
-   "base_name": "Barbell Shrug",
+   "base_name": "Shrug",
    "pattern": "row",
    "supported_prefixes": [
     "BB"
@@ -855,12 +828,12 @@
     "traps"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Stand up straight with your feet at shoulder width as you hold a barbell with both hands in front of you using a pronated grip (palms facing the thighs). Tip: Your hands should be a little wider than shoulder width apart. You can use wrist wraps for this exercise for a better grip. This will be your starting position. Raise your shoulders up as far as you can go as you breathe out and hold the contraction for a second. Tip: Refrain from trying to lift the barbell by using your biceps. Slowly return to the starting position as you breathe in. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Hold a barbell in front of your thighs with straight arms, at your natural standing width. With intention, pull your shoulder blades up and back behind your ears as high as the traps will take them. Hold the top for a full second, then lower until the weight stretches the traps. The bar lets you load heavier than dumbbells \u2014 earn it with the same strict path.",
+   "cues": "Up and back behind the ears, with intention. Own a full second at the top. Arms stay ropes \u2014 traps lift, hands just hold.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=X26Ji1j9LWA",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -1610,12 +1583,12 @@
   },
   {
    "name": "Cable Chest Press",
-   "base_name": "Cable Chest Press",
+   "base_name": "Chest Press",
    "pattern": "push",
    "supported_prefixes": [
     "Cable"
    ],
-   "difficulty_rating": "Beginner",
+   "difficulty_rating": "Intermediate",
    "target_muscles": [
     "chest"
    ],
@@ -1623,12 +1596,12 @@
     "shoulders",
     "triceps"
    ],
-   "instructions_raw": "Adjust the weight to an appropriate amount and be seated, grasping the handles. Your upper arms should be about 45 degrees to the body, with your head and chest up. The elbows should be bent to about 90 degrees. This will be your starting position. Begin by extending through the elbow, pressing the handles together straight in front of you. Keep your shoulder blades retracted as you execute the movement. After pausing at full extension, return to th starting position, keeping tension on the cables. You can also execute this movement with your back off the pad, at an incline or decline, or alternate hands.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Set two handles at chest height, face away, and take a staggered stance. Press both handles forward until your arms are long, letting them drift together at the end. Return under control \u2014 the cable pulls backward the entire rep, so the squeeze at lockout is real work here.",
+   "cues": "Brace into the staggered stance. Press to a full reach, hands finishing together. Ride the cables back slow.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=fOHouR0t9Cw",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -1676,6 +1649,29 @@
    "is_compound": true,
    "source": "free-exercise-db",
    "curated": false,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Cable Glute Kickback",
+   "base_name": "Glute Kickback",
+   "pattern": "unilateral",
+   "supported_prefixes": [
+    "Cable"
+   ],
+   "difficulty_rating": "Beginner",
+   "target_muscles": [
+    "glutes"
+   ],
+   "secondary_muscles": [
+    "hamstrings"
+   ],
+   "instructions_raw": "Strap a low cable to one ankle, face the stack, and hold it for balance with a slight forward lean. Drive the strapped leg straight back and slightly up by squeezing the glute, then return under control. The range is shorter than people want it to be \u2014 where the lower back starts arching is where the glute stopped working.",
+   "cues": "Push the heel back, squeeze at the end. Torso still, hips level. Short honest range beats a high arched kick.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=bVrmtCI00Ys",
+   "is_compound": false,
+   "source": "free-exercise-db",
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -2944,7 +2940,7 @@
   },
   {
    "name": "Double Kettlebell Push Press",
-   "base_name": "Double Kettlebell Push Press",
+   "base_name": "Push Press",
    "pattern": "push",
    "supported_prefixes": [
     "KB"
@@ -2958,12 +2954,12 @@
     "quadriceps",
     "triceps"
    ],
-   "instructions_raw": "Clean two kettlebells to your shoulders. Squat down a few inches and reverse the motion rapidly. Use the momentum from the legs to drive the kettlebells overhead. Once the kettlebells are locked out, lower the kettlebells to your shoulders and repeat.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Clean two kettlebells to the rack position. Dip a few inches by bending the knees with a vertical torso, then drive the legs hard and let that force carry both bells to locked-out arms overhead. Lower back to the rack, breathe, repeat. The legs start the press and the arms finish it \u2014 a shallow, snappy dip beats a deep slow one every time.",
+   "cues": "Dip shallow, drive fast. Legs throw it, arms catch the lockout. Rack, reset, breathe between reps.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=W9NlTHkK1iU",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -3116,12 +3112,12 @@
   },
   {
    "name": "Dumbbell Floor Press",
-   "base_name": "Dumbbell Floor Press",
+   "base_name": "Floor Press",
    "pattern": "push",
    "supported_prefixes": [
     "DB"
    ],
-   "difficulty_rating": "Intermediate",
+   "difficulty_rating": "Beginner",
    "target_muscles": [
     "triceps"
    ],
@@ -3129,12 +3125,12 @@
     "chest",
     "shoulders"
    ],
-   "instructions_raw": "Lay on the floor holding dumbbells in your hands. Your knees can be bent. Begin with the weights fully extended above you. Lower the weights until your upper arm comes in contact with the floor. You can tuck your elbows to emphasize triceps size and strength, or to focus on your chest angle your arms to the side. Pause at the bottom, and then bring the weight together at the top by extending through the elbows.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Lie on the floor with dumbbells pressed over your chest, knees bent, feet flat. Lower until your upper arms rest lightly on the floor, pause a beat, then press back up. The floor caps the range where shoulders get cranky, and it needs no bench \u2014 a natural first press for home training.",
+   "cues": "Elbows about 45 degrees, touch down soft. Pause on the floor, then drive. Wrists stacked over elbows.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=uUGDRwge4F8",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -3153,6 +3149,27 @@
    "instructions_raw": "Lie on a flat bench with dumbbells pressed over your chest, palms facing each other. Open your arms in a wide arc with a fixed soft elbow bend until you feel a real stretch across the chest. Bring them back up along the same arc, like hugging a barrel. The stretch builds the chest; the last inches of the squeeze at the top do almost nothing.",
    "cues": "Elbow angle locked the whole arc. Open to a deep working stretch, then hug the barrel back up. Lighter than you think \u2014 this movement punishes ego.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=LzFvciCdoW0",
+   "is_compound": false,
+   "source": "free-exercise-db",
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Dumbbell Front Raise",
+   "base_name": "Front Raise",
+   "pattern": "accessory",
+   "supported_prefixes": [
+    "DB"
+   ],
+   "difficulty_rating": "Beginner",
+   "target_muscles": [
+    "shoulders"
+   ],
+   "secondary_muscles": [],
+   "instructions_raw": "Stand holding dumbbells in front of your thighs, palms facing back. Raise one or both arms straight ahead to shoulder height with a soft elbow, then lower on a slow count. Front delts already work in every press you do \u2014 this stays light, strict, and honest, or it is the lower back doing the raising.",
+   "cues": "Lift to shoulder height, hands soft. Torso a pillar \u2014 the delts raise, the body stays. Slower down than up.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=zkP0MsTcIVU",
    "is_compound": false,
    "source": "free-exercise-db",
    "curated": true,
@@ -3403,6 +3420,30 @@
    "instructions_raw": "Stand with a dumbbell in each hand and step one foot back, lowering until the back knee hovers just off the floor. Drive through the whole front foot to return to standing. Stepping back instead of forward keeps the front shin vertical and is much kinder to cranky knees \u2014 same muscles, less complaint.",
    "cues": "The front leg does the work \u2014 the back leg just catches you. Torso tall and stacked. Place the step back soft and controlled.",
    "video_placeholder_uri": "https://www.youtube.com/watch?v=mHkPgReOqUM",
+   "is_compound": true,
+   "source": "free-exercise-db",
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Dumbbell Romanian Deadlift",
+   "base_name": "Romanian Deadlift",
+   "pattern": "hinge",
+   "supported_prefixes": [
+    "DB"
+   ],
+   "difficulty_rating": "Beginner",
+   "target_muscles": [
+    "hamstrings"
+   ],
+   "secondary_muscles": [
+    "glutes",
+    "lower back"
+   ],
+   "instructions_raw": "Stand with dumbbells resting on the front of your thighs. Push your hips straight back and let the dumbbells slide down your legs, knees softly bent, until the hamstrings tell you to stop. Drive the hips forward to stand tall. The dumbbells hug your legs the whole way \u2014 daylight between them and you means the load has wandered onto your back.",
+   "cues": "Hips back, dumbbells glued to the legs. Flat back, long spine. Stand up by squeezing the glutes through.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=aa57T45iFSE",
    "is_compound": true,
    "source": "free-exercise-db",
    "curated": true,
@@ -3911,6 +3952,30 @@
    "progression_rank": null
   },
   {
+   "name": "Floor Back Extension",
+   "base_name": "Back Extension",
+   "pattern": "hinge",
+   "supported_prefixes": [
+    "Bodyweight"
+   ],
+   "difficulty_rating": "Beginner",
+   "target_muscles": [
+    "lower back"
+   ],
+   "secondary_muscles": [
+    "glutes",
+    "hamstrings"
+   ],
+   "instructions_raw": "Lie face-down with your arms reaching ahead. Lift your chest, arms, and legs a few inches off the floor by squeezing the glutes and upper back, hold a beat, then lower with control. Height is not the goal \u2014 a long body and a strong squeeze are. Reach LONG through fingers and toes rather than cranking upward.",
+   "cues": "Reach long, then lift \u2014 length before height. Glutes squeeze first. Hold the top for a slow beat.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=z6PJMT2y8GQ",
+   "is_compound": true,
+   "source": "free-exercise-db",
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
    "name": "Floor Glute-Ham Raise",
    "base_name": "Floor Glute-Ham Raise",
    "pattern": "accessory",
@@ -4091,27 +4156,6 @@
    ],
    "secondary_muscles": [],
    "instructions_raw": "Select the weight on a low pulley machine and grasp the single hand cable attachment that is attached to the low pulley with your left hand. Face away from the pulley and put your arm straight down with the hand cable attachment in front of your thighs at arms' length with the palms of the hand facing your thighs. This will be your starting position. While maintaining the torso stationary (no swinging), lift the left arm to the front with a slight bend on the elbow and the palms of the hand always faces down. Continue to go up until you arm is slightly above parallel to the floor. Exhale as you execute this portion of the movement and pause for a second at the top. Now as you inhale lower the arm back down slowly to the starting position. Once all of the recommended amount of repetitions have been performed for this arm, switch arms and perform the exercise with the right one.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": false,
-   "source": "free-exercise-db",
-   "curated": false,
-   "progression_group": null,
-   "progression_rank": null
-  },
-  {
-   "name": "Front Dumbbell Raise",
-   "base_name": "Front Dumbbell Raise",
-   "pattern": "accessory",
-   "supported_prefixes": [
-    "DB"
-   ],
-   "difficulty_rating": "Beginner",
-   "target_muscles": [
-    "shoulders"
-   ],
-   "secondary_muscles": [],
-   "instructions_raw": "Pick a couple of dumbbells and stand with a straight torso and the dumbbells on front of your thighs at arms length with the palms of the hand facing your thighs. This will be your starting position. While maintaining the torso stationary (no swinging), lift the left dumbbell to the front with a slight bend on the elbow and the palms of the hands always facing down. Continue to go up until you arm is slightly above parallel to the floor. Exhale as you execute this portion of the movement and pause for a second at the top. Inhale after the second pause. Now lower the dumbbell back down slowly to the starting position as you simultaneously lift the right dumbbell. Continue alternating in this fashion until all of the recommended amount of repetitions have been performed for each arm.",
    "cues": "",
    "video_placeholder_uri": "",
    "is_compound": false,
@@ -4470,30 +4514,6 @@
    "progression_rank": null
   },
   {
-   "name": "Hyperextensions With No Hyperextension Bench",
-   "base_name": "Hyperextensions With No Hyperextension Bench",
-   "pattern": "hinge",
-   "supported_prefixes": [
-    "Bodyweight"
-   ],
-   "difficulty_rating": "Intermediate",
-   "target_muscles": [
-    "lower back"
-   ],
-   "secondary_muscles": [
-    "glutes",
-    "hamstrings"
-   ],
-   "instructions_raw": "With someone holding down your legs, slide yourself down to the edge a flat bench until your hips hang off the end of the bench. Tip: Your entire upper body should be hanging down towards the floor. Also, you will be in the same position as if you were on a hyperextension bench but the range of motion will be shorter due to the height of the flat bench vs. that of the hyperextension bench. With your body straight, cross your arms in front of you (my preference) or behind your head. This will be your starting position. Tip: You can also hold a weight plate for extra resistance in front of you under your crossed arms. Start bending forward slowly at the waist as far as you can while keeping your back flat. Inhale as you perform this movement. Keep moving forward until you almost touch the floor or you feel a nice stretch on the hamstrings (whichever comes first). Tip: Never round the back as you perform this exercise. Slowly raise your torso back to the initial position as you exhale. Tip: Avoid the temptation to arch your back past a straight line. Also, do not swing the torso at any time in order to protect the back from injury. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": true,
-   "source": "free-exercise-db",
-   "curated": false,
-   "progression_group": null,
-   "progression_rank": null
-  },
-  {
    "name": "Incline Barbell Triceps Extension",
    "base_name": "Incline Barbell Triceps Extension",
    "pattern": "accessory",
@@ -4746,7 +4766,7 @@
   },
   {
    "name": "Incline Push-Up",
-   "base_name": "Incline Push-Up",
+   "base_name": "Push-Up",
    "pattern": "push",
    "supported_prefixes": [
     "Bodyweight"
@@ -4759,12 +4779,12 @@
     "shoulders",
     "triceps"
    ],
-   "instructions_raw": "Stand facing bench or sturdy elevated platform. Place hands on edge of bench or platform, slightly wider than shoulder width. Position forefoot back from bench or platform with arms and body straight. Arms should be perpendicular to body. Keeping body straight, lower chest to edge of box or platform by bending arms. Push body up until arms are extended. Repeat.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Place your hands on a bench or sturdy surface around hip height and walk your feet back into one rigid line. Lower your chest to the edge, then press away to long arms. The higher the hands, the easier the rep \u2014 walk your hands lower over the weeks and the floor push-up arrives on its own.",
+   "cues": "One rigid line, glutes switched on. Chest travels to the edge, whole body together. Lower the surface as reps get strict.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=0JUrOH--Kdk",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -5115,30 +5135,6 @@
     "traps"
    ],
    "instructions_raw": "Place kettlebell between your feet. To get in the starting position, push your butt back and look straight ahead. Clean kettlebell to your shoulder. Clean the kettlebell to your shoulders by extending through the legs and hips as you raise the kettlebell towards your shoulder. The wrist should rotate as you do so. Lower kettlebell to a hanging position between your legs while keeping the hamstrings loaded. Keep your head up at all times.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": true,
-   "source": "free-exercise-db",
-   "curated": false,
-   "progression_group": null,
-   "progression_rank": null
-  },
-  {
-   "name": "Kettlebell One-Legged Deadlift",
-   "base_name": "Kettlebell One-Legged Deadlift",
-   "pattern": "unilateral",
-   "supported_prefixes": [
-    "KB"
-   ],
-   "difficulty_rating": "Intermediate",
-   "target_muscles": [
-    "hamstrings"
-   ],
-   "secondary_muscles": [
-    "glutes",
-    "lower back"
-   ],
-   "instructions_raw": "Hold a kettlebell by the handle in one hand. Stand on one leg, on the same side that you hold the kettlebell. Keeping that knee slightly bent, perform a stiff legged deadlift by bending at the hip, extending your free leg behind you for balance. Continue lowering the kettlebell until you are parallel to the ground, and then return to the upright position.",
    "cues": "",
    "video_placeholder_uri": "",
    "is_compound": true,
@@ -5613,8 +5609,8 @@
    "progression_rank": null
   },
   {
-   "name": "Lying Dumbbell Tricep Extension",
-   "base_name": "Lying Dumbbell Tricep Extension",
+   "name": "Lying Dumbbell Triceps Extension",
+   "base_name": "Triceps Extension",
    "pattern": "accessory",
    "supported_prefixes": [
     "DB"
@@ -5627,12 +5623,12 @@
     "chest",
     "shoulders"
    ],
-   "instructions_raw": "Lie on a flat bench while holding two dumbbells directly in front of you. Your arms should be fully extended at a 90-degree angle from your torso and the floor. The palms should be facing in and the elbows should be tucked in. This is the starting position. As you breathe in and you keep the upper arms stationary with the elbows in, slowly lower the weight until the dumbbells are near your ears. At that point, while keeping the elbows in and the upper arms stationary, use the triceps to bring the weight back up to the starting position as you breathe out. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Lie on a bench with dumbbells pressed over your chest, palms facing each other. Keeping your upper arms still and angled slightly back over your head, bend the elbows and lower the dumbbells beside your ears. Press back to long arms along the same path. Upper arms are the hinge pin \u2014 they point at one spot on the ceiling for the whole set.",
+   "cues": "Upper arms frozen, angled just past vertical. Lower to the ears, deep and controlled. Elbows point at the ceiling, always.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=8ncEJDm7Cig",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -6548,29 +6544,6 @@
    "progression_rank": null
   },
   {
-   "name": "One-Legged Cable Kickback",
-   "base_name": "One-Legged Cable Kickback",
-   "pattern": "unilateral",
-   "supported_prefixes": [
-    "Cable"
-   ],
-   "difficulty_rating": "Intermediate",
-   "target_muscles": [
-    "glutes"
-   ],
-   "secondary_muscles": [
-    "hamstrings"
-   ],
-   "instructions_raw": "Hook a leather ankle cuff to a low cable pulley and then attach the cuff to your ankle. Face the weight stack from a distance of about two feet, grasping the steel frame for support. While keeping your knees and hips bent slightly and your abs tight, contract your glutes to slowly \"kick\" the working leg back in a semicircular arc as high as it will comfortably go as you breathe out. Tip: At full extension, squeeze your glutes for a second in order to achieve a peak contraction. Now slowly bring your working leg forward, resisting the pull of the cable until you reach the starting position. Repeat for the recommended amount of repetitions. Switch legs and repeat the movement for the other side.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": false,
-   "source": "free-exercise-db",
-   "curated": false,
-   "progression_group": null,
-   "progression_rank": null
-  },
-  {
    "name": "Open Palm Kettlebell Clean",
    "base_name": "Open Palm Kettlebell Clean",
    "pattern": "hinge",
@@ -6834,7 +6807,7 @@
   },
   {
    "name": "Preacher Curl",
-   "base_name": "Preacher Curl",
+   "base_name": "Biceps Curl",
    "pattern": "accessory",
    "supported_prefixes": [
     "BB"
@@ -6844,12 +6817,12 @@
     "biceps"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "To perform this movement you will need a preacher bench and an E-Z bar. Grab the E-Z curl bar at the close inner handle (either have someone hand you the bar which is preferable or grab the bar from the front bar rest provided by most preacher benches). The palm of your hands should be facing forward and they should be slightly tilted inwards due to the shape of the bar. With the upper arms positioned against the preacher bench pad and the chest against it, hold the E-Z Curl Bar at shoulder length. This will be your starting position. As you breathe in, slowly lower the bar until your upper arm is extended and the biceps is fully stretched. As you exhale, use the biceps to curl the weight up until your biceps is fully contracted and the bar is at shoulder height. Squeeze the biceps hard and hold this position for a second. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Set your upper arms flat on the preacher pad, chest against it, bar in an underhand grip. Curl to shoulder height, then lower slower than you lifted until your arms reach their natural long position on the pad. The pad removes every cheat you own \u2014 expect to lift less than your standing curl, and let that be information.",
+   "cues": "Upper arms welded to the pad. Lower on a three-count into the long stretch. Settle at the bottom, no bounce out of it.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=BPmUhDtdQfw",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -7044,6 +7017,33 @@
    "is_compound": true,
    "source": "free-exercise-db",
    "curated": false,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
+   "name": "Renegade Row",
+   "base_name": "Renegade Row",
+   "pattern": "row",
+   "supported_prefixes": [
+    "DB"
+   ],
+   "difficulty_rating": "Advanced",
+   "target_muscles": [
+    "middle back"
+   ],
+   "secondary_muscles": [
+    "abdominals",
+    "biceps",
+    "chest",
+    "lats",
+    "triceps"
+   ],
+   "instructions_raw": "Set up in a push-up plank with a hand on each dumbbell, feet wider than usual. Row one dumbbell to your ribs while the rest of you stays a statue, then place it down and row the other side. The row is the easy part \u2014 the work is refusing to let the hips twist.",
+   "cues": "Hips square to the floor \u2014 a statue with one moving arm. Feet wide for a stable base. Pull with the elbow, quiet everywhere else.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=4qEIChzM4ZA",
+   "is_compound": true,
+   "source": "free-exercise-db",
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -8189,6 +8189,30 @@
    "progression_rank": null
   },
   {
+   "name": "Single-Leg Romanian Deadlift",
+   "base_name": "Single-Leg Romanian Deadlift",
+   "pattern": "unilateral",
+   "supported_prefixes": [
+    "KB"
+   ],
+   "difficulty_rating": "Intermediate",
+   "target_muscles": [
+    "hamstrings"
+   ],
+   "secondary_muscles": [
+    "glutes",
+    "lower back"
+   ],
+   "instructions_raw": "Hold a kettlebell in one hand and stand on the opposite leg. Hinge forward, letting the free leg travel straight back as a counterweight, until your torso and back leg are near parallel with the floor. Drive the hips through to stand tall. Wobbling is part of the exercise \u2014 every save is your ankle and hip learning their job.",
+   "cues": "Hips stay square, back leg reaches long. Bell hangs plumb under the shoulder. Slow beats far \u2014 shorten the hinge before you lose it.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=Nenu2LI9_dw",
+   "is_compound": true,
+   "source": "free-exercise-db",
+   "curated": true,
+   "progression_group": null,
+   "progression_rank": null
+  },
+  {
    "name": "Sit-Up",
    "base_name": "Sit-Up",
    "pattern": "core",
@@ -8200,12 +8224,12 @@
     "abdominals"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Lie down on the floor placing your feet either under something that will not move or by having a partner hold them. Your legs should be bent at the knees. Place your hands behind your head and lock them together by clasping your fingers. This is the starting position. Elevate your upper body so that it creates an imaginary V-shape with your thighs. Breathe out when performing this part of the exercise. Once you feel the contraction for a second, lower your upper body back down to the starting position while inhaling. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Lie on your back with knees bent, feet flat, hands crossed on your chest or lightly at your temples. Curl your torso up one segment at a time until your chest meets your thighs, then roll back down the same way. The curl is the exercise \u2014 a flat-backed lever heave onto the hip flexors is a different movement wearing the same name.",
+   "cues": "Peel up one vertebra at a time. Exhale on the way up. Roll down as slowly as you rose.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=pCX65Mtc_Kk",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -8511,22 +8535,22 @@
   },
   {
    "name": "Standing Barbell Calf Raise",
-   "base_name": "Standing Barbell Calf Raise",
+   "base_name": "Calf Raise",
    "pattern": "accessory",
    "supported_prefixes": [
     "BB"
    ],
-   "difficulty_rating": "Beginner",
+   "difficulty_rating": "Intermediate",
    "target_muscles": [
     "calves"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "This exercise is best performed inside a squat rack for safety purposes. To begin, first set the bar on a rack that best matches your height. Once the correct height is chosen and the bar is loaded, step under the bar and place the bar on the back of your shoulders (slightly below the neck). Hold on to the bar using both arms at each side and lift it off the rack by first pushing with your legs and at the same time straightening your torso. Step away from the rack and position your legs using a shoulder width medium stance with the toes slightly pointed out. Keep your head up at all times as looking down will get you off balance and also maintain a straight back. The knees should be kept with a slight bend; never locked. This will be your starting position. Tip: For better range of motion you may also place the ball of your feet on a wooden block but be careful as this option requires more balance and a sturdy block. Raise your heels as you breathe out by extending your ankles as high as possible and flexing your calf. Ensure that the knee is kept stationary at all times. There should be no bending at any time. Hold the contracted position by a second before you start to go back down. Go back slowly to the starting position as you breathe in by lowering your heels as you bend the ankles until calves are stretched. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Set a bar across your upper back as for a squat, balls of your feet on a plate or block, heels hanging free. Lower your heels to a deep stretch, pause, then rise as high onto your toes as balance allows. The bar loads the calves harder than dumbbells ever will \u2014 trade some range for load only after the stretch and pause are non-negotiable habits.",
+   "cues": "Deep stretch, full pause at the bottom. Drive up over the big toe. Tall body, bar quiet on the back.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=3UWi44yN-wM",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -9195,30 +9219,6 @@
     "lower back"
    ],
    "instructions_raw": "Grasp a bar using an overhand grip (palms facing down). You may need some wrist wraps if using a significant amount of weight. Stand with your torso straight and your legs spaced using a shoulder width or narrower stance. The knees should be slightly bent. This is your starting position. Keeping the knees stationary, lower the barbell to over the top of your feet by bending at the hips while keeping your back straight. Keep moving forward as if you were going to pick something from the floor until you feel a stretch on the hamstrings. Inhale as you perform this movement. Start bringing your torso up straight again by extending your hips until you are back at the starting position. Exhale as you perform this movement. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
-   "is_compound": true,
-   "source": "free-exercise-db",
-   "curated": false,
-   "progression_group": null,
-   "progression_rank": null
-  },
-  {
-   "name": "Stiff-Legged Dumbbell Deadlift",
-   "base_name": "Stiff-Legged Dumbbell Deadlift",
-   "pattern": "hinge",
-   "supported_prefixes": [
-    "DB"
-   ],
-   "difficulty_rating": "Beginner",
-   "target_muscles": [
-    "hamstrings"
-   ],
-   "secondary_muscles": [
-    "glutes",
-    "lower back"
-   ],
-   "instructions_raw": "Grasp a couple of dumbbells holding them by your side at arm's length. Stand with your torso straight and your legs spaced using a shoulder width or narrower stance. The knees should be slightly bent. This is your starting position. Keeping the knees stationary, lower the dumbbells to over the top of your feet by bending at the waist while keeping your back straight. Keep moving forward as if you were going to pick something from the floor until you feel a stretch on the hamstrings. Exhale as you perform this movement Start bringing your torso up straight again by extending your hips and waist until you are back at the starting position. Inhale as you perform this movement. Repeat for the recommended amount of repetitions.",
    "cues": "",
    "video_placeholder_uri": "",
    "is_compound": true,
