@@ -113,7 +113,7 @@ export default function ReadinessScreen(): React.JSX.Element {
   const onResetAndLoadDemo = useCallback(() => {
     Alert.alert(
       'Reset & load demo?',
-      'This permanently deletes your training log, telemetry, blocks, and injury data so the 180-day demo athlete can load fresh. Your profile, equipment, and saved profiles are kept.',
+      'This permanently deletes your training log, telemetry, blocks, and today\u2019s injury reports/niggles so the 180-day demo athlete can load fresh. Your profile \u2014 including any saved injury and mobility notes \u2014 plus equipment and saved profiles are kept.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

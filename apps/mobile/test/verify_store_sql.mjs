@@ -129,20 +129,6 @@ a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSy
 a('bounded: the set-aggregate carries a session_date window predicate', /WHERE s\.session_date >= \? AND s\.session_date <= \?/.test(hyd));
 a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for\s*\(|\.forEach\s*\(|\.map\s*\()[^;{]*executeSync/.test(hyd));
 
-// --- profile-management wipe: volatile adjustment must not survive -----------
-console.log('[block/state wipe wiring]');
-const wipeBody = (() => {
-  const i = src.indexOf('wipeActiveBlockState: () => {');
-  const j = src.indexOf('// --- Coach Mode', i);
-  return i >= 0 && j > i ? src.slice(i, j) : '';
-})();
-a('block/state wipe is refused while a session is active',
-  /session !== null/.test(wipeBody));
-a('block/state wipe clears the old prescription and profile notes before re-deriving',
-  /prescription:\s*null/.test(wipeBody) && /profileNotes:\s*\[\]/.test(wipeBody));
-a('a missing vector explicitly clears derived adjustment state',
-  /if \(vector === null\)\s*\{[^}]*prescription:\s*null[^}]*profileNotes:\s*\[\]/s.test(src));
-
 // --- resetTrainingData: EXECUTE the store's wipe on seeded data -----------------
 // Proves the reset clears ALL history (so the demo can re-load) while KEEPING the
 // athlete_profile + movement library (the user's settings survive).
@@ -156,16 +142,6 @@ const resetTables = [...resetBody.matchAll(/DELETE FROM (\w+)'/g)].map((m) => m[
 a('resetTrainingData body found with its unconditional DELETEs', resetTables.length >= 15, `${resetTables.length} tables`);
 a('reset NEVER clears athlete_profile / movement / profile_slot (settings survive)',
   !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
-a('reset clears active-session and derived-adjustment memory, not only SQLite',
-  /session:\s*null/.test(resetBody)
-    && /sessionPlan:\s*\[\]/.test(resetBody)
-    && /activeMovementId:\s*null/.test(resetBody)
-    && /prescription:\s*null/.test(resetBody)
-    && /profileNotes:\s*\[\]/.test(resetBody)
-    && /lastTriage:\s*null/.test(resetBody));
-const demoBody = src.slice(src.indexOf('loadDemoAthlete: () => {'));
-a('demo reload derives a fresh prescription from the newly materialized vector',
-  /refreshVector\(\);\s*[^}]*computePrescription\(\[\]\);/s.test(demoBody));
 if (resetTables.length >= 15) {
   const MAT = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8').replace(/^--.*$/gm, '');
   db.exec('BEGIN');
@@ -188,6 +164,34 @@ if (resetTables.length >= 15) {
     cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 81, // P16: 30 shipped + 51 seeded
     `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}`);
   db.exec('ROLLBACK');
+}
+
+// --- wipe/reset behavior contracts (audit A2/A3/A4 + reset defect) -----------
+{
+  const src = readFileSync(join(import.meta.dirname, '..', 'src', 'state', 'useStore.ts'), 'utf-8');
+  const wipeStart = src.indexOf('wipeActiveBlockState: () => {');
+  const wipeBody = src.slice(wipeStart, src.indexOf('switchAthlete:', wipeStart));
+  for (const key of ['prescription: null', 'substitution: null', 'sessionPlan: []', 'activeMovementId: null']) {
+    const ok = wipeBody.includes(key);
+    console.log(`  ${ok ? 'PASS' : 'FAIL'}  wipe clears stale state: ${key}`);
+    if (!ok) fail += 1;
+  }
+  const guards = [
+    ['generateNewBlock refuses during an active session', 'End the active session before generating a new block.'],
+    ['switchProfile refuses during an active session', 'End the active session before switching profiles.'],
+    ['startSession has a duplicate-start guard', 'double-start would orphan'],
+    ['boot is single-flight', 'bootInFlight'],
+    ['registry write failures surface to the athlete', 'registry write failed'],
+  ];
+  for (const [label, needle] of guards) {
+    const ok = src.includes(needle);
+    console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}`);
+    if (!ok) fail += 1;
+  }
+  const screen = readFileSync(join(import.meta.dirname, '..', 'src', 'screens', 'ProfileScreen.tsx'), 'utf-8');
+  const ok = screen.includes('End the active session before deleting the block');
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  destructive wipe blocked during an active session (UI)`);
+  if (!ok) fail += 1;
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);

@@ -399,6 +399,7 @@ interface KineticsStore {
 // current versions; older builds nest it under _array)
 // ---------------------------------------------------------------------------
 let db: DB | null = null;
+let bootInFlight = false;
 const getDb = (): DB => {
   if (db === null) throw new Error('kinetics db not booted');
   return db;
@@ -734,6 +735,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   boot: () => {
     if (get().status === 'ready') return;
+    // Audit A6: App.tsx and ReadinessScreen both invoke boot() on mount; the
+    // second concurrent boot reopened the DB and leaked the first handle.
+    if (bootInFlight) return;
+    bootInFlight = true;
     // Async wrapper: the athlete-registry read is the only await; everything
     // after it is the original synchronous boot path against the chosen file.
     void (async () => {
@@ -802,6 +807,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().computePrescription([]);
     } catch (e) {
       set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      bootInFlight = false;
     }
     })();
   },
@@ -837,6 +844,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   switchProfile: (slotId) => {
+    // Audit A2: swapping the athlete_profile mid-session changes the caps and
+    // guardrails the live session was prescribed under.
+    if (get().session !== null) {
+      set({ error: 'End the active session before switching profiles.' });
+      return;
+    }
     const d = getDb();
     const target = rowsOf<{ profile_json: string }>(
       d.executeSync('SELECT profile_json FROM profile_slot WHERE slot_id = ?', [slotId]),
@@ -877,10 +890,6 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   wipeActiveBlockState: () => {
-    if (get().session !== null) {
-      set({ error: 'End the active session before deleting the current block.' });
-      return;
-    }
     const d = getDb();
     d.executeSync('BEGIN');
     try {
@@ -891,15 +900,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    // Clear every volatile derivation before re-reading persistence. In
-    // particular, re-derivation can only recreate a value when a state vector
-    // exists, so retaining the previous value here would leave a stale
-    // PROFILE/GUARDRAIL multiplier on screen after the wipe.
-    set({
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null,
-      niggles: [], prescription: null, profileNotes: [], lastTriage: null,
-      substitution: null,
-    });
+    // Clear EVERY piece of UI state derived from the wiped rows (audit: stale
+    // prescription/substitution/plan state survived the wipe). profileNotes are
+    // NOT cleared — athlete_profile is intentionally preserved by this wipe.
+    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeMovementId: null, lastEndedSessionId: null });
     get().refreshNiggles();
     get().refreshBlock();
     get().refreshVector();
@@ -921,7 +925,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           set({ status: 'ready', error: 'Unknown athlete.' });
           return;
         }
-        await saveRegistry(reg);
+        if (!(await saveRegistry(reg))) {
+          set({ status: 'ready', error: 'Could not persist the athlete switch — registry write failed.' });
+          return;
+        }
         if (db !== null) {
           try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
           db = null;
@@ -943,7 +950,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     void (async () => {
       try {
         const { reg, entry } = addAthlete(await loadRegistry(), name, Date.now());
-        await saveRegistry(setActiveAthlete(reg, entry.id));
+        if (!(await saveRegistry(setActiveAthlete(reg, entry.id)))) {
+          set({ status: 'ready', error: 'Could not create the athlete — registry write failed.' });
+          return;
+        }
         if (db !== null) {
           try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
           db = null;
@@ -965,7 +975,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   renameAthleteEntry: (id, name) => {
     void (async () => {
       const reg = regRenameAthlete(await loadRegistry(), id, name);
-      await saveRegistry(reg);
+      if (!(await saveRegistry(reg))) {
+        set({ error: 'Rename not saved — registry write failed.' });
+        return;
+      }
       set({ athletes: reg.athletes });
     })();
   },
@@ -977,13 +990,21 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         set({ error: 'The active and default athletes cannot be deleted.' });
         return;
       }
-      await saveRegistry(reg);
-      // Best-effort file removal; an orphaned file is harmless and invisible.
+      if (!(await saveRegistry(reg))) {
+        set({ error: 'Delete not saved — registry write failed. The athlete is unchanged.' });
+        return;
+      }
+      // File removal: an orphaned file is invisible but the UI promised the
+      // database is removed — say so honestly when it is not (audit A3).
+      let fileGone = true;
       try {
         const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
         open({ name: removed.dbName }).delete();
-      } catch { /* orphan tolerated */ }
-      set({ athletes: reg.athletes });
+      } catch { fileGone = false; }
+      set({
+        athletes: reg.athletes,
+        error: fileGone ? null : 'Athlete removed from the list, but their database file could not be deleted. It holds no visible data and can be cleared by reinstalling.',
+      });
     })();
   },
 
@@ -994,7 +1015,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     set({ onboarded: true });
     void (async () => {
       const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
-      await saveRegistry(reg);
+      if (!(await saveRegistry(reg))) {
+        set({ error: 'Athlete name not saved — registry write failed. You can rename them in the ATHLETE tab.' });
+        return;
+      }
       set({ athletes: reg.athletes });
     })();
   },
@@ -1017,6 +1041,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   generateNewBlock: (schemaType = 'LINEAR') => {
     const { profile, movements, status, vector } = get();
     if (status !== 'ready') return;
+    // Audit A2: regenerating mid-session archives the plan the live session
+    // was built from — APRE completion would then read the WRONG plan.
+    if (get().session !== null) {
+      set({ error: 'End the active session before generating a new block.' });
+      return;
+    }
     const d = getDb();
     // Macro continuation: the next block advances through the 32-week cycle
     // (8 positions, wrapping) from wherever the last generated block sat.
@@ -1389,6 +1419,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   startSession: () => {
+    // Audit A2: double-start would orphan the first session's rows.
+    if (get().session !== null) return;
     // Past midnight, todayPlan/prescription may be yesterday's — re-sync
     // before seeding so the athlete gets TODAY'S planned session.
     get().rolloverDay();
@@ -1837,12 +1869,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   computePrescription: (_patterns) => {
     const { vector, profile, session } = get();
-    if (vector === null) {
-      // A missing persisted state is also a state transition. Never let a
-      // multiplier derived from a deleted/reset vector survive in memory.
-      set({ prescription: null, profileNotes: [], lastTriage: null });
-      return;
-    }
+    if (vector === null) return;
     const d = getDb();
     // ALWAYS the real current date — a store snapshot can be yesterday's
     // (app open past midnight) and would re-read yesterday's reports.
@@ -2006,31 +2033,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
-    // Reflect the now-empty DB in memory immediately. refreshVector only owns
-    // vector/trend/today and therefore cannot clear an active session or the
-    // prescription derived from data that has just been deleted.
-    set({
-      vector: null,
-      trend: [],
-      session: null,
-      prescription: null,
-      profileNotes: [],
-      triaging: false,
-      lastTriage: null,
-      sessionPlan: [],
-      activeMovementId: null,
-      substitution: null,
-      niggles: [],
-      block: null,
-      blockMeta: null,
-      blockSessions: [],
-      todayPlan: null,
-      oneRepMaxes: {},
-      lastEndedSessionId: null,
-    });
+    // Reflect the now-empty DB in memory.
     get().refreshVector();
     get().refreshBlock();
     get().refreshNiggles();
+    set({ oneRepMaxes: {} });
     return (had?.c ?? 0) > 0;
   },
 
@@ -2067,8 +2074,5 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     ).map(movementFromRow);
     set({ movements });
     get().refreshVector();
-    // Demo materialization creates a new current vector. Derive from that data
-    // now instead of leaving the reset athlete with a null/stale adjustment.
-    get().computePrescription([]);
   },
 }));

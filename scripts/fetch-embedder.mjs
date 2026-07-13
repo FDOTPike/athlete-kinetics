@@ -11,6 +11,7 @@
  * Run:  node scripts/fetch-embedder.mjs
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { writeFile } from 'node:fs/promises';
@@ -20,6 +21,13 @@ const ASSETS = join(ROOT, 'packages', 'inference', 'assets');
 const OUT = join(ASSETS, 'minilm');
 const cb = JSON.parse(readFileSync(join(ASSETS, 'phrase-codebase.json'), 'utf-8'));
 const MODEL_ID = cb.embeddingModel; // e.g. "Xenova/all-MiniLM-L6-v2"
+// Supply-chain pinning (audit A5): resolve against a FIXED revision, never the
+// mutable 'main', and verify the artifact hash. After the first trusted fetch
+// the script prints the sha256 — paste it (and the HF commit hash) here.
+const MODEL_REVISION = process.env.AK_EMBEDDER_REVISION ?? 'main'; // TODO(Francis): pin HF commit hash
+const KNOWN_SHA256 = {
+  // 'onnx/model_quantized.onnx': '<paste sha256 after first trusted fetch>',
+};
 const CACHE = join(ROOT, 'node_modules', '@xenova', 'transformers', '.cache', ...MODEL_ID.split('/'));
 
 mkdirSync(OUT, { recursive: true });
@@ -31,11 +39,20 @@ async function materialize(rel, dest) {
     console.log(`from cache: ${rel}`);
     return;
   }
-  const url = `https://huggingface.co/${MODEL_ID}/resolve/main/${rel}`;
+  const url = `https://huggingface.co/${MODEL_ID}/resolve/${MODEL_REVISION}/${rel}`;
   console.log(`downloading: ${url}`);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   await writeFile(dest, Readable.fromWeb(res.body));
+  const sha = createHash('sha256').update(readFileSync(dest)).digest('hex');
+  const expected = KNOWN_SHA256[rel];
+  if (expected !== undefined && sha !== expected) {
+    throw new Error(`CHECKSUM MISMATCH for ${rel}: got ${sha}, pinned ${expected} — refusing the artifact.`);
+  }
+  console.log(`sha256(${rel}) = ${sha}${expected === undefined ? '  <- unpinned: add to KNOWN_SHA256' : '  (pinned, verified)'}`);
+  if (MODEL_REVISION === 'main') {
+    console.warn('WARNING: fetched from mutable main — pin AK_EMBEDDER_REVISION / MODEL_REVISION before release (audit A5).');
+  }
 }
 
 const onnxDest = join(OUT, 'model_quantized.onnx');

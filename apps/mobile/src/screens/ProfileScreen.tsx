@@ -470,11 +470,10 @@ export default function ProfileScreen(): React.JSX.Element {
         </View>
         <Pressable
           onPress={() => {
+            // Audit A2: wiping the block a live session was prescribed from
+            // leaves the session logging against archived rows.
             if (session !== null) {
-              Alert.alert(
-                'Session in progress',
-                'End the active session before deleting its block and state.',
-              );
+              Alert.alert('Session active', 'End the active session before deleting the block and state.');
               return;
             }
             Alert.alert(
