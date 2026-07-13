@@ -14,7 +14,8 @@
  *      strictly less raw strength set volume than the pure strength block
  *      (concurrent-training interference damping).
  */
-import type { MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
+import type { DifficultyRating, MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
+import { DIFFICULTY_RANK } from './types';
 // Phase 13 Step 4 — the Block Generator Intercept: the generator imports the
 // autopilot controller and applies its forward-looking corrections to the next
 // block (a recorded halt snaps the whole block to a recovery template).
@@ -25,6 +26,12 @@ import { deriveControlAction, type ControlAction, type FlawReport } from './kine
 // ---------------------------------------------------------------------------
 export interface GeneratorMovement {
   movement_id: number;
+  /** movement_detail.difficulty_rating; absent = ungated (legacy callers are
+   *  byte-identical — the store passes it from Phase 16 onward). */
+  difficulty?: DifficultyRating;
+  /** movement_beginner_whitelist membership: an Intermediate staple a
+   *  beginner may be prescribed (plan P16 S4). Absent = not whitelisted. */
+  beginner_ok?: boolean;
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
@@ -360,7 +367,19 @@ export function generateBlock(input: BlockInput): BlockPlan {
   const phaseMod = PHASE_MODS[macroPhase];
   const split = SPLITS[profile.objective][clamp(profile.weekly_frequency, 1, 7) - 1];
   const spread = DAY_SPREAD[clamp(profile.weekly_frequency, 1, 7) - 1];
-  const pool = availableMovements(input.movements, profile.equipment_inventory);
+  const equipPool = availableMovements(input.movements, profile.equipment_inventory);
+  // Phase 16: tier gating — a beginner is never PRESCRIBED an Advanced
+  // movement. Untagged rows (difficulty undefined) stay eligible so legacy
+  // callers/fixtures are byte-identical; a pattern with no in-tier candidate
+  // yields a dropped slot + warning at the pick site (strictness over
+  // substitution — the tier cap is a hard safety bound, like equipment).
+  // Plan P16 S4: "Beginner sees Beginner + whitelisted Intermediate staples;
+  // Advanced sees all." Untagged rows (difficulty undefined) stay eligible so
+  // legacy callers/fixtures are byte-identical.
+  const pool = profile.training_age !== 'beginner'
+    ? equipPool
+    : equipPool.filter((m) =>
+        m.difficulty === undefined || m.difficulty === 'Beginner' || m.beginner_ok === true);
   // Session slot budget from the duration cap (~22 min per movement including
   // rest), bounded to the planned_session shape the UI is built around.
   const slotBudget = clamp(Math.round(profile.session_duration_cap_min / 22), 2, 5);
@@ -430,9 +449,15 @@ export function generateBlock(input: BlockInput): BlockPlan {
       for (const pattern of patterns) {
         const m = pickForPattern(pool, pattern, usedIds);
         if (m === null) {
-          // Strictness over substitution: a pattern the inventory cannot
-          // support is dropped, never replaced with unavailable equipment.
-          warnings.add(`${focus}: no equipment-available movement for ${pattern}`);
+          // Strictness over substitution, tier included: a pattern the
+          // inventory cannot support — or that only exists above the
+          // athlete's tier cap — is dropped with a warning, never filled
+          // upward. (Audit F1: the previous ungated fallback could hand a
+          // beginner an Advanced movement.)
+          const tierBlocked = pickForPattern(equipPool, pattern, usedIds) !== null;
+          warnings.add(tierBlocked
+            ? `${focus}: no tier-eligible movement for ${pattern}`
+            : `${focus}: no equipment-available movement for ${pattern}`);
           continue;
         }
         usedIds.add(m.movement_id);

@@ -721,5 +721,79 @@ const injSq = ndSlots(injuredThin, 'squat');
 check('thin-data severe-niggle headroom never raises squat in the block',
   injSq.every((sl, i) => sl.target_rpe <= baseSq[i].target_rpe && sl.sets <= baseSq[i].sets));
 
+// --- [7] Phase 16: tier gating (plan law: Beginner + whitelisted Intermediate staples)
+{
+  const WL = new Set(['Romanian Deadlift', 'Dumbbell Shoulder Press']);
+  const tagged = movements.map((m) => ({
+    ...m,
+    difficulty: (m.name === 'Competition Squat' || m.name === 'Deadlift') ? 'Advanced'
+      : (WL.has(m.name) || m.name === 'Front Squat') ? 'Intermediate'
+      : 'Beginner',
+    beginner_ok: WL.has(m.name),
+  }));
+  const advIds = new Set(tagged.filter((m) => m.difficulty === 'Advanced').map((m) => m.movement_id));
+  const unlistedInt = new Set(tagged.filter((m) => m.difficulty === 'Intermediate' && !m.beginner_ok).map((m) => m.movement_id));
+  const wlIds = new Set(tagged.filter((m) => m.beginner_ok).map((m) => m.movement_id));
+  const begPlan = generateBlock({ profile: prof({ training_age: 'beginner' }), movements: tagged, startDate: START });
+  const begIds = new Set(begPlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
+  check('tier law: beginner block contains no Advanced movement', [...begIds].every((id) => !advIds.has(id)));
+  check('tier law: beginner block contains no UNLISTED Intermediate movement', [...begIds].every((id) => !unlistedInt.has(id)));
+  check('tier law: whitelisted Intermediate staples remain prescribable', [...wlIds].some((id) => begIds.has(id)));
+  const intPlan = generateBlock({ profile: prof({ training_age: 'intermediate' }), movements: tagged, startDate: START });
+  const intIds = new Set(intPlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
+  check('tier law: non-beginner keeps Advanced movements eligible', [...intIds].some((id) => advIds.has(id)));
+  // The cap is HARD: an all-Advanced library prescribes a beginner NOTHING.
+  const allAdv = movements.map((m) => ({ ...m, difficulty: 'Advanced' }));
+  const begAll = generateBlock({ profile: prof({ training_age: 'beginner' }), movements: allAdv, startDate: START });
+  const slotsAll = begAll.sessions.reduce((a, s) => a + s.slots.length, 0);
+  check('tier law is HARD: all-Advanced library prescribes a beginner nothing', slotsAll === 0, `slots=${slotsAll}`);
+  check('tier law: dropped patterns carry tier warnings',
+    begAll.warnings.some((w) => w.includes('no tier-eligible movement')), begAll.warnings.slice(0, 2).join(' | '));
+  // Substitution honors the same law through the PRODUCTION input (trainingAge),
+  // in layer 1 and layer 3 (triage).
+  const subMv = (id, name, difficulty, opts = {}) => ({
+    movement_id: id, name, pattern: opts.pattern ?? 'squat', is_compound: opts.compound ?? true,
+    difficulty, family: `f${id}`, required: [], preference: 0,
+    ...(opts.beginnerOk !== undefined ? { beginnerOk: opts.beginnerOk } : {}),
+  });
+  const subLib = [
+    subMv(1, 'Beginner Squat', 'Beginner'),
+    subMv(2, 'Whitelisted Int Squat', 'Intermediate', { beginnerOk: true }),
+    subMv(3, 'Unlisted Int Squat', 'Intermediate'),
+    subMv(4, 'Advanced Squat', 'Advanced'),
+    subMv(5, 'Beginner Iso', 'Beginner', { pattern: 'isolation', compound: false }),
+    subMv(6, 'Advanced Iso', 'Advanced', { pattern: 'isolation', compound: false }),
+  ];
+  const subTarget = subMv(999, 'Target', 'Advanced');
+  const gated = computeSubstitutions({
+    target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
+  });
+  const offered = gated.layer1Regression.options.map((o) => o.name);
+  check('substitution L1 (beginner): only Beginner + whitelisted staples offered',
+    offered.length > 0 && offered.every((n) => n === 'Beginner Squat' || n === 'Whitelisted Int Squat'), offered.join(','));
+  const { EXPERIENCE_SEVERITY } = require('./.build/types.js');
+  const triage = computeSubstitutions({
+    target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
+    niggles: [{ region: 'general fatigue', severity: EXPERIENCE_SEVERITY.beginner.triageMin }],
+  });
+  const cluster = triage.layer3Triage.cluster;
+  check('substitution L3 triage (beginner): Advanced accessories never selected',
+    cluster !== null && cluster.movements.every((m) => m.name !== 'Advanced Iso'),
+    cluster === null ? 'no cluster' : cluster.movements.map((m) => m.name).join(','));
+  // Untagged libraries remain byte-identical (legacy back-compat).
+  const u1 = gen({ training_age: 'beginner' });
+  const u2 = generateBlock({ profile: prof({ training_age: 'beginner' }), movements, startDate: START });
+  check('tier law: untagged library output unchanged (back-compat, deep-equal)',
+    JSON.stringify(u1) === JSON.stringify(u2));
+  // PRODUCTION wiring contract (audit R1): the live app passes the gate inputs.
+  const storeSrc = readFileSync(join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
+  check('production: store passes trainingAge into computeSubstitutions', storeSrc.includes('trainingAge: profile.training_age'));
+  check('production: store maps beginner_ok into generator + substitution inputs',
+    storeSrc.includes('beginner_ok: m.beginnerOk') && storeSrc.includes('beginnerOk: m.beginnerOk'));
+  check('production: store movement query joins movement_beginner_whitelist', storeSrc.includes('movement_beginner_whitelist'));
+  const screenSrc = readFileSync(join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'screens', 'SessionScreen.tsx'), 'utf-8');
+  check('production: picker applies the beginner whitelist rule', screenSrc.includes('beginnerVisible'));
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

@@ -22,7 +22,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
   '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
-  '014_movement_prefixes.sql', '015_set_prefix.sql']) {
+  '014_movement_prefixes.sql', '015_set_prefix.sql',
+  '016_movement_library_seed.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -160,7 +161,7 @@ if (resetTables.length >= 15) {
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
   a('reset cleared EVERY history table (demo can re-load)', resetTables.every((t) => cnt(t) === 0), seeded.map((t) => `${t}=${cnt(t)}`).filter((s) => !s.endsWith('=0')).join(',') || 'all empty');
   a('athlete_profile + movement library SURVIVE the reset',
-    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 30,
+    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 81, // P16: 30 shipped + 51 seeded
     `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}`);
   db.exec('ROLLBACK');
 }

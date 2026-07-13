@@ -359,12 +359,16 @@ export default function SessionScreen(): React.JSX.Element {
   const elapsedMin = Math.floor((nowMs - session.startedAtMs) / 60_000);
   const overTime = elapsedMin > profile.session_duration_cap_min;
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
-  // Library pickers honor the strict equipment filter: a movement the
-  // athlete's inventory cannot support is never offered.
+  // Library pickers honor the strict equipment filter AND the plan's tier
+  // rule (P16 S4): beginners see Beginner + whitelisted Intermediate staples;
+  // everyone else sees everything the inventory supports.
+  const beginnerVisible = (m: Movement): boolean =>
+    profile.training_age !== 'beginner' || m.difficulty === 'Beginner' || m.beginnerOk;
   const inLibraryNotPlanned = movements.filter(
     (m) =>
       !sessionPlan.some((s) => s.movementId === m.movement_id) &&
-      isMovementAvailable(m, profile.equipment_inventory),
+      isMovementAvailable(m, profile.equipment_inventory) &&
+      beginnerVisible(m),
   );
   // Hierarchical ExRx grouping: 8 categories, fixed engine order, empties hidden.
   const grouped: { category: TaxonomyCategory; items: Movement[] }[] = TAXONOMY_CATEGORIES

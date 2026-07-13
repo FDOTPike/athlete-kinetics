@@ -358,3 +358,26 @@ Architectural deviations from product mandates, with rationale. Newest first.
    coherence): the operative prescription is a pure derivation from persisted
    state (profile + today's `subjective_report` rows), recomputed on boot —
    nothing safety-relevant lives only in memory.
+
+## 2026-07-13 — P16 S4: variant identity vs the 010 prepend model (audit F3/F4, ratified)
+
+The 010 rule ("an implement variant is NOT a new row, it is a display-time
+prepend") cannot carry per-implement equipment: movement_equipment attaches to
+the base row, so a Cable variant of a barbell-demanding base is unreachable
+for a cable-only athlete, and a BB prefix on a bodyweight base demands nothing.
+
+Decision (Francis, 2026-07-13, after external audit): a curated variant becomes
+its OWN row ONLY when its equipment differs from the base row's
+(Cable Shoulder Press, Dumbbell Squat). Variants whose implement is already
+representable AND whose equipment gap predates P16 stay prefix-encoded with no
+new row (Barbell Glute Bridge, Barbell Walking Lunge) — their barbell demand
+remains invisible to the equipment filter; this hole is inherited from the 010
+model, documented here, and scoped for a future per-prefix-equipment design if
+it ever bites on-device.
+
+Also ratified same session: the plan's beginner whitelist ("Beginner +
+whitelisted Intermediate staples") ships as movement_beginner_whitelist with 8
+dumbbell/cable staples — Romanian Deadlift was proposed and DROPPED by the
+rule's own "no barbell for beginners" clause (verify:library caught the
+contradiction). Enforced in blockGenerator, substitution L1/L2/L3, and the
+SessionScreen picker; machine-checked in verify:blocks + verify:library.

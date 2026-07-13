@@ -6,15 +6,22 @@
  * No RNG, no IO, no Date. Same inputs always resolve the same rung, so block
  * generation stays reproducible (rev4 determinism rule).
  *
- * Data contract (P16 S4): movement rows carry nullable progression_group
- * (TEXT) + progression_rank (INTEGER). A chain is every movement sharing a
- * group, ordered by rank. Rank 0 may be a shipped movement; gaps are legal
- * (ranks are ordinals, not indices).
+ * Data contract (P16 S4): movement rows carry a movement_progression side-car
+ * (progression_group TEXT, progression_rank INTEGER). A chain is every
+ * movement sharing a group, ordered by rank. Rank 0 may be a shipped
+ * movement; gaps are legal (ranks are ordinals, not indices).
  *
- * Advancement rule: a rung is PASSED when logged history shows at least
- * `requiredSets` sets of `requiredReps` strict reps in one session at that
- * rung. The active rung is the lowest unpassed rung; a fully passed chain
- * keeps the goal movement active (mastery is maintenance, not graduation).
+ * Advancement rule (audit F7: proven WITHIN one session): a rung is PASSED
+ * when some single logged session at that movement contains at least
+ * `requiredSets` sets of `requiredReps` strict reps. History therefore
+ * arrives as per-session set lists, not cross-session maxima — three sessions
+ * of 1x8 can never masquerade as one session of 3x8. The active rung is the
+ * lowest unpassed rung; a fully passed chain keeps the goal movement active
+ * (mastery is maintenance, not graduation).
+ *
+ * INTEGRATION STATUS: engine + gate only. The store query (set_record ->
+ * SessionSets) and the generator/UI consumers land with P17's session runner;
+ * until then this is machine-verified library code, not a live product path.
  */
 
 export interface ProgressionRung {
@@ -23,11 +30,10 @@ export interface ProgressionRung {
   readonly progressionRank: number;
 }
 
-/** Best single-session performance at a movement, from the athlete's log. */
-export interface RungHistory {
+/** All working sets of ONE session at one movement (rep counts per set). */
+export interface SessionSets {
   readonly movementName: string;
-  readonly bestSets: number;
-  readonly bestReps: number;
+  readonly repsPerSet: readonly number[];
 }
 
 export interface AdvancementPolicy {
@@ -35,7 +41,8 @@ export interface AdvancementPolicy {
   readonly requiredReps: number;
 }
 
-/** 3x8 strict — conservative default; tune per-chain in S4 seed data if needed. */
+/** 3x8 strict in a single session — conservative default; tune per-chain in
+ *  seed data if needed. */
 export const DEFAULT_ADVANCEMENT_POLICY: AdvancementPolicy = {
   requiredSets: 3,
   requiredReps: 8,
@@ -52,17 +59,16 @@ export interface RungResolution {
 
 function isPassed(
   rung: ProgressionRung,
-  history: readonly RungHistory[],
+  history: readonly SessionSets[],
   policy: AdvancementPolicy,
 ): boolean {
-  for (const h of history) {
-    if (
-      h.movementName === rung.movementName &&
-      h.bestSets >= policy.requiredSets &&
-      h.bestReps >= policy.requiredReps
-    ) {
-      return true;
+  for (const session of history) {
+    if (session.movementName !== rung.movementName) continue;
+    let qualifying = 0;
+    for (const reps of session.repsPerSet) {
+      if (reps >= policy.requiredReps) qualifying += 1;
     }
+    if (qualifying >= policy.requiredSets) return true;
   }
   return false;
 }
@@ -75,7 +81,7 @@ function isPassed(
  */
 export function resolveActiveRung(
   chain: readonly ProgressionRung[],
-  history: readonly RungHistory[],
+  history: readonly SessionSets[],
   policy: AdvancementPolicy = DEFAULT_ADVANCEMENT_POLICY,
 ): RungResolution {
   if (chain.length === 0) {
@@ -102,18 +108,14 @@ export function resolveActiveRung(
   );
 
   const passed: ProgressionRung[] = [];
-  let active: ProgressionRung = ordered[ordered.length - 1]!;
-  let next: ProgressionRung | null = null;
   for (let i = 0; i < ordered.length; i += 1) {
     const rung: ProgressionRung = ordered[i]!;
     if (isPassed(rung, history, policy)) {
       passed.push(rung);
     } else {
-      active = rung;
-      next = i + 1 < ordered.length ? ordered[i + 1]! : null;
-      return { active, passed, next };
+      return { active: rung, passed, next: i + 1 < ordered.length ? ordered[i + 1]! : null };
     }
   }
   // Every rung passed: goal movement stays active.
-  return { active, passed: passed.slice(0, -1), next: null };
+  return { active: ordered[ordered.length - 1]!, passed: passed.slice(0, -1), next: null };
 }

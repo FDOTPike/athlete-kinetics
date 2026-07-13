@@ -94,6 +94,9 @@ export type SubstitutionLayer = keyof typeof SUBSTITUTION_COLORS;
  *  + movement_equipment. The store assembles this; the engine never reads SQL. */
 export interface SubstitutionMovement {
   movement_id: number;
+  /** movement_beginner_whitelist membership (plan P16 S4): an Intermediate
+   *  staple a beginner may be offered. Absent = not whitelisted. */
+  beginnerOk?: boolean;
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
@@ -137,6 +140,7 @@ export interface SubstitutionInput {
   /** Current block day index; only strictly-later slots are pull-forward
    *  eligible (Layer 2). */
   currentDayIndex: number;
+
   /** CNS tax cap override (clamped 1..DEFAULT_ACCESSORY_RATIO). */
   maxAccessoryRatio?: number;
   /** Athlete training age — scales the niggle severity thresholds via
@@ -246,6 +250,12 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
 
   const available = (m: SubstitutionMovement): boolean =>
     m.required.every((item) => inventory.has(item));
+  /** Plan P16 S4 tier gate: a beginner is only offered Beginner movements or
+   *  whitelisted Intermediate staples — in EVERY layer, triage included. */
+  const beginnerBars = (m: SubstitutionMovement): boolean =>
+    input.trainingAge === 'beginner' &&
+    m.difficulty !== 'Beginner' &&
+    m.beginnerOk !== true;
   /** Guardrail predicate with the side effect of recording the block. */
   const guardrailBars = (m: SubstitutionMovement): boolean => {
     if (guarded && jointsOf(m).some((j) => injured.has(j))) {
@@ -264,6 +274,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     if (m.pattern !== input.target.pattern) continue;
     if (isAvoided(m) || !available(m)) continue;
     if (DIFFICULTY_RANK[m.difficulty] > targetRank) continue;
+    if (beginnerBars(m)) continue;
     if (guardrailBars(m)) continue;
     const easier = DIFFICULTY_RANK[m.difficulty] < targetRank;
     layer1.push({
@@ -289,6 +300,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     if (m.movement_id === input.target.movement_id) continue;
     if (PATTERN_TO_CATEGORY[m.pattern] !== targetCategory) continue;
     if (isAvoided(m) || !available(m)) continue;
+    if (beginnerBars(m)) continue;
     if (guardrailBars(m)) continue;
     layer2.push({
       movement_id: m.movement_id,
@@ -316,6 +328,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       if (m.movement_id === input.target.movement_id) continue;
       if (m.is_compound) continue;                 // isolation/accessory only
       if (isAvoided(m) || !available(m)) continue;
+      if (beginnerBars(m)) continue;               // tier gate holds in triage too
       if (guardrailBars(m)) continue;              // never triage onto the niggle
       pool.push(m);
     }

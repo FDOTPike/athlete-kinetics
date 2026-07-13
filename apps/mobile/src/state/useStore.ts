@@ -111,6 +111,9 @@ export interface Movement {
   name: string;
   pattern: string;
   is_compound: boolean;
+  /** movement_beginner_whitelist membership — an Intermediate staple a
+   *  beginner may see/be prescribed (plan P16 S4). */
+  beginnerOk: boolean;
   /** Equipment items this movement needs (movement_equipment rows). */
   required: string[];
   /** movement_detail.base_name — the normalized pattern the prefix engine
@@ -506,6 +509,7 @@ interface MovementRow {
   // 010 LEFT JOINs — null when no movement_detail / movement_preference row.
   base_name: string | null; supported_prefixes: string | null;
   difficulty_rating: string | null; preference: number | null;
+  beginner_ok: number | null;
 }
 const PREFIX_SET = new Set<string>(MOVEMENT_PREFIXES);
 /** Parse movement_detail.supported_prefixes, keeping only canonical tokens —
@@ -539,6 +543,7 @@ const movementFromRow = (r: MovementRow): Movement => {
     baseName: r.base_name ?? r.name,
     supportedPrefixes: parsePrefixes(r.supported_prefixes),
     difficulty: (r.difficulty_rating ?? 'Intermediate') as DifficultyRating,
+    beginnerOk: r.beginner_ok === 1,
     preference: toPreference(r.preference),
   };
 };
@@ -551,6 +556,7 @@ const toSubMovement = (m: Movement): SubstitutionMovement => ({
   pattern: m.pattern as MovementPattern,
   is_compound: m.is_compound,
   difficulty: m.difficulty,
+  beginnerOk: m.beginnerOk,
   family: m.baseName,
   required: m.required,
   preference: m.preference,
@@ -745,7 +751,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
       const movements = rowsOf<MovementRow>(
         getDb().executeSync(
-          'SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id ORDER BY m.movement_id',
+          'SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference, (w.movement_id IS NOT NULL) AS beginner_ok FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id ORDER BY m.movement_id',
         ),
       ).map(movementFromRow);
       const profileRow = rowsOf<ProfileRow>(
@@ -1016,6 +1022,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       pattern: m.pattern as MovementPattern,
       is_compound: m.is_compound,
       required: m.required,
+      // Phase 16: tier gating — beginners see Beginner + whitelisted staples.
+      difficulty: m.difficulty,
+      beginner_ok: m.beginnerOk,
     }));
     // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
     // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate
@@ -2017,7 +2026,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     const movements = rowsOf<MovementRow>(
-      d.executeSync('SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id ORDER BY m.movement_id'),
+      d.executeSync('SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, p.preference, (w.movement_id IS NOT NULL) AS beginner_ok FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id ORDER BY m.movement_id'),
     ).map(movementFromRow);
     set({ movements });
     get().refreshVector();
