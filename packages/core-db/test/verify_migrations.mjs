@@ -27,7 +27,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
   '014_movement_prefixes.sql', '015_set_prefix.sql', '016_movement_library_seed.sql', '017_movement_batch.sql',
-  '018_logging_modes.sql', '019_movement_batch.sql'];
+  '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -86,12 +86,12 @@ check('materialize prepares against healed schema', (() => {
 // --- 2b. poisoned v15: 016 tables missing while user_version claims complete ---
 console.log('[2b] poisoned DB: user_version=15 but 016 never applied (audit A1)');
 const b2 = freshDb();
-for (let i = 0; i < MIGRATIONS.length - 4; i += 1) b2.executeSync(MIGRATIONS[i]); // skip 016..019
+for (let i = 0; i < MIGRATIONS.length - 5; i += 1) b2.executeSync(MIGRATIONS[i]); // skip 016..020
 b2.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
 check('precondition: movement_progression missing', sentinelsMissing(b2).includes('movement_progression'));
 runMigrations(b2, MIGRATIONS);
 check('self-heal applied 016 (progression + whitelist sentinels present)', sentinelsMissing(b2).length === 0);
-check('016+017+019 seeds arrived: 109 movements', Number(b2.raw.prepare('SELECT COUNT(*) c FROM movement').get().c) === 109);
+check('016+017+019+020 seeds arrived: 124 movements', Number(b2.raw.prepare('SELECT COUNT(*) c FROM movement').get().c) === 124);
 
 // --- 2c. partial-018 damage: set_metric survives, siblings dropped (audit B4) --
 console.log('[2c] partial 018 damage: movement_logging_mode dropped post-apply');

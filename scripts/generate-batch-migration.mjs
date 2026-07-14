@@ -51,6 +51,21 @@ const PATTERN_11 = {
   'Reverse Grip Bent-Over Rows': 'pull_h',
   'V-Bar Pulldown': 'pull_v',
   'Zottman Curl': 'isolation',
+  'Barbell Seated Calf Raise': 'isolation',
+  'Calf Raises - With Bands': 'isolation',
+  'Cable Hammer Curls - Rope Attachment': 'isolation',
+  'Cable Internal Rotation': 'isolation',
+  'Tuck Crunch': 'rotation',
+  'Decline Crunch': 'rotation',
+  'Cable Deadlifts': 'hinge',
+  'Kettlebell Dead Clean': 'hinge',
+  'Bent Press': 'push_v',
+  'Cable Rope Overhead Triceps Extension': 'isolation',
+  'Cable Rope Rear-Delt Rows': 'pull_h',
+  'Barbell Rear Delt Row': 'pull_h',
+  'Jefferson Squats': 'squat',
+  'Narrow Stance Squats': 'squat',
+  'Kneeling Single-Arm High Pulley Row': 'pull_h',
 };
 
 /** movement_equipment rows (007 vocabulary) for post-016 records. */
@@ -83,6 +98,21 @@ const EQUIPMENT = {
   'Reverse Grip Bent-Over Rows': ['barbell'],
   'V-Bar Pulldown': ['cable_machine'],
   'Zottman Curl': ['dumbbells'],
+  'Barbell Seated Calf Raise': ['barbell', 'bench'],
+  'Calf Raises - With Bands': ['bands'],
+  'Cable Hammer Curls - Rope Attachment': ['cable_machine'],
+  'Cable Internal Rotation': ['cable_machine'],
+  'Tuck Crunch': [],
+  'Decline Crunch': ['bench'],
+  'Cable Deadlifts': ['cable_machine'],
+  'Kettlebell Dead Clean': ['kettlebell'],
+  'Bent Press': ['kettlebell'],
+  'Cable Rope Overhead Triceps Extension': ['cable_machine'],
+  'Cable Rope Rear-Delt Rows': ['cable_machine'],
+  'Barbell Rear Delt Row': ['barbell'],
+  'Jefferson Squats': ['barbell'],
+  'Narrow Stance Squats': ['barbell', 'squat_rack'],
+  'Kneeling Single-Arm High Pulley Row': ['cable_machine'],
 };
 
 const IMPLEMENT = {

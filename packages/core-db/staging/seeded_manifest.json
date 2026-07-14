@@ -89,6 +89,23 @@
    "Reverse Grip Bent-Over Rows",
    "V-Bar Pulldown",
    "Zottman Curl"
+  ],
+  "020": [
+   "Barbell Rear Delt Row",
+   "Barbell Seated Calf Raise",
+   "Bent Press",
+   "Cable Deadlifts",
+   "Cable Hammer Curls - Rope Attachment",
+   "Cable Internal Rotation",
+   "Cable Rope Overhead Triceps Extension",
+   "Cable Rope Rear-Delt Rows",
+   "Calf Raises - With Bands",
+   "Decline Crunch",
+   "Jefferson Squats",
+   "Kettlebell Dead Clean",
+   "Kneeling Single-Arm High Pulley Row",
+   "Narrow Stance Squats",
+   "Tuck Crunch"
   ]
  },
  "do_not_seed": [
