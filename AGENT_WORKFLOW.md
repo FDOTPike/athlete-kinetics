@@ -182,6 +182,13 @@ black, minimalist. Until his design drops:
 1. `git diff --stat` + list of new files; 2. output of the WO's named gates;
 3. a ≤20-line self-report: what was done, judgment calls made, anything
    uncertain — flagged, not buried. No prose claims a gate can't back.
+4. **For curation WOs (MANDATORY):** write the batch's new records to a FRESH
+   file `packages/core-db/staging/batchNN_cp_bundle.json` (a JSON array of
+   exactly the new curated records). Reason: the Cowork bridge shows Fable a
+   length-capped view of REWRITTEN files (in-place edits to
+   movement_import.json can appear truncated on the audit side), but NEW
+   files sync intact. The bundle file is the audit source of truth; it is
+   deleted after the checkpoint verdict (never committed).
 
 **Fable's checkpoint verdicts**: APPROVE (Francis commits), REVISE (itemized,
 Sol re-runs the WO on the same slot), or ESCALATE (needs Francis's ruling).

@@ -722,7 +722,7 @@
   },
   {
    "name": "Barbell Rear Delt Row",
-   "base_name": "Barbell Rear Delt Row",
+   "base_name": "Rear-Delt Row",
    "pattern": "row",
    "supported_prefixes": [
     "BB"
@@ -736,12 +736,12 @@
     "lats",
     "middle back"
    ],
-   "instructions_raw": "Stand up straight while holding a barbell using a wide (higher than shoulder width) and overhand (palms facing your body) grip. Bend knees slightly and bend over as you keep the natural arch of your back. Let the arms hang in front of you as they hold the bar. Once your torso is parallel to the floor, flare the elbows out and away from your body. Tip: Your torso and your arms should resemble the letter \"T\". Now you are ready to begin the exercise. While keeping the upper arms perpendicular to the torso, pull the barbell up towards your upper chest as you squeeze the rear delts and you breathe out. Tip: When performed correctly, this exercise should resemble a bench press in reverse. Also, refrain from using your biceps to do the work. Focus on targeting the rear delts; the arms should only act as hooks. Slowly go back to the initial position as you breathe in. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Take a wide overhand grip, soften the knees, and hinge until the bar hangs beneath a braced torso. Drive the elbows wide and row the bar toward the upper chest, holding long enough to feel the rear shoulders finish. Lower to long arms without rising; if the bar heads toward the stomach, the elbows have tucked and the movement has become a lat row.",
+   "cues": "Brace the hinge before the pull. Drive the elbows wide. Touch the upper chest and lower under control.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=gvBbvB9NKrk",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -773,7 +773,7 @@
   },
   {
    "name": "Barbell Seated Calf Raise",
-   "base_name": "Barbell Seated Calf Raise",
+   "base_name": "Seated Calf Raise",
    "pattern": "accessory",
    "supported_prefixes": [
     "BB"
@@ -783,12 +783,12 @@
     "calves"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Place a block about 12 inches in front of a flat bench. Sit on the bench and place the ball of your feet on the block. Have someone place a barbell over your upper thighs about 3 inches above your knees and hold it there. This will be your starting position. Raise up on your toes as high as possible as you squeeze the calves and as you breathe out. After a second contraction, slowly go back to the starting position. Tip: To get maximum benefit stretch your calves as far as you can. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Sit tall on a flat bench with the balls of both feet on a low block and settle a padded bar across the thighs just above the knees. Let the heels drop into a controlled stretch, then drive through the big-toe joints and rise as high as the ankles allow. Hold the top before lowering; if the bar starts bouncing on the thighs, the calves stopped owning the rep.",
+   "cues": "Root the balls of the feet. Rise tall through the ankles. Hold the top, then lower slowly.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=abDaq2ly34Q",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -1252,12 +1252,12 @@
     "shoulders",
     "triceps"
    ],
-   "instructions_raw": "Clean a kettlebell to your shoulder. Clean the kettlebell to your shoulders by extending through the legs and hips as you raise the kettlebell towards your shoulder. The wrist should rotate as you do so. This will be your starting position. Begin my leaning to the side opposite the kettlebell, continuing until you are able to touch the ground with your free hand, keeping your eyes on the kettlebell. As you do so, press the weight vertically be extending through the elbow, keeping your arm perpendicular to the ground. Return to an upright position, with the kettlebell above your head. Return the kettlebell to the shoulder and repeat for the desired number of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Clean one kettlebell to the shoulder, set the feet wider than the hips, and turn them slightly away from the loaded side. Send the hips away and wedge the torso under the bell, straightening the arm as the body descends while the eyes stay on the handle. Once the elbow is locked, drive the feet through the floor to stand tall; if the bell travels sideways instead of staying over its base, the range is too deep or the setup was rushed.",
+   "cues": "Keep the bell stacked over its base. Send the hips away and wedge under the handle. Stand tall beneath a locked arm.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=cFmSd61PPTI",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -1628,7 +1628,7 @@
   },
   {
    "name": "Cable Deadlifts",
-   "base_name": "Cable Deadlifts",
+   "base_name": "Cable Deadlift",
    "pattern": "hinge",
    "supported_prefixes": [
     "Cable"
@@ -1643,12 +1643,12 @@
     "hamstrings",
     "lower back"
    ],
-   "instructions_raw": "Move the cables to the bottom of the towers and select an appropriate weight. Stand directly in between the uprights. To begin, squat down be flexing your hips and knees until you can reach the handles. After grasping them, begin your ascent. Driving through your heels extend your hips and knees keeping your hands hanging at your side. Keep your head and chest up throughout the movement. After reaching a full standing position, Return to the starting position and repeat.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Set two cable handles at the lowest position, stand centred between them, and sit the hips back to take the handles with long arms. Brace, push the floor away, and extend the hips and knees together until the handles finish beside the thighs. Send the hips back before bending the knees to return; if the stack pulls the shoulders forward at the bottom, the load or range is too large.",
+   "cues": "Brace before the cables leave the stack. Push the floor away through the whole foot. Send the hips back to begin the return.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=_4U_5JO3oiE",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -1677,7 +1677,7 @@
   },
   {
    "name": "Cable Hammer Curls - Rope Attachment",
-   "base_name": "Cable Hammer Curls - Rope Attachment",
+   "base_name": "Hammer Curl",
    "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
@@ -1687,12 +1687,12 @@
     "biceps"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Attach a rope attachment to a low pulley and stand facing the machine about 12 inches away from it. Grasp the rope with a neutral (palms-in) grip and stand straight up keeping the natural arch of the back and your torso stationary. Put your elbows in by your side and keep them there stationary during the entire movement. Tip: Only the forearms should move; not your upper arms. This will be your starting position. Using your biceps, pull your arms up as you exhale until your biceps touch your forearms. Tip: Remember to keep the elbows in and your upper arms stationary. After a 1 second contraction where you squeeze your biceps, slowly start to bring the weight back to the original position. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Attach a rope to a low cable, stand tall with a neutral grip, and settle the elbows beside the ribs. Close the elbows to curl the rope toward the shoulders, separating the ends slightly while the upper arms stay quiet. Return to the natural long-arm rest; if the shoulders roll forward to finish the curl, the stack is ahead of the biceps.",
+   "cues": "Stand tall over quiet elbows. Curl the rope ends toward the shoulders. Reach the natural rest under control.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=7Tw9fpb5mOo",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -1740,7 +1740,7 @@
   },
   {
    "name": "Cable Internal Rotation",
-   "base_name": "Cable Internal Rotation",
+   "base_name": "Internal Rotation",
    "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
@@ -1750,12 +1750,12 @@
     "shoulders"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Sit next to a low pulley sideways (with legs stretched in front of you or crossed) and grasp the single hand cable attachment with the arm nearest to the cable. Tip: If you can adjust the pulley's height, you can use a flat bench to sit on instead. Position the elbow against your side with the elbow bent at 90\u00b0 and the arm pointing towards the pulley. This will be your starting position. Pull the single hand cable attachment toward your body by internally rotating your shoulder until your forearm is across your abs. You will be creating an imaginary semi-circle. Tip: The forearm should be perpendicular to your torso at all times. Slowly go back to the initial position. Repeat for the recommended amount of repetitions and then repeat the movement with the next arm.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Set a single cable handle around elbow height and stand side-on with the working elbow bent to 90 degrees and resting lightly against the ribs. Rotate the forearm across the torso while the upper arm stays quiet, then pause when the hand reaches the centreline. Return until the forearm points toward the cable; if the elbow floats away from the ribs, the chosen range has outrun the shoulder.",
+   "cues": "Stack the wrist in front of the elbow. Rotate around a quiet upper arm. Return smoothly to the cable line.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=YOc7DYcASNk",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -1892,7 +1892,7 @@
   },
   {
    "name": "Cable Rope Overhead Triceps Extension",
-   "base_name": "Cable Rope Overhead Triceps Extension",
+   "base_name": "Overhead Triceps Extension",
    "pattern": "push",
    "supported_prefixes": [
     "Cable"
@@ -1902,18 +1902,18 @@
     "triceps"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Attach a rope to the bottom pulley of the pulley machine. Grasping the rope with both hands, extend your arms with your hands directly above your head using a neutral grip (palms facing each other). Your elbows should be in close to your head and the arms should be perpendicular to the floor with the knuckles aimed at the ceiling. This will be your starting position. Slowly lower the rope behind your head as you hold the upper arms stationary. Inhale as you perform this movement and pause when your triceps are fully stretched. Return to the starting position by flexing your triceps as you breathe out. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Attach a rope to a low cable, face away in a split stance, and bring the rope overhead with the elbows beside the temples. Keep the upper arms quiet as the hands travel behind the head into a long triceps stretch. Extend the elbows and separate the rope at the top; if the torso loses its stack before the arms straighten, the cable is too heavy.",
+   "cues": "Plant the split stance. Aim the elbows forward beside the temples. Reach the knuckles long at the top.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=t7m1RyOZHFQ",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
   {
    "name": "Cable Rope Rear-Delt Rows",
-   "base_name": "Cable Rope Rear-Delt Rows",
+   "base_name": "Rear-Delt Row",
    "pattern": "row",
    "supported_prefixes": [
     "Cable"
@@ -1926,12 +1926,12 @@
     "biceps",
     "middle back"
    ],
-   "instructions_raw": "Sit in the same position on a low pulley row station as you would if you were doing seated cable rows for the back. Attach a rope to the pulley and grasp it with an overhand grip. Your arms should be extended and parallel to the floor with the elbows flared out. Keep your lower back upright and slide your hips back so that your knees are slightly bent. This will be your starting position. Pull the cable attachment towards your upper chest, just below the neck, as you keep your elbows up and out to the sides. Continue this motion as you exhale until the elbows travel slightly behind the back. Tip: Keep your upper arms horizontal, perpendicular to the torso and parallel to the floor throughout the motion. Go back to the initial position where the arms are extended and the shoulders are stretched forward. Inhale as you perform this portion of the movement. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Sit tall at a low cable with a rope in both hands and reach forward at shoulder height until the shoulder blades can travel. Pull the rope toward the upper chest by driving the elbows wide, separating the ends as the rear shoulders finish. Return to the full reach slowly; if the wrists beat the elbows to the finish, the arms have taken the job from the rear delts.",
+   "cues": "Reach the shoulder blades forward. Drive the elbows wide toward the back wall. Separate the rope at the upper chest.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=QPzdXm3osCk",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -2089,7 +2089,7 @@
   },
   {
    "name": "Calf Raises - With Bands",
-   "base_name": "Calf Raises - With Bands",
+   "base_name": "Standing Calf Raise",
    "pattern": "accessory",
    "supported_prefixes": [
     "Banded"
@@ -2099,12 +2099,12 @@
     "calves"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Grab an exercise band and stand on it with your toes making sure that the length of the band between the foot and the arms is the same for both sides. While holding the handles of the band, raise the arms to the side of your head as if you were getting ready to perform a shoulder press. The palms should be facing forward with the elbows bent and to the sides. This movement will create tension on the band. This will be your starting position. Keeping the hands by your shoulder, stand up on your toes as you exhale and contract the calves hard at the top of the movement. After a one second contraction, slowly go back down to the starting position. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Stand on the middle of a long band with the handles held at shoulder height and the feet set about hip width. Root the forefeet and rise as high as the ankles allow while the hands stay quiet beside the shoulders. Pause, then lower into an owned stretch; if the hands bob to manufacture height, the calves have stopped driving the rep.",
+   "cues": "Root the forefeet evenly. Rise tall through the ankles. Own the top before a slow return.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=a2xjbhP4MkY",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -2671,12 +2671,12 @@
     "abdominals"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "Secure your legs at the end of the decline bench and lie down. Now place your hands lightly on either side of your head keeping your elbows in. Tip: Don't lock your fingers behind your head. While pushing the small of your back down in the bench to better isolate your abdominal muscles, begin to roll your shoulders off it. Continue to push down as hard as you can with your lower back as you contract your abdominals and exhale. Your shoulders should come up off the bench only about four inches, and your lower back should remain on the bench. At the top of the movement, contract your abdominals hard and keep the contraction for a second. Tip: Focus on slow, controlled movement - don't cheat yourself by using momentum. After the one second contraction, begin to come down slowly again to the starting position as you inhale. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Secure the legs on a decline bench and lie back with the fingertips resting lightly beside the temples. Press the lower back into the pad and curl the shoulder blades up, bringing the ribs toward the pelvis without sitting tall. Hold the shortened position, then unroll slowly; if the feet do the work and the torso shoots upright, the angle or range is too ambitious.",
+   "cues": "Anchor the lower back to the pad. Curl the ribs toward the pelvis. Hold the top before you unroll.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=FRzQXeN1hro",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -5041,7 +5041,7 @@
   },
   {
    "name": "Jefferson Squats",
-   "base_name": "Jefferson Squats",
+   "base_name": "Jefferson Squat",
    "pattern": "squat",
    "supported_prefixes": [
     "BB"
@@ -5057,12 +5057,12 @@
     "lower back",
     "traps"
    ],
-   "instructions_raw": "Place a barbell on the floor. Stand in the middle of the bar length wise. Bend down by bending at the knees and keeping your back straight and grasp the front of the bar with your right hand. Your palm should be in (neutral grip) facing the left side. Grasp the rear of the bar with your left hand. The palm of your hand should be in neutral grip alignment (palms facing the right side). Tip: Ensure that your grip is even on the bar. Your torso should be positioned right in the middle of the bar and the distance between your torso and your right hand (which should be at the front) should be the same as the distance between your torso and your left hand (which should be to your back). Now stand straight up with the weight. Tip: Your feet should be shoulder width apart and your toes slightly pointed out. Squat down by bending at the knees and keeping your back straight until your upper thighs are parallel with the floor. Tip: Keep your back as vertical as possible with the floor and your head up. Also remember to not let your knees go past your toes. Inhale during this portion of the movement. Now drive yourself back up to the starting position by pushing with the feet . Tip: Keep the bar hanging at arm's length and your elbows locked with a slight bend. The arms only serve as hooks. Avoid doing any lifting with them. Do the lifting with your thighs; not your arms.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Straddle the bar with the feet angled comfortably, then squat down and take one hand in front of the body and one behind at equal distances. Brace a tall torso and push both feet through the floor to stand with the bar travelling between the legs. Lower along the same centred path and switch orientation between sets; if the bar twists away from the midline, reset the grip and stance before adding load.",
+   "cues": "Centre the torso over the bar. Push both feet through the floor. Keep the bar travelling straight between the legs.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=VzQhgHPoi4s",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -5091,7 +5091,7 @@
   },
   {
    "name": "Kettlebell Dead Clean",
-   "base_name": "Kettlebell Dead Clean",
+   "base_name": "Dead Clean",
    "pattern": "hinge",
    "supported_prefixes": [
     "KB"
@@ -5107,12 +5107,12 @@
     "quadriceps",
     "traps"
    ],
-   "instructions_raw": "Place kettlebell between your feet. To get in the starting position, push your butt back and look straight ahead. Clean the kettlebell to your shoulder. Clean the kettlebell to your shoulders by extending through the legs and hips as you raise the kettlebell towards your shoulder. The wrist should rotate as you do so. Lower the kettlebell, keeping the hamstrings loaded by keeping your back straight and your butt out.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Set one kettlebell between the feet, hinge back, and take the handle with the shoulder packed over the bell. Drive the floor away and extend the hips to guide the bell close into the rack rather than looping it around the wrist. Reverse the path to the floor; if the bell slaps the forearm, the hand travelled around the bell instead of the bell rolling around the hand.",
+   "cues": "Drive the floor and finish the hips. Zip the bell close to the body. Receive it softly with the elbow tucked.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=6Hjuscd4ab4",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -5336,7 +5336,7 @@
   },
   {
    "name": "Kneeling Single-Arm High Pulley Row",
-   "base_name": "Kneeling Single-Arm High Pulley Row",
+   "base_name": "Half-Kneeling Single-Arm Row",
    "pattern": "unilateral",
    "supported_prefixes": [
     "Cable"
@@ -5349,12 +5349,12 @@
     "biceps",
     "middle back"
    ],
-   "instructions_raw": "Attach a single handle to a high pulley and make your weight selection. Kneel in front of the cable tower, taking the cable with one hand with your arm extended. This will be your starting position. Starting with your palm facing forward, pull the weight down to your torso by flexing the elbow and retract the shoulder blade. As you do so, rotate the wrist so that at the completion of the movement, your palm is now facing you. After a brief pause, return to the starting position.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Half-kneel facing a high cable, take one handle, and reach the working arm long while the hips and shoulders stay square. Pull the elbow down and back toward the ribs, allowing the palm to turn toward the body as the shoulder blade finishes. Return to the full reach slowly; if the hand reaches the ribs before the elbow travels, soften the grip and let the elbow lead.",
+   "cues": "Reach long from a square half-kneeling base. Drive the elbow down toward the ribs. Let the shoulder blade finish the pull.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=O3D5-yTGH7Y",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -5760,7 +5760,7 @@
   },
   {
    "name": "Narrow Stance Squats",
-   "base_name": "Narrow Stance Squats",
+   "base_name": "Narrow-Stance Squat",
    "pattern": "squat",
    "supported_prefixes": [
     "BB"
@@ -5775,12 +5775,12 @@
     "hamstrings",
     "lower back"
    ],
-   "instructions_raw": "This exercise is best performed inside a squat rack for safety purposes. To begin, first set the bar on a rack that best matches your height. Once the correct height is chosen and the bar is loaded, step under the bar and place the back of your shoulders (slightly below the neck) across it. Hold on to the bar using both arms at each side and lift it off the rack by first pushing with your legs and at the same time straightening your torso. Step away from the rack and position your legs using a less-than-shoulder-width narrow stance with the toes slightly pointed out. Feet should be around 3-6 inches apart. Keep your head up at all times (looking down will get you off balance) and maintain a straight back. This will be your starting position. (Note: For the purposes of this discussion we will use the medium stance described above which targets overall development; however you can choose any of the three stances discussed in the foot stances section). Begin to slowly lower the bar by bending the knees as you maintain a straight posture with the head up. Continue down until the angle between the upper leg and the calves becomes slightly less than 90-degrees (which is the point in which the upper legs are below parallel to the floor). Inhale as you perform this portion of the movement. Tip: If you performed the exercise correctly, the front of the knees should make an imaginary straight line with the toes that is perpendicular to the front. If your knees are past that imaginary line (if they are past your toes) then you are placing undue stress on the knee and the exercise has been performed incorrectly. Begin to raise the bar as you exhale by pushing the floor with the heel of your foot mainly as you straighten the legs again and go back to the starting position. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Set the bar across the upper back and step into a stance narrower than shoulder width with the toes turned slightly out. Brace and let the knees travel forward as the hips sit down, keeping pressure across the whole foot to the deepest position you own. Push the floor away to stand; if the heels lift or the knees lose their line, the stance is narrower than your available range.",
+   "cues": "Root the whole foot. Send the knees forward over the toes. Drive straight up under the bar.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=9Ulb6gOqhA4",
    "is_compound": true,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
@@ -9577,12 +9577,12 @@
     "abdominals"
    ],
    "secondary_muscles": [],
-   "instructions_raw": "To begin, lie down on the floor or an exercise mat with your back pressed against the floor. Your arms should be lying across your sides with the palms facing down. Your legs should be crossed by wrapping one ankle around the other. Slowly elevate your legs up in the air until your thighs are perpendicular to the floor with a slight bend at the knees. Note: Your knees and toes should be parallel to the floor as opposed to the thighs. Move your arms from the floor and cross them so they are resting on your chest. This is the starting position. While keeping your lower back pressed against the floor, slowly lift your torso. Remember to exhale while perform this part of the exercise. Slowly begin to lower your torso back down to the starting position while inhaling. Repeat for the recommended amount of repetitions.",
-   "cues": "",
-   "video_placeholder_uri": "",
+   "instructions_raw": "Lie on your back with the hips and knees bent and the arms reaching toward the feet. Bring the ribs and pelvis toward one another, curling the shoulders up as the knees travel slightly toward the chest. Pause with the abdominals shortened, then lower both ends slowly; if the legs swing ahead of the curl, the range is longer than you own.",
+   "cues": "Draw the ribs and pelvis together. Reach past the hips at the top. Lower both ends on the same slow count.",
+   "video_placeholder_uri": "https://www.youtube.com/watch?v=NuEIjBPATwE",
    "is_compound": false,
    "source": "free-exercise-db",
-   "curated": false,
+   "curated": true,
    "progression_group": null,
    "progression_rank": null
   },
