@@ -24,7 +24,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
   '014_movement_prefixes.sql', '015_set_prefix.sql',
   '016_movement_library_seed.sql', '017_movement_batch.sql',
-  '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql']) {
+  '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
+  '021_taxonomy_corrections.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 

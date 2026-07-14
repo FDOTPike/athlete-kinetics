@@ -243,6 +243,8 @@ These are high-confidence classifier collisions, not a request to rewrite the im
 
 The 18 unseeded fixes can be applied in a later staging WO after Checkpoint C. The two seeded fixes (`Cable Rope Overhead Triceps Extension`, `Triceps Pushdown`) require a new additive corrective migration plus verifier updates; editing their shipped slots is prohibited.
 
+**Implementation addendum (2026-07-14):** all 20 staging pattern corrections above are now applied in `movement_import.json`. The two seeded movements already used the correct engine pattern (`isolation`); generator-produced migration 021 corrects their `movement_taxonomy.category` from `push` to `accessory`. The library gate now enforces seeded taxonomy category equality with curated staging. Equipment-token extensions remain untouched.
+
 ## 5. Checkpoint C decisions - RATIFIED ALL
 
 Fable completed the taxonomy sanity check and Francis ratified all five decisions:

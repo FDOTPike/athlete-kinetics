@@ -265,7 +265,7 @@
   {
    "name": "Back Flyes - With Bands",
    "base_name": "Back Flyes - With Bands",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Banded"
    ],
@@ -748,7 +748,7 @@
   {
    "name": "Barbell Rollout from Bench",
    "base_name": "Barbell Rollout from Bench",
-   "pattern": "push",
+   "pattern": "core",
    "supported_prefixes": [
     "BB"
    ],
@@ -1116,7 +1116,7 @@
   {
    "name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
    "base_name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "DB"
    ],
@@ -1699,7 +1699,7 @@
   {
    "name": "Cable Incline Pushdown",
    "base_name": "Cable Incline Pushdown",
-   "pattern": "push",
+   "pattern": "row",
    "supported_prefixes": [
     "Cable"
    ],
@@ -1851,7 +1851,7 @@
   {
    "name": "Cable Rear Delt Fly",
    "base_name": "Cable Rear Delt Fly",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
    ],
@@ -1893,7 +1893,7 @@
   {
    "name": "Cable Rope Overhead Triceps Extension",
    "base_name": "Overhead Triceps Extension",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
    ],
@@ -2451,7 +2451,7 @@
   {
    "name": "Crunch - Hands Overhead",
    "base_name": "Crunch - Hands Overhead",
-   "pattern": "push",
+   "pattern": "core",
    "supported_prefixes": [
     "Bodyweight"
    ],
@@ -4213,7 +4213,7 @@
   {
    "name": "Front Squat (Clean Grip)",
    "base_name": "Front Squat (Clean Grip)",
-   "pattern": "hinge",
+   "pattern": "squat",
    "supported_prefixes": [
     "BB"
    ],
@@ -5719,7 +5719,7 @@
   {
    "name": "Lying Triceps Press",
    "base_name": "Lying Triceps Press",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "BB"
    ],
@@ -6084,7 +6084,7 @@
   {
    "name": "One-Arm High-Pulley Cable Side Bends",
    "base_name": "One-Arm High-Pulley Cable Side Bends",
-   "pattern": "unilateral",
+   "pattern": "core",
    "supported_prefixes": [
     "Cable"
    ],
@@ -7281,7 +7281,7 @@
   {
    "name": "Reverse Flyes",
    "base_name": "Reverse Flyes",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "DB"
    ],
@@ -7302,7 +7302,7 @@
   {
    "name": "Reverse Flyes With External Rotation",
    "base_name": "Reverse Flyes With External Rotation",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "DB"
    ],
@@ -7348,7 +7348,7 @@
   {
    "name": "Reverse Grip Triceps Pushdown",
    "base_name": "Reverse Grip Triceps Pushdown",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
    ],
@@ -7939,7 +7939,7 @@
   {
    "name": "Seated Triceps Press",
    "base_name": "Seated Triceps Press",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "DB"
    ],
@@ -8286,7 +8286,7 @@
   {
    "name": "Speed Band Overhead Triceps",
    "base_name": "Speed Band Overhead Triceps",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Banded"
    ],
@@ -9026,7 +9026,7 @@
   {
    "name": "Standing Overhead Barbell Triceps Extension",
    "base_name": "Standing Overhead Barbell Triceps Extension",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "BB"
    ],
@@ -9484,7 +9484,7 @@
   {
    "name": "Triceps Overhead Extension with Rope",
    "base_name": "Triceps Overhead Extension with Rope",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
    ],
@@ -9505,7 +9505,7 @@
   {
    "name": "Triceps Pushdown",
    "base_name": "Triceps Pushdown",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
    ],
@@ -9526,7 +9526,7 @@
   {
    "name": "Triceps Pushdown - Rope Attachment",
    "base_name": "Triceps Pushdown - Rope Attachment",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
    ],
@@ -9547,7 +9547,7 @@
   {
    "name": "Triceps Pushdown - V-Bar Attachment",
    "base_name": "Triceps Pushdown - V-Bar Attachment",
-   "pattern": "push",
+   "pattern": "accessory",
    "supported_prefixes": [
     "Cable"
    ],

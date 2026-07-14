@@ -1,7 +1,7 @@
 """
 verify_library.py — the movement-library gate (P16 S4).
 
-Executes the real schema chain (001..016) against a real SQLite engine and
+Executes the real schema chain (001..021) against a real SQLite engine and
 asserts the seeded library against the CURATED staging file it was generated
 from: row counts, side-car completeness, CHECK-domain membership, equipment
 strictness, progression chain integrity, variant rows (audit F3), tier
@@ -30,7 +30,7 @@ def check(label, ok, detail=""):
         fail += 1
 
 print(f"SQLite {sqlite3.sqlite_version}")
-print("\n[1] schema chain applies (001..016, twice: self-heal path)")
+print("\n[1] schema chain applies (001..021, twice: self-heal path)")
 files = sorted(f for f in SCHEMA_DIR.glob("0*.sql") if not f.name.startswith("004"))
 for _ in range(2):
     for f in files:
@@ -112,6 +112,13 @@ n_tax = con.execute(
     "SELECT COUNT(*) FROM movement_taxonomy t JOIN movement m USING(movement_id) WHERE m.name IN (%s)"
     % ",".join("?" * len(seeded_expect)), seeded_expect).fetchone()[0]
 check("every seeded row has a taxonomy side-car", n_tax == len(seeded_expect), f"n={n_tax}")
+taxonomy_category = {r["name"]: r["category"] for r in con.execute("""
+    SELECT m.name, t.category FROM movement_taxonomy t JOIN movement m USING(movement_id)
+""")}
+staged_category = {m["name"]: m["pattern"] for m in curated}
+bad_taxonomy = [n for n in seeded_expect if taxonomy_category.get(n) != staged_category[n]]
+check("every seeded taxonomy category matches curated staging",
+      not bad_taxonomy, str([(n, taxonomy_category.get(n), staged_category[n]) for n in bad_taxonomy[:3]]))
 
 print("\n[4] variant identity (F4 decision: rows only when equipment-distinct)")
 ohp = json.loads(by_name["Overhead Press"]["supported_prefixes"])

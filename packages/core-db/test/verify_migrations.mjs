@@ -27,7 +27,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
   '014_movement_prefixes.sql', '015_set_prefix.sql', '016_movement_library_seed.sql', '017_movement_batch.sql',
-  '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql'];
+  '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
+  '021_taxonomy_corrections.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -66,6 +67,13 @@ check('all sentinels present', sentinelsMissing(a).length === 0,
   `${SENTINELS.length} checked`);
 runMigrations(a, MIGRATIONS); // second boot
 check('re-boot is a no-op (idempotent)', uv(a) === MIGRATIONS.length);
+const taxonomyCorrections = Object.fromEntries(a.raw.prepare(`
+  SELECT m.name, t.category FROM movement_taxonomy t JOIN movement m USING(movement_id)
+  WHERE m.name IN ('Cable Rope Overhead Triceps Extension', 'Triceps Pushdown')
+`).all().map((r) => [r.name, r.category]));
+check('021 applies both ratified taxonomy corrections',
+  Object.keys(taxonomyCorrections).length === 2 && Object.values(taxonomyCorrections).every((c) => c === 'accessory'),
+  JSON.stringify(taxonomyCorrections));
 
 // --- 2. poisoned field DB (user_version lies) ----------------------------------
 console.log('[2] poisoned DB: user_version=4 but 003 never applied');
@@ -86,7 +94,7 @@ check('materialize prepares against healed schema', (() => {
 // --- 2b. poisoned v15: 016 tables missing while user_version claims complete ---
 console.log('[2b] poisoned DB: user_version=15 but 016 never applied (audit A1)');
 const b2 = freshDb();
-for (let i = 0; i < MIGRATIONS.length - 5; i += 1) b2.executeSync(MIGRATIONS[i]); // skip 016..020
+for (let i = 0; i < MIGRATIONS.length - 6; i += 1) b2.executeSync(MIGRATIONS[i]); // skip 016..021
 b2.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
 check('precondition: movement_progression missing', sentinelsMissing(b2).includes('movement_progression'));
 runMigrations(b2, MIGRATIONS);

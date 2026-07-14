@@ -28,11 +28,12 @@ import m017 from './schema/017_movement_batch.sql';
 import m018 from './schema/018_logging_modes.sql';
 import m019 from './schema/019_movement_batch.sql';
 import m020 from './schema/020_movement_batch.sql';
+import m021 from './schema/021_taxonomy_corrections.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);
