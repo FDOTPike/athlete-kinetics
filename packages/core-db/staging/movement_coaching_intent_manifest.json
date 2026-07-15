@@ -1,0 +1,4 @@
+{
+  "_comment": "Records emitted by generated Phase 17 coaching-content migrations. Each content_sha256 fingerprints normalized intent, steps, cues, and video URL; a staged revision must use a dedicated correction migration.",
+  "slots": {}
+}

@@ -1,1696 +1,531 @@
-/**
- * SessionScreen.tsx — active set logging around a workout-overview plan nav.
- *
- * Interaction contract:
- *   * The whole session is visible at a glance: a compact horizontal nav of
- *     planned movements with logged/planned badges. Tap any slot to work it
- *     out of order; SWAP replaces the active slot's movement (logged sets
- *     stand as history); + ADD appends from the library (now an ExRx-grouped
- *     collapsible picker). No duplicates.
- *   * No keyboard, ever: reps/load/RPE are steppers with 64pt+ targets;
- *     values persist between sets because consecutive sets usually match.
- *   * LOG SET is one tap and synchronously durable (op-sqlite JSI insert). The
- *     implement-prefix selector concatenates onto the base name in the payload.
- *   * Long-press a logged row to EDIT (inline steppers) or hard-DELETE it; the
- *     001 mech_daily triggers keep the rollup correct on either path.
- *   * Zero animations; pressed state is a flat color change. RN core only.
- */
-import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import {
-  JOINTS,
-  PATTERN_TO_CATEGORY,
-  conditionApplies,
-  TAXONOMY_CATEGORIES,
-  calculateEffectiveLoad,
-  targetLoadKg,
-  type DaySwapOption,
-  type Joint,
-  type MovementPattern,
-  type MovementPrefix,
-  type MovementPreference,
-  type TaxonomyCategory,
-} from '@ak/inference';
-import {
-  isMovementAvailable,
-  palette,
-  useStore,
-  type LoggedSet,
-  type Movement,
-} from '../state/useStore';
-import InfoTip from '../components/InfoTip';
 
-// ---------------------------------------------------------------------------
-// Stepper — the only numeric input primitive on this screen
-// ---------------------------------------------------------------------------
-interface StepperProps {
-  label: string;
-  display: string;
-  onDec: () => void;
-  onInc: () => void;
-  /** Glossary key — renders an ⓘ tooltip next to the label. */
-  tip?: string;
-  /** Render the value in red (e.g. RPE at an absolute 10). */
-  danger?: boolean;
-}
-function Stepper({ label, display, onDec, onInc, tip, danger }: StepperProps): React.JSX.Element {
-  return (
-    <View style={styles.stepper}>
-      <View style={styles.stepperLabelRow}>
-        <Text style={styles.stepperLabel}>{label}</Text>
-        {tip !== undefined && <InfoTip term={tip} />}
-      </View>
-      <View style={styles.stepperRow}>
-        <Pressable
-          onPress={onDec}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label}`}
-          style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
-        >
-          <Text style={styles.stepBtnText}>−</Text>
-        </Pressable>
-        <Text
-          style={[styles.stepperValue, danger === true && styles.stepperValueDanger]}
-          accessibilityRole="text"
-          accessibilityLabel={`${label} ${display}${danger === true ? ', maximal effort' : ''}`}
-        >
-          {display}
-        </Text>
-        <Pressable
-          onPress={onInc}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Increase ${label}`}
-          style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
-        >
-          <Text style={styles.stepBtnText}>+</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
+/** Phase 17 utility-first active-session surface. */
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { JOINTS, nextUp as nextRunnerWork, targetLoadKg } from '@ak/inference';
+import { palette, useStore, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 
-// ---------------------------------------------------------------------------
-// MiniStepper — compact variant for the inline edit seam (keeps the
-// no-keyboard contract; three fit on one row inside a logged-set card).
-// ---------------------------------------------------------------------------
-interface MiniStepperProps {
-  label: string;
-  display: string;
-  onDec: () => void;
-  onInc: () => void;
-}
-function MiniStepper({ label, display, onDec, onInc }: MiniStepperProps): React.JSX.Element {
-  return (
-    <View style={styles.miniStepper}>
-      <Text style={styles.miniLabel}>{label}</Text>
-      <View style={styles.miniRow}>
-        <Pressable
-          onPress={onDec}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label}`}
-          style={({ pressed }) => [styles.miniBtn, pressed && styles.stepBtnPressed]}
-        >
-          <Text style={styles.miniBtnText}>−</Text>
-        </Pressable>
-        <Text style={styles.miniValue} accessibilityLabel={`${label} ${display}`}>
-          {display}
-        </Text>
-        <Pressable
-          onPress={onInc}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Increase ${label}`}
-          style={({ pressed }) => [styles.miniBtn, pressed && styles.stepBtnPressed]}
-        >
-          <Text style={styles.miniBtnText}>+</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ThumbToggle — binary sentiment (👍 +1 / 👎 −1), tap an active one to clear
-// back to neutral (0). Drives movement_preference via the store.
-// ---------------------------------------------------------------------------
-interface ThumbToggleProps {
-  preference: MovementPreference;
-  onSet: (next: MovementPreference) => void;
-}
-function ThumbToggle({ preference, onSet }: ThumbToggleProps): React.JSX.Element {
-  const up = preference === 1;
-  const down = preference === -1;
-  return (
-    <View style={styles.thumbWrap}>
-      <Pressable
-        onPress={() => onSet(up ? 0 : 1)}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityState={{ selected: up }}
-        accessibilityLabel={up ? 'Prioritized — tap to clear' : 'Prioritize this movement'}
-        style={[styles.thumb, up && styles.thumbUpOn]}
-      >
-        <Text style={styles.thumbText}>👍</Text>
-      </Pressable>
-      <Pressable
-        onPress={() => onSet(down ? 0 : -1)}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityState={{ selected: down }}
-        accessibilityLabel={down ? 'Avoided — tap to clear' : 'Avoid this movement'}
-        style={[styles.thumb, down && styles.thumbDownOn]}
-      >
-        <Text style={styles.thumbText}>👎</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
-const shortName = (name: string): string => (name.length > 12 ? `${name.slice(0, 11)}…` : name);
-
-const CATEGORY_LABEL: Record<TaxonomyCategory, string> = {
-  push: 'PUSH',
-  row: 'ROW',
-  hinge: 'HINGE',
-  squat: 'SQUAT',
-  core: 'CORE',
-  unilateral: 'UNILATERAL',
-  accessory: 'ACCESSORY',
-  cardio: 'CARDIO',
+const accent = palette.green;
+type SessionMode = 'guided' | 'self_directed';
+interface LocalRest { startedAtMs: number; seconds: number; slotId: number; }
+const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
+const scaleFor = (v: string | undefined): number => v === 'extra_large' ? 1.28 : v === 'large' ? 1.14 : 1;
+const secondsText = (n: number): string => {
+  const value = Math.max(0, Math.round(n)); const min = Math.floor(value / 60); const sec = value % 60;
+  return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
 };
-/** Map a 001 movement.pattern onto its ExRx category (the engine's single
- *  source of truth). Unknown patterns fall into 'accessory'. */
-const categoryOf = (pattern: string): TaxonomyCategory =>
-  PATTERN_TO_CATEGORY[pattern as MovementPattern] ?? 'accessory';
+const restSecondsFor = (rpe: number, age: string | undefined): number => {
+  const base = rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
+  const multiplier = age === 'beginner' ? .75 : age === 'elite' ? 1.25 : 1;
+  return clamp(Math.round((base * multiplier) / 15) * 15, 45, 300);
+};
+const targetFor = (slot: PlanSlot): SlotTarget => {
+  const target = (slot as Partial<PlanSlot>).target;
+  if (target?.kind === 'time' && Number.isFinite(target.seconds)) return { kind: 'time', seconds: Math.max(1, Math.round(target.seconds)) };
+  if (target?.kind === 'reps' && Number.isFinite(target.reps)) return { kind: 'reps', reps: Math.max(1, Math.round(target.reps)) };
+  return { kind: 'reps', reps: Math.max(1, Math.round((slot as Partial<PlanSlot>).plannedReps ?? 5)) };
+};
+const targetText = (slot: PlanSlot): string => {
+  const target = targetFor(slot);
+  return target.kind === 'time' ? `${slot.plannedSets} × ${secondsText(target.seconds)}` : `${slot.plannedSets} × ${target.reps}`;
+};
+const lines = (text: string | null | undefined, max: number): string[] => {
+  if (text === null || text === undefined || text.trim().length === 0) return [];
+  const split = text.split(/\r?\n|•/g).map((x) => x.replace(/^[-–—\s]+/, '').trim()).filter(Boolean);
+  return (split.length > 0 ? split : [text.trim()]).slice(0, max);
+};
+const sameSlot = (logged: { session_plan_slot_id: number | null; movement_id: number }, slot: PlanSlot): boolean =>
+  logged.session_plan_slot_id != null ? logged.session_plan_slot_id === slot.sessionPlanSlotId : logged.movement_id === slot.movementId;
 
-/** Substitution-tier presentation. Colors mirror SUBSTITUTION_COLORS in the
- *  engine (green = regression, purple = day-swap, orange = triage); green
- *  reuses the palette, the other two are local since the dark theme has no
- *  purple/orange token. */
-const TIER = {
-  regression: { color: palette.green, hint: 'Easier · same pattern' },
-  day_swap: { color: '#A98EFF', hint: 'Pull from a later day' },
-  triage: { color: '#FF9F45', hint: 'Train around a niggle' },
-} as const;
+function Dot({ state }: { state: 'complete' | 'current' | 'upcoming' }): React.JSX.Element {
+  return <View style={styles.rail}><View style={[styles.dot, state === 'complete' && styles.dotComplete, state === 'current' && styles.dotCurrent]}>{state === 'complete' && <Text style={styles.check}>✓</Text>}</View></View>;
+}
+function Stepper({ label, value, minus, plus, scale }: { label: string; value: string; minus: () => void; plus: () => void; scale: number }): React.JSX.Element {
+  return <View style={styles.stepper}>
+    <Text style={[styles.stepperLabel, { fontSize: 11 * scale }]}>{label}</Text>
+    <Pressable onPress={minus} accessibilityRole="button" accessibilityLabel={`Decrease ${label}`} style={({ pressed }) => [styles.stepperButton, pressed && styles.pressed]}><Text style={[styles.stepperSymbol, { fontSize: 26 * scale }]}>−</Text></Pressable>
+    <Text style={[styles.stepperValue, { fontSize: 17 * scale }]} accessibilityLabel={`${label} ${value}`}>{value}</Text>
+    <Pressable onPress={plus} accessibilityRole="button" accessibilityLabel={`Increase ${label}`} style={({ pressed }) => [styles.stepperButton, pressed && styles.pressed]}><Text style={[styles.stepperSymbol, { fontSize: 26 * scale }]}>+</Text></Pressable>
+  </View>;
+}
+function Disclosure({ open, onPress, children }: { open: boolean; onPress: () => void; children: React.ReactNode }): React.JSX.Element {
+  return <View style={styles.disclosure}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`How and why, ${open ? 'expanded' : 'collapsed'}`} style={({ pressed }) => [styles.disclosureTrigger, pressed && styles.pressed]}><Text style={styles.disclosureTitle}>How & why</Text><Text style={styles.chevron}>{open ? '⌃' : '⌄'}</Text></Pressable>
+    {open && <View style={styles.disclosureBody}>{children}</View>}
+  </View>;
+}
+function CompletedMetrics({
+  sets,
+  bandLadder,
+  movementsById,
+  onEdit,
+  scale,
+}: {
+  sets: readonly LoggedSet[];
+  bandLadder: readonly { level: number; label: string }[];
+  movementsById: ReadonlyMap<number, Movement>;
+  onEdit: (setId: number, reps: number, loadKg: number, rpe: number, metrics?: SetMetricPatch) => void;
+  scale: number;
+}): React.JSX.Element | null {
+  const [open, setOpen] = useState(false);
+  const metricSets = sets.filter((set) => set.timeS !== null || set.bandLevel !== null || (
+    bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true
+  ));
+  if (metricSets.length === 0) return null;
+  return <View style={styles.loggedDetails}>
+    <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`Review logged details, ${open ? 'expanded' : 'collapsed'}`} style={({ pressed }) => [styles.loggedDetailsTrigger, pressed && styles.pressed]}>
+      <Text style={[styles.loggedDetailsTitle, { fontSize: 14 * scale }]}>Review logged details</Text><Text style={styles.chevron}>{open ? '⌃' : '⌄'}</Text>
+    </Pressable>
+    {open && <View style={styles.loggedDetailsBody}>{metricSets.map((set) => {
+      const duration = set.timeS;
+      const supportsBand = bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true;
+      return <View key={set.set_id} style={styles.loggedMetricRow}>
+        <Text style={[styles.loggedMetricTitle, { fontSize: 13 * scale }]}>Set {set.set_index}</Text>
+        {duration !== null && <View style={styles.metricAdjustRow}>
+          <Pressable onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { timeS: Math.max(1, duration - 5) })} accessibilityRole="button" accessibilityLabel={`Decrease logged duration for set ${set.set_index}`} style={({ pressed }) => [styles.metricAdjust, pressed && styles.pressed]}><Text style={[styles.metricAdjustText, { fontSize: 14 * scale }]}>−5s</Text></Pressable>
+          <Text style={[styles.metricValue, { fontSize: 15 * scale }]}>{secondsText(duration)}</Text>
+          <Pressable onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { timeS: duration + 5 })} accessibilityRole="button" accessibilityLabel={`Increase logged duration for set ${set.set_index}`} style={({ pressed }) => [styles.metricAdjust, pressed && styles.pressed]}><Text style={[styles.metricAdjustText, { fontSize: 14 * scale }]}>+5s</Text></Pressable>
+        </View>}
+        {supportsBand && <View style={styles.loggedBandBlock}>
+          <Text style={[styles.loggedBandLabel, { fontSize: 12 * scale }]}>Band</Text>
+          <View style={styles.loggedBandChoices}>{bandLadder.map((band) => {
+            const selected = set.bandLevel === band.level;
+            return <Pressable key={band.level} onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { bandLevel: selected ? null : band.level })} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Set ${set.set_index} band ${band.label}${selected ? ', selected' : ''}`} style={({ pressed }) => [styles.loggedBandChoice, selected && styles.bandChoiceSelected, pressed && styles.pressed]}><Text style={[styles.bandChoiceText, selected && styles.bandChoiceTextSelected, { fontSize: 12 * scale }]}>{band.label}</Text></Pressable>;
+          })}</View>
+        </View>}
+      </View>;
+    })}</View>}
+  </View>;
+}
 
-/** 'lower_back' -> 'LOWER BACK' for the joint picker. */
-const jointLabel = (j: Joint): string => j.replace(/_/g, ' ').toUpperCase();
-
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
 export default function SessionScreen(): React.JSX.Element {
-  const movements = useStore((s) => s.movements);
-  const session = useStore((s) => s.session);
-  const sessionPlan = useStore((s) => s.sessionPlan);
-  const activeSessionPlanSlotId = useStore((s) => s.activeSessionPlanSlotId);
-  const selectMovementSlot = useStore((s) => s.selectMovementSlot);
-  const prescription = useStore((s) => s.prescription);
-  const activeMovementId = useStore((s) => s.activeMovementId);
-  const profile = useStore((s) => s.profile);
-  const lastTriage = useStore((s) => s.lastTriage);
-  const block = useStore((s) => s.block);
-  const todayPlan = useStore((s) => s.todayPlan);
-  const oneRepMaxes = useStore((s) => s.oneRepMaxes);
-  const lastEndedSessionId = useStore((s) => s.lastEndedSessionId);
-  const saveSessionNote = useStore((s) => s.saveSessionNote);
-  const startSession = useStore((s) => s.startSession);
-  const selectMovement = useStore((s) => s.selectMovement);
-  const addPlanSlot = useStore((s) => s.addPlanSlot);
-  const swapMovement = useStore((s) => s.swapMovement);
-  const setMovementPreference = useStore((s) => s.setMovementPreference);
-  const substitution = useStore((s) => s.substitution);
-  const openSubstitution = useStore((s) => s.openSubstitution);
-  const closeSubstitution = useStore((s) => s.closeSubstitution);
-  const applyRegression = useStore((s) => s.applyRegression);
-  const applyDaySwap = useStore((s) => s.applyDaySwap);
-  const niggles = useStore((s) => s.niggles);
-  const reportNiggle = useStore((s) => s.reportNiggle);
-  const movementPrefixes = useStore((s) => s.movementPrefixes);
-  const logSet = useStore((s) => s.logSet);
-  const deleteSet = useStore((s) => s.deleteSet);
-  const editSet = useStore((s) => s.editSet);
-  const endSession = useStore((s) => s.endSession);
+  const state = useStore((s) => s);
+  const {
+    movements, session, sessionPlan, activeSessionPlanSlotId, profile, oneRepMaxes,
+    lastTriage, substitution, startSession, selectMovementSlot, setMovementPreference,
+    openSubstitution, closeSubstitution, applyRegression, applyDaySwap, reportNiggle,
+    logSet, editSet, endSession, runner, sessionMode, uiPreferences, bandLadder, lastLoggedLoads = {},
+    advanceRunnerRest, skipRunnerRest, runnerThumbsDown, runnerHalt,
+  } = state;
+  const preferences = uiPreferences;
+  const typeScale = scaleFor(preferences.textScale);
+  // Mode is frozen when the session starts. Preference edits intentionally wait
+  // for the next session instead of changing an athlete's current flow.
+  const defaultMode: SessionMode = preferences.sessionModeOverride ?? (profile.training_age === 'beginner' ? 'guided' : 'self_directed');
+  const mode: SessionMode = sessionMode ?? defaultMode;
+  const runnerPhase = runner?.phase ?? 'working';
 
-  const [reps, setReps] = useState(5);
-  const [loadKg, setLoadKg] = useState(100);
-  /** 018 time-mode movements: the dose is seconds, not reps. */
-  const [seconds, setSeconds] = useState(40);
-  const [rpe, setRpe] = useState(8);
-  const [noteText, setNoteText] = useState('');
-  const [noteSaved, setNoteSaved] = useState(false);
-  /** 'plan' = normal nav; 'add'/'swap' = picking from the library. */
-  const [pickMode, setPickMode] = useState<'plan' | 'add' | 'swap'>('plan');
-  /** Expanded ExRx categories in the picker; empty == all collapsed (the
-   *  memory-efficient default — collapsed sections unmount their children). */
-  const [expandedCats, setExpandedCats] = useState<Set<TaxonomyCategory>>(new Set());
-  /** Selected implement prefix for the active movement (null == base name). */
-  const [prefix, setPrefix] = useState<MovementPrefix | null>(null);
-  /** Phase 13: toggled condition prefixes (KB/Banded/...) whose movement_prefix
-   *  weights amplify the active set and persist to set_prefix on log. */
-  const [appliedConditions, setAppliedConditions] = useState<MovementPrefix[]>([]);
-  /** Logged-set row whose long-press context seam is open. */
-  const [menuSetId, setMenuSetId] = useState<number | null>(null);
-  /** Logged-set row currently in inline-edit mode (mutually exclusive w/ menu). */
-  const [editSetId, setEditSetId] = useState<number | null>(null);
-  const [editReps, setEditReps] = useState(5);
-  const [editLoad, setEditLoad] = useState(100);
-  const [editRpe, setEditRpe] = useState(8);
-  /** Report-niggle bottom sheet. */
-  const [niggleOpen, setNiggleOpen] = useState(false);
-  const [niggleRegion, setNiggleRegion] = useState<Joint | null>(null);
-  const [niggleSeverity, setNiggleSeverity] = useState(4);
-  // Elapsed-time readout against the profile's duration cap (display only).
   const [nowMs, setNowMs] = useState(Date.now());
+  const [localRest, setLocalRest] = useState<LocalRest | null>(null);
+  const [reps, setReps] = useState(5);
+  const [seconds, setSeconds] = useState(30);
+  const [loadKg, setLoadKg] = useState(0);
+  const [rpe, setRpe] = useState(8);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [safetyOpen, setSafetyOpen] = useState(false);
+  const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
+  const [niggleSeverity, setNiggleSeverity] = useState(4);
+  const [bandLevel, setBandLevel] = useState<number | null>(null);
+  const advancedRest = useRef<string | null>(null);
+
+  const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
+  const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
+  const runnerCurrent = runner?.slots?.[runner.slotIndex ?? -1];
+  const runnerCurrentId = runnerCurrent?.sessionPlanSlotId ?? null;
+  const selected = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
+  const firstIncomplete = sessionPlan.find((slot) => loggedCount(slot) < slot.plannedSets) ?? null;
+  const fallback = selected !== null && loggedCount(selected) < selected.plannedSets ? selected : firstIncomplete;
+  const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
+  const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
+  const currentLogged = currentSlot === null ? 0 : loggedCount(currentSlot);
+  const allDone = sessionPlan.length > 0 && sessionPlan.every((slot) => loggedCount(slot) >= slot.plannedSets);
+  const triageHalted = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
+  const halted = runnerPhase === 'halted' || triageHalted;
+  const complete = !halted && (runnerPhase === 'complete' || allDone);
+  const target = currentSlot === null ? null : targetFor(currentSlot);
+  const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
+  const currentSessionLoad = currentSlot === null
+    ? undefined
+    : session?.sets.find((set) => set.movement_id === currentSlot.movementId)?.load_kg;
+  const lastLoad = currentSlot === null ? undefined : currentSessionLoad ?? lastLoggedLoads[currentSlot.movementId];
+  const rpeTarget = currentSlot?.targetRpe ?? rpe;
+  const oneRmLoad = currentSlot !== null && target?.kind === 'reps' && oneRm !== undefined ? targetLoadKg(oneRm, target.reps, rpeTarget) : null;
+  const suggestedLoad = currentSlot?.overrideLoadKg ?? oneRmLoad ?? lastLoad ?? 0;
+  const loadEvidence = currentSlot?.overrideLoadKg != null ? `Prescribed ${currentSlot.overrideLoadKg.toFixed(1)} kg` : oneRmLoad !== null ? `Based on your ${oneRm?.toFixed(1)} kg 1RM` : lastLoad !== undefined ? `Last logged ${lastLoad.toFixed(1)} kg` : 'Start light and use target RPE';
+
+  const runnerResting = runnerPhase === 'resting';
+  const rest = runnerResting ? {
+    seconds: runner?.restSecondsTarget ?? restSecondsFor(rpe, profile.training_age),
+    startedAtMs: runner?.restStartedAtMs ?? nowMs,
+    slotId: currentSlot?.sessionPlanSlotId ?? -1,
+  } : localRest;
+  const restRemaining = rest === null ? 0 : Math.max(0, rest.seconds - Math.floor((nowMs - rest.startedAtMs) / 1000));
+  const resting = rest !== null && !halted && !complete;
+
   useEffect(() => {
-    if (session === null) return;
-    const t = setInterval(() => setNowMs(Date.now()), 30_000);
-    return () => clearInterval(t);
-  }, [session]);
-  // A new active movement resets the implement selection (a prefix from the
-  // previous movement may not be in this one's supported set).
+    if (!resting) return undefined;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [resting]);
   useEffect(() => {
-    setPrefix(null);
-    setAppliedConditions([]);
-    // Audit B5: bodyweight movements start at 0 added kg — never a phantom
-    // 100 kg dead bug. Loaded movements keep the loaded default.
-    const m = movements.find((x) => x.movement_id === activeMovementId);
-    setLoadKg((m?.supportedPrefixes[0] ?? 'Bodyweight') === 'Bodyweight' ? 0 : 100);
-  }, [activeMovementId, movements]);
+    if (currentSlot === null || target === null) return;
+    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setBandLevel(null);
+    setReps(target.kind === 'reps' ? target.reps : 1);
+    setSeconds(target.kind === 'time' ? target.seconds : 30);
+    setRpe(currentSlot.targetRpe ?? 8);
+    setLoadKg(suggestedLoad);
+  }, [
+    currentSlot?.sessionPlanSlotId,
+    currentMovement?.movement_id,
+    target?.kind,
+    target?.kind === 'reps' ? target.reps : target?.seconds,
+    currentSlot?.targetRpe,
+    currentSlot?.overrideLoadKg,
+    suggestedLoad,
+  ]);
+
+  const moveLegacyForward = (): void => {
+    if (currentSlot === null) return;
+    const i = sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === currentSlot.sessionPlanSlotId);
+    const next = sessionPlan.slice(i + 1).find((slot) => loggedCount(slot) < slot.plannedSets)
+      ?? sessionPlan.slice(0, Math.max(0, i)).find((slot) => loggedCount(slot) < slot.plannedSets)
+      ?? null;
+    if (next !== null) selectMovementSlot(next.sessionPlanSlotId);
+  };
+  useEffect(() => {
+    if (!resting || restRemaining !== 0 || rest === null) return;
+    const key = `${rest.slotId}:${rest.startedAtMs}`;
+    if (advancedRest.current === key) return;
+    advancedRest.current = key;
+    if (runnerResting) advanceRunnerRest();
+    else { setLocalRest(null); moveLegacyForward(); }
+  }, [resting, restRemaining, rest?.slotId, rest?.startedAtMs, runnerResting]);
 
   if (session === null) {
-    // Instant start — no forced check-in (field-tested as friction). An
-    // operative halt still blocks here AND inside the store action; a
-    // plan-less start (no block / rest day) needs explicit confirmation.
-    const startHalted =
-      lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
-    const requestStart = (): void => {
-      if (block === null || todayPlan === null) {
-        Alert.alert(
-          block === null ? 'No training block yet' : 'Rest day',
-          block === null
-            ? 'Generate a 4-week block on COACH first so sessions follow a plan. Start an unplanned session anyway?'
-            : 'Today is a rest day in your block. Start an unplanned session anyway?',
-          [
-            { text: 'CANCEL', style: 'cancel' },
-            { text: 'START ANYWAY', onPress: () => startSession() },
-          ],
-        );
-        return;
-      }
-      startSession();
-    };
-    return (
-      <View style={styles.center}>
-        {startHalted ? (
-          <View style={styles.haltBanner}>
-            <Text style={styles.haltBannerText}>
-              STOP — today&apos;s report ended training. Rest, and report again tomorrow.
-            </Text>
-          </View>
-        ) : (
-          <Pressable
-            onPress={requestStart}
-            accessibilityRole="button"
-            accessibilityLabel="Start a new workout session"
-            style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
-          >
-            <Text style={styles.startBtnText}>START SESSION</Text>
-          </Pressable>
-        )}
-        {lastEndedSessionId !== null && (
-          <View style={styles.noteBox}>
-            <Text style={styles.noteLabel}>NOTES ON LAST SESSION</Text>
-            <TextInput
-              style={styles.noteInput}
-              value={noteText}
-              onChangeText={(t) => { setNoteText(t); setNoteSaved(false); }}
-              placeholder="e.g. grip was the limiter on pulls"
-              placeholderTextColor={palette.dim}
-              maxLength={1000}
-              multiline
-              accessibilityLabel="Free-text notes on the last session"
-            />
-            <Pressable
-              disabled={noteText.trim().length === 0}
-              onPress={() => { saveSessionNote(noteText); setNoteSaved(true); }}
-              accessibilityRole="button"
-              accessibilityLabel="Save the session note"
-              style={[styles.noteSaveBtn, noteText.trim().length === 0 && styles.noteSaveBtnDisabled]}
-            >
-              <Text style={styles.noteSaveText}>{noteSaved ? 'SAVED' : 'SAVE NOTE'}</Text>
-            </Pressable>
-          </View>
-        )}
-      </View>
-    );
+    const blocked = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
+    return <View style={styles.idle}>
+      <Text style={[styles.kicker, { fontSize: 12 * typeScale }]}>SESSION</Text>
+      <Text style={[styles.idleTitle, { fontSize: 30 * typeScale }]}>{blocked ? 'Training is paused.' : 'Ready when you are.'}</Text>
+      <Text style={[styles.idleBody, { fontSize: 16 * typeScale }]}>{blocked ? 'Resolve today’s safety halt before starting another session.' : mode === 'guided' ? 'You will move one clear step at a time.' : 'Your session will stay in one clear vertical timeline.'}</Text>
+      {!blocked && <Pressable onPress={() => startSession()} accessibilityRole="button" accessibilityLabel="Start a new workout session" style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}><Text style={[styles.primaryText, { fontSize: 17 * typeScale }]}>Start session</Text></Pressable>}
+    </View>;
   }
 
-  const byId = new Map(movements.map((m) => [m.movement_id, m]));
-  const activeMovement: Movement | null =
-    activeMovementId !== null ? byId.get(activeMovementId) ?? null : null;
-  const loggedForSlot = (slot: any): number => {
-    if (session === null) return 0;
-    return session.sets.filter((s) =>
-      s.session_plan_slot_id !== null && s.session_plan_slot_id !== undefined
-        ? s.session_plan_slot_id === slot.sessionPlanSlotId
-        : s.movement_id === slot.movementId
-    ).length;
+  const beginnerPlanViolation = profile.training_age === 'beginner' && sessionPlan.some((slot) => {
+    const movement = byId.get(slot.movementId);
+    return movement === undefined || (movement.difficulty !== 'Beginner' && !movement.beginnerOk);
+  });
+  if (beginnerPlanViolation) {
+    return <View style={styles.idle} accessibilityRole="alert">
+      <Text style={[styles.kicker, { fontSize: 12 * typeScale }]}>SESSION CHECK</Text>
+      <Text style={[styles.idleTitle, { fontSize: 30 * typeScale }]}>This plan needs Coach review.</Text>
+      <Text style={[styles.idleBody, { fontSize: 16 * typeScale }]}>A movement outside this athlete’s tier was blocked before it could be shown.</Text>
+      <Pressable onPress={endSession} accessibilityRole="button" accessibilityLabel="Finish the blocked session" style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}><Text style={[styles.secondaryText, { fontSize: 16 * typeScale }]}>Finish session</Text></Pressable>
+    </View>;
+  }
+
+  const chooseSlot = (slot: PlanSlot): void => {
+    if (mode === 'guided' || loggedCount(slot) >= slot.plannedSets) return;
+    selectMovementSlot(slot.sessionPlanSlotId);
   };
-  const activeSlot = sessionPlan.find((sl) => sl.sessionPlanSlotId === activeSessionPlanSlotId) ?? sessionPlan.find((sl) => sl.movementId === activeMovementId);
-  const activeLoggedCount = activeSlot ? loggedForSlot(activeSlot) : 0;
-  const tonnage = session.sets.reduce((a, s) => a + s.tonnage_kg, 0);
-  const elapsedMin = Math.floor((nowMs - session.startedAtMs) / 60_000);
-  // P16 T1: the implement the athlete is ACTUALLY using right now — the
-  // selected prefix, else the movement's primary implement, else bodyweight.
-  const effectiveImplement =
-    prefix ?? activeMovement?.supportedPrefixes[0] ?? ('Bodyweight' as const);
-  const bodyweightMode = effectiveImplement === 'Bodyweight';
-  const timeMode = activeMovement?.loggingMode === 'time';
-  const overTime = elapsedMin > profile.session_duration_cap_min;
-  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
-  // Library pickers honor the strict equipment filter AND the plan's tier
-  // rule (P16 S4): beginners see Beginner + whitelisted Intermediate staples;
-  // everyone else sees everything the inventory supports.
-  const beginnerVisible = (m: Movement): boolean =>
-    profile.training_age !== 'beginner' || m.difficulty === 'Beginner' || m.beginnerOk;
-  const inLibraryNotPlanned = movements.filter(
-    (m) =>
-      !sessionPlan.some((s) => s.movementId === m.movement_id) &&
-      isMovementAvailable(m, profile.equipment_inventory) &&
-      beginnerVisible(m),
-  );
-  // Hierarchical ExRx grouping: 8 categories, fixed engine order, empties hidden.
-  const grouped: { category: TaxonomyCategory; items: Movement[] }[] = TAXONOMY_CATEGORIES
-    .map((category) => ({
-      category,
-      items: inLibraryNotPlanned.filter((m) => categoryOf(m.pattern) === category),
-    }))
-    .filter((g) => g.items.length > 0);
-
-  // Prefix-engine payload: the implement prepends onto the BASE name; with no
-  // implement selected we log the movement's canonical name verbatim.
-  const loggedName =
-    activeMovement !== null
-      ? prefix !== null
-        ? `${prefix} ${activeMovement.baseName}`
-        : activeMovement.name
-      : '';
-
-  const toggleCat = (c: TaxonomyCategory): void => {
-    setExpandedCats((prev) => {
-      const next = new Set(prev);
-      if (next.has(c)) next.delete(c);
-      else next.add(c);
-      return next;
-    });
+  const readyNow = (): void => {
+    if (runnerResting) {
+      skipRunnerRest();
+    } else { setLocalRest(null); moveLegacyForward(); }
   };
-
-  const commitPick = (m: Movement): void => {
-    if (pickMode === 'swap' && activeMovementId !== null) {
-      swapMovement(activeMovementId, m.movement_id);
-    } else {
-      addPlanSlot(m.movement_id);
+  const logCurrent = (): void => {
+    if (currentSlot === null || currentMovement === null || target === null || resting) return;
+    const safeLoad = clamp(Math.round(loadKg * 2) / 2, 0, 500);
+    const safeRpe = clamp(Math.round(rpe * 2) / 2, 5, 10);
+    const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
+    logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
+    if (runner === null) {
+      if (preferences.restTimerEnabled) setLocalRest({ startedAtMs: Date.now(), seconds: restSecondsFor(safeRpe, profile.training_age), slotId: currentSlot.sessionPlanSlotId });
+      else moveLegacyForward();
     }
-    setPickMode('plan');
   };
-
-  const beginEdit = (item: LoggedSet): void => {
-    setMenuSetId(null);
-    setEditReps(item.reps);
-    setEditLoad(item.load_kg);
-    setEditRpe(item.rpe);
-    setEditSetId(item.set_id);
-  };
-
-  // A day-swap is destructive (it deletes a future planned slot to conserve
-  // volume), so it confirms first — showing the engine's own rationale.
-  const confirmDaySwap = (option: DaySwapOption): void => {
-    const targetId = substitution?.targetId ?? null;
-    if (targetId === null) return;
-    Alert.alert(
-      'Pull forward?',
-      `${option.rationale}\n\nThis replaces today's movement and removes that future slot.`,
-      [
-        { text: 'CANCEL', style: 'cancel' },
-        { text: 'PULL FORWARD', onPress: () => applyDaySwap(targetId, option) },
-      ],
-    );
-  };
-
-  const openNiggle = (): void => {
-    setNiggleRegion(null);
-    setNiggleSeverity(4);
-    setNiggleOpen(true);
-  };
-
-  const confirmEnd = (): void => {
-    if (session.sets.length === 0) {
-      // Accidental starts back out cleanly: an empty session is deleted,
-      // never recorded — no rollups touched, no prescription penalty.
-      Alert.alert(
-        'Discard empty session?',
-        'Nothing was logged. Discarding leaves no trace and no penalty.',
-        [
-          { text: 'KEEP LIFTING', style: 'cancel' },
-          { text: 'DISCARD', style: 'destructive', onPress: endSession },
-        ],
-      );
+  const thumbsDown = (): void => {
+    if (currentMovement === null) return;
+    if (runner !== null) {
+      // The store commits Avoid + the runner offer + substitution atomically.
+      runnerThumbsDown();
       return;
     }
-    Alert.alert(
-      'End session?',
-      `${session.sets.length} sets · ${Math.round(tonnage)} kg total`,
-      [
-        { text: 'KEEP LIFTING', style: 'cancel' },
-        { text: 'END', style: 'destructive', onPress: endSession },
-      ],
-    );
+    // Compatibility path for a legacy open session without a checkpoint.
+    setMovementPreference(currentMovement.movement_id, -1);
+    openSubstitution(currentMovement.movement_id);
+  };
+  const submitNiggle = (): void => {
+    if (niggleRegion === null) return;
+    // reportNiggle owns the deterministic NIGGLE/HALT transition and only
+    // offers substitution for qualifying, non-halt reports.
+    reportNiggle(niggleRegion, niggleSeverity);
+    setSafetyOpen(false);
   };
 
-  return (
-    <View style={styles.screen}>
-      {halted && (
-        <View style={styles.haltBanner}>
-          <Text style={styles.haltBannerText}>
-            STOP — today&apos;s report ended this session. {lastTriage.directive.vector.coaching_cue}
-          </Text>
-        </View>
-      )}
+  const setup = lines(currentMovement?.instructions, 4);
+  const cues = lines(currentMovement?.cues, 3);
+  const supportsBands = currentMovement?.supportedPrefixes?.includes('Banded') === true && bandLadder.length > 0;
+  const runnerNext = runner === null ? null : nextRunnerWork(runner);
+  const upcomingSlot = runnerNext !== null
+    ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerNext.slot.sessionPlanSlotId) ?? null
+    : currentSlot === null ? firstIncomplete
+      : sessionPlan.slice(Math.max(0, sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === currentSlot.sessionPlanSlotId) + 1)).find((slot) => loggedCount(slot) < slot.plannedSets) ?? null;
+  const upcomingText = runnerNext !== null && upcomingSlot !== null
+    ? `${byId.get(upcomingSlot.movementId)?.name ?? 'Movement'} · set ${runnerNext.setIndex} of ${runnerNext.slot.sets}`
+    : upcomingSlot !== null
+      ? `${byId.get(upcomingSlot.movementId)?.name ?? 'Movement'} · ${targetText(upcomingSlot)}`
+      : null;
 
-      {/* ---- workout overview nav / library picker ---- */}
-      {pickMode === 'plan' ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.navStrip}
-          contentContainerStyle={styles.navStripContent}
-        >
-          {sessionPlan.map((slot) => {
-            const m = byId.get(slot.movementId);
-            const logged = loggedForSlot(slot);
-            const active = activeSessionPlanSlotId !== null ? slot.sessionPlanSlotId === activeSessionPlanSlotId : slot.movementId === activeMovementId;
-            const done = logged >= slot.plannedSets;
-            return (
-              <Pressable
-                key={slot.sessionPlanSlotId}
-                onPress={() => selectMovementSlot(slot.sessionPlanSlotId)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`${m?.name ?? 'movement'}, ${logged} of ${slot.plannedSets} sets logged`}
-                style={[styles.navSlot, active && styles.navSlotActive]}
-              >
-                <Text
-                  style={[styles.navSlotName, active && styles.navSlotNameActive]}
-                  numberOfLines={1}
-                >
-                  {shortName(m?.name ?? '?')}
-                </Text>
-                <Text style={[styles.navSlotBadge, done && styles.navSlotBadgeDone]}>
-                  {logged}/{slot.plannedSets}
-                </Text>
-              </Pressable>
-            );
-          })}
-          <Pressable
-            onPress={() => setPickMode('add')}
-            accessibilityRole="button"
-            accessibilityLabel="Add a movement to the plan"
-            style={styles.navAction}
-          >
-            <Text style={styles.navActionText}>+ ADD</Text>
-          </Pressable>
-          {activeMovementId !== null && activeLoggedCount === 0 && (
-            <Pressable
-              onPress={() => openSubstitution(activeMovementId)}
-              accessibilityRole="button"
-              accessibilityLabel="Find substitutions for the selected movement"
-              style={styles.navAction}
-            >
-              <Text style={styles.navActionText}>SWAP</Text>
-            </Pressable>
-          )}
-        </ScrollView>
-      ) : (
-        <View style={styles.pickPanel}>
-          <Text style={styles.pickTitle} numberOfLines={1}>
-            {pickMode === 'swap'
-              ? `SWAP ${shortName(byId.get(activeMovementId ?? -1)?.name ?? '?')} FOR:`
-              : 'ADD MOVEMENT:'}
-          </Text>
-          <ScrollView style={styles.pickScroll} keyboardShouldPersistTaps="handled">
-            {grouped.map(({ category, items }) => {
-              const open = expandedCats.has(category);
-              return (
-                <View key={category}>
-                  <Pressable
-                    onPress={() => toggleCat(category)}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: open }}
-                    accessibilityLabel={`${CATEGORY_LABEL[category]}, ${items.length} movements, ${open ? 'expanded' : 'collapsed'}`}
-                    style={styles.catHeader}
-                  >
-                    <Text style={styles.catChevron}>{open ? '▾' : '▸'}</Text>
-                    <Text style={styles.catHeaderText}>{CATEGORY_LABEL[category]}</Text>
-                    <Text style={styles.catCount}>{items.length}</Text>
-                  </Pressable>
-                  {open && (
-                    <View style={styles.catBody}>
-                      {items.map((m) => (
-                        <View key={m.movement_id} style={styles.libRow}>
-                          <Pressable
-                            onPress={() => commitPick(m)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`${pickMode === 'swap' ? 'Swap to' : 'Add'} ${m.name}`}
-                            style={styles.libPick}
-                          >
-                            <Text style={styles.libName} numberOfLines={1}>{m.name}</Text>
-                            <Text style={styles.libMeta}>{m.difficulty}</Text>
-                          </Pressable>
-                          <ThumbToggle
-                            preference={m.preference}
-                            onSet={(next) => setMovementPreference(m.movement_id, next)}
-                          />
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-            {grouped.length === 0 && (
-              <Text style={styles.dimText}>
-                Nothing left to offer — every movement your equipment supports is
-                already in the plan. Add gear under ATHLETE to widen the pool.
-              </Text>
-            )}
-          </ScrollView>
-          <Pressable
-            onPress={() => setPickMode('plan')}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel picking"
-            style={styles.pickCancel}
-          >
-            <Text style={styles.pickCancelText}>CANCEL</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* ---- planned target for the active movement (1RM translation) ---- */}
-      {(() => {
-        const slot = session !== null && activeMovementId !== null
-          ? (sessionPlan.find((sl) => sl.sessionPlanSlotId === activeSessionPlanSlotId) ?? sessionPlan.find((sl) => sl.movementId === activeMovementId) ?? null)
-          : (todayPlan !== null && activeMovementId !== null
-             ? todayPlan.slots.find((sl) => sl.movementId === activeMovementId) ?? null
-             : null);
-        if (slot === null) return null;
-        if ('provenanceKind' in slot) {
-          const rpeSafetyCap = prescription?.vector.rpe_cap ?? 10.0;
-          const effectiveRpe = slot.targetRpe !== null ? Math.min(slot.targetRpe, rpeSafetyCap) : null;
-          if (effectiveRpe === null || slot.plannedReps === null) return null;
-          const oneRm = oneRepMaxes[slot.movementId] as number | undefined;
-          const target = slot.overrideLoadKg ?? (oneRm !== undefined
-            ? targetLoadKg(oneRm, slot.plannedReps, effectiveRpe)
-            : null);
-          return (
-            <View style={styles.targetRow}>
-              <Text style={styles.targetText}>
-                TARGET {slot.plannedSets}×{slot.plannedReps} @ RPE {effectiveRpe.toFixed(1)}
-                {target !== null ? ` · ${target.toFixed(1)} kg` : ''}
-              </Text>
-              {slot.overrideReason !== null && (
-                <Text style={styles.targetReason}>{slot.overrideReason}</Text>
-              )}
-            </View>
-          );
-        } else {
-          const oneRm = oneRepMaxes[slot.movementId] as number | undefined;
-          const target = slot.overrideLoadKg ?? (oneRm !== undefined
-            ? targetLoadKg(oneRm, slot.reps, slot.targetRpe)
-            : null);
-          return (
-            <View style={styles.targetRow}>
-              <Text style={styles.targetText}>
-                TARGET {slot.sets}×{slot.reps} @ RPE {slot.targetRpe.toFixed(1)}
-                {target !== null ? ` · ${target.toFixed(1)} kg` : ''}
-              </Text>
-              {slot.overrideReason !== null && (
-                <Text style={styles.targetReason}>{slot.overrideReason}</Text>
-              )}
-            </View>
-          );
-        }
-      })()}
-
-      {/* ---- prefix engine: implement dropdown preceding the base name ---- */}
-      {activeMovement !== null && activeMovement.supportedPrefixes.length > 0 && (
-        <View style={styles.prefixRow}>
-          <Text style={styles.prefixLabel}>IMPLEMENT</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.prefixChips}
-            keyboardShouldPersistTaps="handled"
-          >
-            {activeMovement.supportedPrefixes.map((p) => {
-              const on = prefix === p;
-              return (
-                <Pressable
-                  key={p}
-                  onPress={() => {
-                    const next = on ? null : p;
-                    setPrefix(next);
-                    // Implement changed: drop conditions that no longer apply.
-                    const eff = next ?? activeMovement.supportedPrefixes[0] ?? 'Bodyweight';
-                    setAppliedConditions((prev) => prev.filter((c) => conditionApplies(c, eff)));
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  accessibilityLabel={`Implement ${p}${on ? ', selected' : ''}`}
-                  style={[styles.prefixChip, on && styles.prefixChipOn]}
-                >
-                  <Text style={[styles.prefixChipText, on && styles.prefixChipTextOn]}>{p}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
-      {activeMovement !== null && (
-        <Text style={styles.loggingName} numberOfLines={1}>
-          LOGGING: {loggedName}
-        </Text>
-      )}
-
-      {/* ---- condition prefixes: weighted toggles (Phase 13 Step 2; P16 T1:
-           only conditions that make sense on the SELECTED implement) ---- */}
-      {activeMovement !== null && movementPrefixes.length > 0 && (
-        <View style={styles.prefixRow}>
-          <Text style={styles.prefixLabel}>CONDITIONS</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.prefixChips}
-            keyboardShouldPersistTaps="handled"
-          >
-            {movementPrefixes.filter((c) => conditionApplies(c.prefixName, effectiveImplement)).map((c) => {
-              const on = appliedConditions.includes(c.prefixName);
-              return (
-                <Pressable
-                  key={c.prefixName}
-                  onPress={() => setAppliedConditions((prev) =>
-                    on ? prev.filter((p) => p !== c.prefixName) : [...prev, c.prefixName])}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  accessibilityLabel={`Condition ${c.prefixName}${on ? ', applied' : ''}`}
-                  style={[styles.condChip, on && styles.condChipOn]}
-                >
-                  <Text style={[styles.condChipText, on && styles.condChipTextOn]}>{c.prefixName}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* ---- input steppers ---- */}
-      <Stepper
-        label={timeMode ? 'SECONDS' : 'REPS'}
-        display={timeMode ? String(seconds) : String(reps)}
-        onDec={() => (timeMode ? setSeconds((v) => clamp(v - 5, 5, 3600)) : setReps((v) => clamp(v - 1, 1, 50)))}
-        onInc={() => (timeMode ? setSeconds((v) => clamp(v + 5, 5, 3600)) : setReps((v) => clamp(v + 1, 1, 50)))}
-      />
-      <Stepper
-        label={bodyweightMode ? "ADDED KG (0 = bodyweight)" : "LOAD KG"}
-        display={loadKg.toFixed(1)}
-        onDec={() => setLoadKg((v) => clamp(v - 2.5, 0, 500))}
-        onInc={() => setLoadKg((v) => clamp(v + 2.5, 0, 500))}
-      />
-      <Stepper
-        label="RPE"
-        display={rpe.toFixed(1)}
-        tip="RPE"
-        danger={rpe >= 10}
-        onDec={() => setRpe((v) => clamp(v - 0.5, 5, 10))}
-        onInc={() => setRpe((v) => clamp(v + 0.5, 5, 10))}
-      />
-
-      {/* ---- condition-adjusted vectors (Phase 13 dynamic math) ---- */}
-      {(() => {
-        const activeConds = movementPrefixes.filter((c) => appliedConditions.includes(c.prefixName));
-        if (activeConds.length === 0) return null;
-        const eff = calculateEffectiveLoad(loadKg, activeConds);
-        return (
-          <View style={styles.condVectors}>
-            <View style={styles.condVec}>
-              <Text style={styles.condVecVal}>{eff.effectiveLoad.toFixed(1)}</Text>
-              <Text style={styles.condVecLabel}>EFFECTIVE KG</Text>
-            </View>
-            <View style={styles.condVec}>
-              <Text style={styles.condVecVal}>{eff.cnsLoad.toFixed(1)}</Text>
-              <Text style={styles.condVecLabel}>CNS LOAD</Text>
-            </View>
-            <View style={styles.condVec}>
-              <Text style={styles.condVecVal}>×{eff.stabilityDemand.toFixed(2)}</Text>
-              <Text style={styles.condVecLabel}>STABILITY</Text>
-            </View>
-          </View>
-        );
-      })()}
-
-      {/* ---- primary action ---- */}
-      <Pressable
-        disabled={activeMovementId === null}
-        onPress={() => {
-          if (activeMovementId !== null) {
-            logSet(activeMovementId, timeMode ? 1 : reps, loadKg, rpe, loggedName, appliedConditions, effectiveImplement, timeMode ? { timeS: seconds } : undefined, activeSessionPlanSlotId ?? undefined);
-            setAppliedConditions([]);
-          }
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={`Log set: ${reps} reps at ${loadKg.toFixed(1)} kilograms, RPE ${rpe.toFixed(1)}`}
-        style={({ pressed }) => [
-          styles.logBtn,
-          pressed && styles.logBtnPressed,
-          activeMovementId === null && styles.logBtnDisabled,
-        ]}
-      >
-        <Text style={styles.logBtnText}>
-          {activeMovementId === null ? 'PICK A MOVEMENT' : 'LOG SET'}
-        </Text>
-      </Pressable>
-
-      {/* ---- session log, newest first; long-press a row to edit/delete ---- */}
-      <FlatList
-        data={session.sets}
-        keyExtractor={(s: LoggedSet) => String(s.set_id)}
-        style={styles.setList}
-        ListEmptyComponent={<Text style={styles.emptyText}>No sets logged yet.</Text>}
-        renderItem={({ item }) => {
-          if (editSetId === item.set_id) {
-            return (
-              <View style={styles.editPanel}>
-                <Text style={styles.editTitle} numberOfLines={1}>
-                  EDIT · {item.movement_name} · S{item.set_index}
-                </Text>
-                <View style={styles.editSteppers}>
-                  <MiniStepper
-                    label="REPS"
-                    display={String(editReps)}
-                    onDec={() => setEditReps((v) => clamp(v - 1, 1, 50))}
-                    onInc={() => setEditReps((v) => clamp(v + 1, 1, 50))}
-                  />
-                  <MiniStepper
-                    label="LOAD"
-                    display={editLoad.toFixed(1)}
-                    onDec={() => setEditLoad((v) => clamp(v - 2.5, 0, 500))}
-                    onInc={() => setEditLoad((v) => clamp(v + 2.5, 0, 500))}
-                  />
-                  <MiniStepper
-                    label="RPE"
-                    display={editRpe.toFixed(1)}
-                    onDec={() => setEditRpe((v) => clamp(v - 0.5, 5, 10))}
-                    onInc={() => setEditRpe((v) => clamp(v + 0.5, 5, 10))}
-                  />
-                </View>
-                <View style={styles.editActions}>
-                  <Pressable
-                    onPress={() => setEditSetId(null)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Cancel edit"
-                    style={styles.editCancel}
-                  >
-                    <Text style={styles.editCancelText}>CANCEL</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => { editSet(item.set_id, editReps, editLoad, editRpe); setEditSetId(null); }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Save edited set"
-                    style={styles.editSave}
-                  >
-                    <Text style={styles.editSaveText}>SAVE</Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          }
-          const menuOpen = menuSetId === item.set_id;
-          return (
-            <Pressable
-              onLongPress={() => setMenuSetId(item.set_id)}
-              delayLongPress={300}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.movement_name}, set ${item.set_index}, ${item.reps} reps at ${item.load_kg.toFixed(1)} kilograms, RPE ${item.rpe.toFixed(1)}`}
-              accessibilityHint="Long-press to edit or delete this set"
-              style={styles.setRowWrap}
-            >
-              <View style={styles.setRow}>
-                <Text style={styles.setRowName} numberOfLines={1}>
-                  {item.movement_name} · S{item.set_index}
-                </Text>
-                <Text style={styles.setRowData}>
-                  {item.reps}×{item.load_kg.toFixed(1)} @ {item.rpe.toFixed(1)}
-                </Text>
-              </View>
-              {menuOpen && (
-                <View style={styles.rowMenu}>
-                  <Pressable
-                    onPress={() => beginEdit(item)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Edit set ${item.set_index} of ${item.movement_name}`}
-                    style={styles.rowMenuBtn}
-                  >
-                    <Text style={styles.rowMenuBtnText}>EDIT</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => { deleteSet(item.set_id); setMenuSetId(null); }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Delete set ${item.set_index} of ${item.movement_name}`}
-                    style={styles.rowMenuDelete}
-                  >
-                    <Text style={styles.rowMenuDeleteText}>🗑  DELETE</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setMenuSetId(null)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close menu"
-                    style={styles.rowMenuClose}
-                  >
-                    <Text style={styles.rowMenuCloseText}>✕</Text>
-                  </Pressable>
-                </View>
-              )}
-            </Pressable>
-          );
-        }}
-      />
-
-      {/* ---- footer: niggle report, tonnage, duration vs cap, end ---- */}
-      <View style={styles.footer}>
-        <Pressable
-          onPress={openNiggle}
-          accessibilityRole="button"
-          accessibilityLabel={
-            niggles.length > 0
-              ? `Report a niggle. ${niggles.length} active today`
-              : 'Report a niggle'
-          }
-          style={[styles.niggleBtn, niggles.length > 0 && styles.niggleBtnActive]}
-        >
-          <Text style={styles.niggleBtnIcon}>⚠</Text>
-          {niggles.length > 0 && (
-            <Text style={styles.niggleBtnCount}>{niggles.length}</Text>
-          )}
-        </Pressable>
-        <View>
-          <Text style={styles.footerLabel}>TONNAGE</Text>
-          <Text style={styles.footerValue}>{Math.round(tonnage)} kg</Text>
-        </View>
-        <View>
-          <Text style={styles.footerLabel}>TIME</Text>
-          <Text style={[styles.footerValue, overTime && styles.footerOver]}>
-            {elapsedMin}/{profile.session_duration_cap_min}m
-          </Text>
-        </View>
-        <Pressable
-          onPress={confirmEnd}
-          accessibilityRole="button"
-          accessibilityLabel="End the workout session"
-          style={({ pressed }) => [styles.endBtn, pressed && styles.endBtnPressed]}
-        >
-          <Text style={styles.endBtnText}>END</Text>
-        </Pressable>
+  return <View style={styles.screen}>
+    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
+      <View style={styles.header}>
+        <Text style={[styles.kicker, { fontSize: 12 * typeScale }]}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
+        <Text style={[styles.headerTitle, { fontSize: 26 * typeScale }]}>{halted ? 'Session paused' : complete ? 'Session complete' : 'Your next step'}</Text>
+        {!halted && !complete && <Text style={[styles.headerMeta, { fontSize: 14 * typeScale }]}>{sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete`}</Text>}
       </View>
 
-      {/* ---- deterministic substitution sheet (SWAP) ---- */}
-      {substitution !== null && (() => {
-        const targetName = byId.get(substitution.targetId)?.name ?? 'movement';
-        const reg = substitution.result.layer1Regression.options;
-        const day = substitution.result.layer2DaySwap.options;
-        const tri = substitution.result.layer3Triage.cluster;
-        const haltAdvised = substitution.result.haltAdvised;
-        const empty = reg.length === 0 && day.length === 0 && tri === null;
-        return (
-          <Modal visible transparent animationType="none" onRequestClose={closeSubstitution}>
-            <Pressable
-              style={styles.subBackdrop}
-              onPress={closeSubstitution}
-              accessibilityRole="button"
-              accessibilityLabel="Dismiss substitutions"
-            >
-              {/* Inner Pressable swallows taps so the card doesn't dismiss. */}
-              <Pressable style={styles.subCard} onPress={() => undefined}>
-                <Text style={styles.subTitle} numberOfLines={2}>SUBSTITUTE {targetName}</Text>
-                {haltAdvised && (
-                  <View style={styles.subHalt}>
-                    <Text style={styles.subHaltText}>
-                      A niggle hit your halt threshold — too severe to train around.
-                      Consider ending the session and reporting it on COACH.
-                    </Text>
-                  </View>
-                )}
-                <ScrollView style={styles.subScroll} keyboardShouldPersistTaps="handled">
-                  {reg.length > 0 && (
-                    <View style={styles.subTier}>
-                      <View style={[styles.subTierBar, { backgroundColor: TIER.regression.color }]} />
-                      <View style={styles.subTierBody}>
-                        <Text style={[styles.subTierLabel, { color: TIER.regression.color }]}>
-                          REGRESSION · {TIER.regression.hint}
-                        </Text>
-                        {reg.map((o) => (
-                          <Pressable
-                            key={o.movement_id}
-                            onPress={() => applyRegression(substitution.targetId, o.movement_id)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Regress to ${o.name}, ${o.difficulty}`}
-                            style={styles.subOption}
-                          >
-                            <View style={styles.subOptionHead}>
-                              <Text style={styles.subOptionName} numberOfLines={1}>{o.name}</Text>
-                              <Text style={styles.subOptionTag}>{o.difficulty}</Text>
-                            </View>
-                            <Text style={styles.subOptionWhy} numberOfLines={2}>{o.rationale}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-                  {day.length > 0 && (
-                    <View style={styles.subTier}>
-                      <View style={[styles.subTierBar, { backgroundColor: TIER.day_swap.color }]} />
-                      <View style={styles.subTierBody}>
-                        <Text style={[styles.subTierLabel, { color: TIER.day_swap.color }]}>
-                          DAY SWAP · {TIER.day_swap.hint}
-                        </Text>
-                        {day.map((o) => (
-                          <Pressable
-                            key={o.plannedSlotId}
-                            onPress={() => confirmDaySwap(o)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Pull ${o.name} forward from day ${o.fromDayIndex}`}
-                            style={styles.subOption}
-                          >
-                            <View style={styles.subOptionHead}>
-                              <Text style={styles.subOptionName} numberOfLines={1}>{o.name}</Text>
-                              <Text style={styles.subOptionTag}>day {o.fromDayIndex} · −{o.setsConserved}</Text>
-                            </View>
-                            <Text style={styles.subOptionWhy} numberOfLines={2}>{o.rationale}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-                  {tri !== null && (
-                    <View style={styles.subTier}>
-                      <View style={[styles.subTierBar, { backgroundColor: TIER.triage.color }]} />
-                      <View style={styles.subTierBody}>
-                        <Text style={[styles.subTierLabel, { color: TIER.triage.color }]}>
-                          TRIAGE · {TIER.triage.hint}
-                        </Text>
-                        <Text style={styles.subOptionWhy}>{tri.rationale}</Text>
-                        <View style={styles.triCluster}>
-                          {tri.movements.map((m) => (
-                            <Text key={m.movement_id} style={styles.triChip}>{m.name}</Text>
-                          ))}
-                        </View>
-                      </View>
-                    </View>
-                  )}
-                  {empty && (
-                    <Text style={styles.subEmpty}>
-                      No engine substitutions for this movement right now — its
-                      pattern has no available regression and no later block day
-                      offers the same category. Browse the full library instead.
-                    </Text>
-                  )}
-                </ScrollView>
-                <View style={styles.subActions}>
-                  <Pressable
-                    onPress={() => { closeSubstitution(); setPickMode('swap'); }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Browse the full movement library"
-                    style={styles.subBrowse}
-                  >
-                    <Text style={styles.subBrowseText}>BROWSE ALL</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={closeSubstitution}
-                    accessibilityRole="button"
-                    accessibilityLabel="Cancel substitution"
-                    style={styles.subCancel}
-                  >
-                    <Text style={styles.subCancelText}>CANCEL</Text>
-                  </Pressable>
-                </View>
-              </Pressable>
-            </Pressable>
-          </Modal>
-        );
-      })()}
+      {halted && <View style={styles.haltCard} accessibilityRole="alert">
+        <Text style={[styles.haltTitle, { fontSize: 20 * typeScale }]}>Stop training for today.</Text>
+        <Text style={[styles.haltBody, { fontSize: 15 * typeScale }]}>{runner?.haltReason ?? (lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : 'A safety report needs your attention before more sets are logged.')}</Text>
+        <Pressable onPress={endSession} accessibilityRole="button" accessibilityLabel="Finish the halted session" style={({ pressed }) => [styles.danger, pressed && styles.pressed]}><Text style={[styles.dangerText, { fontSize: 16 * typeScale }]}>Finish session</Text></Pressable>
+      </View>}
+      {complete && <View style={styles.completeCard} accessibilityRole="summary">
+        <Text style={[styles.completeTitle, { fontSize: 20 * typeScale }]}>All planned work is logged.</Text>
+        <Text style={[styles.completeBody, { fontSize: 15 * typeScale }]}>Take the win. There is nothing else you need to decide here.</Text>
+        <CompletedMetrics sets={session.sets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} scale={typeScale} />
+        <Pressable onPress={endSession} accessibilityRole="button" accessibilityLabel="Finish completed session" style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}><Text style={[styles.primaryText, { fontSize: 16 * typeScale }]}>Finish session</Text></Pressable>
+      </View>}
+      {!halted && !complete && sessionPlan.length === 0 && <View style={styles.emptyCard}>
+        <Text style={[styles.emptyTitle, { fontSize: 19 * typeScale }]}>No exercise is queued.</Text>
+        <Text style={[styles.emptyBody, { fontSize: 15 * typeScale }]}>Return to Coach to create a session plan, then come back here.</Text>
+        <Pressable onPress={endSession} accessibilityRole="button" accessibilityLabel="Finish empty session" style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}><Text style={[styles.secondaryText, { fontSize: 16 * typeScale }]}>Finish session</Text></Pressable>
+      </View>}
 
-      {/* ---- report-niggle sheet (the Layer 3 / guardrail severity source) ---- */}
-      {niggleOpen && (
-        <Modal visible transparent animationType="none" onRequestClose={() => setNiggleOpen(false)}>
-          <Pressable
-            style={styles.subBackdrop}
-            onPress={() => setNiggleOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss niggle report"
-          >
-            <Pressable style={styles.niggleCard} onPress={() => undefined}>
-              <Text style={styles.subTitle}>REPORT NIGGLE</Text>
-              <Text style={styles.niggleHint}>Where does it hurt?</Text>
-              <View style={styles.jointWrap}>
-                {JOINTS.map((j) => {
-                  const on = niggleRegion === j;
-                  return (
-                    <Pressable
-                      key={j}
-                      onPress={() => setNiggleRegion(j)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: on }}
-                      accessibilityLabel={jointLabel(j)}
-                      style={[styles.jointChip, on && styles.jointChipOn]}
-                    >
-                      <Text style={[styles.jointChipText, on && styles.jointChipTextOn]}>
-                        {jointLabel(j)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+      {!halted && !complete && sessionPlan.length > 0 && <View style={styles.timeline}>
+        {sessionPlan.map((slot) => {
+          const movement = byId.get(slot.movementId);
+          const logged = loggedCount(slot);
+          const finished = logged >= slot.plannedSets;
+          const active = !finished && currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId;
+          const selectable = mode === 'self_directed' && !finished && !active && !resting;
+          if (finished) {
+            const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
+            const latestCompleted = completedSets[0];
+            const bandLabel = latestCompleted?.bandLevel === null || latestCompleted?.bandLevel === undefined
+              ? null
+              : bandLadder.find((band) => band.level === latestCompleted.bandLevel)?.label ?? `band ${latestCompleted.bandLevel}`;
+            const metricSummary = latestCompleted?.timeS !== null && latestCompleted?.timeS !== undefined
+              ? ` · ${secondsText(latestCompleted.timeS)} logged`
+              : bandLabel === null ? '' : ` · ${bandLabel}`;
+            return <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+              <Dot state="complete" /><View style={styles.completeRow}>
+                <Text style={[styles.completeRowName, { fontSize: 16 * typeScale }]} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                <Text style={[styles.completeRowMeta, { fontSize: 13 * typeScale }]}>{logged} sets complete{metricSummary}</Text>
+                <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} scale={typeScale} />
               </View>
-              <Stepper
-                label="SEVERITY 1–10"
-                display={String(niggleSeverity)}
-                danger={niggleSeverity >= 8}
-                onDec={() => setNiggleSeverity((v) => clamp(v - 1, 1, 10))}
-                onInc={() => setNiggleSeverity((v) => clamp(v + 1, 1, 10))}
-              />
-              <Text style={styles.niggleScale}>
-                3–5 reroutes a compound to accessories · 6+ also bars that joint
-              </Text>
-              <View style={styles.subActions}>
-                <Pressable
-                  onPress={() => setNiggleOpen(false)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel niggle report"
-                  style={styles.subCancel}
-                >
-                  <Text style={styles.subCancelText}>CANCEL</Text>
-                </Pressable>
-                <Pressable
-                  disabled={niggleRegion === null}
-                  onPress={() => {
-                    if (niggleRegion !== null) {
-                      reportNiggle(niggleRegion, niggleSeverity);
-                      setNiggleOpen(false);
-                    }
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    niggleRegion === null
-                      ? 'Pick a region first'
-                      : `Report ${jointLabel(niggleRegion)} severity ${niggleSeverity}`
-                  }
-                  style={[styles.niggleReport, niggleRegion === null && styles.niggleReportDisabled]}
-                >
-                  <Text style={styles.niggleReportText}>REPORT</Text>
-                </Pressable>
-              </View>
+            </View>;
+          }
+          if (!active) return <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+            <Dot state="upcoming" />
+            <Pressable disabled={!selectable} onPress={() => chooseSlot(slot)} accessibilityRole={selectable ? 'button' : 'text'} accessibilityState={{ disabled: !selectable }} accessibilityLabel={selectable ? `Choose ${movement?.name ?? 'movement'} as the current exercise` : `${movement?.name ?? 'Movement'}, upcoming, ${targetText(slot)}`} style={({ pressed }) => [styles.upcomingRow, selectable && styles.upcomingSelectable, pressed && selectable && styles.pressed]}>
+              <View><Text style={[styles.upcomingName, { fontSize: 16 * typeScale }]} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text><Text style={[styles.upcomingMeta, { fontSize: 13 * typeScale }]}>{targetText(slot)}</Text></View>{selectable && <Text style={[styles.choose, { fontSize: 13 * typeScale }]}>Choose</Text>}
             </Pressable>
-          </Pressable>
-        </Modal>
-      )}
-    </View>
-  );
+          </View>;
+          return <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+            <Dot state="current" />
+            <View style={styles.currentCard}>
+              {resting ? <>
+                <Text style={[styles.currentLabel, { fontSize: 12 * typeScale }]}>REST</Text>
+                <Text style={[styles.restTime, { fontSize: 42 * typeScale }]}>{secondsText(restRemaining)}</Text>
+                <Text style={[styles.restBody, { fontSize: 16 * typeScale }]}>Recover for {movement?.name ?? 'the next set'}.</Text>
+                <Pressable onPress={readyNow} accessibilityRole="button" accessibilityLabel="Ready now, skip the rest timer" style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}><Text style={[styles.primaryText, { fontSize: 17 * typeScale }]}>Ready now</Text></Pressable>
+                {upcomingText !== null && <Text style={[styles.nextUp, { fontSize: 13 * typeScale }]}>Next up: {upcomingText}</Text>}
+              </> : <>
+                <Text style={[styles.currentLabel, { fontSize: 12 * typeScale }]}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
+                <Text style={[styles.movementName, { fontSize: 27 * typeScale }]}>{movement?.name ?? 'Movement'}</Text>
+                <Text style={[styles.targetLine, { fontSize: 16 * typeScale }]}>Target {targetText(slot)}{slot.targetRpe === null ? '' : ` · RPE ${slot.targetRpe.toFixed(1)}`}</Text>
+                <Text style={[styles.loadEvidence, { fontSize: 14 * typeScale }]}>{loadEvidence}</Text>
+                <View style={styles.stepperRow}>
+                  <Stepper scale={typeScale} label={target?.kind === 'time' ? 'Seconds' : 'Reps'} value={String(target?.kind === 'time' ? seconds : reps)} minus={() => target?.kind === 'time' ? setSeconds((n) => clamp(n - 5, 5, 3600)) : setReps((n) => clamp(n - 1, 1, 50))} plus={() => target?.kind === 'time' ? setSeconds((n) => clamp(n + 5, 5, 3600)) : setReps((n) => clamp(n + 1, 1, 50))} />
+                  <Stepper scale={typeScale} label="Load kg" value={loadKg.toFixed(1)} minus={() => setLoadKg((n) => clamp(n - 2.5, 0, 500))} plus={() => setLoadKg((n) => clamp(n + 2.5, 0, 500))} />
+                  <Stepper scale={typeScale} label="RPE" value={rpe.toFixed(1)} minus={() => setRpe((n) => clamp(n - .5, 5, 10))} plus={() => setRpe((n) => clamp(n + .5, 5, 10))} />
+                </View>
+                {supportsBands && <View style={styles.bandBlock}>
+                  <Text style={[styles.bandLabel, { fontSize: 13 * typeScale }]}>Band</Text>
+                  <View style={styles.bandChoices}>{bandLadder.map((band) => {
+                    const selectedBand = bandLevel === band.level;
+                    return <Pressable key={band.level} onPress={() => setBandLevel(selectedBand ? null : band.level)} accessibilityRole="button" accessibilityState={{ selected: selectedBand }} accessibilityLabel={`Band ${band.label}${selectedBand ? ', selected' : ''}`} style={({ pressed }) => [styles.bandChoice, selectedBand && styles.bandChoiceSelected, pressed && styles.pressed]}><Text style={[styles.bandChoiceText, selectedBand && styles.bandChoiceTextSelected]}>{band.label}</Text></Pressable>;
+                  })}</View>
+                </View>}
+                <Pressable onPress={logCurrent} accessibilityRole="button" accessibilityLabel={`Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`} style={({ pressed }) => [styles.logAction, pressed && styles.logActionPressed]}><Text style={[styles.logText, { fontSize: 19 * typeScale }]}>Log set</Text></Pressable>
+                <Disclosure open={detailsOpen} onPress={() => setDetailsOpen((value) => !value)}>
+                  {movement?.coachingIntent != null && <Text style={[styles.intent, { fontSize: 15 * typeScale }]}>{movement.coachingIntent}</Text>}
+                  {setup.length > 0 && <View style={styles.copyGroup}><Text style={[styles.copyHeading, { fontSize: 12 * typeScale }]}>SET UP</Text>{setup.map((line, index) => <Text key={`setup-${index}`} style={[styles.copyLine, { fontSize: 15 * typeScale }]}>{index + 1}. {line}</Text>)}</View>}
+                  {cues.length > 0 && <View style={styles.copyGroup}><Text style={[styles.copyHeading, { fontSize: 12 * typeScale }]}>CUES</Text>{cues.map((line, index) => <Text key={`cue-${index}`} style={[styles.copyLine, { fontSize: 15 * typeScale }]}>• {line}</Text>)}</View>}
+                  {setup.length === 0 && cues.length === 0 && movement?.coachingIntent == null && <Text style={[styles.missing, { fontSize: 14 * typeScale }]}>Curated coaching for this movement is still being reviewed.</Text>}
+                  {movement?.videoUrl !== undefined && movement.videoUrl.trim().length > 0 && <Pressable onPress={() => { void Linking.openURL(movement.videoUrl); }} accessibilityRole="link" accessibilityLabel={`Open video for ${movement.name} in your browser`} style={({ pressed }) => [styles.video, pressed && styles.pressed]}><Text style={[styles.videoText, { fontSize: 15 * typeScale }]}>Open form video</Text></Pressable>}
+                </Disclosure>
+                <View style={styles.quickRow}>
+                  <Pressable onPress={thumbsDown} accessibilityRole="button" accessibilityLabel={`Avoid ${movement?.name ?? 'this movement'} and find a substitution`} style={({ pressed }) => [styles.quick, pressed && styles.pressed]}><Text style={[styles.quickText, { fontSize: 14 * typeScale }]}>Doesn’t feel right</Text></Pressable>
+                  <Pressable onPress={() => setSafetyOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: safetyOpen }} accessibilityLabel={`Report discomfort, ${safetyOpen ? 'expanded' : 'collapsed'}`} style={({ pressed }) => [styles.quick, pressed && styles.pressed]}><Text style={[styles.quickText, { fontSize: 14 * typeScale }]}>Report discomfort</Text></Pressable>
+                </View>
+                {safetyOpen && <View style={styles.safety}>
+                  <Text style={[styles.safetyPrompt, { fontSize: 15 * typeScale }]}>Where, and how strong is it?</Text>
+                  <View style={styles.joints}>{(JOINTS as readonly string[]).map((joint) => {
+                    const selectedJoint = niggleRegion === joint;
+                    return <Pressable key={joint} onPress={() => setNiggleRegion(joint)} accessibilityRole="button" accessibilityState={{ selected: selectedJoint }} accessibilityLabel={`${joint.replace(/_/g, ' ')}${selectedJoint ? ', selected' : ''}`} style={({ pressed }) => [styles.joint, selectedJoint && styles.jointSelected, pressed && styles.pressed]}><Text style={[styles.jointText, selectedJoint && styles.jointTextSelected]}>{joint.replace(/_/g, ' ')}</Text></Pressable>;
+                  })}</View>
+                  <View style={styles.severity}>{[4, 6, 8].map((severity) => {
+                    const selectedSeverity = niggleSeverity === severity;
+                    const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
+                    return <Pressable key={severity} onPress={() => setNiggleSeverity(severity)} accessibilityRole="button" accessibilityState={{ selected: selectedSeverity }} accessibilityLabel={`${label} discomfort, ${severity} of 10`} style={({ pressed }) => [styles.severityButton, selectedSeverity && (severity >= 8 ? styles.severityDanger : styles.severitySelected), pressed && styles.pressed]}><Text style={[styles.severityText, selectedSeverity && styles.severityTextSelected]}>{label}</Text></Pressable>;
+                  })}</View>
+                  <Pressable disabled={niggleRegion === null} onPress={submitNiggle} accessibilityRole="button" accessibilityLabel="Save discomfort report" style={({ pressed }) => [styles.safetySubmit, niggleRegion === null && styles.disabled, pressed && styles.pressed]}><Text style={[styles.safetySubmitText, { fontSize: 15 * typeScale }]}>{niggleSeverity >= 8 ? 'Stop session' : 'Find an alternative'}</Text></Pressable>
+                </View>}
+                <Pressable onPress={() => runnerHalt('manual')} accessibilityRole="button" accessibilityLabel="Stop this session" style={({ pressed }) => [styles.stop, pressed && styles.pressed]}><Text style={[styles.stopText, { fontSize: 14 * typeScale }]}>Stop session</Text></Pressable>
+              </>}
+            </View>
+          </View>;
+        })}
+      </View>}
+
+      {!halted && !complete && substitution !== null && <View style={styles.substitution}>
+        <View style={styles.subHeader}><View><Text style={[styles.subTitle, { fontSize: 19 * typeScale }]}>Choose an alternative</Text><Text style={[styles.subBody, { fontSize: 14 * typeScale }]}>Your completed sets stay recorded. The replacement carries the remaining work.</Text></View><Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={({ pressed }) => [styles.close, pressed && styles.pressed]}><Text style={styles.closeText}>×</Text></Pressable></View>
+        {substitution.result.haltAdvised && <View style={styles.subHalt}><Text style={[styles.subHaltText, { fontSize: 15 * typeScale }]}>This report needs a pause rather than another exercise today.</Text><Pressable onPress={() => runnerHalt('safety')} accessibilityRole="button" accessibilityLabel="Halt session from substitution safety advice" style={({ pressed }) => [styles.danger, pressed && styles.pressed]}><Text style={[styles.dangerText, { fontSize: 15 * typeScale }]}>Stop session</Text></Pressable></View>}
+        {substitution.result.layer1Regression.options.map((option) => <Pressable key={option.movement_id} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}><View style={styles.optionCopy}><Text style={[styles.optionName, { fontSize: 16 * typeScale }]}>{option.name}</Text><Text style={[styles.optionReason, { fontSize: 13 * typeScale }]}>{option.rationale}</Text></View><Text style={styles.optionArrow}>›</Text></Pressable>)}
+        {substitution.result.layer2DaySwap.options.map((option) => <Pressable key={`swap-${option.plannedSlotId}`} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}><View style={styles.optionCopy}><Text style={[styles.optionName, { fontSize: 16 * typeScale }]}>{option.name}</Text><Text style={[styles.optionReason, { fontSize: 13 * typeScale }]}>{option.rationale}</Text></View><Text style={styles.optionArrow}>›</Text></Pressable>)}
+        {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && <Text style={[styles.noOptions, { fontSize: 14 * typeScale }]}>No safe replacement is available with today’s equipment. It is okay to finish here.</Text>}
+      </View>}
+    </ScrollView>
+  </View>;
 }
 
-// ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bg, padding: 16 },
-  center: {
-    flex: 1,
-    backgroundColor: palette.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startBtn: {
-    minHeight: 96,
-    minWidth: 280,
-    borderRadius: 18,
-    backgroundColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startBtnPressed: { backgroundColor: '#26C28F' },
-  startBtnText: { color: '#06251B', fontSize: 24, fontWeight: '800', letterSpacing: 2 },
-
-  haltBanner: {
-    backgroundColor: '#2A1416',
-    borderWidth: 2,
-    borderColor: palette.red,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-  },
-  haltBannerText: { color: palette.red, fontSize: 14, fontWeight: '700', lineHeight: 20 },
-
-  targetRow: {
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.line,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 8,
-  },
-  targetText: {
-    color: palette.green,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 1,
-    fontVariant: ['tabular-nums'],
-  },
-  targetReason: { color: palette.amber, fontSize: 12, lineHeight: 17, marginTop: 4 },
-
-  noteBox: { alignSelf: 'stretch', paddingHorizontal: 24, marginTop: 26 },
-  noteLabel: { color: palette.dim, fontSize: 12, letterSpacing: 2, marginBottom: 8 },
-  noteInput: {
-    minHeight: 64,
-    borderRadius: 12,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.line,
-    color: palette.text,
-    fontSize: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    textAlignVertical: 'top',
-  },
-  noteSaveBtn: {
-    minHeight: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  noteSaveBtnDisabled: { borderColor: palette.line },
-  noteSaveText: { color: palette.green, fontSize: 14, fontWeight: '800', letterSpacing: 1.5 },
-
-  navStrip: { flexGrow: 0, marginBottom: 8 },
-  navStripContent: { gap: 8, paddingVertical: 4, alignItems: 'stretch' },
-  navSlot: {
-    minHeight: 60,
-    minWidth: 92,
-    maxWidth: 150,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.line,
-    justifyContent: 'center',
-  },
-  navSlotActive: { borderColor: palette.green, backgroundColor: '#10241D' },
-  navSlotName: { color: palette.dim, fontSize: 14, fontWeight: '700' },
-  navSlotNameActive: { color: palette.green },
-  navSlotBadge: {
-    color: palette.dim,
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 2,
-    fontVariant: ['tabular-nums'],
-  },
-  navSlotBadgeDone: { color: palette.green },
-  navAction: {
-    minHeight: 60,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navActionText: { color: palette.amber, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-
-  pickPanel: {
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.amber,
-    padding: 12,
-    marginBottom: 8,
-    // Bound the picker so a fully-expanded library never eats the logging UI.
-    maxHeight: 280,
-  },
-  pickTitle: { color: palette.amber, fontSize: 13, fontWeight: '800', letterSpacing: 1.5, marginBottom: 10 },
-  pickScroll: { flexGrow: 0 },
-  pickCancel: { marginTop: 10, alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center' },
-  pickCancelText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-
-  catHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 48,
-    paddingHorizontal: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.line,
-  },
-  catChevron: { color: palette.amber, fontSize: 14, width: 18, fontWeight: '800' },
-  catHeaderText: { color: palette.text, fontSize: 14, fontWeight: '800', letterSpacing: 1.5, flex: 1 },
-  catCount: {
-    color: palette.dim,
-    fontSize: 13,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-    minWidth: 22,
-    textAlign: 'right',
-  },
-  catBody: { paddingVertical: 6, gap: 6 },
-  libRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  libPick: {
-    flex: 1,
-    minHeight: 52,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: palette.bg,
-    borderWidth: 1,
-    borderColor: palette.line,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  libName: { color: palette.text, fontSize: 14, fontWeight: '700', flexShrink: 1 },
-  libMeta: { color: palette.dim, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginLeft: 8 },
-
-  thumbWrap: { flexDirection: 'row', gap: 6 },
-  thumb: {
-    width: 48,
-    height: 52,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.line,
-    backgroundColor: palette.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumbUpOn: { borderColor: palette.green, backgroundColor: '#10241D' },
-  thumbDownOn: { borderColor: palette.red, backgroundColor: '#2A1416' },
-  thumbText: { fontSize: 20 },
-
-  prefixRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 10 },
-  prefixLabel: { color: palette.dim, fontSize: 12, letterSpacing: 2 },
-  prefixChips: { gap: 8, alignItems: 'center', paddingRight: 4 },
-  prefixChip: {
-    minHeight: 40,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.line,
-    backgroundColor: palette.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  prefixChipOn: { borderColor: palette.green, backgroundColor: '#10241D' },
-  prefixChipText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  prefixChipTextOn: { color: palette.green },
-  condChip: {
-    minHeight: 40,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.line,
-    backgroundColor: palette.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  condChipOn: { borderColor: palette.amber, backgroundColor: '#2A210F' },
-  condChipText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  condChipTextOn: { color: palette.amber },
-  condVectors: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  condVec: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.amber,
-    backgroundColor: '#2A210F',
-  },
-  condVecVal: { color: palette.amber, fontSize: 20, fontWeight: '800' },
-  condVecLabel: { color: palette.dim, fontSize: 10, letterSpacing: 1.5, marginTop: 2 },
-  loggingName: {
-    color: palette.text,
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 6,
-    letterSpacing: 0.5,
-  },
-
-  stepper: { marginTop: 10 },
-  stepperLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  stepperLabel: { color: palette.dim, fontSize: 12, letterSpacing: 2 },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  stepBtn: {
-    width: 72,
-    height: 60,
-    borderRadius: 12,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepBtnPressed: { backgroundColor: '#22222A' },
-  stepBtnText: { color: palette.text, fontSize: 32, fontWeight: '700', lineHeight: 36 },
-  stepperValue: {
-    flex: 1,
-    color: palette.text,
-    fontSize: 36,
-    fontWeight: '800',
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
-  stepperValueDanger: { color: palette.red },
-
-  logBtn: {
-    height: 84,
-    borderRadius: 16,
-    backgroundColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  logBtnPressed: { backgroundColor: '#26C28F' },
-  logBtnDisabled: { backgroundColor: palette.line },
-  logBtnText: { color: '#06251B', fontSize: 24, fontWeight: '800', letterSpacing: 3 },
-
-  setList: { flex: 1, marginTop: 12 },
-  emptyText: { color: palette.dim, textAlign: 'center', marginTop: 24, fontSize: 14 },
-  dimText: { color: palette.dim, fontSize: 14, paddingVertical: 8 },
-  setRowWrap: { marginBottom: 6 },
-  setRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-  },
-  setRowName: { color: palette.dim, fontSize: 14, fontWeight: '600', flexShrink: 1 },
-  setRowData: {
-    color: palette.text,
-    fontSize: 17,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-
-  rowMenu: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-    paddingHorizontal: 4,
-  },
-  rowMenuBtn: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowMenuBtnText: { color: palette.amber, fontSize: 14, fontWeight: '800', letterSpacing: 1.5 },
-  rowMenuDelete: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.red,
-    backgroundColor: '#2A1416',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowMenuDeleteText: { color: palette.red, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  rowMenuClose: {
-    width: 48,
-    minHeight: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowMenuCloseText: { color: palette.dim, fontSize: 18, fontWeight: '800' },
-
-  editPanel: {
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.amber,
-    padding: 12,
-    marginBottom: 6,
-  },
-  editTitle: { color: palette.amber, fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
-  editSteppers: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  miniStepper: { flex: 1 },
-  miniLabel: { color: palette.dim, fontSize: 10, letterSpacing: 1.5, marginBottom: 4, textAlign: 'center' },
-  miniRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  miniBtn: {
-    width: 40,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: palette.bg,
-    borderWidth: 1,
-    borderColor: palette.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  miniBtnText: { color: palette.text, fontSize: 24, fontWeight: '700', lineHeight: 26 },
-  miniValue: {
-    flex: 1,
-    color: palette.text,
-    fontSize: 18,
-    fontWeight: '800',
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
-  editActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  editCancel: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editCancelText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  editSave: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 10,
-    backgroundColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editSaveText: { color: '#06251B', fontSize: 14, fontWeight: '800', letterSpacing: 1.5 },
-
-  subBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  subCard: {
-    width: '100%',
-    maxWidth: 420,
-    maxHeight: '82%',
-    backgroundColor: palette.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: palette.line,
-    padding: 16,
-  },
-  subTitle: {
-    color: palette.text,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 12,
-  },
-  subScroll: { flexGrow: 0 },
-  subHalt: {
-    backgroundColor: '#2A1416',
-    borderWidth: 1,
-    borderColor: palette.red,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
-  },
-  subHaltText: { color: palette.red, fontSize: 13, fontWeight: '700', lineHeight: 18 },
-  subTier: { flexDirection: 'row', marginBottom: 14 },
-  subTierBar: { width: 4, borderRadius: 2, marginRight: 10 },
-  subTierBody: { flex: 1 },
-  subTierLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
-  subOption: {
-    minHeight: 56,
-    backgroundColor: palette.bg,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.line,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  subOptionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  subOptionName: { color: palette.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
-  subOptionTag: {
-    color: palette.dim,
-    fontSize: 12,
-    fontWeight: '700',
-    marginLeft: 8,
-    fontVariant: ['tabular-nums'],
-  },
-  subOptionWhy: { color: palette.dim, fontSize: 12, lineHeight: 17, marginTop: 4 },
-  triCluster: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  triChip: {
-    color: palette.text,
-    fontSize: 13,
-    fontWeight: '700',
-    backgroundColor: palette.bg,
-    borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    overflow: 'hidden',
-  },
-  subEmpty: { color: palette.dim, fontSize: 14, lineHeight: 20, paddingVertical: 8 },
-  subActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  subBrowse: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subBrowseText: { color: palette.amber, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  subCancel: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subCancelText: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-
-  niggleBtn: {
-    minWidth: 52,
-    minHeight: 52,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.line,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  niggleBtnActive: { borderColor: palette.amber, backgroundColor: '#2A210F' },
-  niggleBtnIcon: { fontSize: 20, color: palette.amber },
-  niggleBtnCount: {
-    color: palette.amber,
-    fontSize: 14,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  niggleCard: {
-    width: '100%',
-    maxWidth: 420,
-    maxHeight: '82%',
-    backgroundColor: palette.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: palette.amber,
-    padding: 16,
-  },
-  niggleHint: { color: palette.dim, fontSize: 13, marginBottom: 10 },
-  jointWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
-  jointChip: {
-    minHeight: 48,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.line,
-    backgroundColor: palette.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  jointChipOn: { borderColor: palette.amber, backgroundColor: '#2A210F' },
-  jointChipText: { color: palette.dim, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
-  jointChipTextOn: { color: palette.amber },
-  niggleScale: { color: palette.dim, fontSize: 12, lineHeight: 17, marginTop: 8, marginBottom: 4 },
-  niggleReport: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: palette.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  niggleReportDisabled: { backgroundColor: palette.line },
-  niggleReportText: { color: '#2A1A06', fontSize: 14, fontWeight: '800', letterSpacing: 1.5 },
-
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: palette.line,
-  },
-  footerLabel: { color: palette.dim, fontSize: 11, letterSpacing: 2 },
-  footerValue: {
-    color: palette.text,
-    fontSize: 20,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  footerOver: { color: palette.red },
-  endBtn: {
-    minHeight: 60,
-    minWidth: 110,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: palette.red,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  endBtnPressed: { backgroundColor: '#2A1416' },
-  endBtnText: { color: palette.red, fontSize: 18, fontWeight: '800', letterSpacing: 2 },
+  screen: { flex: 1, backgroundColor: palette.bg },
+  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 48 },
+  idle: { flex: 1, alignItems: 'flex-start', justifyContent: 'center', padding: 28, backgroundColor: palette.bg },
+  kicker: { color: accent, fontWeight: '800', letterSpacing: 1.2 },
+  idleTitle: { marginTop: 12, color: palette.text, fontWeight: '700', letterSpacing: -.5 },
+  idleBody: { marginTop: 12, maxWidth: 330, color: palette.dim, lineHeight: 23 },
+  header: { marginBottom: 24 },
+  headerTitle: { marginTop: 7, color: palette.text, fontWeight: '700', letterSpacing: -.4 },
+  headerMeta: { marginTop: 8, color: palette.dim },
+  primary: { minHeight: 58, minWidth: 176, marginTop: 24, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start', borderRadius: 12, backgroundColor: accent },
+  primaryPressed: { backgroundColor: '#69F3C4' },
+  primaryText: { color: palette.bg, fontWeight: '800' },
+  timeline: { marginTop: 2 },
+  timelineRow: { flexDirection: 'row', alignItems: 'stretch' },
+  rail: { width: 30, alignItems: 'center', borderRightWidth: 1, borderRightColor: palette.line },
+  dot: { width: 13, height: 13, marginTop: 18, borderRadius: 7, borderWidth: 2, borderColor: palette.dim, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  dotCurrent: { width: 16, height: 16, marginTop: 20, borderColor: accent, backgroundColor: accent },
+  dotComplete: { borderColor: palette.green, backgroundColor: palette.green },
+  check: { color: palette.bg, fontSize: 9, fontWeight: '900' },
+  completeRow: { flex: 1, minHeight: 56, marginLeft: 16, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: palette.line },
+  completeRowName: { color: palette.text, fontWeight: '600' },
+  completeRowMeta: { marginTop: 3, color: palette.green },
+  loggedDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: palette.line },
+  loggedDetailsTrigger: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  loggedDetailsTitle: { color: palette.dim, fontWeight: '700' },
+  loggedDetailsBody: { paddingBottom: 4 },
+  loggedMetricRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: palette.line },
+  loggedMetricTitle: { color: palette.text, fontWeight: '700' },
+  metricAdjustRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  metricAdjust: { minWidth: 54, minHeight: 40, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 8 },
+  metricAdjustText: { color: palette.text, fontWeight: '700' },
+  metricValue: { minWidth: 68, marginHorizontal: 8, color: palette.text, fontWeight: '700', textAlign: 'center' },
+  loggedBandBlock: { marginTop: 10 },
+  loggedBandLabel: { color: palette.dim, fontWeight: '800', letterSpacing: .7, textTransform: 'uppercase' },
+  loggedBandChoices: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6, marginHorizontal: -3 },
+  loggedBandChoice: { minHeight: 36, margin: 3, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 8 },
+  currentCard: { flex: 1, marginLeft: 16, marginBottom: 12, padding: 20, borderWidth: 1, borderColor: accent, borderRadius: 16, backgroundColor: palette.surface },
+  currentLabel: { color: accent, fontWeight: '800', letterSpacing: 1 },
+  movementName: { marginTop: 8, color: palette.text, fontWeight: '700', letterSpacing: -.5 },
+  targetLine: { marginTop: 8, color: palette.text, fontWeight: '600' },
+  loadEvidence: { marginTop: 5, color: palette.dim },
+  stepperRow: { flexDirection: 'row', marginTop: 22, marginHorizontal: -4 },
+  stepper: { flex: 1, minWidth: 0, marginHorizontal: 4, alignItems: 'center' },
+  stepperLabel: { minHeight: 30, color: palette.dim, fontSize: 11, fontWeight: '800', letterSpacing: .55, textTransform: 'uppercase' },
+  stepperButton: { width: '100%', minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 10, backgroundColor: palette.bg },
+  stepperSymbol: { color: palette.text, fontSize: 26, fontWeight: '400' },
+  stepperValue: { minHeight: 37, paddingTop: 8, color: palette.text, fontSize: 17, fontWeight: '700' },
+  logAction: { minHeight: 64, marginTop: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: accent },
+  logActionPressed: { backgroundColor: '#69F3C4' },
+  logText: { color: palette.bg, fontWeight: '800' },
+  restTime: { marginTop: 10, color: palette.text, fontWeight: '700', letterSpacing: -1 },
+  restBody: { marginTop: 6, color: palette.dim },
+  nextUp: { marginTop: 16, color: palette.dim, lineHeight: 19 },
+  upcomingRow: { flex: 1, minHeight: 68, marginLeft: 16, paddingVertical: 13, paddingRight: 8, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: palette.line },
+  upcomingSelectable: { paddingHorizontal: 10, borderRadius: 10, backgroundColor: palette.surface },
+  upcomingName: { color: palette.text, fontWeight: '600' },
+  upcomingMeta: { marginTop: 3, color: palette.dim },
+  choose: { alignSelf: 'center', color: accent, fontSize: 13, fontWeight: '700' },
+  disclosure: { marginTop: 18, borderTopWidth: 1, borderTopColor: palette.line },
+  disclosureTrigger: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  disclosureTitle: { color: palette.text, fontSize: 15, fontWeight: '700' },
+  chevron: { color: palette.dim, fontSize: 20 },
+  disclosureBody: { paddingBottom: 4 },
+  intent: { color: palette.text, lineHeight: 22 },
+  copyGroup: { marginTop: 16 },
+  copyHeading: { marginBottom: 7, color: palette.dim, fontWeight: '800', letterSpacing: .8 },
+  copyLine: { marginBottom: 6, color: palette.text, lineHeight: 22 },
+  missing: { color: palette.dim, lineHeight: 20 },
+  video: { minHeight: 48, marginTop: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: accent, borderRadius: 10 },
+  videoText: { color: accent, fontWeight: '700' },
+  bandBlock: { marginTop: 18 },
+  bandLabel: { color: palette.dim, fontWeight: '800', letterSpacing: .7, textTransform: 'uppercase' },
+  bandChoices: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginHorizontal: -3 },
+  bandChoice: { minHeight: 40, margin: 3, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 9 },
+  bandChoiceSelected: { borderColor: accent, backgroundColor: '#143228' },
+  bandChoiceText: { color: palette.dim, fontSize: 13, fontWeight: '600' },
+  bandChoiceTextSelected: { color: palette.text },
+  quickRow: { flexDirection: 'row', marginTop: 12, marginHorizontal: -4 },
+  quick: { flex: 1, minHeight: 48, marginHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 10 },
+  quickText: { color: palette.text, fontWeight: '600', textAlign: 'center' },
+  safety: { marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: '#1D1A16' },
+  safetyPrompt: { color: palette.text, fontWeight: '600' },
+  joints: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, marginHorizontal: -3 },
+  joint: { minHeight: 36, margin: 3, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 8 },
+  jointSelected: { borderColor: palette.amber, backgroundColor: '#3A2D1C' },
+  jointText: { color: palette.dim, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
+  jointTextSelected: { color: palette.text },
+  severity: { flexDirection: 'row', marginTop: 12, marginHorizontal: -3 },
+  severityButton: { flex: 1, minHeight: 44, marginHorizontal: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 9 },
+  severitySelected: { borderColor: palette.amber, backgroundColor: '#3A2D1C' },
+  severityDanger: { borderColor: palette.red, backgroundColor: '#3B1C1C' },
+  severityText: { color: palette.dim, fontSize: 13, fontWeight: '700' },
+  severityTextSelected: { color: palette.text },
+  safetySubmit: { minHeight: 48, marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: palette.amber },
+  safetySubmitText: { color: palette.bg, fontWeight: '800' },
+  disabled: { opacity: .42 },
+  stop: { minHeight: 44, marginTop: 8, alignItems: 'center', justifyContent: 'center' },
+  stopText: { color: palette.dim, textDecorationLine: 'underline' },
+  haltCard: { padding: 20, borderWidth: 1, borderColor: palette.red, borderRadius: 16, backgroundColor: '#251616' },
+  haltTitle: { color: palette.text, fontWeight: '800' },
+  haltBody: { marginTop: 8, color: palette.text, lineHeight: 22 },
+  danger: { minHeight: 52, marginTop: 18, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start', borderRadius: 11, backgroundColor: palette.red },
+  dangerText: { color: palette.bg, fontWeight: '800' },
+  completeCard: { padding: 20, borderWidth: 1, borderColor: palette.green, borderRadius: 16, backgroundColor: '#13251F' },
+  completeTitle: { color: palette.text, fontWeight: '800' },
+  completeBody: { marginTop: 8, color: palette.text, lineHeight: 22 },
+  emptyCard: { padding: 20, borderWidth: 1, borderColor: palette.line, borderRadius: 16, backgroundColor: palette.surface },
+  emptyTitle: { color: palette.text, fontWeight: '700' },
+  emptyBody: { marginTop: 8, color: palette.dim, lineHeight: 22 },
+  secondary: { minHeight: 52, marginTop: 18, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start', borderWidth: 1, borderColor: palette.line, borderRadius: 11 },
+  secondaryText: { color: palette.text, fontWeight: '700' },
+  substitution: { marginTop: 24, padding: 16, borderWidth: 1, borderColor: accent, borderRadius: 16, backgroundColor: palette.surface },
+  subHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  subTitle: { color: palette.text, fontWeight: '800' },
+  subBody: { maxWidth: 280, marginTop: 5, color: palette.dim, lineHeight: 20 },
+  close: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  closeText: { color: palette.text, fontSize: 27, fontWeight: '300' },
+  subHalt: { marginTop: 14, padding: 13, borderRadius: 10, backgroundColor: '#251616' },
+  subHaltText: { color: palette.text, lineHeight: 21 },
+  option: { minHeight: 64, marginTop: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: palette.line },
+  optionCopy: { flex: 1, paddingRight: 10 },
+  optionName: { color: palette.text, fontWeight: '700' },
+  optionReason: { marginTop: 3, color: palette.dim, lineHeight: 18 },
+  optionArrow: { color: accent, fontSize: 28 },
+  noOptions: { marginTop: 16, color: palette.dim, lineHeight: 20 },
+  pressed: { opacity: .68 },
 });

@@ -26,7 +26,7 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '016_movement_library_seed.sql', '017_movement_batch.sql',
   '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
   '021_taxonomy_corrections.sql',
-  '022_set_target.sql']) {
+  '022_set_target.sql', '023_phase17_session_foundation.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -140,9 +140,9 @@ const gnb = stripComments(gnbRaw);
 a('generateNewBlock body located', gnb.length > 0);
 a('IMMUTABILITY: generateNewBlock writes NO past/raw table (session/set_record/set_prefix/mech_daily/niggle/state_vector)',
   !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(session|set_record|set_prefix|set_target|mech_daily|niggle|state_vector)\b/i.test(gnb));
-a('the ONLY write targets are training_block / block_meta / planned_session / planned_slot',
+a('the ONLY write targets are training_block / block_meta / planned_session / planned_slot / planned_slot_target',
   [...gnb.matchAll(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi)]
-    .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot'].includes(m[1])));
+    .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot', 'planned_slot_target'].includes(m[1])));
 const hyd = stripComments((() => { const i = gnbRaw.indexOf('autopilot hydration'); const j = gnbRaw.indexOf('generateBlock({'); return i >= 0 && j > i ? gnbRaw.slice(i, j) : ''; })());
 a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match(/GROUP BY s\.session_date, m\.pattern/g) || []).length === 1);
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
@@ -236,7 +236,7 @@ if (resetTables.length >= 15) {
     '014_movement_prefixes.sql', '015_set_prefix.sql',
     '016_movement_library_seed.sql', '017_movement_batch.sql',
     '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
-    '021_taxonomy_corrections.sql', '022_set_target.sql'
+    '021_taxonomy_corrections.sql', '022_set_target.sql', '023_phase17_session_foundation.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.

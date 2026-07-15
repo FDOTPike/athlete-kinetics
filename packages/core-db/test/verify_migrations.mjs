@@ -29,7 +29,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '014_movement_prefixes.sql', '015_set_prefix.sql', '016_movement_library_seed.sql', '017_movement_batch.sql',
   '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
   '021_taxonomy_corrections.sql',
-  '022_set_target.sql'];
+  '022_set_target.sql',
+  '023_phase17_session_foundation.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -148,6 +149,54 @@ check('022 re-apply is a true no-op: session_plan_slot_id preserved', b5row?.ses
 check('022 re-apply: target_rpe preserved', b5row?.target_rpe === 7.5, String(b5row?.target_rpe));
 check('022 re-apply: source_planned_slot_id preserved', b5row?.source_planned_slot_id === 42, String(b5row?.source_planned_slot_id));
 
+// --- 2f. Phase 17 side-cars dropped post-apply (foundation self-heal) -------
+console.log('[2f] 023 tables dropped post-apply (Phase 17 foundation self-heal)');
+const b6 = freshDb();
+runMigrations(b6, MIGRATIONS);
+for (const table of [
+  'movement_coaching_intent',
+  'movement_time_policy',
+  'planned_slot_target',
+  'session_slot_target',
+  'profile_ui_preference',
+  'session_runner_checkpoint',
+]) b6.executeSync(`DROP TABLE ${table}`);
+check('precondition: every 023 sentinel is missing', [
+  'movement_coaching_intent',
+  'movement_time_policy',
+  'planned_slot_target',
+  'session_slot_target',
+  'profile_ui_preference',
+  'session_runner_checkpoint',
+].every((name) => sentinelsMissing(b6).includes(name)));
+runMigrations(b6, MIGRATIONS);
+check('self-heal restored every 023 sentinel', sentinelsMissing(b6).length === 0);
+const timePolicy = Object.fromEntries(b6.raw.prepare(`
+  SELECT m.name, printf('%d/%d', p.default_sets, p.target_seconds) AS dose
+  FROM movement_time_policy p JOIN movement m USING(movement_id)
+`).all().map((row) => [row.name, row.dose]));
+const expectedTimePolicy = {
+  'BJJ Sparring Round': '5/300',
+  'Farmer Carry': '3/40',
+  'Plank': '3/30',
+  'Road Run': '1/1200',
+  'Suitcase Carry': '3/40',
+};
+check('023 restores ratified time-policy defaults',
+  Object.keys(timePolicy).length === Object.keys(expectedTimePolicy).length
+    && Object.entries(expectedTimePolicy).every(([name, dose]) => timePolicy[name] === dose),
+  JSON.stringify(timePolicy));
+const prefDefaults = b6.raw.prepare(`
+  SELECT profile_slot_id, session_mode_override, readiness_detail, rest_timer_enabled, text_scale
+  FROM profile_ui_preference ORDER BY profile_slot_id
+`).all();
+check('023 restores one UI-preference row per profile slot with tier defaults',
+  JSON.stringify(prefDefaults) === JSON.stringify([
+    { profile_slot_id: 1, session_mode_override: null, readiness_detail: 'summary', rest_timer_enabled: 1, text_scale: 'system' },
+    { profile_slot_id: 2, session_mode_override: null, readiness_detail: 'full', rest_timer_enabled: 1, text_scale: 'system' },
+    { profile_slot_id: 3, session_mode_override: null, readiness_detail: 'full', rest_timer_enabled: 1, text_scale: 'system' },
+    { profile_slot_id: 4, session_mode_override: null, readiness_detail: 'full', rest_timer_enabled: 1, text_scale: 'system' },
+  ]), JSON.stringify(prefDefaults));
 // --- 3. failing migration: fail fast, recover on retry --------------------------
 console.log('[3] failing migration mid-chain (the device "ln" scenario)');
 const c = freshDb();

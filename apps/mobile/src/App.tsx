@@ -114,7 +114,12 @@ function AppShell(): React.JSX.Element {
           <OnboardingScreen />
         ) : (
           <>
-            {tab === 'readiness' && <ReadinessScreen />}
+            {tab === 'readiness' && (
+              <ReadinessScreen
+                onOpenSession={() => setTab('session')}
+                onOpenCoach={() => setTab('coach')}
+              />
+            )}
             {tab === 'session' && <SessionScreen />}
             {tab === 'coach' && <BlockScreen onSessionStarted={() => setTab('session')} />}
             {tab === 'athlete' && <ProfileScreen />}

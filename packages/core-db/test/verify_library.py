@@ -18,6 +18,7 @@ from pathlib import Path
 
 SCHEMA_DIR = Path(__file__).resolve().parents[1] / "src" / "schema"
 STAGING = Path(__file__).resolve().parents[1] / "staging" / "movement_import.json"
+CONTENT_MANIFEST = Path(__file__).resolve().parents[1] / "staging" / "movement_coaching_intent_manifest.json"
 
 con = sqlite3.connect(":memory:")
 con.row_factory = sqlite3.Row
@@ -30,7 +31,7 @@ def check(label, ok, detail=""):
         fail += 1
 
 print(f"SQLite {sqlite3.sqlite_version}")
-print("\n[1] schema chain applies (001..021, twice: self-heal path)")
+print("\n[1] current schema chain applies twice (self-heal path)")
 files = sorted(f for f in SCHEMA_DIR.glob("0*.sql") if not f.name.startswith("004"))
 for _ in range(2):
     for f in files:
@@ -39,6 +40,17 @@ check("chain applied twice without error (idempotent)", True)
 con.execute("PRAGMA foreign_keys = ON")
 
 staging = json.loads(STAGING.read_text(encoding="utf-8"))
+content_manifest = json.loads(CONTENT_MANIFEST.read_text(encoding="utf-8"))
+if not isinstance(content_manifest.get("slots"), dict):
+    raise ValueError("movement_coaching_intent_manifest.json slots must be an object")
+if not all(isinstance(records, list) for records in content_manifest["slots"].values()):
+    raise ValueError("movement_coaching_intent_manifest.json slot values must be arrays")
+content_manifest_records = [record for records in content_manifest["slots"].values() for record in records]
+if not all(isinstance(record, dict) and isinstance(record.get("name"), str)
+               and re.fullmatch(r"[a-f0-9]{64}", record.get("content_sha256", ""))
+               for record in content_manifest_records):
+    raise ValueError("movement_coaching_intent_manifest.json records need name and content_sha256")
+content_manifest_names = [record["name"] for record in content_manifest_records]
 curated = [m for m in staging["movements"] if m["curated"]]
 # F4 decision (Francis 2026-07-13): BB Glute Bridge / BB Walking Lunge stay
 # prefix-encoded (no rows); equipment-distinct variants are rows. Mirrors
@@ -65,12 +77,21 @@ check("no uncurated staging record leaked into the DB", not leaked, str(leaked[:
 print("\n[3] seeded content quality (the curation contract)")
 rows = con.execute("""
   SELECT m.name, d.base_name, d.supported_prefixes, d.difficulty_rating,
-         d.target_muscles, d.instructions, d.cues, d.video_placeholder_uri
-  FROM movement m JOIN movement_detail d USING(movement_id)
+         d.target_muscles, d.instructions, d.cues, d.video_placeholder_uri,
+         i.coaching_intent
+  FROM movement m
+  JOIN movement_detail d USING(movement_id)
+  LEFT JOIN movement_coaching_intent i USING(movement_id)
 """).fetchall()
 by_name = {r["name"]: r for r in rows}
+emitted_content = set(content_manifest_names)
+manifest_duplicates = sorted({name for name in content_manifest_names if content_manifest_names.count(name) > 1})
+manifest_unknown = sorted(emitted_content - names_db)
+check("coaching-content manifest has no duplicate names", not manifest_duplicates, str(manifest_duplicates[:3]))
+check("coaching-content manifest names are all seeded movements", not manifest_unknown, str(manifest_unknown[:3]))
+content_contract_names = sorted(set(seeded_expect) | (emitted_content & names_db))
 bad_text, bad_json, bad_uri = [], [], []
-for n in seeded_expect:
+for n in content_contract_names:
     r = by_name[n]
     if not (r["instructions"].strip() and r["cues"].strip()):
         bad_text.append(n)
@@ -81,9 +102,9 @@ for n in seeded_expect:
         bad_json.append(n)
     if not r["video_placeholder_uri"].startswith("https://www.youtube.com/watch?v="):
         bad_uri.append(n)
-check("all seeded rows carry instructions + cues", not bad_text, str(bad_text[:3]))
-check("prefix/muscle JSON valid on all seeded rows", not bad_json, str(bad_json[:3]))
-check("all seeded rows carry one YouTube placeholder URI", not bad_uri, str(bad_uri[:3]))
+check("all curated/emitted rows carry instructions + cues", not bad_text, str(bad_text[:3]))
+check("prefix/muscle JSON valid on all curated/emitted rows", not bad_json, str(bad_json[:3]))
+check("all curated/emitted rows carry one YouTube placeholder URI", not bad_uri, str(bad_uri[:3]))
 
 # Audit F5: the curation contract is structural, not just non-empty.
 bad_cues, bad_steps, bad_claims = [], [], []
@@ -92,7 +113,7 @@ BANNED = re.compile(
     r"\b(cure|heal(s|ing)?|guarantee|injury[- ]proof|prevent(s|ing)? injur|bulletproof|"
     r"pain[- ]free|insurance|pays out|burn(s)? fat|melt|shred your|doctor|medical|"
     r"prescription|diagnos|therap)\b", re.I)
-for n in seeded_expect:
+for n in content_contract_names:
     r = by_name[n]
     n_cues = len([c for c in SENT.split(r["cues"]) if c.strip()])
     n_steps = len([c for c in SENT.split(r["instructions"]) if c.strip()])
@@ -105,9 +126,17 @@ for n in seeded_expect:
 check("every seeded row has 1-3 cues (plan info-density law)", not bad_cues, str(bad_cues[:3]))
 check("every seeded row has 2-4 instruction steps (plan law)", not bad_steps, str(bad_steps[:3]))
 check("no medical/performance claims in seeded text", not bad_claims, str(bad_claims[:3]))
-empty_shipped = [r["name"] for r in rows if r["instructions"].strip() == ""]
-check("shipped-content debt is exactly the 30 shipped rows (no seeded row empty)",
-      len(empty_shipped) == 30 and not set(empty_shipped) & set(seeded_expect), f"empty={len(empty_shipped)}")
+intent_by_name = {r["name"]: r["coaching_intent"] for r in rows if r["coaching_intent"] is not None}
+check("emitted coaching intents exactly match the generated manifest",
+      set(intent_by_name) == emitted_content, str(sorted(set(intent_by_name) ^ emitted_content)[:3]))
+bad_intents = [name for name, intent in intent_by_name.items()
+               if not (1 <= len(intent.strip()) <= 160) or BANNED.search(intent)]
+check("every emitted coaching intent is concise and claim-safe", not bad_intents, str(bad_intents[:3]))
+shipped_names = names_db - set(seeded_expect)
+empty_names = {r["name"] for r in rows if r["instructions"].strip() == ""}
+expected_empty = shipped_names - emitted_content
+check("movement-detail content debt matches emitted coaching-content migrations",
+      empty_names == expected_empty, str(sorted(empty_names ^ expected_empty)[:3]))
 n_tax = con.execute(
     "SELECT COUNT(*) FROM movement_taxonomy t JOIN movement m USING(movement_id) WHERE m.name IN (%s)"
     % ",".join("?" * len(seeded_expect)), seeded_expect).fetchone()[0]

@@ -792,7 +792,10 @@ check('thin-data severe-niggle headroom never raises squat in the block',
     storeSrc.includes('beginner_ok: m.beginnerOk') && storeSrc.includes('beginnerOk: m.beginnerOk'));
   check('production: store movement query joins movement_beginner_whitelist', storeSrc.includes('movement_beginner_whitelist'));
   const screenSrc = readFileSync(join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'screens', 'SessionScreen.tsx'), 'utf-8');
-  check('production: picker applies the beginner whitelist rule', screenSrc.includes('beginnerVisible'));
+  check('production: picker applies the beginner whitelist rule',
+    storeSrc.includes("movement.difficulty === 'Beginner' || movement.beginnerOk")
+    && storeSrc.includes('if (!permittedForProfile(movement, profile))')
+    && screenSrc.includes('beginnerPlanViolation'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

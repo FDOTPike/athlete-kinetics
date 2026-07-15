@@ -1,14 +1,11 @@
 /**
- * BlockScreen.tsx — the COACH tab: 4-week block grid + today's plan + the
- * pre-session safety gate. Replaces the vestigial single-session prescription
- * view (pattern picker + PRESCRIBE) — daily adjustments are computed from
- * persisted state automatically; this screen renders them.
+ * BlockScreen.tsx - the COACH surface.
  *
- * RN core components only (Jetsam envelope): the grid is Views in flex rows,
- * no calendar/chart libraries, zero animations.
+ * Coaching information is arranged around one immediate decision, a compact
+ * four-week trajectory, and inline disclosures for management and context.
  */
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SCHEMA_TYPES, targetLoadKg, type SchemaType } from '@ak/inference';
 import {
   palette,
@@ -16,9 +13,19 @@ import {
   type BlockSessionSummary,
   type TodaySlot,
 } from '../state/useStore';
-import InfoTip from '../components/InfoTip';
-
-const signed = (n: number): string => (n > 0 ? `+${n}` : String(n));
+import {
+  Body,
+  Caption,
+  Disclosure,
+  FocusCard,
+  PrimaryAction,
+  ProgressRow,
+  Screen,
+  SecondaryAction,
+  Section,
+  StatusMark,
+  type FocusTone,
+} from '../components/FocusPrimitives';
 
 const FOCUS_ABBREV: Record<string, string> = {
   lower: 'LWR',
@@ -27,11 +34,12 @@ const FOCUS_ABBREV: Record<string, string> = {
   conditioning: 'CND',
   bjj: 'BJJ',
 };
-const PHASE_ABBREV: Record<string, string> = {
-  accumulation: 'ACCUMULATE',
-  intensification: 'INTENSIFY',
-  realization: 'REALIZE',
-  deload: 'DELOAD',
+
+const PHASE_LABEL: Record<string, string> = {
+  accumulation: 'Build',
+  intensification: 'Build strength',
+  realization: 'Realise',
+  deload: 'Deload',
 };
 
 interface BlockScreenProps {
@@ -39,12 +47,64 @@ interface BlockScreenProps {
   onSessionStarted?: () => void;
 }
 
+interface SessionDetail {
+  summary: BlockSessionSummary;
+  slots: TodaySlot[];
+}
+
+interface WeekRow {
+  week: number;
+  phase: string;
+  cells: (BlockSessionSummary | null)[];
+}
+
+const signed = (value: number): string => (value > 0 ? `+${value}` : String(value));
+
+const focusLabel = (focus: string): string => FOCUS_ABBREV[focus] ?? focus.slice(0, 3).toUpperCase();
+
+const focusName = (focus: string): string => focus
+  .split('_')
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ');
+
+const phaseLabel = (phase: string): string => PHASE_LABEL[phase] ?? phase;
+
+function targetLabel(slot: TodaySlot): string {
+  return slot.target.kind === 'time'
+    ? `${slot.sets} x ${slot.target.seconds}s`
+    : `${slot.sets} x ${slot.target.reps}`;
+}
+
+function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): string {
+  if (slot.target.kind === 'time') {
+    return `${targetLabel(slot)} at RPE ${slot.targetRpe.toFixed(1)}`;
+  }
+  const oneRepMax = oneRepMaxes[slot.movementId];
+  const load = slot.overrideLoadKg ?? (
+    oneRepMax !== undefined ? targetLoadKg(oneRepMax, slot.target.reps, slot.targetRpe) : null
+  );
+  return `${targetLabel(slot)} at RPE ${slot.targetRpe.toFixed(1)}${
+    load === null ? '' : `, ${load.toFixed(1)} kg`
+  }`;
+}
+function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
+  return [1, 2, 3, 4].map((week) => {
+    const inWeek = sessions.filter((session) => session.weekIndex === week);
+    return {
+      week,
+      phase: inWeek[0]?.phase ?? 'accumulation',
+      cells: [1, 2, 3, 4, 5, 6, 7].map(
+        (day) => inWeek.find((session) => session.dayIndex === day) ?? null,
+      ),
+    };
+  });
+}
+
 export default function BlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX.Element {
   const vector = useStore((s) => s.vector);
   const today = useStore((s) => s.today);
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
-  const profile = useStore((s) => s.profile);
   const triageReady = useStore((s) => s.triageReady);
   const triaging = useStore((s) => s.triaging);
   const lastTriage = useStore((s) => s.lastTriage);
@@ -60,694 +120,532 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const startSession = useStore((s) => s.startSession);
 
   const [reportText, setReportText] = useState('');
-  /** Forced 1-10 severity (null until chosen) — the engine won't process a
-   *  textual complaint without it (Phase 12 Step 5). */
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
-  const [detail, setDetail] = useState<{ s: BlockSessionSummary; slots: TodaySlot[] } | null>(null);
+  const [detail, setDetail] = useState<SessionDetail | null>(null);
+  const [manageOpen, setManageOpen] = useState(block === null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [confirmUnplannedStart, setConfirmUnplannedStart] = useState(false);
 
   if (vector === null) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorTitle}>NO STATE VECTOR</Text>
-        <Text style={styles.dimText}>
-          Coaching needs today&apos;s readiness data. Sync telemetry or load the demo athlete.
-        </Text>
+        <FocusCard eyebrow="COACH" title="Readiness is needed first" tone="caution">
+          <Body>Sync telemetry or load the demo athlete before asking Coach to adjust today\'s plan.</Body>
+        </FocusCard>
       </View>
     );
   }
 
   const current = prescription !== null && prescription.forDate === today ? prescription : null;
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+  const rows = weekRowsFor(blockSessions);
+  const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
 
-  const confirmRegenerate = (): void => {
-    Alert.alert(
-      'Generate next block?',
-      `The current block is archived and a new ${schema} block starts today, continuing the 32-week cycle.`,
-      [
-        { text: 'KEEP CURRENT', style: 'cancel' },
-        {
-          text: 'GENERATE',
-          style: 'destructive',
-          // Close any open detail card — it snapshots the OLD block's session.
-          onPress: () => { setDetail(null); generateNewBlock(schema); },
-        },
-      ],
-    );
-  };
-
-  const schemaPicker = (
-    <View style={styles.schemaRow}>
-      {SCHEMA_TYPES.map((t) => {
-        const active = t === schema;
-        return (
-          <Pressable
-            key={t}
-            onPress={() => setSchema(t)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-            accessibilityLabel={`${t} loading schema`}
-            style={[styles.schemaChip, active && styles.schemaChipActive]}
-          >
-            <Text style={[styles.schemaChipText, active && styles.schemaChipTextActive]}>
-              {t}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-
-  // Instant start (no forced check-in — field-tested as friction). The
-  // store itself refuses to start while an operative halt is in force.
-  const beginSession = (): void => {
-    startSession();
-    if (onSessionStarted !== undefined) onSessionStarted();
-  };
-  // Field-tested trap: tapping START before any block existed silently
-  // created an unplanned session. Plan-less starts now require an explicit
-  // confirmation instead of an accidental commitment.
-  const requestStart = (): void => {
-    if (block === null || todayPlan === null) {
-      Alert.alert(
-        block === null ? 'No training block yet' : 'Rest day',
-        block === null
-          ? 'Generate a 4-week block below first so sessions follow a plan. Start an unplanned session anyway?'
-          : 'Today is a rest day in your block. Start an unplanned session anyway?',
-        [
-          { text: 'CANCEL', style: 'cancel' },
-          { text: 'START ANYWAY', onPress: beginSession },
-        ],
-      );
+  const openDetail = (summary: BlockSessionSummary): void => {
+    if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
+      setDetail(null);
       return;
     }
-    beginSession();
+    setDetail({ summary, slots: loadSessionSlots(summary.plannedSessionId) });
   };
 
-  const weekRows: { week: number; phase: string; cells: (BlockSessionSummary | null)[] }[] = [];
-  if (block !== null) {
-    for (let week = 1; week <= 4; week++) {
-      const inWeek = blockSessions.filter((s) => s.weekIndex === week);
-      weekRows.push({
-        week,
-        phase: inWeek.length > 0 ? inWeek[0].phase : 'accumulation',
-        cells: [1, 2, 3, 4, 5, 6, 7].map(
-          (day) => inWeek.find((s) => s.dayIndex === day) ?? null,
-        ),
-      });
+  const openNextSession = (): void => {
+    if (nextPlanned === undefined) {
+      setManageOpen(true);
+      return;
     }
+    setDetail({ summary: nextPlanned, slots: loadSessionSlots(nextPlanned.plannedSessionId) });
+  };
+
+  const startPlannedSession = (): void => {
+    startSession();
+    onSessionStarted?.();
+  };
+
+  const startUnplannedSession = (): void => {
+    startSession();
+    onSessionStarted?.();
+  };
+
+  let todayTitle = 'Recovery day';
+  let todayMessage = nextPlanned === undefined
+    ? 'There is no session to complete today. Use the day to recover.'
+    : `There is no session to complete today. Your next session is ${focusName(nextPlanned.focus)}.`;
+  let todayTone: FocusTone = 'default';
+
+  if (halted) {
+    todayTitle = 'Training is paused';
+    todayMessage = 'Today\'s safety report paused training. Review it before doing more work.';
+    todayTone = 'danger';
+  } else if (session !== null) {
+    todayTitle = 'Session in progress';
+    todayMessage = 'Your active workout is ready to resume.';
+    todayTone = 'active';
+  } else if (todayPlan !== null) {
+    todayTitle = `Today: ${focusName(todayPlan.focus)}`;
+    todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
+    todayTone = 'active';
+  } else if (block === null) {
+    todayTitle = 'Build your first block';
+    todayMessage = 'A short four-week block gives Coach a clear trajectory to follow.';
+    todayTone = 'default';
   }
-  const nextPlanned = blockSessions.find((s) => s.sessionDate > today);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {/* ---- today's operative adjustment (policy -> profile -> guardrail) ---- */}
+    <Screen testID="coach-screen">
       {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
-        <View style={styles.haltCard}>
-          <Text style={styles.haltTitle}>STOP — SESSION OVER</Text>
-          <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+        <FocusCard eyebrow="SAFETY" title="Stop training today" tone="danger" style={styles.haltCard}>
+          <Body>{lastTriage.directive.vector.coaching_cue}</Body>
           {lastTriage.directive.followUp !== null && (
-            <Text style={styles.followUp}>{lastTriage.directive.followUp}</Text>
+            <Caption style={styles.followUp}>{lastTriage.directive.followUp}</Caption>
           )}
-        </View>
-      )}
-      {current !== null && !halted && (
-        <View style={styles.resultCard}>
-          <View style={styles.resultHeader}>
-            <Text style={styles.resultDate}>TODAY&apos;S ADJUSTMENT</Text>
-            <View
-              style={[
-                styles.sourceBadge,
-                { borderColor: current.source === 'policy' ? palette.green : palette.amber },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.sourceBadgeText,
-                  { color: current.source === 'policy' ? palette.green : palette.amber },
-                ]}
-              >
-                {current.source === 'guardrail'
-                  ? 'GUARDRAIL'
-                  : current.source === 'profile'
-                    ? 'PROFILE'
-                    : 'POLICY'}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.bigRow}>
-            <View style={styles.bigCell}>
-              <Text style={styles.bigValue}>×{current.vector.load_modifier.toFixed(2)}</Text>
-              <View style={styles.bigLabelRow}>
-                <Text style={styles.bigLabel}>LOAD</Text>
-                <InfoTip term="LOAD" />
-              </View>
-            </View>
-            <View style={styles.bigCell}>
-              <Text style={styles.bigValue}>{signed(current.vector.set_modifier)}</Text>
-              <View style={styles.bigLabelRow}>
-                <Text style={styles.bigLabel}>SETS</Text>
-                <InfoTip term="SETS" />
-              </View>
-            </View>
-            <View style={styles.bigCell}>
-              <Text style={[styles.bigValue, current.vector.rpe_cap >= 10 && styles.bigValueDanger]}>
-                {current.vector.rpe_cap.toFixed(1)}
-              </Text>
-              <View style={styles.bigLabelRow}>
-                <Text style={styles.bigLabel}>RPE CAP</Text>
-                <InfoTip term="RPE" />
-              </View>
-            </View>
-          </View>
-          <Text style={styles.cue}>{current.vector.coaching_cue}</Text>
-          {profileNotes.map((note) => (
-            <Text key={note} style={styles.profileNote}>
-              {note}
-            </Text>
-          ))}
-        </View>
+        </FocusCard>
       )}
 
-      {/* ---- 4-week block ---- */}
-      <Text style={[styles.sectionLabel, styles.sectionGap]}>4-WEEK BLOCK</Text>
-      {block === null ? (
-        <View>
-          <Text style={styles.dimTextLeft}>
-            No block yet. Generation is deterministic: your objective
-            ({profile.objective.replace(/_/g, ' ')}), {profile.weekly_frequency} days/week,
-            your equipment, and the loading schema below decide every session.
-            Nothing leaves the phone.
-          </Text>
-          {schemaPicker}
-          <Pressable
-            onPress={() => generateNewBlock(schema)}
-            accessibilityRole="button"
-            accessibilityLabel="Generate a 4 week training block"
-            style={({ pressed }) => [styles.generateBtn, pressed && styles.generateBtnPressed]}
-          >
-            <Text style={styles.generateBtnText}>GENERATE 4-WEEK BLOCK</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <View>
-          <Text style={styles.blockMeta}>
-            {block.objective.replace(/_/g, ' ').toUpperCase()} · started {block.startDate}
-            {blockMeta !== null
-              ? ` · ${blockMeta.schemaType} · BLOCK ${blockMeta.macroBlockIndex}/8 · ${blockMeta.macroPhase.toUpperCase()}`
-              : ''}
-          </Text>
-          {blockMeta !== null && blockMeta.peakShifted && (
-            <Text style={styles.peakShiftNote}>
-              Auto-regulation: fatigue (ACWR) was high when this peak block was
-              generated — a deload week was inserted and the peak moved back one week.
-            </Text>
-          )}
-          {weekRows.map((row) => (
-            <View key={row.week} style={styles.weekRow}>
-              <View style={styles.weekLabelBox}>
-                <Text style={styles.weekLabel}>W{row.week}</Text>
-                <Text style={styles.weekPhase}>{PHASE_ABBREV[row.phase] ?? row.phase}</Text>
-              </View>
-              {row.cells.map((cell, i) => {
-                if (cell === null) {
-                  return (
-                    <View key={i} style={[styles.dayCell, styles.dayCellRest]}>
-                      <Text style={styles.dayCellRestText}>·</Text>
-                    </View>
-                  );
-                }
-                const isToday = cell.sessionDate === today;
-                return (
-                  <Pressable
-                    key={i}
-                    onPress={() => setDetail({ s: cell, slots: loadSessionSlots(cell.plannedSessionId) })}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Week ${cell.weekIndex} ${cell.focus} session, ${cell.sessionDate}${cell.trained ? ', trained' : ''}`}
-                    style={[
-                      styles.dayCell,
-                      cell.trained && styles.dayCellTrained,
-                      isToday && styles.dayCellToday,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.dayCellText,
-                        cell.trained && styles.dayCellTextTrained,
-                        isToday && styles.dayCellTextToday,
-                      ]}
-                    >
-                      {FOCUS_ABBREV[cell.focus] ?? cell.focus.slice(0, 3).toUpperCase()}
+      <FocusCard eyebrow="TODAY" title={todayTitle} tone={todayTone}>
+        <StatusMark
+          label={
+            halted
+              ? 'Training paused'
+              : session !== null
+                ? 'Active session'
+                : todayPlan !== null
+                  ? 'Planned session'
+                  : block === null
+                    ? 'Plan needed'
+                    : 'Recovery day'
+          }
+          tone={todayTone}
+        />
+        <Body>{todayMessage}</Body>
+        {current !== null && !halted && <Caption style={styles.adjusted}>Coach adjusted today\'s plan.</Caption>}
+
+        {halted ? (
+          <PrimaryAction label="Review safety report" onPress={() => setReportOpen(true)} />
+        ) : session !== null ? (
+          <PrimaryAction label="Open active session" onPress={() => onSessionStarted?.()} />
+        ) : todayPlan !== null ? (
+          <PrimaryAction label="Start session" onPress={startPlannedSession} />
+        ) : block === null ? (
+          <PrimaryAction label="Set up a four-week block" onPress={() => setManageOpen(true)} />
+        ) : (
+          <PrimaryAction
+            label={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
+            onPress={openNextSession}
+          />
+        )}
+      </FocusCard>
+
+      <Section title="Four-week trajectory">
+        {block === null ? (
+          <View style={styles.emptyTrajectory}>
+            <Body>No block is active yet.</Body>
+            <Caption>Set one up below when you are ready to train with a trajectory.</Caption>
+          </View>
+        ) : (
+          <>
+            {rows.map((row) => (
+              <View key={row.week}>
+                <View style={styles.weekRow}>
+                  <View style={styles.weekMeta}>
+                    <Text style={styles.weekTitle}>Week {row.week}</Text>
+                    <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
+                  </View>
+                  <View style={styles.dayRail}>
+                    {row.cells.map((cell, dayIndex) => {
+                      if (cell === null) {
+                        return (
+                          <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
+                            <Text style={styles.dayMarkRestText}>-</Text>
+                          </View>
+                        );
+                      }
+                      const isToday = cell.sessionDate === today;
+                      const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
+                      return (
+                        <Pressable
+                          key={cell.plannedSessionId}
+                          onPress={() => openDetail(cell)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Week ${cell.weekIndex}, ${cell.focus} session on ${cell.sessionDate}${cell.trained ? ', completed' : ''}`}
+                          accessibilityState={{ expanded: isExpanded, selected: isToday }}
+                          style={({ pressed }) => [
+                            styles.dayMark,
+                            cell.trained && styles.dayMarkTrained,
+                            isToday && styles.dayMarkToday,
+                            isExpanded && styles.dayMarkExpanded,
+                            pressed && styles.dayMarkPressed,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.dayMarkText,
+                              cell.trained && styles.dayMarkTextTrained,
+                              isToday && styles.dayMarkTextToday,
+                            ]}
+                          >
+                            {cell.trained ? 'Done' : isToday ? 'Today' : focusLabel(cell.focus)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {detail !== null && detail.summary.weekIndex === row.week && (
+                  <View style={styles.sessionDetail}>
+                    <Text style={styles.sessionDetailTitle}>
+                      {detail.summary.sessionDate} - {focusName(detail.summary.focus)}
+                      {detail.summary.trained ? ' - completed' : ''}
                     </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ))}
-          {detail !== null && (
-            <View style={styles.detailCard}>
-              <Text style={styles.detailTitle}>
-                W{detail.s.weekIndex} · {detail.s.focus.toUpperCase()} · {detail.s.sessionDate}
-                {detail.s.trained ? ' · TRAINED' : ''}
-              </Text>
-              {detail.slots.map((sl) => (
-                <View key={sl.slotIndex} style={styles.slotRow}>
-                  <Text style={styles.slotName} numberOfLines={1}>{sl.movementName}</Text>
-                  <Text style={styles.slotData}>
-                    {sl.sets}×{sl.reps} @ {sl.targetRpe.toFixed(1)}
-                  </Text>
-                </View>
-              ))}
-              <Pressable
-                onPress={() => setDetail(null)}
-                accessibilityRole="button"
-                accessibilityLabel="Close session detail"
-                style={styles.detailClose}
-              >
-                <Text style={styles.detailCloseText}>CLOSE</Text>
-              </Pressable>
-            </View>
-          )}
-          {schemaPicker}
-          <Pressable
-            onPress={confirmRegenerate}
-            accessibilityRole="button"
-            accessibilityLabel="Generate the next block in the macro cycle"
-            style={styles.regenBtn}
-          >
-            <Text style={styles.regenBtnText}>NEXT BLOCK ({schema})</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* ---- today's plan / rest day ---- */}
-      <Text style={[styles.sectionLabel, styles.sectionGap]}>TODAY&apos;S PLAN</Text>
-      {todayPlan !== null ? (
-        <View style={styles.todayCard}>
-          <Text style={styles.todayFocus}>
-            {todayPlan.focus.toUpperCase()} · {PHASE_ABBREV[todayPlan.phase] ?? todayPlan.phase}
-          </Text>
-          {todayPlan.slots.map((sl) => {
-            const oneRm = oneRepMaxes[sl.movementId] as number | undefined;
-            const target = sl.overrideLoadKg ?? (oneRm !== undefined
-              ? targetLoadKg(oneRm, sl.reps, sl.targetRpe)
-              : null);
-            return (
-              <View key={sl.slotIndex}>
-                <View style={styles.slotRow}>
-                  <Text style={styles.slotName} numberOfLines={1}>{sl.movementName}</Text>
-                  <Text style={styles.slotData}>
-                    {sl.sets}×{sl.reps} @ {sl.targetRpe.toFixed(1)}
-                    {target !== null ? ` · ${target.toFixed(1)}kg` : ''}
-                  </Text>
-                </View>
-                {sl.overrideReason !== null && (
-                  <Text style={styles.overrideReason}>{sl.overrideReason}</Text>
+                    {detail.slots.map((slot) => (
+                      <ProgressRow
+                        key={slot.slotIndex}
+                        label={slot.movementName}
+                        value={targetLabel(slot)}
+                        detail={`RPE ${slot.targetRpe.toFixed(1)}`}
+                      />
+                    ))}
+                    <SecondaryAction label="Close session preview" onPress={() => setDetail(null)} />
+                  </View>
                 )}
               </View>
-            );
-          })}
-          {current !== null && !halted && (
-            <Text style={styles.dimTextLeft}>
-              Today&apos;s adjustment applies on top: ×{current.vector.load_modifier.toFixed(2)} load,
-              {' '}{signed(current.vector.set_modifier)} sets, RPE cap {current.vector.rpe_cap.toFixed(1)}.
-            </Text>
+            ))}
+            <Caption style={styles.trajectoryHint}>Tap a planned day to see its movements.</Caption>
+          </>
+        )}
+      </Section>
+
+      <Section title="Optional details">
+        <Disclosure label="Why today changed" hint="Adjustment source and limits">
+          {current === null ? (
+            <Caption>No extra adjustment is active for today.</Caption>
+          ) : (
+            <>
+              <ProgressRow label="Source" value={current.source} />
+              <ProgressRow label="Load" value={`x${current.vector.load_modifier.toFixed(2)}`} />
+              <ProgressRow label="Sets" value={signed(current.vector.set_modifier)} />
+              <ProgressRow label="RPE cap" value={current.vector.rpe_cap.toFixed(1)} />
+              {profileNotes.map((note) => (
+                <Caption key={note} style={styles.profileNote}>{note}</Caption>
+              ))}
+            </>
           )}
-        </View>
-      ) : (
-        <View style={styles.restCard}>
-          <Text style={styles.restTitle}>REST DAY</Text>
-          <Text style={styles.dimTextLeft}>
-            Recovery is training.
-            {nextPlanned !== undefined
-              ? ` Next session: ${nextPlanned.focus.toUpperCase()} on ${nextPlanned.sessionDate}.`
-              : block === null
-                ? ' Generate a block to get a plan.'
-                : ' This block is complete — regenerate for the next one.'}
-          </Text>
-        </View>
-      )}
+        </Disclosure>
 
-      {/* ---- start session (instant; halts still block) ---- */}
-      {session !== null ? (
-        <Pressable
-          onPress={() => { if (onSessionStarted !== undefined) onSessionStarted(); }}
-          accessibilityRole="button"
-          accessibilityLabel="Session is live, open the session tab"
-          style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
+        {todayPlan !== null && (
+          <Disclosure label="Preview today\'s session" hint="Movement targets before you start">
+            <Caption>
+              {focusName(todayPlan.focus)} - {phaseLabel(todayPlan.phase)}
+            </Caption>
+            {todayPlan.slots.map((slot) => (
+              <ProgressRow
+                key={slot.slotIndex}
+                label={slot.movementName}
+                value={targetLabel(slot)}
+                detail={slotTarget(slot, oneRepMaxes)}
+              />
+            ))}
+          </Disclosure>
+        )}
+
+        <Disclosure
+          label="Manage block"
+          hint={block === null ? 'Choose a structure for your first block' : 'Block settings and regeneration'}
+          open={manageOpen}
+          onOpenChange={setManageOpen}
         >
-          <Text style={styles.startBtnText}>SESSION LIVE — OPEN SESSION TAB</Text>
-        </Pressable>
-      ) : halted ? (
-        <View style={styles.startBlocked}>
-          <Text style={styles.startBlockedText}>
-            STARTING IS BLOCKED — today&apos;s report ended training. Rest, and report again tomorrow.
-          </Text>
-        </View>
-      ) : (
-        <Pressable
-          onPress={requestStart}
-          accessibilityRole="button"
-          accessibilityLabel="Start a new workout session"
-          style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
-        >
-          <Text style={styles.startBtnText}>START SESSION</Text>
-        </Pressable>
-      )}
-
-      {/* ---- ad-hoc subjective report (always-on safety layer) ---- */}
-      <Text style={[styles.sectionLabel, styles.sectionGap]}>SUBJECTIVE REPORT</Text>
-      {!triageReady && (
-        <Text style={styles.dimTextLeft}>
-          Semantic matching is unavailable in this build — injury-language safety
-          checks remain fully active.
-        </Text>
-      )}
-      <TextInput
-        style={styles.reportInput}
-        value={reportText}
-        onChangeText={setReportText}
-        placeholder="How does it feel? e.g. knee a bit sore"
-        placeholderTextColor={palette.dim}
-        maxLength={500}
-        multiline
-        accessibilityLabel="Describe how your body feels today"
-      />
-      {/* Forced severity: the engine scales the guardrail by this + your
-          training age (a 4/10 is benign DOMS for a novice, a red flag for elite). */}
-      <Text style={styles.sevPrompt}>RATE THE SEVERITY (1–10) — REQUIRED</Text>
-      <View style={styles.sevRow}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
-          const on = reportSeverity === n;
-          return (
-            <Pressable
-              key={n}
-              onPress={() => setReportSeverity(n)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={`Severity ${n} of 10`}
-              style={[styles.sevChip, on && (n >= 7 ? styles.sevChipHigh : styles.sevChipOn)]}
-            >
-              <Text style={[styles.sevChipText, on && styles.sevChipTextOn]}>{n}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <Pressable
-        disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
-        onPress={() => {
-          if (reportSeverity === null) return;
-          void reportSubjective(reportText, reportSeverity).then(() => {
-            setReportText('');
-            setReportSeverity(null);
-          });
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={
-          reportSeverity === null ? 'Rate the severity first' : 'Triage this report'
-        }
-        style={({ pressed }) => [
-          styles.triageBtn,
-          pressed && styles.triageBtnPressed,
-          (reportText.trim().length === 0 || reportSeverity === null || triaging) &&
-            styles.triageBtnDisabled,
-        ]}
-      >
-        <Text style={styles.triageBtnText}>
-          {triaging ? 'MATCHING…' : reportSeverity === null ? 'RATE SEVERITY FIRST' : 'TRIAGE'}
-        </Text>
-      </Pressable>
-
-      {lastTriage !== null && lastTriage.kind === 'positive' && (
-        <View style={styles.positiveCard}>
-          <Text style={styles.positiveTitle}>NOTED — ALL SYSTEMS GO</Text>
-          <Text style={styles.dimTextLeft}>{lastTriage.cue}</Text>
-        </View>
-      )}
-      {lastTriage !== null && lastTriage.kind === 'rejected' && (
-        <View style={styles.rejectCard}>
-          <Text style={styles.rejectTitle}>NOTED — NO CHANGE</Text>
-          <Text style={styles.dimTextLeft}>
-            That didn&apos;t match a known scenario, so the prescription is unchanged.
-            It&apos;s logged. Rephrase with how it feels during movement if something is off.
-          </Text>
-        </View>
-      )}
-      {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
-        <View style={styles.matchCard}>
-          <Text style={styles.matchTitle}>GUARDRAIL APPLIED</Text>
-          <Text style={styles.matchCue}>{lastTriage.directive.vector.coaching_cue}</Text>
-          {lastTriage.directive.followUp !== null && (
-            <Text style={styles.followUp}>{lastTriage.directive.followUp}</Text>
+          {block !== null ? (
+            <Caption>
+              {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
+              {blockMeta !== null
+                ? ` - ${blockMeta.schemaType} - macro block ${blockMeta.macroBlockIndex} of 8`
+                : ''}
+            </Caption>
+          ) : (
+            <Caption>
+              Coach will build from your objective, equipment, and weekly frequency.
+            </Caption>
           )}
-          <Text style={styles.dimTextLeft}>
-            The adjustment above now reflects this report, scaled to your training age.
-            It stays in force for the rest of the day, even if the app restarts.
-          </Text>
-        </View>
-      )}
-    </ScrollView>
+          {blockMeta?.peakShifted === true && (
+            <Caption style={styles.peakShift}>
+              Coach inserted a deload week before the peak because fatigue was high.
+            </Caption>
+          )}
+          <Text style={styles.schemaLabel}>Choose a loading structure</Text>
+          <View style={styles.schemaRow}>
+            {SCHEMA_TYPES.map((type) => {
+              const selected = type === schema;
+              return (
+                <Pressable
+                  key={type}
+                  onPress={() => setSchema(type)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${type} loading structure`}
+                  style={[styles.schemaChip, selected && styles.schemaChipSelected]}
+                >
+                  <Text style={[styles.schemaChipText, selected && styles.schemaChipTextSelected]}>
+                    {type}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {!confirmRegenerate ? (
+            <PrimaryAction
+              label={block === null ? 'Create four-week block' : 'Generate next block'}
+              onPress={() => {
+                if (block === null) {
+                  generateNewBlock(schema);
+                  setManageOpen(false);
+                } else {
+                  setConfirmRegenerate(true);
+                }
+              }}
+            />
+          ) : (
+            <View style={styles.confirmation}>
+              <Body>This archives the current block and starts the next one today.</Body>
+              <PrimaryAction
+                label="Generate next block now"
+                onPress={() => {
+                  setDetail(null);
+                  generateNewBlock(schema);
+                  setConfirmRegenerate(false);
+                  setManageOpen(false);
+                }}
+              />
+              <SecondaryAction label="Keep current block" onPress={() => setConfirmRegenerate(false)} />
+            </View>
+          )}
+
+          {(block === null || todayPlan === null) && !halted && session === null && (
+            <Disclosure label="Start without a planned session" tone="caution">
+              {!confirmUnplannedStart ? (
+                <>
+                  <Caption>
+                    This starts a session without the day\'s planned exercise order.
+                  </Caption>
+                  <SecondaryAction
+                    label="Start an unplanned session"
+                    onPress={() => setConfirmUnplannedStart(true)}
+                  />
+                </>
+              ) : (
+                <>
+                  <Body>Start a session without a planned workout?</Body>
+                  <PrimaryAction label="Start unplanned session" onPress={startUnplannedSession} />
+                  <SecondaryAction label="Cancel" onPress={() => setConfirmUnplannedStart(false)} />
+                </>
+              )}
+            </Disclosure>
+          )}
+        </Disclosure>
+
+        <Disclosure
+          label="Something feels off"
+          hint="Add a subjective report only when you need Coach to adapt"
+          tone={halted ? 'danger' : 'caution'}
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+        >
+          {!triageReady && (
+            <Caption>
+              Semantic matching is unavailable in this build. Injury-language safety checks still apply.
+            </Caption>
+          )}
+          <TextInput
+            style={styles.reportInput}
+            value={reportText}
+            onChangeText={setReportText}
+            placeholder="For example: my knee feels sore when I squat"
+            placeholderTextColor={palette.dim}
+            maxLength={500}
+            multiline
+            accessibilityLabel="Describe how your body feels today"
+          />
+          <Text style={styles.severityLabel}>Severity from 1 to 10</Text>
+          <View style={styles.severityRow}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((severity) => {
+              const selected = reportSeverity === severity;
+              const high = severity >= 7;
+              return (
+                <Pressable
+                  key={severity}
+                  onPress={() => setReportSeverity(severity)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`Severity ${severity} of 10`}
+                  style={[
+                    styles.severityChip,
+                    selected && (high ? styles.severityChipHigh : styles.severityChipSelected),
+                  ]}
+                >
+                  <Text style={[styles.severityText, selected && styles.severityTextSelected]}>{severity}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <PrimaryAction
+            label={triaging ? 'Checking report' : 'Apply report'}
+            disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
+            onPress={() => {
+              if (reportSeverity === null) return;
+              void reportSubjective(reportText, reportSeverity).then(() => {
+                setReportText('');
+                setReportSeverity(null);
+              });
+            }}
+          />
+
+          {lastTriage !== null && lastTriage.kind === 'positive' && (
+            <View style={styles.reportResult}>
+              <StatusMark label="Noted" tone="success" />
+              <Body>{lastTriage.cue}</Body>
+            </View>
+          )}
+          {lastTriage !== null && lastTriage.kind === 'rejected' && (
+            <View style={styles.reportResult}>
+              <StatusMark label="No change" tone="default" />
+              <Caption>
+                Coach did not match this to a known scenario, so today\'s plan is unchanged.
+              </Caption>
+            </View>
+          )}
+          {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
+            <View style={styles.reportResult}>
+              <StatusMark label="Plan adjusted" tone="caution" />
+              <Body>{lastTriage.directive.vector.coaching_cue}</Body>
+              {lastTriage.directive.followUp !== null && (
+                <Caption>{lastTriage.directive.followUp}</Caption>
+              )}
+            </View>
+          )}
+        </Disclosure>
+      </Section>
+    </Screen>
   );
 }
 
-// ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bg },
-  content: { padding: 20, paddingBottom: 48 },
   center: {
     flex: 1,
     backgroundColor: palette.bg,
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
-    gap: 12,
+    padding: 24,
   },
-  sectionLabel: { color: palette.dim, fontSize: 12, letterSpacing: 2, marginBottom: 10 },
-  sectionGap: { marginTop: 26 },
-  errorTitle: { color: palette.red, fontSize: 20, fontWeight: '800', letterSpacing: 2 },
-  dimText: { color: palette.dim, fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  dimTextLeft: { color: palette.dim, fontSize: 14, lineHeight: 20, marginTop: 8 },
-
-  resultCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 16,
-    padding: 18,
+  haltCard: { marginBottom: 14 },
+  followUp: { color: palette.text },
+  adjusted: { color: palette.amber },
+  emptyTrajectory: {
     borderWidth: 1,
     borderColor: palette.line,
+    borderRadius: 12,
+    backgroundColor: palette.surface,
+    padding: 16,
+    gap: 8,
   },
-  resultHeader: {
+  weekRow: {
+    minHeight: 54,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
+    alignItems: 'stretch',
+    gap: 8,
+    marginBottom: 5,
   },
-  resultDate: { color: palette.dim, fontSize: 13, letterSpacing: 2 },
-  sourceBadge: { borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  sourceBadgeText: { fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  bigRow: { flexDirection: 'row', marginBottom: 14 },
-  bigCell: { flex: 1, alignItems: 'center' },
-  bigValue: { color: palette.text, fontSize: 34, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  bigValueDanger: { color: palette.red },
-  bigLabel: { color: palette.dim, fontSize: 11, letterSpacing: 2 },
-  bigLabelRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  cue: { color: palette.text, fontSize: 15, lineHeight: 22 },
-  profileNote: { color: palette.amber, fontSize: 13, lineHeight: 19, marginTop: 8 },
-
-  blockMeta: { color: palette.dim, fontSize: 13, letterSpacing: 1, marginBottom: 10 },
-  peakShiftNote: { color: palette.amber, fontSize: 13, lineHeight: 19, marginBottom: 10 },
-  schemaRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 2 },
+  weekMeta: { width: 78, justifyContent: 'center' },
+  weekTitle: { color: palette.text, fontSize: 14, fontWeight: '800' },
+  weekPhase: { color: palette.dim, fontSize: 11, marginTop: 2 },
+  dayRail: { flex: 1, flexDirection: 'row', gap: 4 },
+  dayMark: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: palette.line,
+    borderRadius: 8,
+    backgroundColor: palette.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  dayMarkPressed: { backgroundColor: '#1A1A20' },
+  dayMarkRest: { backgroundColor: 'transparent' },
+  dayMarkTrained: { borderColor: palette.green, backgroundColor: '#10241D' },
+  dayMarkToday: { borderColor: palette.amber, borderWidth: 2 },
+  dayMarkExpanded: { borderColor: palette.text },
+  dayMarkText: { color: palette.text, fontSize: 9, fontWeight: '800', textAlign: 'center' },
+  dayMarkTextTrained: { color: palette.green },
+  dayMarkTextToday: { color: palette.amber },
+  dayMarkRestText: { color: palette.line, fontSize: 16 },
+  trajectoryHint: { marginTop: 6 },
+  sessionDetail: {
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 14,
+    gap: 8,
+  },
+  sessionDetailTitle: { color: palette.text, fontSize: 15, fontWeight: '800' },
+  profileNote: { color: palette.amber },
+  peakShift: { color: palette.amber },
+  schemaLabel: { color: palette.dim, fontSize: 13, fontWeight: '700' },
+  schemaRow: { flexDirection: 'row', gap: 8 },
   schemaChip: {
     flex: 1,
     minHeight: 44,
     borderRadius: 10,
-    backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  schemaChipActive: { borderColor: palette.green, backgroundColor: '#10241D' },
-  schemaChipText: { color: palette.dim, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  schemaChipTextActive: { color: palette.green },
-  overrideReason: { color: palette.amber, fontSize: 12, lineHeight: 17, marginBottom: 6 },
-  weekRow: { flexDirection: 'row', alignItems: 'stretch', gap: 4, marginBottom: 4 },
-  weekLabelBox: { width: 78, justifyContent: 'center' },
-  weekLabel: { color: palette.text, fontSize: 14, fontWeight: '800' },
-  weekPhase: { color: palette.dim, fontSize: 9, letterSpacing: 0.5 },
-  dayCell: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: 8,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayCellRest: { backgroundColor: 'transparent', borderColor: palette.line },
-  dayCellRestText: { color: palette.line, fontSize: 16 },
-  dayCellTrained: { borderColor: palette.green, backgroundColor: '#10241D' },
-  dayCellToday: { borderColor: palette.amber, borderWidth: 2 },
-  dayCellText: { color: palette.text, fontSize: 11, fontWeight: '800' },
-  dayCellTextTrained: { color: palette.green },
-  dayCellTextToday: { color: palette.amber },
-
-  detailCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.line,
-    padding: 14,
-    marginTop: 10,
-  },
-  detailTitle: { color: palette.text, fontSize: 13, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
-  detailClose: { alignSelf: 'flex-end', minHeight: 40, justifyContent: 'center', marginTop: 4 },
-  detailCloseText: { color: palette.dim, fontSize: 13, fontWeight: '800', letterSpacing: 1 },
-  slotRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 7,
-  },
-  slotName: { color: palette.text, fontSize: 15, fontWeight: '600', flexShrink: 1, paddingRight: 10 },
-  slotData: { color: palette.dim, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
-
-  generateBtn: {
-    height: 80,
-    borderRadius: 16,
-    backgroundColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 14,
-  },
-  generateBtnPressed: { backgroundColor: '#26C28F' },
-  generateBtnText: { color: '#06251B', fontSize: 18, fontWeight: '800', letterSpacing: 2 },
-  regenBtn: {
-    minHeight: 52,
-    borderRadius: 12,
+  schemaChipSelected: { borderColor: palette.green, backgroundColor: '#10241D' },
+  schemaChipText: { color: palette.dim, fontSize: 12, fontWeight: '800' },
+  schemaChipTextSelected: { color: palette.green },
+  confirmation: {
     borderWidth: 1,
     borderColor: palette.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
+    borderRadius: 10,
+    padding: 12,
+    gap: 10,
   },
-  regenBtnText: { color: palette.amber, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
-
-  todayCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.line,
-    padding: 14,
-  },
-  todayFocus: { color: palette.green, fontSize: 14, fontWeight: '800', letterSpacing: 1.5, marginBottom: 6 },
-  restCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.line,
-    padding: 16,
-  },
-  restTitle: { color: palette.text, fontSize: 16, fontWeight: '800', letterSpacing: 2 },
-
-  startBtn: {
-    height: 76,
-    borderRadius: 16,
-    backgroundColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 22,
-  },
-  startBtnPressed: { backgroundColor: '#26C28F' },
-  startBtnText: { color: '#06251B', fontSize: 18, fontWeight: '800', letterSpacing: 2 },
-  startBlocked: {
-    backgroundColor: '#2A1416',
-    borderWidth: 2,
-    borderColor: palette.red,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 22,
-  },
-  startBlockedText: { color: palette.red, fontSize: 14, fontWeight: '700', lineHeight: 20 },
-
-  positiveCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.green,
-    padding: 14,
-  },
-  positiveTitle: { color: palette.green, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
-
   reportInput: {
-    minHeight: 64,
-    borderRadius: 12,
-    backgroundColor: palette.bg,
-    borderWidth: 1,
-    borderColor: palette.line,
-    color: palette.text,
-    fontSize: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    textAlignVertical: 'top',
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  sevPrompt: { color: palette.amber, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
-  sevRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  sevChip: {
-    width: 44,
-    height: 48,
+    minHeight: 82,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: palette.line,
     backgroundColor: palette.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: palette.text,
+    fontSize: 16,
+    lineHeight: 22,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlignVertical: 'top',
   },
-  sevChipOn: { borderColor: palette.amber, backgroundColor: '#2A210F' },
-  sevChipHigh: { borderColor: palette.red, backgroundColor: '#2A1416' },
-  sevChipText: { color: palette.dim, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  sevChipTextOn: { color: palette.text },
-  triageBtn: {
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: palette.surface,
-    borderWidth: 2,
-    borderColor: palette.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  triageBtnPressed: { backgroundColor: '#10241D' },
-  triageBtnDisabled: { borderColor: palette.line },
-  triageBtnText: { color: palette.green, fontSize: 18, fontWeight: '800', letterSpacing: 2 },
-  rejectCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 12,
+  severityLabel: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  severityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  severityChip: {
+    width: 42,
+    minHeight: 44,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: palette.line,
-    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rejectTitle: { color: palette.dim, fontSize: 13, fontWeight: '800', letterSpacing: 2 },
-  matchCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: palette.amber,
-    padding: 14,
+  severityChipSelected: { borderColor: palette.amber, backgroundColor: '#2A210F' },
+  severityChipHigh: { borderColor: palette.red, backgroundColor: '#2A1416' },
+  severityText: { color: palette.dim, fontSize: 15, fontWeight: '800' },
+  severityTextSelected: { color: palette.text },
+  reportResult: {
+    borderTopWidth: 1,
+    borderTopColor: palette.line,
+    paddingTop: 12,
+    gap: 8,
   },
-  matchTitle: { color: palette.amber, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
-  matchCue: { color: palette.text, fontSize: 16, lineHeight: 22, marginTop: 8 },
-  haltCard: {
-    backgroundColor: '#2A1416',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: palette.red,
-    padding: 16,
-    marginBottom: 14,
-  },
-  haltTitle: { color: palette.red, fontSize: 18, fontWeight: '800', letterSpacing: 2 },
-  haltCue: { color: palette.text, fontSize: 16, lineHeight: 22, marginTop: 8 },
-  followUp: { color: palette.text, fontSize: 15, fontStyle: 'italic', marginTop: 8 },
 });

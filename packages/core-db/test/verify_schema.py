@@ -571,5 +571,123 @@ con.execute("DELETE FROM set_record WHERE set_id = ?", (sp_ids[0],))
 orphan_sp = con.execute("SELECT count(*) c FROM set_prefix WHERE set_id = ?", (sp_ids[0],)).fetchone()["c"]
 check("set_record delete cascades its set_prefix side-car (no orphan)", orphan_sp == 0)
 
+# --- 18. Phase 17 guided-session persistence foundation ----------------------
+print("\n[18] Phase 17 guided-session persistence foundation (023)")
+p17 = sqlite3.connect(":memory:")
+p17.row_factory = sqlite3.Row
+p17.execute("PRAGMA foreign_keys = ON")
+for migration in sorted(SCHEMA_DIR.glob("0*.sql")):
+    if migration.name.startswith("004_"):
+        continue
+    p17.executescript(migration.read_text(encoding="utf-8"))
+
+policy = {r["name"]: (r["default_sets"], r["target_seconds"]) for r in p17.execute("""
+    SELECT m.name, p.default_sets, p.target_seconds
+    FROM movement_time_policy p JOIN movement m USING(movement_id)
+""")}
+check("023 seeds the ratified time policy exactly", policy == {
+    "Plank": (3, 30),
+    "Farmer Carry": (3, 40),
+    "Suitcase Carry": (3, 40),
+    "Road Run": (1, 1200),
+    "BJJ Sparring Round": (5, 300),
+}, str(policy))
+
+prefs = [tuple(r) for r in p17.execute("""
+    SELECT profile_slot_id, session_mode_override, readiness_detail,
+           rest_timer_enabled, text_scale
+    FROM profile_ui_preference ORDER BY profile_slot_id
+""")]
+check("023 seeds slot-scoped UI defaults (Beginner summary; others full)", prefs == [
+    (1, None, "summary", 1, "system"),
+    (2, None, "full", 1, "system"),
+    (3, None, "full", 1, "system"),
+    (4, None, "full", 1, "system"),
+], str(prefs))
+p17.execute("UPDATE profile_ui_preference SET session_mode_override='guided', text_scale='large' WHERE profile_slot_id=1")
+p17.executescript((SCHEMA_DIR / "023_phase17_session_foundation.sql").read_text(encoding="utf-8"))
+custom_pref = p17.execute("SELECT session_mode_override, text_scale FROM profile_ui_preference WHERE profile_slot_id=1").fetchone()
+check("023 re-apply preserves an athlete's UI preference override",
+      custom_pref is not None and tuple(custom_pref) == ("guided", "large"))
+try:
+    p17.execute("UPDATE profile_ui_preference SET rest_timer_enabled=2 WHERE profile_slot_id=1")
+    check("UI preference CHECK rejects a non-boolean timer", False)
+except sqlite3.IntegrityError:
+    check("UI preference CHECK rejects a non-boolean timer", True)
+
+plank_id = p17.execute("SELECT movement_id FROM movement WHERE name='Plank'").fetchone()["movement_id"]
+p17.execute("INSERT INTO movement_coaching_intent (movement_id, coaching_intent) VALUES (?, 'Build a stable trunk that carries into every loaded movement.')", (plank_id,))
+intent = p17.execute("SELECT coaching_intent FROM movement_coaching_intent WHERE movement_id=?", (plank_id,)).fetchone()
+check("coaching-intent side-car round-trips reviewed copy", intent is not None and "stable trunk" in intent["coaching_intent"])
+try:
+    p17.execute("INSERT INTO movement_coaching_intent (movement_id, coaching_intent) VALUES (?, '   ')",
+                (p17.execute("SELECT movement_id FROM movement WHERE name='Farmer Carry'").fetchone()["movement_id"],))
+    check("coaching-intent CHECK rejects blank copy", False)
+except sqlite3.IntegrityError:
+    check("coaching-intent CHECK rejects blank copy", True)
+
+p17.execute("INSERT INTO training_block (block_id, start_date, objective, created_at_ms) VALUES (2300, '2026-07-15', 'gpp', 0)")
+p17.execute("""INSERT INTO planned_session
+    (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+    VALUES (2300, 2300, 1, 1, 'conditioning', 'accumulation', '2026-07-15')""")
+p17.execute("""INSERT INTO planned_slot
+    (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+    VALUES (2300, 2300, 1, ?, 3, 1, 7.0)""", (plank_id,))
+p17.execute("INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_seconds) VALUES (2300, 'time', 30)")
+plan_target = p17.execute("SELECT target_kind, target_reps, target_seconds FROM planned_slot_target WHERE planned_slot_id=2300").fetchone()
+check("planned-slot target freezes a time union", plan_target is not None and tuple(plan_target) == ("time", None, 30))
+try:
+    p17.execute("UPDATE planned_slot_target SET target_reps=5 WHERE planned_slot_id=2300")
+    check("slot-target XOR CHECK rejects mixed reps/time targets", False)
+except sqlite3.IntegrityError:
+    check("slot-target XOR CHECK rejects mixed reps/time targets", True)
+
+p17.execute("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (2300, '2026-07-15', 1000)")
+p17.execute("""INSERT INTO session_plan_slot
+    (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps,
+     provenance_kind, target_rpe, source_planned_slot_id)
+    VALUES (2300, 2300, 0, ?, 3, NULL, 'planned', 7.0, 2300)""", (plank_id,))
+p17.execute("INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_seconds) VALUES (2300, 'time', 30)")
+p17.execute("""INSERT INTO session_runner_checkpoint
+    (session_id, session_mode, phase, current_session_plan_slot_id, current_set_index,
+     rest_target_seconds, rest_started_at_ms, runner_state_json, updated_at_ms)
+    VALUES (2300, 'guided', 'working', 2300, 1, 0, NULL, '{}', 1000)""")
+p17.execute("""UPDATE session_runner_checkpoint
+    SET phase='resting', rest_target_seconds=120, rest_started_at_ms=1000
+    WHERE session_id=2300""")
+checkpoint = p17.execute("SELECT phase, rest_target_seconds, rest_started_at_ms FROM session_runner_checkpoint WHERE session_id=2300").fetchone()
+check("runner checkpoint persists a valid resting boundary", checkpoint is not None and tuple(checkpoint) == ("resting", 120, 1000))
+try:
+    p17.execute("UPDATE session_runner_checkpoint SET rest_target_seconds=30 WHERE session_id=2300")
+    check("runner checkpoint rejects rest outside the contract", False)
+except sqlite3.IntegrityError:
+    check("runner checkpoint rejects rest outside the contract", True)
+try:
+    p17.execute("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (2301, '2026-07-15', 0)")
+    p17.execute("""INSERT INTO session_runner_checkpoint
+        (session_id, session_mode, phase, rest_target_seconds, runner_state_json)
+        VALUES (2301, 'self_directed', 'complete', 0, 'not json')""")
+    check("runner checkpoint rejects malformed serialized state", False)
+except sqlite3.IntegrityError:
+    check("runner checkpoint rejects malformed serialized state", True)
+
+p17.execute("DELETE FROM session WHERE session_id=2300")
+child_rows = p17.execute("""
+    SELECT (SELECT count(*) FROM session_plan_slot WHERE session_id=2300)
+         + (SELECT count(*) FROM session_slot_target WHERE session_plan_slot_id=2300)
+         + (SELECT count(*) FROM session_runner_checkpoint WHERE session_id=2300) AS c
+""").fetchone()["c"]
+check("session delete cascades frozen session target + runner checkpoint", child_rows == 0, str(child_rows))
+p17.execute("DELETE FROM training_block WHERE block_id=2300")
+check("block delete cascades its frozen planned target",
+      p17.execute("SELECT count(*) c FROM planned_slot_target WHERE planned_slot_id=2300").fetchone()["c"] == 0)
+
+p17.execute("INSERT INTO profile_slot (slot_id, name, profile_json) VALUES (99, 'Test', '{\"training_age\":\"advanced\"}')")
+p17.execute("""INSERT INTO profile_ui_preference
+    (profile_slot_id, readiness_detail, rest_timer_enabled, text_scale)
+    VALUES (99, 'full', 1, 'system')""")
+p17.execute("DELETE FROM profile_slot WHERE slot_id=99")
+check("profile-slot delete cascades its UI preferences",
+      p17.execute("SELECT count(*) c FROM profile_ui_preference WHERE profile_slot_id=99").fetchone()["c"] == 0)
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

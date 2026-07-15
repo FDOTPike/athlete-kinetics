@@ -171,6 +171,11 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
 export default function ProfileScreen(): React.JSX.Element {
   const profile = useStore((s) => s.profile);
   const saveProfile = useStore((s) => s.saveProfile);
+  const uiPreferences = useStore((s) => s.uiPreferences);
+  const saveUiPreferences = useStore((s) => s.saveUiPreferences);
+  const bandLadder = useStore((s) => s.bandLadder);
+  const saveBandLevel = useStore((s) => s.saveBandLevel);
+  const deleteBandLevel = useStore((s) => s.deleteBandLevel);
   const movements = useStore((s) => s.movements);
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const saveOneRepMax = useStore((s) => s.saveOneRepMax);
@@ -193,6 +198,8 @@ export default function ProfileScreen(): React.JSX.Element {
   const [newAthleteName, setNewAthleteName] = useState('');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const [editAthleteName, setEditAthleteName] = useState('');
+
+  const nextBandLevel = Math.min(20, (bandLadder.length > 0 ? bandLadder[bandLadder.length - 1]!.level : 0) + 1);
 
   // Free-text notes are committed on end-editing, not per keystroke.
   const [injuryText, setInjuryText] = useState(
@@ -386,6 +393,122 @@ export default function ProfileScreen(): React.JSX.Element {
         })}
       </View>
 
+      <View style={styles.mgmtSection}>
+        <Text style={styles.mgmtHeading}>SESSION &amp; DISPLAY</Text>
+        <Text style={styles.fieldHint}>
+          These choices stay with this profile slot. Session mode changes start with your next session.
+        </Text>
+        <Text style={styles.fieldLabel}>SESSION MODE</Text>
+        <View style={styles.chipWrap}>
+          {([
+            { value: null, label: 'USE TIER DEFAULT' },
+            { value: 'guided' as const, label: 'GUIDED' },
+            { value: 'self_directed' as const, label: 'SELF-DIRECTED' },
+          ]).map((option) => {
+            const active = uiPreferences.sessionModeOverride === option.value;
+            return (
+              <Pressable
+                key={option.label}
+                onPress={() => saveUiPreferences({ sessionModeOverride: option.value })}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${option.label}${active ? ', selected' : ''}`}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={[styles.fieldLabel, styles.preferenceLabel]}>READINESS DETAIL</Text>
+        <View style={styles.chipWrap}>
+          {(['summary', 'full'] as const).map((value) => {
+            const active = uiPreferences.readinessDetail === value;
+            return (
+              <Pressable
+                key={value}
+                onPress={() => saveUiPreferences({ readinessDetail: value })}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${value} readiness detail${active ? ', selected' : ''}`}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{value.toUpperCase()}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={[styles.fieldLabel, styles.preferenceLabel]}>REST TIMER</Text>
+        <Pressable
+          onPress={() => saveUiPreferences({ restTimerEnabled: !uiPreferences.restTimerEnabled })}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: uiPreferences.restTimerEnabled }}
+          accessibilityLabel={`Rest timer ${uiPreferences.restTimerEnabled ? 'on' : 'off'}`}
+          style={[styles.chip, uiPreferences.restTimerEnabled && styles.chipActive, styles.preferenceToggle]}
+        >
+          <Text style={[styles.chipText, uiPreferences.restTimerEnabled && styles.chipTextActive]}>
+            {uiPreferences.restTimerEnabled ? 'ON' : 'OFF'}
+          </Text>
+        </Pressable>
+        <Text style={[styles.fieldLabel, styles.preferenceLabel]}>APP TEXT SIZE</Text>
+        <View style={styles.chipWrap}>
+          {(['system', 'large', 'extra_large'] as const).map((value) => {
+            const active = uiPreferences.textScale === value;
+            return (
+              <Pressable
+                key={value}
+                onPress={() => saveUiPreferences({ textScale: value })}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${value.replace(/_/g, ' ')} text size${active ? ', selected' : ''}`}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{value.replace(/_/g, ' ').toUpperCase()}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.fieldHint}>
+          Your device accessibility text size is always respected; this adds an optional app preference on top.
+        </Text>
+      </View>
+
+      <View style={styles.mgmtSection}>
+        <Text style={styles.mgmtHeading}>BAND LADDER</Text>
+        <Text style={styles.fieldHint}>
+          Name bands in the order they feel harder. The app records the level, never invents kilograms.
+        </Text>
+        {bandLadder.map((band) => (
+          <View key={band.level} style={styles.bandRow}>
+            <Text style={styles.bandLevel}>LEVEL {band.level}</Text>
+            <TextInput
+              defaultValue={band.label}
+              onEndEditing={(event) => saveBandLevel(band.level, event.nativeEvent.text)}
+              maxLength={48}
+              style={styles.bandInput}
+              accessibilityLabel={`Band level ${band.level} label`}
+            />
+            <Pressable
+              onPress={() => deleteBandLevel(band.level)}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove band level ${band.level}`}
+              style={styles.bandDelete}
+            >
+              <Text style={styles.bandDeleteText}>REMOVE</Text>
+            </Pressable>
+          </View>
+        ))}
+        {nextBandLevel <= 20 && (
+          <Pressable
+            onPress={() => saveBandLevel(nextBandLevel, `Band ${nextBandLevel}`)}
+            accessibilityRole="button"
+            accessibilityLabel={`Add band level ${nextBandLevel}`}
+            style={styles.presetChip}
+          >
+            <Text style={styles.presetChipText}>ADD BAND LEVEL</Text>
+          </Pressable>
+        )}
+      </View>
       <View style={styles.field}>
         <View style={styles.fieldLabelRow}>
           <Text style={styles.fieldLabel}>EQUIPMENT INVENTORY</Text>
@@ -688,6 +811,16 @@ const styles = StyleSheet.create({
   },
   presetChipText: { color: palette.amber, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
   inventoryWrap: { marginTop: 10 },
+  preferenceLabel: { marginTop: 16, marginBottom: 8 },
+  preferenceToggle: { alignSelf: 'flex-start', minWidth: 92 },
+  bandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  bandLevel: { width: 68, color: palette.dim, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  bandInput: {
+    flex: 1, minHeight: 48, borderRadius: 10, backgroundColor: palette.surface,
+    borderWidth: 1, borderColor: palette.line, color: palette.text, fontSize: 15, paddingHorizontal: 12,
+  },
+  bandDelete: { minHeight: 48, paddingHorizontal: 10, justifyContent: 'center', alignItems: 'center' },
+  bandDeleteText: { color: palette.red, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     minHeight: 48,
