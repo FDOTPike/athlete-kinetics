@@ -28,7 +28,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
   '014_movement_prefixes.sql', '015_set_prefix.sql', '016_movement_library_seed.sql', '017_movement_batch.sql',
   '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
-  '021_taxonomy_corrections.sql'];
+  '021_taxonomy_corrections.sql',
+  '022_set_target.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -94,7 +95,8 @@ check('materialize prepares against healed schema', (() => {
 // --- 2b. poisoned v15: 016 tables missing while user_version claims complete ---
 console.log('[2b] poisoned DB: user_version=15 but 016 never applied (audit A1)');
 const b2 = freshDb();
-for (let i = 0; i < MIGRATIONS.length - 6; i += 1) b2.executeSync(MIGRATIONS[i]); // skip 016..021
+const skip016 = FILES.indexOf('016_movement_library_seed.sql'); // stable vs appended migrations
+  for (let i = 0; i < skip016; i += 1) b2.executeSync(MIGRATIONS[i]); // 016..end not yet applied
 b2.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
 check('precondition: movement_progression missing', sentinelsMissing(b2).includes('movement_progression'));
 runMigrations(b2, MIGRATIONS);
@@ -112,6 +114,39 @@ runMigrations(b3, MIGRATIONS);
 check('self-heal restored the dropped 018 sibling', sentinelsMissing(b3).length === 0);
 check('time-mode seeds healed back (5 rows)',
   Number(b3.raw.prepare('SELECT COUNT(*) c FROM movement_logging_mode').get().c) === 5);
+
+// --- 2d. set_target + 022 tables dropped post-apply (Fix-1 provenance side-car, 022) -------
+console.log('[2d] 022 tables dropped post-apply (provenance self-heal)');
+const b4 = freshDb();
+runMigrations(b4, MIGRATIONS);
+b4.executeSync('DROP TABLE set_target');
+b4.executeSync('DROP TABLE session_origin');
+b4.executeSync('DROP TABLE session_plan_slot');
+b4.executeSync('DROP TABLE planned_slot_disposition');
+check('precondition: set_target missing', sentinelsMissing(b4).includes('set_target'));
+check('precondition: session_origin missing', sentinelsMissing(b4).includes('session_origin'));
+check('precondition: session_plan_slot missing', sentinelsMissing(b4).includes('session_plan_slot'));
+check('precondition: planned_slot_disposition missing', sentinelsMissing(b4).includes('planned_slot_disposition'));
+runMigrations(b4, MIGRATIONS);
+check('self-heal restored all 022 tables', sentinelsMissing(b4).length === 0);
+
+// --- 2e. 022 re-application against current schema is a no-op (P1 #2 regression) ---------
+console.log('[2e] 022 reapplication against current schema preserves session_plan_slot_id');
+const b5 = freshDb();
+runMigrations(b5, MIGRATIONS);
+// Seed a row that exercises all 022 columns
+b5.executeSync(`INSERT INTO session (session_id, session_date, started_at_ms) VALUES (1, '2026-01-01', 0)`);
+b5.executeSync(`INSERT INTO movement (movement_id, name, pattern, is_compound) VALUES (999, 'Test', 'push_h', 0)`);
+b5.executeSync(`INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, provenance_kind, target_rpe, source_planned_slot_id) VALUES (7, 1, 0, 999, 3, 'planned', 7.5, 42)`);
+b5.executeSync(`INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (5, 1, 999, 1, 5, 100.0, 7.5, 1000000)`);
+b5.executeSync(`INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (5, 7, 'planned', 7.5, 42, 1000000)`);
+// Regress user_version so migration 022 re-runs
+b5.executeSync(`PRAGMA user_version = ${MIGRATIONS.length - 1};`);
+runMigrations(b5, MIGRATIONS);
+const b5row = b5.raw.prepare('SELECT session_plan_slot_id, target_rpe, source_planned_slot_id FROM set_target WHERE set_id = 5').get();
+check('022 re-apply is a true no-op: session_plan_slot_id preserved', b5row?.session_plan_slot_id === 7, String(b5row?.session_plan_slot_id));
+check('022 re-apply: target_rpe preserved', b5row?.target_rpe === 7.5, String(b5row?.target_rpe));
+check('022 re-apply: source_planned_slot_id preserved', b5row?.source_planned_slot_id === 42, String(b5row?.source_planned_slot_id));
 
 // --- 3. failing migration: fail fast, recover on retry --------------------------
 console.log('[3] failing migration mid-chain (the device "ln" scenario)');

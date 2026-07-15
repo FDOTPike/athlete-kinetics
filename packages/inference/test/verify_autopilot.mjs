@@ -177,6 +177,18 @@ console.log('[2] closed-form correctness (analytic phi pins)');
   // confidence gate.
   const thin = detect(constSeries(L, { e: 3.0, days: 4 }));
   check('thin data (4 obs < 5) → neutral regardless of ΔE', thin.flawClass === 'neutral' && thin.observations === 4, `obs=${thin.observations}`);
+  // Confidence-leak guard (Fix-1): sets logged with NO frozen target carry null
+  // ΔE and must NOT count toward MIN_OBSERVATIONS. 2 real ΔE days + 3 target-less
+  // set-days => obs=2 < 5 => neutral (pre-fix this counted 5 set-days and could act).
+  const leaky = {
+    avgDeltaRPE: Array.from({ length: L }, (_, i) => (i < 2 ? 3.0 : null)),
+    avgAttenuation: Array.from({ length: L }, (_, i) => (i < 5 ? 1 : 0)),
+    setCount: Array.from({ length: L }, (_, i) => (i < 5 ? 1 : 0)),
+    maxJointSev: Array.from({ length: L }, () => 0),
+  };
+  const leak = detect(leaky);
+  check('confidence leak: 3 target-less set-days excluded -> obs=2 < 5 -> neutral',
+    leak.observations === 2 && leak.flawClass === 'neutral', `obs=${leak.observations}`);
   // RECENCY direction ω=λ^(20-i): recent-only vs old-only with EXACT pins
   // (a reversed- or flat-ω mutant yields different exact φ; both are S_max-free).
   const recent6 = detect(atDays(L, [15, 16, 17, 18, 19, 20], { e: 3 }));

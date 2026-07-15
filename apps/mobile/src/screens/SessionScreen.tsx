@@ -217,6 +217,9 @@ export default function SessionScreen(): React.JSX.Element {
   const movements = useStore((s) => s.movements);
   const session = useStore((s) => s.session);
   const sessionPlan = useStore((s) => s.sessionPlan);
+  const activeSessionPlanSlotId = useStore((s) => s.activeSessionPlanSlotId);
+  const selectMovementSlot = useStore((s) => s.selectMovementSlot);
+  const prescription = useStore((s) => s.prescription);
   const activeMovementId = useStore((s) => s.activeMovementId);
   const profile = useStore((s) => s.profile);
   const lastTriage = useStore((s) => s.lastTriage);
@@ -304,7 +307,7 @@ export default function SessionScreen(): React.JSX.Element {
             : 'Today is a rest day in your block. Start an unplanned session anyway?',
           [
             { text: 'CANCEL', style: 'cancel' },
-            { text: 'START ANYWAY', onPress: startSession },
+            { text: 'START ANYWAY', onPress: () => startSession() },
           ],
         );
         return;
@@ -360,8 +363,16 @@ export default function SessionScreen(): React.JSX.Element {
   const byId = new Map(movements.map((m) => [m.movement_id, m]));
   const activeMovement: Movement | null =
     activeMovementId !== null ? byId.get(activeMovementId) ?? null : null;
-  const loggedFor = (movementId: number): number =>
-    session.sets.filter((s) => s.movement_id === movementId).length;
+  const loggedForSlot = (slot: any): number => {
+    if (session === null) return 0;
+    return session.sets.filter((s) =>
+      s.session_plan_slot_id !== null && s.session_plan_slot_id !== undefined
+        ? s.session_plan_slot_id === slot.sessionPlanSlotId
+        : s.movement_id === slot.movementId
+    ).length;
+  };
+  const activeSlot = sessionPlan.find((sl) => sl.sessionPlanSlotId === activeSessionPlanSlotId) ?? sessionPlan.find((sl) => sl.movementId === activeMovementId);
+  const activeLoggedCount = activeSlot ? loggedForSlot(activeSlot) : 0;
   const tonnage = session.sets.reduce((a, s) => a + s.tonnage_kg, 0);
   const elapsedMin = Math.floor((nowMs - session.startedAtMs) / 60_000);
   // P16 T1: the implement the athlete is ACTUALLY using right now — the
@@ -491,13 +502,13 @@ export default function SessionScreen(): React.JSX.Element {
         >
           {sessionPlan.map((slot) => {
             const m = byId.get(slot.movementId);
-            const logged = loggedFor(slot.movementId);
-            const active = slot.movementId === activeMovementId;
+            const logged = loggedForSlot(slot);
+            const active = activeSessionPlanSlotId !== null ? slot.sessionPlanSlotId === activeSessionPlanSlotId : slot.movementId === activeMovementId;
             const done = logged >= slot.plannedSets;
             return (
               <Pressable
-                key={slot.movementId}
-                onPress={() => selectMovement(slot.movementId)}
+                key={slot.sessionPlanSlotId}
+                onPress={() => selectMovementSlot(slot.sessionPlanSlotId)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`${m?.name ?? 'movement'}, ${logged} of ${slot.plannedSets} sets logged`}
@@ -523,7 +534,7 @@ export default function SessionScreen(): React.JSX.Element {
           >
             <Text style={styles.navActionText}>+ ADD</Text>
           </Pressable>
-          {activeMovementId !== null && (
+          {activeMovementId !== null && activeLoggedCount === 0 && (
             <Pressable
               onPress={() => openSubstitution(activeMovementId)}
               accessibilityRole="button"
@@ -601,25 +612,48 @@ export default function SessionScreen(): React.JSX.Element {
 
       {/* ---- planned target for the active movement (1RM translation) ---- */}
       {(() => {
-        const slot = todayPlan !== null && activeMovementId !== null
-          ? todayPlan.slots.find((sl) => sl.movementId === activeMovementId) ?? null
-          : null;
+        const slot = session !== null && activeMovementId !== null
+          ? (sessionPlan.find((sl) => sl.sessionPlanSlotId === activeSessionPlanSlotId) ?? sessionPlan.find((sl) => sl.movementId === activeMovementId) ?? null)
+          : (todayPlan !== null && activeMovementId !== null
+             ? todayPlan.slots.find((sl) => sl.movementId === activeMovementId) ?? null
+             : null);
         if (slot === null) return null;
-        const oneRm = oneRepMaxes[slot.movementId] as number | undefined;
-        const target = slot.overrideLoadKg ?? (oneRm !== undefined
-          ? targetLoadKg(oneRm, slot.reps, slot.targetRpe)
-          : null);
-        return (
-          <View style={styles.targetRow}>
-            <Text style={styles.targetText}>
-              TARGET {slot.sets}×{slot.reps} @ RPE {slot.targetRpe.toFixed(1)}
-              {target !== null ? ` · ${target.toFixed(1)} kg` : ''}
-            </Text>
-            {slot.overrideReason !== null && (
-              <Text style={styles.targetReason}>{slot.overrideReason}</Text>
-            )}
-          </View>
-        );
+        if ('provenanceKind' in slot) {
+          const rpeSafetyCap = prescription?.vector.rpe_cap ?? 10.0;
+          const effectiveRpe = slot.targetRpe !== null ? Math.min(slot.targetRpe, rpeSafetyCap) : null;
+          if (effectiveRpe === null || slot.plannedReps === null) return null;
+          const oneRm = oneRepMaxes[slot.movementId] as number | undefined;
+          const target = slot.overrideLoadKg ?? (oneRm !== undefined
+            ? targetLoadKg(oneRm, slot.plannedReps, effectiveRpe)
+            : null);
+          return (
+            <View style={styles.targetRow}>
+              <Text style={styles.targetText}>
+                TARGET {slot.plannedSets}×{slot.plannedReps} @ RPE {effectiveRpe.toFixed(1)}
+                {target !== null ? ` · ${target.toFixed(1)} kg` : ''}
+              </Text>
+              {slot.overrideReason !== null && (
+                <Text style={styles.targetReason}>{slot.overrideReason}</Text>
+              )}
+            </View>
+          );
+        } else {
+          const oneRm = oneRepMaxes[slot.movementId] as number | undefined;
+          const target = slot.overrideLoadKg ?? (oneRm !== undefined
+            ? targetLoadKg(oneRm, slot.reps, slot.targetRpe)
+            : null);
+          return (
+            <View style={styles.targetRow}>
+              <Text style={styles.targetText}>
+                TARGET {slot.sets}×{slot.reps} @ RPE {slot.targetRpe.toFixed(1)}
+                {target !== null ? ` · ${target.toFixed(1)} kg` : ''}
+              </Text>
+              {slot.overrideReason !== null && (
+                <Text style={styles.targetReason}>{slot.overrideReason}</Text>
+              )}
+            </View>
+          );
+        }
       })()}
 
       {/* ---- prefix engine: implement dropdown preceding the base name ---- */}
@@ -743,7 +777,7 @@ export default function SessionScreen(): React.JSX.Element {
         disabled={activeMovementId === null}
         onPress={() => {
           if (activeMovementId !== null) {
-            logSet(activeMovementId, timeMode ? 1 : reps, loadKg, rpe, loggedName, appliedConditions, effectiveImplement, timeMode ? { timeS: seconds } : undefined);
+            logSet(activeMovementId, timeMode ? 1 : reps, loadKg, rpe, loggedName, appliedConditions, effectiveImplement, timeMode ? { timeS: seconds } : undefined, activeSessionPlanSlotId ?? undefined);
             setAppliedConditions([]);
           }
         }}

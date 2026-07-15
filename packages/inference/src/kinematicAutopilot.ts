@@ -211,7 +211,6 @@ export function detectFlaws(
     const s = patternDailyDelta[p];
     const eArr = s?.avgDeltaRPE ?? [];
     const wArr = s?.avgAttenuation ?? [];
-    const nArr = s?.setCount ?? [];
     const jArr = s?.maxJointSev ?? [];
 
     let P = 0; // §2 deficit accumulation
@@ -228,14 +227,15 @@ export function detectFlaws(
     let recSum = 0; let recCnt = 0;
 
     for (let i = 0; i < L; i++) {
-      const ni = i < nArr.length ? nArr[i] : 0;
       const ji = i < jArr.length ? jArr[i] : 0;
-      if (ni > 0) obs += 1;
       if (ji > maxJ) maxJ = ji;
       const ei = i < eArr.length ? eArr[i] : null;
-      // Skip days with no defined ΔE — and defend against a non-finite aggregate
-      // (a corrupt upstream value must never poison P/N or the trend → NaN φ).
+      // Confidence = days with a VALID ΔE. A day with logged sets but no frozen
+      // target (avgDeltaRPE null) carries no ΔE evidence and must NOT count toward
+      // MIN_OBSERVATIONS — else pre-provenance / free-form history fabricates it.
+      // Injury (maxJ, above) stays tracked independently of ΔE.
       if (ei === null || !Number.isFinite(ei)) continue;
+      obs += 1; // only valid-ΔE days count toward the confidence gate
       const wiRaw = i < wArr.length ? wArr[i] : 0;
       // The attenuation weight is a reciprocal in (0,1] by construction; clamp to
       // that domain and coerce non-finite to 0 so a bad weight can neither flip

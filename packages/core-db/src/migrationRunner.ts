@@ -52,6 +52,10 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'movement_logging_mode' },       // 018
   { type: 'table', name: 'band_ladder' },                 // 018
   { type: 'table', name: 'progression_policy' },          // 018
+  { type: 'table', name: 'set_target' },                  // 022
+  { type: 'table', name: 'session_origin' },              // 022
+  { type: 'table', name: 'session_plan_slot' },           // 022
+  { type: 'table', name: 'planned_slot_disposition' },    // 022
 ];
 
 function userVersion(db: MigrationDb): number {
