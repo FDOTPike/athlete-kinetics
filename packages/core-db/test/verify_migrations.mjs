@@ -31,7 +31,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '021_taxonomy_corrections.sql',
   '022_set_target.sql',
   '023_phase17_session_foundation.sql',
-  '024_phase17_equipment_fixes.sql'];
+  '024_phase17_equipment_fixes.sql',
+  '025_movement_coaching_content.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -72,6 +73,28 @@ const EXPECTED_PHASE17_PREFIXES = {
   'Pallof Press': '["Banded"]',
 };
 const phase17PrefixesHold = (db) => JSON.stringify(phase17Prefixes(db)) === JSON.stringify(EXPECTED_PHASE17_PREFIXES);
+const coachingContentSummary = (db) => ({
+  count: Number(db.raw.prepare(`
+    SELECT COUNT(*) AS c
+    FROM movement m
+    JOIN movement_coaching_intent i USING(movement_id)
+    JOIN movement_detail d USING(movement_id)
+    WHERE trim(i.coaching_intent) <> ''
+      AND trim(d.instructions) <> ''
+      AND trim(d.cues) <> ''
+      AND trim(d.video_placeholder_uri) <> ''
+  `).get().c),
+  feetElevatedUrl: db.raw.prepare(`
+    SELECT d.video_placeholder_uri AS url
+    FROM movement m JOIN movement_detail d USING(movement_id)
+    WHERE m.name = 'Feet-Elevated Push-Up'
+  `).get()?.url ?? null,
+});
+const coachingContentComplete = (db) => {
+  const summary = coachingContentSummary(db);
+  return summary.count === 124
+    && summary.feetElevatedUrl === 'https://www.youtube.com/watch?v=J_mB4TjUf6c';
+};
 
 // --- 1. fresh install ---------------------------------------------------------
 console.log('[1] fresh install');
@@ -82,6 +105,8 @@ check('all sentinels present', sentinelsMissing(a).length === 0,
   `${SENTINELS.length} checked`);
 check('024 fresh install applies all three ratified equipment-prefix corrections',
   phase17PrefixesHold(a), JSON.stringify(phase17Prefixes(a)));
+check('025 fresh install applies all 124 attested coaching records and approved video replacement',
+  coachingContentComplete(a), JSON.stringify(coachingContentSummary(a)));
 
 runMigrations(a, MIGRATIONS); // second boot
 check('re-boot is a no-op (idempotent)', uv(a) === MIGRATIONS.length);
@@ -92,6 +117,11 @@ runMigrations(a, MIGRATIONS);
 check('024 can be re-applied idempotently through the production runner',
   uv(a) === MIGRATIONS.length && phase17PrefixesHold(a),
   JSON.stringify(phase17Prefixes(a)));
+a.executeSync(`PRAGMA user_version = ${FILES.indexOf('025_movement_coaching_content.sql')};`);
+runMigrations(a, MIGRATIONS);
+check('025 can be re-applied idempotently through the production runner',
+  uv(a) === MIGRATIONS.length && coachingContentComplete(a),
+  JSON.stringify(coachingContentSummary(a)));
 const taxonomyCorrections = Object.fromEntries(a.raw.prepare(`
   SELECT m.name, t.category FROM movement_taxonomy t JOIN movement m USING(movement_id)
   WHERE m.name IN ('Cable Rope Overhead Triceps Extension', 'Triceps Pushdown')
@@ -112,6 +142,8 @@ runMigrations(b, MIGRATIONS);
 check('self-heal restored every sentinel', sentinelsMissing(b).length === 0);
 check('full sentinel self-heal replays 024 equipment corrections',
   phase17PrefixesHold(b), JSON.stringify(phase17Prefixes(b)));
+check('full sentinel self-heal replays 025 attested coaching content',
+  coachingContentComplete(b), JSON.stringify(coachingContentSummary(b)));
 check('materialize prepares against healed schema', (() => {
   const sql = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8')
     .replace(/^--.*$/gm, '');

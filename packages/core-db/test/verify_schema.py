@@ -616,11 +616,11 @@ except sqlite3.IntegrityError:
     check("UI preference CHECK rejects a non-boolean timer", True)
 
 plank_id = p17.execute("SELECT movement_id FROM movement WHERE name='Plank'").fetchone()["movement_id"]
-p17.execute("INSERT INTO movement_coaching_intent (movement_id, coaching_intent) VALUES (?, 'Build a stable trunk that carries into every loaded movement.')", (plank_id,))
+p17.execute("UPDATE movement_coaching_intent SET coaching_intent='Build a stable trunk that carries into every loaded movement.' WHERE movement_id=?", (plank_id,))
 intent = p17.execute("SELECT coaching_intent FROM movement_coaching_intent WHERE movement_id=?", (plank_id,)).fetchone()
 check("coaching-intent side-car round-trips reviewed copy", intent is not None and "stable trunk" in intent["coaching_intent"])
 try:
-    p17.execute("INSERT INTO movement_coaching_intent (movement_id, coaching_intent) VALUES (?, '   ')",
+    p17.execute("UPDATE movement_coaching_intent SET coaching_intent='   ' WHERE movement_id=?",
                 (p17.execute("SELECT movement_id FROM movement WHERE name='Farmer Carry'").fetchone()["movement_id"],))
     check("coaching-intent CHECK rejects blank copy", False)
 except sqlite3.IntegrityError:

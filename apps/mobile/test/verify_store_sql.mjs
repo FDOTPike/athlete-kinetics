@@ -27,7 +27,7 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
   '021_taxonomy_corrections.sql',
   '022_set_target.sql', '023_phase17_session_foundation.sql',
-  '024_phase17_equipment_fixes.sql']) {
+  '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -251,7 +251,7 @@ if (resetTables.length >= 15) {
     '016_movement_library_seed.sql', '017_movement_batch.sql',
     '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
     '021_taxonomy_corrections.sql', '022_set_target.sql', '023_phase17_session_foundation.sql',
-    '024_phase17_equipment_fixes.sql'
+    '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.

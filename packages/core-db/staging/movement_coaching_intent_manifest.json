@@ -1,4 +1,503 @@
 {
   "_comment": "Records emitted by generated Phase 17 coaching-content migrations. Each content_sha256 fingerprints normalized intent, steps, cues, and video URL; a staged revision must use a dedicated correction migration.",
-  "slots": {}
+  "slots": {
+    "025": [
+      {
+        "name": "Arnold Press",
+        "content_sha256": "b80dfbac78d74c7f0f3bbf7729b8c06de541fd04c533397937aa9c3fed4c162c"
+      },
+      {
+        "name": "Band External Rotation",
+        "content_sha256": "048ceb8e0266883ffb6bdd6a02138b5ba7891baf2b83a0f63dfa2da2a5aeba05"
+      },
+      {
+        "name": "Band Good Morning",
+        "content_sha256": "e41937a4ccf8b869d54f94759971811466d8ae0382675199d1ec7c66368ea336"
+      },
+      {
+        "name": "Band Pull-Apart",
+        "content_sha256": "2c03ca49f8957099c931dca669d53ff31f0f1718cf56e3427e2afe0dc4680d32"
+      },
+      {
+        "name": "Band Row",
+        "content_sha256": "962ff6acea5066e888433d8eb6c42fde441fedc75b0ec7d5a5109500fd4a344f"
+      },
+      {
+        "name": "Barbell Ab Rollout",
+        "content_sha256": "221eb494e72c40a3a7894aa87947079aa387ca64e511dab6f630b6a326deca57"
+      },
+      {
+        "name": "Barbell Curl",
+        "content_sha256": "fe6614de16e4e3702e8bb6815843480fad1f131c0f5a0e08471d0f3b1372de31"
+      },
+      {
+        "name": "Barbell Hack Squat",
+        "content_sha256": "aa61c7adbdee9c7d4842af0dd45335fe6dbdc744f4251ebdcfd35260aef4586b"
+      },
+      {
+        "name": "Barbell Hip Thrust",
+        "content_sha256": "6fa8eb99ecac6821845765c318b92beb5f3590b0aa59be6cdf553e75d975c82e"
+      },
+      {
+        "name": "Barbell Rear Delt Row",
+        "content_sha256": "f9eceb614817099f5b2cb18e84a88c296c74e78d45850364c3ba8c4138b70b73"
+      },
+      {
+        "name": "Barbell Row",
+        "content_sha256": "7a72840c195acd96d0689e79750b26e3c6c7ff7080afb6c0fc59676cfa303e41"
+      },
+      {
+        "name": "Barbell Seated Calf Raise",
+        "content_sha256": "59a0529e1a9dbbaa54f94dfa9e3ac73a1a3ae79300a702c139e0b3981907545f"
+      },
+      {
+        "name": "Barbell Shrug",
+        "content_sha256": "fb15c364da670e22cae92b450f2a5bd2948df7b856433bcb42334ae1354148be"
+      },
+      {
+        "name": "Barbell Step-Up",
+        "content_sha256": "6be53dce27006ce44efa0571ce4208c17b9995afabcab7817da0ff2a53fddd76"
+      },
+      {
+        "name": "Bench Dip",
+        "content_sha256": "d9ba58ee9c870c529c8c49ef79552396cb498901076dcd9171ea9e41b55eee11"
+      },
+      {
+        "name": "Bent Press",
+        "content_sha256": "00e2f7d8df665d3e8fddf4c028080fb0ca12429b4ea239c8872cc227766887b7"
+      },
+      {
+        "name": "BJJ Sparring Round",
+        "content_sha256": "560e2d9dea4097cf0722c2154b81756248ea44a4478b6fc71651b71d21839a34"
+      },
+      {
+        "name": "Bodyweight Squat",
+        "content_sha256": "5a85daa5991b04bc29b89ef1e0c7287417484ee009f77f1569ca49a3ba297d97"
+      },
+      {
+        "name": "Box Squat",
+        "content_sha256": "1d79a6836f2e4e584b0dc306666f00be1ca239a38f4105319b3fb8433eb1be52"
+      },
+      {
+        "name": "Bulgarian Split Squat",
+        "content_sha256": "5629949f06ae6659f7493784ad316ef39854f7b1b3a29bcadf09d2b22c8f65d6"
+      },
+      {
+        "name": "Cable Chest Press",
+        "content_sha256": "c61355b5d1420f83db1a4e9c951410778432e47d25edcb89ac82042c1b59c314"
+      },
+      {
+        "name": "Cable Crunch",
+        "content_sha256": "997ec8213ee043dfb132f9f897df6e564f61371271f69558d5c923d03804b4b1"
+      },
+      {
+        "name": "Cable Deadlifts",
+        "content_sha256": "9f6481b1db3537935e984126607faf0eb883af483e3d13c0bf2ef86250992071"
+      },
+      {
+        "name": "Cable Glute Kickback",
+        "content_sha256": "ca8b65c17a937459e2e1c58df0f538c84c3a623eca6a7c81cc17bcf1484016e8"
+      },
+      {
+        "name": "Cable Hammer Curls - Rope Attachment",
+        "content_sha256": "93354531ea5b7588cd145662cdb28d277a9b4798b2899b267d0d85cefb7674e5"
+      },
+      {
+        "name": "Cable Internal Rotation",
+        "content_sha256": "5cc67f95fd2819d4bf40d9a33109823c38d23e3ef85a60f362e47d9b46cfce19"
+      },
+      {
+        "name": "Cable Pull-Through",
+        "content_sha256": "cddd65319117a1fe9aa50f8ad71b6874044034ab5e5dab8e3214d1ab9ac9afdd"
+      },
+      {
+        "name": "Cable Reverse Crunch",
+        "content_sha256": "637fa094777e781d3b5b5f6978e2d49f7188b3839c53b0c95f404b4015c3c59c"
+      },
+      {
+        "name": "Cable Rope Overhead Triceps Extension",
+        "content_sha256": "1489c11e92693447e025fc26224a1586a2a5c59f824b5a9914c49cdcd5fc7a9a"
+      },
+      {
+        "name": "Cable Rope Rear-Delt Rows",
+        "content_sha256": "e2b6411bad1cafd047b48c8226fcb498a2d66d35b890347cad459431352b9af7"
+      },
+      {
+        "name": "Cable Row",
+        "content_sha256": "639b2c4265deae2cccf5e5a11e120da6866353f447977dc95ff7c20284f00797"
+      },
+      {
+        "name": "Cable Shoulder Press",
+        "content_sha256": "4bed6ec3794156baab8afb35835a577707424667be4380693577c657ba1019d2"
+      },
+      {
+        "name": "Calf Raises - With Bands",
+        "content_sha256": "ce583a508ec3ba21408081e7eaad16e2a1c3043f31af40dbf3e73d97c34765df"
+      },
+      {
+        "name": "Chest-Supported Dumbbell Row",
+        "content_sha256": "72893a7ae215e46b4376481cdd151d5ad74df05d84003b25cc55092f1ae2d029"
+      },
+      {
+        "name": "Chin-up",
+        "content_sha256": "6fb789783b17dfe17e1d08aa115515892490bdd7d30a70665548fe5e771bfa07"
+      },
+      {
+        "name": "Close-Grip Bench Press",
+        "content_sha256": "3a41cc976d8bbe793628cb48c83994dd812e17a4025b55093e11177f3d9f7774"
+      },
+      {
+        "name": "Close-Grip Dumbbell Press",
+        "content_sha256": "9463464c1a2ffc2002c5b4c6b509e511d4daedd0763ae5f3b8cb3d6ee246fdb5"
+      },
+      {
+        "name": "Competition Bench",
+        "content_sha256": "20761fd102a3c2c96303aec7297c0f61e30b27281c58059c38ae94b1f9fa61a1"
+      },
+      {
+        "name": "Competition Squat",
+        "content_sha256": "13639ac3a92d4ebecb5cd790cbb186db91f46b8359b6699024a89a795f2937d1"
+      },
+      {
+        "name": "Cuban Press",
+        "content_sha256": "fe28043d679e71c40d2ed5a50753d9adbbd038d275447f285b847454d8b588d4"
+      },
+      {
+        "name": "Dead Bug",
+        "content_sha256": "1b89d4bd9b9e4bcb2bc00b2ce4ca6dbb82891704b8ad9a8a5c9c64328d87140d"
+      },
+      {
+        "name": "Deadlift",
+        "content_sha256": "ff491f9dc4816d050a9a9944ec2393c9a937093aacbb852c62203418dd679003"
+      },
+      {
+        "name": "Decline Bench Press",
+        "content_sha256": "a6d4751c15f2bb591074242c2d2069660b1603715a8347997e89c15a32183b3f"
+      },
+      {
+        "name": "Decline Crunch",
+        "content_sha256": "44cb9cf21a06a01148676fd9ecfe597da306f1ebe9f9ef8a70dc696ca848e1dc"
+      },
+      {
+        "name": "Decline Dumbbell Bench Press",
+        "content_sha256": "e9ac4aab507ab2011ed65a26ecbd0dde49f4801d6784d0336e183fb85b84ad83"
+      },
+      {
+        "name": "Deficit Deadlift",
+        "content_sha256": "9f664289c607aef3e96af85f851c9033cfa13704a8faef0bd6acf980787fd534"
+      },
+      {
+        "name": "Dip",
+        "content_sha256": "e9f44d7847c32432433a9281f8129991bc9a0a19aa76ccbeaa5d97d805312ccb"
+      },
+      {
+        "name": "Double Kettlebell Front Squat",
+        "content_sha256": "cfe6cf761fda5453f630f659f5931143f10fb6fa87d7007d841f370762e5cd85"
+      },
+      {
+        "name": "Double Kettlebell Push Press",
+        "content_sha256": "25a45eadcc7e4623f883a8cb4107a4bb6815dc080d887cfe2f5d47b41aca2789"
+      },
+      {
+        "name": "Dumbbell Bench Press",
+        "content_sha256": "7a01a3d9b2b45770dbec3e8ea9c13381f016b02ab1100da68d135066aaeeea20"
+      },
+      {
+        "name": "Dumbbell Floor Press",
+        "content_sha256": "ebe223e7f0e49d720c421ff4f3e3a3b431e41e92fad5a3353ba6fbdc410af6da"
+      },
+      {
+        "name": "Dumbbell Flye",
+        "content_sha256": "cea913312be9e9f5dab9634ce0bd1e4ca9b21414c49e4875e9ec5905b9f94f93"
+      },
+      {
+        "name": "Dumbbell Front Raise",
+        "content_sha256": "e8d8185619785b8178fa78061a8056b9a6f234e01ea6b78cebbff68813a5eee5"
+      },
+      {
+        "name": "Dumbbell Lateral Raise",
+        "content_sha256": "4bf39ae362544bb4add9a588d5ebfdb5a8f2d652e951832ab99a2027ea148579"
+      },
+      {
+        "name": "Dumbbell Lunge",
+        "content_sha256": "fc4ab2a68a12a97de527eca14143523c1cd234852e4bb31b6729be47e681cd27"
+      },
+      {
+        "name": "Dumbbell Reverse Lunge",
+        "content_sha256": "c2a712a2ae4c5faca8535cc07b076fa28ed9df53183107d5b84a204c61d6571d"
+      },
+      {
+        "name": "Dumbbell Romanian Deadlift",
+        "content_sha256": "20782e8c3a75a6d939ec6b3ff34d4c34fd9ded628504e134f3f3705a516e84d0"
+      },
+      {
+        "name": "Dumbbell Shoulder Press",
+        "content_sha256": "8706306946a00fbd2944d8d41013ef0cdbfb6cbb223067bb451fc7747b1a07a6"
+      },
+      {
+        "name": "Dumbbell Shrug",
+        "content_sha256": "594dfb5978e52954036c2aca881cc0f37fc863efaaf723d8e2f81bfeb7ef5d7a"
+      },
+      {
+        "name": "Dumbbell Split Squat",
+        "content_sha256": "4bf3e8017550dfb82600795edd0568aef66606f1664d062130d35d4ff77b1c85"
+      },
+      {
+        "name": "Dumbbell Squat",
+        "content_sha256": "a0f08852eb201fbb9f6ee49a32c2fb39ad0d11480b7e3f8f5766042c516bc65b"
+      },
+      {
+        "name": "Dumbbell Step-Up",
+        "content_sha256": "b3cdb7722ede8a542836a950fcd655667ddea4ce465680687e1bd91c10f6d876"
+      },
+      {
+        "name": "Dumbbell Sumo Squat",
+        "content_sha256": "d778e0dd10f9c12ba52d3cf77d29743743d9138f9d04c516b0995354003ea14f"
+      },
+      {
+        "name": "Eccentric Wall Handstand Push-Up",
+        "content_sha256": "295a87e19ef8d9847ceea4f57480a24a5b911e89eea39b5fbac2e966485ce2ac"
+      },
+      {
+        "name": "Face Pull",
+        "content_sha256": "6d88281fc16805a144b1f5a8cfaf8fe217bd27c339d6ab1fb0fd7a0973fbf00d"
+      },
+      {
+        "name": "Farmer Carry",
+        "content_sha256": "5f0e443cfd78713b803b8f70c00d1faed0038f103e8058d727fb5434240a6d1f"
+      },
+      {
+        "name": "Feet-Elevated Push-Up",
+        "content_sha256": "530c88a7f81c51ab07e15c6efa47d8b818be8388ddd57ef89c7c4676b64be150"
+      },
+      {
+        "name": "Floor Back Extension",
+        "content_sha256": "ab19737d0c3acf49dba9a9ce9c002e44417eb3e262328ec5c636dfa29d4d470c"
+      },
+      {
+        "name": "Front Squat",
+        "content_sha256": "19eca6d144aeba50fc9992172f96f2b78a132de0f637a9851bf145ea23c9dbca"
+      },
+      {
+        "name": "Glute Bridge",
+        "content_sha256": "81de53d081c612298921a7eebc824f09ed651a82a07a544b0b9709cb04ae9f63"
+      },
+      {
+        "name": "Goblet Squat",
+        "content_sha256": "bef76ca750f2101e6dd9b6603c53df45a780f80207abf6ee62b92ba501cb2550"
+      },
+      {
+        "name": "Good Morning",
+        "content_sha256": "2211df10215327498a82088de3e4bac9b34332917f61104e076529016e31f43a"
+      },
+      {
+        "name": "Hammer Curl",
+        "content_sha256": "59a1eb858fd30aaf6db4b36dd8ea458adf4f0cbdaff26503a10015ac4bca4c44"
+      },
+      {
+        "name": "Handstand Push-Up",
+        "content_sha256": "598f3cf846aa9c1363e574ef25066dcbb3d1750337841697de890016645175a5"
+      },
+      {
+        "name": "Hanging Leg Raise",
+        "content_sha256": "a2a961f7531c41b93eca291c18d8bbf2d902574dee1874090529166ece7471f5"
+      },
+      {
+        "name": "Incline Dumbbell Press",
+        "content_sha256": "10bbc03982ee02a56bd317a9892663527b91cf83152b367bf30ebb96ffa15883"
+      },
+      {
+        "name": "Incline Push-Up",
+        "content_sha256": "9265a4ce5197e45db553216e0770217c5d8104e1034f6970ec1c9ba33d1b36f0"
+      },
+      {
+        "name": "Inverted Row",
+        "content_sha256": "7af3b2409e7719fb007af55bdd4bb7c2bf3676df08738280df81ed81409a7d77"
+      },
+      {
+        "name": "Jefferson Squats",
+        "content_sha256": "db0bd4ff39f86f5de1b9b4b54d04c9e1f12010f2a3dc90208f6a7c031a6dcea2"
+      },
+      {
+        "name": "Kettlebell Dead Clean",
+        "content_sha256": "91bee9f407e9684c143c8254ee1ca0d59e2fe58a2faec5fdf3d4ee31ff78ed38"
+      },
+      {
+        "name": "Kettlebell Pistol Squat",
+        "content_sha256": "85382b3a99924c347292fcf44d613d57641d0c037e7dd95a0a4a84c055a57200"
+      },
+      {
+        "name": "Kettlebell Swing",
+        "content_sha256": "560bd4aed2bc92e2a378fbd6ab8b61ce283dc38103842fd0e153b4fd20173a73"
+      },
+      {
+        "name": "Kettlebell Turkish Get-Up",
+        "content_sha256": "a2815f2c54271b6e3cb75d164259786a594b86508babe6d29b091a27f3750ce8"
+      },
+      {
+        "name": "Kneeling Single-Arm High Pulley Row",
+        "content_sha256": "c5400a6c61310556c9c2b584b3a6cadf32558b036607563cfba3c1c678e7d1c7"
+      },
+      {
+        "name": "Lat Pulldown",
+        "content_sha256": "5c5d44e9a8b3f593f51453c97e4cf48feeecb58c868f9fb33cdadec3f6d1fc2d"
+      },
+      {
+        "name": "Lying Dumbbell Triceps Extension",
+        "content_sha256": "57cbb3b42942e8cf9cd36ec2601ab708ff4b00561d5eab053df08543d6b4bdf0"
+      },
+      {
+        "name": "Narrow Stance Squats",
+        "content_sha256": "8d4037466c0674159c4f7eaa4c18dd5bc6d7c310cb7f45b7accf5dab9b38f85e"
+      },
+      {
+        "name": "Nordic Curl",
+        "content_sha256": "fee1b00a621896ba6d6c8221f58f274973465c27cfd91f232e346431b079d026"
+      },
+      {
+        "name": "One Arm Lat Pulldown",
+        "content_sha256": "f9d3f10131395af2c4382d86071adccf239f5e948d9064319b31d5ae723db331"
+      },
+      {
+        "name": "One-Arm Kettlebell Row",
+        "content_sha256": "c4e631bf22f9dfc8daf26ca0692761d63a4cc41fd4eeb7931bc8da548052f294"
+      },
+      {
+        "name": "One-Arm Overhead Kettlebell Squat",
+        "content_sha256": "cd7a917a1f891564963736c67c9d680d24ea62543fd138fc293120444e518797"
+      },
+      {
+        "name": "Overhead Press",
+        "content_sha256": "506a74c6c39fb289c1973d946d377f26e2e6ef6a6322911b392b06d5ad57e132"
+      },
+      {
+        "name": "Pallof Press",
+        "content_sha256": "f69219a4f30ea0251a8ea93d3759bdb813f1dc208ad79b3ebf93ff0d7988d38e"
+      },
+      {
+        "name": "Pike Push-Up",
+        "content_sha256": "de018f8e1bc18452fdcfa1747b8180cd17461e4978530917a2e70f804751fa0d"
+      },
+      {
+        "name": "Plank",
+        "content_sha256": "554c0d2f9bf1783ed7e5d32492261ee6697d8de35dd58d0e68ca40ed3152e37d"
+      },
+      {
+        "name": "Power Clean",
+        "content_sha256": "ca0cab28b5abca45a8b17af25213f352244b869266f10adc2b4ab58377aa49f4"
+      },
+      {
+        "name": "Preacher Curl",
+        "content_sha256": "73d9258347751dda2027c92794b23863ef2e570dffe2891b01ecbe6ad7a53902"
+      },
+      {
+        "name": "Pull-Up",
+        "content_sha256": "e9a0335da1671d18133e5bdeedf849d0f7e6a3a6affb80c277c98a4cb07c2fee"
+      },
+      {
+        "name": "Push-up",
+        "content_sha256": "4f0868d2b5868115adb32fe205dc7ae7cfdef5e873df519d3692ffeb8990e8cc"
+      },
+      {
+        "name": "Renegade Row",
+        "content_sha256": "bd2990b21c372461fbec7021339eb4f6ba1ca3263b668277f542d4d69f4a1835"
+      },
+      {
+        "name": "Reverse Barbell Curl",
+        "content_sha256": "7a2823558e802480ede356e9ea26be715e2ee44f88b1a19b74c4d0b7b4314db3"
+      },
+      {
+        "name": "Reverse Crunch",
+        "content_sha256": "aa113a2bb94caf57c2fc4ac0cf6de13cd19997dc715eba24122ab748003c4822"
+      },
+      {
+        "name": "Reverse Grip Bent-Over Rows",
+        "content_sha256": "568e5b17aa1b0552467d392b523656dd4ee762d9ec12c43f436f173c492dc364"
+      },
+      {
+        "name": "Road Run",
+        "content_sha256": "cff27416847e97aa99e41eeee705b1945171fd5ad34308061994e903c64de048"
+      },
+      {
+        "name": "Romanian Deadlift",
+        "content_sha256": "92e5663b37d949270fe44b4b010f9b7dab51721590f1cc96cea98bae15810c63"
+      },
+      {
+        "name": "Russian Twist",
+        "content_sha256": "6716f649787cb5e50edc6c2bb6dbed5274efe35b853c398bd8be3c7d572ed74b"
+      },
+      {
+        "name": "Scapular Pull-Up",
+        "content_sha256": "f4d846a9c2894e9f26420820215cf71d4aa1c83d3794643ae90ea4e4f53c53e0"
+      },
+      {
+        "name": "Single-Arm Dumbbell Row",
+        "content_sha256": "a67d85588c6a39def116e8c3726f981db0fd990707bf2bc094cf3f0c6f758a33"
+      },
+      {
+        "name": "Single-Leg Glute Bridge",
+        "content_sha256": "e35a2018141826315e8f7b63d5204ca2ce26b820edace1304f8ceae10baea13a"
+      },
+      {
+        "name": "Single-Leg Romanian Deadlift",
+        "content_sha256": "40e78ba8931b73d655039e52e0116ada50ea5559f7df4add45b324906a10c9cd"
+      },
+      {
+        "name": "Sit-Up",
+        "content_sha256": "6375dc7a57b8ac8b5d1afc1c677a01a2a1e4cf991165da1c371756f7bf53b399"
+      },
+      {
+        "name": "Standing Barbell Calf Raise",
+        "content_sha256": "627ad458a8d93323dbab00c98f580ea1306860c874eb5797a3f672cf0a055c54"
+      },
+      {
+        "name": "Standing Dumbbell Calf Raise",
+        "content_sha256": "4ff0c5704d438f4e115f89bedea4bbc27adc37fe7c1559a99b792c3fd4e7e238"
+      },
+      {
+        "name": "Straight-Arm Pulldown",
+        "content_sha256": "9937bb1498e15362413753caa51e1017f13603be4efb747d410e47452f4b4350"
+      },
+      {
+        "name": "Suitcase Carry",
+        "content_sha256": "e5657f355117b018978454468bf9080368e0e26edad66525e172ae2bffa2fe11"
+      },
+      {
+        "name": "Sumo Deadlift",
+        "content_sha256": "08ada22bd3fe9064b3b938e75b5401bc739c74c20cf340b0c223619cd5187e24"
+      },
+      {
+        "name": "T-Bar Row",
+        "content_sha256": "72b868b32c26659d69b0d25abf47d47f571ab5a4e6e76fb281131c0cbc5a8eef"
+      },
+      {
+        "name": "Triceps Pushdown",
+        "content_sha256": "324cb1dd4590590c94e1d6b268ca2d1549828f93a901b292d8d6e4bc74b2a1a6"
+      },
+      {
+        "name": "Tuck Crunch",
+        "content_sha256": "34757515634397f313fc64fb5de06a9349ea5eaefaf4cdd0b57b170941eab75c"
+      },
+      {
+        "name": "V-Bar Pulldown",
+        "content_sha256": "8020a86a3dfda590327d7cca0434db1f83fdaf838c054adfd441d75d4d0c4524"
+      },
+      {
+        "name": "Walking Lunge",
+        "content_sha256": "702560e52f8212fe05859b36eb40ffcd33c898ff9e1b70f67901fcdbe09f4f5b"
+      },
+      {
+        "name": "Weighted Pull-up",
+        "content_sha256": "92dc33159ba88be936b8fed12ca7614fdd4d6d4dc1fc316463918e8752401d9b"
+      },
+      {
+        "name": "Zercher Squat",
+        "content_sha256": "37f701b79e27e285f51111e98a2dce00edf374cb1779133052235576f0f91391"
+      },
+      {
+        "name": "Zottman Curl",
+        "content_sha256": "f63f20a31f4663b2391ef98cbcb2c8fe61499596256d3b51475ebfbf569c180e"
+      }
+    ]
+  }
 }
