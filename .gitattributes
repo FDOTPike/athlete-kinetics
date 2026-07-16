@@ -1,6 +1,18 @@
+# Deterministic line endings for a multi-agent, multi-OS repo.
+# Source, config, docs: LF in the repository, always.
 * text=auto eol=lf
+
+# Windows script formats that require/expect CRLF to execute reliably.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries: never touch.
 *.png binary
+*.jpg binary
 *.pdf binary
 *.gguf binary
 *.onnx binary
-*.ps1 text eol=crlf
+*.db binary
+*.keystore binary
+*.jar binary

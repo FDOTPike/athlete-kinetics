@@ -154,3 +154,83 @@ test('idle state has one focused start action', () => {
   render(<SessionScreen />);
   expect(screen.getByLabelText('Start a new workout session')).toBeOnTheScreen();
 });
+
+test('runner substitution offer: thumbs-down after an earlier set uses runner path and not the legacy preference path', () => {
+  // After completing one set, thumbs-down should route through the runner store
+  // action (not the legacy setMovementPreference + openSubstitution pair).
+  // The runner state has 1 completed set for slot 1 to simulate a mid-session offer.
+  mockState = state({
+    runner: runner({ slotSetCounts: [1, 0], loggedSets: 1, setIndex: 2 }),
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{ set_id: 1, movement_id: 1, movement_name: 'First movement', set_index: 1, reps: 5, load_kg: 0, rpe: 8, tonnage_kg: 0, session_plan_slot_id: 1, timeS: null, bandLevel: null }],
+    },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText('Avoid First movement and find a substitution'));
+  expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
+  // Must NOT touch the legacy paths
+  expect(mockState.setMovementPreference).not.toHaveBeenCalled();
+  expect(mockState.openSubstitution).not.toHaveBeenCalled();
+});
+
+test('session complete phase shows a summary with no active slot controls', () => {
+  mockState = state({
+    runner: runner({
+      phase: 'complete',
+      slotIndex: 1,
+      setIndex: 0,
+      loggedSets: 3,
+      slotSetCounts: [2, 1],
+    }),
+  });
+  render(<SessionScreen />);
+  // No "log set" action should be present
+  expect(screen.queryByLabelText('Log set 1 for First movement')).toBeNull();
+  // A session-complete finish action must be visible
+  expect(screen.getByLabelText('Finish completed session')).toBeOnTheScreen();
+});
+
+test('beginner never renders more than three cues even when the movement detail has more', () => {
+  // The 3-cue rendering limit is a Phase 17 plan law for Beginners.
+  // If the movement detail supplies more than 3 cue lines, only 3 may appear.
+  const fourCueMovement = movement(1, 'First movement', {
+    cues: 'Cue one\nCue two\nCue three\nCue four',
+    difficulty: 'Beginner',
+  });
+  mockState = state({ movements: [fourCueMovement, movement(2, 'Later movement')] });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText('How and why, collapsed'));
+  // Three cues visible is the maximum
+  expect(screen.getByText('• Cue one')).toBeOnTheScreen();
+  expect(screen.getByText('• Cue two')).toBeOnTheScreen();
+  expect(screen.getByText('• Cue three')).toBeOnTheScreen();
+  // The fourth cue must never appear for a Beginner
+  expect(screen.queryByText('• Cue four')).not.toBeOnTheScreen();
+});
+
+test('relaunch recovery: a runner in resting phase displays correct next-set preview on cold mount', () => {
+  // When the app relaunches mid-rest, the SessionScreen must reconstruct the
+  // exact runner state from the serialized checkpoint and immediately show the
+  // correct "next set" preview without requiring any user action.
+  mockState = state({
+    runner: runner({
+      phase: 'resting',
+      setIndex: 2,
+      restSecondsTarget: 120,
+      restStartedAtMs: Date.now() - 30000,
+      restRpe: 8,
+      slotSetCounts: [2, 0],
+      loggedSets: 2,
+    }),
+  });
+  render(<SessionScreen />);
+  // Must show rest UI immediately
+  expect(screen.getByText('REST')).toBeOnTheScreen();
+  // Must correctly compute next-up from the serialized state
+  expect(screen.getByText('Next up: First movement · set 3 of 3')).toBeOnTheScreen();
+  // The skip action must remain available (rest timer can still be skipped)
+  expect(screen.getByLabelText('Ready now, skip the rest timer')).toBeOnTheScreen();
+});

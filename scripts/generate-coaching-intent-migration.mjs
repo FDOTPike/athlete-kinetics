@@ -40,6 +40,7 @@ const SHIPPED_MOVEMENTS = [
 export const CANONICAL_YOUTUBE_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/;
 const NEGATIVE_CUE = /\b(?:don't|do not|never|avoid|stop|no)\b/i;
 const BANNED_CLAIM = /\b(cure|heal(?:s|ing)?|guarantee|injury[- ]proof|prevent(?:s|ing)? injur|bulletproof|pain[- ]free|insurance|pays out|burn(?:s)? fat|melt|shred your|doctor|medical|prescription|diagnos|therap)\b/i;
+const GENERIC_INTENT = /\bbuild strength,\s*mobility,\s*and technique with\b/i;
 
 const q = (value) => `'${String(value).replace(/'/g, "''")}'`;
 const normalizeName = (name) => name.trim().toLocaleLowerCase('en-US');
@@ -65,7 +66,8 @@ export function seededMovementIndex(seedManifest) {
  * normalized names to canonical names; `emitted` contains normalized names
  * already frozen into a prior generated migration.
  */
-export function validateCoachingContent(entries, known, emitted = new Map()) {
+export function validateCoachingContent(entries, known, emitted = new Map(), options = {}) {
+  const requireComplete = options.requireComplete === true;
   const errors = [];
   const fresh = [];
   if (!Array.isArray(entries)) return { errors: ['staging.movements must be an array'], fresh };
@@ -97,6 +99,10 @@ export function validateCoachingContent(entries, known, emitted = new Map()) {
 
     if (coachingIntent === null || coachingIntent.length < 1 || coachingIntent.length > 160) {
       errors.push(`${prefix} coachingIntent must contain 1..160 characters`);
+      continue;
+    }
+    if (GENERIC_INTENT.test(coachingIntent)) {
+      errors.push(`${prefix} coachingIntent must explain this movement's specific purpose, not use the generic strength/mobility/technique template`);
       continue;
     }
     if (!Array.isArray(entry.setupSteps) || entry.setupSteps.length < 2 || entry.setupSteps.length > 4) {
@@ -150,6 +156,15 @@ export function validateCoachingContent(entries, known, emitted = new Map()) {
       continue;
     }
     fresh.push(row);
+  }
+  if (requireComplete) {
+    const missing = [...known.entries()]
+      .filter(([nameKey]) => !seen.has(nameKey))
+      .map(([, canonicalName]) => canonicalName)
+      .sort((a, b) => a.localeCompare(b));
+    if (missing.length > 0) {
+      errors.push(`staging must cover every currently seeded movement; missing: ${missing.join(', ')}`);
+    }
   }
   return { errors, fresh };
 }
@@ -228,7 +243,12 @@ function main() {
   const manifest = readJson(MANIFEST);
   const seeded = readJson(SEEDED);
   const emitted = emittedContentIndex(manifest);
-  const { errors, fresh } = validateCoachingContent(staged.movements, seededMovementIndex(seeded), emitted);
+  const { errors, fresh } = validateCoachingContent(
+    staged.movements,
+    seededMovementIndex(seeded),
+    emitted,
+    { requireComplete: true },
+  );
   if (errors.length > 0) {
     console.error(`ABORT:\n  ${errors.join('\n  ')}`);
     process.exit(1);

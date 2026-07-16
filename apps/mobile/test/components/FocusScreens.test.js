@@ -178,3 +178,35 @@ test('COACH leaves the safety form behind its explicit action even during a halt
   fireEvent.press(screen.getByLabelText('Review safety report'));
   expect(screen.getByLabelText('Describe how your body feels today')).toBeOnTheScreen();
 });
+
+test('READY recovery state lowers the primary action prominence and shows a reduced-effort label', () => {
+  // A recovery readiness score (< 70) triggers the RECOVERY AthleteState.
+  // READY shows a different title and guidance message, not a primary action button.
+  mockState = baseState({
+    vector: {
+      ...vector,
+      readiness_score: 58,
+      acwr: 1.1,
+    },
+  });
+  render(<ReadinessScreen />);
+
+  // The RECOVERY title must be visible
+  expect(screen.getByText('Train steadily today')).toBeOnTheScreen();
+  // OPTIMAL title must not appear
+  expect(screen.queryByText('Ready to train')).not.toBeOnTheScreen();
+  // Recovery guidance directs to the Coach tab, not a direct primary action
+  expect(screen.getByText(/Open the relevant tab below/)).toBeOnTheScreen();
+});
+
+test('COACH renders a rest-day placeholder when no session is scheduled today', () => {
+  // A rest day has no todayPlan, so COACH should render a safe rest-day message
+  // rather than an empty slot list or a crash.
+  mockState = baseState({ todayPlan: null, blockSessions: [] });
+  render(<BlockScreen />);
+
+  // The four-week trajectory must still be visible
+  expect(screen.getByText('Four-week trajectory')).toBeOnTheScreen();
+  // No exercise slot data should appear
+  expect(screen.queryByText('Goblet Squat')).toBeNull();
+});

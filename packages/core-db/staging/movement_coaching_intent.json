@@ -1,4 +1,2025 @@
 {
-  "_comment": "Phase 17 curator-owned guided-content staging. Every entry requires reviewed intent, setup steps, positive cues, and a curator-verified canonical YouTube URL; never add placeholder copy.",
-  "movements": []
+  "movements": [
+    {
+      "name": "Arnold Press",
+      "coachingIntent": "Develop anterior and lateral deltoid strength with a rotational pressing motion.",
+      "setupSteps": [
+        "Sit or stand holding dumbbells at shoulder height with palms facing you.",
+        "Press up while rotating your palms to face forward at the top.",
+        "Reverse the rotation on the way back down to the start.",
+        "Stay tall and braced the whole press — the lean-back arch is the classic cheat, and it quietly turns this into a sloppy incline press."
+      ],
+      "cues": [
+        "Chest open, lats in the back pocket.",
+        "Elbows tight, core tension.",
+        "Rotate smooth all the way to lockout."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=3ml7BH7mNwQ",
+      "videoVerified": false
+    },
+    {
+      "name": "Band External Rotation",
+      "coachingIntent": "Use light, controlled rotation to train the cuff without letting the elbow or torso steal the rep.",
+      "setupSteps": [
+        "Anchor a light band at elbow height and stand side-on, holding it with the far hand, elbow bent 90 degrees and pinned to the ribs.",
+        "Rotate the forearm away from the body only as far as the elbow and torso remain still.",
+        "Return slowly along the same path.",
+        "Keep the load light; when the elbow floats or the body turns, the band is ahead of the rotation you are training."
+      ],
+      "cues": [
+        "Pin the elbow to the ribs.",
+        "Rotate through a smooth, owned range.",
+        "Keep the torso still on the return."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=_UvmPNGtlPM",
+      "videoVerified": false
+    },
+    {
+      "name": "Band Good Morning",
+      "coachingIntent": "Use forgiving band tension to rehearse a clean hip hinge before heavier loading.",
+      "setupSteps": [
+        "Stand on the middle of a long band and loop it across the back of your shoulders, clear of the neck.",
+        "Soften the knees, brace, and push the hips back until the hamstrings load while the band stays over mid-foot.",
+        "Drive the floor away and squeeze the glutes to stand; shorten the depth the moment the back starts carrying more than the hamstrings."
+      ],
+      "cues": [
+        "Brace first, then send the hips back.",
+        "Keep the band stacked over mid-foot.",
+        "Finish tall through the glutes."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=CTRaCzE8pWU",
+      "videoVerified": false
+    },
+    {
+      "name": "Band Pull-Apart",
+      "coachingIntent": "Use light band tension to train the upper back while the arms stay long and the torso stays quiet.",
+      "setupSteps": [
+        "Stand tall with a light band held at shoulder height and a little tension already in it.",
+        "Reach the hands wide until the band meets the chest, keeping the arms long and shoulders low.",
+        "Return slowly; if the elbows bend or the ribs lift, use a lighter band."
+      ],
+      "cues": [
+        "Reach wide with long arms.",
+        "Keep the ribs quiet and shoulders low."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=stwYTTPXubo",
+      "videoVerified": false
+    },
+    {
+      "name": "Band Row",
+      "coachingIntent": "Learn to lead a horizontal pull with the elbows while band tension keeps the return honest.",
+      "setupSteps": [
+        "Anchor a band securely at chest height and step back until it is lightly tensioned.",
+        "Stand tall in a stable stance with both arms reaching long toward the anchor.",
+        "Drive the elbows behind you, then return slowly; if the torso rocks, step closer or use a lighter band."
+      ],
+      "cues": [
+        "Lead the pull with the elbows.",
+        "Keep the torso tall and quiet."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=ujaOX9whpg0",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Ab Rollout",
+      "coachingIntent": "Train the trunk to resist extension as the arms reach farther from the knees.",
+      "setupSteps": [
+        "Kneel behind a loaded barbell with small plates and grip it at shoulder width.",
+        "Brace hard and roll the bar forward as far as you can without your hips sagging.",
+        "Pull the bar back to your knees using your abs, not your arms."
+      ],
+      "cues": [
+        "Tuck the pelvis before you move.",
+        "Reach long with the elbows — push the upper back towards the ceiling.",
+        "Shorten the rollout before you lose position."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=O-d6HC9gLcw",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Curl",
+      "coachingIntent": "Load elbow flexion with both arms together while the bar exposes swinging and uneven effort.",
+      "setupSteps": [
+        "Grip the bar at shoulder width with your arms hanging in their natural rest position.",
+        "Curl to shoulder height with your upper arms pinned, then fight the bar down slower than it went up.",
+        "Lower under control until your arms are back in the rest position — a small hip lean on the last rep is honest, a swing from rep one means the bar is too heavy."
+      ],
+      "cues": [
+        "Elbows stay behind the bar.",
+        "Lower slower than you lift.",
+        "Settle into the rest position between reps."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=QZEqB6wUPxQ",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Hack Squat",
+      "coachingIntent": "Overload the quadriceps by shifting the load behind the legs.",
+      "setupSteps": [
+        "Set a bar on the floor behind your calves, stand about hip width, then squat down and take a shoulder-width grip with long arms.",
+        "Brace the trunk and drive the floor away, letting the bar skim up behind the legs as the hips and knees straighten together.",
+        "Lower along the same close path; when the grip or torso position breaks before the legs tire, that is the load limit for the day."
+      ],
+      "cues": [
+        "Set the chest proud and the arms long.",
+        "Push the floor away.",
+        "Keep the bar close behind the legs."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=EdtaJRBqwes",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Hip Thrust",
+      "coachingIntent": "Load hip extension hardest near lockout, where a brief level-hip pause keeps the glutes working.",
+      "setupSteps": [
+        "Sit on the floor with your upper back against a bench and a padded bar over your hips.",
+        "Plant your feet about hip-width, heels under your knees.",
+        "Drive through your heels until your thighs and torso are level with the floor — finish flat like a tabletop, because any height past neutral comes from the lower back, not the glutes.",
+        "Lower your hips under control and repeat."
+      ],
+      "cues": [
+        "Tuck the pelvis and pause a full beat at the top.",
+        "One straight line knee-to-shoulder, core braced in neutral.",
+        "Drive through the heels, shins vertical."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=pF17m_CXfL0",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Rear Delt Row",
+      "coachingIntent": "Target the posterior deltoids to balance out heavy pressing volume.",
+      "setupSteps": [
+        "Take a wide overhand grip, soften the knees, and hinge until the bar hangs beneath a braced torso.",
+        "Drive the elbows wide and row the bar toward the upper chest, holding long enough to feel the rear shoulders finish.",
+        "Lower to long arms without rising; if the bar heads toward the stomach, the elbows have tucked and the movement has become a lat row."
+      ],
+      "cues": [
+        "Brace the hinge before the pull.",
+        "Drive the elbows wide.",
+        "Touch the upper chest and lower under control."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=gvBbvB9NKrk",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Row",
+      "coachingIntent": "Build horizontal pulling strength while holding a stable hip hinge under load.",
+      "setupSteps": [
+        "Stand holding the bar just outside the legs, then soften the knees and hinge until the torso is stable.",
+        "Let the bar hang beneath the shoulders with the trunk braced and the neck long.",
+        "Drive the elbows back to row toward the lower ribs, then lower to long arms without changing the torso angle.",
+        "If the torso rises on each pull, reduce the load before the hips turn the row into a heave."
+      ],
+      "cues": [
+        "Brace the hinge before the pull.",
+        "Drive the elbows behind you.",
+        "Hold one torso angle for the set."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=G8l_8chR5BE",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Seated Calf Raise",
+      "coachingIntent": "Train the calves with the knees bent, placing more of the work on the soleus.",
+      "setupSteps": [
+        "Sit tall on a flat bench with the balls of both feet on a low block and settle a padded bar across the thighs just above the knees.",
+        "Let the heels drop into a controlled stretch, then drive through the big-toe joints and rise as high as the ankles allow.",
+        "Hold the top before lowering; if the bar starts bouncing on the thighs, the calves stopped owning the rep."
+      ],
+      "cues": [
+        "Root the balls of the feet.",
+        "Rise tall through the ankles.",
+        "Hold the top, then lower slowly."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=abDaq2ly34Q",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Shrug",
+      "coachingIntent": "Load the upper traps through a deliberate up-and-back shrug with a held top position.",
+      "setupSteps": [
+        "Hold a barbell in front of your thighs with straight arms, at your natural standing width.",
+        "With intention, pull your shoulder blades up and back behind your ears as high as the traps will take them.",
+        "Hold the top for a full second, then lower until the weight stretches the traps.",
+        "The bar lets you load heavier than dumbbells — earn it with the same strict path."
+      ],
+      "cues": [
+        "Up and back behind the ears, with intention.",
+        "Own a full second at the top.",
+        "Arms stay ropes — traps lift, hands just hold."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=X26Ji1j9LWA",
+      "videoVerified": false
+    },
+    {
+      "name": "Barbell Step-Up",
+      "coachingIntent": "Develop unilateral leg strength and stability with an elevated step.",
+      "setupSteps": [
+        "Set the bar as for a squat and stand close to a box that puts your thigh near parallel when your foot is up.",
+        "Put the whole foot on the box and stand up through it — the floor leg hangs, it does not jump.",
+        "Lower on a controlled count until the floor toe touches, and go again without rocking."
+      ],
+      "cues": [
+        "Drive through the top leg — the bottom foot is a passenger.",
+        "Whole foot on the box, stand tall through the hip.",
+        "Chest proud the whole way up."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=MRtbwZPK7iY",
+      "videoVerified": false
+    },
+    {
+      "name": "Bench Dip",
+      "coachingIntent": "Use bodyweight leverage to train the triceps through a controlled, shoulder-comfortable range.",
+      "setupSteps": [
+        "Grip the edge of a stable bench behind you, bend the knees, and keep the hips just clear of the edge.",
+        "Bend the elbows straight back and lower only through the range the shoulders can hold comfortably.",
+        "Press to long arms while keeping the hips close to the bench.",
+        "Straighten the legs gradually only after every rep stays controlled and comfortable."
+      ],
+      "cues": [
+        "Elbows point straight back.",
+        "Hips graze the bench the whole way.",
+        "Shoulders down, away from the ears."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=0326dy_-CzM",
+      "videoVerified": false
+    },
+    {
+      "name": "Bent Press",
+      "coachingIntent": "Practise moving beneath a fixed overhead load while the hips and upper back create the working range.",
+      "setupSteps": [
+        "Clean one kettlebell to the shoulder, set the feet wider than the hips, and turn them slightly away from the loaded side.",
+        "Send the hips away and wedge the torso under the bell, straightening the arm as the body descends while the eyes stay on the handle.",
+        "Once the elbow is locked, drive the feet through the floor to stand tall; if the bell travels sideways instead of staying over its base, the range is too deep or the setup was rushed."
+      ],
+      "cues": [
+        "Keep the bell stacked over its base.",
+        "Send the hips away and wedge under the handle.",
+        "Stand tall beneath a locked arm."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=cFmSd61PPTI",
+      "videoVerified": false
+    },
+    {
+      "name": "BJJ Sparring Round",
+      "coachingIntent": "Develop grappling skill and cardiovascular endurance through live sparring.",
+      "setupSteps": [
+        "Confirm the round rules, starting position, and intended pace with your partner.",
+        "Build a stable base before establishing grips and beginning the exchange.",
+        "Use position before force; if your breath races and your grips clamp down, slow the exchange and rebuild your base."
+      ],
+      "cues": [
+        "Breathe through each exchange.",
+        "Build position before applying force.",
+        "Tap clearly and early."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=S4wpkxjRD7g",
+      "videoVerified": false
+    },
+    {
+      "name": "Bodyweight Squat",
+      "coachingIntent": "Practise a balanced squat using full-foot pressure and a depth you can control.",
+      "setupSteps": [
+        "Stand with the feet around shoulder width and toes turned to a comfortable angle.",
+        "Sit between the hips while the knees track with the toes and pressure stays across the whole foot.",
+        "Stand tall; if the heels lift or the chest folds, shorten the depth and own that range."
+      ],
+      "cues": [
+        "Root the whole foot.",
+        "Track the knees with the toes.",
+        "Stand tall through the hips."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=nEQQle9-0NA",
+      "videoVerified": false
+    },
+    {
+      "name": "Box Squat",
+      "coachingIntent": "Use a controlled box pause to practise staying braced before driving back to standing.",
+      "setupSteps": [
+        "Set a box behind you at or just below parallel height and set up as for a back squat.",
+        "Sit back onto the box under control, pausing briefly without relaxing.",
+        "Drive back up to standing without rocking forward."
+      ],
+      "cues": [
+        "Sit back, shins near vertical.",
+        "Land soft and stay tight through the whole pause.",
+        "Explode up off the box."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=WGjf5w8iaTM",
+      "videoVerified": false
+    },
+    {
+      "name": "Bulgarian Split Squat",
+      "coachingIntent": "Develop unilateral leg strength and balance by elevating your rear foot.",
+      "setupSteps": [
+        "Stand far enough in front of a bench that the front foot can stay planted through the whole rep.",
+        "Rest the top of the rear foot on the bench and settle the hips square over the stance.",
+        "Lower the rear knee toward the floor, then drive through the front foot to stand.",
+        "If the front heel lifts or balance breaks before the leg tires, reset the distance before adding load."
+      ],
+      "cues": [
+        "Root the whole front foot.",
+        "Drop the rear knee straight down.",
+        "Drive through the front leg."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=2C-uNgKwPLE",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Chest Press",
+      "coachingIntent": "Maintain constant tension on the pectorals through a stable pressing arc.",
+      "setupSteps": [
+        "Set two handles at chest height, face away, and take a staggered stance.",
+        "Press both handles forward until your arms are long, letting them drift together at the end.",
+        "Return under control — the cable pulls backward the entire rep, so the squeeze at lockout is real work here."
+      ],
+      "cues": [
+        "Brace into the staggered stance.",
+        "Press to a full reach, hands finishing together.",
+        "Ride the cables back slow."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=fOHouR0t9Cw",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Crunch",
+      "coachingIntent": "Load spinal flexion with constant resistance to develop the rectus abdominis.",
+      "setupSteps": [
+        "Kneel far enough from the stack that the cable stays loaded at the top, rope held to your collarbones.",
+        "Crunch by rounding your upper spine, driving your elbows towards your thighs while your hips stay frozen.",
+        "Unroll slowly until the abs are on stretch, keeping the rope pinned to your head the whole set."
+      ],
+      "cues": [
+        "Round the upper spine, elbows to the thighs.",
+        "Hips locked in place.",
+        "Abs pull, arms just hold the rope."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=0KEP6A1deBE",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Deadlifts",
+      "coachingIntent": "Train the hip hinge pattern with constant horizontal tension.",
+      "setupSteps": [
+        "Set two cable handles at the lowest position, stand centred between them, and sit the hips back to take the handles with long arms.",
+        "Brace, push the floor away, and extend the hips and knees together until the handles finish beside the thighs.",
+        "Send the hips back before bending the knees to return; if the stack pulls the shoulders forward at the bottom, the load or range is too large."
+      ],
+      "cues": [
+        "Brace before the cables leave the stack.",
+        "Push the floor away through the whole foot.",
+        "Send the hips back to begin the return."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=_4U_5JO3oiE",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Glute Kickback",
+      "coachingIntent": "Train hip extension against steady cable tension while the pelvis and torso stay quiet.",
+      "setupSteps": [
+        "Strap a low cable to one ankle, face the stack, and hold it for balance with a slight forward lean.",
+        "Drive the strapped leg straight back and slightly up by squeezing the glute, then return under control.",
+        "The range is shorter than people want it to be — where the lower back starts arching is where the glute stopped working."
+      ],
+      "cues": [
+        "Push the heel back, squeeze at the end.",
+        "Torso still, hips level.",
+        "Short honest range beats a high arched kick."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=bVrmtCI00Ys",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Hammer Curls - Rope Attachment",
+      "coachingIntent": "Target the brachialis and brachioradialis for thicker upper arms.",
+      "setupSteps": [
+        "Attach a rope to a low cable, stand tall with a neutral grip, and settle the elbows beside the ribs.",
+        "Close the elbows to curl the rope toward the shoulders, separating the ends slightly while the upper arms stay quiet.",
+        "Return to the natural long-arm rest; if the shoulders roll forward to finish the curl, the stack is ahead of the biceps."
+      ],
+      "cues": [
+        "Stand tall over quiet elbows.",
+        "Curl the rope ends toward the shoulders.",
+        "Reach the natural rest under control."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=7Tw9fpb5mOo",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Internal Rotation",
+      "coachingIntent": "Use light cable resistance to train controlled internal rotation without moving the upper arm.",
+      "setupSteps": [
+        "Set a single cable handle around elbow height and stand side-on with the working elbow bent to 90 degrees and resting lightly against the ribs.",
+        "Rotate the forearm across the torso while the upper arm stays quiet, then pause when the hand reaches the centreline.",
+        "Return until the forearm points toward the cable; if the elbow floats away from the ribs, the chosen range has outrun the shoulder."
+      ],
+      "cues": [
+        "Stack the wrist in front of the elbow.",
+        "Rotate around a quiet upper arm.",
+        "Return smoothly to the cable line."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=YOc7DYcASNk",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Pull-Through",
+      "coachingIntent": "Reinforce the hip hinge mechanic using horizontal cable resistance.",
+      "setupSteps": [
+        "Face away from a low cable with a rope between your legs, held at your hips.",
+        "Walk out until the cable is taut, then push your hips back and hinge forward with a flat back.",
+        "Drive your hips forward to stand tall, squeezing your glutes."
+      ],
+      "cues": [
+        "Push the hips back — the arms just hold the rope.",
+        "Squeeze the glutes at lockout.",
+        "Flat back the whole rep."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=cXPOYVFjgC8",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Reverse Crunch",
+      "coachingIntent": "Load the pelvic curl with cable tension so the trunk, rather than leg swing, finishes each rep.",
+      "setupSteps": [
+        "Attach both ankles to a low cable, lie facing away from the stack, and set the hips and knees near 90 degrees with the shoulders heavy on the floor.",
+        "Tuck the pelvis first, then curl the knees toward the ribs until the tailbone lifts without throwing the legs.",
+        "Set the hips down slowly while keeping cable tension; if the thighs swing but the pelvis stays put, lower the stack and earn the curl."
+      ],
+      "cues": [
+        "Start with the pelvis tucked.",
+        "Curl the knees toward the ribs.",
+        "Set the hips down on a slow count."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=b8oUb_6POhQ",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Rope Overhead Triceps Extension",
+      "coachingIntent": "Train overhead elbow extension with the upper arms fixed so the long head works through a long range.",
+      "setupSteps": [
+        "Attach a rope to a low cable, face away in a split stance, and bring the rope overhead with the elbows beside the temples.",
+        "Keep the upper arms quiet as the hands travel behind the head into a long triceps stretch.",
+        "Extend the elbows and separate the rope at the top; if the torso loses its stack before the arms straighten, the cable is too heavy."
+      ],
+      "cues": [
+        "Plant the split stance.",
+        "Aim the elbows forward beside the temples.",
+        "Reach the knuckles long at the top."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=t7m1RyOZHFQ",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Rope Rear-Delt Rows",
+      "coachingIntent": "Engage the posterior deltoids and rhomboids with a high-angle pull.",
+      "setupSteps": [
+        "Sit tall at a low cable with a rope in both hands and reach forward at shoulder height until the shoulder blades can travel.",
+        "Pull the rope toward the upper chest by driving the elbows wide, separating the ends as the rear shoulders finish.",
+        "Return to the full reach slowly; if the wrists beat the elbows to the finish, the arms have taken the job from the rear delts."
+      ],
+      "cues": [
+        "Reach the shoulder blades forward.",
+        "Drive the elbows wide toward the back wall.",
+        "Separate the rope at the upper chest."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=QPzdXm3osCk",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Row",
+      "coachingIntent": "Train horizontal pulling against steady cable tension, with a full reach and an elbow-led return.",
+      "setupSteps": [
+        "Sit at the cable row with the feet planted and the handle held in long arms.",
+        "Reach forward from the shoulder blades while keeping the torso tall and the stack off its rest.",
+        "Drive the elbows toward the back pockets, then return slowly; if the torso rocks, reduce the load before shortening the reach."
+      ],
+      "cues": [
+        "Lead with the elbows.",
+        "Keep the torso tall and quiet.",
+        "Reach the shoulder blades forward on the return."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=GZbfZ033f74",
+      "videoVerified": false
+    },
+    {
+      "name": "Cable Shoulder Press",
+      "coachingIntent": "Press overhead with constant tension to build deltoid size and stability.",
+      "setupSteps": [
+        "Set a low pulley and bring the handle to shoulder height, standing tall.",
+        "Press to lockout overhead against the cable's pull, which drags forward and down the entire rep — that constant tension is the point, there is no rest at the top.",
+        "Lower under control back to the shoulder.",
+        "Usually run one arm at a time; the free hand tells you when you are leaning."
+      ],
+      "cues": [
+        "Press to a tall, stacked lockout with the chest open.",
+        "Keep the cable loaded from shoulder to lockout.",
+        "Brace against the cable's forward pull."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=VuZSb_4Of-M",
+      "videoVerified": false
+    },
+    {
+      "name": "Calf Raises - With Bands",
+      "coachingIntent": "Apply accommodating resistance to the calves for a stronger peak contraction.",
+      "setupSteps": [
+        "Stand on the middle of a long band with the handles held at shoulder height and the feet set about hip width.",
+        "Root the forefeet and rise as high as the ankles allow while the hands stay quiet beside the shoulders.",
+        "Pause, then lower into an owned stretch; if the hands bob to manufacture height, the calves have stopped driving the rep."
+      ],
+      "cues": [
+        "Root the forefeet evenly.",
+        "Rise tall through the ankles.",
+        "Own the top before a slow return."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=a2xjbhP4MkY",
+      "videoVerified": false
+    },
+    {
+      "name": "Chest-Supported Dumbbell Row",
+      "coachingIntent": "Train the upper back with the bench limiting torso swing and lower-back fatigue.",
+      "setupSteps": [
+        "Lie chest-down on an incline bench with a dumbbell hanging from each hand.",
+        "Row both dumbbells up, driving the elbows towards the ceiling, until your shoulder blades pinch.",
+        "Lower to a full hang and let the weight pull the blades apart.",
+        "The bench removes the cheat — whatever moves the weight here is actually your back."
+      ],
+      "cues": [
+        "Chest glued to the pad the whole set.",
+        "Pull with the elbows.",
+        "Full hang and blade stretch at the bottom."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=kX4gtPQeyb8",
+      "videoVerified": false
+    },
+    {
+      "name": "Chin-up",
+      "coachingIntent": "Build upper body strength with an underhand vertical pulling motion.",
+      "setupSteps": [
+        "Take an underhand grip around shoulder width and begin from a controlled full hang.",
+        "Drive the elbows down to bring the upper chest toward the bar without reaching with the chin.",
+        "Lower to long arms; if the bottom range disappears, finish the set or use assistance."
+      ],
+      "cues": [
+        "Drive the elbows toward the ribs.",
+        "Bring the upper chest to the bar.",
+        "Own the full return to long arms."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=brhRXlOhsAM",
+      "videoVerified": false
+    },
+    {
+      "name": "Close-Grip Bench Press",
+      "coachingIntent": "Shift pressing emphasis to the triceps and anterior deltoids.",
+      "setupSteps": [
+        "Lie on a bench and grip the bar at about shoulder width, not narrower.",
+        "Unrack and lower the bar to your lower chest, elbows staying close to your sides.",
+        "Press back up to straight arms."
+      ],
+      "cues": [
+        "Elbows ride close to the ribs.",
+        "Wrists stacked over the elbows.",
+        "Touch low on the chest."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=nEF0bv2FW94",
+      "videoVerified": false
+    },
+    {
+      "name": "Close-Grip Dumbbell Press",
+      "coachingIntent": "Squeeze the pectorals while heavily loading the triceps in a neutral grip.",
+      "setupSteps": [
+        "Lie on a flat bench with two dumbbells pressed together over the middle of the chest, wrists stacked and feet planted.",
+        "Keep crushing the bells together as you lower them softly to the chest with the elbows close to the ribs.",
+        "Press the pair back up as one unit; if the bells separate, the close-grip tension disappeared before the rep was finished."
+      ],
+      "cues": [
+        "Crush the bells together.",
+        "Stack the wrists over the elbows.",
+        "Touch softly, then press as one unit."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=lNPH4gf4g08",
+      "videoVerified": false
+    },
+    {
+      "name": "Competition Bench",
+      "coachingIntent": "Practise a stable setup, controlled touch and paused press that meet powerlifting competition standards.",
+      "setupSteps": [
+        "Plant the feet and pin the upper back to the bench before taking a secure competition-width grip.",
+        "Unrack to straight arms, settle the bar, then lower to the same chest touch point with stacked forearms.",
+        "Hold the competition pause before pressing back to lockout.",
+        "If the hips lift or the touch point wanders, reduce the load until every rep follows one standard."
+      ],
+      "cues": [
+        "Drive the feet and pin the upper back.",
+        "Touch the same lower-chest point.",
+        "Hold the pause, then press."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=vcBig73ojpE",
+      "videoVerified": false
+    },
+    {
+      "name": "Competition Squat",
+      "coachingIntent": "Practise a braced walkout and competition-depth squat with the same repeatable setup on every rep.",
+      "setupSteps": [
+        "Set the bar securely, brace, and walk it out with the fewest controlled steps needed.",
+        "Root the whole foot and descend until the hip crease passes the top of the knee.",
+        "Drive back to standing while the bar stays over mid-foot.",
+        "If the stance or depth changes between reps, reduce the load until the competition shape is repeatable."
+      ],
+      "cues": [
+        "Brace before the walkout.",
+        "Root the whole foot.",
+        "Drive the back into the bar."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=bEv6CCg2BC8",
+      "videoVerified": false
+    },
+    {
+      "name": "Cuban Press",
+      "coachingIntent": "Coordinate a light high-elbow row, external rotation and press without borrowing motion from the hips.",
+      "setupSteps": [
+        "Stand with very light dumbbells and raise the elbows wide to shoulder height, forearms hanging below them.",
+        "Keep the upper arms fixed while rotating the forearms until the wrists stack directly over the elbows, then press to a tall overhead finish.",
+        "Reverse every stage under control; if the hips have to help, the bells are too heavy for the rotation you are training."
+      ],
+      "cues": [
+        "Hold the elbows high and wide.",
+        "Rotate around quiet upper arms.",
+        "Reverse the path smoothly."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=IyvB-mdKIv4",
+      "videoVerified": false
+    },
+    {
+      "name": "Dead Bug",
+      "coachingIntent": "Train the core to resist extension while moving the extremities.",
+      "setupSteps": [
+        "Lie on your back, arms at the ceiling, knees stacked over your hips.",
+        "Flatten your lower back into the floor and keep that pressure for the entire set — that pressure is the exercise.",
+        "Lower one arm and the opposite leg as far as you can without the back peeling up, exhaling the whole way, then switch sides."
+      ],
+      "cues": [
+        "Press the floor with your lower back — that pressure is the rep.",
+        "Exhale like fogging a mirror as the limbs lower.",
+        "Slow, opposite arm and leg, full control."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=bxn9FBrt4-A",
+      "videoVerified": false
+    },
+    {
+      "name": "Deadlift",
+      "coachingIntent": "Train whole-body force from the floor while keeping the bar close and the trunk braced.",
+      "setupSteps": [
+        "Stand with the bar over mid-foot and take a secure grip without rolling it away.",
+        "Bring the shins to the bar, set the trunk, and pull the slack out before the plates leave the floor.",
+        "Push the floor away and stand tall with the bar close; if it swings forward, reset the start or reduce the load."
+      ],
+      "cues": [
+        "Pull the slack out first.",
+        "Push the floor away.",
+        "Keep the bar close to the legs."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=wYREQkVtvEc",
+      "videoVerified": false
+    },
+    {
+      "name": "Decline Bench Press",
+      "coachingIntent": "Use the decline angle and shorter bar path to train a heavy press toward the lower chest.",
+      "setupSteps": [
+        "Hook your legs into the decline bench and take the bar just wider than shoulder width.",
+        "Lower to the lower line of your chest — the decline shortens the stroke, so expect to touch sooner than on flat.",
+        "Press back to lockout over your eyes.",
+        "Have a spotter for the unrack; getting out of a decline alone is ugly."
+      ],
+      "cues": [
+        "Touch at the natural end of the shorter stroke.",
+        "Wrists stacked, bar over the forearm bones.",
+        "Spotter on the unrack."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=LfyQBUKR8SE",
+      "videoVerified": false
+    },
+    {
+      "name": "Decline Crunch",
+      "coachingIntent": "Increase the range of motion and difficulty of spinal flexion.",
+      "setupSteps": [
+        "Secure the legs on a decline bench and lie back with the fingertips resting lightly beside the temples.",
+        "Press the lower back into the pad and curl the shoulder blades up, bringing the ribs toward the pelvis without sitting tall.",
+        "Hold the shortened position, then unroll slowly; if the feet do the work and the torso shoots upright, the angle or range is too ambitious."
+      ],
+      "cues": [
+        "Anchor the lower back to the pad.",
+        "Curl the ribs toward the pelvis.",
+        "Hold the top before you unroll."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=FRzQXeN1hro",
+      "videoVerified": false
+    },
+    {
+      "name": "Decline Dumbbell Bench Press",
+      "coachingIntent": "Work the lower pectorals with the independent control of dumbbells.",
+      "setupSteps": [
+        "Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and bring the bells to the chest before pressing them into position.",
+        "Lower toward the lower chest with the forearms vertical and the shoulder blades pinned into the pad.",
+        "Press up and slightly inward; when the bells are too heavy to mount cleanly, the setup has already chosen a lighter working load for you."
+      ],
+      "cues": [
+        "Pin the shoulder blades into the pad.",
+        "Stack the wrists over the elbows.",
+        "Press up and slightly in."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=Pf1nDoqx_1A",
+      "videoVerified": false
+    },
+    {
+      "name": "Deficit Deadlift",
+      "coachingIntent": "Increase the pulling range of motion to build strength off the floor.",
+      "setupSteps": [
+        "Stand on a plate or low platform, one to three inches, bar over mid-foot.",
+        "Set up as for a conventional deadlift — the deficit forces more knee and hip bend, so brace before you even reach for the bar.",
+        "Pull to lockout, fighting hardest through the longer bottom range.",
+        "Earn a flat back at this depth before loading heavy; the deficit exposes mobility you can hide on a normal pull."
+      ],
+      "cues": [
+        "Earn the extra range with a flat back.",
+        "Pull the slack out before the bar breaks the floor.",
+        "Keep the deficit small — three inches is plenty."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=hnuPZZfeRzs",
+      "videoVerified": false
+    },
+    {
+      "name": "Dip",
+      "coachingIntent": "Train bodyweight pressing through the triceps and chest with a depth you can reverse under control.",
+      "setupSteps": [
+        "Support yourself on parallel bars with arms straight.",
+        "Bend your elbows and lower your body until your upper arms are about parallel to the floor.",
+        "Press back up to straight arms.",
+        "Lean slightly forward for more chest, stay upright for more triceps."
+      ],
+      "cues": [
+        "Shoulders down, away from the ears.",
+        "Lower to a stretch you can press out of.",
+        "Lock out tall, shoulders packed."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=wjUmnZH528Y",
+      "videoVerified": false
+    },
+    {
+      "name": "Double Kettlebell Front Squat",
+      "coachingIntent": "Challenge the anterior core and quads with a heavy front-loaded rack.",
+      "setupSteps": [
+        "Clean two kettlebells into the rack position, resting on your forearms at your chest.",
+        "Squat down as deep as you can control, keeping your elbows in and chest up.",
+        "Drive back up to standing without letting the bells pull you forward."
+      ],
+      "cues": [
+        "Elbows in, bells resting on the forearms.",
+        "Stay tall — chest proud against the load.",
+        "Full foot planted, knees out."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=6XghYOzny8U",
+      "videoVerified": false
+    },
+    {
+      "name": "Double Kettlebell Push Press",
+      "coachingIntent": "Use leg drive to press heavy kettlebells overhead, building total-body power.",
+      "setupSteps": [
+        "Clean two kettlebells to the rack position.",
+        "Dip a few inches by bending the knees with a vertical torso, then drive the legs hard and let that force carry both bells to locked-out arms overhead.",
+        "Lower back to the rack, breathe, repeat.",
+        "The legs start the press and the arms finish it — a shallow, snappy dip beats a deep slow one every time."
+      ],
+      "cues": [
+        "Dip shallow, drive fast.",
+        "Legs throw it, arms catch the lockout.",
+        "Rack, reset, breathe between reps."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=W9NlTHkK1iU",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Bench Press",
+      "coachingIntent": "Train each side of a horizontal press independently, making control and load balance obvious.",
+      "setupSteps": [
+        "Lie on the bench with the feet planted and both dumbbells settled over the chest.",
+        "Lower the bells beside the chest with the wrists stacked over the elbows and the upper back anchored.",
+        "Press both bells along the same path; if one races or twists, reduce the load until the sides stay matched."
+      ],
+      "cues": [
+        "Anchor the upper back.",
+        "Stack each wrist over its elbow.",
+        "Press both bells on the same path."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=VmB1G1K7v94",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Floor Press",
+      "coachingIntent": "Use the floor to cap pressing depth and train a controlled pause before triceps-driven lockout.",
+      "setupSteps": [
+        "Lie on the floor with the dumbbells over the chest, knees bent and feet planted.",
+        "Lower until the upper arms meet the floor softly, pause, then press back to straight arms.",
+        "The floor creates a repeatable bottom stop; if either elbow lands hard, reduce the load and own the pause."
+      ],
+      "cues": [
+        "Elbows about 45 degrees, touch down soft.",
+        "Pause on the floor, then drive.",
+        "Wrists stacked over elbows."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=uUGDRwge4F8",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Flye",
+      "coachingIntent": "Stretch the pectorals across the chest with a wide, arcing motion.",
+      "setupSteps": [
+        "Lie on a flat bench with the dumbbells over the chest and the palms facing each other.",
+        "Open the arms in a wide arc with one soft elbow angle until the chest reaches an owned stretch.",
+        "Bring the bells back along the same arc, like hugging a barrel.",
+        "Keep control through the return; the rep is won in the long arc, not by crashing the bells together at the top."
+      ],
+      "cues": [
+        "Elbow angle locked the whole arc.",
+        "Open to a deep working stretch, then hug the barrel back up.",
+        "Lighter than you think — this movement punishes ego."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=LzFvciCdoW0",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Front Raise",
+      "coachingIntent": "Train shoulder flexion with a light load while keeping the torso still.",
+      "setupSteps": [
+        "Stand holding dumbbells in front of your thighs, palms facing back.",
+        "Raise one or both arms straight ahead to shoulder height with a soft elbow, then lower on a slow count.",
+        "Front delts already work in every press you do — this stays light, strict, and honest, or it is the lower back doing the raising."
+      ],
+      "cues": [
+        "Lift to shoulder height, hands soft.",
+        "Torso a pillar — the delts raise, the body stays.",
+        "Slower down than up."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=zkP0MsTcIVU",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Lateral Raise",
+      "coachingIntent": "Train the lateral deltoids with an elbow-led raise and a controlled lowering phase.",
+      "setupSteps": [
+        "Stand with a slight forward lean and the dumbbells hanging just off the thighs.",
+        "Raise the arms out and slightly forward until the elbows reach shoulder height, leading with the elbows.",
+        "Lower on a controlled count to keep tension through the full working arc.",
+        "If the torso has to swing, reduce the load until the delts can own the path."
+      ],
+      "cues": [
+        "Lead with the elbows, hands stay below them.",
+        "Lean an inch forward to take the front delts out of it.",
+        "Three seconds down."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=3VcKaXpzqRo",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Lunge",
+      "coachingIntent": "Develop unilateral leg strength and balance while carrying dumbbells.",
+      "setupSteps": [
+        "Step forward far enough that your front shin stays near vertical when you drop.",
+        "Lower until the back knee hovers just off the floor, torso tall.",
+        "Drive through the whole front foot to come back up — the back leg is a kickstand, not an engine."
+      ],
+      "cues": [
+        "Long step, vertical shin.",
+        "All the work belongs to the front leg.",
+        "When you wobble, slow the descent and keep the full range."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=G4gAK8Bhyro",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Reverse Lunge",
+      "coachingIntent": "Train one leg at a time with a backward step that keeps the working foot planted throughout the rep.",
+      "setupSteps": [
+        "Stand tall with a dumbbell in each hand and step one foot back, lowering until the back knee hovers above the floor.",
+        "Drive through the whole front foot to return to standing.",
+        "The backward step lets the working foot stay planted; if the front heel lifts, shorten the step and reset the balance."
+      ],
+      "cues": [
+        "The front leg does the work — the back leg just catches you.",
+        "Torso tall and stacked.",
+        "Place the step back soft and controlled."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=mHkPgReOqUM",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Romanian Deadlift",
+      "coachingIntent": "Load the hamstrings and glutes with a strict hip hinge using dumbbells.",
+      "setupSteps": [
+        "Stand with dumbbells resting on the front of your thighs.",
+        "Push your hips straight back and let the dumbbells slide down your legs, knees softly bent, until the hamstrings tell you to stop.",
+        "Drive the hips forward to stand tall.",
+        "The dumbbells hug your legs the whole way — daylight between them and you means the load has wandered onto your back."
+      ],
+      "cues": [
+        "Hips back, dumbbells glued to the legs.",
+        "Flat back, long spine.",
+        "Stand up by squeezing the glutes through."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=aa57T45iFSE",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Shoulder Press",
+      "coachingIntent": "Train vertical pressing with each arm working independently against a supported torso.",
+      "setupSteps": [
+        "Sit against a supported bench with both dumbbells settled at shoulder height.",
+        "Press to a tall overhead finish while the upper back stays in contact with the pad, then lower along the same path.",
+        "If the back leaves the support or one bell drifts, reduce the load until both sides stay stacked."
+      ],
+      "cues": [
+        "Keep the upper back on the pad.",
+        "Stack each wrist over its elbow.",
+        "Finish both bells over the shoulders."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=qEwKCR5JCog",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Shrug",
+      "coachingIntent": "Train each upper trap through an independent up-and-back path with a held top position.",
+      "setupSteps": [
+        "Stand holding dumbbells at your sides with your arms hanging as dead weight.",
+        "With intention, pull your shoulder blades up and back behind your ears, as high as the traps will take them.",
+        "Hold a full second at the top, then lower until you feel the traps stretch — the rep is the squeeze and the stretch, not the bounce in between."
+      ],
+      "cues": [
+        "With intention: pull the shoulder blades up and back behind your ears.",
+        "Own a full second at the top.",
+        "Let the weight stretch the traps at the bottom."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=qvvJUKq7_sU",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Split Squat",
+      "coachingIntent": "Build unilateral quad and glute strength from a static split stance.",
+      "setupSteps": [
+        "Take a long stance, one foot forward and one back, dumbbells at your sides.",
+        "Lower straight down until the back knee hovers just off the floor — the stance stays planted the entire set, which is what separates this from a lunge.",
+        "Drive up through the front foot.",
+        "If you feel it mostly in the back leg's hip flexor, your stance is too short."
+      ],
+      "cues": [
+        "Drop straight down between the feet.",
+        "Keep both feet planted for the whole set.",
+        "Use a long stance and drive through the front glute."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=5VG4UnfA7Bk",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Squat",
+      "coachingIntent": "Load the legs while holding dumbbells to develop foundational squat mechanics.",
+      "setupSteps": [
+        "Stand with dumbbells hanging at your sides and squat until your thighs are near parallel, letting the dumbbells travel straight down beside you.",
+        "Drive up through the whole foot with a tall chest.",
+        "Grip gives out before legs do at any serious weight — when that happens, it is time for the goblet or the bar, not straps."
+      ],
+      "cues": [
+        "Let the dumbbells hang plumb at your sides.",
+        "Tall chest, full foot.",
+        "When grip becomes the limit, graduate to the bar."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=ZXwvmRSRRxY",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Step-Up",
+      "coachingIntent": "Train single-leg force on a box while the floor leg stays passive and the dumbbells stay quiet.",
+      "setupSteps": [
+        "Hold a dumbbell in each hand and stand close to a box that puts your thigh near parallel when your foot is up.",
+        "Put the whole foot on the box and stand up through it — the floor leg hangs, it does not jump.",
+        "Lower on a controlled count until the floor toe touches, and go again without rocking."
+      ],
+      "cues": [
+        "Drive through the top leg — the bottom foot is a passenger.",
+        "Whole foot on the box, stand all the way up.",
+        "Dumbbells hang quiet at your sides."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=tqECKZxlCKE",
+      "videoVerified": false
+    },
+    {
+      "name": "Dumbbell Sumo Squat",
+      "coachingIntent": "Target the adductors and glutes with a wide stance and heavy dumbbell.",
+      "setupSteps": [
+        "Take a wide stance with the toes turned out and hold one dumbbell between the legs.",
+        "Squat straight down between the knees while the torso stays tall.",
+        "Drive through the whole foot with the knees tracking over the toes.",
+        "The wider stance adds adductor demand; if the knees lose their line, narrow the stance or reduce the load."
+      ],
+      "cues": [
+        "Push the knees out over the toes.",
+        "Sit straight down between the heels.",
+        "Tall chest, let the dumbbell hang."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=GG92d1QZTZg",
+      "videoVerified": false
+    },
+    {
+      "name": "Eccentric Wall Handstand Push-Up",
+      "coachingIntent": "Build overhead pressing strength by controlling the negative phase.",
+      "setupSteps": [
+        "Clear the floor, place a firm padded target beneath the head, and kick to the wall with the hands just outside shoulder width.",
+        "Brace into a vertical line and lower for up to five seconds until the head meets the pad softly.",
+        "Exit through the rehearsed clear side, reset, and kick back up; the controlled lowering is the full rep.",
+        "If control disappears before the pad, raise the target or return to a pike progression."
+      ],
+      "cues": [
+        "Own the full lowering count.",
+        "Hold one strong vertical line.",
+        "Meet the pad softly and exit under control."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=GGBOX8Byz08",
+      "videoVerified": false
+    },
+    {
+      "name": "Face Pull",
+      "coachingIntent": "Target the rear delts and external rotators to counter heavy pressing.",
+      "setupSteps": [
+        "Set the rope at upper-chest height, grab it thumbs-back, and step away until the stack is live.",
+        "Pull the rope to the bridge of your nose while splitting your hands past your ears, letting the shoulders rotate back at the end.",
+        "If you cannot hold a one-second squeeze with the shoulder blades pinned, the weight is wrong — this never becomes a heavy movement."
+      ],
+      "cues": [
+        "Thumbs to the ears, elbows high.",
+        "Squeeze the blades for a full beat.",
+        "The weight stays humble."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=eTCBSFlCJ_s",
+      "videoVerified": false
+    },
+    {
+      "name": "Farmer Carry",
+      "coachingIntent": "Train heavy bilateral carrying while grip, posture and step control all share the load.",
+      "setupSteps": [
+        "Stand between two dumbbells or kettlebells and take a secure grip with the feet balanced beneath you.",
+        "Stand tall with long arms and the weights quiet beside the hips.",
+        "Walk with short, controlled steps; if the weights swing or the stride shortens sharply, reduce the load."
+      ],
+      "cues": [
+        "Stand tall between the weights.",
+        "Take short, quiet steps.",
+        "Keep the weights beside the hips."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=vi4X2iSOyiA",
+      "videoVerified": false
+    },
+    {
+      "name": "Feet-Elevated Push-Up",
+      "coachingIntent": "Shift the emphasis to the upper chest and front delts by elevating the feet.",
+      "setupSteps": [
+        "Set your feet on a box or bench with your hands on the floor just wider than your shoulders.",
+        "Lower your chest to the floor as one rigid line — the higher the feet, the more the shoulders take over from the chest.",
+        "Press back to long arms without the hips piking or sagging.",
+        "Own strict floor push-ups before you raise the feet."
+      ],
+      "cues": [
+        "One rigid line, hips locked into the plank.",
+        "Lead with the chest, chin packed.",
+        "Earn strict floor reps before you raise the feet."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=SKPab2YC8BE",
+      "videoVerified": false
+    },
+    {
+      "name": "Floor Back Extension",
+      "coachingIntent": "Strengthen the spinal erectors and glutes using bodyweight extension.",
+      "setupSteps": [
+        "Lie face-down with your arms reaching ahead.",
+        "Lift your chest, arms, and legs a few inches off the floor by squeezing the glutes and upper back, hold a beat, then lower with control.",
+        "Height is not the goal — a long body and a strong squeeze are.",
+        "Reach LONG through fingers and toes rather than cranking upward."
+      ],
+      "cues": [
+        "Reach long, then lift — length before height.",
+        "Glutes squeeze first.",
+        "Hold the top for a slow beat."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=z6PJMT2y8GQ",
+      "videoVerified": false
+    },
+    {
+      "name": "Front Squat",
+      "coachingIntent": "Build leg strength and core stability by squatting with the barbell resting on your front deltoids.",
+      "setupSteps": [
+        "Set the bar across the front of the shoulders with a secure grip and the elbows pointing forward.",
+        "Stand around shoulder width, root the whole foot, and keep the elbows high before descending.",
+        "Squat between the hips, then drive back to standing with the bar over mid-foot.",
+        "If the elbows drop and the bar rolls forward, reduce the load until the upper back can hold the rack."
+      ],
+      "cues": [
+        "Drive the elbows forward and high.",
+        "Root the whole foot.",
+        "Stay tall through the drive."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=uYumuL_G_V0",
+      "videoVerified": false
+    },
+    {
+      "name": "Glute Bridge",
+      "coachingIntent": "Learn hip extension from the floor, where a level pelvis and held lockout keep the effort in the glutes.",
+      "setupSteps": [
+        "Lie on the back with the feet planted close enough that the fingertips can nearly reach the heels.",
+        "Tuck the pelvis, drive through the feet, and lift until the hips are level between knees and shoulders.",
+        "Hold the top before lowering; if the hamstrings cramp, bring the feet closer and use a shorter range."
+      ],
+      "cues": [
+        "Tuck the pelvis first.",
+        "Drive the floor away.",
+        "Hold level hips at the top."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=8bbE64NuDTU",
+      "videoVerified": false
+    },
+    {
+      "name": "Goblet Squat",
+      "coachingIntent": "Use a front-held load to practise an upright, balanced squat before heavier loading.",
+      "setupSteps": [
+        "Hold one dumbbell or kettlebell close to the chest with the forearms supporting it.",
+        "Stand around shoulder width with the toes turned to a comfortable angle and pressure across the whole foot.",
+        "Sit between the hips and stand tall; if the load pulls the chest down, use a lighter weight or a shorter depth."
+      ],
+      "cues": [
+        "Keep the load close to the chest.",
+        "Root the whole foot.",
+        "Sit between the hips."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=MeIiIdhvXT4",
+      "videoVerified": false
+    },
+    {
+      "name": "Good Morning",
+      "coachingIntent": "Train a barbell hip hinge by loading the hamstrings while the torso stays braced.",
+      "setupSteps": [
+        "Set the bar across the upper back as for a squat.",
+        "Soften the knees and send the hips back until the hamstrings are loaded while the trunk stays long.",
+        "Drive the hips through to stand tall along the same path.",
+        "If the bar rolls or the trunk softens, shorten the range or reduce the load before the next rep."
+      ],
+      "cues": [
+        "Push the hips straight back.",
+        "Flat back the whole rep.",
+        "Feel the hamstrings load — they bring you back up."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=0Syp9iyINZ4",
+      "videoVerified": false
+    },
+    {
+      "name": "Hammer Curl",
+      "coachingIntent": "Train elbow flexion in a neutral grip, adding brachialis and forearm demand to the curl.",
+      "setupSteps": [
+        "Hold the dumbbells at the sides with the palms facing each other and keep that neutral grip for the whole rep.",
+        "Curl to shoulder height with quiet upper arms, then lower slower than you lifted.",
+        "Return to the natural long-arm position; if the elbows drift or the torso rocks, reduce the load."
+      ],
+      "cues": [
+        "Keep the thumbs up through the rep.",
+        "Hold the elbows quietly beside the ribs.",
+        "Lower slowly to the natural rest position."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=zC3nLlEvin4",
+      "videoVerified": false
+    },
+    {
+      "name": "Handstand Push-Up",
+      "coachingIntent": "Train inverted vertical pressing and whole-body control through a range you can lower and press cleanly.",
+      "setupSteps": [
+        "Clear the floor, place a firm padded target beneath the head, and kick to the wall with the hands just outside shoulder width.",
+        "Brace into one vertical line and lower until the head meets the pad softly.",
+        "Press back to straight arms, then exit through a rehearsed clear side.",
+        "If the descent or exit is uncertain, raise the target or build the range with pike push-ups first."
+      ],
+      "cues": [
+        "Hold one strong vertical line.",
+        "Meet the pad softly.",
+        "Press tall, then exit under control."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=7wSZnHQZChI",
+      "videoVerified": false
+    },
+    {
+      "name": "Hanging Leg Raise",
+      "coachingIntent": "Challenge the core with strict abdominal flexion from a dead hang.",
+      "setupSteps": [
+        "Hang from a pull-up bar with an overhand grip, arms and legs straight.",
+        "Raise your legs until they are at least parallel to the floor, higher if you can keep control.",
+        "Lower slowly back to a dead hang.",
+        "Bend your knees to make it easier."
+      ],
+      "cues": [
+        "Curl the pelvis up towards the ribs.",
+        "Dead-still hang between reps.",
+        "Slow on the way down."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=rbOJSK07AGA",
+      "videoVerified": false
+    },
+    {
+      "name": "Incline Dumbbell Press",
+      "coachingIntent": "Target the upper pectorals with the independent control of dumbbells.",
+      "setupSteps": [
+        "Set the bench between 30 and 45 degrees — lower hits more chest, higher bleeds into shoulders.",
+        "Kick the dumbbells up off your knees one at a time and start from the top.",
+        "Lower to a deep stretch just outside your chest with your elbows about 45 degrees from your sides, then press up and slightly back so the dumbbells finish over your face, not your belly."
+      ],
+      "cues": [
+        "Feet planted, upper back tight on the bench.",
+        "Earn the stretch at the bottom.",
+        "Press up and slightly back, finishing over the face."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=8iPEnn-ltC8",
+      "videoVerified": false
+    },
+    {
+      "name": "Incline Push-Up",
+      "coachingIntent": "Use a raised hand position to practise a rigid push-up while scaling the load below a floor rep.",
+      "setupSteps": [
+        "Place your hands on a bench or sturdy surface around hip height and walk your feet back into one rigid line.",
+        "Lower your chest to the edge, then press away to long arms.",
+        "The higher the hands, the easier the rep — walk your hands lower over the weeks and the floor push-up arrives on its own."
+      ],
+      "cues": [
+        "One rigid line, glutes switched on.",
+        "Chest travels to the edge, whole body together.",
+        "Lower the surface as reps get strict."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=0JUrOH--Kdk",
+      "videoVerified": false
+    },
+    {
+      "name": "Inverted Row",
+      "coachingIntent": "Build foundational back strength by pulling your bodyweight to a bar.",
+      "setupSteps": [
+        "Set a bar around hip height and get under it with your body in one rigid line, heels planted.",
+        "Pull your chest to the bar, leading with the elbows, and touch the same spot every rep.",
+        "Lower to long arms without letting the hips sag — the plank is half the exercise.",
+        "Feet further under the bar makes it easier, feet elevated makes it harder."
+      ],
+      "cues": [
+        "Glutes squeezed, body one rigid plank.",
+        "Pull with the elbows, chest to bar.",
+        "Same touch point every rep."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=hXTc1mDnZCw",
+      "videoVerified": false
+    },
+    {
+      "name": "Jefferson Squats",
+      "coachingIntent": "Straddle the barbell to challenge the legs and core from an asymmetrical stance.",
+      "setupSteps": [
+        "Straddle the bar with the feet angled comfortably, then squat down and take one hand in front of the body and one behind at equal distances.",
+        "Brace a tall torso and push both feet through the floor to stand with the bar travelling between the legs.",
+        "Lower along the same centred path and switch orientation between sets; if the bar twists away from the midline, reset the grip and stance before adding load."
+      ],
+      "cues": [
+        "Centre the torso over the bar.",
+        "Push both feet through the floor.",
+        "Keep the bar travelling straight between the legs."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=VzQhgHPoi4s",
+      "videoVerified": false
+    },
+    {
+      "name": "Kettlebell Dead Clean",
+      "coachingIntent": "Develop explosive hip power by cleaning a kettlebell from a dead stop.",
+      "setupSteps": [
+        "Set one kettlebell between the feet, hinge back, and take the handle with the shoulder packed over the bell.",
+        "Drive the floor away and extend the hips to guide the bell close into the rack rather than looping it around the wrist.",
+        "Reverse the path to the floor; if the bell slaps the forearm, the hand travelled around the bell instead of the bell rolling around the hand."
+      ],
+      "cues": [
+        "Drive the floor and finish the hips.",
+        "Zip the bell close to the body.",
+        "Receive it softly with the elbow tucked."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=6Hjuscd4ab4",
+      "videoVerified": false
+    },
+    {
+      "name": "Kettlebell Pistol Squat",
+      "coachingIntent": "Train loaded single-leg squatting with the kettlebell acting as a counterbalance.",
+      "setupSteps": [
+        "Hold a light kettlebell at the chest and stand on one leg with the other leg reaching forward.",
+        "Use the bell as a counterbalance while squatting through the deepest range the standing foot can own.",
+        "Drive through the whole foot to stand without the free foot touching down.",
+        "If the heel lifts or the knee loses its line, shorten the range or use a lighter bell."
+      ],
+      "cues": [
+        "Root the whole standing foot.",
+        "Reach the bell and free leg forward.",
+        "Lower slowly and drive up strong."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=3dMMJMSpFV0",
+      "videoVerified": false
+    },
+    {
+      "name": "Kettlebell Swing",
+      "coachingIntent": "Develop explosive hip power and hamstring strength.",
+      "setupSteps": [
+        "Set the kettlebell a short step ahead of a stance slightly wider than the hips.",
+        "Hinge back, grip the handle, and hike the bell close between the legs.",
+        "Snap the hips to let the bell float, then guide it back into the next hinge with long arms.",
+        "If the knees turn it into a squat or the arms lift the bell, reduce the load and rebuild the hinge."
+      ],
+      "cues": [
+        "Hike close between the legs.",
+        "Snap the hips and let the bell float.",
+        "Keep the arms long and quiet."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=YSxHifyI6s8",
+      "videoVerified": false
+    },
+    {
+      "name": "Kettlebell Turkish Get-Up",
+      "coachingIntent": "Practise linking floor transitions, kneeling and standing while keeping one load stacked overhead.",
+      "setupSteps": [
+        "Lie on your back and press a kettlebell to a locked arm — that arm stays vertical and locked for everything that follows.",
+        "Roll to your elbow, then your hand, sweep the leg through, and stand up in stages, eyes on the bell the whole way.",
+        "Reverse every stage back to the floor with the same control.",
+        "Learn it with a shoe balanced on your fist before you ever load it."
+      ],
+      "cues": [
+        "Bell arm locked and vertical — eyes on the bell.",
+        "Own each position before you leave it.",
+        "Slow IS the technique."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=lpltjWHd0ek",
+      "videoVerified": false
+    },
+    {
+      "name": "Kneeling Single-Arm High Pulley Row",
+      "coachingIntent": "Target the lats from a high angle while resisting torso rotation.",
+      "setupSteps": [
+        "Half-kneel facing a high cable, take one handle, and reach the working arm long while the hips and shoulders stay square.",
+        "Pull the elbow down and back toward the ribs, allowing the palm to turn toward the body as the shoulder blade finishes.",
+        "Return to the full reach slowly; if the hand reaches the ribs before the elbow travels, soften the grip and let the elbow lead."
+      ],
+      "cues": [
+        "Reach long from a square half-kneeling base.",
+        "Drive the elbow down toward the ribs.",
+        "Let the shoulder blade finish the pull."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=O3D5-yTGH7Y",
+      "videoVerified": false
+    },
+    {
+      "name": "Lat Pulldown",
+      "coachingIntent": "Train vertical pulling by driving the elbows down while the torso stays tall and quiet.",
+      "setupSteps": [
+        "Sit with the thighs secured and take a comfortable grip just outside shoulder width.",
+        "Reach long overhead with the torso tall and the stack held just off its rest.",
+        "Drive the elbows down until the bar reaches the upper chest, then return slowly to the full reach.",
+        "If the hands tire before the back, soften the grip and reduce the load until the elbows can lead."
+      ],
+      "cues": [
+        "Drive the elbows down toward the sides.",
+        "Keep the chest tall and torso quiet.",
+        "Reach long overhead on the return."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=hnSqbBk15tw",
+      "videoVerified": false
+    },
+    {
+      "name": "Lying Dumbbell Triceps Extension",
+      "coachingIntent": "Isolate the triceps with dumbbells for balanced arm development.",
+      "setupSteps": [
+        "Lie on a bench with dumbbells pressed over your chest, palms facing each other.",
+        "Keeping your upper arms still and angled slightly back over your head, bend the elbows and lower the dumbbells beside your ears.",
+        "Press back to long arms along the same path.",
+        "Upper arms are the hinge pin — they point at one spot on the ceiling for the whole set."
+      ],
+      "cues": [
+        "Upper arms frozen, angled just past vertical.",
+        "Lower to the ears, deep and controlled.",
+        "Elbows point at the ceiling, always."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=8ncEJDm7Cig",
+      "videoVerified": false
+    },
+    {
+      "name": "Narrow Stance Squats",
+      "coachingIntent": "Use a narrow stance to increase knee travel and demand more ankle range while keeping full-foot pressure.",
+      "setupSteps": [
+        "Set the bar across the upper back and step into a stance narrower than shoulder width with the toes turned slightly out.",
+        "Brace and let the knees travel forward as the hips sit down, keeping pressure across the whole foot to the deepest position you own.",
+        "Push the floor away to stand; if the heels lift or the knees lose their line, the stance is narrower than your available range."
+      ],
+      "cues": [
+        "Root the whole foot.",
+        "Send the knees forward over the toes.",
+        "Drive straight up under the bar."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=9Ulb6gOqhA4",
+      "videoVerified": false
+    },
+    {
+      "name": "Nordic Curl",
+      "coachingIntent": "Train hamstring strength through a slow bodyweight lowering phase with the hips held extended.",
+      "setupSteps": [
+        "Kneel on a soft pad and secure the ankles beneath an anchor that cannot move.",
+        "Hold one line from knees to head with the hips extended, then lower that line as slowly as possible.",
+        "Catch with the hands and use only enough push to return; if the hips fold first, shorten the lowering range."
+      ],
+      "cues": [
+        "Hold the hips extended.",
+        "Own the lowering phase.",
+        "Use the hands for a smooth return."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=0ia97P5konQ",
+      "videoVerified": false
+    },
+    {
+      "name": "One Arm Lat Pulldown",
+      "coachingIntent": "Train each side of a vertical pull independently while the torso resists rotation.",
+      "setupSteps": [
+        "Sit or kneel square to a high cable, take one handle, and reach overhead until the shoulder blade can travel without the stack resting.",
+        "Pull the elbow down toward the hip and pause when the upper arm reaches the ribs, keeping the torso quiet.",
+        "Return to the full reach slowly; if the hand tires before the lat, soften the grip and let the elbow lead the next rep."
+      ],
+      "cues": [
+        "Reach long at the top.",
+        "Drive the elbow toward the hip.",
+        "Keep the torso square and quiet."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=eM162KNncD8",
+      "videoVerified": false
+    },
+    {
+      "name": "One-Arm Kettlebell Row",
+      "coachingIntent": "Build unilateral back strength and core stability with a kettlebell pull.",
+      "setupSteps": [
+        "Take a staggered stance, hinge until the torso is long and stable, and let the kettlebell hang beneath one shoulder.",
+        "Row the bell toward the back pocket by driving the elbow past the ribs while the hips stay square to the floor.",
+        "Lower until the shoulder blade reaches naturally; if the torso opens to finish the pull, the bell is heavier than the row you intended."
+      ],
+      "cues": [
+        "Set a long, square torso.",
+        "Drive the elbow toward the back pocket.",
+        "Reach the shoulder blade at the bottom."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=bZ4h1Bqw-to",
+      "videoVerified": false
+    },
+    {
+      "name": "One-Arm Overhead Kettlebell Squat",
+      "coachingIntent": "Challenge total-body mobility, balance, and shoulder stability.",
+      "setupSteps": [
+        "Clean and press one kettlebell overhead, lock the elbow, and use the free arm forward as a counterbalance.",
+        "Root the whole foot and sit between the hips while keeping the bell stacked over the shoulder and the eyes forward.",
+        "Pause at the deepest owned position, then drive to standing; the rep ends where the bell drifts or the ribs flare, not where the hips wish to go."
+      ],
+      "cues": [
+        "Punch the bell toward the ceiling.",
+        "Sit between the hips on a rooted foot.",
+        "Drive up under the bell."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=tpPKyhvf0IA",
+      "videoVerified": false
+    },
+    {
+      "name": "Overhead Press",
+      "coachingIntent": "Build shoulder strength and core stability by pressing a barbell overhead.",
+      "setupSteps": [
+        "Set the bar across the front shoulders with a full grip and the forearms close to vertical.",
+        "Stand with balanced feet and brace before the bar leaves the shoulders.",
+        "Press close past the face, move the head through to a tall lockout, and lower along the same path.",
+        "If the torso leans into an incline press, reduce the load until the finish stays stacked."
+      ],
+      "cues": [
+        "Brace before the bar moves.",
+        "Press close past the face.",
+        "Finish tall with the head through."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=QAQ64hK4Xxs",
+      "videoVerified": false
+    },
+    {
+      "name": "Pallof Press",
+      "coachingIntent": "Train the trunk to resist rotation while an anchored band pulls from the side.",
+      "setupSteps": [
+        "Stand side-on to an anchored band and hold it at the centre of the chest.",
+        "Set a stable stance, then press to long arms while the shoulders and hips stay square.",
+        "Pause before returning to the chest; if the torso turns, step closer or reduce the resistance."
+      ],
+      "cues": [
+        "Keep the shoulders and hips square.",
+        "Press straight away from the chest.",
+        "Breathe through the hold."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=99evyH71IWs",
+      "videoVerified": false
+    },
+    {
+      "name": "Pike Push-Up",
+      "coachingIntent": "Target the shoulders and upper chest with an inverted bodyweight press.",
+      "setupSteps": [
+        "Start in a push-up position, then walk your feet in and lift your hips high so your torso points at the floor like an inverted V.",
+        "Bend your elbows and lower the top of your head towards the floor between your hands.",
+        "Press back to long arms without the hips drifting forward.",
+        "Elevate the feet to move it closer to a handstand push-up."
+      ],
+      "cues": [
+        "Hips stacked high the whole rep.",
+        "Head travels to a spot just ahead of the hands.",
+        "Elbows track at about 45 degrees."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=lIZ_C4VJnmc",
+      "videoVerified": false
+    },
+    {
+      "name": "Plank",
+      "coachingIntent": "Train sustained trunk tension while breathing normally and keeping the pelvis level.",
+      "setupSteps": [
+        "Set the forearms on the floor with the elbows beneath the shoulders.",
+        "Extend the legs and squeeze the glutes to make one line from head to heels.",
+        "Brace and breathe behind the tension; if the hips or lower back leave that line, end the hold."
+      ],
+      "cues": [
+        "Squeeze the glutes.",
+        "Hold the pelvis level.",
+        "Breathe behind the brace."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=mwlp75MS6Rg",
+      "videoVerified": false
+    },
+    {
+      "name": "Power Clean",
+      "coachingIntent": "Develop explosive full-body power by pulling the bar to the front rack.",
+      "setupSteps": [
+        "Start with the bar over mid-foot, shoulders slightly in front of it, and the whole foot planted.",
+        "Push the floor away and keep the bar close; when it reaches the upper thigh, extend the legs and hips straight up.",
+        "Pull yourself under and receive the bar on the shoulders in a balanced quarter squat with the elbows through.",
+        "Stand, lower the bar under control, and reset before the next rep."
+      ],
+      "cues": [
+        "Push the floor away; keep the bar close.",
+        "Finish tall, then move under.",
+        "Meet the bar with high elbows and balanced feet."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=lI35socHJ4k",
+      "videoVerified": false
+    },
+    {
+      "name": "Preacher Curl",
+      "coachingIntent": "Train elbow flexion with the upper arms fixed to the pad, making the controlled lowering phase difficult to cheat.",
+      "setupSteps": [
+        "Set your upper arms flat on the preacher pad, chest against it, bar in an underhand grip.",
+        "Curl to shoulder height, then lower slower than you lifted until your arms reach their natural long position on the pad.",
+        "The pad removes every cheat you own — expect to lift less than your standing curl, and let that be information."
+      ],
+      "cues": [
+        "Keep the upper arms on the pad.",
+        "Lower on a three-count into the natural long position.",
+        "Settle at the bottom before the next curl."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=BPmUhDtdQfw",
+      "videoVerified": false
+    },
+    {
+      "name": "Pull-Up",
+      "coachingIntent": "Train strict vertical pulling from a full hang, using the elbows to move the body to the bar.",
+      "setupSteps": [
+        "Take an overhand grip just outside your shoulders and start from a dead hang.",
+        "Pull your chest towards the bar, driving the elbows down and back, until your chin clears without reaching for it.",
+        "Lower under full control back to the dead hang — cutting the bottom quietly steals the range that builds the back."
+      ],
+      "cues": [
+        "Begin every rep from a controlled full hang.",
+        "Drive the elbows down and back.",
+        "Keep the body quiet from hang to bar."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=vw5Xmu5CIew",
+      "videoVerified": false
+    },
+    {
+      "name": "Push-up",
+      "coachingIntent": "Train a full-body horizontal press while the trunk holds one rigid line.",
+      "setupSteps": [
+        "Place the hands just outside shoulder width and set one straight line from head to heels.",
+        "Lower the chest as one unit with the elbows tracking around 45 degrees from the torso.",
+        "Push the floor away; if the hips and chest arrive separately, raise the hands and own the same shape."
+      ],
+      "cues": [
+        "Move as one rigid line.",
+        "Track the elbows behind the wrists.",
+        "Push the floor away."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=IODxDxX7oi4",
+      "videoVerified": false
+    },
+    {
+      "name": "Renegade Row",
+      "coachingIntent": "Challenge anti-rotation core strength while rowing from a plank position.",
+      "setupSteps": [
+        "Set up in a push-up plank with a hand on each dumbbell, feet wider than usual.",
+        "Row one dumbbell to your ribs while the rest of you stays a statue, then place it down and row the other side.",
+        "The row is the easy part — the work is refusing to let the hips twist."
+      ],
+      "cues": [
+        "Hips square to the floor — a statue with one moving arm.",
+        "Feet wide for a stable base.",
+        "Pull with the elbow, quiet everywhere else."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=4qEIChzM4ZA",
+      "videoVerified": false
+    },
+    {
+      "name": "Reverse Barbell Curl",
+      "coachingIntent": "Target the brachioradialis and forearms using an overhand grip.",
+      "setupSteps": [
+        "Stand with a light bar in an overhand shoulder-width grip, wrists straight and elbows resting beside the ribs.",
+        "Curl by closing the elbows until the forearms are near vertical, then hold the top without letting the shoulders climb.",
+        "Lower to the natural long-arm rest; when the wrists fold or the shoulders rise, the load has moved ahead of the forearms."
+      ],
+      "cues": [
+        "Keep the knuckles long and the wrists stacked.",
+        "Close the elbows around the bar.",
+        "Lower all the way under control."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=nRgxYX2Ve9w",
+      "videoVerified": false
+    },
+    {
+      "name": "Reverse Crunch",
+      "coachingIntent": "Train a controlled pelvic curl without using leg swing to create the movement.",
+      "setupSteps": [
+        "Lie on your back with knees bent over your hips, hands flat beside you or holding something behind your head.",
+        "Curl your hips off the floor, bringing the knees towards your ribs — the movement is the pelvis rolling up, not the legs swinging.",
+        "Lower the hips back down slowly without letting the feet touch between reps."
+      ],
+      "cues": [
+        "Roll the pelvis up towards the ribs.",
+        "Lower the hips slow — that half is where the abs work.",
+        "Keep the feet floating between reps."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=XY8KzdDcMFg",
+      "videoVerified": false
+    },
+    {
+      "name": "Reverse Grip Bent-Over Rows",
+      "coachingIntent": "Use an underhand grip to add elbow-flexor demand while rowing the bar toward the lower ribs.",
+      "setupSteps": [
+        "Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar hangs below them with the torso braced.",
+        "Pull the elbows back and row the bar toward the lower ribs, holding the top long enough to feel the shoulder blades finish.",
+        "Lower to long arms without changing the hinge; if the torso rises on every pull, the bar is borrowing range from the hips."
+      ],
+      "cues": [
+        "Brace the hinge before the pull.",
+        "Drive the elbows behind you.",
+        "Touch the lower ribs and own the way down."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=3gdGSSgDby8",
+      "videoVerified": false
+    },
+    {
+      "name": "Road Run",
+      "coachingIntent": "Build repeatable aerobic work by settling into a pace and stride you can sustain.",
+      "setupSteps": [
+        "Begin tall with the shoulders relaxed and a small whole-body lean from the ankles.",
+        "Settle into a pace you can hold, letting each foot land quietly beneath the body.",
+        "Keep the stride relaxed; if breathing or form changes sharply, slow to a sustainable effort for the prescribed time."
+      ],
+      "cues": [
+        "Land quietly beneath the body.",
+        "Keep the shoulders and hands relaxed.",
+        "Settle into a sustainable rhythm."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=_kGESn8ArrU",
+      "videoVerified": false
+    },
+    {
+      "name": "Romanian Deadlift",
+      "coachingIntent": "Build strong hamstrings and glutes through a loaded hip hinge.",
+      "setupSteps": [
+        "Stand tall with the bar close to the thighs, a secure grip, and a soft bend in the knees.",
+        "Send the hips back while the bar tracks down the legs until the hamstrings are loaded and the trunk stays long.",
+        "Drive the hips through to stand; if the bar drifts away, reduce the load and keep it close on the next rep."
+      ],
+      "cues": [
+        "Send the hips back.",
+        "Keep the bar close to the legs.",
+        "Stand tall through the hips."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=_oyxCn2iSjU",
+      "videoVerified": false
+    },
+    {
+      "name": "Russian Twist",
+      "coachingIntent": "Develop rotational core strength and oblique endurance.",
+      "setupSteps": [
+        "Sit with knees bent and heels lightly touching the floor, torso leaned back to about 45 degrees with a long spine.",
+        "Rotate your ribcage side to side, eyes and chest travelling together — the hands only follow.",
+        "Add weight at the chest or float the feet only once the rotation stays crisp without the lower back rounding."
+      ],
+      "cues": [
+        "Turn the ribs — the arms just follow.",
+        "Sit tall, long spine.",
+        "Slow rotation, full control at both ends."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=IJDOoVyVjhc",
+      "videoVerified": false
+    },
+    {
+      "name": "Scapular Pull-Up",
+      "coachingIntent": "Strengthen the lower traps and practice the initial pull of a standard pull-up.",
+      "setupSteps": [
+        "Hang from a pull-up bar with straight arms and let your shoulders rise to your ears.",
+        "Without bending your elbows, pull your shoulder blades down and back so your body lifts a few inches.",
+        "Hold the top for a beat, then return to the full hang with control."
+      ],
+      "cues": [
+        "Arms stay straight — this is the shoulder blades' job.",
+        "Small range, done with intention.",
+        "It is the first inch of every pull-up you will ever do."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=-ZIpSoTRsuE",
+      "videoVerified": false
+    },
+    {
+      "name": "Single-Arm Dumbbell Row",
+      "coachingIntent": "Train unilateral horizontal pulling while the supported torso stays square and still.",
+      "setupSteps": [
+        "Support one hand and knee on a bench and set the shoulders and hips square to the floor.",
+        "Let the working arm reach long while the trunk stays braced and still.",
+        "Drive the elbow toward the hip, then lower to the full reach; if the torso rotates, reduce the load before shortening the row."
+      ],
+      "cues": [
+        "Keep the torso square.",
+        "Drive the elbow toward the hip.",
+        "Reach long at the bottom."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=pYcpY20QaE8",
+      "videoVerified": false
+    },
+    {
+      "name": "Single-Leg Glute Bridge",
+      "coachingIntent": "Train one side of hip extension at a time while keeping the pelvis level.",
+      "setupSteps": [
+        "Lie with one foot planted close enough that your fingertips can graze the heel, the other leg extended.",
+        "Drive through the planted heel to a straight line from knee to shoulder, and hold the top until the glute, not the hamstring, owns it.",
+        "If the hamstring cramps, the foot is too far out — pull it in and re-set."
+      ],
+      "cues": [
+        "Hips dead level the whole rep.",
+        "Heel in close for glute, further out for hamstring.",
+        "Own the top before you lower."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=VUl8R0kn6v4",
+      "videoVerified": false
+    },
+    {
+      "name": "Single-Leg Romanian Deadlift",
+      "coachingIntent": "Build unilateral hamstring strength and balance with a hip hinge.",
+      "setupSteps": [
+        "Hold a kettlebell in one hand and stand on the opposite leg.",
+        "Hinge forward, letting the free leg travel straight back as a counterweight, until your torso and back leg are near parallel with the floor.",
+        "Drive the hips through to stand tall.",
+        "Wobbling is part of the exercise — every save is your ankle and hip learning their job."
+      ],
+      "cues": [
+        "Hips stay square, back leg reaches long.",
+        "Bell hangs plumb under the shoulder.",
+        "Slow beats far — shorten the hinge before you lose it."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=Nenu2LI9_dw",
+      "videoVerified": false
+    },
+    {
+      "name": "Sit-Up",
+      "coachingIntent": "Develop foundational abdominal strength through dynamic spinal flexion.",
+      "setupSteps": [
+        "Lie on your back with knees bent, feet flat, hands crossed on your chest or lightly at your temples.",
+        "Curl your torso up one segment at a time until your chest meets your thighs, then roll back down the same way.",
+        "The curl is the exercise — a flat-backed lever heave onto the hip flexors is a different movement wearing the same name."
+      ],
+      "cues": [
+        "Peel up one vertebra at a time.",
+        "Exhale on the way up.",
+        "Roll down as slowly as you rose."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=pCX65Mtc_Kk",
+      "videoVerified": false
+    },
+    {
+      "name": "Standing Barbell Calf Raise",
+      "coachingIntent": "Load standing calf raises heavily while preserving the bottom stretch and top pause.",
+      "setupSteps": [
+        "Set the bar across the upper back and place the balls of the feet on a stable low block with the heels free.",
+        "Lower into an owned stretch, pause, then rise as high as balance allows.",
+        "Preserve the bottom stretch and top pause as load increases; if either disappears, reduce the weight before the next set."
+      ],
+      "cues": [
+        "Deep stretch, full pause at the bottom.",
+        "Drive up over the big toe.",
+        "Tall body, bar quiet on the back."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=3UWi44yN-wM",
+      "videoVerified": false
+    },
+    {
+      "name": "Standing Dumbbell Calf Raise",
+      "coachingIntent": "Build calf size and ankle stability with unilateral or bilateral dumbbell loading.",
+      "setupSteps": [
+        "Stand with the balls of the feet on a stable step, heels free, one dumbbell held while the other hand supports balance.",
+        "Lower into an owned calf stretch, pause, then rise as high as the ankle allows.",
+        "Add load only while the stretch and pause remain; bouncing is the giveaway that the weight has outrun the range."
+      ],
+      "cues": [
+        "Pause in the bottom stretch.",
+        "Rise tall over the big toe.",
+        "Keep the torso quiet."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=HvvqTpTongY",
+      "videoVerified": false
+    },
+    {
+      "name": "Straight-Arm Pulldown",
+      "coachingIntent": "Train shoulder extension with long arms so the lats work without turning the rep into a row.",
+      "setupSteps": [
+        "Stand facing a high cable with a straight bar or rope, arms extended in front of you at shoulder height.",
+        "Keeping a slight elbow bend, pull the attachment down in an arc until your hands reach your thighs.",
+        "Return under control to shoulder height."
+      ],
+      "cues": [
+        "Keep the arms long with one soft elbow angle.",
+        "Lead the arc with the elbows and let the hands stay quiet.",
+        "Hold a small, braced hinge."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=mvgQs3CkgGQ",
+      "videoVerified": false
+    },
+    {
+      "name": "Suitcase Carry",
+      "coachingIntent": "Train one-sided carrying without letting the load tilt or rotate the torso.",
+      "setupSteps": [
+        "Stand beside one dumbbell or kettlebell and take a secure grip with the feet balanced beneath you.",
+        "Stand tall with both shoulders level and the loaded arm long beside the hip.",
+        "Walk a straight line with controlled steps; if the shoulder drops or the path curves, reduce the load."
+      ],
+      "cues": [
+        "Keep both shoulders level.",
+        "Walk a straight line.",
+        "Keep the weight quiet beside the hip."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=IAa-5uP7tSY",
+      "videoVerified": false
+    },
+    {
+      "name": "Sumo Deadlift",
+      "coachingIntent": "Train a wide-stance floor pull using leg drive and a close, vertical bar path.",
+      "setupSteps": [
+        "Stand with a wide stance, toes pointed out, bar over mid-foot.",
+        "Grip the bar inside your knees with straight arms.",
+        "Brace, then drive the floor away, keeping the bar against your legs until you stand tall.",
+        "Push your hips back and bend your knees to return the bar to the floor."
+      ],
+      "cues": [
+        "Knees track over toes.",
+        "Chest up before you pull.",
+        "Push the floor apart with your feet."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=1ltxpKdXkG4",
+      "videoVerified": false
+    },
+    {
+      "name": "T-Bar Row",
+      "coachingIntent": "Load an anchored bar path for heavy horizontal pulling while the torso holds one hinge angle.",
+      "setupSteps": [
+        "Straddle the bar, hinge to about 45 degrees, and take the handle with a neutral grip.",
+        "Pull the plates to your chest, driving the elbows up and back, and let the bar stretch your lats at the bottom of every rep.",
+        "Hold your hinge angle — every degree you stand up as the set gets hard is range you stole from your back."
+      ],
+      "cues": [
+        "Lock your hinge angle and defend it all set.",
+        "Pull with the elbows to the chest.",
+        "Full stretch at the bottom, plates floating."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=zAZQJYx9vrk",
+      "videoVerified": false
+    },
+    {
+      "name": "Triceps Pushdown",
+      "coachingIntent": "Isolate the triceps with constant cable tension for arm hypertrophy.",
+      "setupSteps": [
+        "Set the elbows beside the ribs at a high cable and take a small step back so the line of pull stays live.",
+        "Press to a strong lockout and hold it for a beat.",
+        "Return until the forearms pass parallel; if the elbows drift forward, reduce the load and restore the triceps-led path."
+      ],
+      "cues": [
+        "Elbows glued to the ribs.",
+        "Squeeze the lockout for a beat.",
+        "Ride the cable back up under full control."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=-zLyUAo1gMw",
+      "videoVerified": false
+    },
+    {
+      "name": "Tuck Crunch",
+      "coachingIntent": "Train the ribs and pelvis to curl toward each other while both ends lower under control.",
+      "setupSteps": [
+        "Lie on your back with the hips and knees bent and the arms reaching toward the feet.",
+        "Bring the ribs and pelvis toward one another, curling the shoulders up as the knees travel slightly toward the chest.",
+        "Pause with the abdominals shortened, then lower both ends slowly; if the legs swing ahead of the curl, the range is longer than you own."
+      ],
+      "cues": [
+        "Draw the ribs and pelvis together.",
+        "Reach past the hips at the top.",
+        "Lower both ends on the same slow count."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=NuEIjBPATwE",
+      "videoVerified": false
+    },
+    {
+      "name": "V-Bar Pulldown",
+      "coachingIntent": "Target the center of the back and lats with a narrow, neutral grip.",
+      "setupSteps": [
+        "Lock the thighs under the pad, take the neutral V-bar, and lean back only enough to keep the chest tall beneath the cable.",
+        "Pull the elbows down and back until the handle reaches the upper chest, then pause without turning the rep into a row.",
+        "Return to a full overhead reach without letting the stack settle; if the biceps burn first, soften the hands and lead harder with the elbows."
+      ],
+      "cues": [
+        "Show the chest to the handle.",
+        "Drive the elbows down and back.",
+        "Reach fully at the top."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=LJ5ebC1pWkA",
+      "videoVerified": false
+    },
+    {
+      "name": "Walking Lunge",
+      "coachingIntent": "Train alternating single-leg strength while maintaining balance through continuous forward steps.",
+      "setupSteps": [
+        "Stand tall with enough clear space to take repeatable forward steps.",
+        "Step forward and lower until the back knee approaches the floor while the front foot stays planted.",
+        "Drive through the front foot into the next step; if the back foot has to launch you, shorten the stride or reduce the load."
+      ],
+      "cues": [
+        "Plant the whole front foot.",
+        "Lower straight between the feet.",
+        "Drive into the next step."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=L8fvypPrzzs",
+      "videoVerified": false
+    },
+    {
+      "name": "Weighted Pull-up",
+      "coachingIntent": "Progress strict pull-ups with external load while preserving the full hang and controlled descent.",
+      "setupSteps": [
+        "Secure the external load so it hangs centrally and test that it stays clear of the floor and body.",
+        "Take a controlled full hang with a firm grip and a quiet trunk.",
+        "Drive the elbows down to bring the chest toward the bar, then lower to long arms; if range shortens or the load swings, use less weight."
+      ],
+      "cues": [
+        "Drive the elbows toward the ribs.",
+        "Keep the added load quiet.",
+        "Own the full return to long arms."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=HuuyDNGrCI8",
+      "videoVerified": false
+    },
+    {
+      "name": "Zercher Squat",
+      "coachingIntent": "Challenge the anterior core and upper back with a heavy front-loaded barbell.",
+      "setupSteps": [
+        "Cradle the bar in the crooks of the elbows, clasp the hands, and stand from the rack.",
+        "Squat between the knees while the torso stays as tall as the front load allows.",
+        "Drive up without letting the bar roll down the forearms.",
+        "Use a wrap or pad as needed; if arm pressure becomes painful or changes the position, end the set and adjust."
+      ],
+      "cues": [
+        "Elbows ride inside the knees at the bottom.",
+        "Brace tall like a front squat.",
+        "Wrap the bar, then give it full effort."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=-1iRwWOGTlk",
+      "videoVerified": false
+    },
+    {
+      "name": "Zottman Curl",
+      "coachingIntent": "Hit the biceps on the way up and the forearms on the slow eccentric down.",
+      "setupSteps": [
+        "Stand with dumbbells at the sides, curl with the palms turning up, and keep the upper arms quiet beside the ribs.",
+        "At the top, rotate to palms-down while the elbows stay closed, then lower through the overhand grip.",
+        "Turn back to neutral only at the bottom; this is lighter than the ego wants because the slow overhand descent is the part you came for."
+      ],
+      "cues": [
+        "Curl palms-up with quiet elbows.",
+        "Turn the knuckles over at the top.",
+        "Lower slowly through the overhand grip."
+      ],
+      "videoUrl": "https://www.youtube.com/watch?v=D7bMA4WEKMI",
+      "videoVerified": false
+    }
+  ]
 }

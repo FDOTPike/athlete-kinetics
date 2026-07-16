@@ -26,7 +26,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '016_movement_library_seed.sql', '017_movement_batch.sql',
   '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
   '021_taxonomy_corrections.sql',
-  '022_set_target.sql', '023_phase17_session_foundation.sql']) {
+  '022_set_target.sql', '023_phase17_session_foundation.sql',
+  '024_phase17_equipment_fixes.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -44,6 +45,19 @@ const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  [${detail}]` : ''}`);
   if (!ok) fail += 1;
 };
+const phase17Prefixes = Object.fromEntries(db.prepare(`
+  SELECT m.name, d.supported_prefixes
+  FROM movement m JOIN movement_detail d USING(movement_id)
+  WHERE m.name IN ('Dumbbell Bench Press', 'Dumbbell Shoulder Press', 'Pallof Press')
+  ORDER BY m.name
+`).all().map((row) => [row.name, row.supported_prefixes]));
+const exactPhase17Prefixes =
+  phase17Prefixes['Dumbbell Bench Press'] === '["DB"]'
+  && phase17Prefixes['Dumbbell Shoulder Press'] === '["DB"]'
+  && phase17Prefixes['Pallof Press'] === '["Banded"]';
+check('store schema chain includes exact 024 equipment-prefix corrections',
+  exactPhase17Prefixes,
+  JSON.stringify(phase17Prefixes));
 console.log(`[store DAO SQL] preparing ${statements.length} statements against live schema`);
 for (const sql of statements) {
   const head = sql.replace(/\s+/g, ' ').trim().slice(0, 72);
@@ -236,7 +250,8 @@ if (resetTables.length >= 15) {
     '014_movement_prefixes.sql', '015_set_prefix.sql',
     '016_movement_library_seed.sql', '017_movement_batch.sql',
     '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
-    '021_taxonomy_corrections.sql', '022_set_target.sql', '023_phase17_session_foundation.sql'
+    '021_taxonomy_corrections.sql', '022_set_target.sql', '023_phase17_session_foundation.sql',
+    '024_phase17_equipment_fixes.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
@@ -244,7 +259,7 @@ if (resetTables.length >= 15) {
   // re-apply). Old-draft set_target was never shipped; the migration is now a pure
   // CREATE IF NOT EXISTS — a no-op when tables already exist.
   const upDb = new DatabaseSync(':memory:');
-  for (let i = 0; i < 21; i++) {
+  for (let i = 0; i < FILES.indexOf('022_set_target.sql'); i++) {
     upDb.exec(readFileSync(join(SCHEMA_DIR, FILES[i]), 'utf-8'));
   }
   upDb.exec(readFileSync(join(SCHEMA_DIR, '022_set_target.sql'), 'utf-8'));
@@ -414,6 +429,26 @@ if (resetTables.length >= 15) {
     const hasUnknownSlotGuard = storeSrc.includes('slot not found in the active session plan');
     check('P2: logSet errors on unknown explicit sessionPlanSlotId (no silent movement-fallback)', hasUnknownSlotGuard);
     if (!hasUnknownSlotGuard) fail += 1;
+  }
+  // --- Store-boundary halt enforcement (Phase 17 spec) ----------------------------------
+  // When the runner is in a halted or complete phase, logSet must refuse at the store
+  // boundary before it even attempts a DB write. The runner itself rejects LOG_SET
+  // events from terminal states (check [12] in verify:runner), but the store must also
+  // surface a user-visible error rather than silently no-op.
+  // We verify the production guard is present in source (same approach as the P2 check).
+  {
+    const storeSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'state', 'useStore.ts'), 'utf-8');
+    const hasHaltGuard = storeSrc.includes('cannot be logged in the current session state');
+    check('store-boundary: logSet surfaces a user-visible error when runner rejects LOG_SET (halted/complete guard)', hasHaltGuard);
+    if (!hasHaltGuard) fail += 1;
+
+    // Verify the runner checkpoint also enforces it structurally: the HALT event
+    // transitions to a terminal phase, and every subsequent LOG_SET is a strict no-op
+    // (the runner returns the identical reference). We test this via the source
+    // assertion that the guard checks for an identity-equal runner after advance.
+    const hasIdentityGuard = storeSrc.includes('nextRunner === state.runner') || storeSrc.includes('nextRunner === runner');
+    check('store-boundary: store checks runner identity-equality to detect no-ops from terminal phase events', hasIdentityGuard);
+    if (!hasIdentityGuard) fail += 1;
   }
 }
 

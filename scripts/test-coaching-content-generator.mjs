@@ -67,6 +67,20 @@ check('rejects unknown movement names', () => {
   assert.match(unknown.errors.join('\n'), /not a currently seeded movement/);
 });
 
+check('rejects the generic intent template found by the Phase 17 audit', () => {
+  const generic = validateCoachingContent([{
+    ...valid,
+    coachingIntent: 'Build strength, mobility, and technique with the plank.',
+  }], known);
+  assert.match(generic.errors.join('\n'), /specific purpose/);
+});
+
+check('rejects an otherwise valid staging set that omits a seeded movement', () => {
+  const completeKnown = new Map([['plank', 'Plank'], ['road run', 'Road Run']]);
+  const incomplete = validateCoachingContent([valid], completeKnown, new Map(), { requireComplete: true });
+  assert.match(incomplete.errors.join('\n'), /missing: Road Run/);
+});
+
 check('renders one additive migration that writes intents and movement detail', () => {
   const { fresh, errors } = validateCoachingContent([valid], known);
   assert.deepEqual(errors, []);
@@ -94,15 +108,23 @@ check('generated SQL executes twice and atomically updates intent plus movement 
   db.exec(sql);
   db.exec(sql);
   const row = db.prepare(`
-    SELECT i.coaching_intent, d.instructions, d.cues, d.video_placeholder_uri
+    SELECT m.name, i.coaching_intent, d.instructions, d.cues, d.video_placeholder_uri
     FROM movement m
     JOIN movement_coaching_intent i USING(movement_id)
     JOIN movement_detail d USING(movement_id)
     WHERE m.name = 'Plank'
   `).get();
+  assert.equal(row.name, valid.name);
   assert.equal(row.coaching_intent, valid.coachingIntent);
   assert.equal(row.instructions, 'Set your elbows beneath your shoulders. Press the floor away and brace your trunk.');
   assert.equal(row.cues, 'Keep a long line from head to heel.');
   assert.equal(row.video_placeholder_uri, valid.videoUrl);
+  assert.equal(contentFingerprint({
+    name: row.name,
+    coachingIntent: row.coaching_intent,
+    instructions: row.instructions,
+    cues: row.cues,
+    videoUrl: row.video_placeholder_uri,
+  }), contentFingerprint(fresh[0]));
 });
 console.log(`coaching-content generator — all ${checks} checks green`);

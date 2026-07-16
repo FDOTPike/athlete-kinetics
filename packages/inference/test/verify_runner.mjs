@@ -358,4 +358,50 @@ check('bounded exhaustive sweep has no dead ends, every live state can halt, and
   assert.deepEqual([...phases].sort(), ['complete', 'halted', 'resting', 'working']);
 });
 
+check('rest-timer-disabled preference makes LOG_SET skip directly past resting to the next working state', () => {
+  // The store applies SKIP_REST immediately when restTimerEnabled is false, so
+  // the runner should never remain in resting for the UI to observe.
+  // We prove the runner exposes an orthogonal, deterministic SKIP_REST that can
+  // always immediately follow any resting-phase entry, leaving phase=working.
+  let state = startRunner([repSlot(501, 2, 5, 8)], { tier: 'intermediate', startedAtMs: 0 });
+  state = advance(state, event('LOG_SET', 100, { actualRpe: 8 }));
+  assert.equal(state.phase, 'resting', 'LOG_SET of non-final set must produce resting first');
+  // When rest is disabled, the caller applies SKIP_REST at the same timestamp.
+  const withoutTimer = advance(state, event('SKIP_REST', 100));
+  assert.deepEqual([withoutTimer.phase, withoutTimer.setIndex, withoutTimer.restSecondsTarget], ['working', 2, 0]);
+  // Confirm the shortcut serializes correctly so the checkpoint stays consistent.
+  assert.deepEqual(deserializeRunner(serializeRunner(withoutTimer)), withoutTimer);
+  // Final set: no trailing rest after last set, so goes directly to complete.
+  const final = advance(withoutTimer, event('LOG_SET', 200));
+  assert.equal(final.phase, 'complete');
+});
+
+check('athlete tier is frozen at session start; per-athlete preference changes cannot mutate an in-flight runner', () => {
+  // `startRunner` burns the tier into the state at creation time. A mid-session
+  // profile update can change `uiPreferences.tier`, but the runner state object
+  // returned by `advance` never reads from the store — it only carries the
+  // frozen value forward. Verify that the tier field on every downstream state
+  // equals the original construction tier, regardless of which events fire.
+  const initial = startRunner([repSlot(601, 3, 5, 8)], { tier: 'beginner', startedAtMs: 0 });
+  assert.equal(initial.tier, 'beginner');
+  const events = [
+    event('LOG_SET', 1, { actualRpe: 8 }),
+    event('SKIP_REST', 2),
+    event('LOG_SET', 3, { actualRpe: 7 }),
+    event('SKIP_REST', 4),
+  ];
+  let tierState = initial;
+  for (const e of events) {
+    tierState = advance(tierState, e);
+    assert.equal(tierState.tier, 'beginner', `tier must remain 'beginner' after ${e.kind}`);
+  }
+  // Rest matrix uses the frozen tier. Beginner scale is 0.75x intermediate.
+  const restForBeginner = restSecondsFor({ targetRpe: 9 }, 'beginner');
+  const restForIntermediate = restSecondsFor({ targetRpe: 9 }, 'intermediate');
+  assert.ok(restForBeginner < restForIntermediate, 'beginner rest must be shorter than intermediate');
+  // Serialization preserves the tier.
+  const restoredTier = deserializeRunner(serializeRunner(tierState));
+  assert.equal(restoredTier.tier, 'beginner');
+});
+
 console.log(`verify:runner - all ${n} checks green`);

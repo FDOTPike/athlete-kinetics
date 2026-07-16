@@ -30,7 +30,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
   '021_taxonomy_corrections.sql',
   '022_set_target.sql',
-  '023_phase17_session_foundation.sql'];
+  '023_phase17_session_foundation.sql',
+  '024_phase17_equipment_fixes.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -59,6 +60,18 @@ function freshDb() {
   };
 }
 const uv = (db) => Number(db.raw.prepare('PRAGMA user_version').get().user_version);
+const phase17Prefixes = (db) => Object.fromEntries(db.raw.prepare(`
+  SELECT m.name, d.supported_prefixes
+  FROM movement m JOIN movement_detail d USING(movement_id)
+  WHERE m.name IN ('Dumbbell Bench Press', 'Dumbbell Shoulder Press', 'Pallof Press')
+  ORDER BY m.name
+`).all().map((row) => [row.name, row.supported_prefixes]));
+const EXPECTED_PHASE17_PREFIXES = {
+  'Dumbbell Bench Press': '["DB"]',
+  'Dumbbell Shoulder Press': '["DB"]',
+  'Pallof Press': '["Banded"]',
+};
+const phase17PrefixesHold = (db) => JSON.stringify(phase17Prefixes(db)) === JSON.stringify(EXPECTED_PHASE17_PREFIXES);
 
 // --- 1. fresh install ---------------------------------------------------------
 console.log('[1] fresh install');
@@ -67,8 +80,18 @@ runMigrations(a, MIGRATIONS);
 check(`user_version = ${MIGRATIONS.length}`, uv(a) === MIGRATIONS.length, String(uv(a)));
 check('all sentinels present', sentinelsMissing(a).length === 0,
   `${SENTINELS.length} checked`);
+check('024 fresh install applies all three ratified equipment-prefix corrections',
+  phase17PrefixesHold(a), JSON.stringify(phase17Prefixes(a)));
+
 runMigrations(a, MIGRATIONS); // second boot
 check('re-boot is a no-op (idempotent)', uv(a) === MIGRATIONS.length);
+check('024 corrections survive a normal no-op reboot',
+  phase17PrefixesHold(a), JSON.stringify(phase17Prefixes(a)));
+a.executeSync(`PRAGMA user_version = ${FILES.indexOf('024_phase17_equipment_fixes.sql')};`);
+runMigrations(a, MIGRATIONS);
+check('024 can be re-applied idempotently through the production runner',
+  uv(a) === MIGRATIONS.length && phase17PrefixesHold(a),
+  JSON.stringify(phase17Prefixes(a)));
 const taxonomyCorrections = Object.fromEntries(a.raw.prepare(`
   SELECT m.name, t.category FROM movement_taxonomy t JOIN movement m USING(movement_id)
   WHERE m.name IN ('Cable Rope Overhead Triceps Extension', 'Triceps Pushdown')
@@ -87,6 +110,8 @@ b.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
 check('precondition: state_vector missing', sentinelsMissing(b).includes('state_vector'));
 runMigrations(b, MIGRATIONS);
 check('self-heal restored every sentinel', sentinelsMissing(b).length === 0);
+check('full sentinel self-heal replays 024 equipment corrections',
+  phase17PrefixesHold(b), JSON.stringify(phase17Prefixes(b)));
 check('materialize prepares against healed schema', (() => {
   const sql = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8')
     .replace(/^--.*$/gm, '');
@@ -141,8 +166,9 @@ b5.executeSync(`INSERT INTO movement (movement_id, name, pattern, is_compound) V
 b5.executeSync(`INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, provenance_kind, target_rpe, source_planned_slot_id) VALUES (7, 1, 0, 999, 3, 'planned', 7.5, 42)`);
 b5.executeSync(`INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (5, 1, 999, 1, 5, 100.0, 7.5, 1000000)`);
 b5.executeSync(`INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (5, 7, 'planned', 7.5, 42, 1000000)`);
-// Regress user_version so migration 022 re-runs
-b5.executeSync(`PRAGMA user_version = ${MIGRATIONS.length - 1};`);
+// Regress user_version to the exact 022 boundary so 022 and later data
+// migrations re-run through the production runner.
+b5.executeSync(`PRAGMA user_version = ${FILES.indexOf('022_set_target.sql')};`);
 runMigrations(b5, MIGRATIONS);
 const b5row = b5.raw.prepare('SELECT session_plan_slot_id, target_rpe, source_planned_slot_id FROM set_target WHERE set_id = 5').get();
 check('022 re-apply is a true no-op: session_plan_slot_id preserved', b5row?.session_plan_slot_id === 7, String(b5row?.session_plan_slot_id));

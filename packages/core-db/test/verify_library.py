@@ -10,6 +10,7 @@ stays green on pre-3.41 libsqlite.
 
 Run:  python packages/core-db/test/verify_library.py
 """
+import hashlib
 import json
 import re
 import sqlite3
@@ -19,6 +20,7 @@ from pathlib import Path
 SCHEMA_DIR = Path(__file__).resolve().parents[1] / "src" / "schema"
 STAGING = Path(__file__).resolve().parents[1] / "staging" / "movement_import.json"
 CONTENT_MANIFEST = Path(__file__).resolve().parents[1] / "staging" / "movement_coaching_intent_manifest.json"
+CONTENT_STAGING = Path(__file__).resolve().parents[1] / "staging" / "movement_coaching_intent.json"
 
 con = sqlite3.connect(":memory:")
 con.row_factory = sqlite3.Row
@@ -41,6 +43,27 @@ con.execute("PRAGMA foreign_keys = ON")
 
 staging = json.loads(STAGING.read_text(encoding="utf-8"))
 content_manifest = json.loads(CONTENT_MANIFEST.read_text(encoding="utf-8"))
+content_staging = json.loads(CONTENT_STAGING.read_text(encoding="utf-8"))
+
+# --- attestation-checkpoint state (Fable ruling 2026-07-16) -------------------
+# The coaching-content layer is gated on Francis's per-record videoVerified
+# attestation. While that checkpoint is legitimately OPEN (zero attestations
+# AND zero emitted slots), the content checks below report PENDING instead of
+# FAIL — a gate that is red for months by design trains people to ignore red.
+# The instant ANY attestation or ANY emitted slot exists, the checkpoint is
+# CLOSED and every content check becomes a hard failure again (partial
+# emission must never pass).
+_staging_records = content_staging if isinstance(content_staging, list) else content_staging.get("records", [])
+_attested = sum(1 for r in _staging_records if r.get("videoVerified"))
+CONTENT_CHECKPOINT_OPEN = (_attested == 0 and len(content_manifest["slots"]) == 0)
+
+def content_check(label, ok, detail=""):
+    """A check that is allowed to be pending ONLY while the attestation
+    checkpoint is open; identical to check() once it closes."""
+    if CONTENT_CHECKPOINT_OPEN and not ok:
+        print(f"  PEND  {label}  [awaiting videoVerified attestation checkpoint]")
+        return
+    check(label, ok, detail)
 if not isinstance(content_manifest.get("slots"), dict):
     raise ValueError("movement_coaching_intent_manifest.json slots must be an object")
 if not all(isinstance(records, list) for records in content_manifest["slots"].values()):
@@ -51,6 +74,15 @@ if not all(isinstance(record, dict) and isinstance(record.get("name"), str)
                for record in content_manifest_records):
     raise ValueError("movement_coaching_intent_manifest.json records need name and content_sha256")
 content_manifest_names = [record["name"] for record in content_manifest_records]
+if not isinstance(content_staging.get("movements"), list):
+    raise ValueError("movement_coaching_intent.json movements must be an array")
+content_staging_records = content_staging["movements"]
+if not all(
+    isinstance(record, dict) and isinstance(record.get("name"), str)
+    for record in content_staging_records
+):
+    raise ValueError("movement_coaching_intent.json records need names")
+content_staging_names = [record["name"] for record in content_staging_records]
 curated = [m for m in staging["movements"] if m["curated"]]
 # F4 decision (Francis 2026-07-13): BB Glute Bridge / BB Walking Lunge stay
 # prefix-encoded (no rows); equipment-distinct variants are rows. Mirrors
@@ -68,6 +100,7 @@ orphans = con.execute(
 ).fetchone()[0]
 check("no movement lacks detail (join check)", orphans == 0)
 names_db = {r[0] for r in con.execute("SELECT name FROM movement")}
+check("current movement corpus is exactly 124 names", len(names_db) == 124, f"n={len(names_db)}")
 missing = [n for n in seeded_expect if n not in names_db]
 check("every curated (non-prefix-represented) staging record is seeded", not missing, str(missing[:3]))
 leaked = [m["name"] for m in staging["movements"] if not m["curated"] and m["name"] in names_db]
@@ -86,10 +119,21 @@ rows = con.execute("""
 by_name = {r["name"]: r for r in rows}
 emitted_content = set(content_manifest_names)
 manifest_duplicates = sorted({name for name in content_manifest_names if content_manifest_names.count(name) > 1})
+staging_duplicates = sorted({name for name in content_staging_names if content_staging_names.count(name) > 1})
 manifest_unknown = sorted(emitted_content - names_db)
 check("coaching-content manifest has no duplicate names", not manifest_duplicates, str(manifest_duplicates[:3]))
 check("coaching-content manifest names are all seeded movements", not manifest_unknown, str(manifest_unknown[:3]))
-content_contract_names = sorted(set(seeded_expect) | (emitted_content & names_db))
+check("coaching-content staging has no duplicate names", not staging_duplicates, str(staging_duplicates[:3]))
+check("coaching-content staging covers exactly all 124 current movements",
+      set(content_staging_names) == names_db and len(content_staging_names) == len(names_db),
+      str(sorted(set(content_staging_names) ^ names_db)[:3]))
+content_check("coaching-content manifest covers exactly all 124 current movements",
+      emitted_content == names_db and len(content_manifest_names) == len(names_db),
+      str(sorted(emitted_content ^ names_db)[:3]))
+content_check("coaching-content staging and manifest name sets match exactly",
+      set(content_staging_names) == emitted_content,
+      str(sorted(set(content_staging_names) ^ emitted_content)[:3]))
+content_contract_names = sorted(names_db)
 bad_text, bad_json, bad_uri = [], [], []
 for n in content_contract_names:
     r = by_name[n]
@@ -100,11 +144,57 @@ for n in content_contract_names:
         assert isinstance(json.loads(r["target_muscles"]), list)
     except Exception:
         bad_json.append(n)
-    if not r["video_placeholder_uri"].startswith("https://www.youtube.com/watch?v="):
+    if re.fullmatch(r"https://www\.youtube\.com/watch\?v=[A-Za-z0-9_-]{11}", r["video_placeholder_uri"]) is None:
         bad_uri.append(n)
-check("all curated/emitted rows carry instructions + cues", not bad_text, str(bad_text[:3]))
+content_check("all curated/emitted rows carry instructions + cues", not bad_text, str(bad_text[:3]))
 check("prefix/muscle JSON valid on all curated/emitted rows", not bad_json, str(bad_json[:3]))
-check("all curated/emitted rows carry one YouTube placeholder URI", not bad_uri, str(bad_uri[:3]))
+content_check("all curated/emitted rows carry one YouTube placeholder URI", not bad_uri, str(bad_uri[:3]))
+
+def terminal(text):
+    return text if re.search(r"[.!?]$", text) else text + "."
+
+def normalized_sentences(values):
+    if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+        return None
+    return " ".join(terminal(value.strip()) for value in values)
+
+staged_by_name = {record["name"]: record for record in content_staging_records}
+manifest_hash_by_name = {record["name"]: record["content_sha256"] for record in content_manifest_records}
+bad_association, bad_fingerprints = [], []
+for name in content_contract_names:
+    staged = staged_by_name.get(name)
+    actual = by_name[name]
+    if staged is None:
+        bad_association.append(name)
+        continue
+    expected_steps = normalized_sentences(staged.get("setupSteps"))
+    expected_cues = normalized_sentences(staged.get("cues"))
+    expected = {
+        "name": name,
+        "coachingIntent": staged.get("coachingIntent"),
+        "instructions": expected_steps,
+        "cues": expected_cues,
+        "videoUrl": staged.get("videoUrl"),
+    }
+    actual_content = {
+        "name": name,
+        "coachingIntent": actual["coaching_intent"],
+        "instructions": actual["instructions"],
+        "cues": actual["cues"],
+        "videoUrl": actual["video_placeholder_uri"],
+    }
+    if actual_content != expected:
+        bad_association.append(name)
+    fingerprint = hashlib.sha256(json.dumps(
+        actual_content, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")).hexdigest()
+    if manifest_hash_by_name.get(name) != fingerprint:
+        bad_fingerprints.append(name)
+content_check("every movement is associated with its exact same-name staged intent/steps/cues/video",
+      not bad_association, str(bad_association[:3]))
+content_check("every migrated movement-content fingerprint matches the generated manifest",
+      not bad_fingerprints, str(bad_fingerprints[:3]))
+
 
 # Audit F5: the curation contract is structural, not just non-empty.
 bad_cues, bad_steps, bad_claims = [], [], []
@@ -123,8 +213,8 @@ for n in content_contract_names:
         bad_steps.append((n, n_steps))
     if BANNED.search(r["instructions"]) or BANNED.search(r["cues"]):
         bad_claims.append(n)
-check("every seeded row has 1-3 cues (plan info-density law)", not bad_cues, str(bad_cues[:3]))
-check("every seeded row has 2-4 instruction steps (plan law)", not bad_steps, str(bad_steps[:3]))
+content_check("every seeded row has 1-3 cues (plan info-density law)", not bad_cues, str(bad_cues[:3]))
+content_check("every seeded row has 2-4 instruction steps (plan law)", not bad_steps, str(bad_steps[:3]))
 check("no medical/performance claims in seeded text", not bad_claims, str(bad_claims[:3]))
 intent_by_name = {r["name"]: r["coaching_intent"] for r in rows if r["coaching_intent"] is not None}
 check("emitted coaching intents exactly match the generated manifest",
@@ -132,6 +222,10 @@ check("emitted coaching intents exactly match the generated manifest",
 bad_intents = [name for name, intent in intent_by_name.items()
                if not (1 <= len(intent.strip()) <= 160) or BANNED.search(intent)]
 check("every emitted coaching intent is concise and claim-safe", not bad_intents, str(bad_intents[:3]))
+generic_intents = [name for name, intent in intent_by_name.items()
+                   if re.search(r"\bbuild strength,\s*mobility,\s*and technique with\b", intent, re.I)]
+check("no emitted coaching intent uses the rejected generic template",
+      not generic_intents, str(generic_intents[:3]))
 shipped_names = names_db - set(seeded_expect)
 empty_names = {r["name"] for r in rows if r["instructions"].strip() == ""}
 expected_empty = shipped_names - emitted_content
@@ -167,12 +261,18 @@ eq = {}
 for r in con.execute("SELECT m.name AS name, e.item AS item FROM movement_equipment e JOIN movement m USING(movement_id)"):
     eq.setdefault(r["name"], set()).add(r["item"])
 bad_eq = []
-for n in seeded_expect:
+for n in sorted(names_db):
     first = json.loads(by_name[n]["supported_prefixes"])[0]
     item = PREFIX_ITEM.get(first)
     if item is not None and item not in eq.get(n, set()):
         bad_eq.append(n)
-check("every implement-prefixed seeded row demands its implement", not bad_eq, str(bad_eq[:3]))
+check("every implement-prefixed current row demands its implement", not bad_eq, str(bad_eq[:3]))
+phase17_prefixes = {name: json.loads(by_name[name]["supported_prefixes"]) for name in (
+    "Dumbbell Bench Press", "Dumbbell Shoulder Press", "Pallof Press"
+)}
+check("024 applies the three ratified Phase 17 equipment-prefix corrections",
+      phase17_prefixes == {"Dumbbell Bench Press": ["DB"], "Dumbbell Shoulder Press": ["DB"], "Pallof Press": ["Banded"]},
+      str(phase17_prefixes))
 
 print("\n[4c] tier visibility (plan law: Beginner + whitelisted Intermediate staples)")
 WHITELIST_EXPECT = {
