@@ -1092,3 +1092,57 @@ Phase 15 -> P16, FORGE retarget deferred]
   re-patch + full gate re-run. Session-created files were never affected.
 - Committed locally in 4 scoped commits; push = Francis (VS Code), CI must
   show 13/13 + APK artifact before on-device test.
+
+---
+
+## Entry 0020 — 2026-07-15 · Autopilot Provenance Fix (verify:store target_rpe column mismatch)
+
+### Input G(x)
+
+```
+Could you please explore the code base. The hand over attached gives a summary of what has been shipped. Currently weve just finished phase 16 (movement library). Please ignore the rest of phases 17,18,... we are working on fixing another problem. I would like to use you to code for me, what are you current capabilities? Could you show me by telling me what were currently working on
+```
+
+### Output F(G(x))
+
+- Fix column mismatch in `apps/mobile/test/verify_store_sql.mjs` where `set_target` table inserts were using `planned_slot_id` instead of `source_planned_slot_id`, and missing the required `provenance_kind` column.
+- Run `npm run verify:all` via cmd to confirm all 16 verification gates are green.
+
+---
+
+## Entry 0021 — 2026-07-15 · Phase 13 Step 5: Durable Prescribed-Target Provenance
+
+### Input G(x)
+
+```
+You are now the implementation owner for Phase 13 Step 5: durable prescribed-target provenance for the Kinematic Autopilot.
+```
+
+### Output F(G(x))
+
+- Modified `022_set_target.sql` to define `session_origin`, `session_plan_slot` (with `planned_reps` and overrides), and `planned_slot_disposition`.
+- Updated `useStore.ts` store interfaces (`PlanSlot`, `KineticsStore`, `LoggedSet`) to support `sessionPlanSlotId`, original movement/date, reps, and overrides.
+- Updated `startSession` to atomic-write `session_origin`, `session_plan_slot`, and `planned_slot_disposition` records, resolving consumption logic and duplicate same-day sessions.
+- Updated `addPlanSlot`, `swapMovement`, `applyRegression`, and `applyDaySwap` to use the durable `session_plan_slot` table and handle duplicate movements and dispositions.
+- Refactored `SessionScreen.tsx` active session tabs, target display, and logging triggers to query the durable `sessionPlan` (composed with the daily RPE safety cap) and pass `activeSessionPlanSlotId` to `logSet`.
+- Verified all 16 verification gates (including the repaired `verify:store`) are fully green.
+
+---
+
+## Entry 0022 — 2026-07-15 · Phase 17 Utility-First Guided Sessions
+
+### Input G(x)
+
+```
+Implement Phase 17: a deterministic guided-session runner, durable session/UI
+preferences, curated coaching content, and a high-focus mobile UI that replaces
+dashboard clutter with progressive disclosure and a vertical session timeline.
+```
+
+### Output F(G(x))
+
+- Begin from the existing 022 provenance baseline without modifying shipped migrations.
+- Preserve the user-owned dirty worktree and add only Phase 17-scoped files and edits.
+- Deliver pure runner hardening, additive persistence, coaching/timed-set support,
+  utility-first READY/COACH/SESSION surfaces, and verification coverage before the
+  required physical-device visual checkpoint.
