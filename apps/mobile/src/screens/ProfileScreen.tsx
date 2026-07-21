@@ -603,13 +603,12 @@ export default function ProfileScreen(): React.JSX.Element {
             );
           })}
         </View>
-        {!confirmingWipeBlock ? (
+        {session !== null ? (
+          <Text style={styles.fieldHint}>End the active session before deleting the block.</Text>
+        ) : !confirmingWipeBlock ? (
           <QuietAction
             label="DELETE CURRENT BLOCK & STATE"
-            onPress={() => {
-              if (session !== null) return;
-              setConfirmingWipeBlock(true);
-            }}
+            onPress={() => setConfirmingWipeBlock(true)}
             accessibilityLabel="Delete the current block and today's state"
             style={styles.wipeAction}
           />
