@@ -11,8 +11,10 @@
  * those steps are skipped and safe defaults applied (hybrid + autoregulated,
  * which is also DEFAULT_PROFILE). Advanced athletes get every screen.
  *
- * House rules: keyboard only where unavoidable (name, injury notes), no
- * animations, accessibility roles/labels everywhere, ≥56pt targets.
+ * Law 1: Zero hex literals in screen files — use theme tokens.
+ * Law 2: Selected cards/chips = inverted white fill (textHi fill, ink0 text). NOT chalk.
+ * Law 3: Zero red/amber/green anywhere.
+ * Law 4: Touch targets >= 56pt.
  */
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -31,7 +33,9 @@ import {
   type TrainingAge,
   type UserProfile,
 } from '@ak/inference';
-import { palette, useStore } from '../state/useStore';
+import { theme } from '../theme/theme';
+import { useStore } from '../state/useStore';
+import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
 
 // ---------------------------------------------------------------------------
 // Copy: plain-language labels + one-liners for every enum the wizard shows.
@@ -87,66 +91,6 @@ type StepKey =
   | 'science' | 'body' | 'equipment' | 'summary';
 
 // ---------------------------------------------------------------------------
-// Primitives (wizard-local: bigger cards than ProfileScreen's chips — one
-// decision per screen earns the room).
-// ---------------------------------------------------------------------------
-interface CardProps {
-  label: string;
-  blurb: string;
-  active: boolean;
-  onPress: () => void;
-}
-function OptionCard({ label, blurb, active, onPress }: CardProps): React.JSX.Element {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={`${label}. ${blurb}`}
-      style={[styles.card, active && styles.cardActive]}
-    >
-      <Text style={[styles.cardLabel, active && styles.cardLabelActive]}>{label}</Text>
-      <Text style={styles.cardBlurb}>{blurb}</Text>
-    </Pressable>
-  );
-}
-
-interface StepperProps {
-  label: string;
-  display: string;
-  onDec: () => void;
-  onInc: () => void;
-}
-function BigStepper({ label, display, onDec, onInc }: StepperProps): React.JSX.Element {
-  return (
-    <View style={styles.stepperBlock}>
-      <Text style={styles.stepperLabel}>{label}</Text>
-      <View style={styles.stepperRow}>
-        <Pressable
-          onPress={onDec}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label}`}
-          style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
-        >
-          <Text style={styles.stepBtnText}>−</Text>
-        </Pressable>
-        <Text style={styles.stepValue} accessibilityLabel={`${label}: ${display}`}>{display}</Text>
-        <Pressable
-          onPress={onInc}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Increase ${label}`}
-          style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
-        >
-          <Text style={styles.stepBtnText}>+</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 export default function OnboardingScreen(): React.JSX.Element {
@@ -164,8 +108,6 @@ export default function OnboardingScreen(): React.JSX.Element {
 
   const patch = (p: Partial<UserProfile>): void => setDraft((d) => ({ ...d, ...p }));
 
-  // The beginner path skips the programming-science screen entirely; the
-  // draft keeps DEFAULT_PROFILE's hybrid + autoregulated (the coach decides).
   const steps: StepKey[] = useMemo(
     () =>
       draft.training_age === 'beginner'
@@ -209,7 +151,9 @@ export default function OnboardingScreen(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      {/* Progress dots — position, not percent; no numbers to misread. */}
+      <Text style={styles.wordmark}>pikeMethods</Text>
+
+      {/* Progress dots (P4 ruling: keep as-is with chalk on current dot) */}
       <View style={styles.dots} accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
         {steps.map((k, i) => (
           <View key={k} style={[styles.dot, i === stepIdx && styles.dotActive, i < stepIdx && styles.dotDone]} />
@@ -230,47 +174,47 @@ export default function OnboardingScreen(): React.JSX.Element {
               value={name}
               onChangeText={setName}
               placeholder="Your name"
-              placeholderTextColor={palette.dim}
+              placeholderTextColor={theme.color.textLow}
               maxLength={24}
               accessibilityLabel="Your name"
             />
-            <Pressable
+            <QuietAction
+              label="Just exploring? Load the demo athlete →"
               onPress={finishWithDemo}
-              accessibilityRole="button"
               accessibilityLabel="Skip the questionnaire and load the demo athlete"
               style={styles.demoLink}
-            >
-              <Text style={styles.demoLinkText}>Just exploring? Load the demo athlete →</Text>
-            </Pressable>
+            />
           </View>
         )}
 
         {step === 'goal' && (
-          <View>
+          <View style={styles.cardGroup}>
             <Text style={styles.h2}>WHAT ARE WE TRAINING FOR?</Text>
             {OBJECTIVES.map((o) => (
-              <OptionCard
+              <Chip
                 key={o}
-                label={OBJECTIVE_COPY[o].label}
-                blurb={OBJECTIVE_COPY[o].blurb}
-                active={draft.objective === o}
+                label={`${OBJECTIVE_COPY[o].label} — ${OBJECTIVE_COPY[o].blurb}`}
+                selected={draft.objective === o}
                 onPress={() => patch({ objective: o })}
+                accessibilityLabel={`${OBJECTIVE_COPY[o].label}. ${OBJECTIVE_COPY[o].blurb}`}
+                style={styles.cardChip}
               />
             ))}
           </View>
         )}
 
         {step === 'experience' && (
-          <View>
+          <View style={styles.cardGroup}>
             <Text style={styles.h2}>HOW LONG HAVE YOU BEEN TRAINING?</Text>
             <Text style={styles.pDim}>Be honest — the coach calibrates everything to this.</Text>
             {TRAINING_AGES.map((a) => (
-              <OptionCard
+              <Chip
                 key={a}
-                label={AGE_COPY[a].label}
-                blurb={AGE_COPY[a].blurb}
-                active={draft.training_age === a}
+                label={`${AGE_COPY[a].label} — ${AGE_COPY[a].blurb}`}
+                selected={draft.training_age === a}
                 onPress={() => patch({ training_age: a })}
+                accessibilityLabel={`${AGE_COPY[a].label}. ${AGE_COPY[a].blurb}`}
+                style={styles.cardChip}
               />
             ))}
           </View>
@@ -279,17 +223,19 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'schedule' && (
           <View>
             <Text style={styles.h2}>YOUR WEEK</Text>
-            <BigStepper
+            <Stepper
               label="TRAINING DAYS PER WEEK"
-              display={String(draft.weekly_frequency)}
-              onDec={() => patch({ weekly_frequency: Math.max(1, draft.weekly_frequency - 1) })}
-              onInc={() => patch({ weekly_frequency: Math.min(7, draft.weekly_frequency + 1) })}
+              value={String(draft.weekly_frequency)}
+              onDecrement={() => patch({ weekly_frequency: Math.max(1, draft.weekly_frequency - 1) })}
+              onIncrement={() => patch({ weekly_frequency: Math.min(7, draft.weekly_frequency + 1) })}
+              style={styles.stepperBlock}
             />
-            <BigStepper
+            <Stepper
               label="MAX SESSIONS IN ONE DAY"
-              display={String(draft.max_sessions_per_day)}
-              onDec={() => patch({ max_sessions_per_day: Math.max(1, draft.max_sessions_per_day - 1) })}
-              onInc={() => patch({ max_sessions_per_day: Math.min(3, draft.max_sessions_per_day + 1) })}
+              value={String(draft.max_sessions_per_day)}
+              onDecrement={() => patch({ max_sessions_per_day: Math.max(1, draft.max_sessions_per_day - 1) })}
+              onIncrement={() => patch({ max_sessions_per_day: Math.min(3, draft.max_sessions_per_day + 1) })}
+              style={styles.stepperBlock}
             />
             <Text style={styles.pDim}>
               The coach treats these as hard limits — extra work past them gets
@@ -301,11 +247,12 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'time' && (
           <View>
             <Text style={styles.h2}>HOW LONG IS A SESSION?</Text>
-            <BigStepper
+            <Stepper
               label="MINUTES, TOPS"
-              display={`${draft.session_duration_cap_min} min`}
-              onDec={() => patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) })}
-              onInc={() => patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) })}
+              value={`${draft.session_duration_cap_min} min`}
+              onDecrement={() => patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) })}
+              onIncrement={() => patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) })}
+              style={styles.stepperBlock}
             />
             <Text style={styles.pDim}>A realistic ceiling beats an optimistic one.</Text>
           </View>
@@ -319,43 +266,46 @@ export default function OnboardingScreen(): React.JSX.Element {
               two more reps were in you. This is a ceiling the coach can never
               prescribe past.
             </Text>
-            <BigStepper
+            <Stepper
               label="EFFORT CEILING (RPE)"
-              display={draft.base_rpe_cap.toFixed(1)}
-              onDec={() => patch({ base_rpe_cap: Math.max(5, draft.base_rpe_cap - 0.5) })}
-              onInc={() => patch({ base_rpe_cap: Math.min(10, draft.base_rpe_cap + 0.5) })}
+              value={draft.base_rpe_cap.toFixed(1)}
+              onDecrement={() => patch({ base_rpe_cap: Math.max(5, draft.base_rpe_cap - 0.5) })}
+              onIncrement={() => patch({ base_rpe_cap: Math.min(10, draft.base_rpe_cap + 0.5) })}
+              style={styles.stepperBlock}
             />
             <Text style={styles.p}>{effortBlurb(draft.base_rpe_cap)}</Text>
             {draft.training_age === 'beginner' && draft.base_rpe_cap > 8.5 && (
               <Text style={styles.note}>
-                Heads up: while you're new, the coach caps effort at 8.5 anyway —
-                you'll grow into the rest.
+                Heads up: while you&apos;re new, the coach caps effort at 8.5 anyway —
+                you&apos;ll grow into the rest.
               </Text>
             )}
           </View>
         )}
 
         {step === 'science' && (
-          <View>
+          <View style={styles.cardGroup}>
             <Text style={styles.h2}>THE SCIENCE BITS</Text>
             <Text style={styles.fieldLabel}>ENERGY FOCUS</Text>
             {ENERGY_SYSTEMS.map((e) => (
-              <OptionCard
+              <Chip
                 key={e}
-                label={ENERGY_COPY[e].label}
-                blurb={ENERGY_COPY[e].blurb}
-                active={draft.target_energy_system === e}
+                label={`${ENERGY_COPY[e].label} — ${ENERGY_COPY[e].blurb}`}
+                selected={draft.target_energy_system === e}
                 onPress={() => patch({ target_energy_system: e })}
+                accessibilityLabel={`${ENERGY_COPY[e].label}. ${ENERGY_COPY[e].blurb}`}
+                style={styles.cardChip}
               />
             ))}
             <Text style={styles.fieldLabel}>PROGRESSION STYLE</Text>
             {PROGRESSION_METHODS.map((m) => (
-              <OptionCard
+              <Chip
                 key={m}
-                label={PROGRESSION_COPY[m].label}
-                blurb={PROGRESSION_COPY[m].blurb}
-                active={draft.progression_methodology === m}
+                label={`${PROGRESSION_COPY[m].label} — ${PROGRESSION_COPY[m].blurb}`}
+                selected={draft.progression_methodology === m}
                 onPress={() => patch({ progression_methodology: m })}
+                accessibilityLabel={`${PROGRESSION_COPY[m].label}. ${PROGRESSION_COPY[m].blurb}`}
+                style={styles.cardChip}
               />
             ))}
           </View>
@@ -365,7 +315,7 @@ export default function OnboardingScreen(): React.JSX.Element {
           <View>
             <Text style={styles.h2}>ANYTHING I SHOULD KNOW?</Text>
             <Text style={styles.pDim}>
-              One per line, like "knee: old ACL, careful with deep squats".
+              One per line, like &quot;knee: old ACL, careful with deep squats&quot;.
               Leave empty if nothing applies — you can add these any time.
             </Text>
             <Text style={styles.fieldLabel}>PAST INJURIES</Text>
@@ -375,7 +325,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               onChangeText={setInjuryText}
               multiline
               placeholder="shoulder: dislocated 2023"
-              placeholderTextColor={palette.dim}
+              placeholderTextColor={theme.color.textLow}
               accessibilityLabel="Past injuries, one per line as region colon note"
             />
             <Text style={styles.fieldLabel}>MOBILITY LIMITS</Text>
@@ -385,7 +335,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               onChangeText={setMobilityText}
               multiline
               placeholder="ankles: can't hit depth without heel lift"
-              placeholderTextColor={palette.dim}
+              placeholderTextColor={theme.color.textLow}
               accessibilityLabel="Mobility limits, one per line as region colon note"
             />
           </View>
@@ -396,33 +346,26 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Text style={styles.h2}>WHAT CAN YOU GET YOUR HANDS ON?</Text>
             <View style={styles.presetRow}>
               {(['full_gym', 'home_basic', 'minimal'] as const).map((p) => (
-                <Pressable
+                <Chip
                   key={p}
+                  label={p.replace('_', ' ').toUpperCase()}
+                  selected={false}
                   onPress={() => patch({ equipment_inventory: [...EQUIPMENT_PRESETS[p]] })}
-                  accessibilityRole="button"
                   accessibilityLabel={`Preset: ${p.replace('_', ' ')}`}
-                  style={styles.presetBtn}
-                >
-                  <Text style={styles.presetText}>{p.replace('_', ' ').toUpperCase()}</Text>
-                </Pressable>
+                />
               ))}
             </View>
             <View style={styles.chipWrap}>
               {EQUIPMENT_ITEMS.map((item) => {
                 const owned = draft.equipment_inventory.includes(item);
                 return (
-                  <Pressable
+                  <Chip
                     key={item}
+                    label={EQUIPMENT_LABEL[item]}
+                    selected={owned}
                     onPress={() => toggleEquipment(item)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: owned }}
                     accessibilityLabel={`${EQUIPMENT_LABEL[item]}: ${owned ? 'owned' : 'not owned'}`}
-                    style={[styles.chip, owned && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, owned && styles.chipTextActive]}>
-                      {EQUIPMENT_LABEL[item]}
-                    </Text>
-                  </Pressable>
+                  />
                 );
               })}
             </View>
@@ -455,38 +398,30 @@ export default function OnboardingScreen(): React.JSX.Element {
               Change any of this later in the ATHLETE tab. Your first prescription
               is waiting on the READY tab.
             </Text>
-            <Pressable
+            <PrimaryButton
+              label="START TRAINING"
               onPress={finish}
-              accessibilityRole="button"
               accessibilityLabel="Finish setup and start training"
               style={styles.startBtn}
-            >
-              <Text style={styles.startBtnText}>START TRAINING</Text>
-            </Pressable>
+            />
           </View>
         )}
       </ScrollView>
 
-      {/* Footer: BACK / NEXT (the summary screen owns its own final CTA). */}
+      {/* Footer: BACK / NEXT */}
       <View style={styles.footer}>
-        <Pressable
+        <QuietAction
+          label="BACK"
           onPress={() => setStepIdx((i) => Math.max(0, i - 1))}
           disabled={stepIdx === 0}
-          accessibilityRole="button"
           accessibilityLabel="Back"
-          style={[styles.navBtn, stepIdx === 0 && styles.navBtnDisabled]}
-        >
-          <Text style={[styles.navText, stepIdx === 0 && styles.navTextDisabled]}>BACK</Text>
-        </Pressable>
+        />
         {!isLast && (
-          <Pressable
+          <PrimaryButton
+            label="NEXT"
             onPress={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
-            accessibilityRole="button"
             accessibilityLabel="Next"
-            style={[styles.navBtn, styles.navBtnPrimary]}
-          >
-            <Text style={styles.navTextPrimary}>NEXT</Text>
-          </Pressable>
+          />
         )}
       </View>
     </View>
@@ -494,82 +429,49 @@ export default function OnboardingScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: palette.bg },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: palette.line },
-  dotActive: { backgroundColor: palette.green },
-  dotDone: { backgroundColor: palette.dim },
+  root: { flex: 1, backgroundColor: theme.color.ink0 },
+  wordmark: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+    paddingHorizontal: theme.space[4],
+    paddingTop: theme.space[4],
+  },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: theme.space[2], paddingVertical: theme.space[3] },
+  dot: { width: 8, height: 8, borderRadius: theme.radius.chip, backgroundColor: theme.color.line },
+  dotActive: { backgroundColor: theme.color.chalk },
+  dotDone: { backgroundColor: theme.color.textMid },
   body: { flex: 1 },
-  bodyContent: { padding: 20, paddingBottom: 32 },
-  h1: { color: palette.text, fontSize: 30, fontWeight: '800', letterSpacing: 1.5, lineHeight: 38, marginBottom: 16 },
-  h2: { color: palette.text, fontSize: 22, fontWeight: '800', letterSpacing: 1, marginBottom: 12 },
-  p: { color: palette.text, fontSize: 15, lineHeight: 22, marginBottom: 16 },
-  pDim: { color: palette.dim, fontSize: 14, lineHeight: 20, marginBottom: 16 },
-  note: { color: palette.amber, fontSize: 14, lineHeight: 20, marginTop: 12 },
-  fieldLabel: { color: palette.dim, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginTop: 12, marginBottom: 8 },
+  bodyContent: { padding: theme.space[4], paddingBottom: theme.space[5] },
+  h1: { ...theme.font.title, color: theme.color.textHi, fontSize: 28, lineHeight: 36, marginBottom: theme.space[3] },
+  h2: { ...theme.font.title, color: theme.color.textHi, fontSize: 20, marginBottom: theme.space[3] },
+  p: { ...theme.font.body, color: theme.color.textHi, marginBottom: theme.space[3] },
+  pDim: { ...theme.font.body, color: theme.color.textMid, marginBottom: theme.space[3] },
+  note: { ...theme.font.body, color: theme.color.textMid, marginTop: theme.space[2] },
+  fieldLabel: { ...theme.font.eyebrow, color: theme.color.textLow, marginTop: theme.space[3], marginBottom: theme.space[2] },
   nameInput: {
-    backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, borderRadius: 10,
-    color: palette.text, fontSize: 18, minHeight: 56, paddingHorizontal: 16,
+    backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.control,
+    color: theme.color.textHi, ...theme.font.body, minHeight: theme.touch.min, paddingHorizontal: theme.space[3],
   },
-  demoLink: { minHeight: 56, justifyContent: 'center', marginTop: 20 },
-  demoLinkText: { color: palette.dim, fontSize: 14, textDecorationLine: 'underline' },
-  card: {
-    backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, borderRadius: 12,
-    padding: 16, marginBottom: 10, minHeight: 64,
-  },
-  cardActive: { borderColor: palette.green },
-  cardLabel: { color: palette.text, fontSize: 15, fontWeight: '800', letterSpacing: 1 },
-  cardLabelActive: { color: palette.green },
-  cardBlurb: { color: palette.dim, fontSize: 13, lineHeight: 18, marginTop: 4 },
-  stepperBlock: { marginBottom: 20 },
-  stepperLabel: { color: palette.dim, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  stepBtn: {
-    width: 64, height: 64, borderRadius: 12, backgroundColor: palette.surface,
-    borderWidth: 1, borderColor: palette.line, alignItems: 'center', justifyContent: 'center',
-  },
-  stepBtnPressed: { borderColor: palette.green },
-  stepBtnText: { color: palette.text, fontSize: 28, fontWeight: '700' },
-  stepValue: { color: palette.text, fontSize: 26, fontWeight: '800', flex: 1, textAlign: 'center' },
+  demoLink: { marginTop: theme.space[3] },
+  cardGroup: { gap: theme.space[2] },
+  cardChip: { marginBottom: theme.space[1] },
+  stepperBlock: { marginBottom: theme.space[4] },
   notesInput: {
-    backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, borderRadius: 10,
-    color: palette.text, fontSize: 15, minHeight: 88, padding: 12, textAlignVertical: 'top',
+    backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.control,
+    color: theme.color.textHi, ...theme.font.body, minHeight: 88, padding: theme.space[3], textAlignVertical: 'top',
   },
-  presetRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  presetBtn: {
-    flex: 1, minHeight: 56, borderRadius: 10, backgroundColor: palette.surface,
-    borderWidth: 1, borderColor: palette.line, alignItems: 'center', justifyContent: 'center',
-  },
-  presetText: { color: palette.text, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    minHeight: 56, paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.surface,
-    borderWidth: 1, borderColor: palette.line, alignItems: 'center', justifyContent: 'center',
-  },
-  chipActive: { borderColor: palette.green },
-  chipText: { color: palette.dim, fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
-  chipTextActive: { color: palette.green },
+  presetRow: { flexDirection: 'row', gap: theme.space[2], marginBottom: theme.space[3] },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   summaryBox: {
-    backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, borderRadius: 12,
-    padding: 16, marginBottom: 16, gap: 10,
+    backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.control,
+    padding: theme.space[4], marginBottom: theme.space[4], gap: theme.space[2],
   },
-  summaryRow: { color: palette.text, fontSize: 14, fontWeight: '600', letterSpacing: 0.5 },
+  summaryRow: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600' },
   startBtn: {
-    minHeight: 64, borderRadius: 12, backgroundColor: palette.green,
-    alignItems: 'center', justifyContent: 'center', marginTop: 8,
+    marginTop: theme.space[2],
   },
-  startBtnText: { color: palette.bg, fontSize: 17, fontWeight: '800', letterSpacing: 2 },
   footer: {
-    flexDirection: 'row', gap: 12, padding: 16,
-    borderTopWidth: 1, borderTopColor: palette.line,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.space[3],
+    borderTopWidth: 1, borderTopColor: theme.color.line,
   },
-  navBtn: {
-    flex: 1, minHeight: 60, borderRadius: 12, backgroundColor: palette.surface,
-    borderWidth: 1, borderColor: palette.line, alignItems: 'center', justifyContent: 'center',
-  },
-  navBtnDisabled: { opacity: 0.35 },
-  navBtnPrimary: { backgroundColor: palette.green, borderColor: palette.green },
-  navText: { color: palette.text, fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-  navTextDisabled: { color: palette.dim },
-  navTextPrimary: { color: palette.bg, fontSize: 15, fontWeight: '800', letterSpacing: 2 },
 });

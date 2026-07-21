@@ -19,3 +19,4 @@ apps/mobile/ios/build/
 apps/mobile/android/app/.cxx/
 
 packages/biometrics/test/.build/
+.hermes/

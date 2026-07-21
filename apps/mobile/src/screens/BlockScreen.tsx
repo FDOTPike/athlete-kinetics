@@ -1,31 +1,24 @@
 /**
- * BlockScreen.tsx - the COACH surface.
+ * BlockScreen.tsx - the COACH surface (§1j).
  *
  * Coaching information is arranged around one immediate decision, a compact
- * four-week trajectory, and inline disclosures for management and context.
+ * four-week trajectory (liquid calendar), and inline disclosures for management and context.
  */
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SCHEMA_TYPES, targetLoadKg, type SchemaType } from '@ak/inference';
 import {
-  palette,
   useStore,
   type BlockSessionSummary,
   type TodaySlot,
 } from '../state/useStore';
+import { theme } from '../theme/theme';
 import {
-  Body,
-  Caption,
+  PrimaryButton,
+  SecondaryButton,
+  Chip,
   Disclosure,
-  FocusCard,
-  PrimaryAction,
-  ProgressRow,
-  Screen,
-  SecondaryAction,
-  Section,
-  StatusMark,
-  type FocusTone,
-} from '../components/FocusPrimitives';
+} from '../components/ui';
 
 const FOCUS_ABBREV: Record<string, string> = {
   lower: 'LWR',
@@ -87,6 +80,7 @@ function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): strin
     load === null ? '' : `, ${load.toFixed(1)} kg`
   }`;
 }
+
 function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
   return [1, 2, 3, 4].map((week) => {
     const inWeek = sessions.filter((session) => session.weekIndex === week);
@@ -131,9 +125,13 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   if (vector === null) {
     return (
       <View style={styles.center}>
-        <FocusCard eyebrow="COACH" title="Readiness is needed first" tone="caution">
-          <Body>Sync telemetry or load the demo athlete before asking Coach to adjust today\'s plan.</Body>
-        </FocusCard>
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>COACH</Text>
+          <Text style={styles.cardTitle}>Readiness is needed first</Text>
+          <Text style={styles.bodyText}>
+            Sync telemetry or load the demo athlete before asking Coach to adjust today's plan.
+          </Text>
+        </View>
       </View>
     );
   }
@@ -173,81 +171,95 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   let todayMessage = nextPlanned === undefined
     ? 'There is no session to complete today. Use the day to recover.'
     : `There is no session to complete today. Your next session is ${focusName(nextPlanned.focus)}.`;
-  let todayTone: FocusTone = 'default';
 
   if (halted) {
     todayTitle = 'Training is paused';
     todayMessage = 'Today\'s safety report paused training. Review it before doing more work.';
-    todayTone = 'danger';
   } else if (session !== null) {
     todayTitle = 'Session in progress';
     todayMessage = 'Your active workout is ready to resume.';
-    todayTone = 'active';
   } else if (todayPlan !== null) {
     todayTitle = `Today: ${focusName(todayPlan.focus)}`;
     todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
-    todayTone = 'active';
   } else if (block === null) {
     todayTitle = 'Build your first block';
     todayMessage = 'A short four-week block gives Coach a clear trajectory to follow.';
-    todayTone = 'default';
   }
 
   return (
-    <Screen testID="coach-screen">
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} testID="coach-screen">
+      {/* Header Wordmark */}
+      <View style={styles.header}>
+        <Text style={styles.wordmark}>pikeMethods</Text>
+      </View>
+
+      {/* Safety Halt Card if halted */}
       {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
-        <FocusCard eyebrow="SAFETY" title="Stop training today" tone="danger" style={styles.haltCard}>
-          <Body>{lastTriage.directive.vector.coaching_cue}</Body>
+        <View style={[styles.card, styles.haltCard]}>
+          <Text style={styles.eyebrow}>SAFETY</Text>
+          <Text style={styles.cardTitle}>Stop training today</Text>
+          <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
           {lastTriage.directive.followUp !== null && (
-            <Caption style={styles.followUp}>{lastTriage.directive.followUp}</Caption>
+            <Text style={styles.followUpText}>{lastTriage.directive.followUp}</Text>
           )}
-        </FocusCard>
+        </View>
       )}
 
-      <FocusCard eyebrow="TODAY" title={todayTitle} tone={todayTone}>
-        <StatusMark
-          label={
-            halted
-              ? 'Training paused'
-              : session !== null
-                ? 'Active session'
-                : todayPlan !== null
-                  ? 'Planned session'
-                  : block === null
-                    ? 'Plan needed'
-                    : 'Recovery day'
-          }
-          tone={todayTone}
-        />
-        <Body>{todayMessage}</Body>
-        {current !== null && !halted && <Caption style={styles.adjusted}>Coach adjusted today\'s plan.</Caption>}
-
-        {halted ? (
-          <PrimaryAction label="Review safety report" onPress={() => setReportOpen(true)} />
-        ) : session !== null ? (
-          <PrimaryAction label="Open active session" onPress={() => onSessionStarted?.()} />
-        ) : todayPlan !== null ? (
-          <PrimaryAction label="Start session" onPress={startPlannedSession} />
-        ) : block === null ? (
-          <PrimaryAction label="Set up a four-week block" onPress={() => setManageOpen(true)} />
-        ) : (
-          <PrimaryAction
-            label={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
-            onPress={openNextSession}
-          />
+      {/* Today Focus Card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.eyebrow}>TODAY</Text>
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusBadgeText}>
+              {halted
+                ? 'Training paused'
+                : session !== null
+                  ? 'Active session'
+                  : todayPlan !== null
+                    ? 'Planned session'
+                    : block === null
+                      ? 'Plan needed'
+                      : 'Recovery day'}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.cardTitle}>{todayTitle}</Text>
+        <Text style={styles.bodyText}>{todayMessage}</Text>
+        {current !== null && !halted && (
+          <Text style={styles.adjustedText}>Coach adjusted today's plan.</Text>
         )}
-      </FocusCard>
 
-      <Section title="Four-week trajectory">
+        <View style={styles.cardActionRow}>
+          {halted ? (
+            <PrimaryButton label="Review safety report" onPress={() => setReportOpen(true)} accessibilityLabel="Review safety report" />
+          ) : session !== null ? (
+            <PrimaryButton label="Open active session" onPress={() => onSessionStarted?.()} accessibilityLabel="Open active session" />
+          ) : todayPlan !== null ? (
+            <PrimaryButton label="Start session" onPress={startPlannedSession} accessibilityLabel="Start session" />
+          ) : block === null ? (
+            <PrimaryButton label="Set up a four-week block" onPress={() => setManageOpen(true)} accessibilityLabel="Set up a four-week block" />
+          ) : (
+            <PrimaryButton
+              label={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
+              onPress={openNextSession}
+              accessibilityLabel={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
+            />
+          )}
+        </View>
+      </View>
+
+      {/* Four-week trajectory Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Four-week trajectory</Text>
         {block === null ? (
           <View style={styles.emptyTrajectory}>
-            <Body>No block is active yet.</Body>
-            <Caption>Set one up below when you are ready to train with a trajectory.</Caption>
+            <Text style={styles.bodyText}>No block is active yet.</Text>
+            <Text style={styles.captionText}>Set one up below when you are ready to train with a trajectory.</Text>
           </View>
         ) : (
           <>
             {rows.map((row) => (
-              <View key={row.week}>
+              <View key={row.week} style={styles.weekContainer}>
                 <View style={styles.weekRow}>
                   <View style={styles.weekMeta}>
                     <Text style={styles.weekTitle}>Week {row.week}</Text>
@@ -301,53 +313,75 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                       {detail.summary.trained ? ' - completed' : ''}
                     </Text>
                     {detail.slots.map((slot) => (
-                      <ProgressRow
-                        key={slot.slotIndex}
-                        label={slot.movementName}
-                        value={targetLabel(slot)}
-                        detail={`RPE ${slot.targetRpe.toFixed(1)}`}
-                      />
+                      <View key={slot.slotIndex} style={styles.slotRow}>
+                        <View style={styles.slotMain}>
+                          <Text style={styles.slotName}>{slot.movementName}</Text>
+                          <View style={styles.slotDetails}>
+                            <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
+                            <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
+                          </View>
+                        </View>
+                        {slot.overrideLoadKg !== null && (
+                          <Chip label="SUBSTITUTED" selected={false} onPress={() => {}} />
+                        )}
+                      </View>
                     ))}
-                    <SecondaryAction label="Close session preview" onPress={() => setDetail(null)} />
+                    <SecondaryButton label="Close session preview" onPress={() => setDetail(null)} accessibilityLabel="Close session preview" />
                   </View>
                 )}
               </View>
             ))}
-            <Caption style={styles.trajectoryHint}>Tap a planned day to see its movements.</Caption>
+            <Text style={styles.trajectoryHint}>Tap a planned day to see its movements.</Text>
           </>
         )}
-      </Section>
+      </View>
 
-      <Section title="Optional details">
+      {/* Disclosures Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Optional details</Text>
         <Disclosure label="Why today changed" hint="Adjustment source and limits">
           {current === null ? (
-            <Caption>No extra adjustment is active for today.</Caption>
+            <Text style={styles.captionText}>No extra adjustment is active for today.</Text>
           ) : (
-            <>
-              <ProgressRow label="Source" value={current.source} />
-              <ProgressRow label="Load" value={`x${current.vector.load_modifier.toFixed(2)}`} />
-              <ProgressRow label="Sets" value={signed(current.vector.set_modifier)} />
-              <ProgressRow label="RPE cap" value={current.vector.rpe_cap.toFixed(1)} />
+            <View style={styles.disclosureContent}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Source</Text>
+                <Text style={styles.infoValue}>{current.source}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Load</Text>
+                <Text style={styles.infoValue}>x{current.vector.load_modifier.toFixed(2)}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Sets</Text>
+                <Text style={styles.infoValue}>{signed(current.vector.set_modifier)}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>RPE cap</Text>
+                <Text style={styles.infoValue}>{current.vector.rpe_cap.toFixed(1)}</Text>
+              </View>
               {profileNotes.map((note) => (
-                <Caption key={note} style={styles.profileNote}>{note}</Caption>
+                <Text key={note} style={styles.profileNoteText}>{note}</Text>
               ))}
-            </>
+            </View>
           )}
         </Disclosure>
 
         {todayPlan !== null && (
-          <Disclosure label="Preview today\'s session" hint="Movement targets before you start">
-            <Caption>
-              {focusName(todayPlan.focus)} - {phaseLabel(todayPlan.phase)}
-            </Caption>
-            {todayPlan.slots.map((slot) => (
-              <ProgressRow
-                key={slot.slotIndex}
-                label={slot.movementName}
-                value={targetLabel(slot)}
-                detail={slotTarget(slot, oneRepMaxes)}
-              />
-            ))}
+          <Disclosure label="Preview today's session" hint="Movement targets before you start">
+            <View style={styles.disclosureContent}>
+              <Text style={styles.captionText}>
+                {focusName(todayPlan.focus)} - {phaseLabel(todayPlan.phase)}
+              </Text>
+              {todayPlan.slots.map((slot) => (
+                <View key={slot.slotIndex} style={styles.slotRow}>
+                  <View style={styles.slotMain}>
+                    <Text style={styles.slotName}>{slot.movementName}</Text>
+                    <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           </Disclosure>
         )}
 
@@ -357,295 +391,513 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           open={manageOpen}
           onOpenChange={setManageOpen}
         >
-          {block !== null ? (
-            <Caption>
-              {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
-              {blockMeta !== null
-                ? ` - ${blockMeta.schemaType} - macro block ${blockMeta.macroBlockIndex} of 8`
-                : ''}
-            </Caption>
-          ) : (
-            <Caption>
-              Coach will build from your objective, equipment, and weekly frequency.
-            </Caption>
-          )}
-          {blockMeta?.peakShifted === true && (
-            <Caption style={styles.peakShift}>
-              Coach inserted a deload week before the peak because fatigue was high.
-            </Caption>
-          )}
-          <Text style={styles.schemaLabel}>Choose a loading structure</Text>
-          <View style={styles.schemaRow}>
-            {SCHEMA_TYPES.map((type) => {
-              const selected = type === schema;
-              return (
-                <Pressable
-                  key={type}
-                  onPress={() => setSchema(type)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`${type} loading structure`}
-                  style={[styles.schemaChip, selected && styles.schemaChipSelected]}
-                >
-                  <Text style={[styles.schemaChipText, selected && styles.schemaChipTextSelected]}>
-                    {type}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {!confirmRegenerate ? (
-            <PrimaryAction
-              label={block === null ? 'Create four-week block' : 'Generate next block'}
-              onPress={() => {
-                if (block === null) {
-                  generateNewBlock(schema);
-                  setManageOpen(false);
-                } else {
-                  setConfirmRegenerate(true);
-                }
-              }}
-            />
-          ) : (
-            <View style={styles.confirmation}>
-              <Body>This archives the current block and starts the next one today.</Body>
-              <PrimaryAction
-                label="Generate next block now"
-                onPress={() => {
-                  setDetail(null);
-                  generateNewBlock(schema);
-                  setConfirmRegenerate(false);
-                  setManageOpen(false);
-                }}
-              />
-              <SecondaryAction label="Keep current block" onPress={() => setConfirmRegenerate(false)} />
+          <View style={styles.disclosureContent}>
+            {block !== null ? (
+              <Text style={styles.captionText}>
+                {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
+                {blockMeta !== null
+                  ? ` - ${blockMeta.schemaType} - macro block ${blockMeta.macroBlockIndex} of 8`
+                  : ''}
+              </Text>
+            ) : (
+              <Text style={styles.captionText}>
+                Coach will build from your objective, equipment, and weekly frequency.
+              </Text>
+            )}
+            {blockMeta?.peakShifted === true && (
+              <Text style={styles.peakShiftText}>
+                Coach inserted a deload week before the peak because fatigue was high.
+              </Text>
+            )}
+            <Text style={styles.schemaLabel}>Choose a loading structure</Text>
+            <View style={styles.schemaRow}>
+              {SCHEMA_TYPES.map((type) => {
+                const selected = type === schema;
+                return (
+                  <Pressable
+                    key={type}
+                    onPress={() => setSchema(type)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${type} loading structure`}
+                    style={[styles.schemaChip, selected && styles.schemaChipSelected]}
+                  >
+                    <Text style={[styles.schemaChipText, selected && styles.schemaChipTextSelected]}>
+                      {type}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          )}
 
-          {(block === null || todayPlan === null) && !halted && session === null && (
-            <Disclosure label="Start without a planned session" tone="caution">
-              {!confirmUnplannedStart ? (
-                <>
-                  <Caption>
-                    This starts a session without the day\'s planned exercise order.
-                  </Caption>
-                  <SecondaryAction
-                    label="Start an unplanned session"
-                    onPress={() => setConfirmUnplannedStart(true)}
-                  />
-                </>
-              ) : (
-                <>
-                  <Body>Start a session without a planned workout?</Body>
-                  <PrimaryAction label="Start unplanned session" onPress={startUnplannedSession} />
-                  <SecondaryAction label="Cancel" onPress={() => setConfirmUnplannedStart(false)} />
-                </>
-              )}
-            </Disclosure>
-          )}
+            {!confirmRegenerate ? (
+              <PrimaryButton
+                label={block === null ? 'Create four-week block' : 'Generate next block'}
+                onPress={() => {
+                  if (block === null) {
+                    generateNewBlock(schema);
+                    setManageOpen(false);
+                  } else {
+                    setConfirmRegenerate(true);
+                  }
+                }}
+                accessibilityLabel={block === null ? 'Create four-week block' : 'Generate next block'}
+              />
+            ) : (
+              <View style={styles.confirmation}>
+                <Text style={styles.bodyText}>This archives the current block and starts the next one today.</Text>
+                <PrimaryButton
+                  label="Generate next block now"
+                  onPress={() => {
+                    setDetail(null);
+                    generateNewBlock(schema);
+                    setConfirmRegenerate(false);
+                    setManageOpen(false);
+                  }}
+                  accessibilityLabel="Generate next block now"
+                />
+                <SecondaryButton label="Keep current block" onPress={() => setConfirmRegenerate(false)} accessibilityLabel="Keep current block" />
+              </View>
+            )}
+
+            {(block === null || todayPlan === null) && !halted && session === null && (
+              <Disclosure label="Start without a planned session">
+                <View style={styles.disclosureContent}>
+                  {!confirmUnplannedStart ? (
+                    <>
+                      <Text style={styles.captionText}>
+                        This starts a session without the day's planned exercise order.
+                      </Text>
+                      <SecondaryButton
+                        label="Start an unplanned session"
+                        onPress={() => setConfirmUnplannedStart(true)}
+                        accessibilityLabel="Start an unplanned session"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
+                      <PrimaryButton label="Start unplanned session" onPress={startUnplannedSession} accessibilityLabel="Start unplanned session" />
+                      <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
+                    </>
+                  )}
+                </View>
+              </Disclosure>
+            )}
+          </View>
         </Disclosure>
 
         <Disclosure
           label="Something feels off"
           hint="Add a subjective report only when you need Coach to adapt"
-          tone={halted ? 'danger' : 'caution'}
           open={reportOpen}
           onOpenChange={setReportOpen}
         >
-          {!triageReady && (
-            <Caption>
-              Semantic matching is unavailable in this build. Injury-language safety checks still apply.
-            </Caption>
-          )}
-          <TextInput
-            style={styles.reportInput}
-            value={reportText}
-            onChangeText={setReportText}
-            placeholder="For example: my knee feels sore when I squat"
-            placeholderTextColor={palette.dim}
-            maxLength={500}
-            multiline
-            accessibilityLabel="Describe how your body feels today"
-          />
-          <Text style={styles.severityLabel}>Severity from 1 to 10</Text>
-          <View style={styles.severityRow}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((severity) => {
-              const selected = reportSeverity === severity;
-              const high = severity >= 7;
-              return (
-                <Pressable
-                  key={severity}
-                  onPress={() => setReportSeverity(severity)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`Severity ${severity} of 10`}
-                  style={[
-                    styles.severityChip,
-                    selected && (high ? styles.severityChipHigh : styles.severityChipSelected),
-                  ]}
-                >
-                  <Text style={[styles.severityText, selected && styles.severityTextSelected]}>{severity}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <PrimaryAction
-            label={triaging ? 'Checking report' : 'Apply report'}
-            disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
-            onPress={() => {
-              if (reportSeverity === null) return;
-              void reportSubjective(reportText, reportSeverity).then(() => {
-                setReportText('');
-                setReportSeverity(null);
-              });
-            }}
-          />
+          <View style={styles.disclosureContent}>
+            {!triageReady && (
+              <Text style={styles.captionText}>
+                Semantic matching is unavailable in this build. Injury-language safety checks still apply.
+              </Text>
+            )}
+            <TextInput
+              style={styles.reportInput}
+              value={reportText}
+              onChangeText={setReportText}
+              placeholder="For example: my knee feels sore when I squat"
+              placeholderTextColor={theme.color.textLow}
+              maxLength={500}
+              multiline
+              accessibilityLabel="Describe how your body feels today"
+            />
+            <Text style={styles.severityLabel}>Severity from 1 to 10</Text>
+            <View style={styles.severityRow}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((severity) => {
+                const selected = reportSeverity === severity;
+                return (
+                  <Pressable
+                    key={severity}
+                    onPress={() => setReportSeverity(severity)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Severity ${severity} of 10`}
+                    style={[
+                      styles.severityChip,
+                      selected && styles.severityChipSelected,
+                    ]}
+                  >
+                    <Text style={[styles.severityText, selected && styles.severityTextSelected]}>{severity}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <PrimaryButton
+              label={triaging ? 'Checking report' : 'Apply report'}
+              disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
+              onPress={() => {
+                if (reportSeverity === null) return;
+                void reportSubjective(reportText, reportSeverity).then(() => {
+                  setReportText('');
+                  setReportSeverity(null);
+                });
+              }}
+              accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
+            />
 
-          {lastTriage !== null && lastTriage.kind === 'positive' && (
-            <View style={styles.reportResult}>
-              <StatusMark label="Noted" tone="success" />
-              <Body>{lastTriage.cue}</Body>
-            </View>
-          )}
-          {lastTriage !== null && lastTriage.kind === 'rejected' && (
-            <View style={styles.reportResult}>
-              <StatusMark label="No change" tone="default" />
-              <Caption>
-                Coach did not match this to a known scenario, so today\'s plan is unchanged.
-              </Caption>
-            </View>
-          )}
-          {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
-            <View style={styles.reportResult}>
-              <StatusMark label="Plan adjusted" tone="caution" />
-              <Body>{lastTriage.directive.vector.coaching_cue}</Body>
-              {lastTriage.directive.followUp !== null && (
-                <Caption>{lastTriage.directive.followUp}</Caption>
-              )}
-            </View>
-          )}
+            {lastTriage !== null && lastTriage.kind === 'positive' && (
+              <View style={styles.reportResult}>
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusBadgeText}>Noted</Text>
+                </View>
+                <Text style={styles.bodyText}>{lastTriage.cue}</Text>
+              </View>
+            )}
+            {lastTriage !== null && lastTriage.kind === 'rejected' && (
+              <View style={styles.reportResult}>
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusBadgeText}>No change</Text>
+                </View>
+                <Text style={styles.captionText}>
+                  Coach did not match this to a known scenario, so today's plan is unchanged.
+                </Text>
+              </View>
+            )}
+            {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
+              <View style={styles.reportResult}>
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusBadgeText}>Plan adjusted</Text>
+                </View>
+                <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
+                {lastTriage.directive.followUp !== null && (
+                  <Text style={styles.captionText}>{lastTriage.directive.followUp}</Text>
+                )}
+              </View>
+            )}
+          </View>
         </Disclosure>
-      </Section>
-    </Screen>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: theme.color.ink0,
+  },
+  screenContent: {
+    padding: theme.space[4],
+    gap: theme.space[4],
+  },
   center: {
     flex: 1,
-    backgroundColor: palette.bg,
+    backgroundColor: theme.color.ink0,
     justifyContent: 'center',
-    padding: 24,
+    padding: theme.space[6],
   },
-  haltCard: { marginBottom: 14 },
-  followUp: { color: palette.text },
-  adjusted: { color: palette.amber },
+  header: {
+    marginBottom: theme.space[2],
+  },
+  wordmark: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+  },
+  card: {
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    padding: theme.space[4],
+    gap: theme.space[2],
+  },
+  haltCard: {
+    marginBottom: theme.space[3],
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  eyebrow: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+  },
+  cardTitle: {
+    ...theme.font.title,
+    color: theme.color.textHi,
+  },
+  bodyText: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+  },
+  captionText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  followUpText: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+  },
+  adjustedText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  statusBadge: {
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+    paddingHorizontal: theme.space[2],
+    paddingVertical: theme.space[1],
+  },
+  statusBadgeText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+  },
+  cardActionRow: {
+    marginTop: theme.space[2],
+  },
+  section: {
+    gap: theme.space[3],
+  },
+  sectionTitle: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+  },
   emptyTrajectory: {
     borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 12,
-    backgroundColor: palette.surface,
-    padding: 16,
-    gap: 8,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+    padding: theme.space[4],
+    gap: theme.space[2],
+  },
+  weekContainer: {
+    gap: theme.space[2],
   },
   weekRow: {
-    minHeight: 54,
+    minHeight: theme.touch.min,
     flexDirection: 'row',
     alignItems: 'stretch',
-    gap: 8,
-    marginBottom: 5,
+    gap: theme.space[2],
   },
-  weekMeta: { width: 78, justifyContent: 'center' },
-  weekTitle: { color: palette.text, fontSize: 14, fontWeight: '800' },
-  weekPhase: { color: palette.dim, fontSize: 11, marginTop: 2 },
-  dayRail: { flex: 1, flexDirection: 'row', gap: 4 },
+  weekMeta: {
+    width: 78,
+    justifyContent: 'center',
+  },
+  weekTitle: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+  },
+  weekPhase: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+    marginTop: theme.space[1],
+  },
+  dayRail: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: theme.space[1],
+  },
   dayMark: {
     flex: 1,
     minWidth: 0,
+    minHeight: theme.touch.min,
     borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 8,
-    backgroundColor: palette.surface,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+    backgroundColor: theme.color.ink1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: theme.space[1],
   },
-  dayMarkPressed: { backgroundColor: '#1A1A20' },
-  dayMarkRest: { backgroundColor: 'transparent' },
-  dayMarkTrained: { borderColor: palette.green, backgroundColor: '#10241D' },
-  dayMarkToday: { borderColor: palette.amber, borderWidth: 2 },
-  dayMarkExpanded: { borderColor: palette.text },
-  dayMarkText: { color: palette.text, fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  dayMarkTextTrained: { color: palette.green },
-  dayMarkTextToday: { color: palette.amber },
-  dayMarkRestText: { color: palette.line, fontSize: 16 },
-  trajectoryHint: { marginTop: 6 },
+  dayMarkPressed: {
+    backgroundColor: theme.color.pressed,
+  },
+  dayMarkRest: {
+    backgroundColor: 'transparent',
+    borderColor: theme.color.line,
+  },
+  dayMarkTrained: {
+    borderColor: theme.color.line,
+    backgroundColor: theme.color.ink1,
+  },
+  dayMarkToday: {
+    borderColor: theme.color.chalk,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.color.chalk,
+    backgroundColor: theme.color.ink1,
+  },
+  dayMarkExpanded: {
+    borderColor: theme.color.textHi,
+  },
+  dayMarkText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+    textAlign: 'center',
+  },
+  dayMarkTextTrained: {
+    color: theme.color.textHi,
+  },
+  dayMarkTextToday: {
+    color: theme.color.chalk,
+  },
+  dayMarkRestText: {
+    ...theme.font.body,
+    color: theme.color.line,
+  },
+  trajectoryHint: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+    marginTop: theme.space[1],
+  },
   sessionDetail: {
-    backgroundColor: palette.surface,
+    backgroundColor: theme.color.ink1,
     borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 12,
-    marginBottom: 12,
-    padding: 14,
-    gap: 8,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    padding: theme.space[4],
+    gap: theme.space[3],
   },
-  sessionDetailTitle: { color: palette.text, fontSize: 15, fontWeight: '800' },
-  profileNote: { color: palette.amber },
-  peakShift: { color: palette.amber },
-  schemaLabel: { color: palette.dim, fontSize: 13, fontWeight: '700' },
-  schemaRow: { flexDirection: 'row', gap: 8 },
+  sessionDetailTitle: {
+    ...theme.font.cue,
+    color: theme.color.textHi,
+  },
+  slotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: theme.space[2],
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.line,
+  },
+  slotMain: {
+    flex: 1,
+    gap: theme.space[1],
+  },
+  slotName: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+  },
+  slotDetails: {
+    flexDirection: 'row',
+    gap: theme.space[2],
+  },
+  slotValue: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+  },
+  slotTarget: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  disclosureContent: {
+    gap: theme.space[3],
+    paddingTop: theme.space[2],
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: theme.space[1],
+  },
+  infoLabel: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+  },
+  infoValue: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+  },
+  profileNoteText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  peakShiftText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  schemaLabel: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  schemaRow: {
+    flexDirection: 'row',
+    gap: theme.space[2],
+  },
   schemaChip: {
     flex: 1,
-    minHeight: 44,
-    borderRadius: 10,
+    minHeight: theme.touch.min,
+    borderRadius: theme.radius.chip,
     borderWidth: 1,
-    borderColor: palette.line,
+    borderColor: theme.color.line,
+    backgroundColor: theme.color.ink1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  schemaChipSelected: { borderColor: palette.green, backgroundColor: '#10241D' },
-  schemaChipText: { color: palette.dim, fontSize: 12, fontWeight: '800' },
-  schemaChipTextSelected: { color: palette.green },
+  schemaChipSelected: {
+    borderColor: theme.color.textHi,
+    backgroundColor: theme.color.textHi,
+  },
+  schemaChipText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+  },
+  schemaChipTextSelected: {
+    color: theme.color.ink0,
+  },
   confirmation: {
     borderWidth: 1,
-    borderColor: palette.amber,
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    padding: theme.space[3],
+    gap: theme.space[3],
   },
   reportInput: {
     minHeight: 82,
-    borderRadius: 10,
+    borderRadius: theme.radius.control,
     borderWidth: 1,
-    borderColor: palette.line,
-    backgroundColor: palette.bg,
-    color: palette.text,
-    fontSize: 16,
-    lineHeight: 22,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: theme.color.line,
+    backgroundColor: theme.color.ink0,
+    color: theme.color.textHi,
+    fontSize: theme.font.body.fontSize,
+    lineHeight: theme.font.body.lineHeight,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[3],
     textAlignVertical: 'top',
   },
-  severityLabel: { color: palette.text, fontSize: 14, fontWeight: '700' },
-  severityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  severityLabel: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+  },
+  severityRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
   severityChip: {
-    width: 42,
-    minHeight: 44,
-    borderRadius: 8,
+    width: 44,
+    minHeight: theme.touch.min,
+    borderRadius: theme.radius.chip,
     borderWidth: 1,
-    borderColor: palette.line,
+    borderColor: theme.color.line,
+    backgroundColor: theme.color.ink1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  severityChipSelected: { borderColor: palette.amber, backgroundColor: '#2A210F' },
-  severityChipHigh: { borderColor: palette.red, backgroundColor: '#2A1416' },
-  severityText: { color: palette.dim, fontSize: 15, fontWeight: '800' },
-  severityTextSelected: { color: palette.text },
+  severityChipSelected: {
+    borderColor: theme.color.textHi,
+    backgroundColor: theme.color.textHi,
+  },
+  severityText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  severityTextSelected: {
+    color: theme.color.ink0,
+  },
   reportResult: {
     borderTopWidth: 1,
-    borderTopColor: palette.line,
-    paddingTop: 12,
-    gap: 8,
+    borderTopColor: theme.color.line,
+    paddingTop: theme.space[3],
+    gap: theme.space[2],
   },
-});
+});

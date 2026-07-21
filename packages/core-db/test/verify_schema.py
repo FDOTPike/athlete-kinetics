@@ -689,5 +689,127 @@ p17.execute("""INSERT INTO profile_ui_preference
 p17.execute("DELETE FROM profile_slot WHERE slot_id=99")
 check("profile-slot delete cascades its UI preferences",
       p17.execute("SELECT count(*) c FROM profile_ui_preference WHERE profile_slot_id=99").fetchone()["c"] == 0)
+# --- 19. Phase 18 immutable training-decision side-cars ----------------------
+print("\n[19] Phase 18 immutable training-decision side-cars (026)")
+dose_columns = [r["name"] for r in p17.execute("PRAGMA table_info(set_dose_target)")]
+check("dose snapshot stores only the reps/time union",
+      dose_columns == ["set_id", "target_kind", "target_reps", "target_seconds"],
+      str(dose_columns))
+check("dose snapshot has no RPE, load, or band judgment columns",
+      all(token not in " ".join(dose_columns).lower() for token in ("rpe", "load", "band")))
+
+for session_id in range(2600, 2611):
+    p17.execute("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (?, '2026-07-16', 1000)",
+                (session_id,))
+for set_id in range(2600, 2604):
+    p17.execute("""INSERT INTO set_record
+        (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms)
+        VALUES (?, 2600, ?, ?, 1, 0, 8, 1100)""",
+        (set_id, plank_id, set_id - 2599))
+p17.execute("INSERT INTO set_dose_target (set_id, target_kind, target_reps) VALUES (2600, 'reps', 5)")
+p17.execute("INSERT INTO set_dose_target (set_id, target_kind, target_seconds) VALUES (2601, 'time', 30)")
+doses = [tuple(r) for r in p17.execute("""
+    SELECT set_id, target_kind, target_reps, target_seconds
+    FROM set_dose_target ORDER BY set_id
+""")]
+check("repetition and timed dose snapshots round-trip exactly",
+      doses == [(2600, "reps", 5, None), (2601, "time", None, 30)], str(doses))
+for label, statement in [
+    ("mixed reps/time dose", "INSERT INTO set_dose_target (set_id, target_kind, target_reps, target_seconds) VALUES (2602, 'reps', 5, 30)"),
+    ("missing timed dose", "INSERT INTO set_dose_target (set_id, target_kind) VALUES (2603, 'time')"),
+]:
+    try:
+        p17.execute(statement)
+        check(f"026 rejects {label}", False)
+    except sqlite3.IntegrityError:
+        check(f"026 rejects {label}", True)
+for label, statement in [
+    ("dose UPDATE", "UPDATE set_dose_target SET target_reps=8 WHERE set_id=2600"),
+    ("dose REPLACE", "INSERT OR REPLACE INTO set_dose_target (set_id, target_kind, target_reps) VALUES (2600, 'reps', 8)"),
+    ("direct dose DELETE", "DELETE FROM set_dose_target WHERE set_id=2600"),
+]:
+    try:
+        p17.execute(statement)
+        check(f"immutability trigger rejects {label}", False)
+    except sqlite3.IntegrityError:
+        check(f"immutability trigger rejects {label}", True)
+p17.execute("DELETE FROM set_record WHERE set_id=2601")
+check("set-record parent deletion cascades its immutable dose snapshot",
+      p17.execute("SELECT count(*) c FROM set_dose_target WHERE set_id=2601").fetchone()["c"] == 0)
+
+P18_OUTCOME_SQL = """INSERT INTO session_outcome (
+    session_id, outcome_kind, terminal_phase, halt_reason, origin_kind,
+    session_mode, training_age, slot_count, planned_set_count, logged_set_count,
+    exact_dose_count, under_dose_count, over_dose_count, unknown_dose_count,
+    unmapped_set_count, missing_set_count, missing_unskipped_set_count,
+    extra_set_count, adapted_slot_count, skipped_slot_count, off_plan_slot_count,
+    finalized_at_ms, engine_version
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+def p18_outcome_row(session_id, kind, phase, halt_reason, evidence, origin="planned"):
+    return (session_id, kind, phase, halt_reason, origin, "guided", "beginner",
+            *evidence, 2600000 + session_id, 1)
+P18_FOLLOWED = (1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+P18_EMPTY = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+P18_ADAPTED = (1, 2, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0)
+P18_UNMAPPED_OFF_PLAN = (0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1)
+
+p17.execute(P18_OUTCOME_SQL,
+            p18_outcome_row(2600, "followed_plan", "complete", None, P18_FOLLOWED))
+p17.execute(P18_OUTCOME_SQL,
+            p18_outcome_row(2601, "stopped_safely", "halted", "niggle", P18_EMPTY))
+p17.execute(P18_OUTCOME_SQL,
+            p18_outcome_row(2609, "adapted_session", "complete", None, P18_ADAPTED))
+p17.execute(P18_OUTCOME_SQL,
+            p18_outcome_row(2610, "session_recorded", "complete", None, P18_UNMAPPED_OFF_PLAN))
+outcomes = [tuple(r) for r in p17.execute("""
+    SELECT session_id, outcome_kind, terminal_phase, halt_reason
+    FROM session_outcome ORDER BY session_id
+""")]
+check("complete, adapted, directive-halt, and unmapped neutral outcomes round-trip",
+      outcomes == [
+        (2600, "followed_plan", "complete", None),
+        (2601, "stopped_safely", "halted", "niggle"),
+        (2609, "adapted_session", "complete", None),
+        (2610, "session_recorded", "complete", None),
+      ], str(outcomes))
+
+invalid_outcomes = [
+    ("zero-set manual halt", p18_outcome_row(2602, "stopped_safely", "halted", "manual", P18_EMPTY)),
+    ("zero-set completion", p18_outcome_row(2603, "session_recorded", "complete", None, P18_EMPTY)),
+    ("terminal/label mismatch", p18_outcome_row(2604, "followed_plan", "halted", "safety", P18_FOLLOWED)),
+    ("negative evidence", p18_outcome_row(2605, "session_recorded", "complete", None,
+        (0, 0, 1, -1, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0))),
+    ("impossible per-slot set count", p18_outcome_row(2606, "session_recorded", "complete", None,
+        (1, 101, 1, 1, 0, 0, 0, 0, 100, 100, 0, 0, 0, 0))),
+    ("unknown outcome kind", p18_outcome_row(2607, "rewarded", "complete", None, P18_FOLLOWED)),
+    ("unknown halt reason", p18_outcome_row(2608, "stopped_safely", "halted", "ego", P18_EMPTY)),
+]
+for label, row in invalid_outcomes:
+    try:
+        p17.execute(P18_OUTCOME_SQL, row)
+        check(f"026 rejects {label}", False)
+    except sqlite3.IntegrityError:
+        check(f"026 rejects {label}", True)
+
+replace_followed = P18_OUTCOME_SQL.replace("INSERT INTO", "INSERT OR REPLACE INTO", 1)
+for label, statement, params in [
+    ("outcome UPDATE", "UPDATE session_outcome SET outcome_kind='session_recorded' WHERE session_id=2600", ()),
+    ("outcome REPLACE", replace_followed, p18_outcome_row(2600, "session_recorded", "complete", None, P18_FOLLOWED)),
+    ("direct outcome DELETE", "DELETE FROM session_outcome WHERE session_id=2600", ()),
+]:
+    try:
+        p17.execute(statement, params)
+        check(f"immutability trigger rejects {label}", False)
+    except sqlite3.IntegrityError:
+        check(f"immutability trigger rejects {label}", True)
+
+p17.execute("DELETE FROM session WHERE session_id=2600")
+p17.execute("DELETE FROM session WHERE session_id=2601")
+children = p17.execute("""
+    SELECT (SELECT count(*) FROM set_dose_target WHERE set_id BETWEEN 2600 AND 2603)
+         + (SELECT count(*) FROM session_outcome WHERE session_id IN (2600,2601)) AS c
+""").fetchone()["c"]
+check("parent set/session deletion cascades both immutable Phase 18 side-cars",
+      children == 0, str(children))
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

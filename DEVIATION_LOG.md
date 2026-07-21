@@ -1,6 +1,26 @@
 # Deviation Log
 
 Architectural deviations from product mandates, with rationale. Newest first.
+## 2026-07-17 — Phase 18 (Training Decision Record)
+
+1. **The rewards roadmap is superseded by neutral, immutable session outcomes.**
+   Phase 18 records one of followed_plan, adapted_session, stopped_safely, or
+   session_recorded; it does not award points, badges, streaks, levels, ratios,
+   or adherence scores. Classification uses only athlete-controlled dose
+   (sets, reps, or seconds). RPE, load, band choice, rest behaviour, training
+   age, and session mode remain evidence/context and are never judged.
+
+2. **Recognition is prescription-inert by construction.** The outcome engine is
+   pure and the store writes its decision only during atomic session
+   finalization. APRE and state-vector updates remain independent existing
+   paths, driven from the session's persisted planned origin and logged work;
+   neither reads nor branches on session_outcome.
+
+3. **Empty manual stops are disposable.** A zero-set outcome is durable only
+   when a persisted niggle, pain, or safety directive halted the session.
+   Empty completions and accidental zero-set manual stops delete the session
+   shell and create no outcome row.
+
 
 ## 2026-07-12 — Phase 15 (Onboarding + Coach Mode)
 

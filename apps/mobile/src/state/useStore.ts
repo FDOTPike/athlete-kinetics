@@ -11,6 +11,7 @@
  *     lookups — same read surface as the SLM) and writes ONLY through the
  *     DAO statements below, which mirror packages/core-db.
  */
+import { theme } from '../theme/theme';
 import { create } from 'zustand';
 import type { DB } from '@op-engineering/op-sqlite';
 import {
@@ -78,6 +79,7 @@ import {
   resolveActiveRung,
   type RungResolution,
   targetLoadKg,
+  evaluateSessionOutcome,
   advance as advanceSessionRunner,
   currentSlot as currentRunnerSlot,
   deserializeRunner,
@@ -85,6 +87,11 @@ import {
   startRunner,
   type RunnerHaltReason,
   type RunnerState,
+  type RunnerTarget,
+  type SessionOutcomeDecision,
+  type SessionOutcomeInput,
+  type SessionOutcomeOriginKind,
+  type SessionOutcomeProvenanceKind,
   type Prescription,
   type ProfileContext,
   type SchemaType,
@@ -102,15 +109,26 @@ import phraseVectorsJson from '../../../../packages/inference/assets/phrase-code
 // ---------------------------------------------------------------------------
 // Shared dark palette (sweaty-hands UI: high contrast, zero decoration)
 // ---------------------------------------------------------------------------
+// pikeMethods visual system (theme.ts is canonical; this legacy palette is
+// remapped onto it so every existing screen reskins at once). The old
+// traffic-light keys are DEPRECATED aliases: no red/amber/green exists in the
+// design — halts and finishes carry equal weight by construction. Screen-level
+// work orders retire these aliases; new code imports { theme } directly.
 export const palette = {
-  bg: '#0B0B0E',
-  surface: '#15151A',
-  line: '#26262E',
-  text: '#F4F4F6',
-  dim: '#86868F',
-  green: '#2EE6A8',
-  amber: '#FFB454',
-  red: '#FF5D5D',
+  bg: theme.color.ink0,
+  surface: theme.color.ink1,
+  line: theme.color.line,
+  text: theme.color.textHi,
+  dim: theme.color.textMid,
+  faint: theme.color.textLow,
+  chalk: theme.color.chalk,
+  onChalk: theme.color.onChalk,
+  /** @deprecated traffic-light era — now the single accent. */
+  green: theme.color.chalk,
+  /** @deprecated traffic-light era — now neutral secondary. */
+  amber: theme.color.textMid,
+  /** @deprecated traffic-light era — now plain high-emphasis text. */
+  red: theme.color.textHi,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -499,6 +517,9 @@ interface KineticsStore {
    *  slots. The caller is expected to confirm first (the UI shows an alert).
    *  Returns true if it actually cleared anything. */
   resetTrainingData: () => boolean;
+  dismissOutcome: () => void;
+  loadSessionOutcome: (sessionId: number) => { outcomeKind: string; finalizedAtMs: number } | null;
+  loadRecentOutcomes: (limit?: number) => { outcomeKind: string; finalizedAtMs: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -925,6 +946,247 @@ const persistRunnerCheckpoint = (
   );
 };
 
+interface FinalizationLoggedSet {
+  readonly setId: number;
+  readonly movementId: number;
+  readonly sessionPlanSlotId: number | null;
+  readonly sourcePlannedSlotId: number | null;
+  readonly reps: number;
+  readonly rpe: number | null;
+}
+
+interface SessionFinalizationSnapshot {
+  readonly sessionDate: string;
+  readonly startedAtMs: number | null;
+  readonly originKind: SessionOutcomeOriginKind;
+  readonly sourcePlannedSessionId: number | null;
+  readonly sessionMode: SessionMode;
+  readonly runner: RunnerState;
+  readonly hasPersistedSafetyHalt: boolean;
+  readonly slots: SessionOutcomeInput['slots'];
+  readonly sets: SessionOutcomeInput['sets'];
+  readonly loggedSets: readonly FinalizationLoggedSet[];
+}
+
+const doseFromFields = (
+  kind: string | null,
+  reps: number | null,
+  seconds: number | null,
+): RunnerTarget | null => {
+  if (kind === 'reps' && Number.isInteger(reps) && reps !== null && reps >= 1 && reps <= 100) {
+    return { kind: 'reps', reps };
+  }
+  if (kind === 'time' && Number.isInteger(seconds) && seconds !== null && seconds >= 1 && seconds <= 7200) {
+    return { kind: 'time', seconds };
+  }
+  return null;
+};
+
+/** Read every Phase 18 classification input from SQLite while the caller's
+ * finalization transaction is open. Historical rows without 026 snapshots
+ * remain present through LEFT JOINs and therefore classify as unknown. */
+const hydrateSessionFinalization = (d: DB, sessionId: number): SessionFinalizationSnapshot => {
+  const checkpoint = rowsOf<{
+    session_mode: string;
+    phase: string;
+    runner_state_json: string;
+    session_date: string;
+    started_at_ms: number | null;
+  }>(d.executeSync(
+    'SELECT c.session_mode, c.phase, c.runner_state_json, s.session_date, s.started_at_ms FROM session_runner_checkpoint c JOIN session s ON s.session_id = c.session_id WHERE c.session_id = ?',
+    [sessionId],
+  ))[0];
+  if (checkpoint === undefined) throw new Error('Session checkpoint is missing; reopen the session before finishing.');
+  if (checkpoint.session_mode !== 'guided' && checkpoint.session_mode !== 'self_directed') {
+    throw new Error('Session checkpoint has an invalid frozen mode.');
+  }
+
+  const runner = deserializeRunner(checkpoint.runner_state_json);
+  if (runner.phase !== checkpoint.phase) throw new Error('Session checkpoint phase does not match its runner state.');
+
+  const origin = rowsOf<{ origin_kind: string; source_planned_session_id: number | null }>(d.executeSync(
+    'SELECT origin_kind, source_planned_session_id FROM session_origin WHERE session_id = ?',
+    [sessionId],
+  ))[0];
+  if (origin !== undefined && origin.origin_kind !== 'planned' && origin.origin_kind !== 'free_form') {
+    throw new Error('Session origin is invalid.');
+  }
+  const originKind: SessionOutcomeOriginKind = origin?.origin_kind === 'planned' ? 'planned' : 'free_form';
+
+  const slotRows = rowsOf<{
+    session_plan_slot_id: number;
+    planned_sets: number;
+    provenance_kind: string;
+  }>(d.executeSync(
+    'SELECT session_plan_slot_id, planned_sets, provenance_kind FROM session_plan_slot WHERE session_id = ? ORDER BY slot_index',
+    [sessionId],
+  ));
+  const slots: SessionOutcomeInput['slots'] = slotRows.map((row) => ({
+    sessionPlanSlotId: row.session_plan_slot_id,
+    plannedSets: row.planned_sets,
+    provenanceKind: row.provenance_kind as SessionOutcomeProvenanceKind,
+  }));
+  if (
+    runner.slots.length !== slotRows.length ||
+    runner.slots.some((slot, index) =>
+      slot.sessionPlanSlotId !== slotRows[index]?.session_plan_slot_id ||
+      slot.sets !== slotRows[index]?.planned_sets
+    )
+  ) {
+    throw new Error('Session checkpoint no longer matches its frozen plan.');
+  }
+
+  const setRows = rowsOf<{
+    set_id: number;
+    movement_id: number;
+    reps: number;
+    rpe: number | null;
+    session_plan_slot_id: number | null;
+    source_planned_slot_id: number | null;
+    provenance_kind: string | null;
+    target_kind: string | null;
+    target_reps: number | null;
+    target_seconds: number | null;
+    time_s: number | null;
+  }>(d.executeSync(
+    "SELECT sr.set_id, sr.movement_id, sr.reps, sr.rpe, st.session_plan_slot_id, st.source_planned_slot_id, st.provenance_kind, sdt.target_kind, sdt.target_reps, sdt.target_seconds, tm.value AS time_s FROM set_record sr LEFT JOIN set_target st ON st.set_id = sr.set_id LEFT JOIN set_dose_target sdt ON sdt.set_id = sr.set_id LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s' WHERE sr.session_id = ? ORDER BY sr.set_id",
+    [sessionId],
+  ));
+  const sets: SessionOutcomeInput['sets'] = setRows.map((row) => {
+    const prescribedDose = doseFromFields(row.target_kind, row.target_reps, row.target_seconds);
+    const repsDose = Number.isInteger(row.reps) && row.reps >= 1 && row.reps <= 100
+      ? { kind: 'reps' as const, reps: row.reps }
+      : null;
+    const timeDose = Number.isInteger(row.time_s) && row.time_s !== null && row.time_s >= 1 && row.time_s <= 7200
+      ? { kind: 'time' as const, seconds: row.time_s }
+      : null;
+    const actualDose = prescribedDose?.kind === 'time'
+      ? timeDose
+      : prescribedDose?.kind === 'reps'
+        ? repsDose
+        : timeDose ?? repsDose;
+    return {
+      setId: row.set_id,
+      sessionPlanSlotId: row.session_plan_slot_id,
+      provenanceKind: (row.provenance_kind ?? 'free_form') as SessionOutcomeProvenanceKind,
+      prescribedDose,
+      actualDose,
+    };
+  });
+
+  const hasPersistedSafetyHalt = rowsOf<{ present: number }>(d.executeSync(
+    'SELECT 1 AS present FROM subjective_report WHERE date = ? AND halt = 1 ORDER BY report_id DESC LIMIT 1',
+    [checkpoint.session_date],
+  ))[0]?.present === 1;
+
+  return {
+    sessionDate: checkpoint.session_date,
+    startedAtMs: checkpoint.started_at_ms,
+    originKind,
+    sourcePlannedSessionId: originKind === 'planned' ? origin?.source_planned_session_id ?? null : null,
+    sessionMode: checkpoint.session_mode,
+    runner,
+    hasPersistedSafetyHalt,
+    slots,
+    sets,
+    loggedSets: setRows.map((row) => ({
+      setId: row.set_id,
+      movementId: row.movement_id,
+      sessionPlanSlotId: row.session_plan_slot_id,
+      sourcePlannedSlotId: row.source_planned_slot_id,
+      reps: row.reps,
+      rpe: row.rpe,
+    })),
+  };
+};
+
+const persistSessionOutcome = (
+  d: DB,
+  sessionId: number,
+  originKind: SessionOutcomeOriginKind,
+  sessionMode: SessionMode,
+  trainingAge: RunnerState['tier'],
+  outcomeDecision: SessionOutcomeDecision,
+): void => {
+  const evidence = outcomeDecision.evidence;
+  d.executeSync(
+    'INSERT INTO session_outcome (session_id, outcome_kind, terminal_phase, halt_reason, origin_kind, session_mode, training_age, slot_count, planned_set_count, logged_set_count, exact_dose_count, under_dose_count, over_dose_count, unknown_dose_count, unmapped_set_count, missing_set_count, missing_unskipped_set_count, extra_set_count, adapted_slot_count, skipped_slot_count, off_plan_slot_count, finalized_at_ms, engine_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      sessionId,
+      outcomeDecision.kind,
+      outcomeDecision.terminalPhase,
+      outcomeDecision.haltReason,
+      originKind,
+      sessionMode,
+      trainingAge,
+      evidence.slotCount,
+      evidence.plannedSetCount,
+      evidence.loggedSetCount,
+      evidence.exactDoseCount,
+      evidence.underDoseCount,
+      evidence.overDoseCount,
+      evidence.unknownDoseCount,
+      evidence.unmappedSetCount,
+      evidence.missingSetCount,
+      evidence.missingUnskippedSetCount,
+      evidence.extraSetCount,
+      evidence.adaptedSlotCount,
+      evidence.skippedSlotCount,
+      evidence.offPlanSlotCount,
+      outcomeDecision.finalizedAtMs,
+      outcomeDecision.engineVersion,
+    ],
+  );
+};
+
+/** Preserve the existing APRE mutation, but bind it to this session's frozen
+ * planned origin and persisted sets. Recognition labels never enter this path. */
+const applyApreFinalization = (
+  d: DB,
+  sourcePlannedSessionId: number | null,
+  loggedSets: readonly FinalizationLoggedSet[],
+  finalizedAtMs: number,
+): void => {
+  if (sourcePlannedSessionId === null) return;
+  const source = rowsOf<{ week_index: number; block_id: number }>(d.executeSync(
+    "SELECT ps.week_index, ps.block_id FROM planned_session ps JOIN block_meta bm ON bm.block_id = ps.block_id WHERE ps.planned_session_id = ? AND bm.schema_type = 'APRE'",
+    [sourcePlannedSessionId],
+  ))[0];
+  if (source === undefined || source.week_index >= 4) return;
+
+  const sourceSlots = rowsOf<{ planned_slot_id: number; movement_id: number; reps: number; one_rm_kg: number | null }>(d.executeSync(
+    'SELECT sl.planned_slot_id, sl.movement_id, sl.reps, orm.load_kg AS one_rm_kg FROM planned_slot sl LEFT JOIN one_rep_max orm ON orm.movement_id = sl.movement_id WHERE sl.planned_session_id = ? ORDER BY sl.slot_index',
+    [sourcePlannedSessionId],
+  ));
+  for (const slot of sourceSlots) {
+    if (slot.one_rm_kg === null) continue;
+    const bestReps = loggedSets
+      .filter((loggedSet) => loggedSet.sourcePlannedSlotId === slot.planned_slot_id && loggedSet.movementId === slot.movement_id)
+      .reduce((best, loggedSet) => Math.max(best, loggedSet.reps), 0);
+    const surplus = bestReps - slot.reps;
+    if (surplus <= 0) continue;
+    const nextSlot = rowsOf<{ planned_slot_id: number; reps: number; target_rpe: number }>(d.executeSync(
+      'SELECT sl.planned_slot_id, sl.reps, sl.target_rpe FROM planned_slot sl JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id WHERE ps.block_id = ? AND ps.week_index = ? AND sl.movement_id = ? ORDER BY ps.day_index LIMIT 1',
+      [source.block_id, source.week_index + 1, slot.movement_id],
+    ))[0];
+    if (nextSlot === undefined) continue;
+    const deltaKg = Math.min(7.5, Math.ceil(surplus / 2) * 2.5);
+    const existing = rowsOf<{ target_load_kg: number }>(d.executeSync(
+      'SELECT target_load_kg FROM slot_override WHERE planned_slot_id = ?',
+      [nextSlot.planned_slot_id],
+    ))[0];
+    const base = existing?.target_load_kg ?? targetLoadKg(slot.one_rm_kg, nextSlot.reps, nextSlot.target_rpe);
+    d.executeSync(
+      'INSERT INTO slot_override (planned_slot_id, target_load_kg, reason, created_at_ms) VALUES (?, ?, ?, ?) ON CONFLICT(planned_slot_id) DO UPDATE SET target_load_kg = excluded.target_load_kg, reason = excluded.reason, created_at_ms = excluded.created_at_ms',
+      [
+        nextSlot.planned_slot_id,
+        clamp(base + deltaKg, 2.5, 600),
+        'APRE: +' + deltaKg + ' kg, beat the ' + slot.reps + '-rep target by ' + surplus + ' last week',
+        finalizedAtMs,
+      ],
+    );
+  }
+};
 const runnerSelection = (runner: RunnerState): Pick<KineticsStore, 'runner' | 'activeSessionPlanSlotId' | 'activeMovementId'> => {
   const current = currentRunnerSlot(runner);
   return {
@@ -1383,6 +1645,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   wipeActiveBlockState: () => {
+    if (get().session !== null) {
+      set({ error: 'End the active session before deleting the block.' });
+      return;
+    }
     const d = getDb();
     d.executeSync('BEGIN');
     try {
@@ -2765,7 +3031,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
     }
 
-    const timeMode = planSlot?.target.kind === 'time' || (planSlot === undefined && movement.loggingMode === 'time');
+    const prescribedDose = planSlot?.target ?? null;
+    const timeMode = prescribedDose?.kind === 'time' || (prescribedDose === null && movement.loggingMode === 'time');
     if (timeMode && (metrics?.timeS === undefined || metrics.timeS <= 0)) {
       set({ error: `${movement.name} is time-based - log seconds for it.` });
       return;
@@ -2831,6 +3098,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
          VALUES (?, ?, ?, ?, ?, ?)`,
         [setId, planSlot?.sessionPlanSlotId ?? null, provKind, provTarget, provSlotId, loggedAtMs],
       );
+      if (prescribedDose !== null) {
+        d.executeSync(
+          'INSERT INTO set_dose_target (set_id, target_kind, target_reps, target_seconds) VALUES (?, ?, ?, ?)',
+          [
+            setId,
+            prescribedDose.kind,
+            prescribedDose.kind === 'reps' ? prescribedDose.reps : null,
+            prescribedDose.kind === 'time' ? prescribedDose.seconds : null,
+          ],
+        );
+      }
       if (timeMode && metrics?.timeS !== undefined && metrics.timeS > 0) {
         d.executeSync(
           'INSERT INTO set_metric (set_id, metric, value) VALUES (?, ?, ?)',
@@ -2984,77 +3262,94 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   endSession: () => {
-    const s = get().session;
-    if (s === null) return;
+    const activeSession = get().session;
+    if (activeSession === null) return;
     const d = getDb();
-    if (s.sets.length === 0) {
-      // Nothing logged: remove the empty shell row instead of polluting history.
-      d.executeSync('DELETE FROM set_target WHERE set_id IN (SELECT set_id FROM set_record WHERE session_id = ?)', [s.sessionId]);
-      d.executeSync('DELETE FROM session_runner_checkpoint WHERE session_id = ?', [s.sessionId]);
-      d.executeSync('DELETE FROM session_slot_target WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)', [s.sessionId]);
-      d.executeSync('DELETE FROM planned_slot_disposition WHERE session_id = ?', [s.sessionId]);
-      d.executeSync('DELETE FROM session_plan_slot WHERE session_id = ?', [s.sessionId]);
-      d.executeSync('DELETE FROM session_origin WHERE session_id = ?', [s.sessionId]);
-      d.executeSync('DELETE FROM session WHERE session_id = ?', [s.sessionId]);
-    } else {
-      const avgRpe =
-        Math.round((s.sets.reduce((a, x) => a + x.rpe, 0) / s.sets.length) * 2) / 2;
-      const durationMin = Math.round(((Date.now() - s.startedAtMs) / 60_000) * 10) / 10;
-      d.executeSync(
-        'UPDATE session SET session_rpe = ?, duration_min = ? WHERE session_id = ?',
-        [avgRpe, durationMin, s.sessionId],
-      );
-      // Load changed -> re-materialize today's State Vector (the dashboard
-      // reads the result; triggers already updated mech_daily).
-      d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [s.date]);
+    const finalizedAtMs = Date.now();
+    let outcomeDecision: SessionOutcomeDecision | null = null;
 
-      // APRE reactive mutation: in an APRE block, beating a slot's rep
-      // target raises the SAME movement's load next week (slot_override,
-      // +2.5 kg per 2 surplus reps, capped +7.5) with a reason the UI shows
-      // verbatim — the athlete must never wonder why the bar got heavier.
-      const { todayPlan, blockMeta, oneRepMaxes } = get();
-      if (blockMeta !== null && blockMeta.schemaType === 'APRE' && todayPlan !== null) {
-        const weekRow = rowsOf<{ week_index: number; block_id: number }>(d.executeSync(
-          'SELECT week_index, block_id FROM planned_session WHERE planned_session_id = ?',
-          [todayPlan.plannedSessionId],
-        ))[0];
-        if (weekRow !== undefined && weekRow.week_index < 4) {
-          for (const slot of todayPlan.slots) {
-            const oneRm = oneRepMaxes[slot.movementId];
-            if (oneRm === undefined) continue; // no absolute base to progress
-            const bestReps = s.sets
-              .filter((x) => x.movement_id === slot.movementId)
-              .reduce((m, x) => Math.max(m, x.reps), 0);
-            const surplus = bestReps - slot.reps;
-            if (surplus <= 0) continue;
-            const nextSlot = rowsOf<{
-              planned_slot_id: number; reps: number; target_rpe: number;
-            }>(d.executeSync(
-              'SELECT sl.planned_slot_id, sl.reps, sl.target_rpe FROM planned_slot sl JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id WHERE ps.block_id = ? AND ps.week_index = ? AND sl.movement_id = ? ORDER BY ps.day_index LIMIT 1',
-              [weekRow.block_id, weekRow.week_index + 1, slot.movementId],
-            ))[0];
-            if (nextSlot === undefined) continue;
-            const deltaKg = Math.min(7.5, Math.ceil(surplus / 2) * 2.5);
-            const existing = rowsOf<{ target_load_kg: number }>(d.executeSync(
-              'SELECT target_load_kg FROM slot_override WHERE planned_slot_id = ?',
-              [nextSlot.planned_slot_id],
-            ))[0];
-            const base = existing !== undefined
-              ? existing.target_load_kg
-              : targetLoadKg(oneRm, nextSlot.reps, nextSlot.target_rpe);
-            d.executeSync(
-              'INSERT INTO slot_override (planned_slot_id, target_load_kg, reason, created_at_ms) VALUES (?, ?, ?, ?) ON CONFLICT(planned_slot_id) DO UPDATE SET target_load_kg = excluded.target_load_kg, reason = excluded.reason, created_at_ms = excluded.created_at_ms',
-              [
-                nextSlot.planned_slot_id,
-                clamp(base + deltaKg, 2.5, 600),
-                `APRE: +${deltaKg} kg, beat the ${slot.reps}-rep target by ${surplus} last week`,
-                Date.now(),
-              ],
-            );
-          }
-        }
+    d.executeSync('BEGIN');
+    try {
+      const snapshot = hydrateSessionFinalization(d, activeSession.sessionId);
+      let terminalRunner = snapshot.runner;
+      if (
+        (terminalRunner.phase === 'working' || terminalRunner.phase === 'resting') &&
+        snapshot.hasPersistedSafetyHalt
+      ) {
+        terminalRunner = advanceSessionRunner(terminalRunner, {
+          kind: 'HALT',
+          atMs: finalizedAtMs,
+          reason: 'safety',
+        });
       }
+      if (terminalRunner.phase !== 'complete' && terminalRunner.phase !== 'halted') {
+        throw new Error('Stop the active session before finishing it.');
+      }
+
+      const terminal = terminalRunner.phase === 'complete'
+        ? { phase: 'complete' as const, haltReason: null }
+        : { phase: 'halted' as const, haltReason: terminalRunner.haltReason! };
+      outcomeDecision = evaluateSessionOutcome({
+        originKind: snapshot.originKind,
+        terminal,
+        slots: snapshot.slots,
+        sets: snapshot.sets,
+        skippedSessionPlanSlotIds: terminalRunner.skippedSessionPlanSlotIds,
+        finalizedAtMs,
+      });
+
+      if (outcomeDecision === null) {
+        if (snapshot.loggedSets.length !== 0) {
+          throw new Error('Only an empty session can be discarded.');
+        }
+        // Parent-first keeps 026's immutable side-cars legal. The explicit
+        // cleanup that follows also handles test/dev connections with FKs off.
+        d.executeSync('DELETE FROM session WHERE session_id = ?', [activeSession.sessionId]);
+        d.executeSync('DELETE FROM session_slot_target WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)', [activeSession.sessionId]);
+        d.executeSync('DELETE FROM planned_slot_disposition WHERE session_id = ?', [activeSession.sessionId]);
+        d.executeSync('DELETE FROM session_plan_slot WHERE session_id = ?', [activeSession.sessionId]);
+        d.executeSync('DELETE FROM session_origin WHERE session_id = ?', [activeSession.sessionId]);
+      } else {
+        const ratedSets = snapshot.loggedSets.filter((loggedSet) => loggedSet.rpe !== null);
+        const avgRpe = ratedSets.length === 0
+          ? null
+          : Math.round(
+              (ratedSets.reduce((sum, loggedSet) => sum + (loggedSet.rpe ?? 0), 0) / ratedSets.length) * 2,
+            ) / 2;
+        const durationMin = Math.round(
+          (Math.max(0, finalizedAtMs - (snapshot.startedAtMs ?? finalizedAtMs)) / 60_000) * 10,
+        ) / 10;
+        d.executeSync(
+          'UPDATE session SET session_rpe = ?, duration_min = ? WHERE session_id = ?',
+          [avgRpe, durationMin, activeSession.sessionId],
+        );
+        d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [snapshot.sessionDate]);
+        applyApreFinalization(
+          d,
+          snapshot.originKind === 'planned' ? snapshot.sourcePlannedSessionId : null,
+          snapshot.loggedSets,
+          finalizedAtMs,
+        );
+        persistSessionOutcome(
+          d,
+          activeSession.sessionId,
+          snapshot.originKind,
+          snapshot.sessionMode,
+          terminalRunner.tier,
+          outcomeDecision,
+        );
+      }
+
+      // Always the final DML before COMMIT. A fault here rolls session
+      // finalization, APRE, outcome, and the checkpoint delete back together.
+      d.executeSync('DELETE FROM session_runner_checkpoint WHERE session_id = ?', [activeSession.sessionId]);
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* retain resumable state */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return;
     }
+
     set({
       session: null,
       sessionPlan: [],
@@ -3062,15 +3357,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       activeMovementId: null,
       runner: null,
       sessionMode: null,
-      lastEndedSessionId: s.sets.length > 0 ? s.sessionId : null,
+      substitution: null,
+      lastEndedSessionId: outcomeDecision === null ? null : activeSession.sessionId,
+      error: null,
     });
     get().refreshVector();
-    // Logged work changes the grid's trained markers.
     get().refreshBlock();
-    // Session count changed: the daily/weekly profile clamps may now bind.
     get().computePrescription([]);
   },
-
   computePrescription: (_patterns) => {
     const { vector, profile, session } = get();
     // No readiness vector -> no adjustment; NEVER leave yesterday's on screen.
@@ -3242,6 +3536,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');
       d.executeSync('DELETE FROM set_record');
+      // 026 snapshot immutability permits deletion only after its parent is
+      // gone. With FKs on the parent cascade already emptied this table; with
+      // FKs off this explicit pass removes the now-parentless rows.
+      d.executeSync('DELETE FROM set_dose_target');
       d.executeSync('DELETE FROM session_note');
       d.executeSync('DELETE FROM report_severity');
       d.executeSync('DELETE FROM slot_override');
@@ -3249,6 +3547,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM planned_session');
       d.executeSync('DELETE FROM block_meta');
       d.executeSync('DELETE FROM session');
+      // Same parent-first rule as set_dose_target.
+      d.executeSync('DELETE FROM session_outcome');
       d.executeSync('DELETE FROM micro_cycle');
       d.executeSync('DELETE FROM macro_cycle');
       d.executeSync('DELETE FROM training_block');
@@ -3318,5 +3618,45 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     ).map(movementFromRow);
     set({ movements, lastLoggedLoads: latestLoadMap(d) });
     get().refreshVector();
+  },
+
+  dismissOutcome: () => {
+    set({ lastEndedSessionId: null });
+  },
+
+  loadSessionOutcome: (sessionId) => {
+    try {
+      const res = getDb().executeSync(
+        'SELECT outcome_kind, finalized_at_ms FROM session_outcome WHERE session_id = ?',
+        [sessionId],
+      );
+      const rows = rowsOf<{ outcome_kind: string; finalized_at_ms: number }>(res);
+      if (rows.length > 0) {
+        return {
+          outcomeKind: rows[0].outcome_kind,
+          finalizedAtMs: rows[0].finalized_at_ms,
+        };
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  loadRecentOutcomes: (limit = 20) => {
+    try {
+      const res = getDb().executeSync(
+        'SELECT outcome_kind, finalized_at_ms FROM session_outcome ORDER BY finalized_at_ms DESC LIMIT ?',
+        [limit],
+      );
+      const rows = rowsOf<{ outcome_kind: string; finalized_at_ms: number }>(res);
+      return rows.map((r) => ({
+        outcomeKind: r.outcome_kind,
+        finalizedAtMs: r.finalized_at_ms,
+      }));
+    } catch (e) {
+      console.error('Failed to load recent session outcomes:', e);
+      return [];
+    }
   },
 }));

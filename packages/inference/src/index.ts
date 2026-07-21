@@ -206,3 +206,17 @@ export {
   type RunnerTarget,
   type RunnerWork,
 } from './sessionRunner';
+export {
+  SESSION_OUTCOME_ENGINE_VERSION,
+  SessionOutcomeValidationError,
+  evaluateSessionOutcome,
+  type SessionOutcomeDecision,
+  type SessionOutcomeEvidence,
+  type SessionOutcomeInput,
+  type SessionOutcomeKind,
+  type SessionOutcomeOriginKind,
+  type SessionOutcomeProvenanceKind,
+  type SessionOutcomeSetInput,
+  type SessionOutcomeSlotInput,
+  type SessionOutcomeTerminal,
+} from './sessionOutcome';

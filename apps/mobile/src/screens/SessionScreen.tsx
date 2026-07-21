@@ -1,101 +1,154 @@
-
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { JOINTS, nextUp as nextRunnerWork, targetLoadKg } from '@ak/inference';
-import { palette, useStore, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { useStore, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { theme } from '../theme/theme';
+import {
+  PrimaryButton,
+  SecondaryButton,
+  ListRow,
+  Disclosure,
+  Chip,
+  Stepper,
+  RestTimerCard,
+} from '../components/ui';
 
-const accent = palette.green;
 type SessionMode = 'guided' | 'self_directed';
 interface LocalRest { startedAtMs: number; seconds: number; slotId: number; }
 const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
-const scaleFor = (v: string | undefined): number => v === 'extra_large' ? 1.28 : v === 'large' ? 1.14 : 1;
+
 const secondsText = (n: number): string => {
-  const value = Math.max(0, Math.round(n)); const min = Math.floor(value / 60); const sec = value % 60;
+  const value = Math.max(0, Math.round(n));
+  const min = Math.floor(value / 60);
+  const sec = value % 60;
   return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
 };
+
 const restSecondsFor = (rpe: number, age: string | undefined): number => {
   const base = rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
-  const multiplier = age === 'beginner' ? .75 : age === 'elite' ? 1.25 : 1;
+  const multiplier = age === 'beginner' ? 0.75 : age === 'elite' ? 1.25 : 1;
   return clamp(Math.round((base * multiplier) / 15) * 15, 45, 300);
 };
+
 const targetFor = (slot: PlanSlot): SlotTarget => {
   const target = (slot as Partial<PlanSlot>).target;
   if (target?.kind === 'time' && Number.isFinite(target.seconds)) return { kind: 'time', seconds: Math.max(1, Math.round(target.seconds)) };
   if (target?.kind === 'reps' && Number.isFinite(target.reps)) return { kind: 'reps', reps: Math.max(1, Math.round(target.reps)) };
   return { kind: 'reps', reps: Math.max(1, Math.round((slot as Partial<PlanSlot>).plannedReps ?? 5)) };
 };
+
 const targetText = (slot: PlanSlot): string => {
   const target = targetFor(slot);
   return target.kind === 'time' ? `${slot.plannedSets} × ${secondsText(target.seconds)}` : `${slot.plannedSets} × ${target.reps}`;
 };
+
 const lines = (text: string | null | undefined, max: number): string[] => {
   if (text === null || text === undefined || text.trim().length === 0) return [];
   const split = text.split(/\r?\n|•/g).map((x) => x.replace(/^[-–—\s]+/, '').trim()).filter(Boolean);
   return (split.length > 0 ? split : [text.trim()]).slice(0, max);
 };
+
 const sameSlot = (logged: { session_plan_slot_id: number | null; movement_id: number }, slot: PlanSlot): boolean =>
   logged.session_plan_slot_id != null ? logged.session_plan_slot_id === slot.sessionPlanSlotId : logged.movement_id === slot.movementId;
 
-function Dot({ state }: { state: 'complete' | 'current' | 'upcoming' }): React.JSX.Element {
-  return <View style={styles.rail}><View style={[styles.dot, state === 'complete' && styles.dotComplete, state === 'current' && styles.dotCurrent]}>{state === 'complete' && <Text style={styles.check}>✓</Text>}</View></View>;
-}
-function Stepper({ label, value, minus, plus, scale }: { label: string; value: string; minus: () => void; plus: () => void; scale: number }): React.JSX.Element {
-  return <View style={styles.stepper}>
-    <Text style={[styles.stepperLabel, { fontSize: 11 * scale }]}>{label}</Text>
-    <Pressable onPress={minus} accessibilityRole="button" accessibilityLabel={`Decrease ${label}`} style={({ pressed }) => [styles.stepperButton, pressed && styles.pressed]}><Text style={[styles.stepperSymbol, { fontSize: 26 * scale }]}>−</Text></Pressable>
-    <Text style={[styles.stepperValue, { fontSize: 17 * scale }]} accessibilityLabel={`${label} ${value}`}>{value}</Text>
-    <Pressable onPress={plus} accessibilityRole="button" accessibilityLabel={`Increase ${label}`} style={({ pressed }) => [styles.stepperButton, pressed && styles.pressed]}><Text style={[styles.stepperSymbol, { fontSize: 26 * scale }]}>+</Text></Pressable>
-  </View>;
-}
-function Disclosure({ open, onPress, children }: { open: boolean; onPress: () => void; children: React.ReactNode }): React.JSX.Element {
-  return <View style={styles.disclosure}>
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`How and why, ${open ? 'expanded' : 'collapsed'}`} style={({ pressed }) => [styles.disclosureTrigger, pressed && styles.pressed]}><Text style={styles.disclosureTitle}>How & why</Text><Text style={styles.chevron}>{open ? '⌃' : '⌄'}</Text></Pressable>
-    {open && <View style={styles.disclosureBody}>{children}</View>}
-  </View>;
-}
+const formatFinalizedDate = (ms: number): string => {
+  const date = new Date(ms);
+  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const day = date.getDate();
+  const dayName = weekdays[date.getDay()];
+  const monthName = months[date.getMonth()];
+  return `${dayName} ${day} ${monthName}`;
+};
+
 function CompletedMetrics({
   sets,
   bandLadder,
   movementsById,
   onEdit,
-  scale,
 }: {
   sets: readonly LoggedSet[];
   bandLadder: readonly { level: number; label: string }[];
   movementsById: ReadonlyMap<number, Movement>;
   onEdit: (setId: number, reps: number, loadKg: number, rpe: number, metrics?: SetMetricPatch) => void;
-  scale: number;
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
   const metricSets = sets.filter((set) => set.timeS !== null || set.bandLevel !== null || (
     bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true
   ));
   if (metricSets.length === 0) return null;
-  return <View style={styles.loggedDetails}>
-    <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`Review logged details, ${open ? 'expanded' : 'collapsed'}`} style={({ pressed }) => [styles.loggedDetailsTrigger, pressed && styles.pressed]}>
-      <Text style={[styles.loggedDetailsTitle, { fontSize: 14 * scale }]}>Review logged details</Text><Text style={styles.chevron}>{open ? '⌃' : '⌄'}</Text>
-    </Pressable>
-    {open && <View style={styles.loggedDetailsBody}>{metricSets.map((set) => {
-      const duration = set.timeS;
-      const supportsBand = bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true;
-      return <View key={set.set_id} style={styles.loggedMetricRow}>
-        <Text style={[styles.loggedMetricTitle, { fontSize: 13 * scale }]}>Set {set.set_index}</Text>
-        {duration !== null && <View style={styles.metricAdjustRow}>
-          <Pressable onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { timeS: Math.max(1, duration - 5) })} accessibilityRole="button" accessibilityLabel={`Decrease logged duration for set ${set.set_index}`} style={({ pressed }) => [styles.metricAdjust, pressed && styles.pressed]}><Text style={[styles.metricAdjustText, { fontSize: 14 * scale }]}>−5s</Text></Pressable>
-          <Text style={[styles.metricValue, { fontSize: 15 * scale }]}>{secondsText(duration)}</Text>
-          <Pressable onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { timeS: duration + 5 })} accessibilityRole="button" accessibilityLabel={`Increase logged duration for set ${set.set_index}`} style={({ pressed }) => [styles.metricAdjust, pressed && styles.pressed]}><Text style={[styles.metricAdjustText, { fontSize: 14 * scale }]}>+5s</Text></Pressable>
-        </View>}
-        {supportsBand && <View style={styles.loggedBandBlock}>
-          <Text style={[styles.loggedBandLabel, { fontSize: 12 * scale }]}>Band</Text>
-          <View style={styles.loggedBandChoices}>{bandLadder.map((band) => {
-            const selected = set.bandLevel === band.level;
-            return <Pressable key={band.level} onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { bandLevel: selected ? null : band.level })} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Set ${set.set_index} band ${band.label}${selected ? ', selected' : ''}`} style={({ pressed }) => [styles.loggedBandChoice, selected && styles.bandChoiceSelected, pressed && styles.pressed]}><Text style={[styles.bandChoiceText, selected && styles.bandChoiceTextSelected, { fontSize: 12 * scale }]}>{band.label}</Text></Pressable>;
-          })}</View>
-        </View>}
-      </View>;
-    })}</View>}
-  </View>;
+
+  return (
+    <View style={styles.loggedDetails}>
+      <Disclosure
+        label="Review logged details"
+        open={open}
+        onOpenChange={setOpen}
+        accessibilityLabel={open ? "Review logged details, expanded" : "Review logged details, collapsed"}
+      >
+        <View style={styles.loggedDetailsBody}>
+          {metricSets.map((set) => {
+            const duration = set.timeS;
+            const supportsBand = bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true;
+            return (
+              <View key={set.set_id} style={styles.loggedMetricRow}>
+                <Text style={styles.loggedMetricTitle}>Set {set.set_index}</Text>
+                {duration !== null && (
+                  <View style={styles.metricAdjustRow}>
+                    <Pressable
+                      onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { timeS: Math.max(1, duration - 5) })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Decrease logged duration for set ${set.set_index}`}
+                      style={({ pressed }) => [styles.metricAdjust, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.metricAdjustText}>−5s</Text>
+                    </Pressable>
+                    <Text style={styles.metricValue}>{secondsText(duration)}</Text>
+                    <Pressable
+                      onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { timeS: duration + 5 })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Increase logged duration for set ${set.set_index}`}
+                      style={({ pressed }) => [styles.metricAdjust, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.metricAdjustText}>+5s</Text>
+                    </Pressable>
+                  </View>
+                )}
+                {supportsBand && (
+                  <View style={styles.loggedBandBlock}>
+                    <Text style={styles.loggedBandLabel}>Band</Text>
+                    <View style={styles.loggedBandChoices}>
+                      {bandLadder.map((band) => {
+                        const selected = set.bandLevel === band.level;
+                        return (
+                          <Chip
+                            key={band.level}
+                            label={band.label}
+                            selected={selected}
+                            onPress={() => onEdit(set.set_id, set.reps, set.load_kg, set.rpe, { bandLevel: selected ? null : band.level })}
+                            accessibilityLabel={`Set ${set.set_index} band ${band.label}`}
+                            style={{ margin: theme.space[1] }}
+                          />
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      </Disclosure>
+    </View>
+  );
+}
+
+function rowsOf<T>(res: unknown): T[] {
+  const r = (res as { rows?: unknown }).rows;
+  if (Array.isArray(r)) return r as T[];
+  const arr = (r as { _array?: unknown } | undefined)?._array;
+  return Array.isArray(arr) ? (arr as T[]) : [];
 }
 
 export default function SessionScreen(): React.JSX.Element {
@@ -105,13 +158,11 @@ export default function SessionScreen(): React.JSX.Element {
     lastTriage, substitution, startSession, selectMovementSlot, setMovementPreference,
     openSubstitution, closeSubstitution, applyRegression, applyDaySwap, reportNiggle,
     logSet, editSet, endSession, runner, sessionMode, uiPreferences, bandLadder, lastLoggedLoads = {},
-    advanceRunnerRest, skipRunnerRest, runnerThumbsDown, runnerHalt,
+    advanceRunnerRest, skipRunnerRest, runnerThumbsDown, runnerHalt, lastEndedSessionId,
+    loadSessionOutcome, dismissOutcome,
   } = state;
-  const preferences = uiPreferences;
-  const typeScale = scaleFor(preferences.textScale);
-  // Mode is frozen when the session starts. Preference edits intentionally wait
-  // for the next session instead of changing an athlete's current flow.
-  const defaultMode: SessionMode = preferences.sessionModeOverride ?? (profile.training_age === 'beginner' ? 'guided' : 'self_directed');
+
+  const defaultMode: SessionMode = uiPreferences.sessionModeOverride ?? (profile.training_age === 'beginner' ? 'guided' : 'self_directed');
   const mode: SessionMode = sessionMode ?? defaultMode;
   const runnerPhase = runner?.phase ?? 'working';
 
@@ -128,6 +179,22 @@ export default function SessionScreen(): React.JSX.Element {
   const [bandLevel, setBandLevel] = useState<number | null>(null);
   const advancedRest = useRef<string | null>(null);
 
+  // Outcome details derived from store outcome data
+  const outcome = useMemo(() => {
+    if (lastEndedSessionId == null) return null;
+    const dbOutcome = loadSessionOutcome(lastEndedSessionId);
+    if (dbOutcome) {
+      return {
+        kind: dbOutcome.outcomeKind,
+        dateStr: `Session saved · ${formatFinalizedDate(dbOutcome.finalizedAtMs)}`,
+      };
+    }
+    return {
+      kind: 'session_recorded',
+      dateStr: 'Session saved',
+    };
+  }, [lastEndedSessionId, loadSessionOutcome]);
+
   const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
   const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
   const runnerCurrent = runner?.slots?.[runner.slotIndex ?? -1];
@@ -140,8 +207,9 @@ export default function SessionScreen(): React.JSX.Element {
   const currentLogged = currentSlot === null ? 0 : loggedCount(currentSlot);
   const allDone = sessionPlan.length > 0 && sessionPlan.every((slot) => loggedCount(slot) >= slot.plannedSets);
   const triageHalted = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
-  const halted = runnerPhase === 'halted' || triageHalted;
-  const complete = !halted && (runnerPhase === 'complete' || allDone);
+  const runnerComplete = runnerPhase === 'complete';
+  const halted = runnerPhase === 'halted' || (!runnerComplete && triageHalted);
+  const complete = !halted && sessionPlan.length > 0 && (runnerComplete || allDone);
   const target = currentSlot === null ? null : targetFor(currentSlot);
   const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
   const currentSessionLoad = currentSlot === null
@@ -167,6 +235,7 @@ export default function SessionScreen(): React.JSX.Element {
     const id = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(id);
   }, [resting]);
+
   useEffect(() => {
     if (currentSlot === null || target === null) return;
     setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setBandLevel(null);
@@ -192,6 +261,7 @@ export default function SessionScreen(): React.JSX.Element {
       ?? null;
     if (next !== null) selectMovementSlot(next.sessionPlanSlotId);
   };
+
   useEffect(() => {
     if (!resting || restRemaining !== 0 || rest === null) return;
     const key = `${rest.slotId}:${rest.startedAtMs}`;
@@ -201,38 +271,118 @@ export default function SessionScreen(): React.JSX.Element {
     else { setLocalRest(null); moveLegacyForward(); }
   }, [resting, restRemaining, rest?.slotId, rest?.startedAtMs, runnerResting]);
 
+  if (session === null && lastEndedSessionId != null && outcome !== null) {
+    // Phase-18 post-session quiet line (Outcome View)
+    const isBeginner = profile.training_age === 'beginner';
+    const outcomeCopy: Record<string, string> = isBeginner
+      ? {
+          followed_plan: "You followed today's plan. Recover well.",
+          adapted_session: "You adjusted the session and kept the work appropriate.",
+          stopped_safely: "Stopping was the right call. Recovery is part of the plan.",
+          session_recorded: "Your session is saved. Continue from here next time.",
+        }
+      : {
+          followed_plan: "Plan followed.",
+          adapted_session: "Session adapted.",
+          stopped_safely: "Session stopped safely.",
+          session_recorded: "Session recorded.",
+        };
+
+    const displayMsg = outcomeCopy[outcome.kind] ?? outcomeCopy.session_recorded;
+
+    return (
+      <View style={styles.outcomeContainer}>
+        {/* Wordmark top-left */}
+        <View style={styles.header}>
+          <Text style={styles.wordmark}>pikeMethods</Text>
+        </View>
+
+        <View style={styles.outcomeMain}>
+          {/* 24pt grey dash above */}
+          <View style={styles.outcomeDash} />
+          <Text style={styles.outcomeText}>{displayMsg}</Text>
+          <Text style={styles.outcomeDate}>{outcome.dateStr}</Text>
+        </View>
+
+        <View style={styles.outcomeFooter}>
+          <SecondaryButton
+            label="Back to Ready"
+            onPress={dismissOutcome}
+            accessibilityLabel="Back to Ready"
+            style={{ alignSelf: 'stretch' }}
+          />
+        </View>
+      </View>
+    );
+  }
+
   if (session === null) {
     const blocked = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
-    return <View style={styles.idle}>
-      <Text style={[styles.kicker, { fontSize: 12 * typeScale }]}>SESSION</Text>
-      <Text style={[styles.idleTitle, { fontSize: 30 * typeScale }]}>{blocked ? 'Training is paused.' : 'Ready when you are.'}</Text>
-      <Text style={[styles.idleBody, { fontSize: 16 * typeScale }]}>{blocked ? 'Resolve today’s safety halt before starting another session.' : mode === 'guided' ? 'You will move one clear step at a time.' : 'Your session will stay in one clear vertical timeline.'}</Text>
-      {!blocked && <Pressable onPress={() => startSession()} accessibilityRole="button" accessibilityLabel="Start a new workout session" style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}><Text style={[styles.primaryText, { fontSize: 17 * typeScale }]}>Start session</Text></Pressable>}
-    </View>;
+    return (
+      <View style={styles.idle}>
+        <View style={styles.header}>
+          <Text style={styles.wordmark}>pikeMethods</Text>
+        </View>
+        <Text style={styles.kicker}>SESSION</Text>
+        <Text style={styles.idleTitle}>
+          {blocked ? 'Training is paused.' : 'Ready when you are.'}
+        </Text>
+        <Text style={styles.idleBody}>
+          {blocked
+            ? 'Resolve today’s safety halt before starting another session.'
+            : mode === 'guided'
+            ? 'You will move one clear step at a time.'
+            : 'Your session will stay in one clear vertical timeline.'}
+        </Text>
+        {!blocked && (
+          <PrimaryButton
+            label="Start session"
+            onPress={() => startSession()}
+            accessibilityLabel="Start a new workout session"
+            style={{ marginTop: theme.space[5] }}
+          />
+        )}
+      </View>
+    );
   }
 
   const beginnerPlanViolation = profile.training_age === 'beginner' && sessionPlan.some((slot) => {
     const movement = byId.get(slot.movementId);
     return movement === undefined || (movement.difficulty !== 'Beginner' && !movement.beginnerOk);
   });
+
   if (beginnerPlanViolation) {
-    return <View style={styles.idle} accessibilityRole="alert">
-      <Text style={[styles.kicker, { fontSize: 12 * typeScale }]}>SESSION CHECK</Text>
-      <Text style={[styles.idleTitle, { fontSize: 30 * typeScale }]}>This plan needs Coach review.</Text>
-      <Text style={[styles.idleBody, { fontSize: 16 * typeScale }]}>A movement outside this athlete’s tier was blocked before it could be shown.</Text>
-      <Pressable onPress={endSession} accessibilityRole="button" accessibilityLabel="Finish the blocked session" style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}><Text style={[styles.secondaryText, { fontSize: 16 * typeScale }]}>Finish session</Text></Pressable>
-    </View>;
+    return (
+      <View style={styles.idle} accessibilityRole="alert">
+        <View style={styles.header}>
+          <Text style={styles.wordmark}>pikeMethods</Text>
+        </View>
+        <Text style={styles.kicker}>SESSION CHECK</Text>
+        <Text style={styles.idleTitle}>This plan needs Coach review.</Text>
+        <Text style={styles.idleBody}>
+          A movement outside this athlete’s tier was blocked before it could be shown.
+        </Text>
+        <SecondaryButton
+          label="Finish session"
+          onPress={() => { runnerHalt('safety'); endSession(); }}
+          accessibilityLabel="Finish the blocked session"
+          style={{ marginTop: theme.space[5] }}
+        />
+      </View>
+    );
   }
 
   const chooseSlot = (slot: PlanSlot): void => {
     if (mode === 'guided' || loggedCount(slot) >= slot.plannedSets) return;
     selectMovementSlot(slot.sessionPlanSlotId);
   };
+
   const readyNow = (): void => {
     if (runnerResting) {
       skipRunnerRest();
     } else { setLocalRest(null); moveLegacyForward(); }
   };
+
   const logCurrent = (): void => {
     if (currentSlot === null || currentMovement === null || target === null || resting) return;
     const safeLoad = clamp(Math.round(loadKg * 2) / 2, 0, 500);
@@ -240,25 +390,23 @@ export default function SessionScreen(): React.JSX.Element {
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
     if (runner === null) {
-      if (preferences.restTimerEnabled) setLocalRest({ startedAtMs: Date.now(), seconds: restSecondsFor(safeRpe, profile.training_age), slotId: currentSlot.sessionPlanSlotId });
+      if (uiPreferences.restTimerEnabled) setLocalRest({ startedAtMs: Date.now(), seconds: restSecondsFor(safeRpe, profile.training_age), slotId: currentSlot.sessionPlanSlotId });
       else moveLegacyForward();
     }
   };
+
   const thumbsDown = (): void => {
     if (currentMovement === null) return;
     if (runner !== null) {
-      // The store commits Avoid + the runner offer + substitution atomically.
       runnerThumbsDown();
       return;
     }
-    // Compatibility path for a legacy open session without a checkpoint.
     setMovementPreference(currentMovement.movement_id, -1);
     openSubstitution(currentMovement.movement_id);
   };
+
   const submitNiggle = (): void => {
     if (niggleRegion === null) return;
-    // reportNiggle owns the deterministic NIGGLE/HALT transition and only
-    // offers substitution for qualifying, non-halt reports.
     reportNiggle(niggleRegion, niggleSeverity);
     setSafetyOpen(false);
   };
@@ -277,255 +425,847 @@ export default function SessionScreen(): React.JSX.Element {
       ? `${byId.get(upcomingSlot.movementId)?.name ?? 'Movement'} · ${targetText(upcomingSlot)}`
       : null;
 
-  return <View style={styles.screen}>
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
-      <View style={styles.header}>
-        <Text style={[styles.kicker, { fontSize: 12 * typeScale }]}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
-        <Text style={[styles.headerTitle, { fontSize: 26 * typeScale }]}>{halted ? 'Session paused' : complete ? 'Session complete' : 'Your next step'}</Text>
-        {!halted && !complete && <Text style={[styles.headerMeta, { fontSize: 14 * typeScale }]}>{sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete`}</Text>}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
+        {/* Wordmark top-left */}
+        <View style={styles.header}>
+          <Text style={styles.wordmark}>pikeMethods</Text>
+          <Text style={styles.kicker}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
+          <Text style={styles.headerTitle}>{halted ? 'Session paused' : complete ? 'Session complete' : 'Your next step'}</Text>
+          {!halted && !complete && (
+            <Text style={styles.headerMeta}>
+              {sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete`}
+            </Text>
+          )}
+        </View>
 
-      {halted && <View style={styles.haltCard} accessibilityRole="alert">
-        <Text style={[styles.haltTitle, { fontSize: 20 * typeScale }]}>Stop training for today.</Text>
-        <Text style={[styles.haltBody, { fontSize: 15 * typeScale }]}>{runner?.haltReason ?? (lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : 'A safety report needs your attention before more sets are logged.')}</Text>
-        <Pressable onPress={endSession} accessibilityRole="button" accessibilityLabel="Finish the halted session" style={({ pressed }) => [styles.danger, pressed && styles.pressed]}><Text style={[styles.dangerText, { fontSize: 16 * typeScale }]}>Finish session</Text></Pressable>
-      </View>}
-      {complete && <View style={styles.completeCard} accessibilityRole="summary">
-        <Text style={[styles.completeTitle, { fontSize: 20 * typeScale }]}>All planned work is logged.</Text>
-        <Text style={[styles.completeBody, { fontSize: 15 * typeScale }]}>Take the win. There is nothing else you need to decide here.</Text>
-        <CompletedMetrics sets={session.sets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} scale={typeScale} />
-        <Pressable onPress={endSession} accessibilityRole="button" accessibilityLabel="Finish completed session" style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}><Text style={[styles.primaryText, { fontSize: 16 * typeScale }]}>Finish session</Text></Pressable>
-      </View>}
-      {!halted && !complete && sessionPlan.length === 0 && <View style={styles.emptyCard}>
-        <Text style={[styles.emptyTitle, { fontSize: 19 * typeScale }]}>No exercise is queued.</Text>
-        <Text style={[styles.emptyBody, { fontSize: 15 * typeScale }]}>Return to Coach to create a session plan, then come back here.</Text>
-        <Pressable onPress={endSession} accessibilityRole="button" accessibilityLabel="Finish empty session" style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}><Text style={[styles.secondaryText, { fontSize: 16 * typeScale }]}>Finish session</Text></Pressable>
-      </View>}
-
-      {!halted && !complete && sessionPlan.length > 0 && <View style={styles.timeline}>
-        {sessionPlan.map((slot) => {
-          const movement = byId.get(slot.movementId);
-          const logged = loggedCount(slot);
-          const finished = logged >= slot.plannedSets;
-          const active = !finished && currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId;
-          const selectable = mode === 'self_directed' && !finished && !active && !resting;
-          if (finished) {
-            const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
-            const latestCompleted = completedSets[0];
-            const bandLabel = latestCompleted?.bandLevel === null || latestCompleted?.bandLevel === undefined
-              ? null
-              : bandLadder.find((band) => band.level === latestCompleted.bandLevel)?.label ?? `band ${latestCompleted.bandLevel}`;
-            const metricSummary = latestCompleted?.timeS !== null && latestCompleted?.timeS !== undefined
-              ? ` · ${secondsText(latestCompleted.timeS)} logged`
-              : bandLabel === null ? '' : ` · ${bandLabel}`;
-            return <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
-              <Dot state="complete" /><View style={styles.completeRow}>
-                <Text style={[styles.completeRowName, { fontSize: 16 * typeScale }]} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
-                <Text style={[styles.completeRowMeta, { fontSize: 13 * typeScale }]}>{logged} sets complete{metricSummary}</Text>
-                <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} scale={typeScale} />
-              </View>
-            </View>;
-          }
-          if (!active) return <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
-            <Dot state="upcoming" />
-            <Pressable disabled={!selectable} onPress={() => chooseSlot(slot)} accessibilityRole={selectable ? 'button' : 'text'} accessibilityState={{ disabled: !selectable }} accessibilityLabel={selectable ? `Choose ${movement?.name ?? 'movement'} as the current exercise` : `${movement?.name ?? 'Movement'}, upcoming, ${targetText(slot)}`} style={({ pressed }) => [styles.upcomingRow, selectable && styles.upcomingSelectable, pressed && selectable && styles.pressed]}>
-              <View><Text style={[styles.upcomingName, { fontSize: 16 * typeScale }]} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text><Text style={[styles.upcomingMeta, { fontSize: 13 * typeScale }]}>{targetText(slot)}</Text></View>{selectable && <Text style={[styles.choose, { fontSize: 13 * typeScale }]}>Choose</Text>}
-            </Pressable>
-          </View>;
-          return <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
-            <Dot state="current" />
-            <View style={styles.currentCard}>
-              {resting ? <>
-                <Text style={[styles.currentLabel, { fontSize: 12 * typeScale }]}>REST</Text>
-                <Text style={[styles.restTime, { fontSize: 42 * typeScale }]}>{secondsText(restRemaining)}</Text>
-                <Text style={[styles.restBody, { fontSize: 16 * typeScale }]}>Recover for {movement?.name ?? 'the next set'}.</Text>
-                <Pressable onPress={readyNow} accessibilityRole="button" accessibilityLabel="Ready now, skip the rest timer" style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}><Text style={[styles.primaryText, { fontSize: 17 * typeScale }]}>Ready now</Text></Pressable>
-                {upcomingText !== null && <Text style={[styles.nextUp, { fontSize: 13 * typeScale }]}>Next up: {upcomingText}</Text>}
-              </> : <>
-                <Text style={[styles.currentLabel, { fontSize: 12 * typeScale }]}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
-                <Text style={[styles.movementName, { fontSize: 27 * typeScale }]}>{movement?.name ?? 'Movement'}</Text>
-                <Text style={[styles.targetLine, { fontSize: 16 * typeScale }]}>Target {targetText(slot)}{slot.targetRpe === null ? '' : ` · RPE ${slot.targetRpe.toFixed(1)}`}</Text>
-                <Text style={[styles.loadEvidence, { fontSize: 14 * typeScale }]}>{loadEvidence}</Text>
-                <View style={styles.stepperRow}>
-                  <Stepper scale={typeScale} label={target?.kind === 'time' ? 'Seconds' : 'Reps'} value={String(target?.kind === 'time' ? seconds : reps)} minus={() => target?.kind === 'time' ? setSeconds((n) => clamp(n - 5, 5, 3600)) : setReps((n) => clamp(n - 1, 1, 50))} plus={() => target?.kind === 'time' ? setSeconds((n) => clamp(n + 5, 5, 3600)) : setReps((n) => clamp(n + 1, 1, 50))} />
-                  <Stepper scale={typeScale} label="Load kg" value={loadKg.toFixed(1)} minus={() => setLoadKg((n) => clamp(n - 2.5, 0, 500))} plus={() => setLoadKg((n) => clamp(n + 2.5, 0, 500))} />
-                  <Stepper scale={typeScale} label="RPE" value={rpe.toFixed(1)} minus={() => setRpe((n) => clamp(n - .5, 5, 10))} plus={() => setRpe((n) => clamp(n + .5, 5, 10))} />
-                </View>
-                {supportsBands && <View style={styles.bandBlock}>
-                  <Text style={[styles.bandLabel, { fontSize: 13 * typeScale }]}>Band</Text>
-                  <View style={styles.bandChoices}>{bandLadder.map((band) => {
-                    const selectedBand = bandLevel === band.level;
-                    return <Pressable key={band.level} onPress={() => setBandLevel(selectedBand ? null : band.level)} accessibilityRole="button" accessibilityState={{ selected: selectedBand }} accessibilityLabel={`Band ${band.label}${selectedBand ? ', selected' : ''}`} style={({ pressed }) => [styles.bandChoice, selectedBand && styles.bandChoiceSelected, pressed && styles.pressed]}><Text style={[styles.bandChoiceText, selectedBand && styles.bandChoiceTextSelected]}>{band.label}</Text></Pressable>;
-                  })}</View>
-                </View>}
-                <Pressable onPress={logCurrent} accessibilityRole="button" accessibilityLabel={`Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`} style={({ pressed }) => [styles.logAction, pressed && styles.logActionPressed]}><Text style={[styles.logText, { fontSize: 19 * typeScale }]}>Log set</Text></Pressable>
-                <Disclosure open={detailsOpen} onPress={() => setDetailsOpen((value) => !value)}>
-                  {movement?.coachingIntent != null && <Text style={[styles.intent, { fontSize: 15 * typeScale }]}>{movement.coachingIntent}</Text>}
-                  {setup.length > 0 && <View style={styles.copyGroup}><Text style={[styles.copyHeading, { fontSize: 12 * typeScale }]}>SET UP</Text>{setup.map((line, index) => <Text key={`setup-${index}`} style={[styles.copyLine, { fontSize: 15 * typeScale }]}>{index + 1}. {line}</Text>)}</View>}
-                  {cues.length > 0 && <View style={styles.copyGroup}><Text style={[styles.copyHeading, { fontSize: 12 * typeScale }]}>CUES</Text>{cues.map((line, index) => <Text key={`cue-${index}`} style={[styles.copyLine, { fontSize: 15 * typeScale }]}>• {line}</Text>)}</View>}
-                  {setup.length === 0 && cues.length === 0 && movement?.coachingIntent == null && <Text style={[styles.missing, { fontSize: 14 * typeScale }]}>Curated coaching for this movement is still being reviewed.</Text>}
-                  {movement?.videoUrl !== undefined && movement.videoUrl.trim().length > 0 && <Pressable onPress={() => { void Linking.openURL(movement.videoUrl); }} accessibilityRole="link" accessibilityLabel={`Open video for ${movement.name} in your browser`} style={({ pressed }) => [styles.video, pressed && styles.pressed]}><Text style={[styles.videoText, { fontSize: 15 * typeScale }]}>Open form video</Text></Pressable>}
-                </Disclosure>
-                <View style={styles.quickRow}>
-                  <Pressable onPress={thumbsDown} accessibilityRole="button" accessibilityLabel={`Avoid ${movement?.name ?? 'this movement'} and find a substitution`} style={({ pressed }) => [styles.quick, pressed && styles.pressed]}><Text style={[styles.quickText, { fontSize: 14 * typeScale }]}>Doesn’t feel right</Text></Pressable>
-                  <Pressable onPress={() => setSafetyOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: safetyOpen }} accessibilityLabel={`Report discomfort, ${safetyOpen ? 'expanded' : 'collapsed'}`} style={({ pressed }) => [styles.quick, pressed && styles.pressed]}><Text style={[styles.quickText, { fontSize: 14 * typeScale }]}>Report discomfort</Text></Pressable>
-                </View>
-                {safetyOpen && <View style={styles.safety}>
-                  <Text style={[styles.safetyPrompt, { fontSize: 15 * typeScale }]}>Where, and how strong is it?</Text>
-                  <View style={styles.joints}>{(JOINTS as readonly string[]).map((joint) => {
-                    const selectedJoint = niggleRegion === joint;
-                    return <Pressable key={joint} onPress={() => setNiggleRegion(joint)} accessibilityRole="button" accessibilityState={{ selected: selectedJoint }} accessibilityLabel={`${joint.replace(/_/g, ' ')}${selectedJoint ? ', selected' : ''}`} style={({ pressed }) => [styles.joint, selectedJoint && styles.jointSelected, pressed && styles.pressed]}><Text style={[styles.jointText, selectedJoint && styles.jointTextSelected]}>{joint.replace(/_/g, ' ')}</Text></Pressable>;
-                  })}</View>
-                  <View style={styles.severity}>{[4, 6, 8].map((severity) => {
-                    const selectedSeverity = niggleSeverity === severity;
-                    const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
-                    return <Pressable key={severity} onPress={() => setNiggleSeverity(severity)} accessibilityRole="button" accessibilityState={{ selected: selectedSeverity }} accessibilityLabel={`${label} discomfort, ${severity} of 10`} style={({ pressed }) => [styles.severityButton, selectedSeverity && (severity >= 8 ? styles.severityDanger : styles.severitySelected), pressed && styles.pressed]}><Text style={[styles.severityText, selectedSeverity && styles.severityTextSelected]}>{label}</Text></Pressable>;
-                  })}</View>
-                  <Pressable disabled={niggleRegion === null} onPress={submitNiggle} accessibilityRole="button" accessibilityLabel="Save discomfort report" style={({ pressed }) => [styles.safetySubmit, niggleRegion === null && styles.disabled, pressed && styles.pressed]}><Text style={[styles.safetySubmitText, { fontSize: 15 * typeScale }]}>{niggleSeverity >= 8 ? 'Stop session' : 'Find an alternative'}</Text></Pressable>
-                </View>}
-                <Pressable onPress={() => runnerHalt('manual')} accessibilityRole="button" accessibilityLabel="Stop this session" style={({ pressed }) => [styles.stop, pressed && styles.pressed]}><Text style={[styles.stopText, { fontSize: 14 * typeScale }]}>Stop session</Text></Pressable>
-              </>}
+        {halted && (
+          <View style={styles.haltCard} accessibilityRole="alert">
+            <Text style={styles.haltTitle}>Stop training for today.</Text>
+            <Text style={styles.haltBody}>
+              {runner?.haltReason ?? (lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : 'A safety report needs your attention before more sets are logged.')}
+            </Text>
+            <View style={{ marginTop: theme.space[4], alignSelf: 'stretch' }}>
+              <SecondaryButton
+                label="Finish session"
+                onPress={() => { if (runnerPhase !== 'halted') runnerHalt('safety'); endSession(); }}
+                accessibilityLabel="Finish the halted session"
+                fullWidth={true}
+              />
             </View>
-          </View>;
-        })}
-      </View>}
+          </View>
+        )}
 
-      {!halted && !complete && substitution !== null && <View style={styles.substitution}>
-        <View style={styles.subHeader}><View><Text style={[styles.subTitle, { fontSize: 19 * typeScale }]}>Choose an alternative</Text><Text style={[styles.subBody, { fontSize: 14 * typeScale }]}>Your completed sets stay recorded. The replacement carries the remaining work.</Text></View><Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={({ pressed }) => [styles.close, pressed && styles.pressed]}><Text style={styles.closeText}>×</Text></Pressable></View>
-        {substitution.result.haltAdvised && <View style={styles.subHalt}><Text style={[styles.subHaltText, { fontSize: 15 * typeScale }]}>This report needs a pause rather than another exercise today.</Text><Pressable onPress={() => runnerHalt('safety')} accessibilityRole="button" accessibilityLabel="Halt session from substitution safety advice" style={({ pressed }) => [styles.danger, pressed && styles.pressed]}><Text style={[styles.dangerText, { fontSize: 15 * typeScale }]}>Stop session</Text></Pressable></View>}
-        {substitution.result.layer1Regression.options.map((option) => <Pressable key={option.movement_id} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}><View style={styles.optionCopy}><Text style={[styles.optionName, { fontSize: 16 * typeScale }]}>{option.name}</Text><Text style={[styles.optionReason, { fontSize: 13 * typeScale }]}>{option.rationale}</Text></View><Text style={styles.optionArrow}>›</Text></Pressable>)}
-        {substitution.result.layer2DaySwap.options.map((option) => <Pressable key={`swap-${option.plannedSlotId}`} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}><View style={styles.optionCopy}><Text style={[styles.optionName, { fontSize: 16 * typeScale }]}>{option.name}</Text><Text style={[styles.optionReason, { fontSize: 13 * typeScale }]}>{option.rationale}</Text></View><Text style={styles.optionArrow}>›</Text></Pressable>)}
-        {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && <Text style={[styles.noOptions, { fontSize: 14 * typeScale }]}>No safe replacement is available with today’s equipment. It is okay to finish here.</Text>}
-      </View>}
-    </ScrollView>
-  </View>;
+        {complete && (
+          <View style={styles.completeCard} accessibilityRole="summary">
+            <Text style={styles.completeTitle}>All planned work is logged.</Text>
+            <Text style={styles.completeBody}>Take the win. There is nothing else you need to decide here.</Text>
+            <CompletedMetrics sets={session.sets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+            <PrimaryButton
+              label="Finish session"
+              onPress={endSession}
+              accessibilityLabel="Finish completed session"
+              style={{ marginTop: theme.space[4] }}
+            />
+          </View>
+        )}
+
+        {!halted && !complete && sessionPlan.length === 0 && (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No exercise is queued.</Text>
+            <Text style={styles.emptyBody}>Return to Coach to create a session plan, then come back here.</Text>
+            <SecondaryButton
+              label="Finish session"
+              onPress={endSession}
+              accessibilityLabel="Finish empty session"
+              style={{ marginTop: theme.space[4] }}
+            />
+          </View>
+        )}
+
+        {!halted && !complete && sessionPlan.length > 0 && (
+          <View style={styles.timeline}>
+            {sessionPlan.map((slot) => {
+              const movement = byId.get(slot.movementId);
+              const logged = loggedCount(slot);
+              const finished = logged >= slot.plannedSets;
+              const active = !finished && currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId;
+              const selectable = mode === 'self_directed' && !finished && !active && !resting;
+
+              if (finished) {
+                const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
+                const latestCompleted = completedSets[0];
+                const bandLabel = latestCompleted?.bandLevel === null || latestCompleted?.bandLevel === undefined
+                  ? null
+                  : bandLadder.find((band) => band.level === latestCompleted.bandLevel)?.label ?? `band ${latestCompleted.bandLevel}`;
+                const metricSummary = latestCompleted?.timeS !== null && latestCompleted?.timeS !== undefined
+                  ? ` · ${secondsText(latestCompleted.timeS)} logged`
+                  : bandLabel === null ? '' : ` · ${bandLabel}`;
+
+                return (
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                    <View style={styles.rail}>
+                      <View style={[styles.dot, styles.dotComplete]}>
+                        <Text style={styles.check}>✓</Text>
+                      </View>
+                    </View>
+                    <View style={styles.completeRow}>
+                      <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                      <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}</Text>
+                      <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                    </View>
+                  </View>
+                );
+              }
+
+              if (!active) {
+                return (
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                    <View style={styles.rail}>
+                      <View style={styles.dot} />
+                    </View>
+                    <Pressable
+                      disabled={!selectable}
+                      onPress={() => chooseSlot(slot)}
+                      accessibilityRole={selectable ? 'button' : 'text'}
+                      accessibilityState={{ disabled: !selectable }}
+                      accessibilityLabel={selectable ? `Choose ${movement?.name ?? 'movement'} as the current exercise` : `${movement?.name ?? 'Movement'}, upcoming, ${targetText(slot)}`}
+                      style={({ pressed }) => [styles.upcomingRow, selectable && styles.upcomingSelectable, pressed && selectable && styles.pressed]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.upcomingName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                        <Text style={styles.upcomingMeta}>{targetText(slot)}</Text>
+                      </View>
+                      {selectable && <Text style={styles.choose}>Choose</Text>}
+                    </Pressable>
+                  </View>
+                );
+              }
+
+              // Active slot
+              return (
+                <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                  {/* Left Active Spine (Chalk marks CURRENT/ACTIVE only) */}
+                  <View style={[styles.rail, styles.railActive]}>
+                    <View style={[styles.dot, styles.dotCurrent]} />
+                  </View>
+
+                  <View style={styles.currentCard}>
+                    {resting ? (
+                      <View style={{ alignItems: 'center', gap: theme.space[3] }}>
+                        {/* Draining chalk barRestTimerCard */}
+                        <RestTimerCard
+                          totalSeconds={rest.seconds}
+                          elapsedSeconds={restRemaining}
+                          style={{ alignSelf: 'stretch' }}
+                        />
+                        <PrimaryButton
+                          label="Ready now"
+                          onPress={readyNow}
+                          accessibilityLabel="Ready now, skip the rest timer"
+                          style={{ alignSelf: 'stretch' }}
+                        />
+                        {upcomingText !== null && <Text style={styles.nextUp}>Next up: {upcomingText}</Text>}
+                      </View>
+                    ) : (
+                      <View style={{ gap: theme.space[3] }}>
+                        <Text style={styles.currentLabel}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
+                        <Text style={styles.movementName}>{movement?.name ?? 'Movement'}</Text>
+                        <Text style={styles.targetLine}>Target {targetText(slot)}{slot.targetRpe === null ? '' : ` · RPE ${slot.targetRpe.toFixed(1)}`}</Text>
+                        <Text style={styles.loadEvidence}>{loadEvidence}</Text>
+
+                        {/* Steppers using the shared primitive */}
+                        <View style={styles.stepperRow}>
+                          <Stepper
+                            label={target?.kind === 'time' ? 'Seconds' : 'Reps'}
+                            value={String(target?.kind === 'time' ? seconds : reps)}
+                            onDecrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n - 5, 5, 3600)) : setReps((n) => clamp(n - 1, 1, 50))}
+                            onIncrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n + 5, 5, 3600)) : setReps((n) => clamp(n + 1, 1, 50))}
+                          />
+                          <Stepper
+                            label="Load kg"
+                            value={loadKg.toFixed(1)}
+                            onDecrement={() => setLoadKg((n) => clamp(n - 2.5, 0, 500))}
+                            onIncrement={() => setLoadKg((n) => clamp(n + 2.5, 0, 500))}
+                          />
+                          <Stepper
+                            label="RPE"
+                            value={rpe.toFixed(1)}
+                            onDecrement={() => setRpe((n) => clamp(n - 0.5, 5, 10))}
+                            onIncrement={() => setRpe((n) => clamp(n + 0.5, 5, 10))}
+                          />
+                        </View>
+
+                        {supportsBands && (
+                          <View style={styles.bandBlock}>
+                            <Text style={styles.bandLabel}>Band</Text>
+                            <View style={styles.bandChoices}>
+                              {bandLadder.map((band) => {
+                                const selectedBand = bandLevel === band.level;
+                                return (
+                                  <Chip
+                                    key={band.level}
+                                    label={band.label}
+                                    selected={selectedBand}
+                                    onPress={() => setBandLevel(selectedBand ? null : band.level)}
+                                    accessibilityLabel={`Band ${band.label}`}
+                                    style={{ margin: theme.space[1] }}
+                                  />
+                                );
+                              })}
+                            </View>
+                          </View>
+                        )}
+
+                        {/* 72pt Primary Action Log Set Button */}
+                        <PrimaryButton
+                          label="Log set"
+                          onPress={logCurrent}
+                          size="log"
+                          accessibilityLabel={`Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`}
+                        />
+
+                        {/* Shared Disclosure Primitive */}
+                        <Disclosure
+                          label="How & why"
+                          open={detailsOpen}
+                          onOpenChange={setDetailsOpen}
+                          accessibilityLabel={detailsOpen ? "How and why, expanded" : "How and why, collapsed"}
+                        >
+                          <View style={{ gap: theme.space[3] }}>
+                            {movement?.coachingIntent != null && <Text style={styles.intent}>{movement.coachingIntent}</Text>}
+                            {setup.length > 0 && (
+                              <View style={styles.copyGroup}>
+                                <Text style={styles.copyHeading}>SET UP</Text>
+                                {setup.map((line, index) => <Text key={`setup-${index}`} style={styles.copyLine}>{index + 1}. {line}</Text>)}
+                              </View>
+                            )}
+                            {cues.length > 0 && (
+                              <View style={styles.copyGroup}>
+                                <Text style={styles.copyHeading}>CUES</Text>
+                                {cues.map((line, index) => <Text key={`cue-${index}`} style={styles.cueLine}>• {line}</Text>)}
+                              </View>
+                            )}
+                            {setup.length === 0 && cues.length === 0 && movement?.coachingIntent == null && (
+                              <Text style={styles.missing}>Curated coaching for this movement is still being reviewed.</Text>
+                            )}
+                            {movement?.videoUrl !== undefined && movement.videoUrl.trim().length > 0 && (
+                              <View style={{ marginTop: theme.space[2] }}>
+                                <SecondaryButton
+                                  label="Open form video"
+                                  onPress={() => { void Linking.openURL(movement.videoUrl); }}
+                                  accessibilityLabel={`Open video for ${movement.name} in your browser`}
+                                  style={{ alignSelf: 'stretch' }}
+                                />
+                              </View>
+                            )}
+                          </View>
+                        </Disclosure>
+
+                        {/* 56pt quick avoidance / discomfort trigger rows */}
+                        <View style={styles.quickRow}>
+                          <SecondaryButton
+                            label="Doesn’t feel right"
+                            onPress={thumbsDown}
+                            accessibilityLabel={`Avoid ${movement?.name ?? 'this movement'} and find a substitution`}
+                            style={{ flex: 1, minHeight: theme.touch.min }}
+                          />
+                          <SecondaryButton
+                            label="Report discomfort"
+                            onPress={() => setSafetyOpen((value) => !value)}
+                            accessibilityLabel="Report discomfort"
+                            style={{ flex: 1, minHeight: theme.touch.min }}
+                          />
+                        </View>
+
+                        {safetyOpen && (
+                          <View style={styles.safety}>
+                            <Text style={styles.safetyPrompt}>Where, and how strong is it?</Text>
+                            <View style={styles.joints}>
+                              {(JOINTS as readonly string[]).map((joint) => {
+                                const selectedJoint = niggleRegion === joint;
+                                return (
+                                  <Chip
+                                    key={joint}
+                                    label={joint.replace(/_/g, ' ')}
+                                    selected={selectedJoint}
+                                    onPress={() => setNiggleRegion(joint)}
+                                    accessibilityLabel={joint.replace(/_/g, ' ')}
+                                    style={{ margin: theme.space[1] }}
+                                  />
+                                );
+                              })}
+                            </View>
+                            <View style={styles.severity}>
+                              {[4, 6, 8].map((severity) => {
+                                const selectedSeverity = niggleSeverity === severity;
+                                const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
+                                return (
+                                  <Chip
+                                    key={severity}
+                                    label={label}
+                                    selected={selectedSeverity}
+                                    onPress={() => setNiggleSeverity(severity)}
+                                    accessibilityLabel={`${label} discomfort, ${severity} of 10`}
+                                    style={{ flex: 1, marginHorizontal: theme.space[1] }}
+                                  />
+                                );
+                              })}
+                            </View>
+                            <View style={{ marginTop: theme.space[3] }}>
+                              <PrimaryButton
+                                label={niggleSeverity >= 8 ? 'Stop session' : 'Find an alternative'}
+                                onPress={submitNiggle}
+                                disabled={niggleRegion === null}
+                                accessibilityLabel="Save discomfort report"
+                              />
+                            </View>
+                          </View>
+                        )}
+
+                        {/* Stop Session outlined full-width SecondaryButton */}
+                        <View style={{ marginTop: theme.space[3] }}>
+                          <SecondaryButton
+                            label="Stop session"
+                            onPress={() => runnerHalt('manual')}
+                            accessibilityLabel="Stop this session"
+                            fullWidth={true}
+                          />
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {!halted && !complete && substitution !== null && (
+          <View style={styles.substitution}>
+            <View style={styles.subHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.subTitle}>Choose an alternative</Text>
+                <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
+              </View>
+              <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>
+                <Text style={styles.closeText}>×</Text>
+              </Pressable>
+            </View>
+            {substitution.result.haltAdvised && (
+              <View style={styles.subHalt}>
+                <Text style={styles.subHaltText}>This report needs a pause rather than another exercise today.</Text>
+                <SecondaryButton
+                  label="Stop session"
+                  onPress={() => runnerHalt('safety')}
+                  accessibilityLabel="Halt session from substitution safety advice"
+                  fullWidth={true}
+                  style={{ marginTop: theme.space[3] }}
+                />
+              </View>
+            )}
+            <View style={{ marginTop: theme.space[3] }}>
+              {substitution.result.layer1Regression.options.map((option) => (
+                <Pressable key={option.movement_id} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
+                  <View style={styles.optionCopy}>
+                    <Text style={styles.optionName}>{option.name}</Text>
+                    <Text style={styles.optionReason}>{option.rationale}</Text>
+                  </View>
+                  <Text style={styles.optionArrow}>›</Text>
+                </Pressable>
+              ))}
+              {substitution.result.layer2DaySwap.options.map((option) => (
+                <Pressable key={`swap-${option.plannedSlotId}`} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
+                  <View style={styles.optionCopy}>
+                    <Text style={styles.optionName}>{option.name}</Text>
+                    <Text style={styles.optionReason}>{option.rationale}</Text>
+                  </View>
+                  <Text style={styles.optionArrow}>›</Text>
+                </Pressable>
+              ))}
+              {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
+                <Text style={styles.noOptions}>No safe replacement is available with today’s equipment. It is okay to finish here.</Text>
+              )}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bg },
-  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 48 },
-  idle: { flex: 1, alignItems: 'flex-start', justifyContent: 'center', padding: 28, backgroundColor: palette.bg },
-  kicker: { color: accent, fontWeight: '800', letterSpacing: 1.2 },
-  idleTitle: { marginTop: 12, color: palette.text, fontWeight: '700', letterSpacing: -.5 },
-  idleBody: { marginTop: 12, maxWidth: 330, color: palette.dim, lineHeight: 23 },
-  header: { marginBottom: 24 },
-  headerTitle: { marginTop: 7, color: palette.text, fontWeight: '700', letterSpacing: -.4 },
-  headerMeta: { marginTop: 8, color: palette.dim },
-  primary: { minHeight: 58, minWidth: 176, marginTop: 24, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start', borderRadius: 12, backgroundColor: accent },
-  primaryPressed: { backgroundColor: '#69F3C4' },
-  primaryText: { color: palette.bg, fontWeight: '800' },
-  timeline: { marginTop: 2 },
-  timelineRow: { flexDirection: 'row', alignItems: 'stretch' },
-  rail: { width: 30, alignItems: 'center', borderRightWidth: 1, borderRightColor: palette.line },
-  dot: { width: 13, height: 13, marginTop: 18, borderRadius: 7, borderWidth: 2, borderColor: palette.dim, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  dotCurrent: { width: 16, height: 16, marginTop: 20, borderColor: accent, backgroundColor: accent },
-  dotComplete: { borderColor: palette.green, backgroundColor: palette.green },
-  check: { color: palette.bg, fontSize: 9, fontWeight: '900' },
-  completeRow: { flex: 1, minHeight: 56, marginLeft: 16, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: palette.line },
-  completeRowName: { color: palette.text, fontWeight: '600' },
-  completeRowMeta: { marginTop: 3, color: palette.green },
-  loggedDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: palette.line },
-  loggedDetailsTrigger: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  loggedDetailsTitle: { color: palette.dim, fontWeight: '700' },
-  loggedDetailsBody: { paddingBottom: 4 },
-  loggedMetricRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: palette.line },
-  loggedMetricTitle: { color: palette.text, fontWeight: '700' },
-  metricAdjustRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  metricAdjust: { minWidth: 54, minHeight: 40, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 8 },
-  metricAdjustText: { color: palette.text, fontWeight: '700' },
-  metricValue: { minWidth: 68, marginHorizontal: 8, color: palette.text, fontWeight: '700', textAlign: 'center' },
-  loggedBandBlock: { marginTop: 10 },
-  loggedBandLabel: { color: palette.dim, fontWeight: '800', letterSpacing: .7, textTransform: 'uppercase' },
-  loggedBandChoices: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6, marginHorizontal: -3 },
-  loggedBandChoice: { minHeight: 36, margin: 3, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 8 },
-  currentCard: { flex: 1, marginLeft: 16, marginBottom: 12, padding: 20, borderWidth: 1, borderColor: accent, borderRadius: 16, backgroundColor: palette.surface },
-  currentLabel: { color: accent, fontWeight: '800', letterSpacing: 1 },
-  movementName: { marginTop: 8, color: palette.text, fontWeight: '700', letterSpacing: -.5 },
-  targetLine: { marginTop: 8, color: palette.text, fontWeight: '600' },
-  loadEvidence: { marginTop: 5, color: palette.dim },
-  stepperRow: { flexDirection: 'row', marginTop: 22, marginHorizontal: -4 },
-  stepper: { flex: 1, minWidth: 0, marginHorizontal: 4, alignItems: 'center' },
-  stepperLabel: { minHeight: 30, color: palette.dim, fontSize: 11, fontWeight: '800', letterSpacing: .55, textTransform: 'uppercase' },
-  stepperButton: { width: '100%', minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 10, backgroundColor: palette.bg },
-  stepperSymbol: { color: palette.text, fontSize: 26, fontWeight: '400' },
-  stepperValue: { minHeight: 37, paddingTop: 8, color: palette.text, fontSize: 17, fontWeight: '700' },
-  logAction: { minHeight: 64, marginTop: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: accent },
-  logActionPressed: { backgroundColor: '#69F3C4' },
-  logText: { color: palette.bg, fontWeight: '800' },
-  restTime: { marginTop: 10, color: palette.text, fontWeight: '700', letterSpacing: -1 },
-  restBody: { marginTop: 6, color: palette.dim },
-  nextUp: { marginTop: 16, color: palette.dim, lineHeight: 19 },
-  upcomingRow: { flex: 1, minHeight: 68, marginLeft: 16, paddingVertical: 13, paddingRight: 8, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: palette.line },
-  upcomingSelectable: { paddingHorizontal: 10, borderRadius: 10, backgroundColor: palette.surface },
-  upcomingName: { color: palette.text, fontWeight: '600' },
-  upcomingMeta: { marginTop: 3, color: palette.dim },
-  choose: { alignSelf: 'center', color: accent, fontSize: 13, fontWeight: '700' },
-  disclosure: { marginTop: 18, borderTopWidth: 1, borderTopColor: palette.line },
-  disclosureTrigger: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  disclosureTitle: { color: palette.text, fontSize: 15, fontWeight: '700' },
-  chevron: { color: palette.dim, fontSize: 20 },
-  disclosureBody: { paddingBottom: 4 },
-  intent: { color: palette.text, lineHeight: 22 },
-  copyGroup: { marginTop: 16 },
-  copyHeading: { marginBottom: 7, color: palette.dim, fontWeight: '800', letterSpacing: .8 },
-  copyLine: { marginBottom: 6, color: palette.text, lineHeight: 22 },
-  missing: { color: palette.dim, lineHeight: 20 },
-  video: { minHeight: 48, marginTop: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: accent, borderRadius: 10 },
-  videoText: { color: accent, fontWeight: '700' },
-  bandBlock: { marginTop: 18 },
-  bandLabel: { color: palette.dim, fontWeight: '800', letterSpacing: .7, textTransform: 'uppercase' },
-  bandChoices: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginHorizontal: -3 },
-  bandChoice: { minHeight: 40, margin: 3, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 9 },
-  bandChoiceSelected: { borderColor: accent, backgroundColor: '#143228' },
-  bandChoiceText: { color: palette.dim, fontSize: 13, fontWeight: '600' },
-  bandChoiceTextSelected: { color: palette.text },
-  quickRow: { flexDirection: 'row', marginTop: 12, marginHorizontal: -4 },
-  quick: { flex: 1, minHeight: 48, marginHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 10 },
-  quickText: { color: palette.text, fontWeight: '600', textAlign: 'center' },
-  safety: { marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: '#1D1A16' },
-  safetyPrompt: { color: palette.text, fontWeight: '600' },
-  joints: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, marginHorizontal: -3 },
-  joint: { minHeight: 36, margin: 3, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 8 },
-  jointSelected: { borderColor: palette.amber, backgroundColor: '#3A2D1C' },
-  jointText: { color: palette.dim, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
-  jointTextSelected: { color: palette.text },
-  severity: { flexDirection: 'row', marginTop: 12, marginHorizontal: -3 },
-  severityButton: { flex: 1, minHeight: 44, marginHorizontal: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 9 },
-  severitySelected: { borderColor: palette.amber, backgroundColor: '#3A2D1C' },
-  severityDanger: { borderColor: palette.red, backgroundColor: '#3B1C1C' },
-  severityText: { color: palette.dim, fontSize: 13, fontWeight: '700' },
-  severityTextSelected: { color: palette.text },
-  safetySubmit: { minHeight: 48, marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: palette.amber },
-  safetySubmitText: { color: palette.bg, fontWeight: '800' },
-  disabled: { opacity: .42 },
-  stop: { minHeight: 44, marginTop: 8, alignItems: 'center', justifyContent: 'center' },
-  stopText: { color: palette.dim, textDecorationLine: 'underline' },
-  haltCard: { padding: 20, borderWidth: 1, borderColor: palette.red, borderRadius: 16, backgroundColor: '#251616' },
-  haltTitle: { color: palette.text, fontWeight: '800' },
-  haltBody: { marginTop: 8, color: palette.text, lineHeight: 22 },
-  danger: { minHeight: 52, marginTop: 18, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start', borderRadius: 11, backgroundColor: palette.red },
-  dangerText: { color: palette.bg, fontWeight: '800' },
-  completeCard: { padding: 20, borderWidth: 1, borderColor: palette.green, borderRadius: 16, backgroundColor: '#13251F' },
-  completeTitle: { color: palette.text, fontWeight: '800' },
-  completeBody: { marginTop: 8, color: palette.text, lineHeight: 22 },
-  emptyCard: { padding: 20, borderWidth: 1, borderColor: palette.line, borderRadius: 16, backgroundColor: palette.surface },
-  emptyTitle: { color: palette.text, fontWeight: '700' },
-  emptyBody: { marginTop: 8, color: palette.dim, lineHeight: 22 },
-  secondary: { minHeight: 52, marginTop: 18, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start', borderWidth: 1, borderColor: palette.line, borderRadius: 11 },
-  secondaryText: { color: palette.text, fontWeight: '700' },
-  substitution: { marginTop: 24, padding: 16, borderWidth: 1, borderColor: accent, borderRadius: 16, backgroundColor: palette.surface },
-  subHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  subTitle: { color: palette.text, fontWeight: '800' },
-  subBody: { maxWidth: 280, marginTop: 5, color: palette.dim, lineHeight: 20 },
-  close: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  closeText: { color: palette.text, fontSize: 27, fontWeight: '300' },
-  subHalt: { marginTop: 14, padding: 13, borderRadius: 10, backgroundColor: '#251616' },
-  subHaltText: { color: palette.text, lineHeight: 21 },
-  option: { minHeight: 64, marginTop: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: palette.line },
-  optionCopy: { flex: 1, paddingRight: 10 },
-  optionName: { color: palette.text, fontWeight: '700' },
-  optionReason: { marginTop: 3, color: palette.dim, lineHeight: 18 },
-  optionArrow: { color: accent, fontSize: 28 },
-  noOptions: { marginTop: 16, color: palette.dim, lineHeight: 20 },
-  pressed: { opacity: .68 },
+  screen: {
+    flex: 1,
+    backgroundColor: theme.color.ink0,
+  },
+  content: {
+    paddingHorizontal: theme.space[4], // 16
+    paddingTop: theme.space[4],
+    paddingBottom: theme.space[6],
+  },
+  header: {
+    marginBottom: theme.space[4],
+  },
+  wordmark: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+    marginBottom: theme.space[3],
+  },
+  kicker: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+  },
+  headerTitle: {
+    ...theme.font.title,
+    color: theme.color.textHi,
+    marginTop: theme.space[1],
+  },
+  headerMeta: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    marginTop: theme.space[2],
+  },
+  idle: {
+    flex: 1,
+    padding: theme.space[5],
+    backgroundColor: theme.color.ink0,
+    justifyContent: 'center',
+  },
+  idleTitle: {
+    ...theme.font.title,
+    color: theme.color.textHi,
+    marginTop: theme.space[3],
+  },
+  idleBody: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    marginTop: theme.space[3],
+    lineHeight: 23,
+  },
+  timeline: {
+    marginTop: theme.space[1],
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  rail: {
+    width: 30,
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: theme.color.line,
+  },
+  railActive: {
+    borderRightColor: theme.color.chalk,
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    marginTop: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.color.textLow,
+    backgroundColor: theme.color.ink0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  dotCurrent: {
+    borderColor: theme.color.chalk,
+    backgroundColor: theme.color.chalk,
+  },
+  dotComplete: {
+    borderColor: theme.color.chalk,
+    backgroundColor: theme.color.chalk,
+  },
+  check: {
+    color: theme.color.ink0,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  completeRow: {
+    flex: 1,
+    minHeight: 56,
+    marginLeft: theme.space[4],
+    paddingVertical: theme.space[3],
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.line,
+  },
+  completeRowName: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    fontWeight: '600',
+  },
+  completeRowMeta: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    marginTop: theme.space[1],
+  },
+  loggedDetails: {
+    marginTop: theme.space[2],
+  },
+  loggedDetailsBody: {
+    paddingBottom: theme.space[1],
+  },
+  loggedMetricRow: {
+    paddingVertical: theme.space[2],
+    borderTopWidth: 1,
+    borderTopColor: theme.color.line,
+  },
+  loggedMetricTitle: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+    fontWeight: '700',
+  },
+  metricAdjustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.space[2],
+  },
+  metricAdjust: {
+    minWidth: 54,
+    minHeight: 40,
+    paddingHorizontal: theme.space[2],
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+  },
+  metricAdjustText: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+  },
+  metricValue: {
+    minWidth: 68,
+    marginHorizontal: theme.space[2],
+    ...theme.font.body,
+    color: theme.color.textHi,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  loggedBandBlock: {
+    marginTop: theme.space[2],
+  },
+  loggedBandLabel: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+  },
+  loggedBandChoices: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: theme.space[2],
+  },
+  currentCard: {
+    flex: 1,
+    marginLeft: theme.space[4],
+    marginBottom: theme.space[3],
+    padding: theme.space[4],
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+  },
+  currentLabel: {
+    ...theme.font.eyebrow,
+    color: theme.color.chalk,
+  },
+  movementName: {
+    ...theme.font.display,
+    color: theme.color.textHi,
+    marginTop: theme.space[2],
+  },
+  targetLine: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    fontWeight: '600',
+    marginTop: theme.space[2],
+  },
+  loadEvidence: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    marginTop: theme.space[1],
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    marginTop: theme.space[4],
+    gap: theme.space[2],
+  },
+  nextUp: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    marginTop: theme.space[3],
+    textAlign: 'center',
+  },
+  upcomingRow: {
+    flex: 1,
+    minHeight: 68,
+    marginLeft: theme.space[4],
+    paddingVertical: theme.space[3],
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.line,
+  },
+  upcomingSelectable: {
+    paddingHorizontal: theme.space[3],
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+  },
+  upcomingName: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    fontWeight: '600',
+  },
+  upcomingMeta: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    marginTop: theme.space[1],
+  },
+  choose: {
+    alignSelf: 'center',
+    ...theme.font.label,
+    color: theme.color.textHi,
+  },
+  intent: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    lineHeight: 22,
+  },
+  copyGroup: {
+    marginTop: theme.space[3],
+  },
+  copyHeading: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+    marginBottom: theme.space[1],
+  },
+  copyLine: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    lineHeight: 22,
+    marginBottom: theme.space[1],
+  },
+  cueLine: {
+    ...theme.font.cue,
+    color: theme.color.textHi,
+    lineHeight: 28,
+    marginBottom: theme.space[1],
+  },
+  missing: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    lineHeight: 20,
+  },
+  bandBlock: {
+    marginTop: theme.space[3],
+  },
+  bandLabel: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+  },
+  bandChoices: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: theme.space[2],
+  },
+  quickRow: {
+    flexDirection: 'row',
+    marginTop: theme.space[3],
+    gap: theme.space[2],
+  },
+  safety: {
+    marginTop: theme.space[3],
+    padding: theme.space[3],
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+  },
+  safetyPrompt: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    fontWeight: '600',
+  },
+  joints: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: theme.space[2],
+  },
+  severity: {
+    flexDirection: 'row',
+    marginTop: theme.space[3],
+  },
+  haltCard: {
+    padding: theme.space[4],
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+  },
+  haltTitle: {
+    ...theme.font.title,
+    color: theme.color.textHi,
+  },
+  haltBody: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    lineHeight: 22,
+    marginTop: theme.space[2],
+  },
+  completeCard: {
+    padding: theme.space[4],
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+  },
+  completeTitle: {
+    ...theme.font.title,
+    color: theme.color.textHi,
+  },
+  completeBody: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    lineHeight: 22,
+    marginTop: theme.space[2],
+  },
+  emptyCard: {
+    padding: theme.space[4],
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+  },
+  emptyTitle: {
+    ...theme.font.title,
+    color: theme.color.textHi,
+  },
+  emptyBody: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    lineHeight: 22,
+    marginTop: theme.space[2],
+  },
+  substitution: {
+    marginTop: theme.space[4],
+    padding: theme.space[4],
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+  },
+  subHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  subTitle: {
+    ...theme.font.title,
+    color: theme.color.textHi,
+  },
+  subBody: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    lineHeight: 20,
+    marginTop: theme.space[1],
+  },
+  close: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeText: {
+    color: theme.color.textHi,
+    fontSize: 27,
+    fontWeight: '300',
+  },
+  subHalt: {
+    marginTop: theme.space[3],
+    padding: theme.space[3],
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+  },
+  subHaltText: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    lineHeight: 21,
+  },
+  option: {
+    minHeight: 64,
+    marginTop: theme.space[2],
+    paddingVertical: theme.space[2],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: theme.color.line,
+  },
+  optionCopy: {
+    flex: 1,
+    paddingRight: theme.space[2],
+  },
+  optionName: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    fontWeight: '700',
+  },
+  optionReason: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    lineHeight: 18,
+    marginTop: theme.space[1],
+  },
+  optionArrow: {
+    color: theme.color.textMid,
+    fontSize: 28,
+  },
+  noOptions: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    lineHeight: 20,
+    marginTop: theme.space[3],
+  },
+  pressed: {
+    opacity: 0.68,
+  },
+
+  // Outcome view styles (Phase 18 §1i)
+  outcomeContainer: {
+    flex: 1,
+    backgroundColor: theme.color.ink0,
+    padding: theme.space[4],
+  },
+  outcomeMain: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[5],
+  },
+  outcomeDash: {
+    width: 24,
+    height: 3,
+    backgroundColor: theme.color.line,
+    marginBottom: 28,
+    alignSelf: 'center',
+  },
+  outcomeText: {
+    ...theme.font.cue,
+    color: theme.color.textHi,
+    textAlign: 'center',
+    maxWidth: 300,
+  },
+  outcomeDate: {
+    ...theme.font.label,
+    color: theme.color.textLow,
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  outcomeFooter: {
+    paddingBottom: theme.space[4],
+  },
 });

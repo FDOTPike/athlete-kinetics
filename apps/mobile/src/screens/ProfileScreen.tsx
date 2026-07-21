@@ -5,9 +5,14 @@
  * layer, persisted to the single-row user_profile table on change (no save
  * button to forget). Keyboard-light: chips for enums, ±steppers for numbers;
  * free text only for injury/mobility notes.
+ *
+ * Law 1: Zero hex literals in screen files — use theme tokens.
+ * Law 2: Selected chips = inverted white fill (textHi fill, ink0 text). NOT chalk.
+ * Law 3: Zero red/amber/green anywhere.
+ * Law 4: Touch targets >= 56pt.
  */
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -19,11 +24,26 @@ import {
   type EquipmentItem,
   type UserProfile,
 } from '@ak/inference';
-import { palette, useStore } from '../state/useStore';
+import { theme } from '../theme/theme';
+import { useStore } from '../state/useStore';
+import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
 import InfoTip from '../components/InfoTip';
 
+const OUTCOME_LABELS: Record<string, string> = {
+  followed_plan: 'Plan followed',
+  adapted_session: 'Session adapted',
+  stopped_safely: 'Session stopped safely',
+  session_recorded: 'Session recorded',
+};
+
+const formatFinalizedDate = (ms: number): string => {
+  if (ms <= 0) return '—';
+  const d = new Date(ms);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 // ---------------------------------------------------------------------------
-// Primitives
+// Primitives consuming frozen components from components/ui
 // ---------------------------------------------------------------------------
 interface ChipRowProps<T extends string> {
   label: string;
@@ -41,23 +61,15 @@ function ChipRow<T extends string>({ label, options, value, onSelect, tip }: Chi
         {tip !== undefined && <InfoTip term={tip} />}
       </View>
       <View style={styles.chipWrap}>
-        {options.map((opt) => {
-          const active = opt === value;
-          return (
-            <Pressable
-              key={opt}
-              onPress={() => onSelect(opt)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`${label}: ${opt.replace(/_/g, ' ')}`}
-              style={[styles.chip, active && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                {opt.replace(/_/g, ' ').toUpperCase()}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {options.map((opt) => (
+          <Chip
+            key={opt}
+            label={opt.replace(/_/g, ' ').toUpperCase()}
+            selected={opt === value}
+            onPress={() => onSelect(opt)}
+            accessibilityLabel={`${label}: ${opt.replace(/_/g, ' ')}`}
+          />
+        ))}
       </View>
     </View>
   );
@@ -73,33 +85,17 @@ interface NumberRowProps {
 function NumberRow({ label, display, onDec, onInc, tip }: NumberRowProps): React.JSX.Element {
   return (
     <View style={styles.field}>
-      <View style={styles.fieldLabelRow}>
-        <Text style={styles.fieldLabel}>{label}</Text>
-        {tip !== undefined && <InfoTip term={tip} />}
-      </View>
-      <View style={styles.numberRow}>
-        <Pressable
-          onPress={onDec}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label}`}
-          style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
-        >
-          <Text style={styles.numBtnText}>−</Text>
-        </Pressable>
-        <Text style={styles.numValue} accessibilityLabel={`${label} ${display}`}>
-          {display}
-        </Text>
-        <Pressable
-          onPress={onInc}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Increase ${label}`}
-          style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
-        >
-          <Text style={styles.numBtnText}>+</Text>
-        </Pressable>
-      </View>
+      {tip !== undefined && (
+        <View style={styles.fieldLabelRow}>
+          <InfoTip term={tip} />
+        </View>
+      )}
+      <Stepper
+        label={label}
+        value={display}
+        onDecrement={onDec}
+        onIncrement={onInc}
+      />
     </View>
   );
 }
@@ -147,7 +143,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           onEndEditing={commitText}
           keyboardType="numeric"
           placeholder="—"
-          placeholderTextColor={palette.dim}
+          placeholderTextColor={theme.color.textLow}
           maxLength={6}
           accessibilityLabel={`${label} one rep max in kilograms, type to set`}
         />
@@ -192,6 +188,19 @@ export default function ProfileScreen(): React.JSX.Element {
   const createAthlete = useStore((s) => s.createAthlete);
   const renameAthleteEntry = useStore((s) => s.renameAthleteEntry);
   const deleteAthlete = useStore((s) => s.deleteAthlete);
+  const loadRecentOutcomes = useStore((s) => s.loadRecentOutcomes);
+
+  // Hydrate recent outcomes in effect (never query directly in render body!)
+  const [recentOutcomes, setRecentOutcomes] = useState<{ outcomeKind: string; finalizedAtMs: number }[]>([]);
+  useEffect(() => {
+    setRecentOutcomes(loadRecentOutcomes(20));
+  }, [activeAthleteId, session, loadRecentOutcomes]);
+
+  // In-canvas double-confirm states (P2 & P5)
+  const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
+  const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
+  const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
+  const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
 
   // Coach Mode local UI state (collapsed by default — a beginner never needs it).
   const [coachOpen, setCoachOpen] = useState(false);
@@ -208,15 +217,10 @@ export default function ProfileScreen(): React.JSX.Element {
   const [mobilityText, setMobilityText] = useState(
     profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'),
   );
-  // Resync the free-text fields ONLY when the active profile slot changes (a
-  // switch) — NOT on per-keystroke saves (those keep the same active slot), so
-  // typing is never reformatted mid-edit. Without this, editing after a switch
-  // would persist the previous profile's notes into the newly loaded one.
   const activeSlotId = profileSlots.find((p) => p.isActive)?.slotId ?? null;
   useEffect(() => {
     setInjuryText(profile.injury_flags.map((f) => `${f.region}: ${f.note}`).join('\n'));
     setMobilityText(profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'));
-    // Intentionally keyed on the active slot, not `profile` (see comment above).
   }, [activeSlotId]);
 
   const parseNotes = (text: string): UserProfile['injury_flags'] =>
@@ -233,6 +237,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
       <Text style={styles.subheading}>
         These answers are hard limits on every prescription — the coach can tighten
@@ -296,14 +301,12 @@ export default function ProfileScreen(): React.JSX.Element {
         <TextInput
           style={styles.notesInput}
           value={injuryText}
-          // Saved on every keystroke: blur/tab-switch ordering can never
-          // drop the text (field-tested: onEndEditing alone lost input).
           onChangeText={(t) => {
             setInjuryText(t);
             saveProfile({ injury_flags: parseNotes(t) });
           }}
           placeholder="knee: old MCL strain 2024"
-          placeholderTextColor={palette.dim}
+          placeholderTextColor={theme.color.textLow}
           multiline
           accessibilityLabel="Historical injuries, one per line"
         />
@@ -321,7 +324,7 @@ export default function ProfileScreen(): React.JSX.Element {
             saveProfile({ mobility_limits: parseNotes(t) });
           }}
           placeholder="ankle: limited dorsiflexion"
-          placeholderTextColor={palette.dim}
+          placeholderTextColor={theme.color.textLow}
           multiline
           accessibilityLabel="Mobility limitations, one per line"
         />
@@ -346,26 +349,20 @@ export default function ProfileScreen(): React.JSX.Element {
                   : 'Checking Health Connect…'}
         </Text>
         {(biometricsStatus === 'idle' || biometricsStatus === 'denied') && (
-          <Pressable
+          <Chip
+            label={biometricsStatus === 'idle' ? 'CONNECT' : 'TRY AGAIN'}
+            selected={false}
             onPress={() => { void requestBiometricsAccess(); }}
-            accessibilityRole="button"
             accessibilityLabel="Connect Health Connect and grant read permissions"
-            style={styles.presetChip}
-          >
-            <Text style={styles.presetChipText}>
-              {biometricsStatus === 'idle' ? 'CONNECT' : 'TRY AGAIN'}
-            </Text>
-          </Pressable>
+          />
         )}
         {biometricsStatus === 'ready' && (
-          <Pressable
+          <Chip
+            label="SYNC NOW"
+            selected={false}
             onPress={() => { void syncBiometrics(); }}
-            accessibilityRole="button"
             accessibilityLabel="Sync biometrics from Health Connect now"
-            style={styles.presetChip}
-          >
-            <Text style={styles.presetChipText}>SYNC NOW</Text>
-          </Pressable>
+          />
         )}
       </View>
 
@@ -404,69 +401,46 @@ export default function ProfileScreen(): React.JSX.Element {
             { value: null, label: 'USE TIER DEFAULT' },
             { value: 'guided' as const, label: 'GUIDED' },
             { value: 'self_directed' as const, label: 'SELF-DIRECTED' },
-          ]).map((option) => {
-            const active = uiPreferences.sessionModeOverride === option.value;
-            return (
-              <Pressable
-                key={option.label}
-                onPress={() => saveUiPreferences({ sessionModeOverride: option.value })}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`${option.label}${active ? ', selected' : ''}`}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
+          ]).map((option) => (
+            <Chip
+              key={option.label}
+              label={option.label}
+              selected={uiPreferences.sessionModeOverride === option.value}
+              onPress={() => saveUiPreferences({ sessionModeOverride: option.value })}
+              accessibilityLabel={`${option.label}`}
+            />
+          ))}
         </View>
         <Text style={[styles.fieldLabel, styles.preferenceLabel]}>READINESS DETAIL</Text>
         <View style={styles.chipWrap}>
-          {(['summary', 'full'] as const).map((value) => {
-            const active = uiPreferences.readinessDetail === value;
-            return (
-              <Pressable
-                key={value}
-                onPress={() => saveUiPreferences({ readinessDetail: value })}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`${value} readiness detail${active ? ', selected' : ''}`}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{value.toUpperCase()}</Text>
-              </Pressable>
-            );
-          })}
+          {(['summary', 'full'] as const).map((value) => (
+            <Chip
+              key={value}
+              label={value.toUpperCase()}
+              selected={uiPreferences.readinessDetail === value}
+              onPress={() => saveUiPreferences({ readinessDetail: value })}
+              accessibilityLabel={`${value} readiness detail`}
+            />
+          ))}
         </View>
         <Text style={[styles.fieldLabel, styles.preferenceLabel]}>REST TIMER</Text>
-        <Pressable
+        <Chip
+          label={uiPreferences.restTimerEnabled ? 'ON' : 'OFF'}
+          selected={uiPreferences.restTimerEnabled}
           onPress={() => saveUiPreferences({ restTimerEnabled: !uiPreferences.restTimerEnabled })}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: uiPreferences.restTimerEnabled }}
           accessibilityLabel={`Rest timer ${uiPreferences.restTimerEnabled ? 'on' : 'off'}`}
-          style={[styles.chip, uiPreferences.restTimerEnabled && styles.chipActive, styles.preferenceToggle]}
-        >
-          <Text style={[styles.chipText, uiPreferences.restTimerEnabled && styles.chipTextActive]}>
-            {uiPreferences.restTimerEnabled ? 'ON' : 'OFF'}
-          </Text>
-        </Pressable>
+        />
         <Text style={[styles.fieldLabel, styles.preferenceLabel]}>APP TEXT SIZE</Text>
         <View style={styles.chipWrap}>
-          {(['system', 'large', 'extra_large'] as const).map((value) => {
-            const active = uiPreferences.textScale === value;
-            return (
-              <Pressable
-                key={value}
-                onPress={() => saveUiPreferences({ textScale: value })}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`${value.replace(/_/g, ' ')} text size${active ? ', selected' : ''}`}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{value.replace(/_/g, ' ').toUpperCase()}</Text>
-              </Pressable>
-            );
-          })}
+          {(['system', 'large', 'extra_large'] as const).map((value) => (
+            <Chip
+              key={value}
+              label={value.replace(/_/g, ' ').toUpperCase()}
+              selected={uiPreferences.textScale === value}
+              onPress={() => saveUiPreferences({ textScale: value })}
+              accessibilityLabel={`${value.replace(/_/g, ' ')} text size`}
+            />
+          ))}
         </View>
         <Text style={styles.fieldHint}>
           Your device accessibility text size is always respected; this adds an optional app preference on top.
@@ -488,25 +462,40 @@ export default function ProfileScreen(): React.JSX.Element {
               style={styles.bandInput}
               accessibilityLabel={`Band level ${band.level} label`}
             />
-            <Pressable
-              onPress={() => deleteBandLevel(band.level)}
-              accessibilityRole="button"
-              accessibilityLabel={`Remove band level ${band.level}`}
-              style={styles.bandDelete}
-            >
-              <Text style={styles.bandDeleteText}>REMOVE</Text>
-            </Pressable>
+            {confirmingDeleteBandLevel === band.level ? (
+              <View style={styles.confirmBox}>
+                <Text style={styles.confirmText}>
+                  Remove band level {band.level} ({band.label})?
+                </Text>
+                <QuietAction
+                  label={`Confirm remove level ${band.level}`}
+                  onPress={() => {
+                    deleteBandLevel(band.level);
+                    setConfirmingDeleteBandLevel(null);
+                  }}
+                  style={styles.confirmActionIsolated}
+                />
+                <QuietAction
+                  label="Keep band level"
+                  onPress={() => setConfirmingDeleteBandLevel(null)}
+                />
+              </View>
+            ) : (
+              <QuietAction
+                label="REMOVE"
+                onPress={() => setConfirmingDeleteBandLevel(band.level)}
+                accessibilityLabel={`Remove band level ${band.level}`}
+              />
+            )}
           </View>
         ))}
         {nextBandLevel <= 20 && (
-          <Pressable
+          <Chip
+            label="ADD BAND LEVEL"
+            selected={false}
             onPress={() => saveBandLevel(nextBandLevel, `Band ${nextBandLevel}`)}
-            accessibilityRole="button"
             accessibilityLabel={`Add band level ${nextBandLevel}`}
-            style={styles.presetChip}
-          >
-            <Text style={styles.presetChipText}>ADD BAND LEVEL</Text>
-          </Pressable>
+          />
         )}
       </View>
       <View style={styles.field}>
@@ -518,23 +507,23 @@ export default function ProfileScreen(): React.JSX.Element {
         </Text>
         <View style={styles.chipWrap}>
           {(Object.keys(EQUIPMENT_PRESETS) as (keyof typeof EQUIPMENT_PRESETS)[]).map((preset) => (
-            <Pressable
+            <Chip
               key={preset}
+              label={preset.replace(/_/g, ' ').toUpperCase()}
+              selected={false}
               onPress={() => saveProfile({ equipment_inventory: [...EQUIPMENT_PRESETS[preset]] })}
-              accessibilityRole="button"
               accessibilityLabel={`Use ${preset.replace(/_/g, ' ')} equipment preset`}
-              style={styles.presetChip}
-            >
-              <Text style={styles.presetChipText}>{preset.replace(/_/g, ' ').toUpperCase()}</Text>
-            </Pressable>
+            />
           ))}
         </View>
         <View style={[styles.chipWrap, styles.inventoryWrap]}>
           {EQUIPMENT_ITEMS.map((item: EquipmentItem) => {
             const owned = profile.equipment_inventory.includes(item);
             return (
-              <Pressable
+              <Chip
                 key={item}
+                label={item.replace(/_/g, ' ').toUpperCase()}
+                selected={owned}
                 onPress={() =>
                   saveProfile({
                     equipment_inventory: owned
@@ -542,18 +531,29 @@ export default function ProfileScreen(): React.JSX.Element {
                       : [...profile.equipment_inventory, item],
                   })
                 }
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: owned }}
                 accessibilityLabel={`${item.replace(/_/g, ' ')}, ${owned ? 'owned' : 'not owned'}`}
-                style={[styles.chip, owned && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, owned && styles.chipTextActive]}>
-                  {item.replace(/_/g, ' ').toUpperCase()}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </View>
+      </View>
+
+      {/* ---- Training-Decisions Disclosure (P3: recent 20 outcomes, ink.1 hairlines) ---- */}
+      <View style={styles.mgmtSection}>
+        <Disclosure label="TRAINING-DECISIONS DISCLOSURE">
+          {recentOutcomes.length === 0 ? (
+            <Text style={styles.fieldHint}>No finalized session outcomes recorded yet.</Text>
+          ) : (
+            recentOutcomes.map((row, i) => (
+              <ListRow
+                key={`${row.finalizedAtMs}-${i}`}
+                label={OUTCOME_LABELS[row.outcomeKind] ?? 'Session recorded'}
+                detail={formatFinalizedDate(row.finalizedAtMs)}
+                style={styles.clinicalRow}
+              />
+            ))
+          )}
+        </Disclosure>
       </View>
 
       {/* ---- Profile Management (local multi-tenancy + state wipe) ---- */}
@@ -566,54 +566,72 @@ export default function ProfileScreen(): React.JSX.Element {
           Logged training history is kept.
         </Text>
         <View style={styles.chipWrap}>
-          {profileSlots.map((slot) => (
-            <Pressable
-              key={slot.slotId}
-              onPress={() => {
-                if (slot.isActive) return;
-                Alert.alert(
-                  `Switch to ${slot.name}?`,
-                  'Saves your current profile, loads this one, and wipes the active block and today’s reports/niggles. Training history is kept.',
-                  [
-                    { text: 'CANCEL', style: 'cancel' },
-                    { text: 'SWITCH', style: 'destructive', onPress: () => switchProfile(slot.slotId) },
-                  ],
-                );
-              }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: slot.isActive }}
-              accessibilityLabel={`${slot.name} profile${slot.isActive ? ', active' : ''}`}
-              style={[styles.chip, slot.isActive && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, slot.isActive && styles.chipTextActive]}>
-                {slot.name.toUpperCase()}{slot.isActive ? ' ✓' : ''}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Pressable
-          onPress={() => {
-            // Audit A2: wiping the block a live session was prescribed from
-            // leaves the session logging against archived rows.
-            if (session !== null) {
-              Alert.alert('Session active', 'End the active session before deleting the block and state.');
-              return;
-            }
-            Alert.alert(
-              'Delete current block & state?',
-              'Hard-deletes the active 4-week block and today’s injury reports/niggles so you can regenerate a fresh block. Logged sessions and history are kept. This cannot be undone.',
-              [
-                { text: 'CANCEL', style: 'cancel' },
-                { text: 'DELETE', style: 'destructive', onPress: wipeActiveBlockState },
-              ],
+          {profileSlots.map((slot) => {
+            const isConfirming = confirmingSwitchProfileId === slot.slotId;
+            return (
+              <View key={slot.slotId} style={styles.slotBlock}>
+                <Chip
+                  label={`${slot.name.toUpperCase()}${slot.isActive ? ' ✓' : ''}`}
+                  selected={slot.isActive}
+                  onPress={() => {
+                    if (!slot.isActive) {
+                      setConfirmingSwitchProfileId(isConfirming ? null : slot.slotId);
+                    }
+                  }}
+                  accessibilityLabel={`${slot.name} profile${slot.isActive ? ', active' : ''}`}
+                />
+                {isConfirming && (
+                  <View style={styles.confirmBox}>
+                    <Text style={styles.confirmText}>
+                      Switch to {slot.name}? Saves current profile, loads this one, and wipes active block.
+                    </Text>
+                    <QuietAction
+                      label={`Confirm switch to ${slot.name}`}
+                      onPress={() => {
+                        switchProfile(slot.slotId);
+                        setConfirmingSwitchProfileId(null);
+                      }}
+                      style={styles.confirmActionIsolated}
+                    />
+                    <QuietAction
+                      label="Cancel switch"
+                      onPress={() => setConfirmingSwitchProfileId(null)}
+                    />
+                  </View>
+                )}
+              </View>
             );
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Delete the current block and today's state"
-          style={styles.wipeBtn}
-        >
-          <Text style={styles.wipeBtnText}>DELETE CURRENT BLOCK &amp; STATE</Text>
-        </Pressable>
+          })}
+        </View>
+        {!confirmingWipeBlock ? (
+          <QuietAction
+            label="DELETE CURRENT BLOCK & STATE"
+            onPress={() => {
+              if (session !== null) return;
+              setConfirmingWipeBlock(true);
+            }}
+            accessibilityLabel="Delete the current block and today's state"
+            style={styles.wipeAction}
+          />
+        ) : (
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmText}>
+              Hard-deletes the active 4-week block and today&apos;s injury reports/niggles so you can regenerate a fresh block. Logged sessions and history are kept. This cannot be undone.
+            </Text>
+            <QuietAction
+              label="Confirm delete current block & state"
+              onPress={() => {
+                wipeActiveBlockState();
+                setConfirmingWipeBlock(false);
+              }}
+              style={styles.confirmActionIsolated}
+            />
+            <QuietAction
+              label="Keep current block"
+              onPress={() => setConfirmingWipeBlock(false)}
+            />
+          </View>
+        )}
       </View>
 
       {/* ---- Coach Mode (Phase 15): one database file per athlete ---- */}
@@ -641,6 +659,7 @@ export default function ProfileScreen(): React.JSX.Element {
             {athletes.map((a) => {
               const isActive = a.id === activeAthleteId;
               const deletable = !isActive && a.id !== 'default';
+              const isConfirmingDelete = confirmingDeleteAthleteId === a.id;
               if (editingAthleteId === a.id) {
                 return (
                   <View key={a.id} style={styles.athleteRow}>
@@ -652,80 +671,71 @@ export default function ProfileScreen(): React.JSX.Element {
                       autoFocus
                       accessibilityLabel={`New name for ${a.name}`}
                     />
-                    <Pressable
+                    <QuietAction
+                      label="SAVE"
                       onPress={() => {
                         renameAthleteEntry(a.id, editAthleteName);
                         setEditingAthleteId(null);
                       }}
-                      accessibilityRole="button"
                       accessibilityLabel="Save name"
-                      style={styles.athleteBtn}
-                    >
-                      <Text style={styles.athleteBtnTextGreen}>SAVE</Text>
-                    </Pressable>
-                    <Pressable
+                    />
+                    <QuietAction
+                      label="CANCEL"
                       onPress={() => setEditingAthleteId(null)}
-                      accessibilityRole="button"
                       accessibilityLabel="Cancel rename"
-                      style={styles.athleteBtn}
-                    >
-                      <Text style={styles.athleteBtnText}>✕</Text>
-                    </Pressable>
+                    />
                   </View>
                 );
               }
               return (
-                <View key={a.id} style={styles.athleteRow}>
-                  <Pressable
-                    style={styles.athleteMain}
-                    disabled={isActive}
-                    onPress={() =>
-                      Alert.alert(
-                        `Switch to ${a.name}?`,
-                        'Closes the current athlete’s database and opens this one. Each athlete’s history is fully separate. Not possible mid-session.',
-                        [
-                          { text: 'CANCEL', style: 'cancel' },
-                          { text: 'SWITCH', onPress: () => switchAthlete(a.id) },
-                        ],
-                      )
-                    }
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isActive }}
-                    accessibilityLabel={`Athlete ${a.name}${isActive ? ', active' : ', tap to switch'}`}
-                  >
-                    <Text style={[styles.athleteName, isActive && styles.athleteNameActive]}>
-                      {a.name.toUpperCase()}{isActive ? '  ✓ ACTIVE' : ''}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setEditingAthleteId(a.id);
-                      setEditAthleteName(a.name);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Rename ${a.name}`}
-                    style={styles.athleteBtn}
-                  >
-                    <Text style={styles.athleteBtnText}>RENAME</Text>
-                  </Pressable>
-                  {deletable && (
+                <View key={a.id} style={styles.athleteBlock}>
+                  <View style={styles.athleteRow}>
                     <Pressable
-                      onPress={() =>
-                        Alert.alert(
-                          `Delete ${a.name}?`,
-                          'Removes this athlete AND their entire training database. This cannot be undone.',
-                          [
-                            { text: 'CANCEL', style: 'cancel' },
-                            { text: 'DELETE', style: 'destructive', onPress: () => deleteAthlete(a.id) },
-                          ],
-                        )
-                      }
+                      style={styles.athleteMain}
+                      disabled={isActive}
+                      onPress={() => switchAthlete(a.id)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Delete ${a.name} and their database`}
-                      style={styles.athleteBtn}
+                      accessibilityState={{ selected: isActive }}
+                      accessibilityLabel={`Athlete ${a.name}${isActive ? ', active' : ', tap to switch'}`}
                     >
-                      <Text style={styles.athleteBtnTextRed}>✕</Text>
+                      <Text style={[styles.athleteName, isActive && styles.athleteNameActive]}>
+                        {a.name.toUpperCase()}{isActive ? '  ✓ ACTIVE' : ''}
+                      </Text>
                     </Pressable>
+                    <QuietAction
+                      label="RENAME"
+                      onPress={() => {
+                        setEditingAthleteId(a.id);
+                        setEditAthleteName(a.name);
+                      }}
+                      accessibilityLabel={`Rename ${a.name}`}
+                    />
+                    {deletable && (
+                      <QuietAction
+                        label="DELETE"
+                        onPress={() => setConfirmingDeleteAthleteId(isConfirmingDelete ? null : a.id)}
+                        accessibilityLabel={`Delete ${a.name} and their database`}
+                      />
+                    )}
+                  </View>
+                  {isConfirmingDelete && (
+                    <View style={styles.confirmBox}>
+                      <Text style={styles.confirmText}>
+                        Confirm delete — this removes {a.name} AND their entire training database. This cannot be undone.
+                      </Text>
+                      <QuietAction
+                        label={`Confirm delete ${a.name}`}
+                        onPress={() => {
+                          deleteAthlete(a.id);
+                          setConfirmingDeleteAthleteId(null);
+                        }}
+                        style={styles.confirmActionIsolated}
+                      />
+                      <QuietAction
+                        label="Keep athlete"
+                        onPress={() => setConfirmingDeleteAthleteId(null)}
+                      />
+                    </View>
                   )}
                 </View>
               );
@@ -736,34 +746,19 @@ export default function ProfileScreen(): React.JSX.Element {
                 value={newAthleteName}
                 onChangeText={setNewAthleteName}
                 placeholder="New athlete's name"
-                placeholderTextColor={palette.dim}
+                placeholderTextColor={theme.color.textLow}
                 maxLength={24}
                 accessibilityLabel="New athlete's name"
               />
-              <Pressable
+              <QuietAction
+                label="ADD ATHLETE"
                 onPress={() => {
                   const trimmed = newAthleteName.trim();
-                  Alert.alert(
-                    `Add ${trimmed.length > 0 ? trimmed : 'a new athlete'}?`,
-                    'Creates a brand-new, empty athlete with their own database and starts their setup questionnaire.',
-                    [
-                      { text: 'CANCEL', style: 'cancel' },
-                      {
-                        text: 'ADD',
-                        onPress: () => {
-                          createAthlete(trimmed);
-                          setNewAthleteName('');
-                        },
-                      },
-                    ],
-                  );
+                  createAthlete(trimmed.length > 0 ? trimmed : 'New Athlete');
+                  setNewAthleteName('');
                 }}
-                accessibilityRole="button"
                 accessibilityLabel="Add a new athlete"
-                style={[styles.athleteBtn, styles.athleteAddBtn]}
-              >
-                <Text style={styles.athleteBtnTextGreen}>ADD</Text>
-              </Pressable>
+              />
             </View>
           </View>
         )}
@@ -774,158 +769,130 @@ export default function ProfileScreen(): React.JSX.Element {
 
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.bg },
-  content: { padding: 20, paddingBottom: 48 },
-  heading: { color: palette.text, fontSize: 22, fontWeight: '800', letterSpacing: 2 },
+  screen: { flex: 1, backgroundColor: theme.color.ink0 },
+  content: { padding: theme.space[4], paddingBottom: theme.space[7] },
+  wordmark: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+    marginBottom: theme.space[1],
+  },
+  heading: { ...theme.font.title, color: theme.color.textHi },
   mgmtSection: {
-    marginTop: 12,
-    paddingTop: 18,
+    marginTop: theme.space[3],
+    paddingTop: theme.space[4],
     borderTopWidth: 1,
-    borderTopColor: palette.line,
+    borderTopColor: theme.color.line,
   },
-  mgmtHeading: { color: palette.text, fontSize: 16, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
-  wipeBtn: {
-    minHeight: 60,
-    borderRadius: 12,
-    backgroundColor: '#2A1416',
-    borderWidth: 2,
-    borderColor: palette.red,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 14,
-  },
-  wipeBtnText: { color: palette.red, fontSize: 15, fontWeight: '800', letterSpacing: 1.5 },
-  subheading: { color: palette.dim, fontSize: 13, lineHeight: 19, marginTop: 6, marginBottom: 18 },
-  field: { marginBottom: 18 },
-  fieldLabel: { color: palette.dim, fontSize: 12, letterSpacing: 1.5 },
-  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  fieldHint: { color: palette.dim, fontSize: 12, lineHeight: 17, marginBottom: 10 },
-  presetChip: {
-    minHeight: 44,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  presetChipText: { color: palette.amber, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  inventoryWrap: { marginTop: 10 },
-  preferenceLabel: { marginTop: 16, marginBottom: 8 },
-  preferenceToggle: { alignSelf: 'flex-start', minWidth: 92 },
-  bandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  bandLevel: { width: 68, color: palette.dim, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  mgmtHeading: { ...theme.font.cue, color: theme.color.textHi, marginBottom: theme.space[2] },
+  subheading: { ...theme.font.body, color: theme.color.textMid, marginTop: theme.space[1], marginBottom: theme.space[4] },
+  field: { marginBottom: theme.space[4] },
+  fieldLabel: { ...theme.font.eyebrow, color: theme.color.textLow },
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.space[2] },
+  fieldHint: { ...theme.font.label, color: theme.color.textMid, marginBottom: theme.space[2] },
+  inventoryWrap: { marginTop: theme.space[2] },
+  preferenceLabel: { marginTop: theme.space[4], marginBottom: theme.space[2] },
+  bandRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2], marginBottom: theme.space[2] },
+  bandLevel: { width: 68, ...theme.font.label, color: theme.color.textLow },
   bandInput: {
-    flex: 1, minHeight: 48, borderRadius: 10, backgroundColor: palette.surface,
-    borderWidth: 1, borderColor: palette.line, color: palette.text, fontSize: 15, paddingHorizontal: 12,
+    flex: 1, minHeight: theme.touch.min, borderRadius: theme.radius.control, backgroundColor: theme.color.ink1,
+    borderWidth: 1, borderColor: theme.color.line, color: theme.color.textHi, ...theme.font.body, paddingHorizontal: theme.space[3],
   },
-  bandDelete: { minHeight: 48, paddingHorizontal: 10, justifyContent: 'center', alignItems: 'center' },
-  bandDeleteText: { color: palette.red, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    minHeight: 48,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipActive: { borderColor: palette.green, backgroundColor: '#10241D' },
-  chipText: { color: palette.dim, fontSize: 13, fontWeight: '700' },
-  chipTextActive: { color: palette.green },
-  numberRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
+  numberRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3] },
   numBtn: {
-    width: 64,
-    height: 56,
-    borderRadius: 10,
-    backgroundColor: palette.surface,
+    width: theme.touch.min,
+    height: theme.touch.min,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
     borderWidth: 1,
-    borderColor: palette.line,
+    borderColor: theme.color.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  numBtnPressed: { backgroundColor: '#22222A' },
-  numBtnText: { color: palette.text, fontSize: 28, fontWeight: '700', lineHeight: 32 },
-  numValue: {
-    flex: 1,
-    color: palette.text,
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
+  numBtnPressed: { backgroundColor: theme.color.ink0 },
+  numBtnText: { color: theme.color.textHi, fontSize: 28, fontWeight: '700', lineHeight: 32 },
   oneRmInput: {
     flex: 1,
-    minHeight: 56,
-    borderRadius: 10,
-    backgroundColor: palette.surface,
+    minHeight: theme.touch.min,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
     borderWidth: 1,
-    borderColor: palette.line,
-    color: palette.text,
+    borderColor: theme.color.line,
+    color: theme.color.textHi,
     fontSize: 26,
     fontWeight: '800',
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
-    paddingVertical: 6,
+    paddingVertical: theme.space[1],
   },
   notesInput: {
     minHeight: 72,
-    borderRadius: 10,
-    backgroundColor: palette.surface,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
     borderWidth: 1,
-    borderColor: palette.line,
-    color: palette.text,
-    fontSize: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: theme.color.line,
+    color: theme.color.textHi,
+    ...theme.font.body,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
     textAlignVertical: 'top',
   },
   coachHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    minHeight: 56,
+    minHeight: theme.touch.min,
   },
-  coachToggle: { color: palette.dim, fontSize: 15, fontWeight: '800', letterSpacing: 1 },
-  athleteRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  coachToggle: { ...theme.font.body, color: theme.color.textMid },
+  athleteBlock: { marginBottom: theme.space[2] },
+  athleteRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2], marginBottom: theme.space[2] },
   athleteMain: {
     flex: 1,
-    minHeight: 56,
+    minHeight: theme.touch.min,
     justifyContent: 'center',
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: palette.surface,
+    paddingHorizontal: theme.space[3],
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
     borderWidth: 1,
-    borderColor: palette.line,
+    borderColor: theme.color.line,
   },
-  athleteName: { color: palette.dim, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  athleteNameActive: { color: palette.green },
-  athleteBtn: {
-    minHeight: 56,
-    minWidth: 56,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  athleteAddBtn: { borderColor: palette.green },
-  athleteBtnText: { color: palette.dim, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  athleteBtnTextGreen: { color: palette.green, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  athleteBtnTextRed: { color: palette.red, fontSize: 14, fontWeight: '800' },
+  athleteName: { ...theme.font.body, color: theme.color.textMid },
+  athleteNameActive: { color: theme.color.textHi, fontWeight: '700' },
   athleteEditInput: {
     flex: 1,
-    minHeight: 56,
-    borderRadius: 10,
-    backgroundColor: palette.surface,
+    minHeight: theme.touch.min,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
     borderWidth: 1,
-    borderColor: palette.line,
-    color: palette.text,
-    fontSize: 15,
-    paddingHorizontal: 12,
+    borderColor: theme.color.line,
+    color: theme.color.textHi,
+    ...theme.font.body,
+    paddingHorizontal: theme.space[3],
+  },
+  wipeAction: {
+    marginTop: theme.space[3],
+  },
+  slotBlock: {
+    marginBottom: theme.space[2],
+  },
+  confirmBox: {
+    backgroundColor: theme.color.ink1,
+    borderRadius: theme.radius.control,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    padding: theme.space[4], // 16pt padding
+    marginTop: theme.space[4], // >=16pt isolation
+    marginBottom: theme.space[4], // >=16pt isolation
+    gap: theme.space[4], // >=16pt isolation between elements inside confirm box
+  },
+  confirmText: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+  },
+  confirmActionIsolated: {
+    marginTop: theme.space[4], // >=16pt isolation per Law 4 & F2 spec
+  },
+  clinicalRow: {
+    borderBottomColor: theme.color.ink1,
   },
 });

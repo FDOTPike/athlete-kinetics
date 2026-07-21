@@ -210,3 +210,20 @@ test('COACH renders a rest-day placeholder when no session is scheduled today', 
   // No exercise slot data should appear
   expect(screen.queryByText('Goblet Squat')).toBeNull();
 });
+
+test('READY renders rest-day statement and metrics list when no session is scheduled', () => {
+  mockState = baseState({
+    todayPlan: null,
+    uiPreferences: { sessionModeOverride: null, readinessDetail: 'full', restTimerEnabled: true, textScale: 'system' },
+  });
+  render(<ReadinessScreen />);
+
+  // Wordmark check
+  expect(screen.getByText('pikeMethods')).toBeOnTheScreen();
+  // Display type title check
+  expect(screen.getByText('Rest day.')).toBeOnTheScreen();
+  expect(screen.getByText("That's the work.")).toBeOnTheScreen();
+  // Metrics check (rendered directly as quiet list, not hidden under Full readiness metrics disclosure)
+  expect(screen.getByText('Readiness score')).toBeOnTheScreen();
+  expect(screen.getByText('82 / 100')).toBeOnTheScreen();
+});

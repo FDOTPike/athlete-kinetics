@@ -21,15 +21,17 @@ import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
 import BlockScreen from './screens/BlockScreen';
+import LibraryScreen from './screens/LibraryScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 
-type Tab = 'readiness' | 'session' | 'coach' | 'athlete';
+type Tab = 'readiness' | 'session' | 'coach' | 'library' | 'athlete';
 
 const TABS: readonly { key: Tab; label: string }[] = [
   { key: 'readiness', label: 'READY' },
   { key: 'session', label: 'SESSION' },
   { key: 'coach', label: 'COACH' },
+  { key: 'library', label: 'LIBRARY' },
   { key: 'athlete', label: 'ATHLETE' },
 ];
 
@@ -122,6 +124,7 @@ function AppShell(): React.JSX.Element {
             )}
             {tab === 'session' && <SessionScreen />}
             {tab === 'coach' && <BlockScreen onSessionStarted={() => setTab('session')} />}
+            {tab === 'library' && <LibraryScreen />}
             {tab === 'athlete' && <ProfileScreen />}
           </>
         )}
@@ -139,8 +142,8 @@ function AppShell(): React.JSX.Element {
                 accessibilityLabel={`${t.label} tab`}
                 style={styles.tabBtn}
               >
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
                 <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
               </Pressable>
             );
           })}
@@ -172,10 +175,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  tabText: { color: palette.dim, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  tabTextActive: { color: palette.green },
-  tabIndicator: { height: 3, width: 36, borderRadius: 2, backgroundColor: 'transparent' },
-  tabIndicatorActive: { backgroundColor: palette.green },
+  tabText: { color: palette.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
+  tabTextActive: { color: palette.text, fontWeight: '800' },
+  tabIndicator: { height: 3, width: 32, backgroundColor: 'transparent' },
+  tabIndicatorActive: { backgroundColor: palette.chalk },
   crashBox: { flex: 1, justifyContent: 'center', padding: 28, gap: 12 },
   crashTitle: { color: palette.red, fontSize: 22, fontWeight: '800', letterSpacing: 3 },
   crashText: { color: palette.text, fontSize: 15, lineHeight: 21 },

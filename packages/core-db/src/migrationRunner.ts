@@ -62,6 +62,14 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'session_slot_target' },         // 023
   { type: 'table', name: 'profile_ui_preference' },       // 023
   { type: 'table', name: 'session_runner_checkpoint' },   // 023
+  { type: 'table', name: 'set_dose_target' },             // 026
+  { type: 'table', name: 'session_outcome' },             // 026
+  { type: 'trigger', name: 'trg_set_dose_target_bi' },    // 026
+  { type: 'trigger', name: 'trg_set_dose_target_bu' },    // 026
+  { type: 'trigger', name: 'trg_set_dose_target_bd' },    // 026
+  { type: 'trigger', name: 'trg_session_outcome_bi' },    // 026
+  { type: 'trigger', name: 'trg_session_outcome_bu' },    // 026
+  { type: 'trigger', name: 'trg_session_outcome_bd' },    // 026
 ];
 
 function userVersion(db: MigrationDb): number {

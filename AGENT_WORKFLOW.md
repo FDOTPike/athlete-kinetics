@@ -157,21 +157,25 @@ black, minimalist. Until his design drops:
 - Never edit files during an audit unless explicitly asked; if you do fix
   something, say so and run typecheck + affected gates BEFORE reporting.
 
-## 10. Current state + queue (as of 2026-07-14)
+## 10. Current state + queue (as of 2026-07-17)
 - Library: 96 movements (30 shipped + 016's 51 + 017's 15); 68/434 staged
   curated; 366 remain (~15/ticket via the batch generator → next slot 019).
 - Chains: handstand-push-up + pull-up complete (ranks 0–4); progression
   engine + store resolver live; per-chain policy table ready (time chains
   qualify on seconds).
 - 018: logging modes (time), set_metric, band_ladder, progression_policy.
-- Session runner engine gated (verify:runner) — UI pending redesign.
+- Phase 17 utility-first runner, guided/self-directed session UI, persistence,
+  timed targets, and accessibility foundations are wired. Visual Checkpoint C
+  remains parked until Francis supplies the pikeMethods template.
+- Phase 18 Training Decision Record: pure classifier, migration 026, store wiring,
+  and transaction gates are complete. Visual Checkpoint C remains template-blocked.
 - P19 release blockers (Francis's machine): Android release keystore, iOS
   bundle id, embedder revision+hash pins (script prints sha256 to pin).
 - Open Francis decisions: DB Romanian Deadlift → whitelist?; quarantined
   categories (stretching/plyo/olympic/strongman) in or out; shipped prefix
   arrays that overlap variant rows (trim in a future migration?).
 - Queue: batch 05+ curation → P17 S2 guided UI + S5 library browser (with
-  the pikeMethods template) → P18 rewards → P19 Play Store (open closed
+  the pikeMethods template) → P18 Training Decision Record → P19 Play Store (open closed
   testing EARLY: 12 testers × 14 continuous days).
 
 ---

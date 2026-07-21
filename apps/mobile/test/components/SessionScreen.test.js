@@ -8,16 +8,27 @@ jest.mock('@ak/inference', () => ({
   JOINTS: ['shoulder', 'knee'],
   nextUp: jest.fn((runner) => {
     const current = runner.slots[runner.slotIndex];
+    if (current === undefined) return null;
     const completed = runner.slotSetCounts[runner.slotIndex] ?? 0;
     const nextSetIndex = runner.phase === 'working' ? completed + 2 : completed + 1;
-    return nextSetIndex <= current.sets ? { slot: current, setIndex: nextSetIndex } : { slot: runner.slots[1], setIndex: 1 };
+    if (nextSetIndex <= current.sets) return { slot: current, setIndex: nextSetIndex };
+    const next = runner.slots.find((_, index) => index > runner.slotIndex);
+    return next === undefined ? null : { slot: next, setIndex: 1 };
   }),
   targetLoadKg: jest.fn(() => 42.5),
 }));
-jest.mock('../../src/state/useStore', () => ({
-  palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-  useStore: (selector) => selector(mockState),
-}));
+jest.mock('../../src/state/useStore', () => {
+  const storeFunc = (selector) => selector(mockState);
+  storeFunc.setState = jest.fn((updates) => {
+    Object.assign(mockState, updates);
+  });
+  storeFunc.getState = jest.fn(() => mockState);
+
+  return {
+    palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
+    useStore: storeFunc,
+  };
+});
 
 const movement = (id, name, overrides = {}) => ({
   movement_id: id, name, pattern: 'push_h', is_compound: true, beginnerOk: true,
@@ -57,6 +68,10 @@ const state = (overrides = {}) => ({
   runner: runner(), sessionMode: 'guided',
   uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
   bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
+  loadSessionOutcome: jest.fn(() => null),
+  dismissOutcome: jest.fn(function() {
+    mockState.lastEndedSessionId = null;
+  }),
   ...overrides,
 });
 
@@ -124,6 +139,65 @@ test('a beginner never renders a legacy plan containing an advanced movement', (
   render(<SessionScreen />);
   expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
   expect(screen.queryByText('Advanced movement')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Finish the blocked session'));
+  expect(mockState.runnerHalt).toHaveBeenCalledWith('safety');
+  expect(mockState.endSession).toHaveBeenCalledTimes(1);
+  expect(mockState.runnerHalt.mock.invocationCallOrder[0]).toBeLessThan(
+    mockState.endSession.mock.invocationCallOrder[0],
+  );
+});
+
+test('a triage halt on a live runner persists safety before ending the session', () => {
+  mockState = state({
+    lastTriage: {
+      kind: 'matched',
+      directive: { halt: true, vector: { coaching_cue: 'Stop and reassess this symptom.' } },
+    },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText('Finish the halted session'));
+  expect(mockState.runnerHalt).toHaveBeenCalledWith('safety');
+  expect(mockState.endSession).toHaveBeenCalledTimes(1);
+  expect(mockState.runnerHalt.mock.invocationCallOrder[0]).toBeLessThan(
+    mockState.endSession.mock.invocationCallOrder[0],
+  );
+});
+
+test('a completed runner takes precedence over a later triage halt', () => {
+  mockState = state({
+    runner: runner({ phase: 'complete', slotIndex: 1, setIndex: 0, slotSetCounts: [3, 3], loggedSets: 6 }),
+    lastTriage: {
+      kind: 'matched',
+      directive: { halt: true, vector: { coaching_cue: 'A later report should not rewrite the terminal runner.' } },
+    },
+  });
+  render(<SessionScreen />);
+  expect(screen.getByLabelText('Finish completed session')).toBeOnTheScreen();
+  expect(screen.queryByLabelText('Finish the halted session')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Finish completed session'));
+  expect(mockState.runnerHalt).not.toHaveBeenCalled();
+  expect(mockState.endSession).toHaveBeenCalledTimes(1);
+});
+
+test('an empty complete runner remains disposable instead of showing completion recognition', () => {
+  mockState = state({
+    sessionPlan: [],
+    activeSessionPlanSlotId: null,
+    runner: runner({
+      slots: [],
+      slotIndex: 0,
+      setIndex: 0,
+      phase: 'complete',
+      slotSetCounts: [],
+      loggedSets: 0,
+    }),
+  });
+  render(<SessionScreen />);
+  expect(screen.getByLabelText('Finish empty session')).toBeOnTheScreen();
+  expect(screen.queryByLabelText('Finish completed session')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Finish empty session'));
+  expect(mockState.runnerHalt).not.toHaveBeenCalled();
+  expect(mockState.endSession).toHaveBeenCalledTimes(1);
 });
 
 test('completed timed and band metrics are disclosed and edit through the store', () => {
@@ -233,4 +307,77 @@ test('relaunch recovery: a runner in resting phase displays correct next-set pre
   expect(screen.getByText('Next up: First movement · set 3 of 3')).toBeOnTheScreen();
   // The skip action must remain available (rest timer can still be skipped)
   expect(screen.getByLabelText('Ready now, skip the rest timer')).toBeOnTheScreen();
+});
+
+test('post-session Outcome view displays correct copy for all mappings (beginner & non-beginner) and formats date correctly', () => {
+  // Test beginner mappings
+  const testTimestamp = new Date('2026-07-21T12:00:00Z').getTime(); // Tuesday, 21 July
+
+  const beginnerOutcomes = [
+    { kind: 'followed_plan', expected: "You followed today's plan. Recover well." },
+    { kind: 'adapted_session', expected: "You adjusted the session and kept the work appropriate." },
+    { kind: 'stopped_safely', expected: "Stopping was the right call. Recovery is part of the plan." },
+    { kind: 'session_recorded', expected: "Your session is saved. Continue from here next time." },
+  ];
+
+  for (const { kind, expected } of beginnerOutcomes) {
+    const loadSessionOutcome = jest.fn(() => ({
+      outcomeKind: kind,
+      finalizedAtMs: testTimestamp,
+    }));
+    mockState = state({
+      session: null,
+      lastEndedSessionId: 42,
+      profile: { training_age: 'beginner', equipment_inventory: [], session_duration_cap_min: 60 },
+      loadSessionOutcome,
+    });
+
+    const { unmount } = render(<SessionScreen />);
+    expect(screen.getByText(expected)).toBeOnTheScreen();
+    expect(screen.getByText('Session saved · Tuesday 21 July')).toBeOnTheScreen();
+    unmount();
+  }
+
+  // Test non-beginner mappings
+  const nonBeginnerOutcomes = [
+    { kind: 'followed_plan', expected: "Plan followed." },
+    { kind: 'adapted_session', expected: "Session adapted." },
+    { kind: 'stopped_safely', expected: "Session stopped safely." },
+    { kind: 'session_recorded', expected: "Session recorded." },
+  ];
+
+  for (const { kind, expected } of nonBeginnerOutcomes) {
+    const loadSessionOutcome = jest.fn(() => ({
+      outcomeKind: kind,
+      finalizedAtMs: testTimestamp,
+    }));
+    mockState = state({
+      session: null,
+      lastEndedSessionId: 42,
+      profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+      loadSessionOutcome,
+    });
+
+    const { unmount } = render(<SessionScreen />);
+    expect(screen.getByText(expected)).toBeOnTheScreen();
+    unmount();
+  }
+
+  // Test fallback/neutral mapping (S3: when db returns null)
+  mockState = state({
+    session: null,
+    lastEndedSessionId: 42,
+    profile: { training_age: 'beginner', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadSessionOutcome: jest.fn(() => null),
+  });
+
+  const { unmount } = render(<SessionScreen />);
+  expect(screen.getByText("Your session is saved. Continue from here next time.")).toBeOnTheScreen();
+  expect(screen.getByText('Session saved')).toBeOnTheScreen();
+  
+  // Test dismissing the outcome screen (S2)
+  expect(screen.getByLabelText("Back to Ready")).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText("Back to Ready"));
+  expect(mockState.dismissOutcome).toHaveBeenCalled();
+  unmount();
 });

@@ -6,22 +6,16 @@
  * available through inline disclosure.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
-import { palette, useStore } from '../state/useStore';
+import { useStore } from '../state/useStore';
+import { theme } from '../theme/theme';
 import {
-  Body,
-  Caption,
+  PrimaryButton,
+  SecondaryButton,
+  ListRow,
   Disclosure,
-  FocusCard,
-  PrimaryAction,
-  ProgressRow,
-  Screen,
-  SecondaryAction,
-  Section,
-  StatusMark,
-  type FocusTone,
-} from '../components/FocusPrimitives';
+} from '../components/ui';
 
 export type AthleteState = 'OPTIMAL' | 'OVERREACHED' | 'RECOVERY';
 
@@ -42,7 +36,6 @@ interface ReadinessMeta {
   title: string;
   recommendation: string;
   explanation: string;
-  tone: FocusTone;
 }
 
 const STATE_META: Record<AthleteState, ReadinessMeta> = {
@@ -51,21 +44,18 @@ const STATE_META: Record<AthleteState, ReadinessMeta> = {
     title: 'Ready to train',
     recommendation: 'Follow today\'s plan at the effort it prescribes.',
     explanation: 'Your recent training load and recovery signals support the planned work.',
-    tone: 'success',
   },
   RECOVERY: {
     label: 'Recovery focus',
     title: 'Train steadily today',
     recommendation: 'Keep the planned work controlled and leave room to recover.',
     explanation: 'Your signals support training with a conservative, steady effort.',
-    tone: 'caution',
   },
   OVERREACHED: {
     label: 'Recovery needed',
     title: 'Make recovery the work',
     recommendation: 'Reduce training stress today and follow the adjusted plan.',
     explanation: 'Your recent load or readiness score indicates that extra recovery is the useful next step.',
-    tone: 'danger',
   },
 };
 
@@ -74,7 +64,6 @@ const HALT_META: ReadinessMeta = {
   title: 'Resolve today\'s safety report',
   recommendation: 'Training is paused for today. Review the report before doing more work.',
   explanation: 'A safety report set a halt for today. The Coach view keeps the related guidance visible.',
-  tone: 'danger',
 };
 
 const format = (value: number | null, digits: number, suffix = ''): string =>
@@ -120,8 +109,8 @@ export default function ReadinessScreen({
   if (status === 'booting') {
     return (
       <CenteredState>
-        <ActivityIndicator size="large" color={palette.green} />
-        <Caption>Preparing your training data.</Caption>
+        <ActivityIndicator size="large" color={theme.color.textHi} />
+        <Text style={styles.infoText}>Preparing your training data.</Text>
       </CenteredState>
     );
   }
@@ -129,58 +118,67 @@ export default function ReadinessScreen({
   if (status === 'error') {
     return (
       <CenteredState>
-        <FocusCard eyebrow="READY" title="Training data needs attention" tone="danger">
-          <Body>{error ?? 'The database could not be opened.'}</Body>
-          <PrimaryAction label="Retry" onPress={boot} accessibilityLabel="Retry database boot" />
-        </FocusCard>
+        <View style={styles.card}>
+          <Text style={styles.wordmark}>READY</Text>
+          <Text style={styles.title}>Training data needs attention</Text>
+          <Text style={styles.body}>{error ?? 'The database could not be opened.'}</Text>
+          <PrimaryButton label="Retry" onPress={boot} accessibilityLabel="Retry database boot" />
+        </View>
       </CenteredState>
     );
   }
 
   if (vector === null) {
     return (
-      <Screen testID="readiness-screen">
-        <FocusCard eyebrow="READY" title="No readiness yet" tone="default">
-          <Body>
-            Log a session and sync any available telemetry to build today\'s recommendation.
-          </Body>
-          <PrimaryAction
+      <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer} testID="readiness-screen">
+        <View style={styles.header}>
+          <Text style={styles.wordmark}>pikeMethods</Text>
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.wordmark}>READY</Text>
+          <Text style={styles.title}>No readiness yet</Text>
+          <Text style={styles.body}>
+            Log a session and sync any available telemetry to build today's recommendation.
+          </Text>
+          <PrimaryButton
             label="Load demo athlete"
             onPress={loadDemoAthlete}
             accessibilityLabel="Load the 180 day demo athlete"
           />
-          <SecondaryAction label="Refresh" onPress={refreshVector} />
-          <Disclosure label="Reset and load demo" tone="danger">
-            {!confirmReset ? (
-              <>
-                <Caption>
-                  This removes training history, telemetry, blocks, and today\'s reports. Your
-                  profile and saved profile slots remain.
-                </Caption>
-                <SecondaryAction
-                  label="Continue to reset"
-                  onPress={() => setConfirmReset(true)}
-                  accessibilityLabel="Continue to reset training data and load demo"
-                />
-              </>
-            ) : (
-              <>
-                <Body>This cannot be undone. Reset the training data and load the demo athlete?</Body>
-                <PrimaryAction
-                  label="Reset training data and load demo"
-                  onPress={() => {
-                    resetTrainingData();
-                    loadDemoAthlete();
-                    setConfirmReset(false);
-                  }}
-                  accessibilityLabel="Confirm reset training data and load demo athlete"
-                />
-                <SecondaryAction label="Keep my data" onPress={() => setConfirmReset(false)} />
-              </>
-            )}
-          </Disclosure>
-        </FocusCard>
-      </Screen>
+          <SecondaryButton label="Refresh" onPress={refreshVector} />
+          <View style={{ marginTop: theme.space[3] }}>
+            <Disclosure label="Reset and load demo">
+              {!confirmReset ? (
+                <View style={{ gap: theme.space[3] }}>
+                  <Text style={styles.caption}>
+                    This removes training history, telemetry, blocks, and today's reports. Your
+                    profile and saved profile slots remain.
+                  </Text>
+                  <SecondaryButton
+                    label="Continue to reset"
+                    onPress={() => setConfirmReset(true)}
+                    accessibilityLabel="Continue to reset training data and load demo"
+                  />
+                </View>
+              ) : (
+                <View style={{ gap: theme.space[3] }}>
+                  <Text style={styles.body}>This cannot be undone. Reset the training data and load the demo athlete?</Text>
+                  <PrimaryButton
+                    label="Reset training data and load demo"
+                    onPress={() => {
+                      resetTrainingData();
+                      loadDemoAthlete();
+                      setConfirmReset(false);
+                    }}
+                    accessibilityLabel="Confirm reset training data and load demo athlete"
+                  />
+                  <SecondaryButton label="Keep my data" onPress={() => setConfirmReset(false)} />
+                </View>
+              )}
+            </Disclosure>
+          </View>
+        </View>
+      </ScrollView>
     );
   }
 
@@ -188,106 +186,255 @@ export default function ReadinessScreen({
   const athleteState = classifyReadiness(vector);
   const meta = halted ? HALT_META : STATE_META[athleteState];
   const hasLiveSession = session !== null;
+  const isRestDay = todayPlan === null && !halted && !hasLiveSession;
+
   const primaryLabel = halted
     ? 'Review safety report'
     : hasLiveSession
       ? 'Open active session'
       : todayPlan !== null
-        ? 'Review today\'s plan'
+        ? "Review today's plan"
         : athleteState === 'OVERREACHED'
           ? 'Review recovery plan'
           : 'Review your plan';
   const primaryHandler = hasLiveSession ? onOpenSession : onOpenCoach;
 
+  // Quiet readiness metrics rows
+  const renderRawMetricsList = () => {
+    return (
+      <View style={{ gap: theme.space[1] }}>
+        <ListRow
+          label="Readiness score"
+          detail={`${Math.round(vector.readiness_score)} / 100`}
+        />
+        <ListRow label="Acute to chronic load" detail={format(vector.acwr, 2)} />
+        <ListRow label="HRV deviation" detail={formatSigned(vector.hrv_z, 1)} />
+        <ListRow label="Sleep efficiency" detail={format(vector.sleep_efficiency_pct, 1, '%')} />
+        <ListRow label="Night SpO2" detail={format(vector.spo2_night_mean, 1, '%')} />
+        <ListRow label="Acute load" detail={format(vector.acute_load_kg, 0, ' kg')} />
+        <ListRow label="Chronic load" detail={format(vector.chronic_load_kg, 0, ' kg')} />
+        <ListRow label="HRV component" detail={vector.hrv_component.toFixed(1)} />
+        <ListRow label="Load component" detail={vector.load_component.toFixed(1)} />
+        <ListRow label="Sleep component" detail={vector.sleep_component.toFixed(1)} />
+        <ListRow label="SpO2 component" detail={vector.spo2_component.toFixed(1)} />
+
+        <View style={{ marginTop: theme.space[3] }}>
+          <Disclosure label="Recent readiness" hint="Last seven recorded days">
+            {trend.length === 0 ? (
+              <Text style={styles.caption}>No recent readiness history is available.</Text>
+            ) : (
+              <View style={{ gap: theme.space[1] }}>
+                {trend.slice(-7).reverse().map((point) => (
+                  <ListRow
+                    key={point.date}
+                    label={point.date}
+                    detail={`${Math.round(point.readiness_score)} / 100`}
+                  />
+                ))}
+              </View>
+            )}
+          </Disclosure>
+        </View>
+      </View>
+    );
+  };
+
+  if (isRestDay) {
+    return (
+      <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer} testID="readiness-screen">
+        {/* Wordmark top-left */}
+        <View style={styles.header}>
+          <Text style={styles.wordmark}>pikeMethods</Text>
+        </View>
+
+        {/* Display-type Rest day statement */}
+        <Text style={styles.displayMain}>Rest day.</Text>
+        <Text style={styles.displaySub}>That's the work.</Text>
+
+        <View style={styles.section}>
+          <Disclosure label="Why this recommendation" hint="The short explanation first">
+            <Text style={styles.body}>{meta.explanation}</Text>
+            <View style={{ marginTop: theme.space[4] }}>
+              <SecondaryButton label="Refresh readiness" onPress={refreshVector} />
+            </View>
+          </Disclosure>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>READINESS METRICS</Text>
+          {uiPreferences.readinessDetail === 'full' ? (
+            renderRawMetricsList()
+          ) : (
+            <Text style={styles.caption}>
+              Full metrics are hidden for this profile. You can change that in Athlete.
+            </Text>
+          )}
+        </View>
+
+        <Text style={styles.date}>Readiness for {today}</Text>
+      </ScrollView>
+    );
+  }
+
   return (
-    <Screen testID="readiness-screen">
-      <FocusCard eyebrow="TODAY" title={meta.title} tone={meta.tone}>
-        <StatusMark label={meta.label} tone={meta.tone} />
-        <Body>{meta.recommendation}</Body>
-        {hasLiveSession && <Caption>Your active workout is ready to resume.</Caption>}
+    <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer} testID="readiness-screen">
+      {/* Wordmark top-left */}
+      <View style={styles.header}>
+        <Text style={styles.wordmark}>pikeMethods</Text>
+      </View>
+
+      <View style={[styles.card, styles.cardActiveSpine]}>
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusBadgeText}>{meta.label.toUpperCase()}</Text>
+        </View>
+        <Text style={styles.title}>{meta.title}</Text>
+        <Text style={styles.body}>{meta.recommendation}</Text>
+        {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
         {!hasLiveSession && todayPlan !== null && (
-          <Caption>{todayPlan.focus} is planned today.</Caption>
+          <Text style={styles.caption}>{todayPlan.focus} is planned today.</Text>
         )}
         {!hasLiveSession && todayPlan === null && !halted && (
-          <Caption>
+          <Text style={styles.caption}>
             {athleteState === 'OVERREACHED'
               ? 'There is no training task to force today.'
               : 'There is no planned session for today.'}
-          </Caption>
+          </Text>
         )}
         {primaryHandler !== undefined ? (
-          <PrimaryAction label={primaryLabel} onPress={primaryHandler} />
+          <PrimaryButton label={primaryLabel} onPress={primaryHandler} />
         ) : (
-          <Caption style={styles.navigationHint}>Open the relevant tab below to continue.</Caption>
+          <Text style={styles.navigationHint}>Open the relevant tab below to continue.</Text>
         )}
-      </FocusCard>
+      </View>
 
-      <Section title="Details">
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>DETAILS</Text>
         <Disclosure label="Why this recommendation" hint="The short explanation first">
-          <Body>{meta.explanation}</Body>
+          <Text style={styles.body}>{meta.explanation}</Text>
           {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
-            <Caption style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Caption>
+            <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
           )}
-          {uiPreferences.readinessDetail === 'full' ? (
-          <Disclosure label="Full readiness metrics" hint="Numbers and recent history">
-            <ProgressRow
-              label="Readiness score"
-              value={`${Math.round(vector.readiness_score)} / 100`}
-              tone={meta.tone}
-            />
-            <ProgressRow label="Acute to chronic load" value={format(vector.acwr, 2)} />
-            <ProgressRow label="HRV deviation" value={formatSigned(vector.hrv_z, 1)} />
-            <ProgressRow label="Sleep efficiency" value={format(vector.sleep_efficiency_pct, 1, '%')} />
-            <ProgressRow label="Night SpO2" value={format(vector.spo2_night_mean, 1, '%')} />
-            <ProgressRow label="Acute load" value={format(vector.acute_load_kg, 0, ' kg')} />
-            <ProgressRow label="Chronic load" value={format(vector.chronic_load_kg, 0, ' kg')} />
-            <ProgressRow label="HRV component" value={vector.hrv_component.toFixed(1)} />
-            <ProgressRow label="Load component" value={vector.load_component.toFixed(1)} />
-            <ProgressRow label="Sleep component" value={vector.sleep_component.toFixed(1)} />
-            <ProgressRow label="SpO2 component" value={vector.spo2_component.toFixed(1)} />
-            <Disclosure label="Recent readiness" hint="Last seven recorded days">
-              {trend.length === 0 ? (
-                <Caption>No recent readiness history is available.</Caption>
-              ) : (
-                trend.slice(-7).reverse().map((point) => (
-                  <ProgressRow
-                    key={point.date}
-                    label={point.date}
-                    value={`${Math.round(point.readiness_score)} / 100`}
-                    tone={
-                      point.readiness_score >= 70
-                        ? 'success'
-                        : point.readiness_score >= 40
-                          ? 'caution'
-                          : 'danger'
-                    }
-                  />
-                ))
-              )}
-            </Disclosure>
-          </Disclosure>
-          ) : (
-            <Caption>Full metrics are hidden for this profile. You can change that in Athlete.</Caption>
-          )}
-          <SecondaryAction label="Refresh readiness" onPress={refreshVector} />
+          <View style={{ marginTop: theme.space[3] }}>
+            {uiPreferences.readinessDetail === 'full' ? (
+              <Disclosure label="Full readiness metrics" hint="Numbers and recent history">
+                {renderRawMetricsList()}
+              </Disclosure>
+            ) : (
+              <Text style={styles.caption}>
+                Full metrics are hidden for this profile. You can change that in Athlete.
+              </Text>
+            )}
+          </View>
+          <View style={{ marginTop: theme.space[3] }}>
+            <SecondaryButton label="Refresh readiness" onPress={refreshVector} />
+          </View>
         </Disclosure>
-      </Section>
+      </View>
 
-      <Caption style={styles.date}>Readiness for {today}</Caption>
-    </Screen>
+      <Text style={styles.date}>Readiness for {today}</Text>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: theme.color.ink0,
+  },
+  contentContainer: {
+    paddingHorizontal: theme.space[4], // 16
+    paddingTop: theme.space[4],        // 16
+    paddingBottom: theme.space[6],     // 32
+  },
+  header: {
+    marginBottom: theme.space[4],
+  },
+  wordmark: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+  },
   center: {
     flex: 1,
-    backgroundColor: palette.bg,
+    backgroundColor: theme.color.ink0,
     alignItems: 'stretch',
     justifyContent: 'center',
-    padding: 24,
-    gap: 16,
+    padding: theme.space[5],
+    gap: theme.space[4],
   },
-  navigationHint: { textAlign: 'center', marginTop: 4 },
-  haltCue: { color: palette.amber, marginTop: 2 },
-  date: { textAlign: 'center', marginTop: 24 },
+  card: {
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    padding: theme.space[5],
+    gap: theme.space[4],
+  },
+  cardActiveSpine: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.color.chalk,
+  },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[1],
+  },
+  statusBadgeText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+  },
+  title: {
+    ...theme.font.title,
+    color: theme.color.textHi,
+  },
+  body: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+  },
+  caption: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  displayMain: {
+    ...theme.font.display,
+    color: theme.color.textHi,
+    marginTop: theme.space[4],
+  },
+  displaySub: {
+    ...theme.font.display,
+    color: theme.color.textMid,
+    marginBottom: theme.space[5],
+  },
+  section: {
+    marginTop: theme.space[5],
+    gap: theme.space[3],
+  },
+  sectionTitle: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+  },
+  navigationHint: {
+    textAlign: 'center',
+    marginTop: theme.space[2],
+    ...theme.font.label,
+    color: theme.color.textMid,
+  },
+  haltCue: {
+    color: theme.color.chalk,
+    marginTop: theme.space[2],
+    ...theme.font.body,
+  },
+  date: {
+    textAlign: 'center',
+    marginTop: theme.space[5],
+    ...theme.font.label,
+    color: theme.color.textLow,
+  },
+  infoText: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    textAlign: 'center',
+  },
 });

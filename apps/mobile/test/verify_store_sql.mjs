@@ -27,7 +27,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
   '021_taxonomy_corrections.sql',
   '022_set_target.sql', '023_phase17_session_foundation.sql',
-  '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql']) {
+  '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql',
+  '026_phase18_session_outcome.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -176,11 +177,27 @@ const resetTables = [...resetBody.matchAll(/DELETE FROM (\w+)'/g)].map((m) => m[
 a('resetTrainingData body found with its unconditional DELETEs', resetTables.length >= 15, `${resetTables.length} tables`);
 a('reset NEVER clears athlete_profile / movement / profile_slot (settings survive)',
   !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
+a('reset explicitly clears both immutable Phase 18 side-cars',
+  ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
+a('reset removes each immutable side-car only after its parent',
+  resetTables.indexOf('set_record') >= 0
+    && resetTables.indexOf('set_dose_target') > resetTables.indexOf('set_record')
+    && resetTables.indexOf('session') >= 0
+    && resetTables.indexOf('session_outcome') > resetTables.indexOf('session'));
 if (resetTables.length >= 15) {
   const MAT = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8').replace(/^--.*$/gm, '');
   db.exec('BEGIN');
   db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (701,'2026-06-10',0)");
   db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (701,701,1,1,5,100,8,0)");
+  db.exec("INSERT INTO set_dose_target (set_id,target_kind,target_reps) VALUES (701,'reps',5)");
+  db.exec(`INSERT INTO session_outcome (
+    session_id,outcome_kind,terminal_phase,halt_reason,origin_kind,session_mode,training_age,
+    slot_count,planned_set_count,logged_set_count,exact_dose_count,under_dose_count,
+    over_dose_count,unknown_dose_count,unmapped_set_count,missing_set_count,
+    missing_unskipped_set_count,extra_set_count,adapted_slot_count,skipped_slot_count,
+    off_plan_slot_count,finalized_at_ms,engine_version
+  ) VALUES (701,'followed_plan','complete',NULL,'planned','guided','beginner',
+    1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1)`);
   db.exec("INSERT INTO set_prefix (set_id,applied_prefixes,cns_load_modifier,stability_requirement_modifier,difficulty_modifier,effective_load_kg) VALUES (701,'[]',1,1,1,100)");
   db.exec("INSERT INTO niggle (id,region,severity,reported_at_ms) VALUES ('rn1','knee',5,1000)");
   db.exec("INSERT INTO one_rep_max (movement_id,load_kg,updated_at_ms) VALUES (1,100,0)");
@@ -189,7 +206,7 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_slot', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_slot', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
@@ -251,7 +268,8 @@ if (resetTables.length >= 15) {
     '016_movement_library_seed.sql', '017_movement_batch.sql',
     '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
     '021_taxonomy_corrections.sql', '022_set_target.sql', '023_phase17_session_foundation.sql',
-    '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql'
+    '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql',
+    '026_phase18_session_outcome.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
@@ -452,5 +470,354 @@ if (resetTables.length >= 15) {
   }
 }
 
+// --- Phase 18: immutable dose snapshots + atomic outcome finalization --------
+{
+  console.log('[Phase 18 store persistence contracts]');
+  const sliceBetween = (startNeedle, endNeedle) => {
+    const start = src.indexOf(startNeedle);
+    const end = src.indexOf(endNeedle, start + startNeedle.length);
+    return start >= 0 && end > start ? src.slice(start, end) : '';
+  };
+  const ordered = (body, needles) => {
+    let cursor = -1;
+    for (const needle of needles) {
+      cursor = body.indexOf(needle, cursor + 1);
+      if (cursor < 0) return false;
+    }
+    return true;
+  };
+
+  const logSetBody = sliceBetween('logSet: (movementId, reps', 'editSet: (setId, reps');
+  const editSetBody = sliceBetween('editSet: (setId, reps', 'endSession: () => {');
+  const hydrateBody = sliceBetween('const hydrateSessionFinalization =', 'const persistSessionOutcome =');
+  const persistOutcomeBody = sliceBetween('const persistSessionOutcome =', 'const applyApreFinalization =');
+  const applyApreBody = sliceBetween('const applyApreFinalization =', 'const runnerSelection =');
+  const endSessionBody = sliceBetween('endSession: () => {', 'computePrescription: (_patterns) => {');
+
+  a('Phase 18 implementation bodies are located',
+    [logSetBody, editSetBody, hydrateBody, persistOutcomeBody, applyApreBody, endSessionBody]
+      .every((body) => body.length > 0));
+
+  const logBegin = logSetBody.indexOf("d.executeSync('BEGIN')");
+  const logCommit = logSetBody.indexOf("d.executeSync('COMMIT')", logBegin);
+  const logTxn = logBegin >= 0 && logCommit > logBegin ? logSetBody.slice(logBegin, logCommit) : '';
+  a('dose snapshot is written in the set transaction after record + provenance and before checkpoint/commit',
+    ordered(logTxn, [
+      'INSERT INTO set_record',
+      'INSERT INTO set_target',
+      'INSERT INTO set_dose_target',
+      'persistRunnerCheckpoint(',
+    ]));
+  a('dose snapshot binds the frozen prescribed target, never the actual logged dose',
+    logSetBody.includes('const prescribedDose = planSlot?.target ?? null')
+      && logTxn.includes('if (prescribedDose !== null)')
+      && logTxn.includes('prescribedDose.kind === \'reps\' ? prescribedDose.reps : null')
+      && logTxn.includes('prescribedDose.kind === \'time\' ? prescribedDose.seconds : null'));
+  a('set memory is updated only after the dose transaction commits',
+    logCommit >= 0 && logSetBody.indexOf('const logged: LoggedSet', logCommit) > logCommit);
+  a('editing actual work cannot rewrite its immutable prescribed-dose snapshot',
+    !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+set_dose_target\b/i.test(editSetBody));
+
+  a('finalization hydrates every set with an optional frozen dose and timed actual evidence',
+    hydrateBody.includes('LEFT JOIN set_dose_target')
+      && hydrateBody.includes("LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'")
+      && !hydrateBody.includes('JOIN session_slot_target'));
+  a('APRE attribution binds source planned-slot identity and performed movement identity',
+    hydrateBody.includes('st.source_planned_slot_id')
+      && hydrateBody.includes('sourcePlannedSlotId: row.source_planned_slot_id')
+      && applyApreBody.includes('planned_slot_id')
+      && applyApreBody.includes('loggedSet.sourcePlannedSlotId === slot.planned_slot_id')
+      && applyApreBody.includes('loggedSet.movementId === slot.movement_id'));
+  a('finalization classifies exactly once from the hydrated snapshot',
+    (endSessionBody.match(/evaluateSessionOutcome\s*\(/g) ?? []).length === 1
+      && endSessionBody.includes('sets: snapshot.sets')
+      && endSessionBody.includes('persistSessionOutcome(')
+      && endSessionBody.includes('outcomeDecision,'));
+
+  const evidenceFields = [
+    'slotCount', 'plannedSetCount', 'loggedSetCount', 'exactDoseCount',
+    'underDoseCount', 'overDoseCount', 'unknownDoseCount', 'unmappedSetCount',
+    'missingSetCount', 'missingUnskippedSetCount', 'extraSetCount',
+    'adaptedSlotCount', 'skippedSlotCount', 'offPlanSlotCount',
+  ];
+  a('one classifier decision directly supplies all durable evidence fields',
+    persistOutcomeBody.includes('const evidence = outcomeDecision.evidence')
+      && evidenceFields.every((field) => persistOutcomeBody.includes(`evidence.${field}`))
+      && ['kind', 'terminalPhase', 'haltReason', 'finalizedAtMs', 'engineVersion']
+        .every((field) => persistOutcomeBody.includes(`outcomeDecision.${field}`)));
+
+  const endBegin = endSessionBody.indexOf("d.executeSync('BEGIN')");
+  const endCommit = endSessionBody.indexOf("d.executeSync('COMMIT')", endBegin);
+  const endTxn = endBegin >= 0 && endCommit > endBegin ? endSessionBody.slice(endBegin, endCommit) : '';
+  const checkpointDelete = endTxn.indexOf('DELETE FROM session_runner_checkpoint');
+  const afterCheckpointDelete = checkpointDelete >= 0
+    ? endTxn.slice(checkpointDelete + 'DELETE FROM session_runner_checkpoint'.length)
+    : '';
+  const catchReturn = endSessionBody.indexOf('return;', endCommit);
+  const successClear = endSessionBody.indexOf('session: null', catchReturn);
+  a('outcome, session finalization, and checkpoint delete share one transaction',
+    (endSessionBody.match(/d\.executeSync\('BEGIN'\)/g) ?? []).length === 1
+      && (endSessionBody.match(/d\.executeSync\('COMMIT'\)/g) ?? []).length === 1
+      && ordered(endTxn, [
+        'hydrateSessionFinalization(',
+        'evaluateSessionOutcome(',
+        'UPDATE session SET session_rpe = ?, duration_min = ?',
+        'MATERIALIZE_STATE_VECTOR_SQL',
+        'applyApreFinalization(',
+        'persistSessionOutcome(',
+        'DELETE FROM session_runner_checkpoint',
+      ]));
+  a('checkpoint deletion is the final database mutation before finalization commit',
+    checkpointDelete >= 0 && !afterCheckpointDelete.includes('executeSync(')
+      && !afterCheckpointDelete.includes('persistSessionOutcome(')
+      && !afterCheckpointDelete.includes('applyApreFinalization('));
+  a('finalization failure rolls back and returns without clearing resumable state',
+    endSessionBody.slice(endCommit, catchReturn).includes("d.executeSync('ROLLBACK')")
+      && catchReturn >= 0);
+  a('successful finalization clears memory only after the durable commit',
+    endCommit >= 0 && successClear > catchReturn
+      && !endSessionBody.slice(catchReturn, successClear).includes('executeSync('));
+
+  const hydrationSql = statements.find((sql) => sql.includes('LEFT JOIN set_dose_target'));
+  a('the exact frozen-dose hydration SQL is exposed to the store gate', Boolean(hydrationSql));
+  if (hydrationSql) {
+    let hydrationRan = false;
+    db.exec('BEGIN');
+    try {
+      db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (18300,'2099-12-28',1000)");
+      db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,planned_reps,provenance_kind,target_rpe,source_planned_slot_id) VALUES (18300,18300,0,1,3,8,'planned',8,18300)");
+      db.exec("INSERT INTO session_slot_target (session_plan_slot_id,target_kind,target_reps) VALUES (18300,'reps',8)");
+      for (const [setId, setIndex, reps] of [[18301, 1, 5], [18302, 2, 6], [18303, 3, 1]]) {
+        db.prepare('INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (?,18300,1,?,?,20,8,1100)')
+          .run(setId, setIndex, reps);
+        db.prepare("INSERT INTO set_target (set_id,session_plan_slot_id,provenance_kind,target_rpe,source_planned_slot_id,created_at_ms) VALUES (?,18300,'planned',8,18300,1100)")
+          .run(setId);
+      }
+      db.exec("INSERT INTO set_dose_target (set_id,target_kind,target_reps) VALUES (18301,'reps',5)");
+      db.exec("INSERT INTO set_dose_target (set_id,target_kind,target_seconds) VALUES (18303,'time',30)");
+      db.exec("INSERT INTO set_metric (set_id,metric,value) VALUES (18303,'time_s',25)");
+      const beforeMutation = db.prepare(hydrationSql).all(18300);
+      db.exec("UPDATE session_slot_target SET target_reps=9 WHERE session_plan_slot_id=18300");
+      const afterMutation = db.prepare(hydrationSql).all(18300);
+      const frozen = afterMutation.find((row) => Number(row.set_id) === 18301);
+      const legacy = afterMutation.find((row) => Number(row.set_id) === 18302);
+      const timed = afterMutation.find((row) => Number(row.set_id) === 18303);
+      a('per-set target survives later session-slot mutation unchanged',
+        Number(beforeMutation.find((row) => Number(row.set_id) === 18301)?.target_reps) === 5
+          && Number(frozen?.target_reps) === 5);
+      a('LEFT JOIN retains historical sets with honestly absent dose evidence',
+        afterMutation.length === 3 && legacy?.target_kind === null);
+      a('timed target and actual seconds hydrate from their immutable/metric side-cars',
+        timed?.target_kind === 'time' && Number(timed.target_seconds) === 30 && Number(timed.time_s) === 25);
+      hydrationRan = true;
+    } finally {
+      db.exec('ROLLBACK');
+    }
+    a('frozen-target hydration probe completed', hydrationRan);
+  }
+
+  const apreSourceSql = statements.find((sql) => sql.includes("bm.schema_type = 'APRE'") && sql.includes('ps.week_index'));
+  const apreSourceSlotsSql = statements.find((sql) => sql.includes('sl.planned_slot_id, sl.movement_id, sl.reps, orm.load_kg AS one_rm_kg'));
+  const apreNextSlotSql = statements.find((sql) => sql.includes('SELECT sl.planned_slot_id, sl.reps, sl.target_rpe') && sql.includes('ps.week_index = ?'));
+  const apreExistingOverrideSql = statements.find((sql) => sql.startsWith('SELECT target_load_kg FROM slot_override'));
+  const apreUpsertSql = statements.find((sql) => sql.startsWith('INSERT INTO slot_override') && sql.includes('ON CONFLICT(planned_slot_id)'));
+  a('exact production APRE read/write SQL is exposed to the attribution regression',
+    Boolean(apreSourceSql) && Boolean(apreSourceSlotsSql) && Boolean(apreNextSlotSql)
+      && Boolean(apreExistingOverrideSql) && Boolean(apreUpsertSql));
+  if (
+    hydrationSql && apreSourceSql && apreSourceSlotsSql && apreNextSlotSql
+    && apreExistingOverrideSql && apreUpsertSql
+  ) {
+    const runApreContract = (sourcePlannedSessionId, loggedSets, finalizedAtMs) => {
+      const source = db.prepare(apreSourceSql).get(sourcePlannedSessionId);
+      if (source === undefined || Number(source.week_index) >= 4) return;
+      const sourceSlots = db.prepare(apreSourceSlotsSql).all(sourcePlannedSessionId);
+      for (const slot of sourceSlots) {
+        if (slot.one_rm_kg === null) continue;
+        const bestReps = loggedSets
+          .filter((loggedSet) =>
+            loggedSet.sourcePlannedSlotId === Number(slot.planned_slot_id)
+              && loggedSet.movementId === Number(slot.movement_id))
+          .reduce((best, loggedSet) => Math.max(best, loggedSet.reps), 0);
+        const surplus = bestReps - Number(slot.reps);
+        if (surplus <= 0) continue;
+        const nextSlot = db.prepare(apreNextSlotSql).get(
+          Number(source.block_id), Number(source.week_index) + 1, Number(slot.movement_id),
+        );
+        if (nextSlot === undefined) continue;
+        const existing = db.prepare(apreExistingOverrideSql).get(Number(nextSlot.planned_slot_id));
+        if (existing === undefined) throw new Error('APRE attribution fixture requires a baseline override');
+        const deltaKg = Math.min(7.5, Math.ceil(surplus / 2) * 2.5);
+        db.prepare(apreUpsertSql).run(
+          Number(nextSlot.planned_slot_id),
+          Number(existing.target_load_kg) + deltaKg,
+          `APRE probe: +${deltaKg} kg from source slot ${slot.planned_slot_id}`,
+          finalizedAtMs,
+        );
+      }
+    };
+    const loggedSetsFromHydration = (sessionId) => db.prepare(hydrationSql).all(sessionId).map((row) => ({
+      sourcePlannedSlotId: row.source_planned_slot_id === null ? null : Number(row.source_planned_slot_id),
+      movementId: Number(row.movement_id),
+      reps: Number(row.reps),
+    }));
+    const overrideLoads = () => Object.fromEntries(db.prepare(
+      'SELECT planned_slot_id,target_load_kg FROM slot_override WHERE planned_slot_id IN (18621,18622) ORDER BY planned_slot_id',
+    ).all().map((row) => [Number(row.planned_slot_id), Number(row.target_load_kg)]));
+
+    let apreCollisionRan = false;
+    db.exec('BEGIN');
+    try {
+      db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (18601,'APRE Collision A','squat',1)");
+      db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (18602,'APRE Collision B','hinge',1)");
+      db.exec('INSERT INTO one_rep_max (movement_id,load_kg,updated_at_ms) VALUES (18601,100,0),(18602,100,0)');
+      db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (18600,'2099-12-01','strength',0)");
+      db.exec("INSERT INTO block_meta (block_id,macro_block_index,macro_phase,schema_type) VALUES (18600,1,'gpp','APRE')");
+      db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (18610,18600,1,1,'lower','accumulation','2099-12-01')");
+      db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (18620,18600,2,1,'lower','accumulation','2099-12-08')");
+      db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (18611,18610,1,18601,3,5,8),(18612,18610,2,18602,3,5,8)");
+      db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (18621,18620,1,18601,3,5,8),(18622,18620,2,18602,3,5,8)");
+      db.exec("INSERT INTO slot_override (planned_slot_id,target_load_kg,reason,created_at_ms) VALUES (18621,100,'baseline A',0),(18622,100,'baseline B',0)");
+      db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (18630,'2099-12-01',1000)");
+      // Source slot B was substituted to movement A. Its 12 reps must not be
+      // attributed to source slot A merely because the performed movement collides.
+      db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,planned_reps,provenance_kind,target_rpe,source_planned_slot_id,original_movement_id) VALUES (18631,18630,0,18601,1,5,'substituted',8,18612,18602)");
+      db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (18631,18630,18601,1,12,100,8,1100)");
+      db.exec("INSERT INTO set_target (set_id,session_plan_slot_id,provenance_kind,target_rpe,source_planned_slot_id,created_at_ms) VALUES (18631,18631,'substituted',8,18612,1100)");
+      db.exec("INSERT INTO set_dose_target (set_id,target_kind,target_reps) VALUES (18631,'reps',5)");
+
+      const collisionRows = db.prepare(hydrationSql).all(18630);
+      const collisionLoggedSets = loggedSetsFromHydration(18630);
+      runApreContract(18610, collisionLoggedSets, 2000);
+      const afterCollision = overrideLoads();
+      a('substituted collision retains source slot B + performed movement A identities',
+        collisionRows.length === 1
+          && Number(collisionRows[0].source_planned_slot_id) === 18612
+          && Number(collisionRows[0].movement_id) === 18601);
+      a('substituted reps cannot advance the wrong same-movement source slot',
+        afterCollision[18621] === 100 && afterCollision[18622] === 100);
+
+      // Positive control: a real movement-A set attributed to source slot A may
+      // advance only movement A's next-week slot by the expected +2.5 kg.
+      db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,planned_reps,provenance_kind,target_rpe,source_planned_slot_id) VALUES (18632,18630,1,18601,1,5,'planned',8,18611)");
+      db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (18632,18630,18601,2,7,100,8,1200)");
+      db.exec("INSERT INTO set_target (set_id,session_plan_slot_id,provenance_kind,target_rpe,source_planned_slot_id,created_at_ms) VALUES (18632,18632,'planned',8,18611,1200)");
+      db.exec("INSERT INTO set_dose_target (set_id,target_kind,target_reps) VALUES (18632,'reps',5)");
+      runApreContract(18610, loggedSetsFromHydration(18630), 3000);
+      const afterControl = overrideLoads();
+      a('correctly attributed control set advances only its own future slot',
+        afterControl[18621] === 102.5 && afterControl[18622] === 100);
+      apreCollisionRan = true;
+    } finally {
+      db.exec('ROLLBACK');
+    }
+    a('APRE substitution-collision regression completed', apreCollisionRan);
+  }
+  const setRecordInsertSql = statements.find((sql) => sql.includes('INSERT INTO set_record (session_id, movement_id, set_index'));
+  const setTargetInsertSql = statements.find((sql) => sql.includes('INSERT INTO set_target (set_id, session_plan_slot_id'));
+  const doseInsertSql = statements.find((sql) => sql.includes('INSERT INTO set_dose_target (set_id, target_kind'));
+  a('exact production SQL for all three atomic set rows is exposed',
+    Boolean(setRecordInsertSql) && Boolean(setTargetInsertSql) && Boolean(doseInsertSql));
+  if (setRecordInsertSql && setTargetInsertSql && doseInsertSql) {
+    db.exec('DROP TRIGGER IF EXISTS wo183_poison_dose');
+    db.exec("CREATE TEMP TRIGGER wo183_poison_dose BEFORE INSERT ON set_dose_target BEGIN SELECT RAISE(ABORT,'wo18.3 dose poison'); END");
+    let dosePoisonThrew = false;
+    let poisonedSetId = 0;
+    db.exec('BEGIN');
+    try {
+      db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (18400,'2099-12-29',1000)");
+      db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,planned_reps,provenance_kind,target_rpe,source_planned_slot_id) VALUES (18400,18400,0,1,1,5,'planned',8,18400)");
+      db.prepare(setRecordInsertSql).run(18400, 1, 1, 5, 20, 8, 1100);
+      poisonedSetId = Number(db.prepare('SELECT last_insert_rowid() AS id').get().id);
+      db.prepare(setTargetInsertSql).run(poisonedSetId, 18400, 'planned', 8, 18400, 1100);
+      db.prepare(doseInsertSql).run(poisonedSetId, 'reps', 5, null);
+      db.exec('COMMIT');
+    } catch {
+      dosePoisonThrew = true;
+      db.exec('ROLLBACK');
+    }
+    db.exec('DROP TRIGGER wo183_poison_dose');
+    const poisonedChildren = poisonedSetId === 0 ? 0 : Number(db.prepare(`
+      SELECT (SELECT count(*) FROM set_record WHERE set_id=?)
+           + (SELECT count(*) FROM set_target WHERE set_id=?)
+           + (SELECT count(*) FROM set_dose_target WHERE set_id=?) AS c
+    `).get(poisonedSetId, poisonedSetId, poisonedSetId).c);
+    a('dose snapshot poison aborts the set record + both snapshots atomically',
+      dosePoisonThrew && poisonedChildren === 0
+        && Number(db.prepare('SELECT count(*) AS c FROM session WHERE session_id=18400').get().c) === 0);
+  }
+
+  const outcomeInsertSql = statements.find((sql) => sql.startsWith('INSERT INTO session_outcome'));
+  const finalizeSessionSql = statements.find((sql) => sql.includes('UPDATE session SET session_rpe = ?, duration_min = ?'));
+  const deleteCheckpointSql = statements.find((sql) => sql.includes('DELETE FROM session_runner_checkpoint WHERE session_id = ?'));
+  const openSessionSql = statements.find((sql) => sql.includes('duration_min IS NULL AND started_at_ms IS NOT NULL'));
+  a('exact production outcome/finalization/checkpoint SQL is exposed',
+    Boolean(outcomeInsertSql) && Boolean(finalizeSessionSql)
+      && Boolean(deleteCheckpointSql) && Boolean(openSessionSql));
+  if (outcomeInsertSql && finalizeSessionSql && deleteCheckpointSql && openSessionSql) {
+    const sessionId = 18500;
+    const checkpointJson = '{"version":1,"probe":"wo18.3-exact-resume"}';
+    const outcomeArgs = [
+      sessionId, 'followed_plan', 'complete', null, 'planned', 'guided', 'beginner',
+      1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5000, 1,
+    ];
+    db.exec('BEGIN');
+    db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (18500,'2099-12-30',1000)");
+    db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,planned_reps,provenance_kind,target_rpe,source_planned_slot_id) VALUES (18500,18500,0,1,1,5,'planned',8,18500)");
+    db.prepare(`INSERT INTO session_runner_checkpoint
+      (session_id,session_mode,phase,current_session_plan_slot_id,current_set_index,
+       rest_target_seconds,rest_started_at_ms,runner_state_json,updated_at_ms)
+      VALUES (?,'guided','complete',NULL,NULL,0,NULL,?,4444)`).run(sessionId, checkpointJson);
+    db.exec('COMMIT');
+
+    const checkpointBefore = db.prepare('SELECT * FROM session_runner_checkpoint WHERE session_id=?').get(sessionId);
+    db.exec('DROP TRIGGER IF EXISTS wo183_poison_checkpoint_delete');
+    db.exec(`CREATE TEMP TRIGGER wo183_poison_checkpoint_delete
+      BEFORE DELETE ON session_runner_checkpoint WHEN OLD.session_id=18500
+      BEGIN SELECT RAISE(ABORT,'wo18.3 checkpoint poison'); END`);
+    let finalizationPoisonThrew = false;
+    db.exec('BEGIN');
+    try {
+      db.prepare(outcomeInsertSql).run(...outcomeArgs);
+      db.prepare(finalizeSessionSql).run(8, 1.5, sessionId);
+      db.prepare(deleteCheckpointSql).run(sessionId);
+      db.exec('COMMIT');
+    } catch {
+      finalizationPoisonThrew = true;
+      db.exec('ROLLBACK');
+    }
+    db.exec('DROP TRIGGER wo183_poison_checkpoint_delete');
+
+    const checkpointAfter = db.prepare('SELECT * FROM session_runner_checkpoint WHERE session_id=?').get(sessionId);
+    const sessionAfterRollback = db.prepare('SELECT session_rpe,duration_min FROM session WHERE session_id=?').get(sessionId);
+    const resumable = db.prepare(openSessionSql).get('2099-12-30');
+    a('late checkpoint-delete poison rolls outcome + session finalization back',
+      finalizationPoisonThrew
+        && db.prepare('SELECT 1 FROM session_outcome WHERE session_id=?').get(sessionId) === undefined
+        && sessionAfterRollback?.session_rpe === null
+        && sessionAfterRollback?.duration_min === null);
+    a('rollback preserves the exact checkpoint and boot-visible unfinished session',
+      JSON.stringify(checkpointAfter) === JSON.stringify(checkpointBefore)
+        && checkpointAfter?.runner_state_json === checkpointJson
+        && Number(resumable?.session_id) === sessionId);
+
+    db.exec('BEGIN');
+    db.prepare(outcomeInsertSql).run(...outcomeArgs);
+    db.prepare(finalizeSessionSql).run(8, 1.5, sessionId);
+    db.prepare(deleteCheckpointSql).run(sessionId);
+    db.exec('COMMIT');
+    const finalized = db.prepare('SELECT session_rpe,duration_min FROM session WHERE session_id=?').get(sessionId);
+    a('same exact SQL succeeds atomically after the poison is removed',
+      db.prepare('SELECT outcome_kind FROM session_outcome WHERE session_id=?').get(sessionId)?.outcome_kind === 'followed_plan'
+        && Number(finalized?.session_rpe) === 8
+        && Number(finalized?.duration_min) === 1.5
+        && db.prepare('SELECT 1 FROM session_runner_checkpoint WHERE session_id=?').get(sessionId) === undefined);
+
+    // FK-off cleanup follows the immutable parent-first rule used by resetTrainingData.
+    db.exec('DELETE FROM session_plan_slot WHERE session_id=18500');
+    db.exec('DELETE FROM session WHERE session_id=18500');
+    db.exec('DELETE FROM session_outcome WHERE session_id=18500');
+  }
+}
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

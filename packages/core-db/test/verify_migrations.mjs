@@ -32,7 +32,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '022_set_target.sql',
   '023_phase17_session_foundation.sql',
   '024_phase17_equipment_fixes.sql',
-  '025_movement_coaching_content.sql'];
+  '025_movement_coaching_content.sql',
+  '026_phase18_session_outcome.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 let fail = 0;
@@ -255,6 +256,92 @@ check('023 restores one UI-preference row per profile slot with tier defaults',
     { profile_slot_id: 3, session_mode_override: null, readiness_detail: 'full', rest_timer_enabled: 1, text_scale: 'system' },
     { profile_slot_id: 4, session_mode_override: null, readiness_detail: 'full', rest_timer_enabled: 1, text_scale: 'system' },
   ]), JSON.stringify(prefDefaults));
+// --- 2g. Phase 18 side-cars: poison heal, no backfill, reapply, rollback -----
+console.log('[2g] 026 Phase 18 outcome side-cars');
+const phase18File = '026_phase18_session_outcome.sql';
+const phase18Index = FILES.indexOf(phase18File);
+
+for (const table of ['set_dose_target', 'session_outcome']) {
+  const poisoned = freshDb();
+  runMigrations(poisoned, MIGRATIONS);
+  poisoned.executeSync(`DROP TABLE ${table}`);
+  check(`026 poison precondition: ${table} sentinel missing`, sentinelsMissing(poisoned).includes(table));
+  runMigrations(poisoned, MIGRATIONS);
+  check(`026 poison self-heal restores ${table} and its immutability triggers`,
+    sentinelsMissing(poisoned).length === 0);
+}
+
+const triggerPoison = freshDb();
+runMigrations(triggerPoison, MIGRATIONS);
+const phase18Triggers = [
+  'trg_set_dose_target_bi',
+  'trg_set_dose_target_bu',
+  'trg_set_dose_target_bd',
+  'trg_session_outcome_bi',
+  'trg_session_outcome_bu',
+  'trg_session_outcome_bd',
+];
+for (const trigger of phase18Triggers) triggerPoison.executeSync(`DROP TRIGGER ${trigger}`);
+const missingPhase18Triggers = sentinelsMissing(triggerPoison);
+check('026 trigger poison precondition: all six immutability sentinels missing',
+  phase18Triggers.every((name) => missingPhase18Triggers.includes(name)));
+runMigrations(triggerPoison, MIGRATIONS);
+check('026 trigger poison self-heal restores all immutability sentinels',
+  sentinelsMissing(triggerPoison).length === 0);
+
+const noBackfill = freshDb();
+for (let i = 0; i < phase18Index; i += 1) noBackfill.executeSync(MIGRATIONS[i]);
+noBackfill.executeSync(`PRAGMA user_version = ${phase18Index};`);
+noBackfill.executeSync(`INSERT INTO session (session_id, session_date, started_at_ms) VALUES (2600, '2026-07-16', 1000)`);
+noBackfill.executeSync(`INSERT INTO set_record
+  (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms)
+  VALUES (2600, 2600, 1, 1, 5, 20, 8, 1100)`);
+runMigrations(noBackfill, MIGRATIONS);
+check('026 performs no historical dose or outcome backfill',
+  Number(noBackfill.raw.prepare('SELECT COUNT(*) AS c FROM set_dose_target').get().c) === 0
+    && Number(noBackfill.raw.prepare('SELECT COUNT(*) AS c FROM session_outcome').get().c) === 0);
+noBackfill.executeSync(`INSERT INTO set_dose_target (set_id, target_kind, target_reps)
+  VALUES (2600, 'reps', 5)`);
+noBackfill.executeSync(`INSERT INTO session_outcome (
+    session_id, outcome_kind, terminal_phase, halt_reason, origin_kind,
+    session_mode, training_age, slot_count, planned_set_count, logged_set_count,
+    exact_dose_count, under_dose_count, over_dose_count, unknown_dose_count,
+    unmapped_set_count, missing_set_count, missing_unskipped_set_count,
+    extra_set_count, adapted_slot_count, skipped_slot_count, off_plan_slot_count,
+    finalized_at_ms, engine_version
+  ) VALUES (
+    2600, 'followed_plan', 'complete', NULL, 'planned',
+    'guided', 'beginner', 1, 1, 1,
+    1, 0, 0, 0,
+    0, 0, 0,
+    0, 0, 0, 0,
+    1200, 1
+  )`);
+noBackfill.executeSync(`PRAGMA user_version = ${phase18Index};`);
+runMigrations(noBackfill, MIGRATIONS);
+check('026 reapply preserves immutable dose and outcome rows',
+  noBackfill.raw.prepare('SELECT target_reps FROM set_dose_target WHERE set_id=2600').get()?.target_reps === 5
+    && noBackfill.raw.prepare('SELECT outcome_kind FROM session_outcome WHERE session_id=2600').get()?.outcome_kind === 'followed_plan');
+
+const phase18Rollback = freshDb();
+for (let i = 0; i < phase18Index; i += 1) phase18Rollback.executeSync(MIGRATIONS[i]);
+phase18Rollback.executeSync(`PRAGMA user_version = ${phase18Index};`);
+const brokenPhase18 = [
+  ...MIGRATIONS.slice(0, phase18Index),
+  `${MIGRATIONS[phase18Index]}\nSELECT no_such_phase18_fn(1);`,
+];
+let phase18Threw = false;
+try { runMigrations(phase18Rollback, brokenPhase18); } catch { phase18Threw = true; }
+check('026 failure is thrown and user_version stays at its boundary',
+  phase18Threw && uv(phase18Rollback) === phase18Index, String(uv(phase18Rollback)));
+check('026 failure rolls both side-cars and all six triggers back atomically',
+  ['set_dose_target', 'session_outcome',
+    'trg_set_dose_target_bi', 'trg_set_dose_target_bu', 'trg_set_dose_target_bd',
+    'trg_session_outcome_bi', 'trg_session_outcome_bu', 'trg_session_outcome_bd']
+    .every((name) => phase18Rollback.raw.prepare('SELECT 1 FROM sqlite_master WHERE name=?').get(name) === undefined));
+runMigrations(phase18Rollback, MIGRATIONS);
+check('026 retry with the valid migration completes',
+  uv(phase18Rollback) === MIGRATIONS.length && sentinelsMissing(phase18Rollback).length === 0);
 // --- 3. failing migration: fail fast, recover on retry --------------------------
 console.log('[3] failing migration mid-chain (the device "ln" scenario)');
 const c = freshDb();
