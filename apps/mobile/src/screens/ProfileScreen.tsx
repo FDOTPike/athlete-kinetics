@@ -596,7 +596,10 @@ export default function ProfileScreen(): React.JSX.Element {
         )}
         <Disclosure label="IMPORT TRAINING HISTORY">
           <Text style={styles.fieldHint}>
-            Paste AK_HISTORY_V1 text, preview it, then explicitly choose whether the records are verified. Unknown movement names must be corrected before import. Format rules &amp; copyable templates are documented in docs/AK_HISTORY_V1.md.
+            Paste AK_HISTORY_V1 text, preview it, then explicitly choose whether the records are verified. Unknown movement names must be corrected before import.
+          </Text>
+          <Text selectable style={styles.importExampleBlock}>
+            {HISTORY_IMPORT_EXAMPLE}
           </Text>
           <TextInput
             style={styles.importInput}
@@ -604,7 +607,7 @@ export default function ProfileScreen(): React.JSX.Element {
             onChangeText={(value) => { setHistoryText(value); setHistoryPreview(null); setHistoryNotice(null); }}
             multiline
             autoCapitalize="none"
-            placeholder={HISTORY_IMPORT_EXAMPLE}
+            placeholder="Paste formatted history text here..."
             placeholderTextColor={theme.color.textLow}
             accessibilityLabel="Paste AK history import text"
           />
@@ -660,7 +663,7 @@ export default function ProfileScreen(): React.JSX.Element {
             </View>
           )}
           {historyNotice !== null && <Text style={styles.fieldHint}>{historyNotice}</Text>}
-          <Text style={styles.fieldHint}>External-AI prompt: {HISTORY_IMPORT_AI_PROMPT}</Text>
+          <Text selectable style={styles.fieldHint}>External-AI prompt: {HISTORY_IMPORT_AI_PROMPT}</Text>
         </Disclosure>
       </View>
       {/* ---- Training-Decisions Disclosure (P3: recent 20 outcomes, ink.1 hairlines) ---- */}
@@ -973,6 +976,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
     textAlignVertical: 'top',
+    marginBottom: theme.space[2],
+  },
+  importExampleBlock: {
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    color: theme.color.textMid,
+    ...theme.font.label,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
     marginBottom: theme.space[2],
   },
   importPreview: { marginTop: theme.space[2], gap: theme.space[2] },  coachHeader: {

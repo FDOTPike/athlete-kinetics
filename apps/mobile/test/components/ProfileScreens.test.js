@@ -134,6 +134,26 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByText('Session recorded')).toBeOnTheScreen();
   });
 
+  test('d) history import disclosure renders selectable example and AI prompt blocks without repo path hint', () => {
+    render(<ProfileScreen />);
+
+    // Open Import Training History disclosure
+    fireEvent.press(screen.getByText('IMPORT TRAINING HISTORY'));
+
+    // Example block is visible on-screen and selectable
+    const exampleElement = screen.getByText(/SESSION\|2026-07-20\|45\|7\.5/);
+    expect(exampleElement).toBeOnTheScreen();
+    expect(exampleElement.props.selectable).toBe(true);
+
+    // AI prompt block is visible on-screen and selectable
+    const promptElement = screen.getByText(/External-AI prompt:/);
+    expect(promptElement).toBeOnTheScreen();
+    expect(promptElement.props.selectable).toBe(true);
+
+    // Repo path hint is removed
+    expect(screen.queryByText(/docs\/AK_HISTORY_V1\.md/)).toBeNull();
+  });
+
   test('renders OnboardingScreen wizard correctly using shared primitives', () => {
     render(<OnboardingScreen />);
 
