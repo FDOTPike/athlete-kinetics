@@ -22,7 +22,7 @@
     "verify:coach": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir apps/mobile/test/.build apps/mobile/src/state/athleteRegistryCore.ts && node apps/mobile/test/verify_coach.mjs",
     "verify:memory": "node tools/memory-audit/audit.mjs",
     "verify:library": "node scripts/py.mjs packages/core-db/test/verify_library.py",
-    "verify:coaching-content-generator": "node scripts/test-coaching-content-generator.mjs && node scripts/generate-coaching-intent-migration.mjs --check",
+    "verify:coaching-content-generator": "node scripts/test-coaching-content-generator.mjs && node scripts/test-capability-migration-generator.mjs && node scripts/generate-coaching-intent-migration.mjs --check",
     "verify:progression": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/inference/test/.build packages/inference/src/progressionEngine.ts && node packages/inference/test/verify_progression.mjs",
     "verify:pipeline": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/inference/test/.build packages/inference/src/types.ts packages/inference/src/capabilityResolver.ts packages/inference/src/historyImport.ts packages/inference/src/routineComposer.ts packages/inference/src/chainProjection.ts && node packages/inference/test/verify_pipeline.mjs",
     "verify:runner": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/inference/test/.build packages/inference/src/sessionRunner.ts && node packages/inference/test/verify_runner.mjs",

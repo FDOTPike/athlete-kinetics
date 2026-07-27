@@ -2586,6 +2586,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
     d.executeSync('BEGIN');
     let plannedSessionId = 0;
+    let archivedPreviousBlock = false;
     try {
       let blockRow: { block_id: number; start_date: string } | undefined = rowsOf<{ block_id: number; start_date: string }>(d.executeSync(
         "SELECT block_id, start_date FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
@@ -2595,7 +2596,6 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         [today, blockRow.start_date],
       ))[0]?.day_offset ?? Number.NaN);
 
-      let archivedPreviousBlock = false;
       if (blockRow !== undefined && (!Number.isInteger(dayOffset) || dayOffset < 0 || dayOffset > 27)) {
         if (dayOffset > 27) {
           archivedPreviousBlock = true;
