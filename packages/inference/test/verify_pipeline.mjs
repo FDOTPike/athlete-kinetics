@@ -143,6 +143,19 @@ check('agreement gate: chain projection over live 028 graph matches live movemen
     const legacyMovements = legacyByGroup.get(group);
     assert.deepEqual(projMovements, legacyMovements, `Discrepancy in group ${group}`);
   }
+
+  // Execute _chain_projection.sql.tpl template and assert exact match with TS projectChainsFromGraph
+  const tplPath = join(schemaDir, '_chain_projection.sql.tpl');
+  const tplSql = readFileSync(tplPath, 'utf-8');
+  db.exec(tplSql);
+  const sqlProjectedRows = db.prepare('SELECT movement_id AS movementId, progression_group AS progressionGroup, progression_rank AS progressionRank FROM movement_progression ORDER BY progression_group, progression_rank').all();
+
+  assert.equal(sqlProjectedRows.length, projected.length, 'SQL projection row count must match TS projection');
+  for (let i = 0; i < projected.length; i += 1) {
+    assert.equal(sqlProjectedRows[i].movementId, projected[i].movementId);
+    assert.equal(sqlProjectedRows[i].progressionGroup, projected[i].progressionGroup);
+    assert.equal(sqlProjectedRows[i].progressionRank, projected[i].progressionRank);
+  }
 });
 check('AK_HISTORY_V1.md template parses with zero errors', () => {
   const docPath = join(import.meta.dirname, '..', '..', '..', 'docs', 'AK_HISTORY_V1.md');

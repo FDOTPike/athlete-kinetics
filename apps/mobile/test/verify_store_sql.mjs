@@ -933,6 +933,17 @@ if (resetTables.length >= 15) {
   a('verify:all script invokes exactly 19 verify:* targets', verifyInvocations === 19, `got ${verifyInvocations}`);
   a('AGENT_WORKFLOW.md documents exact verify:all gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
   a('ci.yml documents exact verify:all gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
+
+  // --- [T11] _chain_projection.sql.tpl equivalence check ---
+  console.log('[SQL chain projection template equivalence check]');
+  const tplPath = join(SCHEMA_DIR, '_chain_projection.sql.tpl');
+  const tplSql = readFileSync(tplPath, 'utf-8');
+  a('_chain_projection.sql.tpl contains WITH RECURSIVE walk', tplSql.includes('WITH RECURSIVE'));
+  a('_chain_projection.sql.tpl deletes existing rows before insert', tplSql.includes('DELETE FROM movement_progression;'));
+
+  db.exec(tplSql);
+  const sqlProgressionRows = db.prepare('SELECT movement_id, progression_group, progression_rank FROM movement_progression ORDER BY progression_group, progression_rank').all();
+  a('SQL chain projection template populates 10 movement_progression rows on 028 schema', sqlProgressionRows.length === 10, `got ${sqlProgressionRows.length}`);
 }
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);
 process.exit(fail ? 1 : 0);
