@@ -1028,4 +1028,4 @@ const styles = StyleSheet.create({
     paddingTop: theme.space[3],
     gap: theme.space[2],
   },
-});
+});
