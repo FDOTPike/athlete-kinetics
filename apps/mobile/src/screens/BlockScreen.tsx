@@ -256,9 +256,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     todayTitle = `Today: ${focusName(todayPlan.focus)}`;
     todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
   } else if (block === null) {
-    todayTitle = hasArchivedBlock ? 'Previous block archived' : 'Build your first block';
+    todayTitle = hasArchivedBlock ? 'Your previous block had ended.' : 'Build your first block';
     todayMessage = hasArchivedBlock
-      ? 'Your previous block is complete and archived. Select a strategy below to generate your next block.'
+      ? 'A new block was started.'
       : 'A short four-week block gives Coach a clear trajectory to follow.';
   }
 
@@ -272,9 +272,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
       {block === null && hasArchivedBlock && (
         <View style={styles.card}>
           <Text style={styles.eyebrow}>PERIODIZATION</Text>
-          <Text style={styles.cardTitle}>Previous block archived</Text>
+          <Text style={styles.cardTitle}>Your previous block had ended.</Text>
           <Text style={styles.bodyText}>
-            The previous four-week training block was completed and archived. Select a schema below to generate your next four-week block.
+            A new block was started.
           </Text>
         </View>
       )}

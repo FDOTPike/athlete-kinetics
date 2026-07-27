@@ -41,6 +41,9 @@ export interface AdvancementPolicy {
   readonly requiredReps: number;
 }
 
+/** Trailing window (in days) within which set evidence qualifies a rung.
+ *  Defaulted to 180 days; subject to future optimization/tuning to balance
+ *  athlete capability retention vs query engine performance. */
 export const CAPABILITY_EVIDENCE_WINDOW_DAYS = 180;
 
 /** 3x8 strict in a single session — conservative default; tune per-chain in

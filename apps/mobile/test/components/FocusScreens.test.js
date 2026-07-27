@@ -233,6 +233,6 @@ test('COACH renders archived block card when block is null and hasArchivedBlock 
   mockState = baseState({ block: null, blockMeta: null, todayPlan: null, blockSessions: [], hasArchivedBlock: true });
   render(<BlockScreen />);
 
-  expect(screen.getAllByText('Previous block archived').length).toBeGreaterThanOrEqual(1);
-  expect(screen.getByText(/The previous four-week training block was completed and archived/)).toBeOnTheScreen();
+  expect(screen.getAllByText('Your previous block had ended.').length).toBeGreaterThanOrEqual(1);
+  expect(screen.getAllByText(/A new block was started/).length).toBeGreaterThanOrEqual(1);
 });
