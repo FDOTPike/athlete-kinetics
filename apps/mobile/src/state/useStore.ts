@@ -114,6 +114,21 @@ import {
   type TriageResult,
   type UserProfile,
 } from '@ak/inference';
+
+export type { MovementAvailability };
+
+export const REASON_TEXT_MAP: Record<'tier' | 'equipment' | 'safety' | 'capability', string> = {
+  tier: 'not for your experience level yet',
+  equipment: "needs equipment you don't have",
+  safety: 'held back by a reported niggle',
+  capability: 'build the movement below it first',
+};
+
+export const formatTeachingOnlyReason = (reasons: readonly ('tier' | 'equipment' | 'safety' | 'capability')[]): string => {
+  if (reasons.length === 0) return 'Teaching only';
+  const humanReasons = reasons.map((r) => REASON_TEXT_MAP[r] ?? r).join('; ');
+  return `Teaching only — ${humanReasons}`;
+};
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
 import type { BiometricsBridge } from '@ak/biometrics';
@@ -3312,9 +3327,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     const movement = movements.find((m) => m.movement_id === movementId);
-    if (!permittedForProfile(movement, profile) ||
-        !capabilityAvailableMovementIds(getDb(), movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles)).has(movementId)) {
-      set({ error: 'That movement is teaching-only for this athlete.' });
+    const availability = capabilityMovementAvailability(getDb(), movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles))
+      .find((r) => r.movementId === movementId);
+    if (!permittedForProfile(movement, profile) || availability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(availability?.reasons ?? []) });
       return;
     }
     const baseSets = Math.round(clamp(
@@ -3368,9 +3384,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
     const replacement = movements.find((movement) => movement.movement_id === newMovementId);
     if (slot === undefined || replacement === undefined) return;
-    if (!permittedForProfile(replacement, profile) ||
-        !capabilityAvailableMovementIds(getDb(), movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles)).has(newMovementId)) {
-      set({ error: 'That movement is teaching-only for this athlete.' });
+    const availability = capabilityMovementAvailability(getDb(), movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles))
+      .find((r) => r.movementId === newMovementId);
+    if (!permittedForProfile(replacement, profile) || availability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(availability?.reasons ?? []) });
       return;
     }
 
@@ -3607,9 +3624,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const overrideLoad = overrideRow?.target_load_kg ?? null;
     const overrideReason = overrideRow?.reason ?? null;
     const replacement = movements.find((movement) => movement.movement_id === option.movement_id);
-    if (!permittedForProfile(replacement, profile) ||
-        !capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles)).has(option.movement_id)) {
-      set({ error: 'That movement is teaching-only for this athlete.' });
+    const availability = capabilityMovementAvailability(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles))
+      .find((r) => r.movementId === option.movement_id);
+    if (!permittedForProfile(replacement, profile) || availability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(availability?.reasons ?? []) });
       return;
     }
 

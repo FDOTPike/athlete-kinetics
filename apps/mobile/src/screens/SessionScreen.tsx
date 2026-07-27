@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { JOINTS, nextUp as nextRunnerWork, targetLoadKg } from '@ak/inference';
-import { useStore, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { formatTeachingOnlyReason, useStore, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
 import {
@@ -166,6 +166,14 @@ export default function SessionScreen(): React.JSX.Element {
   const defaultMode: SessionMode = uiPreferences.sessionModeOverride ?? (profile.training_age === 'beginner' ? 'guided' : 'self_directed');
   const mode: SessionMode = sessionMode ?? defaultMode;
   const runnerPhase = runner?.phase ?? 'working';
+
+  const getMovementAvailabilityVerdicts = state.getMovementAvailabilityVerdicts;
+  const availabilityMap = useMemo(() => {
+    const verdicts = getMovementAvailabilityVerdicts !== undefined ? getMovementAvailabilityVerdicts() : [];
+    const map = new Map<number, (typeof verdicts)[number]>();
+    for (const v of verdicts) map.set(v.movementId, v);
+    return map;
+  }, [getMovementAvailabilityVerdicts]);
 
   const [nowMs, setNowMs] = useState(Date.now());
   const [localRest, setLocalRest] = useState<LocalRest | null>(null);
@@ -775,24 +783,42 @@ export default function SessionScreen(): React.JSX.Element {
               </View>
             )}
             <View style={{ marginTop: theme.space[3] }}>
-              {substitution.result.layer1Regression.options.map((option) => (
-                <Pressable key={option.movement_id} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
-                  <View style={styles.optionCopy}>
-                    <Text style={styles.optionName}>{option.name}</Text>
-                    <Text style={styles.optionReason}>{option.rationale}</Text>
-                  </View>
-                  <Text style={styles.optionArrow}>›</Text>
-                </Pressable>
-              ))}
-              {substitution.result.layer2DaySwap.options.map((option) => (
-                <Pressable key={`swap-${option.plannedSlotId}`} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
-                  <View style={styles.optionCopy}>
-                    <Text style={styles.optionName}>{option.name}</Text>
-                    <Text style={styles.optionReason}>{option.rationale}</Text>
-                  </View>
-                  <Text style={styles.optionArrow}>›</Text>
-                </Pressable>
-              ))}
+              {substitution.result.layer1Regression.options.map((option) => {
+                const avail = availabilityMap.get(option.movement_id);
+                const isTeachingOnly = avail?.state === 'teaching_only';
+                return (
+                  <Pressable key={option.movement_id} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
+                    <View style={styles.optionCopy}>
+                      <Text style={styles.optionName}>{option.name}</Text>
+                      <Text style={styles.optionReason}>{option.rationale}</Text>
+                      {isTeachingOnly && (
+                        <Text style={styles.teachingOnlyOption}>
+                          {formatTeachingOnlyReason(avail.reasons)}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.optionArrow}>›</Text>
+                  </Pressable>
+                );
+              })}
+              {substitution.result.layer2DaySwap.options.map((option) => {
+                const avail = availabilityMap.get(option.movement_id);
+                const isTeachingOnly = avail?.state === 'teaching_only';
+                return (
+                  <Pressable key={`swap-${option.plannedSlotId}`} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
+                    <View style={styles.optionCopy}>
+                      <Text style={styles.optionName}>{option.name}</Text>
+                      <Text style={styles.optionReason}>{option.rationale}</Text>
+                      {isTeachingOnly && (
+                        <Text style={styles.teachingOnlyOption}>
+                          {formatTeachingOnlyReason(avail.reasons)}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.optionArrow}>›</Text>
+                  </Pressable>
+                );
+              })}
               {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
                 <Text style={styles.noOptions}>No safe replacement is available with today’s equipment. It is okay to finish here.</Text>
               )}
@@ -1276,5 +1302,10 @@ const styles = StyleSheet.create({
   },
   outcomeFooter: {
     paddingBottom: theme.space[4],
+  },
+  teachingOnlyOption: {
+    ...theme.font.label,
+    color: theme.color.textLow,
+    marginTop: theme.space[1],
   },
 });

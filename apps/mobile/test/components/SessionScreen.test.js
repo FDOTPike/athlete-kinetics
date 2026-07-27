@@ -26,6 +26,7 @@ jest.mock('../../src/state/useStore', () => {
 
   return {
     palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
+    formatTeachingOnlyReason: (reasons) => reasons.length === 0 ? 'Teaching only' : `Teaching only — ${reasons.map((r) => r === 'capability' ? 'build the movement below it first' : r).join('; ')}`,
     useStore: storeFunc,
   };
 });
@@ -61,6 +62,7 @@ const state = (overrides = {}) => ({
   session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },
   sessionPlan: [slot(1, 1), slot(2, 2, 8)], activeSessionPlanSlotId: 1,
   profile: { training_age: 'beginner', equipment_inventory: [], session_duration_cap_min: 60 },
+  getMovementAvailabilityVerdicts: () => [],
   oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
   startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
   openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),

@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../theme/theme';
-import { localToday, useStore, type Movement } from '../state/useStore';
+import { formatTeachingOnlyReason, localToday, useStore, type Movement, type MovementAvailability } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip } from '../components/ui/Chip';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -53,10 +53,12 @@ function humanPattern(patternKey: string): string {
 
 interface MovementRowProps {
   item: Movement;
+  availability?: MovementAvailability;
   onSelect: (id: number) => void;
 }
 
-const MovementRow = React.memo(function MovementRow({ item, onSelect }: MovementRowProps): React.JSX.Element {
+const MovementRow = React.memo(function MovementRow({ item, availability, onSelect }: MovementRowProps): React.JSX.Element {
+  const isTeachingOnly = availability?.state === 'teaching_only';
   return (
     <Pressable
       onPress={() => onSelect(item.movement_id)}
@@ -72,6 +74,11 @@ const MovementRow = React.memo(function MovementRow({ item, onSelect }: Movement
         <Text style={styles.movementMeta}>
           {item.baseName} · {item.beginnerOk ? 'Beginner' : 'Intermediate'}
         </Text>
+        {isTeachingOnly && (
+          <Text style={styles.teachingOnlyBadge}>
+            {formatTeachingOnlyReason(availability.reasons)}
+          </Text>
+        )}
       </View>
       <Text style={styles.chevron}>→</Text>
     </Pressable>
@@ -85,6 +92,14 @@ export interface LibraryScreenProps {
 export default function LibraryScreen({ initialMovementId }: LibraryScreenProps): React.JSX.Element {
   const movements = useStore((s) => s.movements);
   const resolveGoalRung = useStore((s) => s.resolveGoalRung);
+  const getMovementAvailabilityVerdicts = useStore((s) => s.getMovementAvailabilityVerdicts);
+
+  const availabilityMap = useMemo(() => {
+    const verdicts = getMovementAvailabilityVerdicts !== undefined ? getMovementAvailabilityVerdicts() : [];
+    const map = new Map<number, MovementAvailability>();
+    for (const v of verdicts) map.set(v.movementId, v);
+    return map;
+  }, [getMovementAvailabilityVerdicts]);
 
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
@@ -194,6 +209,14 @@ export default function LibraryScreen({ initialMovementId }: LibraryScreenProps)
                 <Text style={styles.detailName}>{selectedMovement.name}</Text>
                 <Text style={styles.detailBase}>{selectedMovement.baseName}</Text>
               </View>
+
+              {availabilityMap.get(selectedMovement.movement_id)?.state === 'teaching_only' && (
+                <View style={styles.teachingOnlyBanner}>
+                  <Text style={styles.teachingOnlyBannerText}>
+                    {formatTeachingOnlyReason(availabilityMap.get(selectedMovement.movement_id)!.reasons)}
+                  </Text>
+                </View>
+              )}
 
               {/* Attributes Chips */}
               <View style={styles.chipRow}>
@@ -353,6 +376,7 @@ export default function LibraryScreen({ initialMovementId }: LibraryScreenProps)
                       <MovementRow
                         key={item.movement_id}
                         item={item}
+                        availability={availabilityMap.get(item.movement_id)}
                         onSelect={handleSelectMovement}
                       />
                     ))}
@@ -547,6 +571,23 @@ const styles = StyleSheet.create({
   },
   ladderItemSub: {
     ...theme.font.label,
+    color: theme.color.textLow,
+  },
+  teachingOnlyBadge: {
+    ...theme.font.label,
+    color: theme.color.textLow,
+    marginTop: theme.space[1],
+  },
+  teachingOnlyBanner: {
+    backgroundColor: theme.color.ink1,
+    borderRadius: theme.radius.control,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    padding: theme.space[3],
+    marginVertical: theme.space[2],
+  },
+  teachingOnlyBannerText: {
+    ...theme.font.body,
     color: theme.color.textLow,
   },
 });

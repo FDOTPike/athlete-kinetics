@@ -7,6 +7,7 @@ let mockState;
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
   localToday: () => '2026-06-01',
+  formatTeachingOnlyReason: (reasons) => reasons.length === 0 ? 'Teaching only' : `Teaching only — ${reasons.map((r) => r === 'capability' ? 'build the movement below it first' : r).join('; ')}`,
   useStore: (selector) => selector(mockState),
 }));
 
@@ -78,6 +79,7 @@ describe('LibraryScreen', () => {
     mockState = {
       movements: sampleMovements,
       profile: { equipmentInventory: ['barbell', 'dumbbell'] },
+      getMovementAvailabilityVerdicts: () => [],
       resolveGoalRung: () => ({
         active: { movementName: 'Goblet Squat', progressionGroup: 'squat-skill', progressionRank: 0 },
         passed: [],
@@ -138,4 +140,11 @@ describe('LibraryScreen', () => {
     expect(screen.queryByText('Progression Ladder')).not.toBeOnTheScreen();
   });
 
+  test('surfaces teaching-only human reason for capability-restricted movement', () => {
+    mockState.getMovementAvailabilityVerdicts = () => [
+      { movementId: 2, state: 'teaching_only', reasons: ['capability'] },
+    ];
+    render(<LibraryScreen initialMovementId={2} />);
+    expect(screen.getByText('Teaching only — build the movement below it first')).toBeOnTheScreen();
+  });
 });
