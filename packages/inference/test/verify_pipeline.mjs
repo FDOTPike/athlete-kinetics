@@ -1,10 +1,14 @@
 'use strict';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 const { resolveMovementAvailability } = require('./.build/capabilityResolver.js');
 const { parseHistoryImport, HISTORY_IMPORT_EXAMPLE } = require('./.build/historyImport.js');
 const { composeRoutine } = require('./.build/routineComposer.js');
+const { projectChainsFromGraph } = require('./.build/chainProjection.js');
 let pass = 0;
 const check = (name, fn) => { try { fn(); console.log(`  PASS ${name}`); pass += 1; } catch (error) { console.error(`  FAIL ${name}: ${error.message}`); process.exitCode = 1; } };
 const movements = [
@@ -72,5 +76,73 @@ check('four method strategies are deterministic and distinct', () => {
   assert.equal(new Set(signatures).size, 4);
   assert.deepEqual(composeRoutine({ ...base, schemaType: 'APRE' }), composeRoutine({ ...base, schemaType: 'APRE' }));
 });
-console.log(`pipeline verification: ${pass}/10 checks passed`);
+check('chain projection throws on cycles and branching ambiguity', () => {
+  const families = [{ movementId: 1, family: 'f' }, { movementId: 2, family: 'f' }, { movementId: 3, family: 'f' }];
+  assert.throws(
+    () => projectChainsFromGraph(families, [
+      { prerequisiteMovementId: 1, movementId: 2, relationship: 'prerequisite' },
+      { prerequisiteMovementId: 2, movementId: 1, relationship: 'prerequisite' },
+    ]),
+    /Disconnected components or cycle|Cycle detected/,
+  );
+  assert.throws(
+    () => projectChainsFromGraph(families, [
+      { prerequisiteMovementId: 1, movementId: 2, relationship: 'prerequisite' },
+      { prerequisiteMovementId: 1, movementId: 3, relationship: 'prerequisite' },
+    ]),
+    /Branching ambiguity/,
+  );
+  assert.throws(
+    () => projectChainsFromGraph(families, [
+      { prerequisiteMovementId: 1, movementId: 3, relationship: 'prerequisite' },
+      { prerequisiteMovementId: 2, movementId: 3, relationship: 'prerequisite' },
+    ]),
+    /Branching ambiguity/,
+  );
+});
+check('agreement gate: chain projection over live 028 graph matches live movement_progression order', () => {
+  const root = join(import.meta.dirname, '..', '..', '..');
+  const schemaDir = join(root, 'packages', 'core-db', 'src', 'schema');
+  const db = new DatabaseSync(':memory:');
+  for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
+    '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
+    '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
+    '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
+    '014_movement_prefixes.sql', '015_set_prefix.sql',
+    '016_movement_library_seed.sql', '017_movement_batch.sql',
+    '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
+    '021_taxonomy_corrections.sql',
+    '022_set_target.sql', '023_phase17_session_foundation.sql',
+    '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql',
+    '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
+    '028_capability_graph.sql', '029_routine_history_analytics.sql',
+    '030_readiness_import_integration.sql', '031_planned_session_method.sql']) {
+    db.exec(readFileSync(join(schemaDir, f), 'utf-8'));
+  }
+
+  const families = db.prepare('SELECT movement_id AS movementId, family FROM movement_capability_family').all();
+  const edges = db.prepare('SELECT prerequisite_movement_id AS prerequisiteMovementId, movement_id AS movementId, relationship FROM movement_capability_edge').all();
+  const projected = projectChainsFromGraph(families, edges);
+
+  const legacyRows = db.prepare('SELECT movement_id AS movementId, progression_group AS progressionGroup, progression_rank AS progressionRank FROM movement_progression ORDER BY progression_group, progression_rank').all();
+
+  const projByGroup = new Map();
+  for (const r of projected) {
+    if (!projByGroup.has(r.progressionGroup)) projByGroup.set(r.progressionGroup, []);
+    projByGroup.get(r.progressionGroup).push(r.movementId);
+  }
+  const legacyByGroup = new Map();
+  for (const r of legacyRows) {
+    if (!legacyByGroup.has(r.progressionGroup)) legacyByGroup.set(r.progressionGroup, []);
+    legacyByGroup.get(r.progressionGroup).push(r.movementId);
+  }
+
+  assert.equal(projByGroup.size, legacyByGroup.size);
+  for (const [group, projMovements] of projByGroup.entries()) {
+    const legacyMovements = legacyByGroup.get(group);
+    assert.deepEqual(projMovements, legacyMovements, `Discrepancy in group ${group}`);
+  }
+});
+console.log(`pipeline verification: ${pass}/12 checks passed`);
 if (process.exitCode) process.exit(process.exitCode);
+

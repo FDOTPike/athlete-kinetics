@@ -251,3 +251,9 @@ export {
   type SessionOutcomeSlotInput,
   type SessionOutcomeTerminal,
 } from './sessionOutcome';
+export {
+  projectChainsFromGraph,
+  type MovementFamilyInput,
+  type CapabilityEdgeInput,
+  type ProjectedChainRow,
+} from './chainProjection';
