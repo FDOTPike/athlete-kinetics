@@ -44,9 +44,10 @@ statements.push(
 );
 
 let fail = 0;
+let pass = 0;
 const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  [${detail}]` : ''}`);
-  if (!ok) fail += 1;
+  if (ok) pass += 1; else fail += 1;
 };
 const phase17Prefixes = Object.fromEntries(db.prepare(`
   SELECT m.name, d.supported_prefixes
@@ -67,6 +68,7 @@ for (const sql of statements) {
   try {
     db.prepare(sql);
     console.log(`  PASS  ${head}`);
+    pass += 1;
   } catch (e) {
     console.log(`  FAIL  ${head}\n        ${e instanceof Error ? e.message : e}`);
     fail += 1;
@@ -77,21 +79,24 @@ for (const sql of statements) {
 // verified in verify:policy [6]; these assert the store actually routes
 // through it and guards date rollover.
 console.log('[store wiring]');
-for (const needle of ['derivePrescription(', 'rolloverDay', 'localToday()',
-  // Phase 13 Step 4: the store must route block generation through the autopilot
-  // (flaw detection + window projection), or the wiring is silently dead.
-  'detectFlaws(', 'buildPatternWindow(', 'flawReport']) {
-  const ok = src.includes(needle);
+function need(needle, re) {
+  const ok = re.test(src);
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  store references ${needle}`);
-  if (!ok) fail += 1;
+  if (ok) pass += 1; else fail += 1;
 }
+need('derivePrescription(', /derivePrescription\(/);
+need('rolloverDay', /rolloverDay/);
+need('localToday()', /localToday\(\)/);
+need('detectFlaws(', /detectFlaws\(/);
+need('buildPatternWindow(', /buildPatternWindow\(/);
+need('flawReport', /flawReport/);
 
 // --- [Phase 13 Step 4] autopilot projection SQL: EXECUTED against seeded rows ----
 // PREPARE only proves columns/syntax; the ΔE join + reciprocal attenuation are the
 // signal the whole autopilot consumes, so run the EXACT store SQL on known data.
 const a = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  [${detail}]` : ''}`);
-  if (!ok) fail += 1;
+  if (ok) pass += 1; else fail += 1;
 };
 console.log('[autopilot projection — executed against seeded rows]');
 const setAggSql = statements.find((s) => s.includes('sum_attenuation'));
@@ -910,5 +915,5 @@ if (resetTables.length >= 15) {
     db.exec('ROLLBACK');
   }
 }
-console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);
+console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);
 process.exit(fail ? 1 : 0);
