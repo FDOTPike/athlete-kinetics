@@ -144,6 +144,39 @@ check('agreement gate: chain projection over live 028 graph matches live movemen
     assert.deepEqual(projMovements, legacyMovements, `Discrepancy in group ${group}`);
   }
 });
-console.log(`pipeline verification: ${pass}/12 checks passed`);
+check('AK_HISTORY_V1.md template parses with zero errors', () => {
+  const docPath = join(import.meta.dirname, '..', '..', '..', 'docs', 'AK_HISTORY_V1.md');
+  const docContent = readFileSync(docPath, 'utf-8');
+  const match = docContent.match(/```text\r?\n([\s\S]*?)\r?\n```/);
+  assert.ok(match, 'Template code block not found in docs/AK_HISTORY_V1.md');
+  const templateText = match[1];
+
+  const root = join(import.meta.dirname, '..', '..', '..');
+  const schemaDir = join(root, 'packages', 'core-db', 'src', 'schema');
+  const db = new DatabaseSync(':memory:');
+  for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
+    '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
+    '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
+    '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
+    '014_movement_prefixes.sql', '015_set_prefix.sql',
+    '016_movement_library_seed.sql', '017_movement_batch.sql',
+    '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
+    '021_taxonomy_corrections.sql',
+    '022_set_target.sql', '023_phase17_session_foundation.sql',
+    '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql',
+    '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
+    '028_capability_graph.sql', '029_routine_history_analytics.sql',
+    '030_readiness_import_integration.sql', '031_planned_session_method.sql']) {
+    db.exec(readFileSync(join(schemaDir, f), 'utf-8'));
+  }
+  const library = db.prepare('SELECT movement_id AS movementId, name FROM movement').all();
+
+  const parsed = parseHistoryImport(templateText, library);
+  assert.equal(parsed.errors.length, 0, `Expected 0 errors, got: ${JSON.stringify(parsed.errors)}`);
+  assert.equal(parsed.sessions.length, 3, `Expected 3 sessions, got ${parsed.sessions.length}`);
+  assert.equal(parsed.unknownMovementNames.length, 0, `Unknown movements: ${parsed.unknownMovementNames.join(', ')}`);
+});
+console.log(`pipeline verification: ${pass}/13 checks passed`);
 if (process.exitCode) process.exit(process.exitCode);
+
 

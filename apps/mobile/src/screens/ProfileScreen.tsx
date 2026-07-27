@@ -596,7 +596,7 @@ export default function ProfileScreen(): React.JSX.Element {
         )}
         <Disclosure label="IMPORT TRAINING HISTORY">
           <Text style={styles.fieldHint}>
-            Paste AK_HISTORY_V1 text, preview it, then explicitly choose whether the records are verified. Unknown movement names must be corrected before import.
+            Paste AK_HISTORY_V1 text, preview it, then explicitly choose whether the records are verified. Unknown movement names must be corrected before import. Format rules &amp; copyable templates are documented in docs/AK_HISTORY_V1.md.
           </Text>
           <TextInput
             style={styles.importInput}
