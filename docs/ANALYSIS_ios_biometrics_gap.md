@@ -1,4 +1,10 @@
-# Technical Analysis: iOS Biometrics Gap & Readiness Telemetry Strategy
+# Technical Analysis & Design: iOS Biometrics Gap & Apple Health Strategy
+
+**Author:** Antigravity / Gemini  
+**Date:** July 28, 2026  
+**Status:** COMPLETE (Analysis & Design Investigation)
+
+---
 
 ## 1. Live Readiness Inputs: Android vs. iOS
 
@@ -64,7 +70,57 @@ Where:
 
 ---
 
-## 3. SpO2 Component Disposition
+## 3. Technical Design: iOS Apple Health Integration (`@ak/biometrics`)
+
+When Option A is executed, the following architecture must be followed:
+
+### 1. Architectural Strategy & Bridge Selection
+- **Recommended Library:** `react-native-health` or `@kingstinct/react-native-healthkit`.
+- **Inviolable Degradation Contract:**
+  1. **No Import Side-Effects:** Native HealthKit module MUST be dynamically `require()`d inside `tryCreateAppleHealthBridge()`, never imported at module root scope. This prevents app boot crashes on platforms without HealthKit support (e.g. iPad, simulator without HealthKit, missing entitlement).
+  2. **Platform Guard:** Returns `null` immediately when `Platform.OS !== 'ios'`.
+  3. **Unified `BiometricsBridge` Interface:** Both Android (`healthConnect.ts`) and iOS (`appleHealth.ts`) implement `BiometricsBridge`:
+     ```typescript
+     export interface BiometricsBridge {
+       hasGrantedPermissions(): Promise<boolean>;
+       requestPermissions(): Promise<boolean>;
+       readDaily(days: number): Promise<DailyBiometrics[]>;
+     }
+     ```
+  4. **Factory Pattern (`packages/biometrics/src/index.ts`):**
+     ```typescript
+     export async function createBiometricsBridge(): Promise<BiometricsBridge | null> {
+       if (Platform.OS === 'android') return tryCreateHealthConnectBridge();
+       if (Platform.OS === 'ios') return tryCreateAppleHealthBridge();
+       return null;
+     }
+     ```
+
+### 2. Apple HealthKit Metric Mapping to `state_vector`
+
+| Biometrics Metric | HealthKit Sample Type | HealthKit Unit / Enum | Target Field in `DailyBiometrics` | `state_vector` Derivation |
+| :--- | :--- | :--- | :--- | :--- |
+| **HRV (Vagal Tone)** | `HKQuantityTypeIdentifierHeartRateVariabilitySDNN` | `ms` | `rmssdMs` | `ln_rmssd = ln(rmssdMs)`; `hrv_z` score against 30-day baseline |
+| **Resting Heart Rate** | `HKQuantityTypeIdentifierRestingHeartRate` | `count/min` | `restingHrBpm` | `rhr_z` score against 30-day baseline |
+| **Sleep Duration & Stages** | `HKCategoryTypeIdentifierSleepAnalysis` | `HKCategoryValueSleepAnalysis*` | `asleepMin`, `deepMin`, `remMin`, `lightMin`, `inBedMin` | `sleep_efficiency_pct = (asleepMin / inBedMin) * 100`; `sleep_component` score |
+| **Blood Oxygen** | `HKQuantityTypeIdentifierOxygenSaturation` | `%` | `spo2NightMean` | `spo2_component` score |
+
+### 3. Sleep Stage Values Mapping
+Apple HealthKit categorizes sleep samples into:
+- `HKCategoryValueSleepAnalysisInBed` $\rightarrow$ `inBedMin`
+- `HKCategoryValueSleepAnalysisAsleepCore` / `AsleepUnspecified` $\rightarrow$ `lightMin`
+- `HKCategoryValueSleepAnalysisAsleepDeep` $\rightarrow$ `deepMin`
+- `HKCategoryValueSleepAnalysisAsleepREM` $\rightarrow$ `remMin`
+- `HKCategoryValueSleepAnalysisAwake` $\rightarrow$ Excluded from `asleepMin`
+
+### 4. Privacy & Authorization Handling on iOS
+- Requires `NSHealthShareUsageDescription` in `Info.plist`:
+  `<string>pikeMethods reads HRV, resting heart rate, and sleep data to compute daily readiness and adjust workout volume.</string>`
+- iOS authorization dialog is shown ONLY on explicit user tap of CONNECT button on ProfileScreen.
+
+---
+
+## 4. SpO2 Component Disposition
 
 - **Current Status:** `spo2_component` is computed and stored in `state_vector` (`004_state_vector_materialize.sql:45,51`), but is **omitted from the readiness score calculation**.
 - **Google Policy Context:** Google Health Connect's Jan-2026 Policy Enforcement requires explicit written developer justification per data type. Ingesting background SpO2 data without consuming it in the readiness score exposes the app to rejection during Health Connect data audit.
@@ -72,7 +128,7 @@ Where:
 
 ---
 
-## 4. Final Recommendation
+## 5. Final Recommendation
 
 1. **Short Term (Current Release):** Implement **Option C** — ship iOS on `load_component` alone, displaying an honest disclosure.
 2. **Next Telemetry Cycle:** Build **Option A** (`appleHealth.ts`) cleanly matching the dynamic `require()` graceful degradation pattern of `healthConnect.ts`.
