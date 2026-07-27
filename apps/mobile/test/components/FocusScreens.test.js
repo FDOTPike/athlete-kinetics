@@ -234,5 +234,6 @@ test('COACH renders archived block card when block is null and hasArchivedBlock 
   render(<BlockScreen />);
 
   expect(screen.getAllByText('Your previous block had ended.').length).toBeGreaterThanOrEqual(1);
-  expect(screen.getAllByText(/A new block was started/).length).toBeGreaterThanOrEqual(1);
+  expect(screen.getAllByText('A short four-week block gives Coach a clear trajectory to follow.').length).toBeGreaterThanOrEqual(1);
+  expect(screen.queryByText('A new block was started.')).toBeNull();
 });

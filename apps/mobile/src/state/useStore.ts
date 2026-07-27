@@ -619,7 +619,7 @@ interface KineticsStore {
     routineTemplateId: number,
     sessionDate?: string,
     dayIndex?: number,
-  ) => { plannedSessionId: number };
+  ) => { plannedSessionId: number; archivedPreviousBlock: boolean };
   getMovementAvailabilityVerdicts: () => readonly MovementAvailability[];
   getRoutineRoleEligibleMovementIds: () => Record<RoutineRole, readonly number[]>;
 }
@@ -2595,7 +2595,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         [today, blockRow.start_date],
       ))[0]?.day_offset ?? Number.NaN);
 
+      let archivedPreviousBlock = false;
       if (blockRow !== undefined && (!Number.isInteger(dayOffset) || dayOffset < 0 || dayOffset > 27)) {
+        if (dayOffset > 27) {
+          archivedPreviousBlock = true;
+        }
         d.executeSync("UPDATE training_block SET status = 'archived' WHERE block_id = ?", [blockRow.block_id]);
         blockRow = undefined;
         dayOffset = 0;
@@ -2681,7 +2685,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
 
     get().refreshBlock();
-    return { plannedSessionId };
+    return { plannedSessionId, archivedPreviousBlock };
   },
   connectBiometrics: async (bridge) => {
     biometrics = bridge;

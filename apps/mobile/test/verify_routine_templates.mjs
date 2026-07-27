@@ -272,6 +272,13 @@ check('both block_meta writers share one macro-continuation helper', () => {
     'the hardcoded macro position in the freeze path must be gone');
 });
 
+check('freezeRoutineTemplateToPlannedSession sets archivedPreviousBlock ONLY when dayOffset > 27', () => {
+  const hasGuardedLimb = storeSource.includes('if (dayOffset > 27) {') && storeSource.includes('archivedPreviousBlock = true;');
+  assert.ok(hasGuardedLimb, 'archivedPreviousBlock must be set ONLY on dayOffset > 27 condition');
+  const returnsFlag = storeSource.includes('return { plannedSessionId, archivedPreviousBlock };');
+  assert.ok(returnsFlag, 'freezeRoutineTemplateToPlannedSession must return archivedPreviousBlock');
+});
+
 check('the routine builder does not offer a role with no ratified movements', () => {
   const builderSource = readFileSync(
     join(ROOT, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8',

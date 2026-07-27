@@ -145,6 +145,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     kind: 'use' | 'delete'; routineTemplateId: number;
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
+  const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
 
   const hasSubView =
     detail !== null ||
@@ -165,6 +166,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
   const requestRoutineAction = (kind: 'use' | 'delete', routineTemplateId: number): void => {
     setRoutineActionMessage(null);
+    setBlockArchivedNotice(null);
     setConfirmRoutineAction({ kind, routineTemplateId });
   };
 
@@ -175,12 +177,19 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
       if (action.kind === 'delete') {
         deleteRoutineTemplate(template.routineTemplateId);
         setRoutineActionMessage(`${template.name} was deleted.`);
+        setBlockArchivedNotice(null);
       } else {
-        freezeRoutineTemplateToPlannedSession(template.routineTemplateId);
+        const result = freezeRoutineTemplateToPlannedSession(template.routineTemplateId);
         setRoutineActionMessage(`${template.name} is frozen into today's plan.`);
+        if (result.archivedPreviousBlock) {
+          setBlockArchivedNotice('Your previous block had ended. A new block was started.');
+        } else {
+          setBlockArchivedNotice(null);
+        }
       }
     } catch (error) {
       setRoutineActionMessage(error instanceof Error ? error.message : String(error));
+      setBlockArchivedNotice(null);
     } finally {
       setConfirmRoutineAction(null);
     }
@@ -257,9 +266,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
   } else if (block === null) {
     todayTitle = hasArchivedBlock ? 'Your previous block had ended.' : 'Build your first block';
-    todayMessage = hasArchivedBlock
-      ? 'A new block was started.'
-      : 'A short four-week block gives Coach a clear trajectory to follow.';
+    todayMessage = 'A short four-week block gives Coach a clear trajectory to follow.';
   }
 
   return (
@@ -274,8 +281,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.eyebrow}>PERIODIZATION</Text>
           <Text style={styles.cardTitle}>Your previous block had ended.</Text>
           <Text style={styles.bodyText}>
-            A new block was started.
+            A short four-week block gives Coach a clear trajectory to follow.
           </Text>
+        </View>
+      )}
+
+      {blockArchivedNotice !== null && (
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>PERIODIZATION</Text>
+          <Text style={styles.cardTitle}>{blockArchivedNotice}</Text>
         </View>
       )}
 
