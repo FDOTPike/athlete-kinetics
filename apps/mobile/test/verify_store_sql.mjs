@@ -887,6 +887,28 @@ if (resetTables.length >= 15) {
 
     db.exec('ROLLBACK');
   }
+
+  // --- [T5] attestation writer SQL & FK integrity assertion ---
+  console.log('[capability attestation SQL & FK integrity]');
+  const attestInsertSql = statements.find((s) => s.includes('INSERT INTO movement_capability_attestation'));
+  const attestDeleteSql = statements.find((s) => s.includes('DELETE FROM movement_capability_attestation WHERE prerequisite_movement_id'));
+  a('store exposes exact attestation INSERT and DELETE SQL statements', Boolean(attestInsertSql) && Boolean(attestDeleteSql));
+  if (attestInsertSql && attestDeleteSql) {
+    db.exec('BEGIN');
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (971,'Attest Prereq','push_h',0)");
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (972,'Attest Target','push_h',0)");
+    db.exec("INSERT INTO movement_capability_edge (prerequisite_movement_id,movement_id,relationship,requires_attestation) VALUES (971,972,'prerequisite',1)");
+
+    db.prepare(attestInsertSql).run(971, 972, 1000);
+    const row = db.prepare('SELECT * FROM movement_capability_attestation WHERE prerequisite_movement_id = 971 AND movement_id = 972').get();
+    a('attestation row appears with FK integrity', Boolean(row) && Number(row.attested_at_ms) === 1000);
+
+    db.prepare(attestDeleteSql).run(971, 972);
+    const rowRevoked = db.prepare('SELECT * FROM movement_capability_attestation WHERE prerequisite_movement_id = 971 AND movement_id = 972').get();
+    a('revoke SQL removes attestation row', rowRevoked === undefined);
+
+    db.exec('ROLLBACK');
+  }
 }
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

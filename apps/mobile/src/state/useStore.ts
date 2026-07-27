@@ -496,6 +496,9 @@ interface KineticsStore {
    *  logged history (pure read — UI consumers land with P17). Null when the
    *  group has no chain rows. */
   resolveGoalRung: (progressionGroup: string, today: string) => RungResolution | null;
+  /** Capability attestation: manual coach/athlete override for attestation-gated edges. */
+  attestEdge: (prerequisiteMovementId: number, movementId: number) => void;
+  revokeAttestation: (prerequisiteMovementId: number, movementId: number) => void;
   /** Coach Mode: close the current athlete's DB and re-boot against the
    *  target athlete's file. Refused while a session is active. */
   switchAthlete: (id: string) => void;
@@ -1920,6 +1923,40 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return resolveActiveRung(chain, [...bySession.values()], { requiredSets: pol.required_sets, requiredReps: pol.required_value });
     }
     return resolveActiveRung(chain, [...bySession.values()]);
+  },
+
+  attestEdge: (prerequisiteMovementId, movementId) => {
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        'INSERT INTO movement_capability_attestation (prerequisite_movement_id, movement_id, attested_at_ms) VALUES (?, ?, ?) ON CONFLICT(prerequisite_movement_id, movement_id) DO UPDATE SET attested_at_ms = excluded.attested_at_ms',
+        [prerequisiteMovementId, movementId, Date.now()],
+      );
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    get().refreshVector();
+  },
+
+  revokeAttestation: (prerequisiteMovementId, movementId) => {
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        'DELETE FROM movement_capability_attestation WHERE prerequisite_movement_id = ? AND movement_id = ?',
+        [prerequisiteMovementId, movementId],
+      );
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    get().refreshVector();
   },
 
   // --- Coach Mode (Phase 15): one DB file per athlete ------------------------
