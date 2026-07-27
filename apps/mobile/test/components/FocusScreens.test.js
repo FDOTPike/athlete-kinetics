@@ -73,6 +73,7 @@ const baseState = (overrides = {}) => ({
   triaging: false,
   block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
   blockMeta: { schemaType: 'LINEAR', macroBlockIndex: 1, macroPhase: 'gpp', peakShifted: false },
+  hasArchivedBlock: false,
   oneRepMaxes: {},
   blockSessions: [{
     plannedSessionId: 1,
@@ -226,4 +227,12 @@ test('READY renders rest-day statement and metrics list when no session is sched
   // Metrics check (rendered directly as quiet list, not hidden under Full readiness metrics disclosure)
   expect(screen.getByText('Readiness estimate')).toBeOnTheScreen();
   expect(screen.getByText('82 / 100')).toBeOnTheScreen();
+});
+
+test('COACH renders archived block card when block is null and hasArchivedBlock is true', () => {
+  mockState = baseState({ block: null, blockMeta: null, todayPlan: null, blockSessions: [], hasArchivedBlock: true });
+  render(<BlockScreen />);
+
+  expect(screen.getAllByText('Previous block archived').length).toBeGreaterThanOrEqual(1);
+  expect(screen.getByText(/The previous four-week training block was completed and archived/)).toBeOnTheScreen();
 });

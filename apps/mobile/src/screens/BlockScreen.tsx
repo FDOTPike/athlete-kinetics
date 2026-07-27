@@ -117,6 +117,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const blockSessions = useStore((s) => s.blockSessions);
   const todayPlan = useStore((s) => s.todayPlan);
+  const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const session = useStore((s) => s.session);
   const generateNewBlock = useStore((s) => s.generateNewBlock);
   const loadSessionSlots = useStore((s) => s.loadSessionSlots);
@@ -255,8 +256,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     todayTitle = `Today: ${focusName(todayPlan.focus)}`;
     todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
   } else if (block === null) {
-    todayTitle = 'Build your first block';
-    todayMessage = 'A short four-week block gives Coach a clear trajectory to follow.';
+    todayTitle = hasArchivedBlock ? 'Previous block archived' : 'Build your first block';
+    todayMessage = hasArchivedBlock
+      ? 'Your previous block is complete and archived. Select a strategy below to generate your next block.'
+      : 'A short four-week block gives Coach a clear trajectory to follow.';
   }
 
   return (
@@ -265,6 +268,16 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
       <View style={styles.header}>
         <Text style={styles.wordmark}>pikeMethods</Text>
       </View>
+
+      {block === null && hasArchivedBlock && (
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>PERIODIZATION</Text>
+          <Text style={styles.cardTitle}>Previous block archived</Text>
+          <Text style={styles.bodyText}>
+            The previous four-week training block was completed and archived. Select a schema below to generate your next four-week block.
+          </Text>
+        </View>
+      )}
 
       {/* Safety Halt Card if halted */}
       {halted && lastTriage !== null && lastTriage.kind === 'matched' && (

@@ -433,6 +433,7 @@ interface KineticsStore {
   blockMeta: BlockMeta | null;
   blockSessions: BlockSessionSummary[];
   todayPlan: TodayPlan | null;
+  hasArchivedBlock: boolean;
   routineTemplates: RoutineTemplate[];
   /** Absolute 1RMs by movement_id (one_rep_max rows). */
   oneRepMaxes: Record<number, number>;
@@ -1487,6 +1488,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   blockMeta: null,
   blockSessions: [],
   todayPlan: null,
+  hasArchivedBlock: false,
   routineTemplates: [],
   oneRepMaxes: {},
   lastLoggedLoads: {},
@@ -2270,13 +2272,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   refreshBlock: () => {
     const d = getDb();
     const today = localToday();
+    const hasArchivedBlock = Number(rowsOf<{ count: number }>(d.executeSync(
+      "SELECT count(block_id) AS count FROM training_block WHERE status = 'archived'",
+    ))[0]?.count ?? 0) > 0;
     const blockRow = rowsOf<{
       block_id: number; start_date: string; objective: string; created_at_ms: number;
     }>(d.executeSync(
       "SELECT block_id, start_date, objective, created_at_ms FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
     ))[0];
     if (blockRow === undefined) {
-      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null });
+      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, hasArchivedBlock });
       return;
     }
     const metaRow = rowsOf<{
