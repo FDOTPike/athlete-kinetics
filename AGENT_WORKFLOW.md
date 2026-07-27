@@ -59,10 +59,11 @@ session. Therefore:
 ## 3. The verification loop (nothing ships around it)
 ```
 npm run typecheck        # first, always
-npm run verify:all       # 16 gates; semantic+embedder need network
+npm run verify:all       # 19 gates + typecheck; semantic+embedder need network
 ```
 Gates: db, demo, migrations, policy, blocks, autopilot, biometrics, semantic,
-embedder, store, coach, memory, progression, runner, library (+ typecheck).
+embedder, store, coach, memory, progression, pipeline, runner, outcomes, library,
+coaching-content-generator, components (+ typecheck).
 - A new invariant is not real until a gate asserts it. Prefer extending the
   owning gate over prose promises. Behavior contracts (source-grep checks in
   verify_store/verify_blocks) are acceptable until RN component tests exist.
