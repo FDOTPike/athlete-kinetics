@@ -27,6 +27,8 @@ const sampleMovements = [
     supportedPrefixes: [],
     difficulty: 'Beginner',
     preference: 0,
+    progressionGroup: 'squat-skill',
+    progressionRank: 0,
   },
   {
     movement_id: 2,
@@ -45,6 +47,8 @@ const sampleMovements = [
     supportedPrefixes: [],
     difficulty: 'Intermediate',
     preference: 0,
+    progressionGroup: 'squat-skill',
+    progressionRank: 1,
   },
   {
     movement_id: 3,
@@ -63,6 +67,8 @@ const sampleMovements = [
     supportedPrefixes: [],
     difficulty: 'Beginner',
     preference: 0,
+    progressionGroup: null,
+    progressionRank: null,
   },
 ];
 
@@ -71,6 +77,11 @@ describe('LibraryScreen', () => {
     mockState = {
       movements: sampleMovements,
       profile: { equipmentInventory: ['barbell', 'dumbbell'] },
+      resolveGoalRung: () => ({
+        active: { movementName: 'Goblet Squat', progressionGroup: 'squat-skill', progressionRank: 0 },
+        passed: [],
+        next: { movementName: 'Barbell Back Squat', progressionGroup: 'squat-skill', progressionRank: 1 },
+      }),
     };
   });
 
@@ -110,9 +121,20 @@ describe('LibraryScreen', () => {
     expect(screen.getByText('Big air, drive through mid-foot.')).toBeOnTheScreen();
     expect(screen.getByText('Bar on upper traps. Descend under control.')).toBeOnTheScreen();
     expect(screen.getByText('Progression Ladder')).toBeOnTheScreen();
+    expect(screen.getByText('Rung 1 of 2')).toBeOnTheScreen();
+    expect(screen.getByText('Rung 2 of 2')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Select Goblet Squat from progression ladder').props.accessibilityState).toEqual({ selected: true });
 
     // Back to list
     fireEvent.press(screen.getByLabelText('Back to movement list'));
     expect(screen.getByText('Movement Library')).toBeOnTheScreen();
   });
+  test('hides the ladder for a movement with no authored chain', () => {
+    render(<LibraryScreen />);
+
+    fireEvent.press(screen.getByLabelText('View Dumbbell Bench Press'));
+
+    expect(screen.queryByText('Progression Ladder')).not.toBeOnTheScreen();
+  });
+
 });

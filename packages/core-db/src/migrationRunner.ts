@@ -70,6 +70,16 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'trigger', name: 'trg_session_outcome_bi' },    // 026
   { type: 'trigger', name: 'trg_session_outcome_bu' },    // 026
   { type: 'trigger', name: 'trg_session_outcome_bd' },    // 026
+  { type: 'trigger', name: 'trg_session_date_guard_bu' }, // 027
+  { type: 'table', name: 'movement_role_eligibility' }, // 028
+  { type: 'table', name: 'movement_capability_edge' },  // 028
+  { type: 'table', name: 'capability_session_evidence' }, // 028
+  { type: 'table', name: 'routine_template' },          // 029
+  { type: 'table', name: 'history_import' },            // 029
+  { type: 'table', name: 'bodyweight_daily' },          // 029
+  { type: 'view', name: 'v_training_daily_all' },       // 029
+  { type: 'table', name: 'import_readiness_daily' },     // 029
+  { type: 'view', name: 'v_readiness_inputs' },          // 030
 ];
 
 function userVersion(db: MigrationDb): number {

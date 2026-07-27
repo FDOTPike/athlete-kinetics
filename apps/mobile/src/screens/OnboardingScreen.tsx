@@ -17,24 +17,23 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   DEFAULT_PROFILE,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
   EQUIPMENT_PRESETS,
   OBJECTIVES,
-  PROGRESSION_METHODS,
   TRAINING_AGES,
   type EnergySystem,
   type EquipmentItem,
   type Objective,
-  type ProgressionMethod,
   type TrainingAge,
   type UserProfile,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
 import { useStore } from '../state/useStore';
+import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
 
 // ---------------------------------------------------------------------------
@@ -63,13 +62,6 @@ const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
   anaerobic: { label: 'ANAEROBIC', blurb: 'Hard rounds and repeats — grappling pace' },
   atp_pc: { label: 'PURE POWER', blurb: 'Short maximal efforts, full rest' },
   hybrid: { label: 'MIXED', blurb: 'A blend — the default for most athletes' },
-};
-
-const PROGRESSION_COPY: Record<ProgressionMethod, { label: string; blurb: string }> = {
-  linear: { label: 'LINEAR', blurb: 'Add a little every week, simple and steady' },
-  undulating: { label: 'UNDULATING', blurb: 'Heavy, light, and medium days mixed through the week' },
-  conjugate: { label: 'CONJUGATE', blurb: 'Rotating max-effort and speed work' },
-  autoregulated: { label: 'AUTO (COACHED)', blurb: 'The coach adjusts to your readiness day by day — recommended' },
 };
 
 const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
@@ -105,6 +97,8 @@ export default function OnboardingScreen(): React.JSX.Element {
   const [injuryText, setInjuryText] = useState('');
   const [mobilityText, setMobilityText] = useState('');
   const [stepIdx, setStepIdx] = useState(0);
+
+  useSubViewBack(stepIdx > 0, () => setStepIdx((i) => Math.max(0, i - 1)));
 
   const patch = (p: Partial<UserProfile>): void => setDraft((d) => ({ ...d, ...p }));
 
@@ -160,7 +154,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         ))}
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
         {step === 'welcome' && (
           <View>
             <Text style={styles.h1}>YOUR COACH.{'\n'}IN YOUR POCKET.{'\n'}OFFLINE.</Text>
@@ -294,17 +288,6 @@ export default function OnboardingScreen(): React.JSX.Element {
                 selected={draft.target_energy_system === e}
                 onPress={() => patch({ target_energy_system: e })}
                 accessibilityLabel={`${ENERGY_COPY[e].label}. ${ENERGY_COPY[e].blurb}`}
-                style={styles.cardChip}
-              />
-            ))}
-            <Text style={styles.fieldLabel}>PROGRESSION STYLE</Text>
-            {PROGRESSION_METHODS.map((m) => (
-              <Chip
-                key={m}
-                label={`${PROGRESSION_COPY[m].label} — ${PROGRESSION_COPY[m].blurb}`}
-                selected={draft.progression_methodology === m}
-                onPress={() => patch({ progression_methodology: m })}
-                accessibilityLabel={`${PROGRESSION_COPY[m].label}. ${PROGRESSION_COPY[m].blurb}`}
                 style={styles.cardChip}
               />
             ))}
@@ -472,6 +455,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.space[3],
+    paddingBottom: Platform.OS === 'ios' ? theme.space[4] : theme.space[3],
     borderTopWidth: 1, borderTopColor: theme.color.line,
   },
 });

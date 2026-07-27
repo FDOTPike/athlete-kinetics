@@ -1,9 +1,9 @@
 /**
- * App.tsx — shell: status bar, safe area, custom tab bar.
+ * App.tsx — shell: status bar, safe area, custom tab bar with deterministic back navigation.
  *
- * No navigation library: three screens, one useState, 64pt tab targets.
+ * Zero navigation library: five tabs, NavigationProvider stack, 64pt tab targets.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   AppState,
   KeyboardAvoidingView,
@@ -18,14 +18,13 @@ import {
 import { tryCreateHealthConnectBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
+import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
 import BlockScreen from './screens/BlockScreen';
 import LibraryScreen from './screens/LibraryScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
-
-type Tab = 'readiness' | 'session' | 'coach' | 'library' | 'athlete';
 
 const TABS: readonly { key: Tab; label: string }[] = [
   { key: 'readiness', label: 'READY' },
@@ -68,13 +67,15 @@ class RootErrorBoundary extends React.Component<React.PropsWithChildren, Boundar
 export default function App(): React.JSX.Element {
   return (
     <RootErrorBoundary>
-      <AppShell />
+      <NavigationProvider>
+        <AppShell />
+      </NavigationProvider>
     </RootErrorBoundary>
   );
 }
 
 function AppShell(): React.JSX.Element {
-  const [tab, setTab] = useState<Tab>('readiness');
+  const { tab, setTab } = useNavigation();
   const boot = useStore((s) => s.boot);
   const status = useStore((s) => s.status);
   const onboarded = useStore((s) => s.onboarded);
@@ -140,7 +141,7 @@ function AppShell(): React.JSX.Element {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`${t.label} tab`}
-                style={styles.tabBtn}
+                style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
               >
                 <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
                 <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
@@ -174,6 +175,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  tabBtnPressed: {
+    opacity: 0.7,
   },
   tabText: { color: palette.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
   tabTextActive: { color: palette.text, fontWeight: '800' },

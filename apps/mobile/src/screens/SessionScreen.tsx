@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { JOINTS, nextUp as nextRunnerWork, targetLoadKg } from '@ak/inference';
 import { useStore, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
 import {
   PrimaryButton,
@@ -178,6 +179,14 @@ export default function SessionScreen(): React.JSX.Element {
   const [niggleSeverity, setNiggleSeverity] = useState(4);
   const [bandLevel, setBandLevel] = useState<number | null>(null);
   const advancedRest = useRef<string | null>(null);
+
+  const hasSubView = detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
+  useSubViewBack(hasSubView, () => {
+    if (detailsOpen) setDetailsOpen(false);
+    else if (safetyOpen) setSafetyOpen(false);
+    else if (niggleRegion !== null) setNiggleRegion(null);
+    else if (substitution !== null) closeSubstitution();
+  });
 
   // Outcome details derived from store outcome data
   const outcome = useMemo(() => {
@@ -427,7 +436,7 @@ export default function SessionScreen(): React.JSX.Element {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" accessibilityLabel="Current workout timeline">
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>

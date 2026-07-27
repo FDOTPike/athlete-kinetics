@@ -180,6 +180,36 @@ export {
   type SessionSets,
 } from './progressionEngine';
 export {
+  capabilityEdgeKey,
+  resolveMovementAvailability,
+  type CapabilityEdge,
+  type CapabilityEvidence,
+  type CapabilityMovement,
+  type MovementAvailability,
+  type MovementAvailabilityState,
+  type ResolveMovementAvailabilityInput,
+} from './capabilityResolver';
+export {
+  HISTORY_FORMAT_VERSION,
+  HISTORY_IMPORT_AI_PROMPT,
+  HISTORY_IMPORT_EXAMPLE,
+  historyContentFingerprint,
+  parseHistoryImport,
+  type HistoryMovementRef,
+  type HistoryParseIssue,
+  type HistoryParseResult,
+  type ParsedHistorySession,
+  type ParsedHistorySet,
+} from './historyImport';
+export {
+  composeRoutine,
+  type ComposeRoutineInput,
+  type ComposedRoutine,
+  type RoutinePrescription,
+  type RoutineRole,
+  type RoutineSelection,
+} from './routineComposer';
+export {
   RUNNER_CHECKPOINT_VERSION,
   RunnerCheckpointError,
   advance,

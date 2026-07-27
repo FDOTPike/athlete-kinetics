@@ -33,8 +33,13 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '023_phase17_session_foundation.sql',
   '024_phase17_equipment_fixes.sql',
   '025_movement_coaching_content.sql',
-  '026_phase18_session_outcome.sql'];
+  '026_phase18_session_outcome.sql',
+  '027_operational_safeguards.sql',
+  '028_capability_graph.sql',
+  '029_routine_history_analytics.sql',
+  '030_readiness_import_integration.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
 let fail = 0;
 const check = (label, ok, detail = '') => {
@@ -108,6 +113,12 @@ check('024 fresh install applies all three ratified equipment-prefix corrections
   phase17PrefixesHold(a), JSON.stringify(phase17Prefixes(a)));
 check('025 fresh install applies all 124 attested coaching records and approved video replacement',
   coachingContentComplete(a), JSON.stringify(coachingContentSummary(a)));
+a.raw.exec("INSERT INTO import_readiness_daily (date, tonnage_kg, updated_at_ms) VALUES ('2030-01-01', 2800, 1)");
+a.raw.prepare(MATERIALIZE_SQL).run('2030-01-01');
+const importedReadiness = a.raw.prepare("SELECT acute_load_kg, chronic_load_kg FROM state_vector WHERE date = '2030-01-01'").get();
+check('030 consumes only materialized eligible import load in readiness',
+  importedReadiness !== undefined && importedReadiness.acute_load_kg === 400 && importedReadiness.chronic_load_kg === 100,
+  JSON.stringify(importedReadiness));
 
 runMigrations(a, MIGRATIONS); // second boot
 check('re-boot is a no-op (idempotent)', uv(a) === MIGRATIONS.length);

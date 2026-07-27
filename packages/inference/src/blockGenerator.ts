@@ -32,6 +32,8 @@ export interface GeneratorMovement {
   /** movement_beginner_whitelist membership: an Intermediate staple a
    *  beginner may be prescribed (plan P16 S4). Absent = not whitelisted. */
   beginner_ok?: boolean;
+  /** Shared capability resolver verdict. False means teaching-only. */
+  capability_available?: boolean;
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
@@ -367,7 +369,8 @@ export function generateBlock(input: BlockInput): BlockPlan {
   const phaseMod = PHASE_MODS[macroPhase];
   const split = SPLITS[profile.objective][clamp(profile.weekly_frequency, 1, 7) - 1];
   const spread = DAY_SPREAD[clamp(profile.weekly_frequency, 1, 7) - 1];
-  const equipPool = availableMovements(input.movements, profile.equipment_inventory);
+  const equipPool = availableMovements(input.movements, profile.equipment_inventory)
+    .filter((movement) => movement.capability_available !== false);
   // Phase 16: tier gating — a beginner is never PRESCRIBED an Advanced
   // movement. Untagged rows (difficulty undefined) stay eligible so legacy
   // callers/fixtures are byte-identical; a pattern with no in-tier candidate

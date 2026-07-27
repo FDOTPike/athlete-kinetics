@@ -117,9 +117,9 @@ test('READY renders the full vector only for profiles that explicitly request it
   render(<ReadinessScreen />);
 
   fireEvent.press(screen.getByLabelText('Why this recommendation'));
-  expect(screen.queryByText('Readiness score')).toBeNull();
+  expect(screen.queryByText('Readiness estimate')).toBeNull();
   fireEvent.press(screen.getByLabelText('Full readiness metrics'));
-  expect(screen.getByText('Readiness score')).toBeOnTheScreen();
+  expect(screen.getByText('Readiness estimate')).toBeOnTheScreen();
   expect(screen.getByText('82 / 100')).toBeOnTheScreen();
 });
 
@@ -224,6 +224,6 @@ test('READY renders rest-day statement and metrics list when no session is sched
   expect(screen.getByText('Rest day.')).toBeOnTheScreen();
   expect(screen.getByText("That's the work.")).toBeOnTheScreen();
   // Metrics check (rendered directly as quiet list, not hidden under Full readiness metrics disclosure)
-  expect(screen.getByText('Readiness score')).toBeOnTheScreen();
+  expect(screen.getByText('Readiness estimate')).toBeOnTheScreen();
   expect(screen.getByText('82 / 100')).toBeOnTheScreen();
 });

@@ -794,7 +794,7 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   const screenSrc = readFileSync(join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'screens', 'SessionScreen.tsx'), 'utf-8');
   check('production: picker applies the beginner whitelist rule',
     storeSrc.includes("movement.difficulty === 'Beginner' || movement.beginnerOk")
-    && storeSrc.includes('if (!permittedForProfile(movement, profile))')
+    && storeSrc.includes('if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(m.movement_id))')
     && screenSrc.includes('beginnerPlanViolation'));
 }
 

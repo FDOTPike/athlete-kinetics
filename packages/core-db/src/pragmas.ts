@@ -18,6 +18,9 @@ const BOOT_PRAGMAS: readonly string[] = [
   // and roughly halves write latency on mobile flash.
   'PRAGMA synchronous = NORMAL;',
   'PRAGMA foreign_keys = ON;',
+  // New databases reclaim deleted telemetry pages incrementally; existing files
+  // are not forced through a blocking full VACUUM.
+  'PRAGMA auto_vacuum = INCREMENTAL;',
   // Sort/temp B-trees in RAM, not on flash.
   'PRAGMA temp_store = MEMORY;',
   // 16 MB page cache (negative = KiB). Sized so cache + WAL stays inside the

@@ -6,7 +6,7 @@
  * available through inline disclosure.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
 import { theme } from '../theme/theme';
@@ -72,6 +72,13 @@ const format = (value: number | null, digits: number, suffix = ''): string =>
 const formatSigned = (value: number | null, digits: number): string =>
   value === null ? 'Not available' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
+export const readinessCoverage = (vector: StateVectorRow): string => {
+  const available = [vector.acwr !== null, vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
+    .filter(Boolean).length;
+  if (available === 0) return 'No current inputs';
+  if (available === 1 && vector.acwr !== null) return 'Load only · 1 of 3 inputs';
+  return `${available} of 3 inputs`;
+};
 export interface ReadinessScreenProps {
   /** Supplied by the shell so the focused action can open a live session. */
   onOpenSession?: () => void;
@@ -101,6 +108,16 @@ export default function ReadinessScreen({
   const loadDemoAthlete = useStore((s) => s.loadDemoAthlete);
   const resetTrainingData = useStore((s) => s.resetTrainingData);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    try {
+      refreshVector();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshVector]);
 
   useEffect(() => {
     boot();
@@ -204,19 +221,18 @@ export default function ReadinessScreen({
     return (
       <View style={{ gap: theme.space[1] }}>
         <ListRow
-          label="Readiness score"
+          label="Readiness estimate"
           detail={`${Math.round(vector.readiness_score)} / 100`}
         />
+        <ListRow label="Data coverage" detail={readinessCoverage(vector)} />
         <ListRow label="Acute to chronic load" detail={format(vector.acwr, 2)} />
         <ListRow label="HRV deviation" detail={formatSigned(vector.hrv_z, 1)} />
         <ListRow label="Sleep efficiency" detail={format(vector.sleep_efficiency_pct, 1, '%')} />
-        <ListRow label="Night SpO2" detail={format(vector.spo2_night_mean, 1, '%')} />
         <ListRow label="Acute load" detail={format(vector.acute_load_kg, 0, ' kg')} />
         <ListRow label="Chronic load" detail={format(vector.chronic_load_kg, 0, ' kg')} />
         <ListRow label="HRV component" detail={vector.hrv_component.toFixed(1)} />
         <ListRow label="Load component" detail={vector.load_component.toFixed(1)} />
         <ListRow label="Sleep component" detail={vector.sleep_component.toFixed(1)} />
-        <ListRow label="SpO2 component" detail={vector.spo2_component.toFixed(1)} />
 
         <View style={{ marginTop: theme.space[3] }}>
           <Disclosure label="Recent readiness" hint="Last seven recorded days">
@@ -241,7 +257,12 @@ export default function ReadinessScreen({
 
   if (isRestDay) {
     return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer} testID="readiness-screen">
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.color.textMid} colors={[theme.color.textMid]} />}
+        testID="readiness-screen"
+      >
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
@@ -277,7 +298,12 @@ export default function ReadinessScreen({
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer} testID="readiness-screen">
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.color.textMid} colors={[theme.color.textMid]} />}
+      testID="readiness-screen"
+    >
       {/* Wordmark top-left */}
       <View style={styles.header}>
         <Text style={styles.wordmark}>pikeMethods</Text>

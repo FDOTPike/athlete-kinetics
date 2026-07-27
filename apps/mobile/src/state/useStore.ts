@@ -45,6 +45,8 @@ import {
   EQUIPMENT_ITEMS,
   EXPERIENCE_SEVERITY,
   generateBlock,
+  historyContentFingerprint,
+  parseHistoryImport,
   OBJECTIVES,
   PROGRESSION_METHODS,
   TRAINING_AGES,
@@ -56,7 +58,10 @@ import {
   RED_FLAG_PAIN,
   RED_FLAG_SYSTEMIC,
   resolveReport,
+  resolveMovementAvailability,
   triage,
+  type CapabilityEdge,
+  type CapabilityEvidence,
   type DaySwapOption,
   type DifficultyRating,
   type Embedder,
@@ -64,6 +69,7 @@ import {
   type GeneratorMovement,
   type Guardrail,
   type Joint,
+  type HistoryParseResult,
   type LoadedCodebase,
   type MovementPattern,
   type MovementPrefix,
@@ -167,6 +173,9 @@ export interface Movement {
   /** movement_preference.preference — thumbs sentiment. 0/neutral when no row
    *  exists (the 010 invariant: neutral is the ABSENCE of a row). */
   preference: MovementPreference;
+  /** Authored progression metadata. Null means no ordered skill chain. */
+  progressionGroup: string | null;
+  progressionRank: number | null;
 }
 
 /** STRICT boolean equipment filter: available iff every required item is in
@@ -320,6 +329,20 @@ export interface TodayPlan {
   slots: TodaySlot[];
 }
 
+export interface HistoryImportCommitResult {
+  readonly committed: boolean;
+  readonly duplicate: boolean;
+  readonly preview: HistoryParseResult;
+}
+export interface MeasuredDailyPoint {
+  readonly date: string;
+  readonly tonnageKg: number;
+  readonly setCount: number;
+  readonly bodyweightKg: number | null;
+  readonly hrvRmssdMs: number | null;
+  readonly restingHr: number | null;
+  readonly sleepMinutes: number | null;
+}
 interface KineticsStore {
   status: BootStatus;
   error: string | null;
@@ -397,6 +420,12 @@ interface KineticsStore {
   generateNewBlock: (schemaType?: SchemaType) => void;
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
+  /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
+  importHistory: (text: string, verified: boolean, readinessEligible: boolean) => HistoryImportCommitResult;
+  /** Manual bodyweight is a measured daily value, never a score. Null deletes. */
+  saveBodyweight: (date: string, kg: number | null) => void;
+  /** Indexed daily rollups for local charts; imported sessions always appear. */
+  loadMeasuredHistory: (limit?: number) => MeasuredDailyPoint[];
   /** Attach/replace a free-text note on the last completed session. */
   saveSessionNote: (text: string) => void;
   /** Wire the Health Connect bridge (null = unavailable). READ-ONLY at
@@ -643,6 +672,7 @@ interface MovementRow {
   instructions: string | null; cues: string | null; video_placeholder_uri: string | null;
   coaching_intent: string | null;
   time_default_sets: number | null; time_target_seconds: number | null;
+  progression_group: string | null; progression_rank: number | null;
 }
 const PREFIX_SET = new Set<string>(MOVEMENT_PREFIXES);
 /** Parse movement_detail.supported_prefixes, keeping only canonical tokens —
@@ -686,8 +716,17 @@ const movementFromRow = (r: MovementRow): Movement => {
       ? { defaultSets: r.time_default_sets, targetSeconds: r.time_target_seconds }
       : null,
     preference: toPreference(r.preference),
+    progressionGroup: r.progression_group,
+    progressionRank: r.progression_rank,
   };
 };
+
+const MOVEMENT_LIBRARY_SQL = `SELECT m.movement_id, m.name, m.pattern, m.is_compound,
+  (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json,
+  d.base_name, d.supported_prefixes, d.difficulty_rating, d.instructions, d.cues, d.video_placeholder_uri,
+  ci.coaching_intent, tp.default_sets AS time_default_sets, tp.target_seconds AS time_target_seconds, p.preference,
+  (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode, mp.progression_group, mp.progression_rank
+  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id ORDER BY m.movement_id`;
 
 /** Map the 023 side-car (or a conservative legacy rep fallback) into one
  * target union. Historic sessions without the side-car stay readable. */
@@ -727,18 +766,82 @@ const permittedForProfile = (movement: Movement | undefined, profile: UserProfil
 
 /** Project a store Movement onto the substitution engine's input shape. The
  *  engine never reads SQL; the store assembles this from 001 + 010 columns. */
-const toSubMovement = (m: Movement): SubstitutionMovement => ({
+const toSubMovement = (m: Movement, availableIds?: ReadonlySet<number>): SubstitutionMovement => ({
   movement_id: m.movement_id,
   name: m.name,
   pattern: m.pattern as MovementPattern,
   is_compound: m.is_compound,
   difficulty: m.difficulty,
   beginnerOk: m.beginnerOk,
+  capabilityAvailable: availableIds?.has(m.movement_id),
   family: m.baseName,
   required: m.required,
   preference: m.preference,
 });
 
+/** Resolve the one shared selection law from indexed sidecars. This reads the
+ * compact capability evidence table, never historical set_record rows. */
+const capabilityAvailableMovementIds = (
+  d: DB,
+  movements: readonly Movement[],
+  profile: UserProfile,
+  safetyExcludedMovementIds: ReadonlySet<number> = new Set<number>(),
+): ReadonlySet<number> => {
+  const edges = rowsOf<{
+    prerequisite_movement_id: number; movement_id: number; relationship: CapabilityEdge['relationship'];
+    min_sessions: number; min_sets_per_session: number; min_value: number;
+    value_kind: CapabilityEdge['valueKind']; max_rpe: number | null; requires_attestation: number;
+  }>(d.executeSync(`SELECT prerequisite_movement_id, movement_id, relationship,
+      min_sessions, min_sets_per_session, min_value, value_kind, max_rpe, requires_attestation
+    FROM movement_capability_edge ORDER BY prerequisite_movement_id, movement_id`));
+  const evidence = rowsOf<{
+    session_id: number; movement_id: number; qualifying_sets: number;
+    minimum_value: number; maximum_rpe: number | null; verified: number;
+  }>(d.executeSync(`SELECT session_id, movement_id, qualifying_sets, minimum_value, maximum_rpe, verified
+    FROM capability_session_evidence WHERE verified = 1 ORDER BY movement_id, session_id`));
+  const importedEvidence = rowsOf<{
+    history_import_session_id: number; movement_id: number; qualifying_sets: number;
+    minimum_value: number; maximum_rpe: number | null;
+  }>(d.executeSync(`SELECT ice.history_import_session_id, ice.movement_id, ice.qualifying_sets,
+      ice.minimum_value, ice.maximum_rpe
+    FROM history_import_capability_evidence ice
+    JOIN history_import_session his USING (history_import_session_id)
+    JOIN history_import hi USING (history_import_id)
+    WHERE hi.verified = 1
+    ORDER BY ice.movement_id, ice.history_import_session_id`));  const attestations = rowsOf<{ prerequisite_movement_id: number; movement_id: number }>(
+    d.executeSync('SELECT prerequisite_movement_id, movement_id FROM movement_capability_attestation'),
+  );
+  const verdicts = resolveMovementAvailability({
+    movements: movements.map((movement) => ({
+      movementId: movement.movement_id, difficulty: movement.difficulty,
+      beginnerOk: movement.beginnerOk, requiredEquipment: movement.required,
+    })),
+    edges: edges.map((edge): CapabilityEdge => ({
+      prerequisiteMovementId: edge.prerequisite_movement_id, movementId: edge.movement_id,
+      relationship: edge.relationship, minSessions: edge.min_sessions,
+      minSetsPerSession: edge.min_sets_per_session, minValue: edge.min_value,
+      valueKind: edge.value_kind, maxRpe: edge.max_rpe,
+      requiresAttestation: edge.requires_attestation === 1,
+    })),
+    evidence: [
+      ...evidence.map((row): CapabilityEvidence => ({
+        movementId: row.movement_id, sessionId: row.session_id,
+        qualifyingSets: row.qualifying_sets, minimumValue: row.minimum_value,
+        maximumRpe: row.maximum_rpe, verified: row.verified === 1,
+      })),
+      ...importedEvidence.map((row): CapabilityEvidence => ({
+        movementId: row.movement_id, sessionId: `import:${row.history_import_session_id}`,
+        qualifyingSets: row.qualifying_sets, minimumValue: row.minimum_value,
+        maximumRpe: row.maximum_rpe, verified: true,
+      })),
+    ],
+    attestedEdgeKeys: new Set(attestations.map((row) => `${row.prerequisite_movement_id}:${row.movement_id}`)),
+    trainingAge: profile.training_age,
+    equipment: new Set(profile.equipment_inventory),
+    safetyExcludedMovementIds,
+  });
+  return new Set(verdicts.filter((row) => row.state === 'available').map((row) => row.movementId));
+};
 // --- profile row <-> object mapping ------------------------------------------
 interface ProfileRow {
   objective: string; training_age: string; weekly_frequency: number;
@@ -1285,7 +1388,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
       const movements = rowsOf<MovementRow>(
         getDb().executeSync(
-          'SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, d.instructions, d.cues, d.video_placeholder_uri, ci.coaching_intent, tp.default_sets AS time_default_sets, tp.target_seconds AS time_target_seconds, p.preference, (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id ORDER BY m.movement_id',
+          MOVEMENT_LIBRARY_SQL,
         ),
       ).map(movementFromRow);
       const profileRow = rowsOf<ProfileRow>(
@@ -1846,6 +1949,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       : 1;
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
+    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile);
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id,
       name: m.name,
@@ -1855,6 +1959,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // Phase 16: tier gating — beginners see Beginner + whitelisted staples.
       difficulty: m.difficulty,
       beginner_ok: m.beginnerOk,
+      capability_available: capabilityAvailable.has(m.movement_id),
     }));
     // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
     // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate
@@ -2168,6 +2273,130 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     set({ oneRepMaxes: Object.fromEntries(rms.map((r) => [r.movement_id, r.load_kg])) });
   },
 
+  importHistory: (text, verified, readinessEligible) => {
+    const movements = get().movements;
+    const preview = parseHistoryImport(
+      text,
+      movements.map((movement) => ({ movementId: movement.movement_id, name: movement.name })),
+    );
+    if (preview.formatVersion === null || preview.errors.length > 0 || preview.unknownMovementNames.length > 0) {
+      return { committed: false, duplicate: false, preview };
+    }
+    const d = getDb();
+    const fingerprint = historyContentFingerprint(text);
+    const duplicate = (rowsOf<{ c: number }>(d.executeSync(
+      'SELECT COUNT(*) AS c FROM history_import WHERE content_fingerprint = ?', [fingerprint],
+    ))[0]?.c ?? 0) > 0;
+    if (duplicate) return { committed: false, duplicate: true, preview };
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        `INSERT INTO history_import
+           (content_fingerprint, format_version, verified, readiness_eligible, created_at_ms)
+         VALUES (?, 'AK_HISTORY_V1', ?, ?, ?)`,
+        [fingerprint, verified ? 1 : 0, verified && readinessEligible ? 1 : 0, Date.now()],
+      );
+      const importId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+      for (const session of preview.sessions) {
+        d.executeSync(
+          `INSERT INTO history_import_session
+             (history_import_id, source_ordinal, session_date, duration_min, session_rpe, source_line)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [importId, session.sourceOrdinal, session.sessionDate, session.durationMin, session.sessionRpe, session.sourceLine],
+        );
+        const importSessionId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        const byMovement = new Map<number, { sets: number; minimum: number; maxRpe: number | null }>();
+        for (const historySet of session.sets) {
+          d.executeSync(
+            `INSERT INTO history_import_set
+               (history_import_session_id, movement_id, set_index, reps, load_kg, rpe, seconds, source_line)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [importSessionId, historySet.movementId, historySet.setIndex, historySet.reps,
+             historySet.loadKg, historySet.rpe, historySet.seconds, historySet.sourceLine],
+          );
+          const value = historySet.seconds ?? historySet.reps;
+          const current = byMovement.get(historySet.movementId);
+          byMovement.set(historySet.movementId, current === undefined
+            ? { sets: 1, minimum: value, maxRpe: historySet.rpe }
+            : {
+                sets: current.sets + 1,
+                minimum: Math.min(current.minimum, value),
+                maxRpe: historySet.rpe === null ? current.maxRpe
+                  : current.maxRpe === null ? historySet.rpe : Math.max(current.maxRpe, historySet.rpe),
+              });
+        }
+        for (const [movementId, evidence] of byMovement) {
+          d.executeSync(
+            `INSERT INTO history_import_capability_evidence
+               (history_import_session_id, movement_id, qualifying_sets, minimum_value, maximum_rpe)
+             VALUES (?, ?, ?, ?, ?)`,
+            [importSessionId, movementId, evidence.sets, evidence.minimum, evidence.maxRpe],
+          );
+        }
+        if (verified && readinessEligible) {
+          const tonnageKg = session.sets.reduce((sum, historySet) => sum + historySet.reps * historySet.loadKg, 0);
+          d.executeSync(
+            `INSERT INTO import_readiness_daily (date, tonnage_kg, updated_at_ms)
+             VALUES (?, ?, ?)
+             ON CONFLICT(date) DO UPDATE SET tonnage_kg = import_readiness_daily.tonnage_kg + excluded.tonnage_kg,
+               updated_at_ms = excluded.updated_at_ms`,
+            [session.sessionDate, tonnageKg, Date.now()],
+          );
+        }
+      }
+      d.executeSync('COMMIT');
+      if (verified && readinessEligible) {
+        for (const date of demoDates(localToday(), 29)) d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
+        get().refreshVector();
+        get().computePrescription([]);
+      }
+      return { committed: true, duplicate: false, preview };
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* full import remains atomic */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return { committed: false, duplicate: false, preview };
+    }
+  },
+
+  saveBodyweight: (date, kg) => {
+    const d = getDb();
+    if (kg === null) {
+      d.executeSync('DELETE FROM bodyweight_daily WHERE date = ?', [date]);
+      return;
+    }
+    const safe = Math.round(clamp(kg, 20, 500) * 10) / 10;
+    d.executeSync(
+      `INSERT INTO bodyweight_daily (date, weight_kg, source, recorded_at_ms)
+       VALUES (?, ?, 'manual', ?)
+       ON CONFLICT(date) DO UPDATE SET weight_kg = excluded.weight_kg,
+         source = 'manual', recorded_at_ms = excluded.recorded_at_ms`,
+      [date, safe, Date.now()],
+    );
+  },
+
+  loadMeasuredHistory: (limit = 90) => rowsOf<{
+    date: string; tonnage_kg: number | null; set_count: number | null;
+    weight_kg: number | null; rmssd_ms: number | null; resting_hr: number | null;
+    asleep_min: number | null;
+  }>(getDb().executeSync(
+    `WITH dates(date) AS (
+       SELECT date FROM v_training_daily_all UNION SELECT date FROM bodyweight_daily
+       UNION SELECT date FROM hrv_daily UNION SELECT date FROM sleep_daily
+     )
+     SELECT dates.date, td.tonnage_kg, td.set_count, bw.weight_kg,
+            h.rmssd_ms, h.resting_hr, sl.asleep_min
+     FROM dates
+     LEFT JOIN v_training_daily_all td USING (date)
+     LEFT JOIN bodyweight_daily bw USING (date)
+     LEFT JOIN hrv_daily h USING (date)
+     LEFT JOIN sleep_daily sl USING (date)
+     ORDER BY dates.date DESC LIMIT ?`,
+    [Math.round(clamp(limit, 1, 7300))],
+  )).map((row) => ({
+    date: row.date, tonnageKg: row.tonnage_kg ?? 0, setCount: row.set_count ?? 0,
+    bodyweightKg: row.weight_kg, hrvRmssdMs: row.rmssd_ms,
+    restingHr: row.resting_hr, sleepMinutes: row.asleep_min,
+  })),
   saveSessionNote: (text) => {
     const sessionId = get().lastEndedSessionId;
     const raw = text.trim().slice(0, 1000);
@@ -2241,10 +2470,13 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
 
     const { prescription, todayPlan, movements, profile, uiPreferences } = get();
-    if (todayPlan !== null && todayPlan.slots.some((slot) => !permittedForProfile(
-      movements.find((movement) => movement.movement_id === slot.movementId), profile,
-    ))) {
-      set({ error: 'This plan contains a movement outside the athlete tier. Regenerate the block before starting.' });
+    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile);
+    if (todayPlan !== null && todayPlan.slots.some((slot) =>
+      !permittedForProfile(
+        movements.find((movement) => movement.movement_id === slot.movementId), profile,
+      ) || !capabilityAvailable.has(slot.movementId)
+    )) {
+      set({ error: 'This plan contains a movement outside the athlete tier or capability boundary. Regenerate the block before starting.' });
       return;
     }
 
@@ -2301,7 +2533,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         const movement = movements.find((item) => item.movement_id === m.movement_id);
         // Repeating old history is still a prescription route. A beginner may
         // never inherit an Advanced movement from a prior athlete tier.
-        if (!permittedForProfile(movement, profile)) return [];
+        if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(m.movement_id)) return [];
         const target = targetForMovement(movement, 5);
         return [{
           sessionPlanSlotId: 0,
@@ -2591,8 +2823,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     const movement = movements.find((m) => m.movement_id === movementId);
-    if (!permittedForProfile(movement, profile)) {
-      set({ error: 'That movement is not available for this athlete tier.' });
+    if (!permittedForProfile(movement, profile) ||
+        !capabilityAvailableMovementIds(getDb(), movements, profile).has(movementId)) {
+      set({ error: 'That movement is teaching-only for this athlete.' });
       return;
     }
     const baseSets = Math.round(clamp(
@@ -2646,8 +2879,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
     const replacement = movements.find((movement) => movement.movement_id === newMovementId);
     if (slot === undefined || replacement === undefined) return;
-    if (!permittedForProfile(replacement, profile)) {
-      set({ error: 'That movement is not available for this athlete tier.' });
+    if (!permittedForProfile(replacement, profile) ||
+        !capabilityAvailableMovementIds(getDb(), movements, profile).has(newMovementId)) {
+      set({ error: 'That movement is teaching-only for this athlete.' });
       return;
     }
 
@@ -2738,6 +2972,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
     const today = localToday();
     const byId = new Map(movements.map((m) => [m.movement_id, m]));
+    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile);
     let futureSlots: FutureSlot[] = [];
     let currentDayIndex = 0;
     // Layer 2 (day-swap) needs the active block's later days. With no block,
@@ -2767,12 +3002,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         const mv = byId.get(r.movement_id);
         return mv === undefined
           ? []
-          : [{ plannedSlotId: r.planned_slot_id, dayIndex: r.day_index, movement: toSubMovement(mv), sets: r.sets }];
+          : [{ plannedSlotId: r.planned_slot_id, dayIndex: r.day_index, movement: toSubMovement(mv, capabilityAvailable), sets: r.sets }];
       });
     }
     const result = computeSubstitutions({
-      target: toSubMovement(target),
-      library: movements.map(toSubMovement),
+      target: toSubMovement(target, capabilityAvailable),
+      library: movements.map((movement) => toSubMovement(movement, capabilityAvailable)),
       inventory: profile.equipment_inventory,
       niggles: get().niggles, // active niggles drive the guardrail + Layer 3
       futureSlots,
@@ -2883,8 +3118,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const overrideLoad = overrideRow?.target_load_kg ?? null;
     const overrideReason = overrideRow?.reason ?? null;
     const replacement = movements.find((movement) => movement.movement_id === option.movement_id);
-    if (!permittedForProfile(replacement, profile)) {
-      set({ error: 'That movement is not available for this athlete tier.' });
+    if (!permittedForProfile(replacement, profile) ||
+        !capabilityAvailableMovementIds(d, movements, profile).has(option.movement_id)) {
+      set({ error: 'That movement is teaching-only for this athlete.' });
       return;
     }
 
@@ -3323,7 +3559,25 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           'UPDATE session SET session_rpe = ?, duration_min = ? WHERE session_id = ?',
           [avgRpe, durationMin, activeSession.sessionId],
         );
-        d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [snapshot.sessionDate]);
+        d.executeSync(
+          `INSERT INTO capability_session_evidence
+             (session_id, movement_id, qualifying_sets, minimum_value, maximum_rpe, verified)
+           SELECT sr.session_id, sr.movement_id, COUNT(*),
+                  CAST(MIN(CASE WHEN lm.mode = 'time' THEN tm.value ELSE sr.reps END) AS INTEGER),
+                  MAX(sr.rpe), 1
+           FROM set_record sr
+           LEFT JOIN movement_logging_mode lm ON lm.movement_id = sr.movement_id
+           LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
+           WHERE sr.session_id = ?
+             AND (lm.mode <> 'time' OR tm.value IS NOT NULL)
+           GROUP BY sr.session_id, sr.movement_id
+           ON CONFLICT(session_id, movement_id) DO UPDATE SET
+             qualifying_sets = excluded.qualifying_sets,
+             minimum_value = excluded.minimum_value,
+             maximum_rpe = excluded.maximum_rpe,
+             verified = 1`,
+          [activeSession.sessionId],
+        );        d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [snapshot.sessionDate]);
         applyApreFinalization(
           d,
           snapshot.originKind === 'planned' ? snapshot.sourcePlannedSessionId : null,
@@ -3527,6 +3781,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     try {
       // Children before parents, so it is correct whether or not foreign_keys is
       // ON. KEEPS athlete_profile / movement library / preferences / profile_slot.
+      d.executeSync('DELETE FROM history_import_capability_evidence');
+      d.executeSync('DELETE FROM history_import_set');
+      d.executeSync('DELETE FROM history_import_session');
+      d.executeSync('DELETE FROM history_import');
+      d.executeSync('DELETE FROM import_readiness_daily');
+      d.executeSync('DELETE FROM bodyweight_daily');
+      d.executeSync('DELETE FROM movement_capability_attestation');
+      d.executeSync('DELETE FROM capability_session_evidence');
       d.executeSync('DELETE FROM set_target');
       d.executeSync('DELETE FROM session_runner_checkpoint');
       d.executeSync('DELETE FROM session_slot_target');
@@ -3614,7 +3876,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     const movements = rowsOf<MovementRow>(
-      d.executeSync('SELECT m.movement_id, m.name, m.pattern, m.is_compound, (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json, d.base_name, d.supported_prefixes, d.difficulty_rating, d.instructions, d.cues, d.video_placeholder_uri, ci.coaching_intent, tp.default_sets AS time_default_sets, tp.target_seconds AS time_target_seconds, p.preference, (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id ORDER BY m.movement_id'),
+      d.executeSync(MOVEMENT_LIBRARY_SQL),
     ).map(movementFromRow);
     set({ movements, lastLoggedLoads: latestLoadMap(d) });
     get().refreshVector();

@@ -110,9 +110,9 @@ check("ACWR ~ 1.0 on steady loading", sv["acwr"] is not None and 0.85 <= sv["acw
 check("load_component = 100 in sweet spot", sv["load_component"] == 100.0)
 check("hrv_z computed from 28d ln-baseline", sv["hrv_z"] is not None, f"z={round(sv['hrv_z'],3)}")
 check("sleep efficiency generated col (85-89%)", 80 <= sv["sleep_efficiency_pct"] <= 95, f"{sv['sleep_efficiency_pct']}")
-expected = round(0.35 * sv["hrv_component"] + 0.30 * sv["load_component"]
-                 + 0.25 * sv["sleep_component"] + 0.10 * sv["spo2_component"], 1)
-check("weights sum: 0.35/0.30/0.25/0.10", abs(sv["readiness_score"] - expected) < 0.05, f"{sv['readiness_score']} vs {expected}")
+expected = round((0.35 * sv["hrv_component"] + 0.30 * sv["load_component"]
+                  + 0.25 * sv["sleep_component"]) / 0.90, 1)
+check("available-input weights renormalize without SpO2", abs(sv["readiness_score"] - expected) < 0.05, f"{sv['readiness_score']} vs {expected}")
 n = con.execute(sql_004, (target,))  # idempotent re-run (upsert)
 check("re-run is idempotent upsert",
       con.execute("SELECT count(*) c FROM state_vector WHERE date=?", (target,)).fetchone()["c"] == 1)

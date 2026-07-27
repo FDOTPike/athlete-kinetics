@@ -97,6 +97,8 @@ export interface SubstitutionMovement {
   /** movement_beginner_whitelist membership (plan P16 S4): an Intermediate
    *  staple a beginner may be offered. Absent = not whitelisted. */
   beginnerOk?: boolean;
+  /** Shared capability resolver verdict. False stays visible for teaching but cannot be offered. */
+  capabilityAvailable?: boolean;
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
@@ -249,7 +251,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   const blocked = new Set<number>();
 
   const available = (m: SubstitutionMovement): boolean =>
-    m.required.every((item) => inventory.has(item));
+    m.capabilityAvailable !== false && m.required.every((item) => inventory.has(item));
   /** Plan P16 S4 tier gate: a beginner is only offered Beginner movements or
    *  whitelisted Intermediate staples — in EVERY layer, triage included. */
   const beginnerBars = (m: SubstitutionMovement): boolean =>

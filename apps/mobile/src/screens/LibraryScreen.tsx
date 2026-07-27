@@ -10,7 +10,7 @@
  * Law 3: Zero red/amber/green anywhere.
  * Law 4: Touch targets >= 56pt.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Linking,
   Pressable,
@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { theme } from '../theme/theme';
 import { useStore, type Movement } from '../state/useStore';
+import { useSubViewBack } from '../navigation/navigation';
 import { Chip } from '../components/ui/Chip';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { SecondaryButton } from '../components/ui/SecondaryButton';
@@ -50,16 +51,50 @@ function humanPattern(patternKey: string): string {
   return patternKey.replace(/_/g, ' ').toUpperCase();
 }
 
+interface MovementRowProps {
+  item: Movement;
+  onSelect: (id: number) => void;
+}
+
+const MovementRow = React.memo(function MovementRow({ item, onSelect }: MovementRowProps): React.JSX.Element {
+  return (
+    <Pressable
+      onPress={() => onSelect(item.movement_id)}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${item.name}`}
+      style={({ pressed }) => [
+        styles.movementRow,
+        pressed && styles.movementRowPressed,
+      ]}
+    >
+      <View style={styles.movementInfo}>
+        <Text style={styles.movementName}>{item.name}</Text>
+        <Text style={styles.movementMeta}>
+          {item.baseName} · {item.beginnerOk ? 'Beginner' : 'Intermediate'}
+        </Text>
+      </View>
+      <Text style={styles.chevron}>→</Text>
+    </Pressable>
+  );
+});
+
 export interface LibraryScreenProps {
   initialMovementId?: number;
 }
 
 export default function LibraryScreen({ initialMovementId }: LibraryScreenProps): React.JSX.Element {
   const movements = useStore((s) => s.movements);
+  const resolveGoalRung = useStore((s) => s.resolveGoalRung);
 
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
   const [selectedMovementId, setSelectedMovementId] = useState<number | null>(initialMovementId ?? null);
+
+  const handleSelectMovement = useCallback((id: number) => {
+    setSelectedMovementId(id);
+  }, []);
+
+  useSubViewBack(selectedMovementId !== null, () => setSelectedMovementId(null));
 
   const selectedMovement = useMemo(() => {
     if (selectedMovementId === null) return null;
@@ -120,12 +155,17 @@ export default function LibraryScreen({ initialMovementId }: LibraryScreenProps)
 
   // Progression ladder for selected movement
   const progressionLadder = useMemo(() => {
-    if (selectedMovement === null) return [];
-    // Related movements sharing the same baseName or pattern
-    return movements.filter(
-      (m) => m.pattern === selectedMovement.pattern || m.baseName === selectedMovement.baseName,
-    );
+    if (selectedMovement === null || selectedMovement.progressionGroup === null) return [];
+    return movements
+      .filter((m) => m.progressionGroup === selectedMovement.progressionGroup)
+      .sort((a, b) => (a.progressionRank ?? Number.MAX_SAFE_INTEGER) - (b.progressionRank ?? Number.MAX_SAFE_INTEGER));
   }, [movements, selectedMovement]);
+  const rungResolution = useMemo(
+    () => selectedMovement !== null && selectedMovement.progressionGroup !== null
+      ? resolveGoalRung(selectedMovement.progressionGroup)
+      : null,
+    [resolveGoalRung, selectedMovement],
+  );
 
   return (
     <View style={styles.container}>
@@ -213,11 +253,12 @@ export default function LibraryScreen({ initialMovementId }: LibraryScreenProps)
               )}
 
               {/* Vertical Progression Ladder (§1l) */}
-              <View style={styles.sectionBlock}>
-                <Text style={styles.sectionTitle}>Progression Ladder</Text>
+              {progressionLadder.length > 0 && (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionTitle}>Progression Ladder</Text>
                 <View style={styles.ladderContainer}>
-                  {progressionLadder.map((ladderItem) => {
-                    const isCurrent = ladderItem.movement_id === selectedMovement.movement_id;
+                  {progressionLadder.map((ladderItem, index) => {
+                    const isCurrent = ladderItem.name === rungResolution?.active.movementName;
                     return (
                       <Pressable
                         key={ladderItem.movement_id}
@@ -235,14 +276,15 @@ export default function LibraryScreen({ initialMovementId }: LibraryScreenProps)
                             {ladderItem.name}
                           </Text>
                           <Text style={styles.ladderItemSub}>
-                            {ladderItem.beginnerOk ? 'Beginner OK' : 'Intermediate'}
+                            {`Rung ${index + 1} of ${progressionLadder.length}`}
                           </Text>
                         </View>
                       </Pressable>
                     );
                   })}
+                  </View>
                 </View>
-              </View>
+              )}
             </View>
           </View>
         ) : (
@@ -264,6 +306,7 @@ export default function LibraryScreen({ initialMovementId }: LibraryScreenProps)
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.filterScroll}
             >
               {FILTER_TYPES.map((filter) => {
@@ -307,24 +350,11 @@ export default function LibraryScreen({ initialMovementId }: LibraryScreenProps)
                 >
                   <View style={styles.movementList}>
                     {group.items.map((item) => (
-                      <Pressable
+                      <MovementRow
                         key={item.movement_id}
-                        onPress={() => setSelectedMovementId(item.movement_id)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`View ${item.name}`}
-                        style={({ pressed }) => [
-                          styles.movementRow,
-                          pressed && styles.movementRowPressed,
-                        ]}
-                      >
-                        <View style={styles.movementInfo}>
-                          <Text style={styles.movementName}>{item.name}</Text>
-                          <Text style={styles.movementMeta}>
-                            {item.baseName} · {item.beginnerOk ? 'Beginner' : 'Intermediate'}
-                          </Text>
-                        </View>
-                        <Text style={styles.chevron}>→</Text>
-                      </Pressable>
+                        item={item}
+                        onSelect={handleSelectMovement}
+                      />
                     ))}
                   </View>
                 </Disclosure>
@@ -345,7 +375,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: theme.space[4],
     gap: theme.space[4],
-    paddingBottom: theme.space[7],
+    paddingBottom: theme.space[6], // 32 — matches other screens' tab-bar clearance
   },
   header: {
     marginBottom: theme.space[2],

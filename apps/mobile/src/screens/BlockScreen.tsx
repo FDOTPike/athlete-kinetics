@@ -12,6 +12,7 @@ import {
   type BlockSessionSummary,
   type TodaySlot,
 } from '../state/useStore';
+import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
 import {
   PrimaryButton,
@@ -19,6 +20,13 @@ import {
   Chip,
   Disclosure,
 } from '../components/ui';
+
+const SCHEMA_LABEL: Record<SchemaType, string> = {
+  LINEAR: 'Linear',
+  WAVE: 'Undulating',
+  STEP: 'Step Loading',
+  APRE: 'Autoregulated',
+};
 
 const FOCUS_ABBREV: Record<string, string> = {
   lower: 'LWR',
@@ -122,6 +130,14 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmUnplannedStart, setConfirmUnplannedStart] = useState(false);
 
+  const hasSubView = detail !== null || reportOpen || confirmRegenerate || confirmUnplannedStart;
+  useSubViewBack(hasSubView, () => {
+    if (detail !== null) setDetail(null);
+    else if (reportOpen) setReportOpen(false);
+    else if (confirmRegenerate) setConfirmRegenerate(false);
+    else if (confirmUnplannedStart) setConfirmUnplannedStart(false);
+  });
+
   if (vector === null) {
     return (
       <View style={styles.center}>
@@ -187,7 +203,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} testID="coach-screen">
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled" testID="coach-screen">
       {/* Header Wordmark */}
       <View style={styles.header}>
         <Text style={styles.wordmark}>pikeMethods</Text>
@@ -419,11 +435,11 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                     onPress={() => setSchema(type)}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    accessibilityLabel={`${type} loading structure`}
+                    accessibilityLabel={`${SCHEMA_LABEL[type]} loading structure`}
                     style={[styles.schemaChip, selected && styles.schemaChipSelected]}
                   >
                     <Text style={[styles.schemaChipText, selected && styles.schemaChipTextSelected]}>
-                      {type}
+                      {SCHEMA_LABEL[type]}
                     </Text>
                   </Pressable>
                 );
@@ -587,6 +603,7 @@ const styles = StyleSheet.create({
   screenContent: {
     padding: theme.space[4],
     gap: theme.space[4],
+    paddingBottom: theme.space[6],
   },
   center: {
     flex: 1,

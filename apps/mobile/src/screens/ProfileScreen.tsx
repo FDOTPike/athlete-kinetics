@@ -18,14 +18,18 @@ import {
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
   EQUIPMENT_PRESETS,
+  HISTORY_IMPORT_AI_PROMPT,
+  HISTORY_IMPORT_EXAMPLE,
   OBJECTIVES,
-  PROGRESSION_METHODS,
+  parseHistoryImport,
   TRAINING_AGES,
   type EquipmentItem,
+  type HistoryParseResult,
   type UserProfile,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
 import { useStore } from '../state/useStore';
+import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
 import InfoTip from '../components/InfoTip';
 
@@ -189,6 +193,10 @@ export default function ProfileScreen(): React.JSX.Element {
   const renameAthleteEntry = useStore((s) => s.renameAthleteEntry);
   const deleteAthlete = useStore((s) => s.deleteAthlete);
   const loadRecentOutcomes = useStore((s) => s.loadRecentOutcomes);
+  const today = useStore((s) => s.today);
+  const importHistory = useStore((s) => s.importHistory);
+  const saveBodyweight = useStore((s) => s.saveBodyweight);
+  const loadMeasuredHistory = useStore((s) => s.loadMeasuredHistory);
 
   // Hydrate recent outcomes in effect (never query directly in render body!)
   const [recentOutcomes, setRecentOutcomes] = useState<{ outcomeKind: string; finalizedAtMs: number }[]>([]);
@@ -196,11 +204,29 @@ export default function ProfileScreen(): React.JSX.Element {
     setRecentOutcomes(loadRecentOutcomes(20));
   }, [activeAthleteId, session, loadRecentOutcomes]);
 
+  useEffect(() => {
+    setRecentMeasures(loadMeasuredHistory(14));
+  }, [activeAthleteId, loadMeasuredHistory]);
   // In-canvas double-confirm states (P2 & P5)
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
+  const [historyText, setHistoryText] = useState('');
+  const [historyPreview, setHistoryPreview] = useState<HistoryParseResult | null>(null);
+  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
+  const [importVerified, setImportVerified] = useState(false);
+  const [includeImportReadiness, setIncludeImportReadiness] = useState(false);
+  const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
+  const [bodyweightText, setBodyweightText] = useState('');
+
+  const hasConfirm = confirmingDeleteAthleteId !== null || confirmingWipeBlock || confirmingSwitchProfileId !== null || confirmingDeleteBandLevel !== null;
+  useSubViewBack(hasConfirm, () => {
+    if (confirmingDeleteAthleteId !== null) setConfirmingDeleteAthleteId(null);
+    else if (confirmingWipeBlock) setConfirmingWipeBlock(false);
+    else if (confirmingSwitchProfileId !== null) setConfirmingSwitchProfileId(null);
+    else if (confirmingDeleteBandLevel !== null) setConfirmingDeleteBandLevel(null);
+  });
 
   // Coach Mode local UI state (collapsed by default — a beginner never needs it).
   const [coachOpen, setCoachOpen] = useState(false);
@@ -236,7 +262,7 @@ export default function ProfileScreen(): React.JSX.Element {
       });
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
       <Text style={styles.subheading}>
@@ -289,15 +315,10 @@ export default function ProfileScreen(): React.JSX.Element {
         value={profile.target_energy_system}
         onSelect={(target_energy_system) => saveProfile({ target_energy_system })}
       />
-      <ChipRow
-        label="8 · PROGRESSION METHODOLOGY"
-        options={PROGRESSION_METHODS}
-        value={profile.progression_methodology}
-        onSelect={(progression_methodology) => saveProfile({ progression_methodology })}
-      />
+
 
       <View style={styles.field}>
-        <Text style={styles.fieldLabel}>9 · HISTORICAL INJURIES (one per line, &quot;region: note&quot;)</Text>
+        <Text style={styles.fieldLabel}>8 · HISTORICAL INJURIES (one per line, &quot;region: note&quot;)</Text>
         <TextInput
           style={styles.notesInput}
           value={injuryText}
@@ -315,7 +336,7 @@ export default function ProfileScreen(): React.JSX.Element {
         </Text>
       </View>
       <View style={styles.field}>
-        <Text style={styles.fieldLabel}>10 · MOBILITY LIMITS (one per line)</Text>
+        <Text style={styles.fieldLabel}>9 · MOBILITY LIMITS (one per line)</Text>
         <TextInput
           style={styles.notesInput}
           value={mobilityText}
@@ -538,6 +559,110 @@ export default function ProfileScreen(): React.JSX.Element {
         </View>
       </View>
 
+      <View style={styles.mgmtSection}>
+        <Text style={styles.mgmtHeading}>HISTORY &amp; MEASUREMENTS</Text>
+        <Text style={styles.fieldHint}>
+          Training history stays on this device. Imported sessions always appear in the timeline; only an explicitly verified import can support capability guidance. Recent imports stay outside readiness until you explicitly mark their load history complete.
+        </Text>
+        <Text style={styles.fieldLabel}>BODYWEIGHT TODAY (KG)</Text>
+        <View style={styles.numberRow}>
+          <TextInput
+            style={styles.oneRmInput}
+            value={bodyweightText}
+            onChangeText={setBodyweightText}
+            onEndEditing={() => {
+              const value = Number.parseFloat(bodyweightText.replace(',', '.'));
+              saveBodyweight(today, Number.isFinite(value) && value >= 20 ? value : null);
+              setRecentMeasures(loadMeasuredHistory(14));
+            }}
+            keyboardType="numeric"
+            placeholder="—"
+            placeholderTextColor={theme.color.textLow}
+            accessibilityLabel="Bodyweight today in kilograms"
+          />
+        </View>
+        <Text style={styles.fieldHint}>Enter a measured value; blank clears today&apos;s manual entry.</Text>
+        {recentMeasures.length > 0 && (
+          <View style={styles.measureRows}>
+            {recentMeasures.slice(0, 7).map((row) => (
+              <ListRow
+                key={row.date}
+                label={row.date}
+                detail={`${Math.round(row.tonnageKg)} kg load · ${row.setCount} sets${row.bodyweightKg === null ? '' : ` · ${row.bodyweightKg.toFixed(1)} kg BW`}`}
+                style={styles.clinicalRow}
+              />
+            ))}
+          </View>
+        )}
+        <Disclosure label="IMPORT TRAINING HISTORY">
+          <Text style={styles.fieldHint}>
+            Paste AK_HISTORY_V1 text, preview it, then explicitly choose whether the records are verified. Unknown movement names must be corrected before import.
+          </Text>
+          <TextInput
+            style={styles.importInput}
+            value={historyText}
+            onChangeText={(value) => { setHistoryText(value); setHistoryPreview(null); setHistoryNotice(null); }}
+            multiline
+            autoCapitalize="none"
+            placeholder={HISTORY_IMPORT_EXAMPLE}
+            placeholderTextColor={theme.color.textLow}
+            accessibilityLabel="Paste AK history import text"
+          />
+          <View style={styles.chipWrap}>
+            <Chip
+              label="PREVIEW"
+              selected={false}
+              onPress={() => setHistoryPreview(parseHistoryImport(historyText, movements.map((movement) => ({ movementId: movement.movement_id, name: movement.name }))))}
+              accessibilityLabel="Preview history import without saving"
+            />
+            <Chip
+              label={importVerified ? 'VERIFIED' : 'UNVERIFIED'}
+              selected={importVerified}
+              onPress={() => {
+                setImportVerified(!importVerified);
+                if (importVerified) setIncludeImportReadiness(false);
+              }}
+              accessibilityLabel="Toggle whether imported history is verified"
+            />
+            {importVerified && (
+              <Chip
+                label={includeImportReadiness ? 'LOAD COMPLETE' : 'EXCLUDE FROM READINESS'}
+                selected={includeImportReadiness}
+                onPress={() => setIncludeImportReadiness(!includeImportReadiness)}
+                accessibilityLabel="Confirm this imported recent load history is complete for readiness"
+              />
+            )}
+          </View>
+          {historyPreview !== null && (
+            <View style={styles.importPreview}>
+              <Text style={styles.fieldHint}>
+                {historyPreview.sessions.length} sessions · {historyPreview.errors.length} errors · {historyPreview.warnings.length} warnings
+              </Text>
+              {historyPreview.unknownMovementNames.length > 0 && (
+                <Text style={styles.fieldHint}>Unknown: {historyPreview.unknownMovementNames.join(', ')}</Text>
+              )}
+              {historyPreview.errors.slice(0, 3).map((issue) => (
+                <Text key={`${issue.line}-${issue.message}`} style={styles.fieldHint}>Line {issue.line}: {issue.message}</Text>
+              ))}
+              <Chip
+                label="COMMIT IMPORT"
+                selected={false}
+                onPress={() => {
+                  const result = importHistory(historyText, importVerified, includeImportReadiness);
+                  setHistoryPreview(result.preview);
+                  setHistoryNotice(result.committed
+                    ? 'History imported. It is visible in the local timeline.'
+                    : result.duplicate ? 'This exact import was already recorded.' : 'Import was not saved. Correct the preview issues first.');
+                  if (result.committed) setRecentMeasures(loadMeasuredHistory(14));
+                }}
+                accessibilityLabel="Commit reviewed history import"
+              />
+            </View>
+          )}
+          {historyNotice !== null && <Text style={styles.fieldHint}>{historyNotice}</Text>}
+          <Text style={styles.fieldHint}>External-AI prompt: {HISTORY_IMPORT_AI_PROMPT}</Text>
+        </Disclosure>
+      </View>
       {/* ---- Training-Decisions Disclosure (P3: recent 20 outcomes, ink.1 hairlines) ---- */}
       <View style={styles.mgmtSection}>
         <Disclosure label="TRAINING-DECISIONS DISCLOSURE">
@@ -769,7 +894,7 @@ export default function ProfileScreen(): React.JSX.Element {
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.color.ink0 },
-  content: { padding: theme.space[4], paddingBottom: theme.space[7] },
+  content: { padding: theme.space[4], paddingBottom: theme.space[6] }, // 32 — matches other screens
   wordmark: {
     ...theme.font.eyebrow,
     color: theme.color.textLow,
@@ -836,7 +961,21 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
     textAlignVertical: 'top',
   },
-  coachHeader: {
+  measureRows: { marginTop: theme.space[2], borderTopWidth: 1, borderTopColor: theme.color.line },
+  importInput: {
+    minHeight: 144,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    color: theme.color.textHi,
+    ...theme.font.label,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+    textAlignVertical: 'top',
+    marginBottom: theme.space[2],
+  },
+  importPreview: { marginTop: theme.space[2], gap: theme.space[2] },  coachHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
