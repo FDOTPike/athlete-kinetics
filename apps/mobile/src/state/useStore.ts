@@ -55,6 +55,8 @@ import {
   JOINTS,
   PATTERN_JOINTS,
   loadCodebase,
+  MACRO_BLOCKS,
+  macroPhaseOf,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
   RED_FLAG_PAIN,
@@ -75,6 +77,7 @@ import {
   type Joint,
   type HistoryParseResult,
   type LoadedCodebase,
+  type MacroPhase,
   type MovementPattern,
   type MovementPrefix,
   type MovementPrefixCondition,
@@ -1338,6 +1341,22 @@ const persistSessionOutcome = (
   );
 };
 
+/** Macro-cycle continuation — the ONLY place the next position is derived.
+ *  Every path that mints a block_meta row must call this. Two callers used to
+ *  compute it independently and drifted: the routine-template freeze hardcoded
+ *  index 1 / 'gpp', so using a template after a block expired rewound an
+ *  athlete mid-macrocycle back to the start (audit 6ff5449 s2). Deterministic:
+ *  reads persisted state only, no clock, no RNG. */
+const nextMacroPosition = (d: DB): { macroBlockIndex: number; macroPhase: MacroPhase } => {
+  const lastMeta = rowsOf<{ macro_block_index: number }>(d.executeSync(
+    'SELECT macro_block_index FROM block_meta ORDER BY block_id DESC LIMIT 1',
+  ))[0];
+  const macroBlockIndex = lastMeta !== undefined
+    ? (lastMeta.macro_block_index % MACRO_BLOCKS) + 1
+    : 1;
+  return { macroBlockIndex, macroPhase: macroPhaseOf(macroBlockIndex) };
+};
+
 /** Preserve the existing APRE mutation, but bind it to this session's frozen
  * planned origin and persisted sets. Recognition labels never enter this path. */
 const applyApreFinalization = (
@@ -2039,12 +2058,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
     // Macro continuation: the next block advances through the 32-week cycle
     // (8 positions, wrapping) from wherever the last generated block sat.
-    const lastMeta = rowsOf<{ macro_block_index: number }>(d.executeSync(
-      'SELECT macro_block_index FROM block_meta ORDER BY block_id DESC LIMIT 1',
-    ))[0];
-    const macroBlockIndex = lastMeta !== undefined
-      ? (lastMeta.macro_block_index % 8) + 1
-      : 1;
+    const { macroBlockIndex } = nextMacroPosition(d);
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
     const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
@@ -2460,7 +2474,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   deleteRoutineTemplate: (routineTemplateId) => {
     const d = getDb();
-    d.executeSync('DELETE FROM routine_template WHERE routine_template_id = ?', [routineTemplateId]);
+    // Slots cascade; any frozen planned_session_method row keeps its snapshot
+    // via ON DELETE SET NULL. Wrapped for consistency with every other mutation
+    // in this store -- an unguarded write is the one that surprises you later.
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync('DELETE FROM routine_template WHERE routine_template_id = ?', [routineTemplateId]);
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* transaction already closed */ }
+      throw error;
+    }
     get().loadRoutineTemplates();
   },
 
@@ -2522,9 +2546,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           [today, profile.objective, Date.now()],
         );
         const blockId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        // Continue the macrocycle. Freezing a template is not a reason to lose
+        // the athlete's periodization position.
+        const macro = nextMacroPosition(d);
         d.executeSync(
           'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
-          [blockId, 1, 'gpp', template.schemaType, 0],
+          [blockId, macro.macroBlockIndex, macro.macroPhase, template.schemaType, 0],
         );
         blockRow = { block_id: blockId, start_date: today };
       }

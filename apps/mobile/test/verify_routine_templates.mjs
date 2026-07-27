@@ -222,6 +222,69 @@ check('production capability assembly applies active niggles as an outer safety 
   assert.ok(storeSource.includes('get().niggles'));
 });
 
+// --- Macro-cycle continuity (regression gate for audit 6ff5449 s2) ----------
+// The freeze path used to hardcode macro_block_index = 1 / macro_phase 'gpp'.
+// generateNewBlock derives the next position from the LAST block_meta row, so a
+// hardcoded 1 silently rewound an athlete mid-macrocycle back to the start.
+check('freezing a routine template continues the macrocycle instead of rewinding it', () => {
+  // The exact statement nextMacroPosition() issues, and the exact increment.
+  const readLast = () => db.prepare(
+    'SELECT macro_block_index FROM block_meta ORDER BY block_id DESC LIMIT 1',
+  ).get();
+  const nextIndex = () => {
+    const last = readLast();
+    return last === undefined ? 1 : (last.macro_block_index % 8) + 1;
+  };
+  const mintBlock = (blockId, phase) => {
+    db.prepare("INSERT INTO training_block (block_id, start_date, objective, created_at_ms) VALUES (?, ?, 'strength', 0)")
+      .run(blockId, `2031-0${blockId % 9}-01`);
+    db.prepare('INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, 0)')
+      .run(blockId, nextIndex(), phase, 'LINEAR');
+  };
+
+  // Athlete walks to macro position 6 (peak).
+  for (let i = 1; i <= 6; i += 1) mintBlock(32000 + i, 'peak');
+  assert.equal(readLast().macro_block_index, 6, 'setup: athlete should sit at macro position 6');
+
+  // Block expires; athlete freezes a routine template -> a block is minted here.
+  mintBlock(32100, 'peak');
+  assert.equal(readLast().macro_block_index, 7,
+    'freeze must continue the macrocycle (7), not reset it to 1');
+
+  // The next generated block continues from there rather than from 2.
+  mintBlock(32101, 'peak');
+  assert.equal(readLast().macro_block_index, 8,
+    'generateNewBlock after a freeze must continue (8), not rewind');
+
+  // Wrap is still intact at the cycle boundary.
+  assert.equal((8 % 8) + 1, 1, 'position 8 wraps to 1');
+});
+
+check('both block_meta writers share one macro-continuation helper', () => {
+  // One reader, one increment, one place to change it.
+  assert.ok(storeSource.includes('const nextMacroPosition = (d: DB)'),
+    'nextMacroPosition helper must exist');
+  assert.equal((storeSource.match(/nextMacroPosition\(d\)/g) ?? []).length, 2,
+    'exactly two callers: generateNewBlock and the routine-template freeze');
+  assert.equal((storeSource.match(/SELECT macro_block_index FROM block_meta/g) ?? []).length, 1,
+    'the continuation query must live in exactly one place');
+  assert.ok(!storeSource.includes("[blockId, 1, 'gpp', template.schemaType, 0]"),
+    'the hardcoded macro position in the freeze path must be gone');
+});
+
+check('the routine builder does not offer a role with no ratified movements', () => {
+  const builderSource = readFileSync(
+    join(ROOT, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8',
+  );
+  assert.ok(builderSource.includes('conditional: roleEligibleSets.conditional.size === 0 ? 0 : 3'),
+    'conditional slots must be withheld while the role has zero ratified movements');
+  const conditional = db.prepare(
+    "SELECT COUNT(*) c FROM movement_role_eligibility WHERE role = 'conditional'",
+  ).get().c;
+  assert.equal(conditional, 0,
+    'if conditional movements have been ratified, re-check the builder gate above');
+});
+
 console.log(`routine templates tests complete: ${pass} passed, ${fail} failed`);
 if (fail > 0) {
   process.exit(1);

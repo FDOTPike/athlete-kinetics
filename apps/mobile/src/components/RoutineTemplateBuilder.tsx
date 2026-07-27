@@ -142,7 +142,15 @@ export function RoutineTemplateBuilder({
     availableMovementIds: availableSet,
   });
 
-  const roleMaxima: Record<RoutineRole, number> = { major: 1, supplementary: 2, conditional: 3 };
+  // A role with no ratified movements is not offered. Conditional work is
+  // seeded empty (028 leaves it curator-owned), so offering the slot produced a
+  // picker where all 124 movements rendered disabled. Re-enables itself the
+  // moment conditional movements are ratified -- no code change needed.
+  const roleMaxima: Record<RoutineRole, number> = {
+    major: 1,
+    supplementary: 2,
+    conditional: roleEligibleSets.conditional.size === 0 ? 0 : 3,
+  };
   const roleCount = (role: RoutineRole): number => slots.filter((slot) => slot.role === role).length;
 
   const addSlot = (role: RoutineRole): void => {
