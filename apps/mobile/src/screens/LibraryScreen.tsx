@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../theme/theme';
-import { useStore, type Movement } from '../state/useStore';
+import { localToday, useStore, type Movement } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip } from '../components/ui/Chip';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -162,7 +162,7 @@ export default function LibraryScreen({ initialMovementId }: LibraryScreenProps)
   }, [movements, selectedMovement]);
   const rungResolution = useMemo(
     () => selectedMovement !== null && selectedMovement.progressionGroup !== null
-      ? resolveGoalRung(selectedMovement.progressionGroup)
+      ? resolveGoalRung(selectedMovement.progressionGroup, localToday())
       : null,
     [resolveGoalRung, selectedMovement],
   );

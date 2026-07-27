@@ -172,6 +172,7 @@ export {
 
 // P16 progression ladders + P17 S1 session runner (engine-side; UI lands P17).
 export {
+  CAPABILITY_EVIDENCE_WINDOW_DAYS,
   DEFAULT_ADVANCEMENT_POLICY,
   resolveActiveRung,
   type AdvancementPolicy,

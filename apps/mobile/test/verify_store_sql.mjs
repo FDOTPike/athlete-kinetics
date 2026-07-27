@@ -852,6 +852,41 @@ if (resetTables.length >= 15) {
     a('latestLoadMap: weighted movement (993) has latest load_kg (85.5)', map[993] === 85.5, `got ${map[993]}`);
     db.exec('ROLLBACK');
   }
+
+  // --- [T3] resolveGoalRung evidence window assertion ---
+  console.log('[resolveGoalRung evidence window]');
+  const goalRungSql = statements.find((s) => s.includes('WHERE p.progression_group = ? AND s.session_date >= date(?, ?)'));
+  a('store exposes bounded resolveGoalRung SQL literal with bound date params', Boolean(goalRungSql));
+  if (goalRungSql) {
+    db.exec('BEGIN');
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (981,'Window Test Pushup','push_h',0)");
+    db.exec("INSERT INTO movement_progression (movement_id,progression_group,progression_rank) VALUES (981,'test_window_group',0)");
+
+    // Session 981: inside 180-day window (today = 2026-06-01, session_date = 2026-05-01)
+    db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (981,'2026-05-01',0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (981,981,981,1,8,0,8.0,0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (982,981,981,2,8,0,8.0,0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (983,981,981,3,8,0,8.0,0)");
+
+    // Session 982: outside 180-day window (today = 2026-06-01, session_date = 2025-10-01)
+    db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (982,'2025-10-01',0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (984,982,981,1,8,0,8.0,0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (985,982,981,2,8,0,8.0,0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (986,982,981,3,8,0,8.0,0)");
+
+    const today = '2026-06-01';
+    const windowParam = '-180 days';
+    const rowsInside = db.prepare(goalRungSql).all('test_window_group', today, windowParam);
+    a('qualifying session inside 180-day window returns sets', rowsInside.length === 3);
+
+    // Delete session inside window and check session outside window
+    db.exec("DELETE FROM set_record WHERE session_id = 981");
+    db.exec("DELETE FROM session WHERE session_id = 981");
+    const rowsOutside = db.prepare(goalRungSql).all('test_window_group', today, windowParam);
+    a('byte-identical qualifying session dated outside 180-day window returns NO sets', rowsOutside.length === 0);
+
+    db.exec('ROLLBACK');
+  }
 }
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

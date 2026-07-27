@@ -88,6 +88,7 @@ import {
   type SubstitutionResult,
   type PhraseEntry,
   calculateEffectiveLoad,
+  CAPABILITY_EVIDENCE_WINDOW_DAYS,
   conditionApplies,
   resolveActiveRung,
   type RungResolution,
@@ -494,7 +495,7 @@ interface KineticsStore {
   /** P16 progression: resolve the active rung of a goal-movement chain from
    *  logged history (pure read — UI consumers land with P17). Null when the
    *  group has no chain rows. */
-  resolveGoalRung: (progressionGroup: string) => RungResolution | null;
+  resolveGoalRung: (progressionGroup: string, today: string) => RungResolution | null;
   /** Coach Mode: close the current athlete's DB and re-boot against the
    *  target athlete's file. Refused while a session is active. */
   switchAthlete: (id: string) => void;
@@ -621,7 +622,7 @@ const rowsOf = <T>(res: unknown): T[] => {
   return Array.isArray(arr) ? (arr as T[]) : [];
 };
 
-const localToday = (): string => {
+export const localToday = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
@@ -1889,16 +1890,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().computePrescription([]);
   },
 
-  resolveGoalRung: (progressionGroup) => {
+  resolveGoalRung: (progressionGroup, today) => {
     const d = getDb();
     const chain = rowsOf<{ name: string; progression_group: string; progression_rank: number }>(
       d.executeSync('SELECT m.name, p.progression_group, p.progression_rank FROM movement_progression p JOIN movement m ON m.movement_id = p.movement_id WHERE p.progression_group = ? ORDER BY p.progression_rank', [progressionGroup]),
     ).map((r) => ({ movementName: r.name, progressionGroup: r.progression_group, progressionRank: r.progression_rank }));
     if (chain.length === 0) return null;
     // Per-session set lists at chain movements (same-session 3x8 semantics —
-    // the engine never aggregates across sessions).
+    // the engine never aggregates across sessions). Bounded by evidence window.
     const rows = rowsOf<{ session_id: number; name: string; reps: number }>(
-      d.executeSync("SELECT sr.session_id, m.name, COALESCE(sm.value, sr.reps) AS reps FROM set_record sr JOIN movement m ON m.movement_id = sr.movement_id JOIN movement_progression p ON p.movement_id = sr.movement_id LEFT JOIN set_metric sm ON sm.set_id = sr.set_id AND sm.metric = 'time_s' WHERE p.progression_group = ? ORDER BY sr.session_id, sr.set_index", [progressionGroup]),
+      d.executeSync(
+        "SELECT sr.session_id, m.name, COALESCE(sm.value, sr.reps) AS reps FROM set_record sr JOIN session s ON s.session_id = sr.session_id JOIN movement m ON m.movement_id = sr.movement_id JOIN movement_progression p ON p.movement_id = sr.movement_id LEFT JOIN set_metric sm ON sm.set_id = sr.set_id AND sm.metric = 'time_s' WHERE p.progression_group = ? AND s.session_date >= date(?, ?) ORDER BY sr.session_id, sr.set_index",
+        [progressionGroup, today, `-${CAPABILITY_EVIDENCE_WINDOW_DAYS} days`],
+      ),
     );
     const bySession = new Map<string, { movementName: string; repsPerSet: number[] }>();
     for (const r of rows) {

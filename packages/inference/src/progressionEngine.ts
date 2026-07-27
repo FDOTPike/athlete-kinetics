@@ -41,6 +41,8 @@ export interface AdvancementPolicy {
   readonly requiredReps: number;
 }
 
+export const CAPABILITY_EVIDENCE_WINDOW_DAYS = 180;
+
 /** 3x8 strict in a single session — conservative default; tune per-chain in
  *  seed data if needed. */
 export const DEFAULT_ADVANCEMENT_POLICY: AdvancementPolicy = {

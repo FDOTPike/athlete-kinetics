@@ -6,6 +6,7 @@ let mockState;
 
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
+  localToday: () => '2026-06-01',
   useStore: (selector) => selector(mockState),
 }));
 
