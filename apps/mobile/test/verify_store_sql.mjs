@@ -29,7 +29,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '022_set_target.sql', '023_phase17_session_foundation.sql',
   '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql',
   '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
-  '028_capability_graph.sql', '029_routine_history_analytics.sql']) {
+  '028_capability_graph.sql', '029_routine_history_analytics.sql',
+  '030_readiness_import_integration.sql', '031_planned_session_method.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -204,10 +205,11 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO one_rep_max (movement_id,load_kg,updated_at_ms) VALUES (1,100,0)");
   db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (701,'2026-06-01','strength',0)");
   db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'lower','accumulation','2026-06-10')");
+  db.exec("INSERT INTO planned_session_method (planned_session_id,schema_type,routine_template_id,template_name,frozen_at_ms) VALUES (701,'APRE',NULL,'Reset probe',0)");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_slot', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
@@ -271,7 +273,8 @@ if (resetTables.length >= 15) {
     '021_taxonomy_corrections.sql', '022_set_target.sql', '023_phase17_session_foundation.sql',
     '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql',
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
-    '028_capability_graph.sql', '029_routine_history_analytics.sql'
+    '028_capability_graph.sql', '029_routine_history_analytics.sql',
+    '030_readiness_import_integration.sql', '031_planned_session_method.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
@@ -618,7 +621,7 @@ if (resetTables.length >= 15) {
     a('frozen-target hydration probe completed', hydrationRan);
   }
 
-  const apreSourceSql = statements.find((sql) => sql.includes("bm.schema_type = 'APRE'") && sql.includes('ps.week_index'));
+  const apreSourceSql = statements.find((sql) => sql.includes("COALESCE(psm.schema_type, bm.schema_type) = 'APRE'") && sql.includes('ps.week_index'));
   const apreSourceSlotsSql = statements.find((sql) => sql.includes('sl.planned_slot_id, sl.movement_id, sl.reps, orm.load_kg AS one_rm_kg'));
   const apreNextSlotSql = statements.find((sql) => sql.includes('SELECT sl.planned_slot_id, sl.reps, sl.target_rpe') && sql.includes('ps.week_index = ?'));
   const apreExistingOverrideSql = statements.find((sql) => sql.startsWith('SELECT target_load_kg FROM slot_override'));

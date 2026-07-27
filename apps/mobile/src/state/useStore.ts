@@ -37,6 +37,7 @@ import {
 import { loadRegistry, saveRegistry } from './athleteRegistry';
 import {
   buildPatternWindow,
+  composeRoutine,
   computeSubstitutions,
   DEFAULT_PROFILE,
   detectFlaws,
@@ -52,6 +53,7 @@ import {
   TRAINING_AGES,
   isNoOpGuardrail,
   JOINTS,
+  PATTERN_JOINTS,
   loadCodebase,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
@@ -63,6 +65,8 @@ import {
   type CapabilityEdge,
   type CapabilityEvidence,
   type DaySwapOption,
+  type MovementAvailability,
+  type RoutineRole,
   type DifficultyRating,
   type Embedder,
   type FutureSlot,
@@ -329,6 +333,28 @@ export interface TodayPlan {
   slots: TodaySlot[];
 }
 
+export interface RoutineTemplateSlot {
+  routineTemplateSlotId: number;
+  routineTemplateId: number;
+  dayIndex: number;
+  slotIndex: number;
+  role: RoutineRole;
+  movementId: number;
+  movementName: string;
+  sets: number;
+  reps: number;
+  targetRpe: number;
+}
+
+export interface RoutineTemplate {
+  routineTemplateId: number;
+  name: string;
+  schemaType: SchemaType;
+  createdAtMs: number;
+  updatedAtMs: number;
+  slots: RoutineTemplateSlot[];
+}
+
 export interface HistoryImportCommitResult {
   readonly committed: boolean;
   readonly duplicate: boolean;
@@ -388,6 +414,7 @@ interface KineticsStore {
   blockMeta: BlockMeta | null;
   blockSessions: BlockSessionSummary[];
   todayPlan: TodayPlan | null;
+  routineTemplates: RoutineTemplate[];
   /** Absolute 1RMs by movement_id (one_rep_max rows). */
   oneRepMaxes: Record<number, number>;
   /** Evidence-backed last load by movement, hydrated from durable set history. */
@@ -549,6 +576,29 @@ interface KineticsStore {
   dismissOutcome: () => void;
   loadSessionOutcome: (sessionId: number) => { outcomeKind: string; finalizedAtMs: number } | null;
   loadRecentOutcomes: (limit?: number) => { outcomeKind: string; finalizedAtMs: number }[];
+  loadRoutineTemplates: () => void;
+  saveRoutineTemplate: (input: {
+    routineTemplateId?: number;
+    name: string;
+    schemaType: SchemaType;
+    slots: Array<{
+      dayIndex?: number;
+      slotIndex?: number;
+      role: RoutineRole;
+      movementId: number;
+      sets?: number;
+      reps?: number;
+      targetRpe?: number;
+    }>;
+  }) => RoutineTemplate;
+  deleteRoutineTemplate: (routineTemplateId: number) => void;
+  freezeRoutineTemplateToPlannedSession: (
+    routineTemplateId: number,
+    sessionDate?: string,
+    dayIndex?: number,
+  ) => { plannedSessionId: number };
+  getMovementAvailabilityVerdicts: () => readonly MovementAvailability[];
+  getRoutineRoleEligibleMovementIds: () => Record<RoutineRole, readonly number[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -779,14 +829,38 @@ const toSubMovement = (m: Movement, availableIds?: ReadonlySet<number>): Substit
   preference: m.preference,
 });
 
+/** Resolve active niggles into movement-level safety exclusions using the same
+ * pattern/joint map as substitutions. Safety remains an outer hard gate. */
+const safetyExcludedMovementIdsFor = (
+  movements: readonly Movement[],
+  profile: UserProfile,
+  niggles: readonly NiggleInput[],
+): ReadonlySet<number> => {
+  const injuredJoints = new Set<Joint>();
+  const triageMin = EXPERIENCE_SEVERITY[profile.training_age].triageMin;
+  for (const niggle of niggles) {
+    if (niggle.severity < triageMin) continue;
+    const key = niggle.region.trim().toLowerCase();
+    const joint = JOINTS.find((candidate) => candidate.toLowerCase() === key);
+    if (joint !== undefined) injuredJoints.add(joint);
+  }
+  if (injuredJoints.size === 0) return new Set<number>();
+  return new Set(
+    movements
+      .filter((movement) => (PATTERN_JOINTS[movement.pattern as MovementPattern] ?? [])
+        .some((joint) => injuredJoints.has(joint)))
+      .map((movement) => movement.movement_id),
+  );
+};
+
 /** Resolve the one shared selection law from indexed sidecars. This reads the
  * compact capability evidence table, never historical set_record rows. */
-const capabilityAvailableMovementIds = (
+const capabilityMovementAvailability = (
   d: DB,
   movements: readonly Movement[],
   profile: UserProfile,
   safetyExcludedMovementIds: ReadonlySet<number> = new Set<number>(),
-): ReadonlySet<number> => {
+): readonly MovementAvailability[] => {
   const edges = rowsOf<{
     prerequisite_movement_id: number; movement_id: number; relationship: CapabilityEdge['relationship'];
     min_sessions: number; min_sets_per_session: number; min_value: number;
@@ -808,10 +882,11 @@ const capabilityAvailableMovementIds = (
     JOIN history_import_session his USING (history_import_session_id)
     JOIN history_import hi USING (history_import_id)
     WHERE hi.verified = 1
-    ORDER BY ice.movement_id, ice.history_import_session_id`));  const attestations = rowsOf<{ prerequisite_movement_id: number; movement_id: number }>(
+    ORDER BY ice.movement_id, ice.history_import_session_id`));
+  const attestations = rowsOf<{ prerequisite_movement_id: number; movement_id: number }>(
     d.executeSync('SELECT prerequisite_movement_id, movement_id FROM movement_capability_attestation'),
   );
-  const verdicts = resolveMovementAvailability({
+  return resolveMovementAvailability({
     movements: movements.map((movement) => ({
       movementId: movement.movement_id, difficulty: movement.difficulty,
       beginnerOk: movement.beginnerOk, requiredEquipment: movement.required,
@@ -840,7 +915,28 @@ const capabilityAvailableMovementIds = (
     equipment: new Set(profile.equipment_inventory),
     safetyExcludedMovementIds,
   });
-  return new Set(verdicts.filter((row) => row.state === 'available').map((row) => row.movementId));
+};
+
+const capabilityAvailableMovementIds = (
+  d: DB,
+  movements: readonly Movement[],
+  profile: UserProfile,
+  safetyExcludedMovementIds: ReadonlySet<number> = new Set<number>(),
+): ReadonlySet<number> => new Set(
+  capabilityMovementAvailability(d, movements, profile, safetyExcludedMovementIds)
+    .filter((row) => row.state === 'available')
+    .map((row) => row.movementId),
+);
+
+const routineRoleEligibility = (d: DB): Record<RoutineRole, ReadonlySet<number>> => {
+  const result: Record<RoutineRole, Set<number>> = {
+    major: new Set<number>(), supplementary: new Set<number>(), conditional: new Set<number>(),
+  };
+  const rows = rowsOf<{ movement_id: number; role: RoutineRole }>(d.executeSync(
+    'SELECT movement_id, role FROM movement_role_eligibility ORDER BY role, movement_id',
+  ));
+  for (const row of rows) result[row.role].add(row.movement_id);
+  return result;
 };
 // --- profile row <-> object mapping ------------------------------------------
 interface ProfileRow {
@@ -1252,7 +1348,7 @@ const applyApreFinalization = (
 ): void => {
   if (sourcePlannedSessionId === null) return;
   const source = rowsOf<{ week_index: number; block_id: number }>(d.executeSync(
-    "SELECT ps.week_index, ps.block_id FROM planned_session ps JOIN block_meta bm ON bm.block_id = ps.block_id WHERE ps.planned_session_id = ? AND bm.schema_type = 'APRE'",
+    `SELECT ps.week_index, ps.block_id FROM planned_session ps JOIN block_meta bm ON bm.block_id = ps.block_id LEFT JOIN planned_session_method psm ON psm.planned_session_id = ps.planned_session_id WHERE ps.planned_session_id = ? AND COALESCE(psm.schema_type, bm.schema_type) = 'APRE'`,
     [sourcePlannedSessionId],
   ))[0];
   if (source === undefined || source.week_index >= 4) return;
@@ -1321,7 +1417,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   vector: null, trend: [], session: null, prescription: null,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
-  block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+  block: null, blockMeta: null, blockSessions: [], todayPlan: null, routineTemplates: [],
   oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), bandLadder: [], onboarded: true,
 };
 
@@ -1353,6 +1449,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   blockMeta: null,
   blockSessions: [],
   todayPlan: null,
+  routineTemplates: [],
   oneRepMaxes: {},
   lastLoggedLoads: {},
   lastEndedSessionId: null,
@@ -1437,6 +1534,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().refreshBandLadder();
       // The block lives only in SQLite; the store is a read surface over it.
       get().refreshBlock();
+      get().loadRoutineTemplates();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
       // duration (endSession stamps duration or deletes empty shells).
@@ -1949,7 +2047,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       : 1;
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
-    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile);
+    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id,
       name: m.name,
@@ -2174,6 +2272,329 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     });
   },
 
+  getMovementAvailabilityVerdicts: () => {
+    const d = getDb();
+    const { movements, profile, niggles } = get();
+    return capabilityMovementAvailability(
+      d,
+      movements,
+      profile,
+      safetyExcludedMovementIdsFor(movements, profile, niggles),
+    );
+  },
+
+  getRoutineRoleEligibleMovementIds: () => {
+    const eligible = routineRoleEligibility(getDb());
+    return {
+      major: [...eligible.major],
+      supplementary: [...eligible.supplementary],
+      conditional: [...eligible.conditional],
+    };
+  },
+  loadRoutineTemplates: () => {
+    const d = getDb();
+    const templates = rowsOf<{
+      routine_template_id: number; name: string; schema_type: string;
+      created_at_ms: number; updated_at_ms: number;
+    }>(d.executeSync('SELECT routine_template_id, name, schema_type, created_at_ms, updated_at_ms FROM routine_template ORDER BY routine_template_id DESC'));
+
+    const result: RoutineTemplate[] = [];
+    for (const t of templates) {
+      const slots = rowsOf<{
+        routine_template_slot_id: number; routine_template_id: number; day_index: number;
+        slot_index: number; role: RoutineRole; movement_id: number; movement_name: string;
+        sets: number; reps: number; target_rpe: number;
+      }>(d.executeSync(
+        `SELECT rts.routine_template_slot_id, rts.routine_template_id, rts.day_index,
+                rts.slot_index, rts.role, rts.movement_id, m.name AS movement_name,
+                rts.sets, rts.reps, rts.target_rpe
+         FROM routine_template_slot rts
+         JOIN movement m ON m.movement_id = rts.movement_id
+         WHERE rts.routine_template_id = ?
+         ORDER BY rts.day_index, rts.slot_index`,
+        [t.routine_template_id]
+      ));
+      result.push({
+        routineTemplateId: t.routine_template_id,
+        name: t.name,
+        schemaType: t.schema_type as SchemaType,
+        createdAtMs: t.created_at_ms,
+        updatedAtMs: t.updated_at_ms,
+        slots: slots.map((s) => ({
+          routineTemplateSlotId: s.routine_template_slot_id,
+          routineTemplateId: s.routine_template_id,
+          dayIndex: s.day_index,
+          slotIndex: s.slot_index,
+          role: s.role,
+          movementId: s.movement_id,
+          movementName: s.movement_name,
+          sets: s.sets,
+          reps: s.reps,
+          targetRpe: s.target_rpe,
+        })),
+      });
+    }
+    set({ routineTemplates: result });
+  },
+
+  saveRoutineTemplate: (input) => {
+    const d = getDb();
+    const { profile } = get();
+    const name = input.name.trim();
+    if (name.length < 1 || name.length > 80) {
+      throw new Error('Routine template name must be between 1 and 80 characters.');
+    }
+    const validSchemas: SchemaType[] = ['LINEAR', 'WAVE', 'STEP', 'APRE'];
+    if (!validSchemas.includes(input.schemaType)) {
+      throw new Error(`Invalid schema type: ${input.schemaType}`);
+    }
+    if (input.slots.length < 1 || input.slots.length > 6) {
+      throw new Error('A routine template must contain between 1 and 6 movements.');
+    }
+
+    const verdicts = get().getMovementAvailabilityVerdicts();
+    const availableSet = new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
+    const roleEligibility = routineRoleEligibility(d);
+    const counts: Record<RoutineRole, number> = { major: 0, supplementary: 0, conditional: 0 };
+    const maxima: Record<RoutineRole, number> = { major: 1, supplementary: 2, conditional: 3 };
+    const seenMovements = new Set<number>();
+    const seenPositions = new Set<string>();
+
+    for (let index = 0; index < input.slots.length; index += 1) {
+      const item = input.slots[index];
+      const dayIndex = item.dayIndex ?? 1;
+      const slotIndex = item.slotIndex ?? index + 1;
+      if (!Number.isInteger(dayIndex) || dayIndex < 1 || dayIndex > 7 ||
+          !Number.isInteger(slotIndex) || slotIndex < 1 || slotIndex > 6) {
+        throw new Error('Routine day and slot positions must stay inside the supported 1-7 / 1-6 bounds.');
+      }
+      const positionKey = `${dayIndex}:${slotIndex}`;
+      if (seenPositions.has(positionKey)) throw new Error('Routine slot positions must be unique.');
+      seenPositions.add(positionKey);
+      if (seenMovements.has(item.movementId)) throw new Error('A movement can appear only once in a routine day.');
+      seenMovements.add(item.movementId);
+      counts[item.role] += 1;
+      if (counts[item.role] > maxima[item.role]) {
+        throw new Error(`A routine supports at most ${maxima[item.role]} ${item.role} movement${maxima[item.role] === 1 ? '' : 's'}.`);
+      }
+      if (!roleEligibility[item.role].has(item.movementId)) {
+        throw new Error(`Movement ${item.movementId} is not ratified for the ${item.role} role.`);
+      }
+      if (!availableSet.has(item.movementId)) {
+        throw new Error(`Movement ${item.movementId} is unavailable under the capability resolver.`);
+      }
+      if (item.sets !== undefined && (!Number.isInteger(item.sets) || item.sets < 1 || item.sets > 10)) {
+        throw new Error('Routine sets must be a whole number between 1 and 10.');
+      }
+      if (item.reps !== undefined && (!Number.isInteger(item.reps) || item.reps < 1 || item.reps > 100)) {
+        throw new Error('Routine reps must be a whole number between 1 and 100.');
+      }
+      if (item.targetRpe !== undefined &&
+          (!Number.isFinite(item.targetRpe) || item.targetRpe < 5 || item.targetRpe > profile.base_rpe_cap)) {
+        throw new Error(`Routine RPE must be between 5 and the athlete cap of ${profile.base_rpe_cap}.`);
+      }
+    }
+    if (counts.major !== 1) throw new Error('A routine must contain exactly one major movement.');
+
+    const composed = composeRoutine({
+      selections: input.slots.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
+      schemaType: input.schemaType,
+      objective: profile.objective,
+      trainingAge: profile.training_age,
+      // Persist defaults for the complete six-slot template. The athlete's live
+      // duration cap is applied later when a particular session is frozen.
+      durationCapMin: Math.max(profile.session_duration_cap_min, 66),
+      baseRpeCap: profile.base_rpe_cap,
+      availableMovementIds: availableSet,
+    });
+    if (composed.slots.length !== input.slots.length) {
+      throw new Error(composed.warnings[0] ?? 'The routine could not be composed safely.');
+    }
+
+    const now = Date.now();
+    let templateId = input.routineTemplateId;
+    d.executeSync('BEGIN');
+    try {
+      if (templateId !== undefined) {
+        const existing = rowsOf<{ routine_template_id: number }>(d.executeSync(
+          'SELECT routine_template_id FROM routine_template WHERE routine_template_id = ?',
+          [templateId],
+        ))[0];
+        if (existing === undefined) throw new Error(`Routine template ${templateId} not found.`);
+        d.executeSync(
+          'UPDATE routine_template SET name = ?, schema_type = ?, updated_at_ms = ? WHERE routine_template_id = ?',
+          [name, input.schemaType, now, templateId],
+        );
+        d.executeSync('DELETE FROM routine_template_slot WHERE routine_template_id = ?', [templateId]);
+      } else {
+        d.executeSync(
+          'INSERT INTO routine_template (name, schema_type, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?)',
+          [name, input.schemaType, now, now],
+        );
+        templateId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+      }
+
+      for (let index = 0; index < input.slots.length; index += 1) {
+        const item = input.slots[index];
+        const prescribed = composed.slots[index];
+        const sets = item.sets ?? prescribed.sets;
+        const reps = item.reps ?? prescribed.reps;
+        const targetRpe = item.targetRpe ?? prescribed.targetRpe;
+        d.executeSync(
+          `INSERT INTO routine_template_slot (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [templateId, item.dayIndex ?? 1, item.slotIndex ?? index + 1, item.role, item.movementId, sets, reps, targetRpe],
+        );
+      }
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* transaction already closed */ }
+      throw error;
+    }
+
+    get().loadRoutineTemplates();
+    const saved = get().routineTemplates.find((template) => template.routineTemplateId === templateId);
+    if (saved === undefined) throw new Error('Routine template saved but could not be reloaded.');
+    return saved;
+  },
+
+  deleteRoutineTemplate: (routineTemplateId) => {
+    const d = getDb();
+    d.executeSync('DELETE FROM routine_template WHERE routine_template_id = ?', [routineTemplateId]);
+    get().loadRoutineTemplates();
+  },
+
+  freezeRoutineTemplateToPlannedSession: (routineTemplateId, sessionDate, routineDayIndex = 1) => {
+    if (get().session !== null) throw new Error('End the active session before replacing today\'s plan.');
+    const d = getDb();
+    const today = sessionDate ?? localToday();
+    const template = get().routineTemplates.find((candidate) => candidate.routineTemplateId === routineTemplateId);
+    if (template === undefined) throw new Error(`Routine template ${routineTemplateId} not found.`);
+
+    const { profile, movements } = get();
+    const verdicts = get().getMovementAvailabilityVerdicts();
+    const availableSet = new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
+    const roleEligibility = routineRoleEligibility(d);
+    const daySlots = template.slots.filter((slot) => slot.dayIndex === routineDayIndex);
+    if (daySlots.length === 0) throw new Error(`Routine template ${routineTemplateId} has no movements for day ${routineDayIndex}.`);
+    for (const slot of daySlots) {
+      if (!roleEligibility[slot.role].has(slot.movementId)) {
+        throw new Error(`${slot.movementName} is no longer ratified for the ${slot.role} role.`);
+      }
+      if (!availableSet.has(slot.movementId)) {
+        throw new Error(`${slot.movementName} is currently teaching-only. Edit the template before using it.`);
+      }
+    }
+
+    const composed = composeRoutine({
+      selections: daySlots.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
+      schemaType: template.schemaType,
+      objective: profile.objective,
+      trainingAge: profile.training_age,
+      durationCapMin: profile.session_duration_cap_min,
+      baseRpeCap: profile.base_rpe_cap,
+      availableMovementIds: availableSet,
+    });
+    if (composed.slots.length === 0) {
+      throw new Error('The current duration cap cannot fit any movement from this template.');
+    }
+
+    d.executeSync('BEGIN');
+    let plannedSessionId = 0;
+    try {
+      let blockRow: { block_id: number; start_date: string } | undefined = rowsOf<{ block_id: number; start_date: string }>(d.executeSync(
+        "SELECT block_id, start_date FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
+      ))[0];
+      let dayOffset = blockRow === undefined ? 0 : Number(rowsOf<{ day_offset: number }>(d.executeSync(
+        'SELECT CAST(julianday(?) - julianday(?) AS INTEGER) AS day_offset',
+        [today, blockRow.start_date],
+      ))[0]?.day_offset ?? Number.NaN);
+
+      if (blockRow !== undefined && (!Number.isInteger(dayOffset) || dayOffset < 0 || dayOffset > 27)) {
+        d.executeSync("UPDATE training_block SET status = 'archived' WHERE block_id = ?", [blockRow.block_id]);
+        blockRow = undefined;
+        dayOffset = 0;
+      }
+      if (blockRow === undefined) {
+        d.executeSync("UPDATE training_block SET status = 'archived' WHERE status = 'active'");
+        d.executeSync(
+          'INSERT INTO training_block (start_date, objective, created_at_ms) VALUES (?, ?, ?)',
+          [today, profile.objective, Date.now()],
+        );
+        const blockId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        d.executeSync(
+          'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
+          [blockId, 1, 'gpp', template.schemaType, 0],
+        );
+        blockRow = { block_id: blockId, start_date: today };
+      }
+
+      const weekIndex = Math.floor(dayOffset / 7) + 1;
+      const plannedDayIndex = (dayOffset % 7) + 1;
+      const existingSession = rowsOf<{ planned_session_id: number; session_date: string }>(d.executeSync(
+        'SELECT planned_session_id, session_date FROM planned_session WHERE block_id = ? AND week_index = ? AND day_index = ?',
+        [blockRow.block_id, weekIndex, plannedDayIndex],
+      ))[0];
+
+      if (existingSession !== undefined) {
+        plannedSessionId = existingSession.planned_session_id;
+        const alreadyUsed = Number(rowsOf<{ c: number }>(d.executeSync(
+          `SELECT (SELECT COUNT(*) FROM session_origin WHERE source_planned_session_id = ?)
+                + (SELECT COUNT(*) FROM planned_slot_disposition pd JOIN planned_slot ps USING (planned_slot_id)
+                   WHERE ps.planned_session_id = ?) AS c`,
+          [plannedSessionId, plannedSessionId],
+        ))[0]?.c ?? 0);
+        if (alreadyUsed > 0) throw new Error('Today\'s planned session has already been used and cannot be replaced.');
+        d.executeSync(
+          "UPDATE planned_session SET focus = 'full', phase = ?, session_date = ? WHERE planned_session_id = ?",
+          [weekIndex === 4 ? 'deload' : 'accumulation', today, plannedSessionId],
+        );
+        d.executeSync('DELETE FROM planned_slot WHERE planned_session_id = ?', [plannedSessionId]);
+      } else {
+        d.executeSync(
+          'INSERT INTO planned_session (block_id, week_index, day_index, focus, phase, session_date) VALUES (?, ?, ?, ?, ?, ?)',
+          [blockRow.block_id, weekIndex, plannedDayIndex, 'full', weekIndex === 4 ? 'deload' : 'accumulation', today],
+        );
+        plannedSessionId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+      }
+
+      d.executeSync(
+        `INSERT INTO planned_session_method (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(planned_session_id) DO UPDATE SET
+           schema_type = excluded.schema_type,
+           routine_template_id = excluded.routine_template_id,
+           template_name = excluded.template_name,
+           frozen_at_ms = excluded.frozen_at_ms`,
+        [plannedSessionId, template.schemaType, template.routineTemplateId, template.name, Date.now()],
+      );
+
+      for (const composedSlot of composed.slots) {
+        const savedSlot = daySlots.find((slot) => slot.movementId === composedSlot.movementId)!;
+        const movement = movements.find((candidate) => candidate.movement_id === composedSlot.movementId);
+        const target = targetForMovement(movement, savedSlot.reps);
+        const plannedSets = defaultSetsForTarget(movement, savedSlot.sets);
+        const legacyReps = target.kind === 'reps' ? Math.min(30, target.reps) : Math.min(30, savedSlot.reps);
+        d.executeSync(
+          'INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, ?, ?, ?, ?)',
+          [plannedSessionId, composedSlot.slotIndex, savedSlot.movementId, plannedSets, legacyReps, Math.min(savedSlot.targetRpe, profile.base_rpe_cap)],
+        );
+        const plannedSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        d.executeSync(
+          'INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds) VALUES (?, ?, ?, ?)',
+          [plannedSlotId, target.kind, target.kind === 'reps' ? target.reps : null, target.kind === 'time' ? target.seconds : null],
+        );
+      }
+
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* transaction already closed */ }
+      throw error;
+    }
+
+    get().refreshBlock();
+    return { plannedSessionId };
+  },
   connectBiometrics: async (bridge) => {
     biometrics = bridge;
     if (bridge === null) {
@@ -2470,7 +2891,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
 
     const { prescription, todayPlan, movements, profile, uiPreferences } = get();
-    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile);
+    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
     if (todayPlan !== null && todayPlan.slots.some((slot) =>
       !permittedForProfile(
         movements.find((movement) => movement.movement_id === slot.movementId), profile,
@@ -2824,7 +3245,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
     const movement = movements.find((m) => m.movement_id === movementId);
     if (!permittedForProfile(movement, profile) ||
-        !capabilityAvailableMovementIds(getDb(), movements, profile).has(movementId)) {
+        !capabilityAvailableMovementIds(getDb(), movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles)).has(movementId)) {
       set({ error: 'That movement is teaching-only for this athlete.' });
       return;
     }
@@ -2880,7 +3301,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const replacement = movements.find((movement) => movement.movement_id === newMovementId);
     if (slot === undefined || replacement === undefined) return;
     if (!permittedForProfile(replacement, profile) ||
-        !capabilityAvailableMovementIds(getDb(), movements, profile).has(newMovementId)) {
+        !capabilityAvailableMovementIds(getDb(), movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles)).has(newMovementId)) {
       set({ error: 'That movement is teaching-only for this athlete.' });
       return;
     }
@@ -2972,7 +3393,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
     const today = localToday();
     const byId = new Map(movements.map((m) => [m.movement_id, m]));
-    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile);
+    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
     let futureSlots: FutureSlot[] = [];
     let currentDayIndex = 0;
     // Layer 2 (day-swap) needs the active block's later days. With no block,
@@ -3119,7 +3540,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const overrideReason = overrideRow?.reason ?? null;
     const replacement = movements.find((movement) => movement.movement_id === option.movement_id);
     if (!permittedForProfile(replacement, profile) ||
-        !capabilityAvailableMovementIds(d, movements, profile).has(option.movement_id)) {
+        !capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles)).has(option.movement_id)) {
       set({ error: 'That movement is teaching-only for this athlete.' });
       return;
     }
@@ -3794,6 +4215,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM session_slot_target');
       d.executeSync('DELETE FROM planned_slot_disposition');
       d.executeSync('DELETE FROM planned_slot_target');
+      d.executeSync('DELETE FROM planned_session_method');
       d.executeSync('DELETE FROM session_plan_slot');
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');

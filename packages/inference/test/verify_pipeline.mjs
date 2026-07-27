@@ -48,11 +48,29 @@ check('routine composer uses shared eligibility, role maxima, duration, and RPE 
   const result = composeRoutine({ selections: [{ movementId: 1, role: 'major' }, { movementId: 2, role: 'major' }, { movementId: 3, role: 'supplementary' }], schemaType: 'LINEAR', objective: 'strength', trainingAge: 'beginner', durationCapMin: 30, baseRpeCap: 7, availableMovementIds: new Set([1, 2]) });
   assert.equal(result.slots.length, 1); assert.ok(result.slots.every((slot) => slot.targetRpe <= 7)); assert.ok(result.warnings.length >= 2);
 });
+check('routine composer preserves the athlete-authored slot order', () => {
+  const selections = [
+    { movementId: 4, role: 'conditional' },
+    { movementId: 1, role: 'major' },
+    { movementId: 2, role: 'supplementary' },
+  ];
+  const result = composeRoutine({
+    selections,
+    schemaType: 'LINEAR',
+    objective: 'strength',
+    trainingAge: 'intermediate',
+    durationCapMin: 60,
+    baseRpeCap: 9,
+    availableMovementIds: new Set([1, 2, 4]),
+  });
+  assert.deepEqual(result.slots.map((slot) => slot.movementId), [4, 1, 2]);
+  assert.deepEqual(result.slots.map((slot) => slot.slotIndex), [1, 2, 3]);
+});
 check('four method strategies are deterministic and distinct', () => {
   const base = { selections: [{ movementId: 1, role: 'major' }], objective: 'strength', trainingAge: 'intermediate', durationCapMin: 60, baseRpeCap: 9, availableMovementIds: new Set([1]) };
   const signatures = ['LINEAR', 'WAVE', 'STEP', 'APRE'].map((schemaType) => JSON.stringify(composeRoutine({ ...base, schemaType }).slots));
   assert.equal(new Set(signatures).size, 4);
   assert.deepEqual(composeRoutine({ ...base, schemaType: 'APRE' }), composeRoutine({ ...base, schemaType: 'APRE' }));
 });
-console.log(`pipeline verification: ${pass}/9 checks passed`);
+console.log(`pipeline verification: ${pass}/10 checks passed`);
 if (process.exitCode) process.exit(process.exitCode);

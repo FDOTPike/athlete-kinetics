@@ -11,7 +11,9 @@ import {
   useStore,
   type BlockSessionSummary,
   type TodaySlot,
+  type RoutineTemplate,
 } from '../state/useStore';
+import { RoutineTemplateBuilder } from '../components/RoutineTemplateBuilder';
 import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
 import {
@@ -121,6 +123,12 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const reportSubjective = useStore((s) => s.reportSubjective);
   const startSession = useStore((s) => s.startSession);
 
+  const routineTemplates = useStore((s) => s.routineTemplates) ?? [];
+  const freezeRoutineTemplateToPlannedSession = useStore(
+    (s) => s.freezeRoutineTemplateToPlannedSession,
+  );
+  const deleteRoutineTemplate = useStore((s) => s.deleteRoutineTemplate);
+
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
@@ -129,14 +137,63 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmUnplannedStart, setConfirmUnplannedStart] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<
+    RoutineTemplate | 'new' | null
+  >(null);
+  const [confirmRoutineAction, setConfirmRoutineAction] = useState<{
+    kind: 'use' | 'delete'; routineTemplateId: number;
+  } | null>(null);
+  const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
 
-  const hasSubView = detail !== null || reportOpen || confirmRegenerate || confirmUnplannedStart;
+  const hasSubView =
+    detail !== null ||
+    reportOpen ||
+    confirmRegenerate ||
+    confirmUnplannedStart ||
+    editingTemplate !== null ||
+    confirmRoutineAction !== null;
+
   useSubViewBack(hasSubView, () => {
-    if (detail !== null) setDetail(null);
+    if (editingTemplate !== null) setEditingTemplate(null);
+    else if (confirmRoutineAction !== null) setConfirmRoutineAction(null);
+    else if (detail !== null) setDetail(null);
     else if (reportOpen) setReportOpen(false);
     else if (confirmRegenerate) setConfirmRegenerate(false);
     else if (confirmUnplannedStart) setConfirmUnplannedStart(false);
   });
+
+  const requestRoutineAction = (kind: 'use' | 'delete', routineTemplateId: number): void => {
+    setRoutineActionMessage(null);
+    setConfirmRoutineAction({ kind, routineTemplateId });
+  };
+
+  const confirmSelectedRoutineAction = (template: RoutineTemplate): void => {
+    const action = confirmRoutineAction;
+    if (action === null || action.routineTemplateId !== template.routineTemplateId) return;
+    try {
+      if (action.kind === 'delete') {
+        deleteRoutineTemplate(template.routineTemplateId);
+        setRoutineActionMessage(`${template.name} was deleted.`);
+      } else {
+        freezeRoutineTemplateToPlannedSession(template.routineTemplateId);
+        setRoutineActionMessage(`${template.name} is frozen into today's plan.`);
+      }
+    } catch (error) {
+      setRoutineActionMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setConfirmRoutineAction(null);
+    }
+  };
+
+  if (editingTemplate !== null) {
+    return (
+      <RoutineTemplateBuilder
+        initialTemplate={editingTemplate === 'new' ? null : editingTemplate}
+        onSaved={() => setEditingTemplate(null)}
+        onCancel={() => setEditingTemplate(null)}
+      />
+    );
+  }
 
   if (vector === null) {
     return (
@@ -402,6 +459,54 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         )}
 
         <Disclosure
+          label="Routine templates"
+          hint="Create, edit, and freeze custom routine templates"
+        >
+          <View style={styles.disclosureContent}>
+            {routineTemplates.length === 0 ? (
+              <Text style={styles.captionText}>No saved routine templates yet.</Text>
+            ) : (
+              routineTemplates.map((t) => (
+                <View key={t.routineTemplateId} style={styles.slotRow}>
+                  <View style={styles.slotMain}>
+                    <Text style={styles.slotName}>{t.name}</Text>
+                    <Text style={styles.slotTarget}>
+                      {SCHEMA_LABEL[t.schemaType]} - {t.slots.length} movements
+                    </Text>
+                  </View>
+                  <View style={styles.routineActions}>
+                    {confirmRoutineAction?.routineTemplateId === t.routineTemplateId ? (
+                      <>
+                        <Chip
+                          label={confirmRoutineAction.kind === 'delete' ? 'Confirm delete' : 'Confirm replace'}
+                          selected={false}
+                          onPress={() => confirmSelectedRoutineAction(t)}
+                        />
+                        <Chip label="Cancel" selected={false} onPress={() => setConfirmRoutineAction(null)} />
+                      </>
+                    ) : (
+                      <>
+                        <Chip label="Use today" selected={false} onPress={() => requestRoutineAction('use', t.routineTemplateId)} />
+                        <Chip label="Edit" selected={false} onPress={() => setEditingTemplate(t)} />
+                        <Chip label="Delete" selected={false} onPress={() => requestRoutineAction('delete', t.routineTemplateId)} />
+                      </>
+                    )}
+                  </View>
+                </View>
+              ))
+            )}
+            {routineActionMessage !== null && (
+              <Text style={styles.captionText}>{routineActionMessage}</Text>
+            )}
+            <PrimaryButton
+              label="+ Build new routine template"
+              onPress={() => setEditingTemplate('new')}
+              accessibilityLabel="Build new routine template"
+            />
+          </View>
+        </Disclosure>
+
+        <Disclosure
           label="Manage block"
           hint={block === null ? 'Choose a structure for your first block' : 'Block settings and regeneration'}
           open={manageOpen}
@@ -645,6 +750,12 @@ const styles = StyleSheet.create({
   bodyText: {
     ...theme.font.body,
     color: theme.color.textHi,
+  },
+  routineActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[1],
+    justifyContent: 'flex-end',
   },
   captionText: {
     ...theme.font.label,

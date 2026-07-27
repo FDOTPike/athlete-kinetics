@@ -37,7 +37,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '027_operational_safeguards.sql',
   '028_capability_graph.sql',
   '029_routine_history_analytics.sql',
-  '030_readiness_import_integration.sql'];
+  '030_readiness_import_integration.sql',
+  '031_planned_session_method.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -119,6 +120,26 @@ const importedReadiness = a.raw.prepare("SELECT acute_load_kg, chronic_load_kg F
 check('030 consumes only materialized eligible import load in readiness',
   importedReadiness !== undefined && importedReadiness.acute_load_kg === 400 && importedReadiness.chronic_load_kg === 100,
   JSON.stringify(importedReadiness));
+a.raw.exec(`
+  INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
+  VALUES (31000, '2030-01-01', 'strength', 1);
+  INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (31001, 31000, 1, 1, 'full', 'accumulation', '2030-01-01');
+  INSERT INTO routine_template (routine_template_id, name, schema_type, created_at_ms, updated_at_ms)
+  VALUES (31002, 'APRE snapshot', 'APRE', 1, 1);
+  INSERT INTO planned_session_method
+    (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+  VALUES (31001, 'APRE', 31002, 'APRE snapshot', 1);
+  DELETE FROM routine_template WHERE routine_template_id = 31002;
+`);
+const methodSnapshot = a.raw.prepare(
+  'SELECT schema_type, routine_template_id, template_name FROM planned_session_method WHERE planned_session_id = 31001',
+).get();
+check('031 preserves the frozen method snapshot after template deletion',
+  methodSnapshot?.schema_type === 'APRE'
+    && methodSnapshot?.routine_template_id === null
+    && methodSnapshot?.template_name === 'APRE snapshot',
+  JSON.stringify(methodSnapshot));
 
 runMigrations(a, MIGRATIONS); // second boot
 check('re-boot is a no-op (idempotent)', uv(a) === MIGRATIONS.length);
