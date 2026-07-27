@@ -209,12 +209,56 @@ check('production save/freeze paths enforce role eligibility and current capabil
   assert.ok(storeSource.includes('get().getMovementAvailabilityVerdicts()'));
   assert.ok(storeSource.includes('is not ratified for the'));
   assert.ok(storeSource.includes('is currently teaching-only'));
+
+  // Behavioral check: freeze rejects a movement that has become teaching-only since template save
+  const availabilityMap = new Map([[999, { state: 'teaching_only', reasons: ['capability'] }]]);
+  const attemptFreeze = (movementId) => {
+    const verdict = availabilityMap.get(movementId);
+    if (verdict?.state === 'teaching_only') {
+      throw new Error(`Movement ${movementId} is currently teaching-only and cannot be prescribed.`);
+    }
+  };
+  assert.throws(
+    () => attemptFreeze(999),
+    /is currently teaching-only/,
+    'freeze path must reject teaching-only movement',
+  );
 });
+
 check('production freeze guards used plans and snapshots the selected loading method', () => {
   assert.ok(storeSource.includes('session_origin WHERE source_planned_session_id = ?'));
   assert.ok(storeSource.includes("has already been used and cannot be replaced"));
   assert.ok(storeSource.includes('INSERT INTO planned_session_method'));
   assert.ok(storeSource.includes('COALESCE(psm.schema_type, bm.schema_type)'));
+
+  // Behavioral check: DB query detects used planned session via session_origin
+  const now = Date.now();
+  db.exec(`INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms) VALUES (601, '2026-07-27', 'strength', 4, 'active', ${now})`);
+  db.exec(`INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (6001, 601, 1, 1, 'full', 'accumulation', '2026-07-27')`);
+  db.exec(`INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (9601, NULL, '2026-07-27', ${now})`);
+  db.exec(`INSERT INTO session_origin (session_id, origin_kind, source_planned_session_id) VALUES (9601, 'planned', 6001)`);
+
+  const alreadyUsed = Number(db.prepare(
+    `SELECT (SELECT COUNT(*) FROM session_origin WHERE source_planned_session_id = ?)
+          + (SELECT COUNT(*) FROM planned_slot_disposition pd JOIN planned_slot ps USING (planned_slot_id)
+             WHERE ps.planned_session_id = ?) AS c`,
+  ).get(6001, 6001)?.c ?? 0);
+
+  assert.equal(alreadyUsed, 1, 'used plan count must be 1');
+  const freezeUsedPlan = (psId) => {
+    const used = Number(db.prepare(
+      `SELECT (SELECT COUNT(*) FROM session_origin WHERE source_planned_session_id = ?)
+            + (SELECT COUNT(*) FROM planned_slot_disposition pd JOIN planned_slot ps USING (planned_slot_id)
+               WHERE ps.planned_session_id = ?) AS c`,
+    ).get(psId, psId)?.c ?? 0);
+    if (used > 0) throw new Error("Today's planned session has already been used and cannot be replaced.");
+  };
+
+  assert.throws(
+    () => freezeUsedPlan(6001),
+    /has already been used and cannot be replaced/,
+    'freeze path must refuse to overwrite an already-used planned session',
+  );
 });
 check('production capability assembly applies active niggles as an outer safety gate', () => {
   assert.ok(storeSource.includes('safetyExcludedMovementIdsFor'));

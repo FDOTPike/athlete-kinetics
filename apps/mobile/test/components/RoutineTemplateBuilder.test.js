@@ -99,4 +99,18 @@ describe('RoutineTemplateBuilder', () => {
     expect(saveRoutineTemplate.mock.calls[0][0].slots[1]).toMatchObject({ sets: 6, reps: 4, targetRpe: 8.5 });
     expect(onSaved).toHaveBeenCalledTimes(1);
   });
+
+  test('enforces role maxima and disables + Cond chip when conditional role has zero ratified movements', () => {
+    render(<RoutineTemplateBuilder />);
+
+    // In default mockState:
+    // conditional has 0 ratified movements -> roleMaxima.conditional is 0 -> + Cond chip is disabled
+    expect(screen.getByLabelText('+ Cond').props.accessibilityState?.disabled).toBe(true);
+
+    // major has 1 ratified movement -> roleMaxima.major is 1 (1/1 slots filled) -> + Major chip is disabled
+    expect(screen.getByLabelText('+ Major').props.accessibilityState?.disabled).toBe(true);
+
+    // supplementary has 2/2 slots filled -> + Supp chip is disabled
+    expect(screen.getByLabelText('+ Supp').props.accessibilityState?.disabled).toBe(true);
+  });
 });
