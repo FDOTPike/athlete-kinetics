@@ -39,8 +39,6 @@ jobs:
         run: npm run fetch:embedder
       - name: verify:all (19 gates + typecheck)
         run: npm run verify:all
-      - name: verify:components (RN component tests)
-        run: npm run verify:components
       - name: Seeder physiology — pinned alignment + today's alignment
         run: |
           node scripts/seed-db.ts --end=2026-06-10 --db=/tmp/pinned.db

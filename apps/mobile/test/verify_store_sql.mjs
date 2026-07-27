@@ -914,6 +914,25 @@ if (resetTables.length >= 15) {
 
     db.exec('ROLLBACK');
   }
+
+  // --- [F3] Gate count & documentation drift assertion ---
+  console.log('[documentation & CI gate count drift check]');
+  const pkgJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
+  const verifyAllScript = pkgJson.scripts['verify:all'] ?? '';
+  const verifyInvocations = (verifyAllScript.match(/npm run verify:(?!all\b)[a-z0-9-]+/g) ?? []).length;
+
+  const agentWorkflowContent = readFileSync(join(ROOT, 'AGENT_WORKFLOW.md'), 'utf-8');
+  const ciYmlContent = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf-8');
+
+  const workflowMatch = agentWorkflowContent.match(/npm run verify:all\s+#\s+(\d+)\s+gates/);
+  const workflowGateCount = workflowMatch ? Number(workflowMatch[1]) : null;
+
+  const ciMatches = Array.from(ciYmlContent.matchAll(/\((\d+)\s+gates/g));
+  const ciGateCounts = ciMatches.map((m) => Number(m[1]));
+
+  a('verify:all script invokes exactly 19 verify:* targets', verifyInvocations === 19, `got ${verifyInvocations}`);
+  a('AGENT_WORKFLOW.md documents exact verify:all gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
+  a('ci.yml documents exact verify:all gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
 }
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);
 process.exit(fail ? 1 : 0);
