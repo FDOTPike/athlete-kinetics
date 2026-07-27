@@ -1417,16 +1417,16 @@ const runnerSelection = (runner: RunnerState): Pick<KineticsStore, 'runner' | 'a
 /** One durable, evidence-backed starting load per movement. Zero is preserved
  * as valid evidence for bodyweight work; only an absent row means “start light”. */
 const latestLoadMap = (d: DB): Record<number, number> => {
-  const rows = rowsOf<{ movement_id: number; load_kg: number }>(d.executeSync(
-    `SELECT sr.movement_id, sr.load_kg
-     FROM set_record sr
-     JOIN (
-       SELECT movement_id, MAX(set_id) AS set_id
-       FROM set_record
-       GROUP BY movement_id
-     ) latest ON latest.set_id = sr.set_id`,
+  const rows = rowsOf<{ movement_id: number; load_kg: number | null }>(d.executeSync(
+    `SELECT m.movement_id,
+            (SELECT sr.load_kg FROM set_record sr
+              WHERE sr.movement_id = m.movement_id
+              ORDER BY sr.set_id DESC LIMIT 1) AS load_kg
+       FROM movement m`,
   ));
-  return Object.fromEntries(rows.map((row) => [row.movement_id, row.load_kg]));
+  return Object.fromEntries(
+    rows.filter((row) => row.load_kg !== null).map((row) => [row.movement_id, row.load_kg as number]),
+  );
 };
 /** Everything per-athlete in the store, cleared on a Coach Mode file swap so
  *  nothing bleeds across athletes (the re-boot re-hydrates all of it from the

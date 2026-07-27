@@ -823,6 +823,35 @@ if (resetTables.length >= 15) {
     db.exec('DELETE FROM session WHERE session_id=18500');
     db.exec('DELETE FROM session_outcome WHERE session_id=18500');
   }
+
+  // --- [T2] latestLoadMap query plan & semantics check ---
+  console.log('[latestLoadMap query plan & semantics]');
+  const latestLoadSql = statements.find((s) => s.includes('FROM movement m') && s.includes('set_record'));
+  a('store exposes latestLoadMap SQL literal', Boolean(latestLoadSql));
+  if (latestLoadSql) {
+    const eqp = db.prepare(`EXPLAIN QUERY PLAN ${latestLoadSql}`).all();
+    const hasScanSetRecord = eqp.some((row) => row.detail && row.detail.includes('SCAN set_record'));
+    a('latestLoadMap EXPLAIN QUERY PLAN contains no SCAN set_record', !hasScanSetRecord, JSON.stringify(eqp));
+
+    db.exec('BEGIN');
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (991,'No Set Movement','squat',1)");
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (992,'BW Movement','squat',0)");
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (993,'Weighted Movement','squat',1)");
+    db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (991,'2026-06-01',0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (991,991,992,1,10,0,7.0,0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (992,991,993,1,5,80,7.0,0)");
+    db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (993,991,993,2,5,85.5,8.0,0)");
+
+    const rows = db.prepare(latestLoadSql).all();
+    const map = Object.fromEntries(
+      rows.filter((r) => r.load_kg !== null).map((r) => [r.movement_id, r.load_kg])
+    );
+
+    a('latestLoadMap: zero-set movement (991) is ABSENT', !(991 in map));
+    a('latestLoadMap: last-set-was-0 movement (992) is PRESENT with 0', map[992] === 0, `got ${map[992]}`);
+    a('latestLoadMap: weighted movement (993) has latest load_kg (85.5)', map[993] === 85.5, `got ${map[993]}`);
+    db.exec('ROLLBACK');
+  }
 }
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} STATEMENT(S) FAILED`}`);
 process.exit(fail ? 1 : 0);
