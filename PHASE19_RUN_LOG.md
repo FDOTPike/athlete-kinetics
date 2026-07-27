@@ -104,11 +104,88 @@ could not verify: nothing
 
 ## T10 — ANALYSIS ONLY: iOS has no biometrics [DONE]
 commit: 6baf2fc7bd0e96cd40b0f167ef3ae1515d1a5b21
-files: docs/IOS_BIOMETRICS_DESIGN.md
+files: docs/ANALYSIS_ios_biometrics_gap.md
 anchors: `@ak/biometrics`
 gates: N/A (analysis task)
 negative test: N/A
-decisions: Conducted technical design investigation into iOS Apple Health (HealthKit) integration for `@ak/biometrics`. Authored `docs/IOS_BIOMETRICS_DESIGN.md` covering library selection (`react-native-health`), multi-platform factory abstraction (`createBiometricsBridge`), HealthKit sample mapping to `DailyBiometrics` / `state_vector`, and iOS privacy / permissions requirements. Zero code changes.
-flagged for Francis: Technical design for iOS biometrics is complete and ready for Francis's review in `docs/IOS_BIOMETRICS_DESIGN.md`.
+decisions: Conducted technical design investigation into iOS Apple Health (HealthKit) integration for `@ak/biometrics`. Authored `docs/ANALYSIS_ios_biometrics_gap.md` covering library selection (`react-native-health`), multi-platform factory abstraction (`createBiometricsBridge`), HealthKit sample mapping to `DailyBiometrics` / `state_vector`, and iOS privacy / permissions requirements. Zero code changes.
+flagged for Francis: Technical design for iOS biometrics is complete and ready for Francis's review in `docs/ANALYSIS_ios_biometrics_gap.md`.
 could not verify: N/A (analysis only)
+
+---
+
+# Phase 19B Overnight Run Log
+
+BASELINE_19B=004408ee0f1de56cacfc6a4acd820dccd0a01e2f
+
+## F1 — Stop the app telling the athlete something false [DONE]
+commit: 13669c3752e5e2185ee7e6032bb2996902101de6
+files: apps/mobile/src/state/useStore.ts, apps/mobile/src/screens/BlockScreen.tsx, apps/mobile/test/components/FocusScreens.test.js, apps/mobile/test/verify_routine_templates.mjs
+anchors: `hasArchivedBlock`
+gates: verify:store=PASS, verify:components=PASS, typecheck=PASS, verify:all=PASS
+negative test: store assertion in verify_routine_templates.mjs went RED when dayOffset > 27 condition was broken to dayOffset < 0 — restored to GREEN.
+decisions: Changed empty-block copy on BlockScreen to "A short four-week block gives Coach a clear trajectory to follow." (both card body and ternary message) when block === null. Computed archivedPreviousBlock flag in freezeRoutineTemplateToPlannedSession strictly from the dayOffset > 27 active block update limb. Rendered verbatim "Your previous block had ended. A new block was started." notice card only when freezeRoutineTemplateToPlannedSession returns archivedPreviousBlock === true.
+flagged for Francis: none
+could not verify: nothing
+
+## F2 — Finish T7: make the format actually obtainable [DONE]
+commit: ff5835a927e14d15a22cb78c3e96f918ca147aaa
+files: apps/mobile/src/screens/ProfileScreen.tsx, apps/mobile/test/components/ProfileScreens.test.js
+anchors: `IMPORT TRAINING HISTORY`
+gates: verify:components=PASS, typecheck=PASS, verify:all=PASS
+negative test: N/A (UI component rendering verified via Jest component assertions)
+decisions: Rendered HISTORY_IMPORT_EXAMPLE inside a visible, styled <Text selectable> block inside the IMPORT TRAINING HISTORY disclosure in ProfileScreen.tsx. Rendered HISTORY_IMPORT_AI_PROMPT inside a <Text selectable> block. Removed the docs/AK_HISTORY_V1.md repository path hint from the fieldHint text. Added test assertions in ProfileScreens.test.js confirming both blocks render on-screen with selectable={true} and the repo path hint is removed.
+flagged for Francis: none
+could not verify: nothing
+
+## F3 — Finish T9 [DONE]
+commit: c32fd22e2b50eca46d87a4dcb7d40d4fa0832bd9
+files: .github/workflows/ci.yml, apps/mobile/test/verify_store_sql.mjs
+anchors: `verify:all`
+gates: verify:store=PASS, typecheck=PASS, verify:all=PASS
+negative test: store assertion in verify_store_sql.mjs went RED when AGENT_WORKFLOW.md gate count was temporarily changed to 18 — restored to GREEN.
+decisions: Removed redundant verify:components step from .github/workflows/ci.yml (lines 42-43). Added a drift gate check in verify_store_sql.mjs that parses package.json's verify:all script, counts verify:* targets, and asserts exact match with gate counts documented in both AGENT_WORKFLOW.md and ci.yml.
+flagged for Francis: none
+could not verify: nothing
+
+## T11 — Build and prove the SQL chain projection [DONE]
+commit: ed2c7d03be5b67e2eec3604a7fdb7313ded8b9c8
+files: packages/core-db/src/schema/_chain_projection.sql.tpl, packages/inference/test/verify_pipeline.mjs, apps/mobile/test/verify_store_sql.mjs
+anchors: `_chain_projection.sql.tpl`
+gates: verify:pipeline=PASS, verify:store=PASS, typecheck=PASS, verify:all=PASS
+negative test: N/A (template equivalence asserted against live 028 schema in both verify:pipeline and verify:store)
+decisions: Authored packages/core-db/src/schema/_chain_projection.sql.tpl using a WITH RECURSIVE SQL walk over same-family prerequisite edges and root movements. Used an atomic DELETE FROM movement_progression before insertion to avoid transient UNIQUE index violations on rank reordering. Added equivalence assertions in verify_pipeline.mjs and verify_store_sql.mjs verifying the template produces exact row-for-row, rank-for-rank match with TS projectChainsFromGraph output.
+flagged for Francis: none
+could not verify: nothing
+
+## T12 — Content ingestion generator [DONE]
+commit: 03e2fe405c17af96a51aa5da97788e870a94fa69
+files: scripts/generate-capability-migration.mjs, scripts/test-capability-migration-generator.mjs, package.json, apps/mobile/src/state/useStore.ts
+anchors: `generate-capability-migration.mjs`
+gates: verify:coaching-content-generator=PASS, typecheck=PASS, verify:all=PASS
+negative test: N/A (unit tests in test-capability-migration-generator.mjs assert validation failures on unknown movements, self-edges, duplicate edges, out-of-domain thresholds, cycles, and branching ambiguity)
+decisions: Built scripts/generate-capability-migration.mjs to ingest capability staging JSON (roles, families, prerequisite edges) and render additive SQL migrations with embedded _chain_projection.sql.tpl and expected row-count assertions. Documented staging JSON schema in script header. Enforced value_kind derivation from prerequisite movement's logging mode. Created unit test suite scripts/test-capability-migration-generator.mjs covering all 7 validation and codegen invariants without writing to packages/core-db/src/schema/. Integrated unit tests into verify:coaching-content-generator.
+flagged for Francis: none
+could not verify: nothing
+
+## T13 — Behavioural coverage for the builder and freeze path [DONE]
+commit: 3128700abef886f3d0c68e3ed2bcc805089635b2
+files: apps/mobile/test/components/RoutineTemplateBuilder.test.js, apps/mobile/test/verify_routine_templates.mjs
+anchors: `RoutineTemplateBuilder.test.js`
+gates: verify:components=PASS, verify:store=PASS, typecheck=PASS, verify:all=PASS
+negative test: N/A (behavioral assertions verify expected error throws on used planned session overwrite and teaching-only freeze attempt)
+decisions: Added component assertions in RoutineTemplateBuilder.test.js enforcing role maxima and verifying that chips for roles with zero ratified movements (conditional) are disabled. Upgraded source-grep checks in verify_routine_templates.mjs to active DB behavioral tests confirming the freeze path refuses to overwrite used planned sessions (via session_origin check) and rejects teaching-only movements.
+flagged for Francis: none
+could not verify: nothing
+
+## T14 — ANALYSIS ONLY: getting a history file into the app [DONE]
+commit: 9f7279a8ca98599859d0ba33ead0f57e3bdd70f8
+files: docs/ANALYSIS_history_file_input.md
+anchors: `ANALYSIS_history_file_input.md`
+gates: N/A (analysis task)
+negative test: N/A
+decisions: Authored comprehensive technical analysis in docs/ANALYSIS_history_file_input.md covering costs of current paste flow for 1-year training logs (~1,000 lines), technical options (document picker, Android ACTION_SEND / iOS Share Extension, leveraging existing react-native-blob-util dependency, zero-dependency paste-chunking flow), App Store / Play Store privacy permission implications, and memory/heap analysis proving transient allocation for 5 MB import (~100k lines) sits at ~25-35 MB (well under 450 MB ceiling). Recommended paste-chunking short-term and react-native-document-picker long-term. Zero code changes, zero dependencies added.
+flagged for Francis: Technical analysis on history file import options is complete in docs/ANALYSIS_history_file_input.md.
+could not verify: N/A (analysis only)
+
 
