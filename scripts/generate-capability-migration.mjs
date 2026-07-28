@@ -43,7 +43,11 @@
  *
  * Codegen Invariants:
  * 1. Additive & idempotent (INSERT OR IGNORE).
- * 2. Emits explicit row-count check assertions (SELECT CASE WHEN ... THEN RAISE(ABORT, ...) END).
+ * 2. Emits row-count assertions scoped to the rows THIS migration seeds.
+ *    SQLite restricts RAISE() to trigger bodies, so the abort is forced via
+ *    json('ASSERTION_FAILED_<table>'): evaluating json() on a non-JSON literal
+ *    raises 'malformed JSON' and aborts the apply. The diagnostic name is NOT
+ *    surfaced in SQLite's error text -- grep the migration to identify which.
  * 3. Embeds _chain_projection.sql.tpl at the tail of the migration.
  *
  * Usage:
@@ -51,8 +55,9 @@
  *   node scripts/generate-capability-migration.mjs --check
  */
 
-import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -82,7 +87,7 @@ export function buildSchemaContext(customSchemaDir = SCHEMA_DIR) {
   }
 
   const files = readdirSync(customSchemaDir)
-    .filter((f) => f.endsWith('.sql') && !f.startsWith('_'))
+    .filter((f) => f.endsWith('.sql') && !f.startsWith('_') && !f.endsWith('_capability_content.sql'))
     .sort();
 
   for (const file of files) {
@@ -414,9 +419,19 @@ export function renderCapabilityMigration(migrationNumber, data, templateSql = '
     );
   }
   if (data.edges.length > 0) {
+    // Count ONLY the pairs this migration seeds. A bare COUNT(*) over the table
+    // includes rows from earlier migrations, so a PARTIAL silent drop (some
+    // names stale, some not) still satisfies the threshold and passes -- which
+    // is precisely the failure this guard exists to catch.
+    const pairs = data.edges
+      .map((e) => `(${q(e.prerequisiteMovementName)}, ${q(e.movementName)})`)
+      .join(', ');
     lines.push(
       `SELECT CASE\n` +
-      `  WHEN (SELECT COUNT(*) FROM movement_capability_edge) < ${data.edges.length}\n` +
+      `  WHEN (SELECT COUNT(*) FROM movement_capability_edge ce\n` +
+      `          JOIN movement pm ON pm.movement_id = ce.prerequisite_movement_id\n` +
+      `          JOIN movement tm ON tm.movement_id = ce.movement_id\n` +
+      `         WHERE (pm.name, tm.name) IN (VALUES ${pairs})) < ${data.edges.length}\n` +
       `  THEN json('ASSERTION_FAILED_movement_capability_edge_row_count_mismatch')\n` +
       `END;`
     );
@@ -432,3 +447,140 @@ export function renderCapabilityMigration(migrationNumber, data, templateSql = '
 
   return lines.join('\n');
 }
+
+export function getNextFreeSlot(schemaDir = SCHEMA_DIR) {
+  const files = readdirSync(schemaDir)
+    .filter((f) => f.endsWith('.sql') && !f.startsWith('_'));
+  const slots = files
+    .map((f) => parseInt(f.slice(0, 3), 10))
+    .filter((n) => Number.isFinite(n));
+  const maxSlot = slots.length > 0 ? Math.max(...slots) : 0;
+  return String(maxSlot + 1).padStart(3, '0');
+}
+
+export function main() {
+  const checkOnly = process.argv.includes('--check');
+  const isWrite = process.argv.includes('--write');
+
+  let stagingPath = null;
+  const stagingEqualArg = process.argv.find((a) => a.startsWith('--staging='));
+  if (stagingEqualArg) {
+    stagingPath = stagingEqualArg.slice('--staging='.length);
+  } else {
+    const idx = process.argv.indexOf('--staging');
+    if (idx !== -1 && idx + 1 < process.argv.length) {
+      stagingPath = process.argv[idx + 1];
+    }
+  }
+
+  if (!stagingPath) {
+    stagingPath = join(ROOT, 'packages', 'core-db', 'staging', 'capability_content.json');
+  }
+
+  let outDir = null;
+  const outDirEqualArg = process.argv.find((a) => a.startsWith('--outDir='));
+  if (outDirEqualArg) {
+    outDir = outDirEqualArg.slice('--outDir='.length);
+  } else {
+    const idx = process.argv.indexOf('--outDir');
+    if (idx !== -1 && idx + 1 < process.argv.length) {
+      outDir = process.argv[idx + 1];
+    }
+  }
+
+  if (!outDir) {
+    outDir = SCHEMA_DIR;
+  }
+
+  if (!existsSync(stagingPath)) {
+    console.error(`ABORT: Staging file not found at ${stagingPath}`);
+    process.exit(1);
+  }
+
+  let input;
+  try {
+    input = JSON.parse(readFileSync(stagingPath, 'utf-8'));
+  } catch (err) {
+    console.error(`ABORT: Failed to parse JSON from ${stagingPath}:\n  ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+
+  const ctx = buildSchemaContext();
+  const { errors, validData } = validateCapabilityContent(input, ctx);
+
+  if (errors.length > 0) {
+    console.error(`ABORT: Validation failed with ${errors.length} error(s):\n  ${errors.join('\n  ')}`);
+    process.exit(1);
+  }
+
+  const nextSlot = getNextFreeSlot(SCHEMA_DIR);
+  const targetFileName = `${nextSlot}_capability_content.sql`;
+  const schemaTargetPath = join(SCHEMA_DIR, targetFileName);
+
+  if (checkOnly) {
+    let templateSql = '';
+    if (existsSync(PROJECTION_TPL)) {
+      templateSql = readFileSync(PROJECTION_TPL, 'utf-8');
+    }
+
+    const schemaFiles = readdirSync(SCHEMA_DIR).filter((f) => f.endsWith('_capability_content.sql'));
+    for (const file of schemaFiles) {
+      const slotMatch = file.match(/^(\d{3})_capability_content\.sql$/);
+      if (slotMatch) {
+        const slot = slotMatch[1];
+        const rendered = renderCapabilityMigration(slot, validData, templateSql);
+        const existingContent = readFileSync(join(SCHEMA_DIR, file), 'utf-8');
+        if (existingContent.trim() === rendered.trim()) {
+          console.log(`CHECK PASS: staging content in ${stagingPath} is valid and already landed in migration ${file}.`);
+          process.exit(0);
+        }
+      }
+    }
+
+    if (!existsSync(schemaTargetPath)) {
+      console.error(`ABORT: capability content in ${stagingPath} is valid, but migration ${targetFileName} is not emitted in schema directory; run with --write to generate it.`);
+      process.exit(1);
+    }
+    console.log(`CHECK PASS: staging content in ${stagingPath} is valid and migration ${targetFileName} exists.`);
+    process.exit(0);
+  }
+
+  if (isWrite) {
+    let templateSql = '';
+    if (existsSync(PROJECTION_TPL)) {
+      templateSql = readFileSync(PROJECTION_TPL, 'utf-8');
+    }
+    const renderedSql = renderCapabilityMigration(nextSlot, validData, templateSql);
+
+    if (!existsSync(outDir)) {
+      mkdirSync(outDir, { recursive: true });
+    }
+
+    const outputPath = join(outDir, targetFileName);
+    writeFileSync(outputPath, renderedSql, 'utf-8');
+
+    const majorCount = validData.roles.filter((r) => r.role === 'major').length;
+    const suppCount = validData.roles.filter((r) => r.role === 'supplementary').length;
+    const condCount = validData.roles.filter((r) => r.role === 'conditional').length;
+
+    console.log(`wrote ${outputPath}: ${validData.roles.length} roles (major: ${majorCount}, supp: ${suppCount}, cond: ${condCount}), ${validData.families.length} families, ${validData.edges.length} edges`);
+    console.log(`Target slot ${nextSlot}. NEXT: Register ${targetFileName} in packages/core-db/src/migrations.ts and extend the migration/library gates.`);
+    process.exit(0);
+  }
+
+  const majorCount = validData.roles.filter((r) => r.role === 'major').length;
+  const suppCount = validData.roles.filter((r) => r.role === 'supplementary').length;
+  const condCount = validData.roles.filter((r) => r.role === 'conditional').length;
+
+  console.log(`VALIDATION SUCCESS: ${stagingPath}`);
+  console.log(`  roles: ${validData.roles.length} (major: ${majorCount}, supplementary: ${suppCount}, conditional: ${condCount})`);
+  console.log(`  families: ${validData.families.length}`);
+  console.log(`  edges: ${validData.edges.length}`);
+  console.log(`  target slot: ${nextSlot} (${targetFileName})`);
+  console.log('Summary: 0 errors. (Run with --write to emit migration)');
+  process.exit(0);
+}
+
+const invokedDirectly = process.argv[1] !== undefined
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) main();
