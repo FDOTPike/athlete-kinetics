@@ -20,3 +20,28 @@ apps/mobile/android/app/.cxx/
 
 packages/biometrics/test/.build/
 .hermes/
+
+# --- Agent scaffolding -------------------------------------------------------
+# Work orders, start prompts, audits and proposals produced during agent runs.
+# Kept on disk for reference; never committed. Note this does NOT untrack the
+# agent docs already in the repo (AGENT_WORKFLOW.md, PROMPT_LEDGER.md,
+# DEVIATION_LOG.md, WO_UI_*.md, AUDIT_REPORT.md, PHASE19_RUN_LOG.md) — those
+# stay tracked by design.
+/PROMPT_*.md
+/PROMPT_*.txt
+/WO_L*.md
+/WO_PHASE*.md
+/WO_IDE_*.md
+/WO_UX_*.md
+/WO_UX_*.txt
+/AUDIT_*.md
+!/AUDIT_REPORT.md
+/ASSESSMENT_*.md
+/PROPOSAL_*.md
+/PHASE*_PLAN_*.md
+/walkthrough.md
+
+# --- Local scratch and regenerable artifacts ---------------------------------
+.worktrees/
+/diff.txt
+/movement_library_export.json
