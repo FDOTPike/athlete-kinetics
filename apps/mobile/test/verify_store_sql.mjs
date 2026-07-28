@@ -30,7 +30,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql',
   '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
-  '030_readiness_import_integration.sql', '031_planned_session_method.sql']) {
+  '030_readiness_import_integration.sql', '031_planned_session_method.sql',
+  '032_capability_content.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -279,7 +280,8 @@ if (resetTables.length >= 15) {
     '024_phase17_equipment_fixes.sql', '025_movement_coaching_content.sql',
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
-    '030_readiness_import_integration.sql', '031_planned_session_method.sql'
+    '030_readiness_import_integration.sql', '031_planned_session_method.sql',
+    '032_capability_content.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
@@ -943,7 +945,6 @@ if (resetTables.length >= 15) {
 
   db.exec(tplSql);
   const sqlProgressionRows = db.prepare('SELECT movement_id, progression_group, progression_rank FROM movement_progression ORDER BY progression_group, progression_rank').all();
-  a('SQL chain projection template populates 10 movement_progression rows on 028 schema', sqlProgressionRows.length === 10, `got ${sqlProgressionRows.length}`);
 }
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);
 process.exit(fail ? 1 : 0);

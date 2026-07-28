@@ -73,7 +73,8 @@ check('accepts valid capability content fixture and generates expected SQL with 
     '023_phase17_session_foundation.sql', '024_phase17_equipment_fixes.sql',
     '025_movement_coaching_content.sql', '026_phase18_session_outcome.sql',
     '027_operational_safeguards.sql', '028_capability_graph.sql', '029_routine_history_analytics.sql',
-    '030_readiness_import_integration.sql', '031_planned_session_method.sql'];
+    '030_readiness_import_integration.sql', '031_planned_session_method.sql',
+    '032_capability_content.sql'];
   const schemaDir = join(import.meta.dirname, '..', 'packages', 'core-db', 'src', 'schema');
   for (const f of files) {
     db.exec(readFileSync(join(schemaDir, f), 'utf-8'));

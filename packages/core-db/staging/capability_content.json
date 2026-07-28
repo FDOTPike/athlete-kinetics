@@ -1,0 +1,384 @@
+{
+  "roles": [
+    {
+      "movementName": "Front Squat",
+      "role": "major"
+    },
+    {
+      "movementName": "Barbell Row",
+      "role": "major"
+    },
+    {
+      "movementName": "Power Clean",
+      "role": "major"
+    },
+    {
+      "movementName": "Sumo Deadlift",
+      "role": "major"
+    },
+    {
+      "movementName": "Farmer Carry",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Suitcase Carry",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Road Run",
+      "role": "conditional"
+    },
+    {
+      "movementName": "BJJ Sparring Round",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Pallof Press",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Dead Bug",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Plank",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Band External Rotation",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Cable Internal Rotation",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Face Pull",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Band Pull-Apart",
+      "role": "conditional"
+    },
+    {
+      "movementName": "Kettlebell Turkish Get-Up",
+      "role": "conditional"
+    }
+  ],
+  "families": [
+    {
+      "movementName": "Bodyweight Squat",
+      "family": "squat-competition",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Goblet Squat",
+      "family": "squat-competition",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Front Squat",
+      "family": "squat-competition",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Competition Squat",
+      "family": "squat-competition",
+      "isAnchor": true
+    },
+    {
+      "movementName": "Glute Bridge",
+      "family": "hinge-deadlift",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Dumbbell Romanian Deadlift",
+      "family": "hinge-deadlift",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Romanian Deadlift",
+      "family": "hinge-deadlift",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Deadlift",
+      "family": "hinge-deadlift",
+      "isAnchor": true
+    },
+    {
+      "movementName": "Incline Push-Up",
+      "family": "press-bench",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Dumbbell Floor Press",
+      "family": "press-bench",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Dumbbell Bench Press",
+      "family": "press-bench",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Competition Bench",
+      "family": "press-bench",
+      "isAnchor": true
+    },
+    {
+      "movementName": "Dumbbell Shoulder Press",
+      "family": "press-overhead",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Overhead Press",
+      "family": "press-overhead",
+      "isAnchor": true
+    },
+    {
+      "movementName": "Chest-Supported Dumbbell Row",
+      "family": "row-barbell",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Single-Arm Dumbbell Row",
+      "family": "row-barbell",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Barbell Row",
+      "family": "row-barbell",
+      "isAnchor": true
+    },
+    {
+      "movementName": "Dumbbell Reverse Lunge",
+      "family": "lunge-split",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Dumbbell Split Squat",
+      "family": "lunge-split",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Bulgarian Split Squat",
+      "family": "lunge-split",
+      "isAnchor": true
+    },
+    {
+      "movementName": "Suitcase Carry",
+      "family": "carry-loaded",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Farmer Carry",
+      "family": "carry-loaded",
+      "isAnchor": true
+    },
+    {
+      "movementName": "Dead Bug",
+      "family": "core-antiextension",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Plank",
+      "family": "core-antiextension",
+      "isAnchor": false
+    },
+    {
+      "movementName": "Barbell Ab Rollout",
+      "family": "core-antiextension",
+      "isAnchor": true
+    }
+  ],
+  "edges": [
+    {
+      "prerequisiteMovementName": "Bodyweight Squat",
+      "movementName": "Goblet Squat",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Goblet Squat",
+      "movementName": "Front Squat",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Front Squat",
+      "movementName": "Competition Squat",
+      "relationship": "prerequisite",
+      "minSessions": 3,
+      "minSetsPerSession": 3,
+      "minValue": 5,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Glute Bridge",
+      "movementName": "Dumbbell Romanian Deadlift",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Dumbbell Romanian Deadlift",
+      "movementName": "Romanian Deadlift",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Romanian Deadlift",
+      "movementName": "Deadlift",
+      "relationship": "prerequisite",
+      "minSessions": 3,
+      "minSetsPerSession": 3,
+      "minValue": 5,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Incline Push-Up",
+      "movementName": "Dumbbell Floor Press",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Dumbbell Floor Press",
+      "movementName": "Dumbbell Bench Press",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Dumbbell Bench Press",
+      "movementName": "Competition Bench",
+      "relationship": "prerequisite",
+      "minSessions": 3,
+      "minSetsPerSession": 3,
+      "minValue": 5,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Dumbbell Shoulder Press",
+      "movementName": "Overhead Press",
+      "relationship": "prerequisite",
+      "minSessions": 3,
+      "minSetsPerSession": 3,
+      "minValue": 5,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Chest-Supported Dumbbell Row",
+      "movementName": "Single-Arm Dumbbell Row",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Single-Arm Dumbbell Row",
+      "movementName": "Barbell Row",
+      "relationship": "prerequisite",
+      "minSessions": 3,
+      "minSetsPerSession": 3,
+      "minValue": 5,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Dumbbell Reverse Lunge",
+      "movementName": "Dumbbell Split Squat",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Dumbbell Split Squat",
+      "movementName": "Bulgarian Split Squat",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Suitcase Carry",
+      "movementName": "Farmer Carry",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 45,
+      "valueKind": "time",
+      "maxRpe": null,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Dead Bug",
+      "movementName": "Plank",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 8,
+      "valueKind": "reps",
+      "maxRpe": 8.5,
+      "requiresAttestation": false
+    },
+    {
+      "prerequisiteMovementName": "Plank",
+      "movementName": "Barbell Ab Rollout",
+      "relationship": "prerequisite",
+      "minSessions": 2,
+      "minSetsPerSession": 3,
+      "minValue": 45,
+      "valueKind": "time",
+      "maxRpe": null,
+      "requiresAttestation": false
+    }
+  ]
+}

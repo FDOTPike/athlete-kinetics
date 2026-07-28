@@ -38,7 +38,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '028_capability_graph.sql',
   '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql',
-  '031_planned_session_method.sql'];
+  '031_planned_session_method.sql',
+  '032_capability_content.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 

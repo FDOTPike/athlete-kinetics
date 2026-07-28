@@ -40,6 +40,7 @@ const schemaFiles = [
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql',
   '031_planned_session_method.sql',
+  '032_capability_content.sql',
 ];
 
 for (const f of schemaFiles) {
@@ -100,14 +101,14 @@ check('deletes routine_template with cascading slot cleanup', () => {
   assert.equal(sCount, 0);
 });
 
-check('role eligibility keeps major lifts curator-owned and conditional empty until ratified', () => {
+check('role eligibility tracks ratified major (8) and conditional (12) movements', () => {
   const counts = Object.fromEntries(db.prepare(
     'SELECT role, COUNT(*) AS count FROM movement_role_eligibility GROUP BY role ORDER BY role',
   ).all().map((row) => [row.role, Number(row.count)]));
   const movementCount = Number(db.prepare('SELECT COUNT(*) AS count FROM movement').get().count);
   assert.equal(counts.supplementary, movementCount);
-  assert.equal(counts.major, 4);
-  assert.equal(counts.conditional ?? 0, 0);
+  assert.equal(counts.major, 8);
+  assert.equal(counts.conditional, 12);
 });
 
 // 2. Schema_type Constraint Checks
@@ -210,19 +211,12 @@ check('production save/freeze paths enforce role eligibility and current capabil
   assert.ok(storeSource.includes('is not ratified for the'));
   assert.ok(storeSource.includes('is currently teaching-only'));
 
-  // Behavioral check: freeze rejects a movement that has become teaching-only since template save
-  const availabilityMap = new Map([[999, { state: 'teaching_only', reasons: ['capability'] }]]);
-  const attemptFreeze = (movementId) => {
-    const verdict = availabilityMap.get(movementId);
-    if (verdict?.state === 'teaching_only') {
-      throw new Error(`Movement ${movementId} is currently teaching-only and cannot be prescribed.`);
-    }
-  };
-  assert.throws(
-    () => attemptFreeze(999),
-    /is currently teaching-only/,
-    'freeze path must reject teaching-only movement',
-  );
+  // NOTE: the teaching-only refusal itself cannot be exercised here. It lives in
+  // a zustand action in useStore.ts, and nothing in this repo can invoke a store
+  // action from node. A previous version of this check defined a local lambda
+  // that threw and then asserted its own lambda threw -- that tested nothing.
+  // The engine half IS covered behaviourally in verify:pipeline
+  // (resolveMovementAvailability); what remains untested is the store's wiring.
 });
 
 check('production freeze guards used plans and snapshots the selected loading method', () => {
@@ -244,21 +238,18 @@ check('production freeze guards used plans and snapshots the selected loading me
              WHERE ps.planned_session_id = ?) AS c`,
   ).get(6001, 6001)?.c ?? 0);
 
-  assert.equal(alreadyUsed, 1, 'used plan count must be 1');
-  const freezeUsedPlan = (psId) => {
-    const used = Number(db.prepare(
-      `SELECT (SELECT COUNT(*) FROM session_origin WHERE source_planned_session_id = ?)
-            + (SELECT COUNT(*) FROM planned_slot_disposition pd JOIN planned_slot ps USING (planned_slot_id)
-               WHERE ps.planned_session_id = ?) AS c`,
-    ).get(psId, psId)?.c ?? 0);
-    if (used > 0) throw new Error("Today's planned session has already been used and cannot be replaced.");
-  };
+  assert.equal(alreadyUsed, 1, 'a plan consumed by a session must count as used');
 
-  assert.throws(
-    () => freezeUsedPlan(6001),
-    /has already been used and cannot be replaced/,
-    'freeze path must refuse to overwrite an already-used planned session',
-  );
+  // Discriminating half: an untouched planned session must NOT count as used.
+  // Without this the assertion above passes on any non-zero result and cannot
+  // distinguish "correctly detected" from "counts everything".
+  db.exec(`INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (6002, 601, 1, 2, 'full', 'accumulation', '2026-07-28')`);
+  const unusedCount = Number(db.prepare(
+    `SELECT (SELECT COUNT(*) FROM session_origin WHERE source_planned_session_id = ?)
+          + (SELECT COUNT(*) FROM planned_slot_disposition pd JOIN planned_slot ps USING (planned_slot_id)
+             WHERE ps.planned_session_id = ?) AS c`,
+  ).get(6002, 6002)?.c ?? 0);
+  assert.equal(unusedCount, 0, 'an unconsumed plan must not count as used');
 });
 check('production capability assembly applies active niggles as an outer safety gate', () => {
   assert.ok(storeSource.includes('safetyExcludedMovementIdsFor'));
@@ -323,7 +314,7 @@ check('freezeRoutineTemplateToPlannedSession sets archivedPreviousBlock ONLY whe
   assert.ok(returnsFlag, 'freezeRoutineTemplateToPlannedSession must return archivedPreviousBlock');
 });
 
-check('the routine builder does not offer a role with no ratified movements', () => {
+check('the routine builder offers 3 conditional slots when conditional movements are ratified (12)', () => {
   const builderSource = readFileSync(
     join(ROOT, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8',
   );
@@ -332,8 +323,8 @@ check('the routine builder does not offer a role with no ratified movements', ()
   const conditional = db.prepare(
     "SELECT COUNT(*) c FROM movement_role_eligibility WHERE role = 'conditional'",
   ).get().c;
-  assert.equal(conditional, 0,
-    'if conditional movements have been ratified, re-check the builder gate above');
+  assert.equal(conditional, 12,
+    'conditional movements are ratified (12) post-032 so the builder offers 3 conditional slots');
 });
 
 console.log(`routine templates tests complete: ${pass} passed, ${fail} failed`);
