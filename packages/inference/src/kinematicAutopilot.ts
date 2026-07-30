@@ -75,6 +75,17 @@ export const CONTROL_AUTHORITY = {
   LOAD_STEP: 0.05,
   /** Allowed RPE delta per block. */
   RPE_STEP: 0.5,
+  /**
+   * Maximum summed positive RPE grants across one 8-block macro-cycle.
+   * The autopilot is a corrective overlay, not the progression mechanism:
+   * progressionEngine and SCHEMES/PHASE_MODS still advance the planned dose.
+   * Francis preferred six blocks — roughly 24 weeks — as the coaching-learning
+   * window, but C6B rejected 3.0 after applied-block `mixed` rose 401 to 463.
+   * The authorized next-lower 2.5 keeps five blocks (roughly 20 weeks) open and
+   * exactly preserves the baseline applied-trajectory assignment. Unbounded
+   * authority remains a deterministic NO-GO.
+   */
+  MAX_MACROCYCLE_RPE_RAISE: 2.5,
   /** Allowed set delta per pattern. */
   SET_STEP: 1,
   /** Deadband for φ: |φ| < DEADBAND → no action. */
@@ -217,14 +228,19 @@ export function detectFlaws(
     let N = 0; // §2 headroom accumulation
     let obs = 0;
     let maxJ = 0;
-    // §4 trend windows: oldest up-to-7 days [0..oldTo], newest up-to-7 days
-    // [recentFrom..L-1]. recentFrom is floored at oldTo+1 so the two windows are
-    // DISJOINT even for short (< 14-day) histories — at L=21 this is exactly the
-    // derivation's [0..6] / [14..20] (no day is ever double-counted in the trend).
-    const oldTo = Math.min(6, lastIdx);
-    const recentFrom = Math.max(oldTo + 1, L - 7);
-    let oldSum = 0; let oldCnt = 0;
-    let recSum = 0; let recCnt = 0;
+    // R2 window-segment trend. At production block boundaries the fixed window's
+    // three seven-day segments align with prescription weeks: normal templates
+    // expose weeks 2/3/deload, while shifted peak exposes accumulation/
+    // intensification/realization. Non-week-aligned diagnostic offsets remain
+    // window-relative and are not claimed to preserve prescription-phase labels.
+    // Compare movement only WITHIN a segment, never segment mean against segment
+    // mean. A segment needs two valid observations; one-observation-per-week
+    // patterns contribute no trend and remain governed by MIN_OBSERVATIONS.
+    const PHASE_DAYS = 7;
+    const phaseCount = Math.ceil(L / PHASE_DAYS);
+    const phaseFirst: (number | null)[] = new Array(phaseCount).fill(null);
+    const phaseLast: (number | null)[] = new Array(phaseCount).fill(null);
+    const phaseObs: number[] = new Array(phaseCount).fill(0);
 
     for (let i = 0; i < L; i++) {
       const ji = i < jArr.length ? jArr[i] : 0;
@@ -250,17 +266,29 @@ export function detectFlaws(
         // §2 N_p: headroom magnitude (NO injury attenuation — by derivation).
         N += omega * wi * Math.min(Math.abs(ei), E_MAX);
       }
-      if (i <= oldTo) { oldSum += ei; oldCnt += 1; }
-      if (i >= recentFrom) { recSum += ei; recCnt += 1; }
+      const phaseIndex = Math.floor(i / PHASE_DAYS);
+      if (phaseFirst[phaseIndex] === null) phaseFirst[phaseIndex] = ei;
+      phaseLast[phaseIndex] = ei;
+      phaseObs[phaseIndex] += 1;
     }
 
     // §3 base signal + deadband.
     const dNorm = sMax > 0 ? (P - N) / (E_MAX * sMax) : 0;
     const phiBase = Math.abs(dNorm) < DELTA ? 0 : dNorm;
     // §4 trend.
-    const eOld = oldCnt > 0 ? oldSum / oldCnt : 0;
-    const eRecent = recCnt > 0 ? recSum / recCnt : 0;
-    const tP = tanh((eRecent - eOld) / T_SCALE);
+    let phaseDeltaSum = 0;
+    let phaseDeltaCount = 0;
+    for (let phase = 0; phase < phaseCount; phase++) {
+      const first = phaseFirst[phase];
+      const last = phaseLast[phase];
+      if (phaseObs[phase] >= 2 && first !== null && last !== null) {
+        phaseDeltaSum += last - first;
+        phaseDeltaCount += 1;
+      }
+    }
+    const meanWithinPhaseDelta =
+      phaseDeltaCount > 0 ? phaseDeltaSum / phaseDeltaCount : 0;
+    const tP = tanh(meanWithinPhaseDelta / T_SCALE);
     // §5 final score (finite-guarded: corrupt inputs collapse to 0, not NaN).
     const phiRaw = W_BASE * phiBase + W_TREND * tP;
     const phi = Number.isFinite(phiRaw) ? round4(clamp(phiRaw, -1, 1)) : 0;
@@ -313,6 +341,8 @@ export interface ControlAction {
   corrections: Record<MovementPattern, PatternCorrection>;
   /** Total positive set additions actually granted (≤ MAX_ADDED_SETS). */
   blockAddedSets: number;
+  /** Sum of positive per-pattern RPE grants in this block. */
+  blockAddedRpe: number;
 }
 
 const NEUTRAL_CORRECTION: PatternCorrection = {
@@ -328,6 +358,9 @@ const NEUTRAL_CORRECTION: PatternCorrection = {
  * Anti-windup / bounded authority (§5 invariant): per-pattern load moves at
  * most one literal step (±0.05) off neutral, set by ±1, RPE by ±0.5; total
  * positive set additions across the block are capped at MAX_ADDED_SETS.
+ * Positive RPE authority is separately bounded to +2.5 across the 8-block
+ * macro-cycle: one +0.5 grant may be released in each of blocks 1 through 5;
+ * unused grants do not bank and blocks 6-8 have no upward RPE authority.
  * Monotone-conservative under flags (§2): a 'caution' pattern or a restrictive
  * global guardrail may only reduce/neutralize. Halt supremacy (§4): a recorded
  * halt forces a fully neutral action.
@@ -336,16 +369,24 @@ const NEUTRAL_CORRECTION: PatternCorrection = {
  *                    downstream block projection clamps target_rpe to
  *                    [5.0, base_rpe_cap]; carried per the operator contract.
  * @param macroPhase  the next block's macro phase — same contract.
+ * @param macroBlockIndex  required 1..8 block position; absent/non-finite fails closed.
  */
 export function deriveControlAction(
   report: FlawReport,
   profile: UserProfile,
   macroPhase: MacroPhase,
+  macroBlockIndex: number,
 ): ControlAction {
   void macroPhase; // contract param; consumed by the future block-projection (§2 snap)
 
   const g = report.globalGuardrail;
-  const { DEADBAND, STRONG_THRESHOLD, MAX_ADDED_SETS } = CONTROL_AUTHORITY;
+  const {
+    DEADBAND,
+    STRONG_THRESHOLD,
+    MAX_ADDED_SETS,
+    RPE_STEP,
+    MAX_MACROCYCLE_RPE_RAISE,
+  } = CONTROL_AUTHORITY;
   const { MIN_OBSERVATIONS } = FLAW_DETECTION_CONSTANTS;
   // §u 4th override trigger needs the per-pattern injury threshold for this athlete.
   const triageMin = EXPERIENCE_SEVERITY[profile.training_age].triageMin;
@@ -355,7 +396,7 @@ export function deriveControlAction(
   // §4 Halt supremacy: a recorded halt is never relaxed — emit nothing else.
   if (g?.halt === true) {
     for (const p of MOVEMENT_PATTERNS) corrections[p] = { ...NEUTRAL_CORRECTION };
-    return { corrections, blockAddedSets: 0 };
+    return { corrections, blockAddedSets: 0, blockAddedRpe: 0 };
   }
 
   const restrictive =
@@ -425,7 +466,41 @@ export function deriveControlAction(
     );
   }
 
-  return { corrections, blockAddedSets };
+  // Pass 3: R1 macro-cycle RPE authority envelope. Because the autopilot is a
+  // corrective overlay rather than the progression mechanism, reserve one
+  // RPE_STEP grant for each of the earliest
+  // MAX_MACROCYCLE_RPE_RAISE / RPE_STEP blocks. The resulting
+  // 0.5,0.5,0.5,0.5,0.5,0,0,0 is the C6B fallback schedule. The preferred
+  // six-block / roughly 24-week window failed the applied-action mixed-drift
+  // gate, so the nearest lower clean step retains roughly 20 weeks of authority.
+  // This uses the already-persisted macroBlockIndex, needs no hidden state, and
+  // guarantees the cumulative bound even when every boundary requests a raise.
+  // Unused early grants do not bank; cuts are not in `rpePositives` and remain
+  // completely unrationed.
+  const macroGrantSlots = Math.floor(MAX_MACROCYCLE_RPE_RAISE / RPE_STEP);
+  const normalizedMacroBlockIndex =
+    Number.isFinite(macroBlockIndex)
+      ? Math.max(1, Math.round(macroBlockIndex))
+      : macroGrantSlots + 1;
+  const grantsThisBlock = normalizedMacroBlockIndex <= macroGrantSlots ? 1 : 0;
+  const rpePositives = MOVEMENT_PATTERNS.filter((p) => corrections[p].dRpe_p > 0);
+  const rankedRpePositives = [...rpePositives].sort(
+    (a, b) =>
+      report.patterns[a].phi - report.patterns[b].phi ||
+      MOVEMENT_PATTERNS.indexOf(a) - MOVEMENT_PATTERNS.indexOf(b),
+  );
+  for (let k = grantsThisBlock; k < rankedRpePositives.length; k++) {
+    corrections[rankedRpePositives[k]] = {
+      ...corrections[rankedRpePositives[k]],
+      dRpe_p: 0,
+    };
+  }
+  const blockAddedRpe = MOVEMENT_PATTERNS.reduce(
+    (total, p) => total + Math.max(0, corrections[p].dRpe_p),
+    0,
+  );
+
+  return { corrections, blockAddedSets, blockAddedRpe };
 }
 
 /** A pattern token rendered into the CUE_RE-safe charset (no underscores). */

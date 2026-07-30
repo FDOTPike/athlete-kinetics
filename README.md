@@ -52,7 +52,7 @@ more conservative**; halts (sharp pain, dizziness, chest symptoms) end it.
 
 ```powershell
 npm install
-npm run verify:all     # 80+ checks: schema, grammar, policy, store SQL, memory gate
+npm run verify:all     # 20 gates + typecheck; semantic/embedder need network
 npm run seed           # deterministic 180-day athlete -> athlete_kinetics.seed.db
 ```
 
@@ -88,6 +88,7 @@ Every layer ships with a runnable verifier; all must pass before a change lands.
 | `npm run typecheck`    | strict TS across app + packages against real library types          |
 | `npm run verify:db`    | schema, triggers, ACWR/HRV window math, query plans (real SQLite)   |
 | `npm run verify:policy`| 10k-row state-space sweep stays inside the output contract          |
+| `npm run verify:autopilot-counterexamples` | preserves seven known XFAIL counterexamples plus safety/thin-data expected passes |
 | `npm run verify:semantic` | live routing with the real embedding model (15 query cases incl. off-topic rejection), asset alignment, guardrail conservativeness |
 | `npm run verify:store` | every store SQL statement prepares against the live schema          |
 | `npm run verify:coach` | Coach Mode athlete registry invariants (per-athlete DB isolation)   |

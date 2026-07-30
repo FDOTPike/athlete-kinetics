@@ -359,11 +359,14 @@ export function generateBlock(input: BlockInput): BlockPlan {
   const recovery = flawReport?.globalGuardrail?.halt === true;
   const control: ControlAction | null =
     flawReport !== undefined && !recovery
-      ? deriveControlAction(flawReport, profile, macroPhase)
+      ? deriveControlAction(flawReport, profile, macroPhase, macroBlockIndex)
       : null;
   // Positive set additions are granted ONCE per pattern (the block-wide +2 cap is
   // already enforced inside deriveControlAction.blockAddedSets).
   const positiveApplied = new Set<MovementPattern>();
+  // R1: a positive RPE grant is likewise applied to at most one planned slot
+  // in the block. Cuts remain applied to every occurrence.
+  const positiveRpeApplied = new Set<MovementPattern>();
   const autopilotAdjusted = new Set<MovementPattern>();
   const scheme = SCHEMES[profile.objective];
   const phaseMod = PHASE_MODS[macroPhase];
@@ -478,16 +481,24 @@ export function generateBlock(input: BlockInput): BlockPlan {
         // Phase 13 Step 4: apply the autopilot's per-pattern correction. Only on
         // NON-deload weeks (the deload is sacred) and not locomotion rounds.
         // dRpe shifts the prescribed effort (re-clamped to [5, base_rpe_cap],
-        // rehab ≤ 7, 0.5 grid); dSet trims on every occurrence but ADDS at most
-        // once per pattern (block-wide +2 cap already held by the controller).
+        // rehab ≤ 7, 0.5 grid). R1 applies a positive dRpe grant once in the
+        // block while negative dRpe still reaches every occurrence. dSet trims
+        // every occurrence but ADDS at most once per pattern (block-wide +2 cap).
         if (control !== null && !deload && !locomotion) {
           const corr = control.corrections[m.pattern];
-          if (corr.dRpe_p !== 0) {
+          const mayApplyRpe =
+            corr.dRpe_p < 0 ||
+            (corr.dRpe_p > 0 && !positiveRpeApplied.has(m.pattern));
+          if (mayApplyRpe) {
+            const previousRpe = slotRpe;
             let r = slotRpe + corr.dRpe_p;
             r = Math.min(r, profile.base_rpe_cap);
             if (profile.objective === 'rehab') r = Math.min(r, 7.0);
             slotRpe = Math.max(5.0, Math.round(r * 2) / 2);
-            autopilotAdjusted.add(m.pattern);
+            if (slotRpe !== previousRpe) {
+              if (corr.dRpe_p > 0) positiveRpeApplied.add(m.pattern);
+              autopilotAdjusted.add(m.pattern);
+            }
           }
           if (corr.dSet_p < 0) {
             slotSets = Math.max(1, slotSets + corr.dSet_p);

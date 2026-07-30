@@ -1,6 +1,57 @@
 # Deviation Log
 
 Architectural deviations from product mandates, with rationale. Newest first.
+
+## 2026-07-30 - Kinematic Autopilot R1/R1a authority envelope
+
+1. **The final +2.5 macro-cycle RPE-raise budget is a corrective-overlay bound.**
+   R1/R1a first established a +1.0 fail-closed bound; C6B then ratified the
+   finite relaxation to `0.5,0.5,0.5,0.5,0.5,0,0,0`. Planned progression still
+   comes from `progressionEngine` and the `SCHEMES`/`PHASE_MODS` tables. The
+   final schedule disables only additional upward autopilot correction after
+   macro block 5; it does not stop athletes progressing on plan.
+
+2. **Unknown macro position fails closed.** `deriveControlAction` requires the
+   persisted `macroBlockIndex`, and its runtime guard gives absent or
+   non-finite values no positive RPE allowance. Corrupt state cannot reopen
+   upward authority.
+
+3. **R2 authority obligation discharged by C6B.** After correcting the
+   deload/window observer straddle, the deterministic 2,385-case family was
+   re-run at `1.0`, `2.5`, `3.0`, and unbounded authority. Francis preferred
+   `3.0` for a six-block, roughly 24-week coaching-learning window, but its
+   applied-block `mixed` population rose from 401 to 463 toward the unbounded
+   control, so C6B rejected it under the predeclared early-warning rule. The
+   authorized next-lower `2.5` value was selected: it preserves the baseline
+   historical and applied classification assignments, with zero upward
+   saturation, zero limit cycles, and green historical counterexamples.
+   Unbounded authority remains a NO-GO because it introduces one deterministic
+   decision-boundary limit cycle and raises historical `mixed` from 389 to 562;
+   R2 did not make the finite R1 authority envelope redundant.
+
+4. **C3 aggregates restated under the corrected applied-block classifier.** The
+   isolated pre-R1/pre-R2 replay reproduced the historical labels exactly, then
+   changed the primary headlines from 14 to 7 limit cycles and from 1,711 to
+   1,687 saturated cases: 1,445 upward and 242 downward. The explicit
+   stationary action tables, zero-noise examples, and pinned counterexamples
+   are unchanged, so the C3 NO-GO finding and both remediations still stand.
+
+## 2026-07-30 — Kinematic Autopilot C4 expected-failure gate
+
+1. **Controller stability is not demonstrated.** C3 found six
+   stationary-template limit cycles and nominal gain-3 upward saturation. The
+   product must not claim stability while this defect remains open.
+
+2. **The C4 gate intentionally reports seven XFAIL cases.** These are temporary
+   evidence pins, not desired behavior contracts. An unexpected pass makes the
+   gate red so the remediation must deliberately convert the affected case to
+   an expected pass. The healthy/niggle override and two low-frequency
+   thin-data cases remain ordinary expected-pass assertions.
+
+3. **No shipped controller behavior changes at C4.** Remediation is sequenced:
+   first a cumulative RPE authority budget (option 3), then a phase-aware trend
+   reference (option 4), each behind its own checkpoint.
+
 ## 2026-07-17 — Phase 18 (Training Decision Record)
 
 1. **The rewards roadmap is superseded by neutral, immutable session outcomes.**

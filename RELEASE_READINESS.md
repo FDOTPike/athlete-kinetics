@@ -68,6 +68,12 @@ validation, and store paperwork (one health gate in particular), not the design.
       ads/data-mining on health data). Currently N/A — no HealthKit lib present.
 
 ## D. Health-claims positioning (review + liability risk)
+- [x] **Kinematic Autopilot remediation ratified:** R1/R1a, R2, and the C6B
+      `2.5` authority policy convert the six pinned stationary decision
+      counterexamples and nominal gain-3 saturation, with zero upward
+      saturation and zero limit cycles in the remediated 2,385-case family.
+      This is tested-family evidence, not a universal stability proof; avoid an
+      unqualified controller-stability claim.
 - [ ] The app issues readiness/recovery/training prescriptions derived from
       biometric signals. Both stores (Apple 1.4.1; Google's Medical-Device
       labeling) scrutinize this. Add clear, visible disclaimers: **not medical

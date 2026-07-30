@@ -189,13 +189,30 @@ console.log('[2] closed-form correctness (analytic phi pins)');
   const leak = detect(leaky);
   check('confidence leak: 3 target-less set-days excluded -> obs=2 < 5 -> neutral',
     leak.observations === 2 && leak.flawClass === 'neutral', `obs=${leak.observations}`);
-  // RECENCY direction ω=λ^(20-i): recent-only vs old-only with EXACT pins
-  // (a reversed- or flat-ω mutant yields different exact φ; both are S_max-free).
-  const recent6 = detect(atDays(L, [15, 16, 17, 18, 19, 20], { e: 3 }));
-  const old6 = detect(atDays(L, [0, 1, 2, 3, 4, 5], { e: 3 }));
-  check('recency: recent-only ΔE=+3 → φ=0.7009 (ω weights newest)', recent6.phi === 0.7009, `${recent6.phi}`);
-  check('recency: old-only ΔE=+3 → φ=−0.2985 (old signal decays, trend negative)', old6.phi === -0.2985, `${old6.phi}`);
-  check('recency direction pinned: φ(recent) ≫ φ(old)', recent6.phi > old6.phi);
+  // R2 recompute: the newest template slice remains in the recency-weighted base
+  // signal but no longer participates in the phase trend. Reference-only data
+  // has no comparable phase evidence and therefore cannot fabricate a trend.
+  // Old observer pins: newest-only 0.7009; reference-only -0.2985.
+  const newest6 = detect(atDays(L, [15, 16, 17, 18, 19, 20], { e: 3 }));
+  const reference6 = detect(atDays(L, [0, 1, 2, 3, 4, 5], { e: 3 }));
+  check('R2 newest-slice ΔE=+3 → φ=0.4024 through the base EMA only', newest6.phi === 0.4024, `${newest6.phi}`);
+  check('R2 reference-only ΔE=+3 → φ=0 (no unmatched phase trend)', reference6.phi === 0, `${reference6.phi}`);
+  check('recency direction pinned: φ(newest) > φ(reference)', newest6.phi > reference6.phi);
+
+  const phaseLocalSeries = (direction) => ({
+    avgDeltaRPE: Array.from({ length: L }, (_, i) =>
+      i % 7 === 1 ? -direction : i % 7 === 5 ? direction : null),
+    avgAttenuation: Array.from({ length: L }, (_, i) =>
+      i % 7 === 1 || i % 7 === 5 ? 1 : 0),
+    setCount: Array.from({ length: L }, (_, i) =>
+      i % 7 === 1 || i % 7 === 5 ? 1 : 0),
+    maxJointSev: Array.from({ length: L }, () => 0),
+  });
+  const phaseRise = detect(phaseLocalSeries(1));
+  const phaseFall = detect(phaseLocalSeries(-1));
+  check('R2 window-segment trend remains direction-sensitive within each 7-day segment',
+    phaseRise.phi > 0 && phaseFall.phi < 0 && phaseRise.phi === -phaseFall.phi,
+    `rise=${phaseRise.phi} fall=${phaseFall.phi}`);
 
   const rep = detectFlaws(svRows(L), makeDelta(L, { squat: constSeries(L, { e: -3 }), hinge: constSeries(L, { e: 3 }) }), 'intermediate');
   check('windowSummary picks max |φ| as criticalPattern',
@@ -211,7 +228,7 @@ console.log('[2] closed-form correctness (analytic phi pins)');
 // =============================================================================
 console.log('[3] control-law table (phi band -> correction, inclusive boundaries)');
 {
-  const u = (phi) => deriveControlAction(makeReport({ hinge: { phi } }), NEUTRAL_PROFILE, GPP).corrections.hinge;
+  const u = (phi) => deriveControlAction(makeReport({ hinge: { phi } }), NEUTRAL_PROFILE, GPP, 1).corrections.hinge;
   check('φ=0 (deadband) → {1.0,0,0,0}', eq(u(0), NEUTRAL_CORR));
   check('φ=0.5 (strong deficit) → {0.95,-1,-0.5,-1}', eq(u(0.5), { dLoad_p: 0.95, dSet_p: -1, dRpe_p: -0.5, prefBias_p: -1 }));
   check('φ=0.25 (mild deficit) → {1.0,-1,-0.5,-1}', eq(u(0.25), { dLoad_p: 1.0, dSet_p: -1, dRpe_p: -0.5, prefBias_p: -1 }));
@@ -262,8 +279,9 @@ console.log('[5] halt supremacy');
   const haltGuard = guard({ load_multiplier: 0.5, set_delta: -2, rpe_cap_max: 6, halt: true });
   const rep = makeReport(Object.fromEntries(MOVEMENT_PATTERNS.map((p, i) => [p, { phi: i % 2 ? 0.6 : -0.6 }])), { guardrail: haltGuard });
   const u = deriveControlAction(rep, NEUTRAL_PROFILE, GPP);
-  check('halt → every correction exactly neutral, blockAddedSets=0',
-    u.blockAddedSets === 0 && MOVEMENT_PATTERNS.every((p) => eq(u.corrections[p], NEUTRAL_CORR)));
+  check('halt → every correction exactly neutral, blockAddedSets=0, blockAddedRpe=0',
+    u.blockAddedSets === 0 && u.blockAddedRpe === 0 &&
+    MOVEMENT_PATTERNS.every((p) => eq(u.corrections[p], NEUTRAL_CORR)));
   const adjHalt = deriveDailyAdjustment(u, ['hinge', 'squat'], NEUTRAL_PROFILE);
   check('halt daily projection: load 1.0, set 0, rpe = base cap (default 9.0)',
     adjHalt.load_modifier === 1.0 && adjHalt.set_modifier === 0 && adjHalt.rpe_cap === 9.0, JSON.stringify(adjHalt));
@@ -282,7 +300,7 @@ console.log('[6] bounded authority / anti-windup');
   const u = deriveControlAction(makeReport({
     squat: { phi: -0.2 }, hinge: { phi: -0.25 }, push_h: { phi: -0.3 },
     rotation: { phi: -0.8 }, locomotion: { phi: -0.9 },
-  }), NEUTRAL_PROFILE, GPP);
+  }), NEUTRAL_PROFILE, GPP, 1);
   const added = MOVEMENT_PATTERNS.filter((p) => u.corrections[p].dSet_p > 0);
   check('total positive additions capped at MAX_ADDED_SETS (2)', u.blockAddedSets === CONTROL_AUTHORITY.MAX_ADDED_SETS && added.length === 2, `added=${added.join(',')}`);
   check('granted to the LOWEST-φ patterns (locomotion,rotation — late decl. order)', added.includes('locomotion') && added.includes('rotation'), added.join(','));
@@ -293,9 +311,46 @@ console.log('[6] bounded authority / anti-windup');
   const tieAdded = MOVEMENT_PATTERNS.filter((p) => tie.corrections[p].dSet_p > 0);
   check('φ tie → kept by declaration order (rotation,isolation)', eq(tieAdded.sort(), ['isolation', 'rotation']), tieAdded.join(','));
 
+  const rpeGranted = MOVEMENT_PATTERNS.filter((p) => u.corrections[p].dRpe_p > 0);
+  check('R1 block grant is one RPE_STEP, kept by lowest φ',
+    u.blockAddedRpe === CONTROL_AUTHORITY.RPE_STEP &&
+    eq(rpeGranted, ['locomotion']), `granted=${rpeGranted.join(',')}`);
+
+  const allHeadroom = makeReport(Object.fromEntries(
+    MOVEMENT_PATTERNS.map((p) => [p, { phi: -0.5 }]),
+  ));
+  const macroActions = Array.from(
+    { length: 8 },
+    (_, i) => deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, i + 1),
+  );
+  check('C6B fallback releases one +0.5 grant in macro blocks 1-5 only',
+    eq(macroActions.map((a) => a.blockAddedRpe), [0.5, 0.5, 0.5, 0.5, 0.5, 0, 0, 0]));
+  check('C6B fallback cumulative macro-cycle RPE movement is +2.5',
+    macroActions.reduce((sum, a) => sum + a.blockAddedRpe, 0) ===
+      CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE);
+
+  const allDeficit = makeReport(Object.fromEntries(
+    MOVEMENT_PATTERNS.map((p) => [p, { phi: 0.5 }]),
+  ));
+  const lateCuts = deriveControlAction(allDeficit, NEUTRAL_PROFILE, GPP, 8);
+  check('R1 never rations cuts after the upward budget is exhausted',
+    MOVEMENT_PATTERNS.every((p) => lateCuts.corrections[p].dRpe_p === -0.5));
+  check('R1 release resets when the persisted macro index rolls 8→1',
+    deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, 1).blockAddedRpe === 0.5);
+
+  const failClosedIndexActions = [
+    deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP),
+    deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, undefined),
+    deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, NaN),
+  ];
+  check('R1a absent/non-finite macro index fails closed with zero RPE grant',
+    failClosedIndexActions.every((action) =>
+      action.blockAddedRpe === 0 &&
+      MOVEMENT_PATTERNS.every((p) => action.corrections[p].dRpe_p === 0)));
+
   let bounded = true;
   for (let phi = -1; phi <= 1.0001; phi += 0.05) {
-    const c = deriveControlAction(makeReport({ hinge: { phi } }), NEUTRAL_PROFILE, GPP).corrections.hinge;
+    const c = deriveControlAction(makeReport({ hinge: { phi } }), NEUTRAL_PROFILE, GPP, 1).corrections.hinge;
     if (![-1, 0, 1].includes(c.dSet_p) || ![0.95, 1.0, 1.05].includes(c.dLoad_p) || ![-0.5, 0, 0.5].includes(c.dRpe_p) || ![-1, 0, 1].includes(c.prefBias_p)) bounded = false;
   }
   check('per-pattern: dSet∈{-1,0,1}, dLoad∈{0.95,1,1.05}, dRpe∈{-0.5,0,0.5}, pref∈{-1,0,1}', bounded);
@@ -395,7 +450,7 @@ console.log('[10] constant contract');
 {
   const F = FLAW_DETECTION_CONSTANTS;
   check('FLAW_DETECTION_CONSTANTS pinned', F.LAMBDA === 0.88 && F.E_MAX === 3.0 && F.J_MAX === 10 && F.DELTA === 0.15 && F.W_BASE === 0.7 && F.W_TREND === 0.3 && F.T_SCALE === 1.0 && F.MIN_OBSERVATIONS === 5 && F.THETA_DEFICIT === 0.3 && F.THETA_HEADROOM === 0.3);
-  check('CONTROL_AUTHORITY pinned', CONTROL_AUTHORITY.MAX_ADDED_SETS === 2 && CONTROL_AUTHORITY.DEADBAND === 0.15 && CONTROL_AUTHORITY.STRONG_THRESHOLD === 0.4 && CONTROL_AUTHORITY.RPE_STEP === 0.5 && CONTROL_AUTHORITY.SET_STEP === 1 && CONTROL_AUTHORITY.LOAD_STEP === 0.05);
+  check('CONTROL_AUTHORITY pinned', CONTROL_AUTHORITY.MAX_ADDED_SETS === 2 && CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE === 2.5 && CONTROL_AUTHORITY.DEADBAND === 0.15 && CONTROL_AUTHORITY.STRONG_THRESHOLD === 0.4 && CONTROL_AUTHORITY.RPE_STEP === 0.5 && CONTROL_AUTHORITY.SET_STEP === 1 && CONTROL_AUTHORITY.LOAD_STEP === 0.05);
   check('NEUTRAL_LOAD_MODIFIER === 1.0', NEUTRAL_LOAD_MODIFIER === 1.0);
   check('EXPERIENCE_SEVERITY.intermediate.triageMin === 4', EXPERIENCE_SEVERITY.intermediate.triageMin === 4);
   check('snapToLiteral nearest', snapToLiteral(0.93, LOAD_MODIFIER_LITERALS) === 0.95 && snapToLiteral(0.86, LOAD_MODIFIER_LITERALS) === 0.85);

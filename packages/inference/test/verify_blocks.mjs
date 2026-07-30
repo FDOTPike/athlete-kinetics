@@ -714,6 +714,64 @@ const ndTotalSets = (plan) => plan.sessions.filter((s) => s.phase !== 'deload')
 const setDelta = ndTotalSets(allUp) - ndTotalSets(plainGpp);
 check('anti-windup: TOTAL block set additions ≤ MAX_ADDED_SETS (2)', setDelta >= 0 && setDelta <= 2, `delta=${setDelta}`);
 
+// C6B fallback: macroBlockIndex releases one +0.5 RPE grant in blocks 1-5
+// only. Sum per-pattern prescription deltas, not repeated slot occurrences.
+const allHeadroomReport = makeFlawReport(Object.fromEntries(
+  MOVEMENT_PATTERNS.map((p) => [p, { phi: -0.5 }]),
+));
+let macroRpeRaise = 0;
+let macroAppliedRpeRaise = 0;
+for (let macroBlockIndex = 1; macroBlockIndex <= 8; macroBlockIndex++) {
+  const base = generateBlock({
+    profile: prof({ objective: 'strength' }), movements, startDate: START,
+    macroBlockIndex,
+  });
+  const adjusted = generateBlock({
+    profile: prof({ objective: 'strength' }), movements, startDate: START,
+    macroBlockIndex, flawReport: allHeadroomReport,
+  });
+  const baseRpes = base.sessions.flatMap((s) => s.slots.map((sl) => sl.target_rpe));
+  const adjustedRpes = adjusted.sessions.flatMap((s) => s.slots.map((sl) => sl.target_rpe));
+  macroAppliedRpeRaise += adjustedRpes.reduce(
+    (sum, rpe, i) => sum + Math.max(0, rpe - (baseRpes[i] ?? rpe)),
+    0,
+  );
+  for (const p of MOVEMENT_PATTERNS) {
+    const baseSlots = ndSlots(base, p);
+    const adjustedSlots = ndSlots(adjusted, p);
+    const maxRaise = adjustedSlots.reduce(
+      (highest, slot, i) => Math.max(
+        highest,
+        slot.target_rpe - (baseSlots[i]?.target_rpe ?? slot.target_rpe),
+      ),
+      0,
+    );
+    macroRpeRaise += maxRaise;
+  }
+}
+check('C6B fallback generated-plan cumulative RPE raise ≤ 2.5 over macro blocks 1-8',
+  macroRpeRaise >= 0 && macroRpeRaise <= 2.5, `delta=${macroRpeRaise}`);
+check('C6B fallback applied-slot cumulative RPE raise ≤ 2.5 over macro blocks 1-8',
+  macroAppliedRpeRaise >= 0 && macroAppliedRpeRaise <= 2.5,
+  `delta=${macroAppliedRpeRaise}`);
+
+const allDeficitReport = makeFlawReport(Object.fromEntries(
+  MOVEMENT_PATTERNS.map((p) => [p, { phi: 0.5 }]),
+));
+const lateBase = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  macroBlockIndex: 8,
+});
+const lateCut = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  macroBlockIndex: 8, flawReport: allDeficitReport,
+});
+const lateBaseRpe = lateBase.sessions.flatMap((s) => s.slots.map((sl) => sl.target_rpe));
+const lateCutRpe = lateCut.sessions.flatMap((s) => s.slots.map((sl) => sl.target_rpe));
+check('R1 late-cycle cuts remain applied and unrationed',
+  lateCutRpe.every((rpe, i) => rpe <= lateBaseRpe[i]) &&
+  lateCutRpe.some((rpe, i) => rpe < lateBaseRpe[i]));
+
 // thin-data / injury safety propagates through the generator (Step-3 R2#1 fix).
 const injuredThin = genFR({ objective: 'strength' },
   makeFlawReport({ squat: { phi: -0.6, flawClass: 'neutral', obs: 4, maxJointSev: 9 } }));

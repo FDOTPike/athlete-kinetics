@@ -14,7 +14,7 @@ env:
 
 jobs:
   verify:
-    name: Verification suite (19 gates + typecheck)
+    name: Verification suite (20 gates + typecheck)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -37,7 +37,7 @@ jobs:
       # Hugging Face download on a cold cache).
       - name: Fetch embedder assets
         run: npm run fetch:embedder
-      - name: verify:all (19 gates + typecheck)
+      - name: verify:all (20 gates + typecheck)
         run: npm run verify:all
       - name: Seeder physiology — pinned alignment + today's alignment
         run: |
