@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import SessionScreen from '../../src/screens/SessionScreen';
 
@@ -79,6 +80,61 @@ const state = (overrides = {}) => ({
 
 beforeEach(() => { mockState = state(); });
 
+test('keeps all current-set values visible in a phone-width vertical stack', () => {
+  render(<SessionScreen />);
+
+  expect(StyleSheet.flatten(screen.getByTestId('current-set-steppers').props.style)).toMatchObject({
+    flexDirection: 'column',
+  });
+
+  const usablePhoneWidth = 411 - 40;
+  [
+    ['current-reps-stepper', 'Reps', 'Reps 5', '5'],
+    ['current-load-stepper', 'Added kg (0 = bodyweight)', 'Added kg (0 = bodyweight) 0.0', '0.0'],
+    ['current-rpe-stepper', 'RPE', 'RPE 8.0', '8.0'],
+  ].forEach(([testID, label, accessibilityLabel, expectedValue]) => {
+    expect(StyleSheet.flatten(screen.getByTestId(testID).props.style)).toMatchObject({
+      flex: 0,
+      width: '100%',
+    });
+    const valueText = screen.getByLabelText(accessibilityLabel);
+    expect(valueText.props.children).toBe(expectedValue);
+    expect(expectedValue).not.toHaveLength(0);
+
+    const valueStyle = StyleSheet.flatten(valueText.props.style);
+    const decrementStyle = StyleSheet.flatten(screen.getByLabelText(`Decrease ${label}`).props.style);
+    const incrementStyle = StyleSheet.flatten(screen.getByLabelText(`Increase ${label}`).props.style);
+    expect(decrementStyle).toMatchObject({ width: 88, flexShrink: 0 });
+    expect(incrementStyle).toMatchObject({ width: 88, flexShrink: 0 });
+    expect(decrementStyle.width + valueStyle.minWidth + incrementStyle.width)
+      .toBeLessThanOrEqual(usablePhoneWidth);
+  });
+});
+test('bodyweight load is added weight and never a normal 1RM suggestion', () => {
+  mockState = state({ oneRepMaxes: { 1: 100 } });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Added kg (0 = bodyweight) 0.0')).toBeOnTheScreen();
+  expect(screen.getByText('0 kg means bodyweight only')).toBeOnTheScreen();
+});
+
+test('externally loaded movement keeps its normal load and 1RM suggestion', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load kg 42.5')).toBeOnTheScreen();
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+
 test('guided mode keeps only the current movement expanded and future work unavailable', () => {
   render(<SessionScreen />);
   expect(screen.getByText('First movement')).toBeOnTheScreen();
@@ -116,6 +172,42 @@ test('rest is silent, previews the next deterministic set, and can end early', (
   render(<SessionScreen />);
   expect(screen.getByText('REST')).toBeOnTheScreen();
   expect(screen.getByText('Next up: First movement · set 2 of 3')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Ready now, skip the rest timer'));
+  expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
+});
+
+test('final-set rest stays visible so the next movement can advance', () => {
+  const completedSets = Array.from({ length: 3 }, (_, index) => ({
+    set_id: index + 1,
+    movement_id: 1,
+    movement_name: 'First movement',
+    set_index: index + 1,
+    reps: 5,
+    load_kg: 0,
+    rpe: 8,
+    tonnage_kg: 0,
+    session_plan_slot_id: 1,
+    timeS: null,
+    bandLevel: null,
+  }));
+  mockState = state({
+    session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: completedSets },
+    runner: runner({
+      phase: 'resting',
+      setIndex: 3,
+      restSecondsTarget: 120,
+      restStartedAtMs: Date.now(),
+      restRpe: 8,
+      slotSetCounts: [3, 0],
+      loggedSets: 3,
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('1 of 2 exercises complete')).toBeOnTheScreen();
+  expect(screen.getByText('REST')).toBeOnTheScreen();
+  expect(screen.getByText(/^Next up: Later movement .* set 1 of 3$/)).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Ready now, skip the rest timer'));
   expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
 });

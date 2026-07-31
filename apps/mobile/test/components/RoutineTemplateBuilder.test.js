@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { RoutineTemplateBuilder } from '../../src/components/RoutineTemplateBuilder';
 
@@ -74,6 +75,35 @@ describe('RoutineTemplateBuilder', () => {
     fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
     expect(screen.getByText('Teaching only (not ratified for major)')).toBeOnTheScreen();
     expect(screen.getByText('Teaching only (capability, not ratified for major)')).toBeOnTheScreen();
+  });
+
+  test('renders every seeded movement in a bounded picker list', () => {
+    render(<RoutineTemplateBuilder />);
+    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+
+    expect(StyleSheet.flatten(screen.getByTestId('movement-picker-card').props.style)).toMatchObject({
+      height: '80%',
+    });
+    expect(screen.getByTestId('movement-picker-list')).toBeOnTheScreen();
+    movements.forEach((movement) => {
+      expect(screen.getByTestId(`movement-picker-row-${movement.movement_id}`)).toBeOnTheScreen();
+      expect(screen.getByLabelText(`Choose ${movement.name}`)).toBeOnTheScreen();
+    });
+  });
+
+  test('shows an honest empty state instead of a blank picker', () => {
+    mockState.movements = [];
+    mockState.getMovementAvailabilityVerdicts = () => [];
+    mockState.getRoutineRoleEligibleMovementIds = () => ({
+      major: [],
+      supplementary: [],
+      conditional: [],
+    });
+
+    render(<RoutineTemplateBuilder />);
+    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+
+    expect(screen.getByText('No movements are available.')).toBeOnTheScreen();
   });
 
   test('preserves athlete-authored ordering when saving', () => {

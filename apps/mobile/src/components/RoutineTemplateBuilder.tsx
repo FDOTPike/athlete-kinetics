@@ -467,9 +467,12 @@ export function RoutineTemplateBuilder({
       {/* Movement Picker Overlay */}
       {pickerSlotIndex !== null && (
         <View style={styles.pickerOverlay}>
-          <View style={styles.pickerCard}>
+          <View testID="movement-picker-card" style={styles.pickerCard}>
             <Text style={styles.pickerTitle}>Choose Movement</Text>
-            <ScrollView style={styles.pickerList}>
+            <ScrollView testID="movement-picker-list" style={styles.pickerList}>
+              {movements.length === 0 && (
+                <Text style={styles.reasonText}>No movements are available.</Text>
+              )}
               {movements.map((m) => {
                 const verdict = verdictMap.get(m.movement_id);
                 const pickerRole = slots[pickerSlotIndex]?.role ?? 'supplementary';
@@ -485,8 +488,12 @@ export function RoutineTemplateBuilder({
                 return (
                   <Pressable
                     key={m.movement_id}
+                    testID={`movement-picker-row-${m.movement_id}`}
                     disabled={!isAvailable}
                     onPress={() => selectMovementForSlot(m.movement_id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Choose ${m.name}`}
+                    accessibilityState={{ disabled: !isAvailable }}
                     style={[
                       styles.pickerItem,
                       !isAvailable && styles.pickerItemDisabled,
@@ -762,7 +769,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: theme.radius.control,
     padding: theme.space[4],
-    maxHeight: '80%',
+    height: '80%',
     gap: theme.space[3],
   },
   pickerTitle: {

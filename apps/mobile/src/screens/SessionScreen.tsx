@@ -229,14 +229,23 @@ export default function SessionScreen(): React.JSX.Element {
   const complete = !halted && sessionPlan.length > 0 && (runnerComplete || allDone);
   const target = currentSlot === null ? null : targetFor(currentSlot);
   const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
+  const primaryImplement = currentMovement?.supportedPrefixes[0] ?? 'Bodyweight';
+  const bodyweightMode = primaryImplement === 'Bodyweight';
+  const loadLabel = bodyweightMode ? 'Added kg (0 = bodyweight)' : 'Load kg';
   const currentSessionLoad = currentSlot === null
     ? undefined
     : session?.sets.find((set) => set.movement_id === currentSlot.movementId)?.load_kg;
   const lastLoad = currentSlot === null ? undefined : currentSessionLoad ?? lastLoggedLoads[currentSlot.movementId];
   const rpeTarget = currentSlot?.targetRpe ?? rpe;
-  const oneRmLoad = currentSlot !== null && target?.kind === 'reps' && oneRm !== undefined ? targetLoadKg(oneRm, target.reps, rpeTarget) : null;
+  const oneRmLoad = !bodyweightMode && currentSlot !== null && target?.kind === 'reps' && oneRm !== undefined ? targetLoadKg(oneRm, target.reps, rpeTarget) : null;
   const suggestedLoad = currentSlot?.overrideLoadKg ?? oneRmLoad ?? lastLoad ?? 0;
-  const loadEvidence = currentSlot?.overrideLoadKg != null ? `Prescribed ${currentSlot.overrideLoadKg.toFixed(1)} kg` : oneRmLoad !== null ? `Based on your ${oneRm?.toFixed(1)} kg 1RM` : lastLoad !== undefined ? `Last logged ${lastLoad.toFixed(1)} kg` : 'Start light and use target RPE';
+  const loadEvidence = bodyweightMode
+    ? currentSlot?.overrideLoadKg != null
+      ? `Prescribed ${currentSlot.overrideLoadKg.toFixed(1)} kg added load`
+      : lastLoad !== undefined ? `Last logged ${lastLoad.toFixed(1)} kg added load` : '0 kg means bodyweight only'
+    : currentSlot?.overrideLoadKg != null
+      ? `Prescribed ${currentSlot.overrideLoadKg.toFixed(1)} kg`
+      : oneRmLoad !== null ? `Based on your ${oneRm?.toFixed(1)} kg 1RM` : lastLoad !== undefined ? `Last logged ${lastLoad.toFixed(1)} kg` : 'Start light and use target RPE';
 
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
@@ -507,10 +516,12 @@ export default function SessionScreen(): React.JSX.Element {
               const movement = byId.get(slot.movementId);
               const logged = loggedCount(slot);
               const finished = logged >= slot.plannedSets;
-              const active = !finished && currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId;
+              // Cross-movement rest still belongs to the just-finished slot.
+              // Keep it active so the rest controls remain reachable.
+              const active = currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
               const selectable = mode === 'self_directed' && !finished && !active && !resting;
 
-              if (finished) {
+              if (finished && !active) {
                 const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
                 const latestCompleted = completedSets[0];
                 const bandLabel = latestCompleted?.bandLevel === null || latestCompleted?.bandLevel === undefined
@@ -593,24 +604,30 @@ export default function SessionScreen(): React.JSX.Element {
                         <Text style={styles.loadEvidence}>{loadEvidence}</Text>
 
                         {/* Steppers using the shared primitive */}
-                        <View style={styles.stepperRow}>
+                        <View testID="current-set-steppers" style={styles.stepperStack}>
                           <Stepper
+                            testID="current-reps-stepper"
                             label={target?.kind === 'time' ? 'Seconds' : 'Reps'}
                             value={String(target?.kind === 'time' ? seconds : reps)}
                             onDecrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n - 5, 5, 3600)) : setReps((n) => clamp(n - 1, 1, 50))}
                             onIncrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n + 5, 5, 3600)) : setReps((n) => clamp(n + 1, 1, 50))}
+                            style={styles.sessionStepper}
                           />
                           <Stepper
-                            label="Load kg"
+                            testID="current-load-stepper"
+                            label={loadLabel}
                             value={loadKg.toFixed(1)}
                             onDecrement={() => setLoadKg((n) => clamp(n - 2.5, 0, 500))}
                             onIncrement={() => setLoadKg((n) => clamp(n + 2.5, 0, 500))}
+                            style={styles.sessionStepper}
                           />
                           <Stepper
+                            testID="current-rpe-stepper"
                             label="RPE"
                             value={rpe.toFixed(1)}
                             onDecrement={() => setRpe((n) => clamp(n - 0.5, 5, 10))}
                             onIncrement={() => setRpe((n) => clamp(n + 0.5, 5, 10))}
+                            style={styles.sessionStepper}
                           />
                         </View>
 
@@ -1023,10 +1040,14 @@ const styles = StyleSheet.create({
     color: theme.color.textMid,
     marginTop: theme.space[1],
   },
-  stepperRow: {
-    flexDirection: 'row',
+  stepperStack: {
+    flexDirection: 'column',
     marginTop: theme.space[4],
     gap: theme.space[2],
+  },
+  sessionStepper: {
+    flex: 0,
+    width: '100%',
   },
   nextUp: {
     ...theme.font.label,

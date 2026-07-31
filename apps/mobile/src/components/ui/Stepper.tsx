@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     borderColor: theme.color.line,
     borderRadius: theme.radius.control,
     backgroundColor: theme.color.ink0,
-    flexShrink: 1,
+    flexShrink: 0,
   },
   buttonPressed: {
     backgroundColor: theme.color.ink1,
@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
   },
   value: {
     flex: 1,
+    minWidth: 56,
     textAlign: 'center',
     ...theme.font.title,
     fontFamily: theme.font.family,

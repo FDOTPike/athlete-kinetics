@@ -124,7 +124,9 @@ function AppShell(): React.JSX.Element {
               />
             )}
             {tab === 'session' && <SessionScreen />}
-            {tab === 'coach' && <BlockScreen onSessionStarted={() => setTab('session')} />}
+            {tab === 'coach' && status === 'ready' && (
+              <BlockScreen onSessionStarted={() => setTab('session')} />
+            )}
             {tab === 'library' && <LibraryScreen />}
             {tab === 'athlete' && <ProfileScreen />}
           </>

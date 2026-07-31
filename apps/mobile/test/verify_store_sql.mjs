@@ -92,6 +92,22 @@ need('detectFlaws(', /detectFlaws\(/);
 need('buildPatternWindow(', /buildPatternWindow\(/);
 need('flawReport', /flawReport/);
 
+console.log('[boot readiness contract]');
+const bootCommitStart = src.indexOf("      set({\n        oneRepMaxes:");
+const bootCommitEnd = src.indexOf('      get().refreshVector();', bootCommitStart);
+const bootCommit = bootCommitStart >= 0 && bootCommitEnd > bootCommitStart
+  ? src.slice(bootCommitStart, bootCommitEnd)
+  : '';
+check(
+  'boot publishes movements in the same commit that publishes ready status',
+  bootCommit.includes("status: 'ready'") && bootCommit.includes('\n        movements,'),
+);
+const appSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'App.tsx'), 'utf-8');
+check(
+  'COACH cannot mount before the store is ready',
+  /tab === 'coach' && status === 'ready' && \(\s*<BlockScreen/.test(appSrc),
+);
+
 // --- [Phase 13 Step 4] autopilot projection SQL: EXECUTED against seeded rows ----
 // PREPARE only proves columns/syntax; the ΔE join + reciprocal attenuation are the
 // signal the whole autopilot consumes, so run the EXACT store SQL on known data.
