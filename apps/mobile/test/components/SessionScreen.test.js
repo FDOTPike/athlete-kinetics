@@ -54,7 +54,7 @@ const runner = (overrides = {}) => ({
     { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
   ],
   slotIndex: 0, setIndex: 1, phase: 'working', restSecondsTarget: 0, restStartedAtMs: null,
-  restRpe: null, slotSetCounts: [0, 0], loggedSets: 0,
+  restRpe: null, restSecondsOverride: null, slotSetCounts: [0, 0], loggedSets: 0,
   substitutionOfferedForSessionPlanSlotId: null, haltReason: null, skippedSessionPlanSlotIds: [], updatedAtMs: Date.now(),
   ...overrides,
 });
@@ -70,7 +70,7 @@ const state = (overrides = {}) => ({
   reportNiggle: jest.fn(), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
   runner: runner(), sessionMode: 'guided',
   uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
-  bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
+  bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
   loadSessionOutcome: jest.fn(() => null),
   dismissOutcome: jest.fn(function() {
     mockState.lastEndedSessionId = null;
@@ -175,6 +175,30 @@ test('rest is silent, previews the next deterministic set, and can end early', (
   fireEvent.press(screen.getByLabelText('Ready now, skip the rest timer'));
   expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
 });
+test('session rest override changes by 15 seconds and persists through the runner action', () => {
+  mockState = state({
+    runner: runner({
+      phase: 'resting',
+      setIndex: 1,
+      restSecondsTarget: 90,
+      restStartedAtMs: Date.now(),
+      restRpe: 8,
+      restSecondsOverride: 90,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Session rest seconds 90')).toBeOnTheScreen();
+  expect(screen.getByText('Applies to this session.')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Increase Session rest seconds'));
+  expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(105);
+  fireEvent.press(screen.getByLabelText('Decrease Session rest seconds'));
+  expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(75);
+});
+
 
 test('final-set rest stays visible so the next movement can advance', () => {
   const completedSets = Array.from({ length: 3 }, (_, index) => ({

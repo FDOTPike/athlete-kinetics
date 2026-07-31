@@ -80,6 +80,7 @@ function canonicalStateKey(state) {
     phase: state.phase,
     restSecondsTarget: state.restSecondsTarget,
     restRpe: state.restRpe,
+    restSecondsOverride: state.restSecondsOverride,
     slotSetCounts: state.slotSetCounts,
     loggedSets: state.loggedSets,
     substitutionOfferedForSessionPlanSlotId: state.substitutionOfferedForSessionPlanSlotId,
@@ -93,6 +94,7 @@ function representativeEvents(state) {
   if (state.phase === 'working') {
     return [
       event('LOG_SET', atMs, { actualRpe: 8 }),
+      event('SET_REST_OVERRIDE', atMs, { seconds: 90 }),
       event('THUMBS_DOWN', atMs),
       event('NIGGLE', atMs, { severity: 4 }),
       event('NIGGLE', atMs, { severity: 8 }),
@@ -106,6 +108,8 @@ function representativeEvents(state) {
     return [
       event('REST_ELAPSED', state.restStartedAtMs + state.restSecondsTarget * 1000),
       event('SKIP_REST', atMs),
+      event('SET_REST_OVERRIDE', atMs, { seconds: 90 }),
+      event('SET_REST_OVERRIDE', atMs, { seconds: null }),
       event('SKIP_SLOT', atMs),
       event('NIGGLE', atMs, { severity: 8 }),
       event('HALT', atMs, { reason: 'manual' }),
@@ -335,7 +339,7 @@ check('bounded exhaustive sweep has no dead ends, every live state can halt, and
     assert.deepEqual(deserializeRunner(serializeRunner(state)), state, 'every visited state serializes exactly');
     if (state.phase === 'resting') {
       assert.ok(state.restSecondsTarget >= 45 && state.restSecondsTarget <= 300 && state.restSecondsTarget % 15 === 0);
-      assert.equal(state.restSecondsTarget, restSecondsFor(currentSlot(state), state.tier, state.restRpe));
+      assert.equal(state.restSecondsTarget, state.restSecondsOverride ?? restSecondsFor(currentSlot(state), state.tier, state.restRpe));
     }
     if (state.phase === 'working' || state.phase === 'resting') {
       const halted = advance(state, event('HALT', (state.updatedAtMs ?? 0) + 1));
@@ -403,5 +407,38 @@ check('athlete tier is frozen at session start; per-athlete preference changes c
   const restoredTier = deserializeRunner(serializeRunner(tierState));
   assert.equal(restoredTier.tier, 'beginner');
 });
+check('session rest override is deterministic, crash-safe, bounded, and session-scoped', () => {
+  let state = startRunner([repSlot(701, 3, 5, 8)], { tier: 'intermediate', startedAtMs: 0 });
+  assert.equal(state.restSecondsOverride, null);
+
+  state = advance(state, event('SET_REST_OVERRIDE', 1, { seconds: 150 }));
+  assert.deepEqual([state.phase, state.restSecondsOverride, state.restSecondsTarget], ['working', 150, 0]);
+
+  state = advance(state, event('LOG_SET', 2, { actualRpe: 9 }));
+  assert.deepEqual([state.phase, state.restSecondsOverride, state.restSecondsTarget], ['resting', 150, 150]);
+  const restStartedAtMs = state.restStartedAtMs;
+
+  state = advance(state, event('SET_REST_OVERRIDE', 3, { seconds: 90 }));
+  assert.deepEqual([state.restSecondsOverride, state.restSecondsTarget, state.restStartedAtMs], [90, 90, restStartedAtMs]);
+  assert.deepEqual(deserializeRunner(serializeRunner(state)), state, 'override must survive crash recovery');
+
+  const invalid = advance(state, event('SET_REST_OVERRIDE', 4, { seconds: 100 }));
+  assert.strictEqual(invalid, state, 'non-15-second input must fail closed');
+
+  state = advance(state, event('SKIP_REST', 5));
+  assert.deepEqual([state.phase, state.restSecondsOverride], ['working', 90]);
+  state = advance(state, event('LOG_SET', 6, { actualRpe: 8 }));
+  assert.deepEqual([state.phase, state.restSecondsTarget], ['resting', 90], 'override must apply to future rests');
+
+  state = advance(state, event('SET_REST_OVERRIDE', 7, { seconds: null }));
+  assert.deepEqual([state.restSecondsOverride, state.restSecondsTarget], [null, 180], 'clearing restores prescribed rest');
+
+  const legacyCheckpoint = JSON.parse(serializeRunner(advance(state, event('SKIP_REST', 8))));
+  delete legacyCheckpoint.state.restSecondsOverride;
+  assert.equal(restoreRunnerCheckpoint(legacyCheckpoint).restSecondsOverride, null, 'old checkpoints default safely');
+
+  assert.equal(completeSession(state).restSecondsOverride, null, 'override dies with terminal session state');
+});
+
 
 console.log(`verify:runner - all ${n} checks green`);

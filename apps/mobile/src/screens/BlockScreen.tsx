@@ -4,7 +4,7 @@
  * Coaching information is arranged around one immediate decision, a compact
  * four-week trajectory (liquid calendar), and inline disclosures for management and context.
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SCHEMA_TYPES, targetLoadKg, type SchemaType } from '@ak/inference';
 import {
@@ -135,6 +135,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [manageOpen, setManageOpen] = useState(block === null);
+  const scrollRef = useRef<ScrollView>(null);
+  const trajectorySectionY = useRef(0);
+  const manageSectionOffsetY = useRef(0);
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmUnplannedStart, setConfirmUnplannedStart] = useState(false);
@@ -232,9 +235,17 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     setDetail({ summary, slots: loadSessionSlots(summary.plannedSessionId) });
   };
 
+  const openManageBlock = (): void => {
+    setManageOpen(true);
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, trajectorySectionY.current + manageSectionOffsetY.current - theme.space[4]),
+      animated: true,
+    });
+  };
+
   const openNextSession = (): void => {
     if (nextPlanned === undefined) {
-      setManageOpen(true);
+      openManageBlock();
       return;
     }
     setDetail({ summary: nextPlanned, slots: loadSessionSlots(nextPlanned.plannedSessionId) });
@@ -270,7 +281,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled" testID="coach-screen">
+    <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled" testID="coach-screen">
       {/* Header Wordmark */}
       <View style={styles.header}>
         <Text style={styles.wordmark}>pikeMethods</Text>
@@ -337,7 +348,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           ) : todayPlan !== null ? (
             <PrimaryButton label="Start session" onPress={startPlannedSession} accessibilityLabel="Start session" />
           ) : block === null ? (
-            <PrimaryButton label="Set up a four-week block" onPress={() => setManageOpen(true)} accessibilityLabel="Set up a four-week block" />
+            <PrimaryButton label="Set up a four-week block" onPress={openManageBlock} accessibilityLabel="Set up a four-week block" />
           ) : (
             <PrimaryButton
               label={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
@@ -345,11 +356,21 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               accessibilityLabel={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
             />
           )}
+          {block !== null && (
+            <SecondaryButton
+              label="Manage block"
+              onPress={openManageBlock}
+              accessibilityLabel="Manage current block"
+            />
+          )}
         </View>
       </View>
 
       {/* Four-week trajectory Section */}
-      <View style={styles.section}>
+      <View
+        style={styles.section}
+        onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
+      >
         <Text style={styles.sectionTitle}>Four-week trajectory</Text>
         {block === null ? (
           <View style={styles.emptyTrajectory}>
@@ -533,6 +554,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           </View>
         </Disclosure>
 
+        <View
+          testID="manage-block-section"
+          onLayout={(event) => { manageSectionOffsetY.current = event.nativeEvent.layout.y; }}
+        >
         <Disclosure
           label="Manage block"
           hint={block === null ? 'Choose a structure for your first block' : 'Block settings and regeneration'}
@@ -634,6 +659,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             )}
           </View>
         </Disclosure>
+        </View>
 
         <Disclosure
           label="Something feels off"
@@ -809,6 +835,7 @@ const styles = StyleSheet.create({
   },
   cardActionRow: {
     marginTop: theme.space[2],
+    gap: theme.space[2],
   },
   section: {
     gap: theme.space[3],

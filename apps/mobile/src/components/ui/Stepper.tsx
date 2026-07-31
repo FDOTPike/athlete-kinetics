@@ -7,7 +7,7 @@
  *
  * Law: zero hex literals. No chalk.
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -25,6 +25,7 @@ export interface StepperProps {
   onIncrement: () => void;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  repeatOnHold?: boolean;
 }
 
 export function Stepper({
@@ -34,13 +35,49 @@ export function Stepper({
   onIncrement,
   style,
   testID,
+  repeatOnHold = false,
 }: StepperProps): React.JSX.Element {
+  const holdTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const didRepeat = useRef(false);
+
+  const stopRepeating = (): void => {
+    if (holdTimeout.current !== null) {
+      clearTimeout(holdTimeout.current);
+      holdTimeout.current = null;
+    }
+    if (repeatInterval.current !== null) {
+      clearInterval(repeatInterval.current);
+      repeatInterval.current = null;
+    }
+  };
+
+  useEffect(() => stopRepeating, []);
+
+  const startRepeating = (action: () => void): void => {
+    if (!repeatOnHold) return;
+    stopRepeating();
+    didRepeat.current = false;
+    holdTimeout.current = setTimeout(() => {
+      didRepeat.current = true;
+      action();
+      repeatInterval.current = setInterval(action, 100);
+    }, 300);
+  };
+
+  const finishPress = (action: () => void): void => {
+    if (!repeatOnHold || !didRepeat.current) action();
+    didRepeat.current = false;
+  };
+
   return (
     <View style={[styles.container, style]} testID={testID}>
       <Text style={styles.label}>{label.toUpperCase()}</Text>
       <View style={styles.row}>
         <Pressable
-          onPress={onDecrement}
+          onPress={() => finishPress(onDecrement)}
+          onPressIn={repeatOnHold ? () => startRepeating(onDecrement) : undefined}
+          onPressOut={repeatOnHold ? stopRepeating : undefined}
           accessibilityRole="button"
           accessibilityLabel={`Decrease ${label}`}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
@@ -54,7 +91,9 @@ export function Stepper({
           {value}
         </Text>
         <Pressable
-          onPress={onIncrement}
+          onPress={() => finishPress(onIncrement)}
+          onPressIn={repeatOnHold ? () => startRepeating(onIncrement) : undefined}
+          onPressOut={repeatOnHold ? stopRepeating : undefined}
           accessibilityRole="button"
           accessibilityLabel={`Increase ${label}`}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}

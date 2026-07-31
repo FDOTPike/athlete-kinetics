@@ -9,7 +9,7 @@
  *   - QuietAction → not red (no red colour referenced)
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { act, render, screen, fireEvent } from '@testing-library/react-native';
 
 // Mock the theme to expose testable token names without native rendering
 jest.mock('../../src/theme/theme', () => ({
@@ -201,6 +201,31 @@ test('Stepper: renders label and value, fires decrement and increment', () => {
   fireEvent.press(screen.getByLabelText('Increase Reps'));
   expect(inc).toHaveBeenCalledTimes(1);
 });
+test('Stepper: optional hold repeats after 300ms and stops on release', () => {
+  jest.useFakeTimers();
+  const inc = jest.fn();
+  const { unmount } = render(
+    <Stepper label="Load" value="0" onDecrement={() => {}} onIncrement={inc} repeatOnHold={true} />
+  );
+  const button = screen.getByLabelText('Increase Load');
+
+  fireEvent(button, 'pressIn');
+  act(() => jest.advanceTimersByTime(299));
+  expect(inc).not.toHaveBeenCalled();
+  act(() => jest.advanceTimersByTime(1));
+  expect(inc).toHaveBeenCalledTimes(1);
+  act(() => jest.advanceTimersByTime(300));
+  expect(inc).toHaveBeenCalledTimes(4);
+
+  fireEvent(button, 'pressOut');
+  fireEvent(button, 'press');
+  act(() => jest.advanceTimersByTime(500));
+  expect(inc).toHaveBeenCalledTimes(4);
+
+  unmount();
+  jest.useRealTimers();
+});
+
 
 // ── Disclosure ────────────────────────────────────────────────────────────────
 

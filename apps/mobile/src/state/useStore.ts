@@ -538,6 +538,8 @@ interface KineticsStore {
   advanceRunnerRest: () => void;
   /** Athlete-controlled, non-judgmental rest skip. */
   skipRunnerRest: () => void;
+  /** Persist a 15-second session rest override in the durable runner checkpoint. */
+  setRunnerRestOverride: (seconds: number | null) => void;
   /** Avoid the current movement and open its deterministic substitution choices. */
   runnerThumbsDown: () => void;
   runnerDeclineSubstitution: () => void;
@@ -2079,6 +2081,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // that marks this athlete onboarded on every future boot).
     get().saveProfile(patch);
     set({ onboarded: true });
+    // The questionnaire is the first-block brief. saveProfile publishes the
+    // clamped answers synchronously, so the generator reads the athlete's real
+    // objective, equipment, and weekly frequency. Never replace an existing block.
+    if (get().block === null) get().generateNewBlock('LINEAR');
     void (async () => {
       const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
       if (!(await saveRegistry(reg))) {
@@ -3229,6 +3235,24 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
     const nextRunner = advanceSessionRunner(runner, { kind: 'SKIP_REST', atMs: Date.now() });
+    if (nextRunner === runner) return;
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* no partial checkpoint */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    set(runnerSelection(nextRunner));
+  },
+
+  setRunnerRestOverride: (seconds) => {
+    const { session, runner, sessionMode } = get();
+    if (session === null || runner === null || sessionMode === null) return;
+    const nextRunner = advanceSessionRunner(runner, { kind: 'SET_REST_OVERRIDE', atMs: Date.now(), seconds });
     if (nextRunner === runner) return;
     const d = getDb();
     d.executeSync('BEGIN');

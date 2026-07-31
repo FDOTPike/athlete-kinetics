@@ -60,6 +60,8 @@ export interface RunnerState {
   readonly restStartedAtMs: number | null;
   /** RPE that produced the active rest prescription; null outside rest. */
   readonly restRpe: number | null;
+  /** Athlete-selected rest duration for this session; null uses the prescription. */
+  readonly restSecondsOverride: number | null;
   /** Completed logged sets by immutable session-plan slot index. */
   readonly slotSetCounts: readonly number[];
   /** Aggregate of slotSetCounts, retained for concise session summaries. */
@@ -94,6 +96,7 @@ export type RunnerEvent =
   | (TimestampedRunnerEvent & { readonly kind: 'LOG_SET'; readonly actualRpe?: number })
   | (TimestampedRunnerEvent & { readonly kind: 'REST_ELAPSED' })
   | (TimestampedRunnerEvent & { readonly kind: 'SKIP_REST' })
+  | (TimestampedRunnerEvent & { readonly kind: 'SET_REST_OVERRIDE'; readonly seconds: number | null })
   | (TimestampedRunnerEvent & { readonly kind: 'THUMBS_DOWN' })
   | (TimestampedRunnerEvent & { readonly kind: 'NIGGLE'; readonly severity: number })
   | (TimestampedRunnerEvent & { readonly kind: 'DECLINE_SUBSTITUTION' })
@@ -353,6 +356,11 @@ function normalizeState(value: unknown): RunnerState {
     throw new RunnerCheckpointError('state.updatedAtMs is invalid');
   }
   const updatedAtMs = value.updatedAtMs === undefined ? null : value.updatedAtMs as number | null;
+  const restOverrideRaw = value.restSecondsOverride;
+  if (restOverrideRaw !== null && restOverrideRaw !== undefined && !isRestTarget(restOverrideRaw)) {
+    throw new RunnerCheckpointError('state.restSecondsOverride is invalid');
+  }
+  const restSecondsOverride = restOverrideRaw === undefined ? null : restOverrideRaw as number | null;
   const offered = value.substitutionOfferedForSessionPlanSlotId;
   if (offered !== null && offered !== undefined && !isPositiveInteger(offered)) {
     throw new RunnerCheckpointError('state.substitutionOfferedForSessionPlanSlotId is invalid');
@@ -396,6 +404,7 @@ function normalizeState(value: unknown): RunnerState {
     restStartedAtMs: value.restStartedAtMs === undefined ? null : value.restStartedAtMs as number | null,
     restRpe: value.restRpe === undefined ? null : value.restRpe as number | null,
     slotSetCounts,
+    restSecondsOverride,
     loggedSets,
     substitutionOfferedForSessionPlanSlotId,
     haltReason: value.haltReason === undefined ? null : value.haltReason as RunnerHaltReason | null,
@@ -409,7 +418,7 @@ function normalizeState(value: unknown): RunnerState {
   const skipped = new Set(state.skippedSessionPlanSlotIds);
   if (phase === 'complete') {
     if (state.slotIndex !== slots.length || state.setIndex !== 0 || state.restSecondsTarget !== 0 ||
-      state.restStartedAtMs !== null || state.restRpe !== null ||
+      state.restStartedAtMs !== null || state.restRpe !== null || state.restSecondsOverride !== null ||
       state.substitutionOfferedForSessionPlanSlotId !== null || state.haltReason !== null ||
       !allSlotsResolved(slots, state.slotSetCounts, skipped)) {
       throw new RunnerCheckpointError('complete state has unresolved or live-session fields');
@@ -431,7 +440,7 @@ function normalizeState(value: unknown): RunnerState {
   }
 
   if (phase === 'halted') {
-    if (state.restSecondsTarget !== 0 || state.restStartedAtMs !== null || state.restRpe !== null ||
+    if (state.restSecondsTarget !== 0 || state.restStartedAtMs !== null || state.restRpe !== null || state.restSecondsOverride !== null ||
       state.substitutionOfferedForSessionPlanSlotId !== null || !isHaltReason(state.haltReason)) {
       throw new RunnerCheckpointError('halted state has invalid live-session fields');
     }
@@ -461,7 +470,7 @@ function normalizeState(value: unknown): RunnerState {
     allSlotsResolved(slots, state.slotSetCounts, skipped)) {
     throw new RunnerCheckpointError('resting state must follow a logged, non-final session set');
   }
-  if (state.restSecondsTarget !== restSecondsFor(current, state.tier, state.restRpe)) {
+  if (state.restSecondsTarget !== (state.restSecondsOverride ?? restSecondsFor(current, state.tier, state.restRpe))) {
     throw new RunnerCheckpointError('resting state violates the rest prescription');
   }
   return state;
@@ -516,6 +525,7 @@ export function startRunner(
       restSecondsTarget: 0,
       restStartedAtMs: null,
       restRpe: null,
+      restSecondsOverride: null,
       slotSetCounts: slots.map(() => 0),
       loggedSets: 0,
       substitutionOfferedForSessionPlanSlotId: null,
@@ -533,6 +543,7 @@ export function startRunner(
     restSecondsTarget: 0,
     restStartedAtMs: null,
     restRpe: null,
+    restSecondsOverride: null,
     slotSetCounts: slots.map(() => 0),
     loggedSets: 0,
     substitutionOfferedForSessionPlanSlotId: null,
@@ -595,6 +606,7 @@ function completeAt(state: RunnerState, atMs: number): RunnerState {
     restSecondsTarget: 0,
     restStartedAtMs: null,
     restRpe: null,
+    restSecondsOverride: null,
     substitutionOfferedForSessionPlanSlotId: null,
     haltReason: null,
   });
@@ -610,6 +622,7 @@ function haltAt(state: RunnerState, atMs: number, reason: RunnerHaltReason): Run
     restSecondsTarget: 0,
     restStartedAtMs: null,
     restRpe: null,
+    restSecondsOverride: null,
     substitutionOfferedForSessionPlanSlotId: null,
     haltReason: reason,
     updatedAtMs,
@@ -667,6 +680,20 @@ export function advance(state: RunnerState, event: RunnerEvent): RunnerState {
   if (!isNormalEventTime(state, event.atMs)) return state;
 
   switch (event.kind) {
+    case 'SET_REST_OVERRIDE': {
+      if (event.seconds !== null && !isRestTarget(event.seconds)) return state;
+      const restSecondsTarget = state.phase === 'resting'
+        ? event.seconds ?? restSecondsFor(slot, state.tier, state.restRpe)
+        : 0;
+      if (state.restSecondsOverride === event.seconds &&
+        (state.phase !== 'resting' || state.restSecondsTarget === restSecondsTarget)) return state;
+      return withUpdate(state, event.atMs, {
+        restSecondsOverride: event.seconds,
+        ...(state.phase === 'resting' ? {
+          restSecondsTarget,
+        } : {}),
+      });
+    }
     case 'LOG_SET': {
       const currentCompleted = state.slotSetCounts[state.slotIndex] ?? 0;
       if (state.phase !== 'working' || currentCompleted >= slot.sets ||
@@ -683,7 +710,7 @@ export function advance(state: RunnerState, event: RunnerEvent): RunnerState {
         slotSetCounts,
         loggedSets,
         phase: 'resting',
-        restSecondsTarget: restSecondsFor(slot, state.tier, actualRpe),
+        restSecondsTarget: state.restSecondsOverride ?? restSecondsFor(slot, state.tier, actualRpe),
         restStartedAtMs: event.atMs,
         restRpe: actualRpe,
         substitutionOfferedForSessionPlanSlotId: null,

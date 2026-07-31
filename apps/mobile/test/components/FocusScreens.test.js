@@ -157,7 +157,8 @@ test('COACH keeps the trajectory compact and expands a session only when its day
   expect(screen.getByText('Source')).toBeOnTheScreen();
   expect(screen.getByText('policy')).toBeOnTheScreen();
 
-  fireEvent.press(screen.getByLabelText('Manage block'));
+  expect(screen.getByLabelText('Manage current block')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Manage current block'));
   expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
 });
 

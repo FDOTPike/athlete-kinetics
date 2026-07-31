@@ -108,6 +108,37 @@ check(
   /tab === 'coach' && status === 'ready' && \(\s*<BlockScreen/.test(appSrc),
 );
 
+console.log('[onboarding first-block contract]');
+const onboardingStart = src.indexOf('completeOnboarding: (patch, athleteName) => {');
+const onboardingEnd = src.indexOf('rolloverDay: () => {', onboardingStart);
+const onboardingBody = onboardingStart >= 0 && onboardingEnd > onboardingStart
+  ? src.slice(onboardingStart, onboardingEnd)
+  : '';
+const onboardingSave = onboardingBody.indexOf('get().saveProfile(patch)');
+const onboardingGenerate = onboardingBody.indexOf("get().generateNewBlock('LINEAR')");
+check(
+  'completed questionnaire saves its profile before generating the first block',
+  onboardingSave >= 0 && onboardingGenerate > onboardingSave,
+);
+check(
+  'completed questionnaire never replaces an existing athlete block',
+  onboardingBody.includes("if (get().block === null) get().generateNewBlock('LINEAR')"),
+);
+
+console.log('[session rest override store contract]');
+const restOverrideStart = src.indexOf('setRunnerRestOverride: (seconds) => {');
+const restOverrideEnd = src.indexOf('runnerThumbsDown: () => {', restOverrideStart);
+const restOverrideBody = restOverrideStart >= 0 && restOverrideEnd > restOverrideStart
+  ? src.slice(restOverrideStart, restOverrideEnd)
+  : '';
+check(
+  'rest override advances the pure runner and persists the resulting checkpoint transactionally',
+  restOverrideBody.includes("kind: 'SET_REST_OVERRIDE'")
+    && restOverrideBody.includes("d.executeSync('BEGIN')")
+    && restOverrideBody.includes('persistRunnerCheckpoint(')
+    && restOverrideBody.includes("d.executeSync('COMMIT')"),
+);
+
 // --- [Phase 13 Step 4] autopilot projection SQL: EXECUTED against seeded rows ----
 // PREPARE only proves columns/syntax; the ΔE join + reciprocal attenuation are the
 // signal the whole autopilot consumes, so run the EXACT store SQL on known data.

@@ -2,6 +2,22 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-07-31 - Open defect: bodyweight work is invisible to readiness load
+
+1. **Status: open; coefficient remediation deferred pending evidence.** A
+   bodyweight set records only added external load and correctly defaults that
+   input to `0 kg`. However, `set_record.tonnage_kg` is generated as
+   `reps * load_kg` (`001_mechanical_input.sql:84`). A bodyweight-only set
+   therefore contributes zero tonnage to `mech_daily`, the acute/chronic load
+   ratio, and `state_vector.load_component`, regardless of the athlete's body
+   mass or completed reps.
+
+2. **Impact is concentrated in the beginner path.** Beginners are deliberately
+   eligible for bodyweight and dumbbell work, so the profiles most likely to
+   rely on bodyweight training have the least complete readiness-load signal.
+   No bodyweight coefficient will be invented without data. Remediation needs
+   a separately ratified effective-load model and recalibration evidence.
+
 ## 2026-07-30 - Kinematic Autopilot R1/R1a authority envelope
 
 1. **The final +2.5 macro-cycle RPE-raise budget is a corrective-overlay bound.**

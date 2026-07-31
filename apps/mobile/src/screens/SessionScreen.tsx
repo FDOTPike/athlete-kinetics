@@ -159,7 +159,7 @@ export default function SessionScreen(): React.JSX.Element {
     lastTriage, substitution, startSession, selectMovementSlot, setMovementPreference,
     openSubstitution, closeSubstitution, applyRegression, applyDaySwap, reportNiggle,
     logSet, editSet, endSession, runner, sessionMode, uiPreferences, bandLadder, lastLoggedLoads = {},
-    advanceRunnerRest, skipRunnerRest, runnerThumbsDown, runnerHalt, lastEndedSessionId,
+    advanceRunnerRest, skipRunnerRest, setRunnerRestOverride, runnerThumbsDown, runnerHalt, lastEndedSessionId,
     loadSessionOutcome, dismissOutcome,
   } = state;
 
@@ -588,6 +588,20 @@ export default function SessionScreen(): React.JSX.Element {
                           elapsedSeconds={restRemaining}
                           style={{ alignSelf: 'stretch' }}
                         />
+                        {runnerResting && (
+                          <>
+                            <Stepper
+                              testID="session-rest-stepper"
+                              label="Session rest seconds"
+                              value={String(rest.seconds)}
+                              onDecrement={() => setRunnerRestOverride(clamp(rest.seconds - 15, 45, 300))}
+                              onIncrement={() => setRunnerRestOverride(clamp(rest.seconds + 15, 45, 300))}
+                              repeatOnHold={true}
+                              style={styles.sessionStepper}
+                            />
+                            <Text style={styles.nextUp}>Applies to this session.</Text>
+                          </>
+                        )}
                         <PrimaryButton
                           label="Ready now"
                           onPress={readyNow}
@@ -607,6 +621,7 @@ export default function SessionScreen(): React.JSX.Element {
                         <View testID="current-set-steppers" style={styles.stepperStack}>
                           <Stepper
                             testID="current-reps-stepper"
+                            repeatOnHold={target?.kind === 'time'}
                             label={target?.kind === 'time' ? 'Seconds' : 'Reps'}
                             value={String(target?.kind === 'time' ? seconds : reps)}
                             onDecrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n - 5, 5, 3600)) : setReps((n) => clamp(n - 1, 1, 50))}
@@ -615,6 +630,7 @@ export default function SessionScreen(): React.JSX.Element {
                           />
                           <Stepper
                             testID="current-load-stepper"
+                            repeatOnHold={true}
                             label={loadLabel}
                             value={loadKg.toFixed(1)}
                             onDecrement={() => setLoadKg((n) => clamp(n - 2.5, 0, 500))}
