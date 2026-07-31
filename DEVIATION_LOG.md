@@ -2,6 +2,24 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-07-31 - Completion-action evidence limits
+
+1. **A mean-only completion signal is direction-blind.** Equal-average
+   improving and worsening shortfall histories produce the same candidate
+   action. This is an accepted measurement limit, not a tuning defect.
+   Completion authority remains dormant while the connected device has zero
+   eligible finalized outcomes. If real data later shows that direction must
+   affect control, a separately ratified slope/recency term and finite sweep
+   will be required; it must not be smuggled into the threshold.
+
+2. **Skipped-slot identity is not durable.** `session_outcome` persists only
+   `skipped_slot_count`, not the identities or movement patterns of skipped
+   slots. The migration-free observer therefore excludes an entire session
+   whenever `skipped_slot_count > 0`, rather than fabricating pattern
+   attribution. This further shrinks the evidence pool. Before completion
+   becomes the live beginner control signal, real usage may justify a migration
+   that freezes per-slot skip identity.
+
 ## 2026-07-31 - Open defect: bodyweight work is invisible to readiness load
 
 1. **Status: open; coefficient remediation deferred pending evidence.** A

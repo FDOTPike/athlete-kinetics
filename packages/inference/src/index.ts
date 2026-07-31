@@ -106,6 +106,17 @@ export {
   type WindowSetRow,
 } from './autopilotProjection';
 export {
+  buildCompletionWindow,
+  composeControlActions,
+  deriveCompletionAction,
+  loggedCompletionShortfall,
+  summarizeCompletionWindow,
+  type CompletionActionPolicy,
+  type CompletionPatternSummary,
+  type PatternDailyCompletion,
+  type WindowCompletionRow,
+} from './completionAction';
+export {
   applyProfileLimits,
   applySeverityToGuardrail,
   EXPERIENCE_TRIAGE,
