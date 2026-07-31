@@ -182,6 +182,14 @@ if (setAggSql && niggleWinSql && maxNigSql) {
   const sq2 = db.prepare(setAggSql).all('2026-06-11', '2026-06-11').find((r) => r.pattern === 'squat');
   a('no-set_prefix set coalesces to base load → attenuation 1.0', Boolean(sq2) && Math.abs(Number(sq2.sum_attenuation) - 1.0) < 1e-9, sq2 && String(sq2.sum_attenuation));
   a('ΔE excludes a set with no prescribed target (delta_count 0 on un-planned day)', Boolean(sq2) && Number(sq2.delta_count) === 0, sq2 && String(sq2.delta_count));
+  db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (903,'2026-06-12',0)");
+  db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (904,903,901,1,5,100,NULL,0)");
+  db.exec("INSERT INTO set_target (set_id,provenance_kind,target_rpe,source_planned_slot_id,created_at_ms) VALUES (904,'planned',8.0,901,0)");
+  const sqNullRpe = db.prepare(setAggSql).all('2026-06-12', '2026-06-12').find((r) => r.pattern === 'squat');
+  a('delta-RPE excludes unanswered actual RPE even when its frozen target exists',
+    Boolean(sqNullRpe) && Number(sqNullRpe.set_count) === 1
+      && Number(sqNullRpe.delta_count) === 0 && Number(sqNullRpe.sum_delta_rpe) === 0,
+    sqNullRpe && `${sqNullRpe.set_count}/${sqNullRpe.delta_count}/${sqNullRpe.sum_delta_rpe}`);
   // PROVENANCE (022): an overlapping ARCHIVED plan with a LOWER target must NOT
   // corrupt ΔE. The set_target snapshot pins each set at log time; the old
   // MIN(target_rpe)-by-(date,movement) join (no status filter) would have used
@@ -572,6 +580,16 @@ if (resetTables.length >= 15) {
       && logTxn.includes('if (prescribedDose !== null)')
       && logTxn.includes('prescribedDose.kind === \'reps\' ? prescribedDose.reps : null')
       && logTxn.includes('prescribedDose.kind === \'time\' ? prescribedDose.seconds : null'));
+  a('unanswered actual RPE stays nullable through store clamp and set_record binding',
+    logSetBody.includes('const safeRpe = rpe === null ? null')
+      && logTxn.includes('[s.sessionId, movementId, setIndex, safeReps, safeLoad, safeRpe, loggedAtMs]'));
+  a('runner may use prescribed RPE for rest without fabricating persisted athlete evidence',
+    logSetBody.includes("...(safeRpe === null ? {} : { actualRpe: safeRpe })")
+      && logSetBody.includes('rpe: safeRpe'));
+  a('metric-only set edits preserve an unanswered nullable RPE',
+    editSetBody.includes('const safeRpe = rpe === null ? null')
+      && editSetBody.includes('[safeReps, safeLoad, safeRpe, setId]')
+      && editSetBody.includes('rpe: safeRpe'));
   a('set memory is updated only after the dose transaction commits',
     logCommit >= 0 && logSetBody.indexOf('const logged: LoggedSet', logCommit) > logCommit);
   a('editing actual work cannot rewrite its immutable prescribed-dose snapshot',
@@ -778,6 +796,17 @@ if (resetTables.length >= 15) {
   a('exact production SQL for all three atomic set rows is exposed',
     Boolean(setRecordInsertSql) && Boolean(setTargetInsertSql) && Boolean(doseInsertSql));
   if (setRecordInsertSql && setTargetInsertSql && doseInsertSql) {
+    db.exec('BEGIN');
+    db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (18390,'2099-12-28',1000)");
+    db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,planned_reps,provenance_kind,target_rpe,source_planned_slot_id) VALUES (18390,18390,0,1,1,5,'planned',8,18390)");
+    db.prepare(setRecordInsertSql).run(18390, 1, 1, 5, 20, null, 1100);
+    const nullRpeSetId = Number(db.prepare('SELECT last_insert_rowid() AS id').get().id);
+    db.prepare(setTargetInsertSql).run(nullRpeSetId, 18390, 'planned', 8, 18390, 1100);
+    const nullablePair = db.prepare('SELECT sr.rpe, st.target_rpe FROM set_record sr JOIN set_target st ON st.set_id=sr.set_id WHERE sr.set_id=?').get(nullRpeSetId);
+    a('exact production set SQL stores unanswered actual RPE as NULL beside its frozen target',
+      nullablePair?.rpe === null && Number(nullablePair?.target_rpe) === 8);
+    db.exec('ROLLBACK');
+
     db.exec('DROP TRIGGER IF EXISTS wo183_poison_dose');
     db.exec("CREATE TEMP TRIGGER wo183_poison_dose BEFORE INSERT ON set_dose_target BEGIN SELECT RAISE(ABORT,'wo18.3 dose poison'); END");
     let dosePoisonThrew = false;

@@ -72,7 +72,7 @@ function CompletedMetrics({
   sets: readonly LoggedSet[];
   bandLadder: readonly { level: number; label: string }[];
   movementsById: ReadonlyMap<number, Movement>;
-  onEdit: (setId: number, reps: number, loadKg: number, rpe: number, metrics?: SetMetricPatch) => void;
+  onEdit: (setId: number, reps: number, loadKg: number, rpe: number | null, metrics?: SetMetricPatch) => void;
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
   const metricSets = sets.filter((set) => set.timeS !== null || set.bandLevel !== null || (
@@ -181,6 +181,7 @@ export default function SessionScreen(): React.JSX.Element {
   const [seconds, setSeconds] = useState(30);
   const [loadKg, setLoadKg] = useState(0);
   const [rpe, setRpe] = useState(8);
+  const [rpeTouched, setRpeTouched] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
@@ -268,9 +269,11 @@ export default function SessionScreen(): React.JSX.Element {
     setReps(target.kind === 'reps' ? target.reps : 1);
     setSeconds(target.kind === 'time' ? target.seconds : 30);
     setRpe(currentSlot.targetRpe ?? 8);
+    setRpeTouched(false);
     setLoadKg(suggestedLoad);
   }, [
     currentSlot?.sessionPlanSlotId,
+    currentLogged,
     currentMovement?.movement_id,
     target?.kind,
     target?.kind === 'reps' ? target.reps : target?.seconds,
@@ -412,11 +415,15 @@ export default function SessionScreen(): React.JSX.Element {
   const logCurrent = (): void => {
     if (currentSlot === null || currentMovement === null || target === null || resting) return;
     const safeLoad = clamp(Math.round(loadKg * 2) / 2, 0, 500);
-    const safeRpe = clamp(Math.round(rpe * 2) / 2, 5, 10);
+    const safeRpe = rpeTouched ? clamp(Math.round(rpe * 2) / 2, 5, 10) : null;
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
     if (runner === null) {
-      if (uiPreferences.restTimerEnabled) setLocalRest({ startedAtMs: Date.now(), seconds: restSecondsFor(safeRpe, profile.training_age), slotId: currentSlot.sessionPlanSlotId });
+      if (uiPreferences.restTimerEnabled) setLocalRest({
+        startedAtMs: Date.now(),
+        seconds: restSecondsFor(safeRpe ?? currentSlot.targetRpe ?? 8, profile.training_age),
+        slotId: currentSlot.sessionPlanSlotId,
+      });
       else moveLegacyForward();
     }
   };
@@ -639,12 +646,33 @@ export default function SessionScreen(): React.JSX.Element {
                           />
                           <Stepper
                             testID="current-rpe-stepper"
-                            label="RPE"
+                            label="Actual RPE"
                             value={rpe.toFixed(1)}
-                            onDecrement={() => setRpe((n) => clamp(n - 0.5, 5, 10))}
-                            onIncrement={() => setRpe((n) => clamp(n + 0.5, 5, 10))}
+                            onDecrement={() => {
+                              setRpeTouched(true);
+                              setRpe((n) => clamp(n - 0.5, 5, 10));
+                            }}
+                            onIncrement={() => {
+                              setRpeTouched(true);
+                              setRpe((n) => clamp(n + 0.5, 5, 10));
+                            }}
                             style={styles.sessionStepper}
                           />
+                          <View style={styles.rpeConfirmation}>
+                            <Chip
+                              label={rpeTouched ? `RPE ${rpe.toFixed(1)} recorded` : `Confirm target RPE ${rpe.toFixed(1)}`}
+                              selected={rpeTouched}
+                              onPress={() => setRpeTouched(true)}
+                              accessibilityLabel={rpeTouched
+                                ? `Actual RPE ${rpe.toFixed(1)} confirmed`
+                                : `Confirm actual RPE ${rpe.toFixed(1)}`}
+                            />
+                            <Text style={styles.rpeEvidence}>
+                              {rpeTouched
+                                ? 'This actual RPE will be used as Coach evidence.'
+                                : 'Unanswered RPE is left out of Coach evidence.'}
+                            </Text>
+                          </View>
                         </View>
 
                         {supportsBands && (
@@ -1064,6 +1092,15 @@ const styles = StyleSheet.create({
   sessionStepper: {
     flex: 0,
     width: '100%',
+  },
+  rpeConfirmation: {
+    alignItems: 'center',
+    gap: theme.space[1],
+  },
+  rpeEvidence: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    textAlign: 'center',
   },
   nextUp: {
     ...theme.font.label,

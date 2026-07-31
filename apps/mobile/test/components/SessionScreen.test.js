@@ -91,7 +91,7 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
   [
     ['current-reps-stepper', 'Reps', 'Reps 5', '5'],
     ['current-load-stepper', 'Added kg (0 = bodyweight)', 'Added kg (0 = bodyweight) 0.0', '0.0'],
-    ['current-rpe-stepper', 'RPE', 'RPE 8.0', '8.0'],
+    ['current-rpe-stepper', 'Actual RPE', 'Actual RPE 8.0', '8.0'],
   ].forEach(([testID, label, accessibilityLabel, expectedValue]) => {
     expect(StyleSheet.flatten(screen.getByTestId(testID).props.style)).toMatchObject({
       flex: 0,
@@ -141,6 +141,44 @@ test('guided mode keeps only the current movement expanded and future work unava
   const future = screen.getByLabelText('Later movement, upcoming, 3 × 8');
   expect(future.props.accessibilityState.disabled).toBe(true);
   expect(screen.getByLabelText('Log set 1 for First movement')).toBeOnTheScreen();
+});
+
+test('untouched actual RPE logs null instead of fabricating target equality', () => {
+  render(<SessionScreen />);
+
+  expect(screen.getByText('Unanswered RPE is left out of Coach evidence.')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('explicit confirmation records a genuine exact-target RPE', () => {
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByLabelText('Confirm actual RPE 8.0'));
+  expect(screen.getByText('This actual RPE will be used as Coach evidence.')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, 8,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('adjusting actual RPE marks and records the changed answer', () => {
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
+  expect(screen.getByLabelText('Actual RPE 8.5')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, 8.5,
+    undefined, undefined, undefined, undefined, 1,
+  );
 });
 
 test('a current session keeps its frozen guided mode after a preference change', () => {
@@ -325,7 +363,7 @@ test('completed timed and band metrics are disclosed and edit through the store'
       sessionId: 10,
       date: '2026-07-15',
       startedAtMs: Date.now(),
-      sets: [{ set_id: 77, movement_id: 1, movement_name: 'First movement', set_index: 1, reps: 1, load_kg: 0, rpe: 8, tonnage_kg: 0, session_plan_slot_id: 1, timeS: 30, bandLevel: 1 }],
+      sets: [{ set_id: 77, movement_id: 1, movement_name: 'First movement', set_index: 1, reps: 1, load_kg: 0, rpe: null, tonnage_kg: 0, session_plan_slot_id: 1, timeS: 30, bandLevel: 1 }],
     },
     sessionPlan: [slot(1, 1, 1, { plannedSets: 1 }), slot(2, 2, 8)],
     activeSessionPlanSlotId: 2,
@@ -336,9 +374,9 @@ test('completed timed and band metrics are disclosed and edit through the store'
   expect(screen.queryByLabelText('Decrease logged duration for set 1')).toBeNull();
   fireEvent.press(screen.getByLabelText('Review logged details, collapsed'));
   fireEvent.press(screen.getByLabelText('Decrease logged duration for set 1'));
-  expect(mockState.editSet).toHaveBeenCalledWith(77, 1, 0, 8, { timeS: 25 });
+  expect(mockState.editSet).toHaveBeenCalledWith(77, 1, 0, null, { timeS: 25 });
   fireEvent.press(screen.getByLabelText('Set 1 band Heavy'));
-  expect(mockState.editSet).toHaveBeenLastCalledWith(77, 1, 0, 8, { bandLevel: 2 });
+  expect(mockState.editSet).toHaveBeenLastCalledWith(77, 1, 0, null, { bandLevel: 2 });
 });
 
 test('idle state has one focused start action', () => {

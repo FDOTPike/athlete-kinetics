@@ -215,7 +215,7 @@ export interface LoggedSet {
   set_index: number;
   reps: number;
   load_kg: number;
-  rpe: number;
+  rpe: number | null;
   tonnage_kg: number;
   session_plan_slot_id: number | null;
   timeS: number | null;
@@ -576,7 +576,7 @@ interface KineticsStore {
    *  falls back to the movement's canonical name when absent. `appliedPrefixes`
    *  (Phase 13) are the toggled condition tokens; their compound multipliers +
    *  effective load are persisted to the set_prefix side-car. */
-  logSet: (movementId: number, reps: number, loadKg: number, rpe: number, displayName?: string, appliedPrefixes?: readonly MovementPrefix[], implement?: MovementPrefix, metrics?: { timeS?: number; bandLevel?: number }, sessionPlanSlotId?: number) => void;
+  logSet: (movementId: number, reps: number, loadKg: number, rpe: number | null, displayName?: string, appliedPrefixes?: readonly MovementPrefix[], implement?: MovementPrefix, metrics?: { timeS?: number; bandLevel?: number }, sessionPlanSlotId?: number) => void;
   /** Hard-delete one logged set. The 001 AFTER DELETE trigger
    *  (trg_set_record_ad) drains mech_daily by this row's exact contribution;
    *  the in-memory list drops the row. */
@@ -585,7 +585,7 @@ interface KineticsStore {
    *  trigger (trg_set_record_au) re-deltas mech_daily. NOTE: "sets" is not a
    *  per-row attribute — each set_record row IS one set; change the count by
    *  adding/deleting rows, not by editing one. */
-  editSet: (setId: number, reps: number, loadKg: number, rpe: number, metrics?: SetMetricPatch) => void;
+  editSet: (setId: number, reps: number, loadKg: number, rpe: number | null, metrics?: SetMetricPatch) => void;
   endSession: () => void;
   computePrescription: (patterns: readonly MovementPattern[]) => void;
   /** First-run affordance: 180-day deterministic demo athlete. Refuses to run
@@ -1594,7 +1594,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           set_index: number;
           reps: number;
           load_kg: number;
-          rpe: number;
+          rpe: number | null;
           session_plan_slot_id: number | null;
           time_s: number | null; band_level: number | null;
         }>(
@@ -3818,12 +3818,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
     const safeReps = timeMode ? 1 : Math.round(clamp(reps, 1, 50));
     const safeLoad = clamp(Math.round(loadKg / 2.5) * 2.5, 0, 500);
-    const safeRpe = clamp(Math.round(rpe * 2) / 2, 5, 10);
+    const safeRpe = rpe === null ? null : clamp(Math.round(rpe * 2) / 2, 5, 10);
     const loggedAtMs = Date.now();
 
     let nextRunner: RunnerState | null = state.runner;
     if (state.runner !== null) {
-      nextRunner = advanceSessionRunner(state.runner, { kind: 'LOG_SET', atMs: loggedAtMs, actualRpe: safeRpe });
+      nextRunner = advanceSessionRunner(state.runner, {
+        kind: 'LOG_SET',
+        atMs: loggedAtMs,
+        ...(safeRpe === null ? {} : { actualRpe: safeRpe }),
+      });
       if (nextRunner === state.runner) {
         set({ error: 'That set cannot be logged in the current session state.' });
         return;
@@ -3963,7 +3967,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         ? null
         : Math.round(clamp(metrics.bandLevel, 1, 20));
     const safeLoad = clamp(Math.round(loadKg / 2.5) * 2.5, 0, 500);
-    const safeRpe = clamp(Math.round(rpe * 2) / 2, 5, 10);
+    const safeRpe = rpe === null ? null : clamp(Math.round(rpe * 2) / 2, 5, 10);
     // UPDATE OF reps, load_kg, rpe fires trg_set_record_au, which re-deltas
     // mech_daily (old contribution out, new in). tonnage_kg is a GENERATED
     // STORED column — SQLite recomputes it; we mirror it in memory below.
