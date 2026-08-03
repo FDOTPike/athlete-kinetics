@@ -316,8 +316,8 @@ export interface BlockSessionSummary {
   phase: string;
   sessionDate: string;
   slotCount: number;
-  /** A real session with logged sets exists on this date. */
-  trained: boolean;
+  /** Exact finalized outcome for this planned session; never inferred by date. */
+  completionStatus: 'complete' | 'halted' | null;
 }
 
 export interface TodaySlot {
@@ -2299,12 +2299,25 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const sessions = rowsOf<{
       planned_session_id: number; week_index: number; day_index: number;
       focus: string; phase: string; session_date: string; slot_count: number;
-      trained: number;
+      completion_status: string | null;
     }>(d.executeSync(
       `SELECT ps.planned_session_id, ps.week_index, ps.day_index, ps.focus, ps.phase,
               ps.session_date, count(sl.planned_slot_id) AS slot_count,
-              EXISTS (SELECT 1 FROM session s JOIN set_record sr ON sr.session_id = s.session_id
-                      WHERE s.session_date = ps.session_date) AS trained
+              CASE
+                WHEN EXISTS (
+                  SELECT 1 FROM session_origin so
+                  JOIN session_outcome outcome ON outcome.session_id = so.session_id
+                  WHERE so.source_planned_session_id = ps.planned_session_id
+                    AND outcome.terminal_phase = 'complete'
+                ) THEN 'complete'
+                WHEN EXISTS (
+                  SELECT 1 FROM session_origin so
+                  JOIN session_outcome outcome ON outcome.session_id = so.session_id
+                  WHERE so.source_planned_session_id = ps.planned_session_id
+                    AND outcome.terminal_phase = 'halted'
+                ) THEN 'halted'
+                ELSE NULL
+              END AS completion_status
        FROM planned_session ps
        LEFT JOIN planned_slot sl ON sl.planned_session_id = ps.planned_session_id
        WHERE ps.block_id = ?
@@ -2320,7 +2333,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       phase: s.phase,
       sessionDate: s.session_date,
       slotCount: s.slot_count,
-      trained: s.trained === 1,
+      completionStatus:
+        s.completion_status === 'complete' || s.completion_status === 'halted'
+          ? s.completion_status
+          : null,
     }));
     // Rest-day fallback: no planned session today is a normal, renderable
     // state (todayPlan null) — never an error.

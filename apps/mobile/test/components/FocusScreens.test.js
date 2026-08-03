@@ -83,7 +83,7 @@ const baseState = (overrides = {}) => ({
     phase: 'accumulation',
     sessionDate: TODAY,
     slotCount: 1,
-    trained: false,
+    completionStatus: null,
   }],
   generateNewBlock: jest.fn(),
   loadSessionSlots: jest.fn(() => [todaySlot]),
@@ -160,6 +160,22 @@ test('COACH keeps the trajectory compact and expands a session only when its day
   expect(screen.getByLabelText('Manage current block')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Manage current block'));
   expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
+});
+
+test('COACH shows only exact finalized plan outcomes as Done or Stopped', () => {
+  const planned = baseState().blockSessions[0];
+  mockState = baseState({
+    blockSessions: [
+      { ...planned, completionStatus: 'complete' },
+      { ...planned, plannedSessionId: 2, dayIndex: 2, sessionDate: '2026-07-02', completionStatus: 'halted' },
+    ],
+  });
+  render(<BlockScreen />);
+
+  expect(screen.getByText('Done')).toBeOnTheScreen();
+  expect(screen.getByText('Stopped')).toBeOnTheScreen();
+  expect(screen.getByLabelText(`Week 1, lower session on ${TODAY}, completed`)).toBeOnTheScreen();
+  expect(screen.getByLabelText('Week 1, lower session on 2026-07-02, stopped')).toBeOnTheScreen();
 });
 
 test('COACH leaves the safety form behind its explicit action even during a halt', () => {

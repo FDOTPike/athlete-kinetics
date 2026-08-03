@@ -402,11 +402,17 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                           key={cell.plannedSessionId}
                           onPress={() => openDetail(cell)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Week ${cell.weekIndex}, ${cell.focus} session on ${cell.sessionDate}${cell.trained ? ', completed' : ''}`}
+                          accessibilityLabel={`Week ${cell.weekIndex}, ${cell.focus} session on ${cell.sessionDate}${
+                            cell.completionStatus === 'complete'
+                              ? ', completed'
+                              : cell.completionStatus === 'halted'
+                                ? ', stopped'
+                                : ''
+                          }`}
                           accessibilityState={{ expanded: isExpanded, selected: isToday }}
                           style={({ pressed }) => [
                             styles.dayMark,
-                            cell.trained && styles.dayMarkTrained,
+                            cell.completionStatus !== null && styles.dayMarkFinalized,
                             isToday && styles.dayMarkToday,
                             isExpanded && styles.dayMarkExpanded,
                             pressed && styles.dayMarkPressed,
@@ -415,11 +421,17 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                           <Text
                             style={[
                               styles.dayMarkText,
-                              cell.trained && styles.dayMarkTextTrained,
+                              cell.completionStatus !== null && styles.dayMarkTextFinalized,
                               isToday && styles.dayMarkTextToday,
                             ]}
                           >
-                            {cell.trained ? 'Done' : isToday ? 'Today' : focusLabel(cell.focus)}
+                            {cell.completionStatus === 'complete'
+                              ? 'Done'
+                              : cell.completionStatus === 'halted'
+                                ? 'Stopped'
+                                : isToday
+                                  ? 'Today'
+                                  : focusLabel(cell.focus)}
                           </Text>
                         </Pressable>
                       );
@@ -431,7 +443,11 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   <View style={styles.sessionDetail}>
                     <Text style={styles.sessionDetailTitle}>
                       {detail.summary.sessionDate} - {focusName(detail.summary.focus)}
-                      {detail.summary.trained ? ' - completed' : ''}
+                      {detail.summary.completionStatus === 'complete'
+                        ? ' - completed'
+                        : detail.summary.completionStatus === 'halted'
+                          ? ' - stopped'
+                          : ''}
                     </Text>
                     {detail.slots.map((slot) => (
                       <View key={slot.slotIndex} style={styles.slotRow}>
@@ -898,7 +914,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderColor: theme.color.line,
   },
-  dayMarkTrained: {
+  dayMarkFinalized: {
     borderColor: theme.color.line,
     backgroundColor: theme.color.ink1,
   },
@@ -916,7 +932,7 @@ const styles = StyleSheet.create({
     color: theme.color.textMid,
     textAlign: 'center',
   },
-  dayMarkTextTrained: {
+  dayMarkTextFinalized: {
     color: theme.color.textHi,
   },
   dayMarkTextToday: {

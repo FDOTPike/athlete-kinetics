@@ -125,6 +125,20 @@ check(
   onboardingBody.includes("if (get().block === null) get().generateNewBlock('LINEAR')"),
 );
 
+console.log('[planned-session completion contract]');
+const completionSql = statements.find((sql) => sql.includes('END AS completion_status')) ?? '';
+check(
+  'planned completion is joined through exact session_origin provenance and immutable session_outcome',
+  completionSql.includes('so.source_planned_session_id = ps.planned_session_id')
+    && completionSql.includes('JOIN session_outcome outcome ON outcome.session_id = so.session_id'),
+);
+check(
+  'planned completion never uses same-date sets as a proxy',
+  completionSql.length > 0
+    && !completionSql.includes('set_record')
+    && !completionSql.includes('s.session_date = ps.session_date'),
+
+);
 console.log('[session rest override store contract]');
 const restOverrideStart = src.indexOf('setRunnerRestOverride: (seconds) => {');
 const restOverrideEnd = src.indexOf('runnerThumbsDown: () => {', restOverrideStart);
