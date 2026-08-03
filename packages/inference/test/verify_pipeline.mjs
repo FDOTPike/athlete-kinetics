@@ -118,7 +118,7 @@ check('agreement gate: chain projection over live 028 graph matches live movemen
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-    '032_capability_content.sql']) {
+    '032_capability_content.sql', '033_goal_program.sql']) {
     db.exec(readFileSync(join(schemaDir, f), 'utf-8'));
   }
 
@@ -181,7 +181,7 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-    '032_capability_content.sql']) {
+    '032_capability_content.sql', '033_goal_program.sql']) {
     db.exec(readFileSync(join(schemaDir, f), 'utf-8'));
   }
   const library = db.prepare('SELECT movement_id AS movementId, name FROM movement').all();

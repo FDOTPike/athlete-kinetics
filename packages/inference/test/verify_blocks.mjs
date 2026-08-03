@@ -26,7 +26,8 @@ import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
-  SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS } = require('./.build/blockGenerator.js');
+  SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
+  programFocuses } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
@@ -854,6 +855,61 @@ check('thin-data severe-niggle headroom never raises squat in the block',
     storeSrc.includes("movement.difficulty === 'Beginner' || movement.beginnerOk")
     && storeSrc.includes('if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(m.movement_id))')
     && screenSrc.includes('beginnerPlanViolation'));
+}
+
+// --- [17] guided goal-program schedule and preference laws -----------------
+console.log('[17] guided goal-program schedule and preference laws');
+{
+  const objective = 'strength';
+  const frequency = 3;
+  const legacy = gen({ objective, weekly_frequency: frequency });
+  const explicitDays = defaultProgramDayIndices(frequency).map((day_index, index) => ({
+    day_index, focus: programFocuses(objective, frequency)[index],
+  }));
+  const explicit = generateBlock({
+    profile: prof({ objective, weekly_frequency: frequency }), movements, startDate: START,
+    programDays: explicitDays,
+  });
+  check('explicit default schedule is byte-identical to the legacy generator',
+    JSON.stringify(explicit) === JSON.stringify(legacy));
+
+  const oneDay = [{ day_index: 2, focus: 'full' }];
+  const baseline = generateBlock({ profile: prof({ objective, weekly_frequency: 1 }), movements, startDate: START, programDays: oneDay });
+  const baselineSquat = baseline.sessions[0].slots.find((slot) =>
+    movements.find((movement) => movement.movement_id === slot.movement_id)?.pattern === 'squat');
+  const alternate = movements.find((movement) => movement.pattern === 'squat' && movement.movement_id !== baselineSquat?.movement_id);
+  const preferenceDays = [{
+    day_index: 2, focus: 'full',
+    movement_preferences: [{ slot_index: 1, pattern: 'squat', movement_id: alternate.movement_id }],
+  }];
+  const preferred = generateBlock({
+    profile: prof({ objective, weekly_frequency: 1 }), movements, startDate: START, programDays: preferenceDays,
+  });
+  check('preferred day index repeats unchanged through all four weeks',
+    preferred.sessions.length === 4 && preferred.sessions.every((session) => session.day_index === 2));
+  check('safe same-pattern preference is used in every block week',
+    preferred.sessions.every((session) => session.slots.some((slot) => slot.movement_id === alternate.movement_id)));
+  check('coach/custom program preview is deterministic', JSON.stringify(preferred) === JSON.stringify(generateBlock({
+    profile: prof({ objective, weekly_frequency: 1 }), movements, startDate: START, programDays: preferenceDays,
+  })));
+
+  const unsafeLibrary = movements.map((movement) => movement.movement_id === alternate.movement_id
+    ? { ...movement, capability_available: false } : movement);
+  const fallback = generateBlock({
+    profile: prof({ objective, weekly_frequency: 1 }), movements: unsafeLibrary, startDate: START, programDays: preferenceDays,
+  });
+  check('unsafe preferred movement uses deterministic same-pattern fallback',
+    fallback.sessions.every((session) => !session.slots.some((slot) => slot.movement_id === alternate.movement_id))
+      && fallback.warnings.some((warning) => warning.includes('safe fallback used')));
+
+  const noSquatLibrary = unsafeLibrary.filter((movement) => movement.pattern !== 'squat' || movement.movement_id === alternate.movement_id);
+  const dropped = generateBlock({
+    profile: prof({ objective, weekly_frequency: 1 }), movements: noSquatLibrary, startDate: START, programDays: preferenceDays,
+  });
+  check('preference is dropped only when no safe same-pattern fallback exists, with warning',
+    dropped.sessions.every((session) => session.slots.every((slot) =>
+      noSquatLibrary.find((movement) => movement.movement_id === slot.movement_id)?.pattern !== 'squat'))
+      && dropped.warnings.some((warning) => warning.includes('slot dropped')));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

@@ -86,6 +86,18 @@ export interface BlockPlan {
   autopilotAdjusted: string[];
 }
 
+export interface ProgramMovementPreference {
+  slot_index: number;
+  pattern: MovementPattern;
+  movement_id: number;
+}
+
+export interface ProgramDayPreference {
+  day_index: number;
+  focus: BlockFocus;
+  movement_preferences?: readonly ProgramMovementPreference[];
+}
+
 export interface BlockInput {
   profile: UserProfile;
   movements: readonly GeneratorMovement[];
@@ -98,6 +110,9 @@ export interface BlockInput {
   /** Rolling fatigue at generation time (state_vector.acwr) — drives the
    *  deadlift auto-regulation gate in the peak phase. */
   recentAcwr?: number | null;
+  /** Explicit repeating weekly schedule for a goal program. */
+  programDays?: readonly ProgramDayPreference[];
+
   /** Phase 13 Step 4: the Kinematic Autopilot's flaw report for the trailing
    *  3-week window. When present the generator derives a bounded ControlAction
    *  (deriveControlAction) and applies its per-pattern target_rpe / working-set
@@ -190,6 +205,14 @@ const SPLITS: Record<Objective, readonly (readonly BlockFocus[])[]> = {
   rehab: REHAB_SPLITS,
   hybrid: HYBRID_SPLITS,
 };
+
+export const programFocuses = (objective: Objective, frequency: number): readonly BlockFocus[] =>
+  SPLITS[objective][clamp(Math.round(frequency), 1, 7) - 1];
+
+export const defaultProgramDayIndices = (frequency: number): readonly number[] =>
+  DAY_SPREAD[clamp(Math.round(frequency), 1, 7) - 1];
+
+const BLOCK_FOCI: ReadonlySet<BlockFocus> = new Set(['lower', 'upper', 'full', 'conditioning', 'bjj']);
 
 /** Rep/set/effort scheme per objective. rpeWave is weeks 1..3; week 4 is the
  *  deload transform (sets halved up, RPE = wave[0] - 1.0, floor 5.0). */
@@ -370,8 +393,41 @@ export function generateBlock(input: BlockInput): BlockPlan {
   const autopilotAdjusted = new Set<MovementPattern>();
   const scheme = SCHEMES[profile.objective];
   const phaseMod = PHASE_MODS[macroPhase];
-  const split = SPLITS[profile.objective][clamp(profile.weekly_frequency, 1, 7) - 1];
-  const spread = DAY_SPREAD[clamp(profile.weekly_frequency, 1, 7) - 1];
+  const frequency = clamp(profile.weekly_frequency, 1, 7);
+  const split = SPLITS[profile.objective][frequency - 1];
+  const spread = DAY_SPREAD[frequency - 1];
+  const programSchedule = input.programDays === undefined
+    ? null
+    : [...input.programDays]
+        .sort((a, b) => a.day_index - b.day_index)
+        .map((day) => ({ ...day, movement_preferences: [...(day.movement_preferences ?? [])] }));
+  if (programSchedule !== null) {
+    if (programSchedule.length < 1 || programSchedule.length > 7) {
+      throw new Error('Program schedule must contain 1-7 days.');
+    }
+    const seenDays = new Set<number>();
+    for (const day of programSchedule) {
+      if (!Number.isInteger(day.day_index) || day.day_index < 1 || day.day_index > 7
+          || seenDays.has(day.day_index) || !BLOCK_FOCI.has(day.focus)) {
+        throw new Error('Program schedule contains an invalid or duplicate day.');
+      }
+      seenDays.add(day.day_index);
+      const seenSlots = new Set<number>();
+      const seenPatterns = new Set<MovementPattern>();
+      for (const preference of day.movement_preferences) {
+        if (!Number.isInteger(preference.slot_index) || preference.slot_index < 1 || preference.slot_index > 5
+            || seenSlots.has(preference.slot_index) || seenPatterns.has(preference.pattern)
+            || !FOCUS_PATTERNS[day.focus].includes(preference.pattern)) {
+          throw new Error('Program schedule contains an invalid movement preference.');
+        }
+        seenSlots.add(preference.slot_index);
+        seenPatterns.add(preference.pattern);
+      }
+    }
+  }
+  const schedule = programSchedule ?? split.map((focus, i) => ({
+    day_index: spread[i], focus, movement_preferences: [] as ProgramMovementPreference[],
+  }));
   const equipPool = availableMovements(input.movements, profile.equipment_inventory)
     .filter((movement) => movement.capability_available !== false);
   // Phase 16: tier gating — a beginner is never PRESCRIBED an Advanced
@@ -421,9 +477,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
     const progIdx = clamp((peakShifted ? week - 2 : week - 1), 0, 2);
     const wmod = SCHEMA_WEEKS[schemaType][progIdx as 0 | 1 | 2];
 
-    for (let dayPos = 0; dayPos < split.length; dayPos++) {
-      const focus = split[dayPos];
-      const dayIndex = spread[dayPos];
+    for (const { focus, day_index: dayIndex, movement_preferences: preferences } of schedule) {
       const patterns = FOCUS_PATTERNS[focus].slice(0, slotBudget);
 
       // Working sets: objective scheme + macro phase + schema row, damped for
@@ -453,7 +507,18 @@ export function generateBlock(input: BlockInput): BlockPlan {
       const usedIds = new Set<number>();
       const slots: PlannedSlotPlan[] = [];
       for (const pattern of patterns) {
-        const m = pickForPattern(pool, pattern, usedIds);
+        const preferred = preferences.find((p) => p.pattern === pattern);
+        const preferredMovement = preferred === undefined
+          ? undefined
+          : pool.find((candidate) => candidate.movement_id === preferred.movement_id
+              && candidate.pattern === pattern && !usedIds.has(candidate.movement_id));
+        const m = preferredMovement ?? pickForPattern(pool, pattern, usedIds);
+        if (preferred !== undefined && preferredMovement === undefined && m !== null) {
+          warnings.add(`${focus}: preferred ${pattern} movement unavailable; safe fallback used`);
+        }
+        if (preferred !== undefined && preferredMovement === undefined && m === null) {
+          warnings.add(`${focus}: preferred ${pattern} movement unavailable; slot dropped`);
+        }
         if (m === null) {
           // Strictness over substitution, tier included: a pattern the
           // inventory cannot support — or that only exists above the

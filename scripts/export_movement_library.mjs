@@ -31,7 +31,7 @@ const FILES = [
   '025_movement_coaching_content.sql', '026_phase18_session_outcome.sql',
   '027_operational_safeguards.sql', '028_capability_graph.sql',
   '029_routine_history_analytics.sql', '030_readiness_import_integration.sql',
-  '031_planned_session_method.sql', '032_capability_content.sql',
+  '031_planned_session_method.sql', '032_capability_content.sql', '033_goal_program.sql',
 ];
 
 const db = new DatabaseSync(':memory:');

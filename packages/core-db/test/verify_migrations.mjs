@@ -39,7 +39,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql',
   '031_planned_session_method.sql',
-  '032_capability_content.sql'];
+  '032_capability_content.sql',
+  '033_goal_program.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -141,6 +142,34 @@ check('031 preserves the frozen method snapshot after template deletion',
     && methodSnapshot?.routine_template_id === null
     && methodSnapshot?.template_name === 'APRE snapshot',
   JSON.stringify(methodSnapshot));
+
+a.raw.exec(`
+  INSERT INTO training_program
+    (objective, start_date, horizon_kind, requested_review_date, planned_end_date, planned_block_count,
+     starting_macro_block_index, schema_type, status, created_at_ms, updated_at_ms)
+  VALUES ('strength', '2030-01-01', 'weeks', NULL, '2030-01-29', 1, 1, 'LINEAR', 'active', 1, 1);
+  INSERT INTO training_program_day (program_id, day_index, focus) VALUES (1, 1, 'full');
+  INSERT INTO training_program_movement_preference (program_id, day_index, slot_index, pattern, movement_id)
+  SELECT 1, 1, 1, pattern, movement_id FROM movement WHERE pattern = 'squat' ORDER BY movement_id LIMIT 1;
+  INSERT INTO training_block_program (block_id, program_id, sequence_index) VALUES (31000, 1, 1);
+`);
+const programSidecars = a.raw.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM training_program_day WHERE program_id = 1) AS days,
+    (SELECT COUNT(*) FROM training_program_movement_preference WHERE program_id = 1) AS preferences,
+    (SELECT COUNT(*) FROM training_block_program WHERE program_id = 1) AS links
+`).get();
+check('033 stores goal-program days, movement preferences, and explicit block links',
+  programSidecars.days === 1 && programSidecars.preferences === 1 && programSidecars.links === 1,
+  JSON.stringify(programSidecars));
+let secondCurrentRejected = false;
+try {
+  a.raw.exec(`INSERT INTO training_program
+    (objective, start_date, horizon_kind, requested_review_date, planned_end_date, planned_block_count,
+     starting_macro_block_index, schema_type, status, created_at_ms, updated_at_ms)
+    VALUES ('gpp', '2030-01-01', 'weeks', NULL, '2030-01-29', 1, 1, 'LINEAR', 'review_due', 2, 2)`);
+} catch { secondCurrentRejected = true; }
+check('033 enforces only one active or review-due program', secondCurrentRejected);
 
 runMigrations(a, MIGRATIONS); // second boot
 check('re-boot is a no-op (idempotent)', uv(a) === MIGRATIONS.length);

@@ -37,6 +37,7 @@ import {
 import { loadRegistry, saveRegistry } from './athleteRegistry';
 import {
   buildPatternWindow,
+  addDaysIso,
   composeRoutine,
   computeSubstitutions,
   DEFAULT_PROFILE,
@@ -48,6 +49,8 @@ import {
   generateBlock,
   historyContentFingerprint,
   parseHistoryImport,
+  defaultProgramDayIndices,
+  programFocuses,
   OBJECTIVES,
   PROGRESSION_METHODS,
   TRAINING_AGES,
@@ -71,6 +74,8 @@ import {
   type RoutineRole,
   type DifficultyRating,
   type Embedder,
+  type BlockPlan,
+  type ProgramDayPreference,
   type FutureSlot,
   type GeneratorMovement,
   type Guardrail,
@@ -352,6 +357,56 @@ export interface TodayPlan {
   slots: TodaySlot[];
 }
 
+export interface TrainingProgramMovementPreference {
+  dayIndex: number;
+  slotIndex: number;
+  pattern: MovementPattern;
+  movementId: number;
+}
+
+export interface TrainingProgramDay {
+  dayIndex: number;
+  focus: string;
+}
+
+export interface TrainingProgram {
+  programId: number;
+  objective: UserProfile['objective'];
+  startDate: string;
+  horizonKind: 'weeks' | 'date';
+  requestedReviewDate: string | null;
+  plannedEndDate: string;
+  plannedBlockCount: number;
+  startingMacroBlockIndex: number;
+  schemaType: SchemaType;
+  status: 'active' | 'review_due' | 'archived';
+  currentSequenceIndex: number;
+  days: TrainingProgramDay[];
+  movementPreferences: TrainingProgramMovementPreference[];
+}
+
+export type TrainingProgramHorizon =
+  | { kind: 'weeks'; blockCount: number }
+  | { kind: 'date'; requestedReviewDate: string };
+
+export interface TrainingProgramInput {
+  horizon: TrainingProgramHorizon;
+  schemaType: SchemaType;
+  dayIndices: number[];
+  movementPreferences?: TrainingProgramMovementPreference[];
+}
+
+export interface TrainingProgramPreview {
+  objective: UserProfile['objective'];
+  startDate: string;
+  requestedReviewDate: string | null;
+  plannedEndDate: string;
+  plannedBlockCount: number;
+  schemaType: SchemaType;
+  days: TrainingProgramDay[];
+  plan: BlockPlan;
+}
+
 export interface RoutineTemplateSlot {
   routineTemplateSlotId: number;
   routineTemplateId: number;
@@ -434,6 +489,7 @@ interface KineticsStore {
   blockSessions: BlockSessionSummary[];
   todayPlan: TodayPlan | null;
   hasArchivedBlock: boolean;
+  program: TrainingProgram | null;
   routineTemplates: RoutineTemplate[];
   /** Absolute 1RMs by movement_id (one_rep_max rows). */
   oneRepMaxes: Record<number, number>;
@@ -465,6 +521,13 @@ interface KineticsStore {
    *  SQLite transaction). Deterministic: profile + equipment + schema +
    *  macro position + today. Continues the 32-week macro-cycle. */
   generateNewBlock: (schemaType?: SchemaType) => void;
+  previewTrainingProgram: (input: TrainingProgramInput) => TrainingProgramPreview;
+  createTrainingProgram: (input: TrainingProgramInput) => boolean;
+  updateProgramPreferences: (input: TrainingProgramInput) => boolean;
+  previewNextProgramBlock: () => BlockPlan | null;
+  continueTrainingProgram: () => void;
+  archiveTrainingProgram: () => void;
+  refreshProgram: () => void;
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
@@ -1450,6 +1513,80 @@ const latestLoadMap = (d: DB): Record<number, number> => {
     rows.filter((row) => row.load_kg !== null).map((row) => [row.movement_id, row.load_kg as number]),
   );
 };
+interface PendingProgramCreation {
+  input: TrainingProgramInput;
+  preview: TrainingProgramPreview;
+  programDays: ProgramDayPreference[];
+}
+
+let pendingProgramCreation: PendingProgramCreation | null = null;
+
+interface PendingProgramContinuation {
+  programId: number;
+  sequenceIndex: number;
+  plannedEndDate: string;
+  programDays: ProgramDayPreference[];
+  weeklyFrequency: number;
+  objective: UserProfile['objective'];
+}
+
+let pendingProgramContinuation: PendingProgramContinuation | null = null;
+const isoUtcMs = (value: string): number => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('Review date must use YYYY-MM-DD.');
+  const [y, m, day] = value.split('-').map(Number);
+  const ms = Date.UTC(y, m - 1, day);
+  if (new Date(ms).toISOString().slice(0, 10) !== value) throw new Error('Review date is not valid.');
+  return ms;
+};
+
+const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput, startDate: string) => {
+  const selected = [...new Set(input.dayIndices)].sort((a, b) => a - b);
+  if (selected.length < 1 || selected.length > 7
+      || selected.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
+    throw new Error('Choose between one and seven training days.');
+  }
+  let plannedBlockCount: number;
+  let requestedReviewDate: string | null = null;
+  if (input.horizon.kind === 'weeks') {
+    plannedBlockCount = input.horizon.blockCount;
+    if (!Number.isInteger(plannedBlockCount) || plannedBlockCount < 1 || plannedBlockCount > 8) {
+      throw new Error('Choose a review horizon from 4 to 32 weeks.');
+    }
+  } else {
+    requestedReviewDate = input.horizon.requestedReviewDate;
+    const daysAway = Math.floor((isoUtcMs(requestedReviewDate) - isoUtcMs(startDate)) / 86400000);
+    if (daysAway < 28 || daysAway > 224) throw new Error('Review date must be 4 to 32 weeks away.');
+    plannedBlockCount = Math.ceil(daysAway / 28);
+  }
+  const focuses = programFocuses(profile.objective, selected.length);
+  const days = selected.map((dayIndex, i) => ({ dayIndex, focus: focuses[i] }));
+  const allowedDays = new Set(selected);
+  const seenSlots = new Set<string>();
+  const movementPreferences = [...(input.movementPreferences ?? [])].sort(
+    (a, b) => a.dayIndex - b.dayIndex || a.slotIndex - b.slotIndex,
+  );
+  for (const preference of movementPreferences) {
+    const key = `${preference.dayIndex}:${preference.slotIndex}`;
+    if (!allowedDays.has(preference.dayIndex) || !Number.isInteger(preference.slotIndex)
+        || preference.slotIndex < 1 || preference.slotIndex > 5 || seenSlots.has(key)) {
+      throw new Error('A movement preference points to an invalid program slot.');
+    }
+    seenSlots.add(key);
+  }
+  const programDays: ProgramDayPreference[] = days.map((day) => ({
+    day_index: day.dayIndex,
+    focus: day.focus as ProgramDayPreference['focus'],
+    movement_preferences: movementPreferences.filter((p) => p.dayIndex === day.dayIndex).map((p) => ({
+      slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
+    })),
+  }));
+  return {
+    requestedReviewDate, plannedBlockCount,
+    plannedEndDate: addDaysIso(startDate, plannedBlockCount * 28),
+    days, movementPreferences, programDays,
+  };
+};
+
 /** Everything per-athlete in the store, cleared on a Coach Mode file swap so
  *  nothing bleeds across athletes (the re-boot re-hydrates all of it from the
  *  target file). `onboarded: true` here is the no-flash default; boot() then
@@ -1458,7 +1595,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   vector: null, trend: [], session: null, prescription: null,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
-  block: null, blockMeta: null, blockSessions: [], todayPlan: null, routineTemplates: [],
+  block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [],
   oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), bandLadder: [], onboarded: true,
 };
 
@@ -1491,6 +1628,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   blockSessions: [],
   todayPlan: null,
   hasArchivedBlock: false,
+  program: null,
   routineTemplates: [],
   oneRepMaxes: {},
   lastLoggedLoads: {},
@@ -1576,6 +1714,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().refreshBandLadder();
       // The block lives only in SQLite; the store is a read surface over it.
       get().refreshBlock();
+      get().refreshProgram();
       get().loadRoutineTemplates();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
@@ -1867,6 +2006,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('UPDATE profile_slot SET is_active = CASE WHEN slot_id = ? THEN 1 ELSE 0 END', [slotId]);
       persistProfileFields(d, loaded);
       runBlockWipe(d, localToday());
+      d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE status IN ('active','review_due')", [Date.now()]);
       d.executeSync('COMMIT');
     } catch (e) {
       d.executeSync('ROLLBACK');
@@ -1875,7 +2015,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
     set({
       profile: loaded,
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+      block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
       niggles: [], lastTriage: null,
     });
     get().refreshProfileSlots();
@@ -1883,6 +2023,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshBandLadder();
     get().refreshNiggles();
     get().refreshBlock();
+    get().refreshProgram();
     get().refreshVector();
     get().computePrescription([]);
   },
@@ -1896,6 +2037,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     d.executeSync('BEGIN');
     try {
       runBlockWipe(d, localToday());
+      d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE status IN ('active','review_due')", [Date.now()]);
       d.executeSync('COMMIT');
     } catch (e) {
       d.executeSync('ROLLBACK');
@@ -1905,9 +2047,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // Clear EVERY piece of UI state derived from the wiped rows (audit: stale
     // prescription/substitution/plan state survived the wipe). profileNotes are
     // NOT cleared — athlete_profile is intentionally preserved by this wipe.
-    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, lastEndedSessionId: null });
+    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, lastEndedSessionId: null });
     get().refreshNiggles();
     get().refreshBlock();
+    get().refreshProgram();
     get().refreshVector();
     get().computePrescription([]);
   },
@@ -2081,18 +2224,82 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // that marks this athlete onboarded on every future boot).
     get().saveProfile(patch);
     set({ onboarded: true });
-    // The questionnaire is the first-block brief. saveProfile publishes the
-    // clamped answers synchronously, so the generator reads the athlete's real
-    // objective, equipment, and weekly frequency. Never replace an existing block.
-    if (get().block === null) get().generateNewBlock('LINEAR');
     void (async () => {
       const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
       if (!(await saveRegistry(reg))) {
+    if (get().session !== null) {
+      throw new Error('End the active session before previewing program changes.');
+    }
         set({ error: 'Athlete name not saved — registry write failed. You can rename them in the ATHLETE tab.' });
         return;
       }
       set({ athletes: reg.athletes });
     })();
+  },
+
+  previewTrainingProgram: (input) => {
+    const { profile, movements, vector, niggles } = get();
+    if (!(['LINEAR', 'WAVE', 'STEP', 'APRE'] as readonly string[]).includes(input.schemaType)) {
+      throw new Error('Choose a training method.');
+    }
+    const planningProfile = get().program === null ? profile
+      : { ...profile, objective: get().program!.objective };
+    const startDate = localToday();
+    const shape = trainingProgramShape(planningProfile, input, startDate);
+    const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
+    for (const preference of shape.movementPreferences) {
+      const movement = byId.get(preference.movementId);
+      if (movement === undefined || movement.pattern !== preference.pattern) {
+        throw new Error('A preferred movement does not match that slot.');
+      }
+    }
+    const d = getDb();
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, niggles),
+    );
+    const genMovements: GeneratorMovement[] = movements.map((m) => ({
+      movement_id: m.movement_id, name: m.name, pattern: m.pattern as MovementPattern,
+      is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,
+      beginner_ok: m.beginnerOk, capability_available: capabilityAvailable.has(m.movement_id),
+    }));
+    const { macroBlockIndex } = nextMacroPosition(d);
+    const effectiveProfile = { ...planningProfile, weekly_frequency: shape.days.length };
+    const plan = generateBlock({
+      profile: effectiveProfile, movements: genMovements, startDate,
+      schemaType: input.schemaType, macroBlockIndex,
+      recentAcwr: vector?.acwr ?? null, programDays: shape.programDays,
+    });
+    return {
+      objective: planningProfile.objective, startDate, requestedReviewDate: shape.requestedReviewDate,
+      plannedEndDate: shape.plannedEndDate, plannedBlockCount: shape.plannedBlockCount,
+      schemaType: input.schemaType, days: shape.days, plan,
+    };
+  },
+
+  createTrainingProgram: (input) => {
+    if (get().session !== null) {
+      set({ error: 'End the active session before creating a program.' });
+      return false;
+    }
+    if (get().block !== null || get().program !== null) {
+      set({ error: 'Archive the current block or program before creating another.' });
+      return false;
+    }
+    try {
+      const preview = get().previewTrainingProgram(input);
+      const shape = trainingProgramShape(get().profile, input, preview.startDate);
+      pendingProgramCreation = { input, preview, programDays: shape.programDays };
+      set({ error: null });
+      get().generateNewBlock(input.schemaType);
+      get().refreshProgram();
+      const created = get().program !== null && get().error === null;
+      pendingProgramCreation = null;
+      return created;
+    } catch (e) {
+      pendingProgramCreation = null;
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
   },
 
   rolloverDay: () => {
@@ -2107,16 +2314,27 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshVector();   // also advances store.today
     get().refreshNiggles();  // yesterday's niggles drop out of the active set
     get().refreshBlock();
+    get().refreshProgram();
     get().computePrescription([]);
   },
 
   generateNewBlock: (schemaType = 'LINEAR') => {
-    const { profile, movements, status, vector } = get();
+    const { profile: storedProfile, movements, status, vector } = get();
+    const pendingFrequency = pendingProgramCreation?.preview.days.length
+      ?? pendingProgramContinuation?.weeklyFrequency;
+    const pendingObjective = pendingProgramCreation?.preview.objective
+      ?? pendingProgramContinuation?.objective;
+    const profile = pendingFrequency === undefined && pendingObjective === undefined ? storedProfile
+      : { ...storedProfile, weekly_frequency: pendingFrequency ?? storedProfile.weekly_frequency, objective: pendingObjective ?? storedProfile.objective };
     if (status !== 'ready') return;
     // Audit A2: regenerating mid-session archives the plan the live session
     // was built from — APRE completion would then read the WRONG plan.
     if (get().session !== null) {
       set({ error: 'End the active session before generating a new block.' });
+      return;
+    }
+    if (get().program?.status === 'active' && pendingProgramContinuation === null && pendingProgramCreation === null) {
+      set({ error: 'Review and confirm the next program block before starting it.' });
       return;
     }
     const d = getDb();
@@ -2216,10 +2434,49 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       schemaType,
       macroBlockIndex,
       recentAcwr: vector !== null ? vector.acwr : null,
+      programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
       flawReport,
     });
     d.executeSync('BEGIN');
     try {
+      let programId: number | null = pendingProgramContinuation?.programId ?? null;
+      const programDraft = pendingProgramCreation;
+      if (programDraft !== null) {
+        const now = Date.now();
+        d.executeSync(
+          `INSERT INTO training_program
+             (objective, start_date, horizon_kind, requested_review_date, planned_end_date,
+              planned_block_count, starting_macro_block_index, schema_type, status, created_at_ms, updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+          [profile.objective, programDraft.preview.startDate, programDraft.input.horizon.kind,
+            programDraft.preview.requestedReviewDate, programDraft.preview.plannedEndDate,
+            programDraft.preview.plannedBlockCount, plan.macroBlockIndex, schemaType, now, now],
+        );
+        programId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        for (const day of programDraft.preview.days) {
+          d.executeSync(
+            'INSERT INTO training_program_day (program_id, day_index, focus) VALUES (?, ?, ?)',
+            [programId, day.dayIndex, day.focus],
+          );
+        }
+        for (const preference of programDraft.input.movementPreferences ?? []) {
+          d.executeSync(
+            `INSERT INTO training_program_movement_preference
+               (program_id, day_index, slot_index, pattern, movement_id) VALUES (?, ?, ?, ?, ?)`,
+            [programId, preference.dayIndex, preference.slotIndex, preference.pattern, preference.movementId],
+          );
+        }
+        d.executeSync(
+          'UPDATE athlete_profile SET weekly_frequency = ?, updated_at_ms = ? WHERE profile_id = 1',
+          [programDraft.preview.days.length, now],
+        );
+      }
+      if (pendingProgramContinuation !== null) {
+        d.executeSync(
+          'UPDATE training_program SET planned_end_date = ?, updated_at_ms = ? WHERE program_id = ? AND status = ?',
+          [pendingProgramContinuation.plannedEndDate, Date.now(), pendingProgramContinuation.programId, 'active'],
+        );
+      }
       d.executeSync(
         "UPDATE training_block SET status = 'archived' WHERE status = 'active'",
       );
@@ -2230,6 +2487,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       const blockId = rowsOf<{ id: number }>(
         d.executeSync('SELECT last_insert_rowid() AS id'),
       )[0]!.id;
+      if (programId !== null) {
+        d.executeSync(
+          'INSERT INTO training_block_program (block_id, program_id, sequence_index) VALUES (?, ?, ?)',
+          [blockId, programId, pendingProgramContinuation?.sequenceIndex ?? 1],
+        );
+      }
       d.executeSync(
         'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
         [blockId, plan.macroBlockIndex, plan.macroPhase, plan.schemaType, plan.peakShifted ? 1 : 0],
@@ -2272,7 +2535,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
+    if (pendingFrequency !== undefined) set({ profile });
     get().refreshBlock();
+    get().refreshProgram();
   },
 
   refreshBlock: () => {
@@ -2367,6 +2632,196 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       blockSessions,
       todayPlan,
     });
+  },
+
+  refreshProgram: () => {
+    const d = getDb();
+    const row = rowsOf<{
+      program_id: number; objective: string; start_date: string; horizon_kind: 'weeks' | 'date';
+      requested_review_date: string | null; planned_end_date: string; planned_block_count: number;
+      starting_macro_block_index: number; schema_type: SchemaType;
+      status: 'active' | 'review_due' | 'archived'; current_sequence_index: number;
+    }>(d.executeSync(
+      `SELECT tp.*, COALESCE(MAX(tbp.sequence_index), 0) AS current_sequence_index
+         FROM training_program tp
+         LEFT JOIN training_block_program tbp ON tbp.program_id = tp.program_id
+        WHERE tp.status IN ('active','review_due')
+        GROUP BY tp.program_id
+        ORDER BY tp.program_id DESC LIMIT 1`,
+    ))[0];
+    if (row === undefined) {
+      set({ program: null });
+      return;
+    }
+    const days = rowsOf<{ day_index: number; focus: string }>(d.executeSync(
+      'SELECT day_index, focus FROM training_program_day WHERE program_id = ? ORDER BY day_index',
+      [row.program_id],
+    )).map((day) => ({ dayIndex: day.day_index, focus: day.focus }));
+    const movementPreferences = rowsOf<{
+      day_index: number; slot_index: number; pattern: MovementPattern; movement_id: number;
+    }>(d.executeSync(
+      `SELECT day_index, slot_index, pattern, movement_id
+         FROM training_program_movement_preference
+        WHERE program_id = ? ORDER BY day_index, slot_index`,
+      [row.program_id],
+    )).map((preference) => ({
+      dayIndex: preference.day_index, slotIndex: preference.slot_index,
+      pattern: preference.pattern, movementId: preference.movement_id,
+    }));
+    set({ program: {
+      programId: row.program_id, objective: row.objective as UserProfile['objective'], startDate: row.start_date,
+      horizonKind: row.horizon_kind, requestedReviewDate: row.requested_review_date,
+      plannedEndDate: row.planned_end_date, plannedBlockCount: row.planned_block_count,
+      startingMacroBlockIndex: row.starting_macro_block_index, schemaType: row.schema_type,
+      status: row.status, currentSequenceIndex: row.current_sequence_index, days, movementPreferences,
+    } });
+  },
+
+  updateProgramPreferences: (input) => {
+    const current = get().program;
+    if (get().session !== null) {
+      set({ error: 'End the active session before managing the program.' });
+      return false;
+    }
+    if (current === null || current.status !== 'active') {
+      set({ error: 'No active program to manage.' });
+      return false;
+    }
+    try {
+      const preview = get().previewTrainingProgram(input);
+      if (preview.plannedBlockCount < current.currentSequenceIndex) {
+        throw new Error('The horizon cannot remove a block already started.');
+      }
+      const d = getDb();
+      const now = Date.now();
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync(
+          `UPDATE training_program SET horizon_kind = ?, requested_review_date = ?, planned_end_date = ?,
+             planned_block_count = ?, schema_type = ?, updated_at_ms = ?
+           WHERE program_id = ? AND status = 'active'`,
+          [input.horizon.kind, preview.requestedReviewDate, preview.plannedEndDate,
+            preview.plannedBlockCount, input.schemaType, now, current.programId],
+        );
+        d.executeSync('DELETE FROM training_program_movement_preference WHERE program_id = ?', [current.programId]);
+        d.executeSync('DELETE FROM training_program_day WHERE program_id = ?', [current.programId]);
+        for (const day of preview.days) {
+          d.executeSync('INSERT INTO training_program_day (program_id, day_index, focus) VALUES (?, ?, ?)',
+            [current.programId, day.dayIndex, day.focus]);
+        }
+        for (const preference of input.movementPreferences ?? []) {
+          d.executeSync(
+            `INSERT INTO training_program_movement_preference
+               (program_id, day_index, slot_index, pattern, movement_id) VALUES (?, ?, ?, ?, ?)`,
+            [current.programId, preference.dayIndex, preference.slotIndex, preference.pattern, preference.movementId],
+          );
+        }
+        d.executeSync('UPDATE athlete_profile SET weekly_frequency = ?, updated_at_ms = ? WHERE profile_id = 1',
+          [preview.days.length, now]);
+        d.executeSync('COMMIT');
+      } catch (e) {
+        d.executeSync('ROLLBACK');
+        throw e;
+      }
+      set({ profile: { ...get().profile, weekly_frequency: preview.days.length }, error: null });
+      get().refreshProgram();
+      return true;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+  },
+
+  previewNextProgramBlock: () => {
+    const current = get().program;
+    const block = get().block;
+    if (current === null || block === null || current.status !== 'active'
+        || localToday() <= addDaysIso(block.startDate, 27)
+        || current.currentSequenceIndex >= current.plannedBlockCount) return null;
+    const input: TrainingProgramInput = {
+      horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
+      schemaType: current.schemaType, dayIndices: current.days.map((day) => day.dayIndex),
+      movementPreferences: current.movementPreferences,
+    };
+    return get().previewTrainingProgram(input).plan;
+  },
+
+  continueTrainingProgram: () => {
+    const current = get().program;
+    const block = get().block;
+    if (get().session !== null) {
+      set({ error: 'End the active session before continuing the program.' });
+      return;
+    }
+    if (current === null || block === null || current.status !== 'active'
+        || localToday() <= addDaysIso(block.startDate, 27)) {
+      set({ error: 'The current block is not ready to continue.' });
+      return;
+    }
+    const d = getDb();
+    if (current.currentSequenceIndex >= current.plannedBlockCount) {
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync("UPDATE training_block SET status = 'archived' WHERE block_id = ?", [block.blockId]);
+        d.executeSync("UPDATE training_program SET status = 'review_due', updated_at_ms = ? WHERE program_id = ?",
+          [Date.now(), current.programId]);
+        d.executeSync('COMMIT');
+      } catch (e) {
+        d.executeSync('ROLLBACK');
+        set({ error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      get().refreshBlock();
+      get().refreshProgram();
+      return;
+    }
+    const programDays: ProgramDayPreference[] = current.days.map((day) => ({
+      day_index: day.dayIndex, focus: day.focus as ProgramDayPreference['focus'],
+      movement_preferences: current.movementPreferences.filter((p) => p.dayIndex === day.dayIndex).map((p) => ({
+        slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
+      })),
+    }));
+    const nextSequence = current.currentSequenceIndex + 1;
+    const remainingBlocks = current.plannedBlockCount - current.currentSequenceIndex;
+    pendingProgramContinuation = {
+      programId: current.programId, sequenceIndex: nextSequence,
+      plannedEndDate: addDaysIso(localToday(), remainingBlocks * 28),
+      objective: current.objective,
+      programDays, weeklyFrequency: current.days.length,
+    };
+    try {
+      set({ error: null });
+      get().generateNewBlock(current.schemaType);
+    } finally {
+      pendingProgramContinuation = null;
+    }
+  },
+
+  archiveTrainingProgram: () => {
+    const current = get().program;
+    if (current === null) return;
+    if (get().session !== null) {
+      set({ error: 'End the active session before archiving the program.' });
+      return;
+    }
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE program_id = ?",
+        [Date.now(), current.programId]);
+      d.executeSync(
+        `UPDATE training_block SET status = 'archived' WHERE block_id IN
+          (SELECT block_id FROM training_block_program WHERE program_id = ?) AND status = 'active'`,
+        [current.programId],
+      );
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    get().refreshBlock();
+    get().refreshProgram();
   },
 
   getMovementAvailabilityVerdicts: () => {
@@ -2573,6 +3028,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   freezeRoutineTemplateToPlannedSession: (routineTemplateId, sessionDate, routineDayIndex = 1) => {
     if (get().session !== null) throw new Error('End the active session before replacing today\'s plan.');
+    if (get().program?.status === 'active') {
+      throw new Error('Standalone routines cannot replace a goal-program block. Manage the program instead.');
+    }
     const d = getDb();
     const today = sessionDate ?? localToday();
     const template = get().routineTemplates.find((candidate) => candidate.routineTemplateId === routineTemplateId);
@@ -4369,6 +4827,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM planned_slot');
       d.executeSync('DELETE FROM planned_session');
       d.executeSync('DELETE FROM block_meta');
+      d.executeSync('DELETE FROM training_program_movement_preference');
+      d.executeSync('DELETE FROM training_program_day');
+      d.executeSync('DELETE FROM training_block_program');
+      d.executeSync('DELETE FROM training_program');
       d.executeSync('DELETE FROM session');
       // Same parent-first rule as set_dose_target.
       d.executeSync('DELETE FROM session_outcome');
@@ -4399,11 +4861,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       lastLoggedLoads: {},
       session: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null,
       prescription: null, substitution: null, lastTriage: null, niggles: [],
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+      block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
       lastEndedSessionId: null,
     });
     get().refreshVector();
     get().refreshBlock();
+    get().refreshProgram();
     get().refreshNiggles();
     return (had?.c ?? 0) > 0;
   },

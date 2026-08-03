@@ -31,7 +31,7 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-  '032_capability_content.sql']) {
+  '032_capability_content.sql', '033_goal_program.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -108,25 +108,69 @@ check(
   /tab === 'coach' && status === 'ready' && \(\s*<BlockScreen/.test(appSrc),
 );
 
-console.log('[onboarding first-block contract]');
+console.log('[onboarding guided-program contract]');
 const onboardingStart = src.indexOf('completeOnboarding: (patch, athleteName) => {');
-const onboardingEnd = src.indexOf('rolloverDay: () => {', onboardingStart);
+const onboardingEnd = src.indexOf('previewTrainingProgram: (input) => {', onboardingStart);
 const onboardingBody = onboardingStart >= 0 && onboardingEnd > onboardingStart
   ? src.slice(onboardingStart, onboardingEnd)
   : '';
 const onboardingSave = onboardingBody.indexOf('get().saveProfile(patch)');
-const onboardingGenerate = onboardingBody.indexOf("get().generateNewBlock('LINEAR')");
 check(
-  'completed questionnaire saves its profile before generating the first block',
-  onboardingSave >= 0 && onboardingGenerate > onboardingSave,
+  'completed questionnaire persists its profile',
+  onboardingSave >= 0,
 );
 check(
-  'completed questionnaire never replaces an existing athlete block',
-  onboardingBody.includes("if (get().block === null) get().generateNewBlock('LINEAR')"),
+  'completed questionnaire does not silently generate a LINEAR block',
+  !onboardingBody.includes('generateNewBlock'),
+);
+check(
+  'fresh onboarded athletes route into explicit guided program setup',
+  appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen />'),
 );
 
 console.log('[planned-session completion contract]');
 const completionSql = statements.find((sql) => sql.includes('END AS completion_status')) ?? '';
+
+console.log('[guided goal-program contract]');
+const shapeStart = src.indexOf('const trainingProgramShape =');
+const shapeEnd = src.indexOf('/** Everything per-athlete', shapeStart);
+const shapeBody = src.slice(shapeStart, shapeEnd);
+check('date horizon rejects under 4 and over 32 weeks and rounds up to a complete block boundary',
+  shapeBody.includes('daysAway < 28 || daysAway > 224')
+    && shapeBody.includes('Math.ceil(daysAway / 28)')
+    && shapeBody.includes('plannedBlockCount * 28'),
+);
+const createStart = src.indexOf('createTrainingProgram: (input) => {');
+const createEnd = src.indexOf('rolloverDay: () => {', createStart);
+const createBody = src.slice(createStart, createEnd);
+check('program creation refuses active sessions and existing blocks/programs',
+  createBody.includes('get().session !== null')
+    && createBody.includes('get().block !== null || get().program !== null'),
+);
+const generatorStart = src.indexOf('generateNewBlock: (schemaType =');
+const generatorEnd = src.indexOf('refreshBlock:', generatorStart);
+const generatorBody = src.slice(generatorStart, generatorEnd);
+check('first program, preferences, weekly frequency, first block, and link share one transaction',
+  generatorBody.includes("d.executeSync('BEGIN')")
+    && generatorBody.includes('INSERT INTO training_program')
+    && generatorBody.includes('INSERT INTO training_program_day')
+    && generatorBody.includes('INSERT INTO training_program_movement_preference')
+    && generatorBody.includes('UPDATE athlete_profile SET weekly_frequency')
+    && generatorBody.includes('INSERT INTO training_block_program')
+    && generatorBody.includes("d.executeSync('COMMIT')"),
+);
+const updateStart = src.indexOf('updateProgramPreferences: (input) => {');
+const updateEnd = src.indexOf('previewNextProgramBlock:', updateStart);
+const updateBody = src.slice(updateStart, updateEnd);
+check('future preference edits never write current or historical block tables',
+  !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(training_block|block_meta|planned_session|planned_slot)\b/i.test(updateBody),
+);
+check('program continuation is confirmation-only and refuses an active session',
+  src.includes('previewNextProgramBlock: () =>')
+    && src.includes('continueTrainingProgram: () =>')
+    && src.includes('End the active session before continuing the program.'),
+);
+
 check(
   'planned completion is joined through exact session_origin provenance and immutable session_outcome',
   completionSql.includes('so.source_planned_session_id = ps.planned_session_id')
@@ -232,9 +276,11 @@ const gnb = stripComments(gnbRaw);
 a('generateNewBlock body located', gnb.length > 0);
 a('IMMUTABILITY: generateNewBlock writes NO past/raw table (session/set_record/set_prefix/mech_daily/niggle/state_vector)',
   !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(session|set_record|set_prefix|set_target|mech_daily|niggle|state_vector)\b/i.test(gnb));
-a('the ONLY write targets are training_block / block_meta / planned_session / planned_slot / planned_slot_target',
+a('the ONLY write targets are forward plan/program tables plus weekly frequency',
   [...gnb.matchAll(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi)]
-    .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot', 'planned_slot_target'].includes(m[1])));
+    .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot', 'planned_slot_target',
+      'training_program', 'training_program_day', 'training_program_movement_preference',
+      'training_block_program', 'athlete_profile'].includes(m[1])));
 const hyd = stripComments((() => { const i = gnbRaw.indexOf('autopilot hydration'); const j = gnbRaw.indexOf('generateBlock({'); return i >= 0 && j > i ? gnbRaw.slice(i, j) : ''; })());
 a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match(/GROUP BY s\.session_date, m\.pattern/g) || []).length === 1);
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
@@ -350,7 +396,7 @@ if (resetTables.length >= 15) {
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-    '032_capability_content.sql'
+    '032_capability_content.sql', '033_goal_program.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.

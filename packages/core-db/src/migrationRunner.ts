@@ -81,6 +81,10 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'import_readiness_daily' },     // 029
   { type: 'view', name: 'v_readiness_inputs' },          // 030
   { type: 'table', name: 'planned_session_method' },     // 031
+  { type: 'table', name: 'training_program' },          // 033
+  { type: 'table', name: 'training_program_day' },      // 033
+  { type: 'table', name: 'training_program_movement_preference' }, // 033
+  { type: 'table', name: 'training_block_program' },    // 033
 ];
 
 function userVersion(db: MigrationDb): number {

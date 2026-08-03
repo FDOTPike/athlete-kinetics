@@ -41,6 +41,7 @@ const schemaFiles = [
   '030_readiness_import_integration.sql',
   '031_planned_session_method.sql',
   '032_capability_content.sql',
+  '033_goal_program.sql',
 ];
 
 for (const f of schemaFiles) {
@@ -299,8 +300,8 @@ check('both block_meta writers share one macro-continuation helper', () => {
   // One reader, one increment, one place to change it.
   assert.ok(storeSource.includes('const nextMacroPosition = (d: DB)'),
     'nextMacroPosition helper must exist');
-  assert.equal((storeSource.match(/nextMacroPosition\(d\)/g) ?? []).length, 2,
-    'exactly two callers: generateNewBlock and the routine-template freeze');
+  assert.equal((storeSource.match(/nextMacroPosition\(d\)/g) ?? []).length, 3,
+    'exactly three callers: program preview, block generation, and routine-template freeze');
   assert.equal((storeSource.match(/SELECT macro_block_index FROM block_meta/g) ?? []).length, 1,
     'the continuation query must live in exactly one place');
   assert.ok(!storeSource.includes("[blockId, 1, 'gpp', template.schemaType, 0]"),
