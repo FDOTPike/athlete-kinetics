@@ -27,7 +27,7 @@ import { DatabaseSync } from 'node:sqlite';
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
   SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
-  programFocuses } = require('./.build/blockGenerator.js');
+  programFocuses, programMacroIndex } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
@@ -910,6 +910,46 @@ console.log('[17] guided goal-program schedule and preference laws');
     dropped.sessions.every((session) => session.slots.every((slot) =>
       noSquatLibrary.find((movement) => movement.movement_id === slot.movement_id)?.pattern !== 'squat'))
       && dropped.warnings.some((warning) => warning.includes('slot dropped')));
+}
+
+// --- [18] guided program macro-cycle ownership ------------------------------
+// Regression gate for AUD-GP-2: a guided program owns its macro progression.
+// Block N of a program starting at `starting` must sit at
+//   ((starting - 1) + (sequence_index - 1)) % 8 + 1
+// NOT at the athlete's global-cycle next position. This is the derivation
+// both preview and committed generation must share.
+console.log('[18] guided program macro-cycle ownership');
+{
+  const expected = (starting, sequenceIndex) =>
+    (((starting - 1) + (sequenceIndex - 1)) % 8) + 1;
+
+  check('programMacroIndex is exported and matches the specification formula',
+    typeof programMacroIndex === 'function'
+      && programMacroIndex(1, 1) === 1 && programMacroIndex(8, 1) === 8
+      && programMacroIndex(1, 8) === 8 && programMacroIndex(8, 8) === 7);
+
+  for (const starting of [6, 7, 8]) {
+    for (let sequenceIndex = 1; sequenceIndex <= 4; sequenceIndex += 1) {
+      const want = expected(starting, sequenceIndex);
+      const got = programMacroIndex(starting, sequenceIndex);
+      check(`program starting at macro ${starting}, block ${sequenceIndex} -> macro ${want}`,
+        got === want);
+    }
+  }
+
+  check('program starting at 6 wraps 6,7,8,1 (volume->peak->peak->gpp)',
+    [1, 2, 3, 4].map((n) => programMacroIndex(6, n)).join(',') === '6,7,8,1');
+
+  check('program starting at 7 wraps 7,8,1,2',
+    [1, 2, 3, 4].map((n) => programMacroIndex(7, n)).join(',') === '7,8,1,2');
+
+  check('program starting at 8 wraps 8,1,2,3',
+    [1, 2, 3, 4].map((n) => programMacroIndex(8, n)).join(',') === '8,1,2,3');
+
+  check('program phases derive from the OWNED index, not the global counter',
+    macroPhaseOf(programMacroIndex(6, 4)) === 'gpp'
+      && macroPhaseOf(programMacroIndex(6, 1)) === 'volume'
+      && macroPhaseOf(programMacroIndex(6, 2)) === 'peak');
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

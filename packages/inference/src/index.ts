@@ -68,6 +68,7 @@ export {
   MACRO_BLOCKS,
   MACRO_TOTAL_WEEKS,
   programFocuses,
+  programMacroIndex,
   macroPhaseOf,
   OVERREACH_ACWR,
   SCHEMA_FATIGUE_COST,

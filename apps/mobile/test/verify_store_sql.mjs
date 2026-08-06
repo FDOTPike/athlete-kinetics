@@ -150,13 +150,11 @@ check('program creation refuses active sessions and existing blocks/programs',
 const generatorStart = src.indexOf('generateNewBlock: (schemaType =');
 const generatorEnd = src.indexOf('refreshBlock:', generatorStart);
 const generatorBody = src.slice(generatorStart, generatorEnd);
-check('first program, preferences, weekly frequency, first block, and link share one transaction',
+check('program creation is transactional and calls the SHARED programTx helpers',
   generatorBody.includes("d.executeSync('BEGIN')")
-    && generatorBody.includes('INSERT INTO training_program')
-    && generatorBody.includes('INSERT INTO training_program_day')
-    && generatorBody.includes('INSERT INTO training_program_movement_preference')
-    && generatorBody.includes('UPDATE athlete_profile SET weekly_frequency')
-    && generatorBody.includes('INSERT INTO training_block_program')
+    && generatorBody.includes('insertTrainingProgram(d, {')
+    && generatorBody.includes('linkTrainingBlockProgram(d, blockId, programId,')
+    && generatorBody.includes('archiveActiveTrainingBlock(d)')
     && generatorBody.includes("d.executeSync('COMMIT')"),
 );
 const updateStart = src.indexOf('updateProgramPreferences: (input) => {');
@@ -169,6 +167,19 @@ check('program continuation is confirmation-only and refuses an active session',
   src.includes('previewNextProgramBlock: () =>')
     && src.includes('continueTrainingProgram: () =>')
     && src.includes('End the active session before continuing the program.'),
+);
+
+console.log('[guided program macro ownership contract]');
+check('program-owned macro index is used in BOTH preview and committed generation',
+  src.includes('programMacroIndex(activeProgram.startingMacroBlockIndex, activeProgram.currentSequenceIndex + 1)')
+    && src.includes('programMacroIndex(pendingProgramContinuation.startingMacroBlockIndex, pendingProgramContinuation.sequenceIndex)'),
+);
+check('continuation carries the program anchor, never re-reads the global cycle',
+  src.includes('startingMacroBlockIndex: current.startingMacroBlockIndex')
+    && src.includes("pendingProgramContinuation.startingMacroBlockIndex"),
+);
+check('standalone block generation still advances the athlete global cycle',
+  src.includes('nextMacroPosition(d).macroBlockIndex'),
 );
 
 check(

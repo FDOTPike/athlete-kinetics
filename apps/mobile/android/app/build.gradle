@@ -76,6 +76,14 @@ android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
+    externalNativeBuild {
+        cmake {
+            // CMake 3.22.1 hits a Windows ninja regeneration loop
+            // ("manifest 'build.ninja' still dirty after 100 tries").
+            // 3.30.x also ships a newer ninja. Installed via sdkmanager.
+            version "3.30.5"
+        }
+    }
 
     namespace "com.athletekinetics"
     defaultConfig {
@@ -84,6 +92,12 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // NOTE: this app module has no own CMake build (no src/main/cpp), so
+        // these arguments affect nothing in this module. The 16 KB alignment
+        // of autolinked native modules is governed by the NDK version pinned
+        // in the root build.gradle — NDK r28+ aligns ELF LOAD segments to
+        // 16 KB by default. Keep the NDK at r28 or newer; do not rely on
+        // app-level flags to reach op-sqlite / onnxruntime-react-native.
     }
     signingConfigs {
         debug {

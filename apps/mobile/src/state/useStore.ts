@@ -19,11 +19,15 @@ import {
   MATERIALIZE_STATE_VECTOR_SQL,
   SPO2_FOLD_SQL,
   SPO2_TRIM_SQL,
+  archiveActiveTrainingBlock,
   closeKineticsDb,
   demoDates,
   generateDemoHistory,
+  insertTrainingProgram,
+  linkTrainingBlockProgram,
   migrate,
   openKineticsDb,
+  updateTrainingProgramEndDate,
   type DemoSql,
 } from '@ak/core-db';
 import {
@@ -60,6 +64,7 @@ import {
   loadCodebase,
   MACRO_BLOCKS,
   macroPhaseOf,
+  programMacroIndex,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
   RED_FLAG_PAIN,
@@ -1524,6 +1529,10 @@ let pendingProgramCreation: PendingProgramCreation | null = null;
 interface PendingProgramContinuation {
   programId: number;
   sequenceIndex: number;
+  /** The program's own anchor macro position (training_program.starting_macro_block_index).
+   *  Carried through so preview and committed generation share the SAME
+   *  program-owned derivation (AUD-GP-2) — never re-read from the global cycle. */
+  startingMacroBlockIndex: number;
   plannedEndDate: string;
   programDays: ProgramDayPreference[];
   weeklyFrequency: number;
@@ -2242,8 +2251,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     if (!(['LINEAR', 'WAVE', 'STEP', 'APRE'] as readonly string[]).includes(input.schemaType)) {
       throw new Error('Choose a training method.');
     }
-    const planningProfile = get().program === null ? profile
-      : { ...profile, objective: get().program!.objective };
+    const activeProgram = get().program;
+    const planningProfile = activeProgram === null ? profile
+      : { ...profile, objective: activeProgram.objective };
     const startDate = localToday();
     const shape = trainingProgramShape(planningProfile, input, startDate);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
@@ -2262,7 +2272,13 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,
       beginner_ok: m.beginnerOk, capability_available: capabilityAvailable.has(m.movement_id),
     }));
-    const { macroBlockIndex } = nextMacroPosition(d);
+    // Program-owned macro position (AUD-GP-2): when a program exists, the
+    // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
+    // the identical derivation committed generation uses. Only a brand-new
+    // program (no program row yet) anchors to the athlete's global position.
+    const macroBlockIndex = activeProgram !== null
+      ? programMacroIndex(activeProgram.startingMacroBlockIndex, activeProgram.currentSequenceIndex + 1)
+      : nextMacroPosition(d).macroBlockIndex;
     const effectiveProfile = { ...planningProfile, weekly_frequency: shape.days.length };
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
@@ -2338,9 +2354,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     const d = getDb();
-    // Macro continuation: the next block advances through the 32-week cycle
-    // (8 positions, wrapping) from wherever the last generated block sat.
-    const { macroBlockIndex } = nextMacroPosition(d);
+    // Macro continuation: STANDALONE blocks advance through the athlete's
+    // GLOBAL 32-week cycle from wherever the last generated block sat. A
+    // guided-program continuation OWNS its macro position (AUD-GP-2): block N
+    // sits at starting_macro_block_index + (N-1) mod 8 — the SAME derivation
+    // the preview used, never the global counter.
+    const macroBlockIndex = pendingProgramContinuation !== null
+      ? programMacroIndex(pendingProgramContinuation.startingMacroBlockIndex, pendingProgramContinuation.sequenceIndex)
+      : nextMacroPosition(d).macroBlockIndex;
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
     const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
@@ -2442,44 +2463,28 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       let programId: number | null = pendingProgramContinuation?.programId ?? null;
       const programDraft = pendingProgramCreation;
       if (programDraft !== null) {
-        const now = Date.now();
-        d.executeSync(
-          `INSERT INTO training_program
-             (objective, start_date, horizon_kind, requested_review_date, planned_end_date,
-              planned_block_count, starting_macro_block_index, schema_type, status, created_at_ms, updated_at_ms)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
-          [profile.objective, programDraft.preview.startDate, programDraft.input.horizon.kind,
-            programDraft.preview.requestedReviewDate, programDraft.preview.plannedEndDate,
-            programDraft.preview.plannedBlockCount, plan.macroBlockIndex, schemaType, now, now],
-        );
-        programId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
-        for (const day of programDraft.preview.days) {
-          d.executeSync(
-            'INSERT INTO training_program_day (program_id, day_index, focus) VALUES (?, ?, ?)',
-            [programId, day.dayIndex, day.focus],
-          );
-        }
-        for (const preference of programDraft.input.movementPreferences ?? []) {
-          d.executeSync(
-            `INSERT INTO training_program_movement_preference
-               (program_id, day_index, slot_index, pattern, movement_id) VALUES (?, ?, ?, ?, ?)`,
-            [programId, preference.dayIndex, preference.slotIndex, preference.pattern, preference.movementId],
-          );
-        }
-        d.executeSync(
-          'UPDATE athlete_profile SET weekly_frequency = ?, updated_at_ms = ? WHERE profile_id = 1',
-          [programDraft.preview.days.length, now],
-        );
+        // Shared production helper (AUD P2): the Node verifier exercises the
+        // SAME function via the compiled core-db build.
+        programId = insertTrainingProgram(d, {
+          objective: profile.objective,
+          startDate: programDraft.preview.startDate,
+          horizonKind: programDraft.input.horizon.kind,
+          requestedReviewDate: programDraft.preview.requestedReviewDate,
+          plannedEndDate: programDraft.preview.plannedEndDate,
+          plannedBlockCount: programDraft.preview.plannedBlockCount,
+          startingMacroBlockIndex: plan.macroBlockIndex,
+          schemaType,
+          days: programDraft.preview.days,
+          movementPreferences: programDraft.input.movementPreferences ?? [],
+          weeklyFrequency: programDraft.preview.days.length,
+          now: Date.now(),
+        });
       }
       if (pendingProgramContinuation !== null) {
-        d.executeSync(
-          'UPDATE training_program SET planned_end_date = ?, updated_at_ms = ? WHERE program_id = ? AND status = ?',
-          [pendingProgramContinuation.plannedEndDate, Date.now(), pendingProgramContinuation.programId, 'active'],
-        );
+        updateTrainingProgramEndDate(d, pendingProgramContinuation.programId,
+          pendingProgramContinuation.plannedEndDate, Date.now());
       }
-      d.executeSync(
-        "UPDATE training_block SET status = 'archived' WHERE status = 'active'",
-      );
+      archiveActiveTrainingBlock(d);
       d.executeSync(
         'INSERT INTO training_block (start_date, objective, created_at_ms) VALUES (?, ?, ?)',
         [plan.start_date, plan.objective, Date.now()],
@@ -2488,10 +2493,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         d.executeSync('SELECT last_insert_rowid() AS id'),
       )[0]!.id;
       if (programId !== null) {
-        d.executeSync(
-          'INSERT INTO training_block_program (block_id, program_id, sequence_index) VALUES (?, ?, ?)',
-          [blockId, programId, pendingProgramContinuation?.sequenceIndex ?? 1],
-        );
+        linkTrainingBlockProgram(d, blockId, programId, pendingProgramContinuation?.sequenceIndex ?? 1);
       }
       d.executeSync(
         'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
@@ -2785,6 +2787,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const remainingBlocks = current.plannedBlockCount - current.currentSequenceIndex;
     pendingProgramContinuation = {
       programId: current.programId, sequenceIndex: nextSequence,
+      startingMacroBlockIndex: current.startingMacroBlockIndex,
       plannedEndDate: addDaysIso(localToday(), remainingBlocks * 28),
       objective: current.objective,
       programDays, weeklyFrequency: current.days.length,

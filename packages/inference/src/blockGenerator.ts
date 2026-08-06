@@ -248,6 +248,18 @@ export const macroPhaseOf = (blockIndex: number): MacroPhase => {
   return phases[Math.floor((Math.min(Math.max(blockIndex, 1), MACRO_BLOCKS) - 1) / 2)];
 };
 
+/** Guided program macro ownership (AUD-GP-2): block N of a goal program
+ *  anchored at `startingMacroBlockIndex` sits at
+ *    ((starting - 1) + (sequence_index - 1)) % 8 + 1
+ *  — the program OWNS its macro progression and does not inherit the
+ *  athlete's global cycle counter at continuation time. Both preview and
+ *  committed generation MUST call this identical derivation so a mid-cycle
+ *  start (e.g. 6,7,8,1) is deterministic and tested, never silent. */
+export const programMacroIndex = (
+  startingMacroBlockIndex: number,
+  sequenceIndex: number,
+): number => (((startingMacroBlockIndex - 1) + (sequenceIndex - 1)) % MACRO_BLOCKS) + 1;
+
 /** Macro-phase modulation applied on top of the objective scheme. */
 const PHASE_MODS: Record<MacroPhase, { reps: number; rpe: number; sets: number }> = {
   gpp: { reps: 2, rpe: -0.5, sets: 0 },

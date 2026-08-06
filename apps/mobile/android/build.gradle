@@ -4,7 +4,7 @@ buildscript {
         minSdkVersion = 26 // Health Connect client floor (was 24)
         compileSdkVersion = 36
         targetSdkVersion = 36
-        ndkVersion = "27.1.12297006"
+        ndkVersion = "28.2.13676358" // r28: aligns native ELF LOAD segments to 16 KB by default (AUD-A16)
         kotlinVersion = "2.1.20"
     }
     repositories {
@@ -19,3 +19,25 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// --- Native dependency pinning (AUD-A16) ------------------------------------
+// The onnxruntime-react-native plugin declares FLOATING Maven coordinates
+// (com.microsoft.onnxruntime:onnxruntime-android:latest.integration@aar,
+// com.facebook.fbjni:fbjni:+). Floating versions break reproducible builds
+// and can silently change native-binary alignment between builds. Force the
+// resolved versions here at the root so every module builds against the
+// pinned artifacts.
+subprojects { subproject ->
+    subproject.configurations.configureEach { configuration ->
+        configuration.resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == "com.microsoft.onnxruntime"
+                && details.requested.name == "onnxruntime-android") {
+                details.useVersion "1.28.0"
+            }
+            if (details.requested.group == "com.facebook.fbjni"
+                && details.requested.name == "fbjni") {
+                details.useVersion "0.7.0"
+            }
+        }
+    }
+}
