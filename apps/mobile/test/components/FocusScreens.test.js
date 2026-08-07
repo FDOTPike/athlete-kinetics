@@ -1,7 +1,9 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
 import BlockScreen from '../../src/screens/BlockScreen';
+import { theme } from '../../src/theme/theme';
 
 let mockState;
 
@@ -253,4 +255,53 @@ test('COACH renders archived block card when block is null and hasArchivedBlock 
   expect(screen.getAllByText('Your previous block had ended.').length).toBeGreaterThanOrEqual(1);
   expect(screen.getAllByText('A short four-week block gives Coach a clear trajectory to follow.').length).toBeGreaterThanOrEqual(1);
   expect(screen.queryByText('A new block was started.')).toBeNull();
+});
+
+test('COACH enforces Law-2 assertion by marking only TODAY with chalk in the trajectory', () => {
+  const planned = baseState().blockSessions[0];
+  mockState = baseState({
+    today: TODAY,
+    blockSessions: [
+      { ...planned, plannedSessionId: 1, dayIndex: 1, sessionDate: TODAY, focus: 'lower' },
+      { ...planned, plannedSessionId: 2, dayIndex: 3, sessionDate: '2026-07-17', focus: 'upper' },
+      { ...planned, plannedSessionId: 3, dayIndex: 5, sessionDate: '2026-07-19', focus: 'full' },
+    ],
+  });
+  render(<BlockScreen />);
+
+  const todayMarker = screen.getByTestId('today-marker');
+  expect(todayMarker).toBeOnTheScreen();
+  expect(screen.queryAllByTestId('today-marker')).toHaveLength(1);
+
+  const todayPressable = screen.getByLabelText(`Week 1, lower session on ${TODAY}`);
+  expect(todayPressable.props.accessibilityState.selected).toBe(true);
+  expect(StyleSheet.flatten(todayPressable.props.style)).toMatchObject({
+    borderLeftColor: theme.color.chalk,
+    borderLeftWidth: 4,
+  });
+
+  const futurePressable1 = screen.getByLabelText('Week 1, upper session on 2026-07-17');
+  expect(futurePressable1.props.accessibilityState.selected).toBe(false);
+  expect(StyleSheet.flatten(futurePressable1.props.style)).not.toMatchObject({
+    borderLeftColor: theme.color.chalk,
+    borderLeftWidth: 4,
+  });
+
+  const futurePressable2 = screen.getByLabelText('Week 1, full session on 2026-07-19');
+  expect(futurePressable2.props.accessibilityState.selected).toBe(false);
+  expect(StyleSheet.flatten(futurePressable2.props.style)).not.toMatchObject({
+    borderLeftColor: theme.color.chalk,
+    borderLeftWidth: 4,
+  });
+});
+
+test('COACH displays SUBSTITUTED badge element when slot load is overridden', () => {
+  const substitutedSlot = { ...todaySlot, overrideLoadKg: 45.0 };
+  mockState = baseState({
+    loadSessionSlots: jest.fn(() => [substitutedSlot]),
+  });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
+
+  expect(screen.getByText('SUBSTITUTED')).toBeOnTheScreen();
 });

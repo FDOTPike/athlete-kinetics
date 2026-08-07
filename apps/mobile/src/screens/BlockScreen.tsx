@@ -485,6 +485,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                                 : ''
                           }`}
                           accessibilityState={{ expanded: isExpanded, selected: isToday }}
+                          testID={isToday ? 'today-marker' : undefined}
                           style={({ pressed }) => [
                             styles.dayMark,
                             cell.completionStatus !== null && styles.dayMarkFinalized,
@@ -534,7 +535,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                           </View>
                         </View>
                         {slot.overrideLoadKg !== null && (
-                          <Chip label="SUBSTITUTED" selected={false} onPress={() => {}} />
+                          <View style={styles.substitutedBadge} accessibilityRole="text">
+                            <Text style={styles.substitutedBadgeText}>SUBSTITUTED</Text>
+                          </View>
                         )}
                       </View>
                     ))}
@@ -1174,5 +1177,17 @@ const styles = StyleSheet.create({
     borderTopColor: theme.color.line,
     paddingTop: theme.space[3],
     gap: theme.space[2],
+  },
+  substitutedBadge: {
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+    paddingHorizontal: theme.space[2],
+    paddingVertical: theme.space[1],
+    backgroundColor: theme.color.ink1,
+  },
+  substitutedBadgeText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
   },
 });

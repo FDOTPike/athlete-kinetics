@@ -23,10 +23,12 @@ import {
 import { theme } from '../theme/theme';
 import { formatTeachingOnlyReason, localToday, useStore, type Movement, type MovementAvailability } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
-import { Chip } from '../components/ui/Chip';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
-import { SecondaryButton } from '../components/ui/SecondaryButton';
-import { Disclosure } from '../components/ui/Disclosure';
+import {
+  Chip,
+  PrimaryButton,
+  SecondaryButton,
+  Disclosure,
+} from '../components/ui';
 
 const FILTER_TYPES = ['All', 'Barbell', 'Dumbbell', 'Bodyweight', 'Beginner', 'Compound'] as const;
 type FilterType = (typeof FILTER_TYPES)[number];
