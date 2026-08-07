@@ -53,6 +53,16 @@ export {
 } from './types';
 export { evaluatePolicy } from './policyReference';
 export {
+  defaultLoadPreference,
+  resolveLoadSelection,
+  transitionLoadPreference,
+  type AdvisoryKind,
+  type LoadPreference,
+  type LoadSelection,
+  type LoadSelectionInput,
+  type LoadSource,
+} from './loadSelection';
+export {
   derivePrescription,
   type DeriveInput,
   type DerivedPrescription,

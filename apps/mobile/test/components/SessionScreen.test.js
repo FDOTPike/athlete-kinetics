@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { targetLoadKg } from '@ak/inference';
 import SessionScreen from '../../src/screens/SessionScreen';
 
 let mockState;
@@ -58,25 +59,69 @@ const runner = (overrides = {}) => ({
   substitutionOfferedForSessionPlanSlotId: null, haltReason: null, skippedSessionPlanSlotIds: [], updatedAtMs: Date.now(),
   ...overrides,
 });
-const state = (overrides = {}) => ({
-  movements: [movement(1, 'First movement'), movement(2, 'Later movement')],
-  session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },
-  sessionPlan: [slot(1, 1), slot(2, 2, 8)], activeSessionPlanSlotId: 1,
-  profile: { training_age: 'beginner', equipment_inventory: [], session_duration_cap_min: 60 },
-  getMovementAvailabilityVerdicts: () => [],
-  oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
-  startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
-  openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
-  reportNiggle: jest.fn(), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
-  runner: runner(), sessionMode: 'guided',
-  uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
-  bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
-  loadSessionOutcome: jest.fn(() => null),
-  dismissOutcome: jest.fn(function() {
-    mockState.lastEndedSessionId = null;
-  }),
-  ...overrides,
-});
+const state = (overrides = {}) => {
+  const base = {
+    movements: [movement(1, 'First movement'), movement(2, 'Later movement')],
+    session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },
+    sessionPlan: [slot(1, 1), slot(2, 2, 8)], activeSessionPlanSlotId: 1,
+    profile: { training_age: 'beginner', equipment_inventory: [], session_duration_cap_min: 60 },
+    getMovementAvailabilityVerdicts: () => [],
+    oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
+    startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
+    openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
+    reportNiggle: jest.fn(), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
+    runner: runner(), sessionMode: 'guided',
+    uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
+    bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
+    loadSessionOutcome: jest.fn(() => null),
+    dismissOutcome: jest.fn(function() {
+      mockState.lastEndedSessionId = null;
+    }),
+    ...overrides,
+  };
+  // Test-side implementation of the store's resolver surface: mirrors
+  // useStore.resolveSlotLoad against the mock state's evidence. The resolver
+  // itself is exhaustively pinned in verify_load_selection.mjs; these tests
+  // assert the SCREEN's behavior per effective source.
+  base.loadPreference = base.loadPreference ?? 'auto';
+  base.resolveSlotLoad = (input) => {
+    const age = base.profile.training_age;
+    const pref = age === 'beginner' ? 'auto' : base.loadPreference;
+    const history = Object.prototype.hasOwnProperty.call(base.lastLoggedLoads, input.movementId)
+      ? base.lastLoggedLoads[input.movementId]
+      : null;
+    const apre = input.overrideLoadKg ?? null;
+    const oneRm = base.oneRepMaxes[input.movementId] ?? null;
+    const derived = !input.bodyweightMode && Number.isInteger(input.targetReps)
+      && input.targetReps > 0 && Number.isFinite(input.targetRpe)
+      && input.targetRpe >= 5 && input.targetRpe <= 10 && oneRm !== null
+      ? targetLoadKg(oneRm, input.targetReps, input.targetRpe)
+      : null;
+    const logged = (base.session?.sets ?? []).filter((s) => s.movement_id === input.movementId);
+    const latestLogged = logged.reduce((latest, candidate) => latest === null || candidate.set_id > latest.set_id ? candidate : latest, null);
+    const currentSessionLoad = latestLogged?.load_kg ?? null;
+    const advisory = apre !== null ? { kg: apre, kind: 'apre' }
+      : derived !== null ? { kg: derived, kind: 'onerm' }
+        : history !== null ? { kg: history, kind: 'history' }
+          : { kg: null, kind: null };
+    if (age === 'beginner') {
+      return history !== null
+        ? { source: 'history', initialLoadKg: history, advisoryKg: null, advisoryKind: null }
+        : { source: 'seeded', initialLoadKg: input.bodyweightMode ? 0 : null, advisoryKg: null, advisoryKind: null };
+    }
+    if (pref === 'manual') {
+      if (logged.length > 0 && currentSessionLoad !== null) {
+        return { source: 'manual', initialLoadKg: currentSessionLoad, advisoryKg: advisory.kg, advisoryKind: advisory.kind };
+      }
+      return { source: 'manual', initialLoadKg: input.bodyweightMode ? 0 : null, advisoryKg: advisory.kg, advisoryKind: advisory.kind };
+    }
+    if (apre !== null) return { source: 'derived', initialLoadKg: apre, advisoryKg: null, advisoryKind: null };
+    if (derived !== null) return { source: 'derived', initialLoadKg: derived, advisoryKg: null, advisoryKind: null };
+    if (history !== null) return { source: 'history', initialLoadKg: history, advisoryKg: null, advisoryKind: null };
+    return { source: 'seeded', initialLoadKg: input.bodyweightMode ? 0 : null, advisoryKg: null, advisoryKind: null };
+  };
+  return base;
+};
 
 beforeEach(() => { mockState = state(); });
 
@@ -90,7 +135,6 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
   const usablePhoneWidth = 411 - 40;
   [
     ['current-reps-stepper', 'Reps', 'Reps 5', '5'],
-    ['current-load-stepper', 'Added kg (0 = bodyweight)', 'Added kg (0 = bodyweight) 0.0', '0.0'],
     ['current-rpe-stepper', 'Actual RPE', 'Actual RPE 8.0', '8.0'],
   ].forEach(([testID, label, accessibilityLabel, expectedValue]) => {
     expect(StyleSheet.flatten(screen.getByTestId(testID).props.style)).toMatchObject({
@@ -109,14 +153,25 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
     expect(decrementStyle.width + valueStyle.minWidth + incrementStyle.width)
       .toBeLessThanOrEqual(usablePhoneWidth);
   });
+
+  // Load is a direct-entry field with ±2.5 adjust controls (four-mode load
+  // selection): label uppercase, adjust buttons at the Stepper's 88pt pads,
+  // and the whole composition fits the phone-width stack.
+  expect(screen.getByTestId('session-load-label').props.children).toBe('ADDED KG (0 = BODYWEIGHT)');
+  const inputStyle = StyleSheet.flatten(screen.getByTestId('session-load-input').props.style);
+  const decStyle = StyleSheet.flatten(screen.getByLabelText('Decrease load by 2.5 kilograms').props.style);
+  const incStyle = StyleSheet.flatten(screen.getByLabelText('Increase load by 2.5 kilograms').props.style);
+  expect(decStyle).toMatchObject({ width: 88, flexShrink: 0 });
+  expect(incStyle).toMatchObject({ width: 88, flexShrink: 0 });
+  expect(decStyle.width + inputStyle.minWidth + incStyle.width).toBeLessThanOrEqual(usablePhoneWidth);
 });
 test('bodyweight load is added weight and never a normal 1RM suggestion', () => {
   mockState = state({ oneRepMaxes: { 1: 100 } });
 
   render(<SessionScreen />);
 
-  expect(screen.getByLabelText('Added kg (0 = bodyweight) 0.0')).toBeOnTheScreen();
-  expect(screen.getByText('0 kg means bodyweight only')).toBeOnTheScreen();
+  expect(screen.getByTestId('session-load-input').props.value).toBe('0.0');
+  expect(screen.getByText('0 kg means bodyweight only. Add weight when you need it.')).toBeOnTheScreen();
 });
 
 test('externally loaded movement keeps its normal load and 1RM suggestion', () => {
@@ -126,12 +181,179 @@ test('externally loaded movement keeps its normal load and 1RM suggestion', () =
       movement(2, 'Later movement'),
     ],
     oneRepMaxes: { 1: 100 },
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
   });
 
   render(<SessionScreen />);
 
-  expect(screen.getByLabelText('Load kg 42.5')).toBeOnTheScreen();
+  expect(screen.getByTestId('session-load-input').props.value).toBe('42.5');
   expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+test('seeded external load stays blank and cannot log until explicitly entered', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('');
+  expect(screen.getByText('First time on this one — pick a weight you could lift about ten times.')).toBeOnTheScreen();
+  expect(screen.getByText('Enter a load to log this set.')).toBeOnTheScreen();
+  expect(screen.getByLabelText(/Log set 1 for First movement, unavailable/).props.accessibilityState.disabled).toBe(true);
+});
+
+test('history auto source prefills the exact latest logged load, including source accessibility copy', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 37.5 },
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('37.5');
+  expect(screen.getByLabelText('Load source. Last logged 37.5 kg')).toBeOnTheScreen();
+});
+
+test('APRE auto source prefills the absolute prescription ahead of other evidence', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'advanced', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'auto',
+    oneRepMaxes: { 1: 100 },
+    lastLoggedLoads: { 1: 37.5 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: 55 }), slot(2, 2, 8)],
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('55.0');
+  expect(screen.getByText('Prescribed 55.0 kg')).toBeOnTheScreen();
+});
+
+test('manual first set shows APRE as advice without prefilling authoritative entry', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'advanced', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+    oneRepMaxes: { 1: 100 },
+    lastLoggedLoads: { 1: 37.5 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: 55 }), slot(2, 2, 8)],
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('');
+  expect(screen.getByLabelText('Load source. Coach suggests 55.0 kg — your entry stands.')).toBeOnTheScreen();
+  expect(screen.getByLabelText(/Log set 1 for First movement, unavailable/).props.accessibilityState.disabled).toBe(true);
+});
+
+test('manual bodyweight initializes identity load 0.0 and remains loggable', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('0.0');
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('manual subsequent set carries the latest actual current-session load', () => {
+  const loggedSets = [
+    { set_id: 20, movement_id: 1, movement_name: 'First movement', set_index: 2, reps: 5, load_kg: 47.5, rpe: 8, tonnage_kg: 237.5, session_plan_slot_id: 1, timeS: null, bandLevel: null },
+    { set_id: 10, movement_id: 1, movement_name: 'First movement', set_index: 1, reps: 5, load_kg: 40, rpe: 8, tonnage_kg: 200, session_plan_slot_id: 1, timeS: null, bandLevel: null },
+  ];
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+    session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: loggedSets },
+    runner: runner({ setIndex: 3, slotSetCounts: [2, 0], loggedSets: 2 }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('47.5');
+  expect(screen.getByText('Your call. The number you enter is what gets logged.')).toBeOnTheScreen();
+});
+
+test('timed work cannot derive from 1RM and uses interval-specific seeded copy', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'], loggingMode: 'time' }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [
+      slot(1, 1, 5, { target: { kind: 'time', seconds: 30 } }),
+      slot(2, 2, 8),
+    ],
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('');
+  expect(screen.getByText('First time on this one — choose a load you can control for the full interval.')).toBeOnTheScreen();
+  expect(screen.queryByText(/Based on your 100\.0 kg 1RM/)).toBeNull();
+});
+
+test('invalid draft is distinct from blank, while explicit zero is valid and loggable', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+
+  expect(screen.queryByTestId('session-load-validation')).toBeNull();
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '12kg');
+  expect(screen.getByLabelText('Load validation. Enter a number, 0 or more.')).toBeOnTheScreen();
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '0');
+  expect(screen.queryByTestId('session-load-validation')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('athlete-entered load survives a rerender and refreshed history evidence', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  const view = render(<SessionScreen />);
+
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '32.5');
+  mockState.lastLoggedLoads = { 1: 80 };
+  view.rerender(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('32.5');
 });
 
 

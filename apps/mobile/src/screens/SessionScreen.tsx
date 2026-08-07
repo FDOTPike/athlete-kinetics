@@ -1,8 +1,8 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { JOINTS, nextUp as nextRunnerWork, targetLoadKg } from '@ak/inference';
-import { formatTeachingOnlyReason, useStore, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { JOINTS, nextUp as nextRunnerWork } from '@ak/inference';
+import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
 import {
@@ -24,6 +24,74 @@ const secondsText = (n: number): string => {
   const min = Math.floor(value / 60);
   const sec = value % 60;
   return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
+};
+
+/** Strict load-draft parsing (Sol audit correction 1): decimal notation only,
+ *  dot or comma separator; rejects trailing garbage, hex, NaN/Infinity text,
+ *  and negatives. An empty/whitespace draft is ABSENT evidence (null), which
+ *  is never coerced to zero. The literal "0" is a valid explicit zero. */
+const LOAD_DRAFT_RE = /^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
+const parseLoadDraft = (text: string): number | null => {
+  const trimmed = text.trim();
+  if (trimmed === '') return null;
+  if (!LOAD_DRAFT_RE.test(trimmed)) return null;
+  const value = Number(trimmed.replace(',', '.'));
+  return Number.isFinite(value) && value >= 0 ? value : null;
+};
+/** True when the draft holds a loggable value (explicit zero included). */
+const isLoadDraftLoggable = (text: string): boolean => parseLoadDraft(text) !== null;
+
+/** Athlete-facing source/advisory copy for the load field (Kimi spec §1a, Sol
+ *  audit corrections 3–6). The effective source comes from the pure resolver;
+ *  this maps it to reviewed copy. An edited value keeps its source — there is
+ *  no fifth "athlete-entered" source. */
+const loadSourceCopy = (
+  sel: LoadSelection,
+  bodyweightMode: boolean,
+  oneRmKg: number | undefined,
+  timedTarget: boolean,
+): string => {
+  if (sel.source === 'manual') {
+    switch (sel.advisoryKind) {
+      case 'apre': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg — your entry stands.`;
+      case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg?.toFixed(1)} kg 1RM — your entry stands.`;
+      case 'history': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
+      default: return 'Your call. The number you enter is what gets logged.';
+    }
+  }
+  if (sel.source === 'history') {
+    return bodyweightMode
+      ? `Last logged ${sel.initialLoadKg?.toFixed(1)} kg added load`
+      : `Last logged ${sel.initialLoadKg?.toFixed(1)} kg`;
+  }
+  // seeded
+  return bodyweightMode
+    ? '0 kg means bodyweight only. Add weight when you need it.'
+    : timedTarget
+      ? 'First time on this one — choose a load you can control for the full interval.'
+      : 'First time on this one — pick a weight you could lift about ten times.';
+};
+
+/** Derived-source copy must distinguish APRE prescription from 1RM
+ *  derivation; the resolver's source alone does not carry that. */
+const loadCopyFor = (
+  sel: LoadSelection,
+  bodyweightMode: boolean,
+  oneRmKg: number | undefined,
+  apreOverrideKg: number | null,
+  timedTarget: boolean,
+): string => {
+  if (sel.source === 'derived') {
+    const hasValidApre = apreOverrideKg !== null
+      && Number.isFinite(apreOverrideKg)
+      && apreOverrideKg >= 0;
+    return hasValidApre
+      ? bodyweightMode
+        ? `Prescribed ${apreOverrideKg.toFixed(1)} kg added load`
+        : `Prescribed ${apreOverrideKg.toFixed(1)} kg`
+      : `Based on your ${oneRmKg?.toFixed(1)} kg 1RM`;
+  }
+  return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget);
 };
 
 const restSecondsFor = (rpe: number, age: string | undefined): number => {
@@ -158,7 +226,7 @@ export default function SessionScreen(): React.JSX.Element {
     movements, session, sessionPlan, activeSessionPlanSlotId, profile, oneRepMaxes,
     lastTriage, substitution, startSession, selectMovementSlot, setMovementPreference,
     openSubstitution, closeSubstitution, applyRegression, applyDaySwap, reportNiggle,
-    logSet, editSet, endSession, runner, sessionMode, uiPreferences, bandLadder, lastLoggedLoads = {},
+    logSet, editSet, endSession, runner, sessionMode, uiPreferences, bandLadder,
     advanceRunnerRest, skipRunnerRest, setRunnerRestOverride, runnerThumbsDown, runnerHalt, lastEndedSessionId,
     loadSessionOutcome, dismissOutcome,
   } = state;
@@ -179,7 +247,12 @@ export default function SessionScreen(): React.JSX.Element {
   const [localRest, setLocalRest] = useState<LocalRest | null>(null);
   const [reps, setReps] = useState(5);
   const [seconds, setSeconds] = useState(30);
-  const [loadKg, setLoadKg] = useState(0);
+  // Load entry is a DRAFT STRING (WO four-mode load selection): "" is absent
+  // evidence (blank), "0" is a valid explicit zero, and the two are never
+  // conflated. Initialized from the resolver per set key; rerenders and
+  // evidence refreshes must never overwrite an athlete-entered draft.
+  const [loadText, setLoadText] = useState('');
+  const [loadInvalid, setLoadInvalid] = useState(false);
   const [rpe, setRpe] = useState(8);
   const [rpeTouched, setRpeTouched] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -233,20 +306,26 @@ export default function SessionScreen(): React.JSX.Element {
   const primaryImplement = currentMovement?.supportedPrefixes[0] ?? 'Bodyweight';
   const bodyweightMode = primaryImplement === 'Bodyweight';
   const loadLabel = bodyweightMode ? 'Added kg (0 = bodyweight)' : 'Load kg';
-  const currentSessionLoad = currentSlot === null
-    ? undefined
-    : session?.sets.find((set) => set.movement_id === currentSlot.movementId)?.load_kg;
-  const lastLoad = currentSlot === null ? undefined : currentSessionLoad ?? lastLoggedLoads[currentSlot.movementId];
-  const rpeTarget = currentSlot?.targetRpe ?? rpe;
-  const oneRmLoad = !bodyweightMode && currentSlot !== null && target?.kind === 'reps' && oneRm !== undefined ? targetLoadKg(oneRm, target.reps, rpeTarget) : null;
-  const suggestedLoad = currentSlot?.overrideLoadKg ?? oneRmLoad ?? lastLoad ?? 0;
-  const loadEvidence = bodyweightMode
-    ? currentSlot?.overrideLoadKg != null
-      ? `Prescribed ${currentSlot.overrideLoadKg.toFixed(1)} kg added load`
-      : lastLoad !== undefined ? `Last logged ${lastLoad.toFixed(1)} kg added load` : '0 kg means bodyweight only'
-    : currentSlot?.overrideLoadKg != null
-      ? `Prescribed ${currentSlot.overrideLoadKg.toFixed(1)} kg`
-      : oneRmLoad !== null ? `Based on your ${oneRm?.toFixed(1)} kg 1RM` : lastLoad !== undefined ? `Last logged ${lastLoad.toFixed(1)} kg` : 'Start light and use target RPE';
+  const loadSelection: LoadSelection | null = currentSlot === null || target === null
+    ? null
+    : state.resolveSlotLoad({
+        movementId: currentSlot.movementId,
+        bodyweightMode,
+        targetReps: target.kind === 'reps' ? target.reps : null,
+        targetRpe: currentSlot.targetRpe ?? rpe,
+        overrideLoadKg: currentSlot.overrideLoadKg,
+        sessionPlanSlotId: currentSlot.sessionPlanSlotId,
+      });
+  const loadEvidence = loadSelection === null
+    ? ''
+    : loadCopyFor(
+        loadSelection,
+        bodyweightMode,
+        oneRm,
+        currentSlot?.overrideLoadKg ?? null,
+        target?.kind === 'time',
+      );
+  const loadLoggable = isLoadDraftLoggable(loadText) && !loadInvalid;
 
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
@@ -270,7 +349,21 @@ export default function SessionScreen(): React.JSX.Element {
     setSeconds(target.kind === 'time' ? target.seconds : 30);
     setRpe(currentSlot.targetRpe ?? 8);
     setRpeTouched(false);
-    setLoadKg(suggestedLoad);
+    // Initialize the load draft ONCE per set key from the resolver output.
+    // null = blank (athlete must choose); 0 = identity/explicit zero. The
+    // resolver's output is intentionally NOT a dependency: rerenders,
+    // preference hydration, and evidence refreshes must never overwrite a
+    // draft the athlete has already entered.
+    const initial = state.resolveSlotLoad({
+      movementId: currentSlot.movementId,
+      bodyweightMode,
+      targetReps: target.kind === 'reps' ? target.reps : null,
+      targetRpe: currentSlot.targetRpe ?? 8,
+      overrideLoadKg: currentSlot.overrideLoadKg,
+      sessionPlanSlotId: currentSlot.sessionPlanSlotId,
+    }).initialLoadKg;
+    setLoadText(initial === null ? '' : initial.toFixed(1));
+    setLoadInvalid(false);
   }, [
     currentSlot?.sessionPlanSlotId,
     currentLogged,
@@ -279,7 +372,6 @@ export default function SessionScreen(): React.JSX.Element {
     target?.kind === 'reps' ? target.reps : target?.seconds,
     currentSlot?.targetRpe,
     currentSlot?.overrideLoadKg,
-    suggestedLoad,
   ]);
 
   const moveLegacyForward = (): void => {
@@ -414,7 +506,14 @@ export default function SessionScreen(): React.JSX.Element {
 
   const logCurrent = (): void => {
     if (currentSlot === null || currentMovement === null || target === null || resting) return;
-    const safeLoad = clamp(Math.round(loadKg * 2) / 2, 0, 500);
+    const parsed = parseLoadDraft(loadText);
+    // Logging an external-load set requires an explicit finite, non-negative
+    // entry; blank is absent evidence and never coerces to zero.
+    if (parsed === null) {
+      setLoadInvalid(loadText.trim() !== '');
+      return;
+    }
+    const safeLoad = clamp(Math.round(parsed / 2.5) * 2.5, 0, 500);
     const safeRpe = rpeTouched ? clamp(Math.round(rpe * 2) / 2, 5, 10) : null;
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
@@ -622,7 +721,26 @@ export default function SessionScreen(): React.JSX.Element {
                         <Text style={styles.currentLabel}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
                         <Text style={styles.movementName}>{movement?.name ?? 'Movement'}</Text>
                         <Text style={styles.targetLine}>Target {targetText(slot)}{slot.targetRpe === null ? '' : ` · RPE ${slot.targetRpe.toFixed(1)}`}</Text>
-                        <Text style={styles.loadEvidence}>{loadEvidence}</Text>
+                        <Text
+                          style={styles.loadEvidence}
+                          testID="session-load-source-line"
+                          accessibilityLabel={`Load source. ${loadEvidence}`}
+                        >
+                          {loadEvidence}
+                        </Text>
+                        {loadInvalid && (
+                          <Text
+                            style={styles.loadEvidence}
+                            testID="session-load-validation"
+                            accessibilityRole="alert"
+                            accessibilityLabel="Load validation. Enter a number, 0 or more."
+                          >
+                            Enter a number, 0 or more.
+                          </Text>
+                        )}
+                        {!loadInvalid && !loadLoggable && (
+                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
+                        )}
 
                         {/* Steppers using the shared primitive */}
                         <View testID="current-set-steppers" style={styles.stepperStack}>
@@ -635,15 +753,69 @@ export default function SessionScreen(): React.JSX.Element {
                             onIncrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n + 5, 5, 3600)) : setReps((n) => clamp(n + 1, 1, 50))}
                             style={styles.sessionStepper}
                           />
-                          <Stepper
-                            testID="current-load-stepper"
-                            repeatOnHold={true}
-                            label={loadLabel}
-                            value={loadKg.toFixed(1)}
-                            onDecrement={() => setLoadKg((n) => clamp(n - 2.5, 0, 500))}
-                            onIncrement={() => setLoadKg((n) => clamp(n + 2.5, 0, 500))}
-                            style={styles.sessionStepper}
-                          />
+                          <View style={styles.loadField}>
+                            <Text style={styles.loadFieldLabel} testID="session-load-label">{loadLabel.toUpperCase()}</Text>
+                            <View style={styles.loadFieldRow}>
+                              <Pressable
+                                testID="session-load-decrease"
+                                onPress={() => {
+                                  const current = parseLoadDraft(loadText);
+                                  if (current === null) return;
+                                  setLoadText(clamp(current - 2.5, 0, 500).toFixed(1));
+                                  setLoadInvalid(false);
+                                }}
+                                disabled={parseLoadDraft(loadText) === null}
+                                accessibilityRole="button"
+                                accessibilityLabel="Decrease load by 2.5 kilograms"
+                                accessibilityState={{ disabled: parseLoadDraft(loadText) === null }}
+                                style={({ pressed }) => [
+                                  styles.loadAdjust,
+                                  pressed && styles.loadAdjustPressed,
+                                  parseLoadDraft(loadText) === null && styles.loadAdjustDisabled,
+                                ]}
+                              >
+                                <Text style={styles.loadAdjustText}>−</Text>
+                              </Pressable>
+                              <TextInput
+                                testID="session-load-input"
+                                style={styles.loadInput}
+                                value={loadText}
+                                onChangeText={(t) => {
+                                  setLoadText(t);
+                                  setLoadInvalid(t.trim() !== '' && parseLoadDraft(t) === null);
+                                }}
+                                keyboardType="numeric"
+                                placeholder="—"
+                                placeholderTextColor={theme.color.textLow}
+                                maxLength={6}
+                                accessibilityLabel={
+                                  loadSelection === null
+                                    ? `${loadLabel} entry`
+                                    : `${bodyweightMode ? 'Added load in kilograms, zero means bodyweight only' : 'Load in kilograms'}. ${loadEvidence}`
+                                }
+                              />
+                              <Pressable
+                                testID="session-load-increase"
+                                onPress={() => {
+                                  const current = parseLoadDraft(loadText);
+                                  if (current === null) return;
+                                  setLoadText(clamp(current + 2.5, 0, 500).toFixed(1));
+                                  setLoadInvalid(false);
+                                }}
+                                disabled={parseLoadDraft(loadText) === null}
+                                accessibilityRole="button"
+                                accessibilityLabel="Increase load by 2.5 kilograms"
+                                accessibilityState={{ disabled: parseLoadDraft(loadText) === null }}
+                                style={({ pressed }) => [
+                                  styles.loadAdjust,
+                                  pressed && styles.loadAdjustPressed,
+                                  parseLoadDraft(loadText) === null && styles.loadAdjustDisabled,
+                                ]}
+                              >
+                                <Text style={styles.loadAdjustText}>+</Text>
+                              </Pressable>
+                            </View>
+                          </View>
                           <Stepper
                             testID="current-rpe-stepper"
                             label="Actual RPE"
@@ -701,7 +873,10 @@ export default function SessionScreen(): React.JSX.Element {
                           label="Log set"
                           onPress={logCurrent}
                           size="log"
-                          accessibilityLabel={`Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`}
+                          disabled={!loadLoggable}
+                          accessibilityLabel={loadLoggable
+                            ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
+                            : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
 
                         {/* Shared Disclosure Primitive */}
@@ -1092,6 +1267,61 @@ const styles = StyleSheet.create({
   sessionStepper: {
     flex: 0,
     width: '100%',
+  },
+  loadField: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  loadFieldLabel: {
+    ...theme.font.eyebrow,
+    fontFamily: theme.font.family,
+    color: theme.color.textMid,
+    marginBottom: theme.space[2],
+  },
+  loadFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  loadAdjust: {
+    // 88pt hit zone, matching the Stepper primitive's ± pads
+    width: 88,
+    height: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink0,
+    flexShrink: 0,
+  },
+  loadAdjustPressed: {
+    backgroundColor: theme.color.ink1,
+  },
+  loadAdjustDisabled: {
+    opacity: 0.45,
+    backgroundColor: theme.color.ink1,
+  },
+  loadAdjustText: {
+    ...theme.font.title,
+    fontFamily: theme.font.family,
+    color: theme.color.textHi,
+    fontWeight: '300',
+  },
+  loadInput: {
+    flex: 1,
+    minWidth: 56,
+    textAlign: 'center',
+    ...theme.font.title,
+    fontFamily: theme.font.family,
+    color: theme.color.textHi,
+    fontVariant: ['tabular-nums'],
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    minHeight: theme.touch.min,
+    marginHorizontal: theme.space[2],
   },
   rpeConfirmation: {
     alignItems: 'center',

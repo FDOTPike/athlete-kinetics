@@ -25,8 +25,11 @@ import {
   EQUIPMENT_PRESETS,
   OBJECTIVES,
   TRAINING_AGES,
+  defaultLoadPreference,
+  transitionLoadPreference,
   type EnergySystem,
   type EquipmentItem,
+  type LoadPreference,
   type Objective,
   type TrainingAge,
   type UserProfile,
@@ -64,6 +67,11 @@ const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
   hybrid: { label: 'MIXED', blurb: 'A blend — the default for most athletes' },
 };
 
+const LOAD_PREFERENCE_COPY: Record<LoadPreference, { label: string; blurb: string }> = {
+  auto: { label: 'COACH SUGGESTS', blurb: 'Targets come from your numbers and history. You can always adjust before logging.' },
+  manual: { label: 'I CHOOSE', blurb: 'You set every load. Coach suggestions appear as reference only.' },
+};
+
 const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
   barbell: 'BARBELL', squat_rack: 'SQUAT RACK', bench: 'BENCH', dumbbells: 'DUMBBELLS',
   kettlebell: 'KETTLEBELL', pullup_bar: 'PULL-UP BAR', nordic_bench: 'NORDIC BENCH',
@@ -80,7 +88,7 @@ const effortBlurb = (rpe: number): string => {
 
 type StepKey =
   | 'welcome' | 'goal' | 'experience' | 'schedule' | 'time' | 'effort'
-  | 'science' | 'body' | 'equipment' | 'summary';
+  | 'loads' | 'science' | 'body' | 'equipment' | 'summary';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -97,16 +105,35 @@ export default function OnboardingScreen(): React.JSX.Element {
   const [injuryText, setInjuryText] = useState('');
   const [mobilityText, setMobilityText] = useState('');
   const [stepIdx, setStepIdx] = useState(0);
+  // Four-mode load selection (WO_FOUR_MODE_LOAD): the durable two-way
+  // preference rides the wizard as draft state and commits in the same
+  // transaction as the profile. `loadPreferenceExplicit` flips true ONLY when
+  // the athlete presses a chip on the loads step — a value that came from a
+  // tier default is not explicit and re-derives on tier change.
+  const [loadPreference, setLoadPreference] = useState<LoadPreference>(defaultLoadPreference(DEFAULT_PROFILE.training_age));
+  const [loadPreferenceExplicit, setLoadPreferenceExplicit] = useState(false);
 
   useSubViewBack(stepIdx > 0, () => setStepIdx((i) => Math.max(0, i - 1)));
 
   const patch = (p: Partial<UserProfile>): void => setDraft((d) => ({ ...d, ...p }));
 
+  const selectTrainingAge = (age: TrainingAge): void => {
+    const prior = draft.training_age;
+    patch({ training_age: age });
+    setLoadPreference((current) => transitionLoadPreference(prior, age, current, loadPreferenceExplicit));
+    if (age === 'beginner') setLoadPreferenceExplicit(false);
+  };
+
+  const chooseLoadPreference = (preference: LoadPreference): void => {
+    setLoadPreference(preference);
+    setLoadPreferenceExplicit(true);
+  };
+
   const steps: StepKey[] = useMemo(
     () =>
       draft.training_age === 'beginner'
         ? ['welcome', 'goal', 'experience', 'schedule', 'time', 'effort', 'body', 'equipment', 'summary']
-        : ['welcome', 'goal', 'experience', 'schedule', 'time', 'effort', 'science', 'body', 'equipment', 'summary'],
+        : ['welcome', 'goal', 'experience', 'schedule', 'time', 'effort', 'loads', 'science', 'body', 'equipment', 'summary'],
     [draft.training_age],
   );
   const step = steps[Math.min(stepIdx, steps.length - 1)];
@@ -128,6 +155,8 @@ export default function OnboardingScreen(): React.JSX.Element {
     completeOnboarding(
       { ...draft, injury_flags: parseNotes(injuryText), mobility_limits: parseNotes(mobilityText) },
       name.trim().length > 0 ? name : 'Athlete 1',
+      loadPreference,
+      loadPreferenceExplicit,
     );
   };
 
@@ -206,7 +235,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 key={a}
                 label={`${AGE_COPY[a].label} — ${AGE_COPY[a].blurb}`}
                 selected={draft.training_age === a}
-                onPress={() => patch({ training_age: a })}
+                onPress={() => selectTrainingAge(a)}
                 accessibilityLabel={`${AGE_COPY[a].label}. ${AGE_COPY[a].blurb}`}
                 style={styles.cardChip}
               />
@@ -274,6 +303,28 @@ export default function OnboardingScreen(): React.JSX.Element {
                 you&apos;ll grow into the rest.
               </Text>
             )}
+          </View>
+        )}
+
+        {step === 'loads' && (
+          <View style={styles.cardGroup} testID="onboarding-loads-step">
+            <Text style={styles.h2}>WHO PICKS THE WEIGHTS?</Text>
+            <Text style={styles.pDim}>
+              You can change this later in the ATHLETE tab when no session is active.
+            </Text>
+            {(['auto', 'manual'] as const).map((p) => (
+              <Chip
+                key={p}
+                testID={p === 'auto' ? 'onboarding-loads-auto' : 'onboarding-loads-manual'}
+                label={`${LOAD_PREFERENCE_COPY[p].label} — ${LOAD_PREFERENCE_COPY[p].blurb}`}
+                selected={loadPreference === p}
+                onPress={() => chooseLoadPreference(p)}
+                accessibilityLabel={p === 'auto'
+                  ? 'Coach suggests. Targets come from your numbers and history.'
+                  : 'I choose. You set every load, with coach suggestions as reference.'}
+                style={styles.cardChip}
+              />
+            ))}
           </View>
         )}
 
@@ -376,6 +427,13 @@ export default function OnboardingScreen(): React.JSX.Element {
               {draft.training_age === 'beginner' && (
                 <Text style={styles.summaryRow}>PROGRAMMING — handled by your coach (auto)</Text>
               )}
+              <Text style={styles.summaryRow} testID="onboarding-summary-loads-row">
+                {draft.training_age === 'beginner'
+                  ? 'LOADS — you choose the first; next time starts from what you logged'
+                  : loadPreference === 'auto'
+                    ? 'LOADS — coach suggests'
+                    : 'LOADS — you choose'}
+              </Text>
             </View>
             <Text style={styles.pDim}>
               Change any of this later in the ATHLETE tab. Your first prescription

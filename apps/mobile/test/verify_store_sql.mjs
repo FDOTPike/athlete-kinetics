@@ -31,7 +31,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-  '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql']) {
+  '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
+  '035_profile_load_preference.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -109,15 +110,22 @@ check(
 );
 
 console.log('[onboarding guided-program contract]');
-const onboardingStart = src.indexOf('completeOnboarding: (patch, athleteName) => {');
+const onboardingStart = src.indexOf('completeOnboarding: (patch, athleteName');
 const onboardingEnd = src.indexOf('previewTrainingProgram: (input) => {', onboardingStart);
 const onboardingBody = onboardingStart >= 0 && onboardingEnd > onboardingStart
   ? src.slice(onboardingStart, onboardingEnd)
   : '';
-const onboardingSave = onboardingBody.indexOf('get().saveProfile(patch)');
+const onboardingSave = onboardingBody.indexOf('persistProfileFields(d, merged)');
 check(
   'completed questionnaire persists its profile',
   onboardingSave >= 0,
+);
+check(
+  'onboarding commits profile, preference, and explicit-choice metadata in one transaction',
+  onboardingBody.includes("d.executeSync('BEGIN')")
+    && onboardingBody.includes('persistLoadPreferenceRow(d, pref, prefExplicit)')
+    && onboardingBody.includes("d.executeSync('COMMIT')")
+    && onboardingBody.includes("d.executeSync('ROLLBACK')"),
 );
 check(
   'completed questionnaire does not silently generate a LINEAR block',
@@ -351,6 +359,8 @@ const resetTables = [...resetBody.matchAll(/DELETE FROM (\w+)'/g)].map((m) => m[
 a('resetTrainingData body found with its unconditional DELETEs', resetTables.length >= 15, `${resetTables.length} tables`);
 a('reset NEVER clears athlete_profile / movement / profile_slot (settings survive)',
   !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
+a('reset NEVER clears the load preference (035) or UI preferences (023) — profile settings survive',
+  !['profile_load_preference', 'profile_ui_preference'].some((t) => resetTables.includes(t)));
 a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',
@@ -419,8 +429,17 @@ if (resetTables.length >= 15) {
     ['boot is single-flight', 'bootInFlight'],
     ['registry write failures surface to the athlete', 'registry write failed'],
     ['time-mode movements enforce seconds at the log boundary', 'is time-based'],
+    ['set logging rejects non-finite or negative load at the store boundary', 'Enter a finite load of 0 kg or more before logging the set.'],
     ['boot resumes an unfinished session (crash recovery)', 'RESUMES it on restart'],
     ['missing readiness vector clears the stale prescription', "vector === null) { set({ prescription: null })"],
+    ['load preference change refuses during an active session', 'End the active session before changing load selection.'],
+    ['beginner can never persist manual load authority', "profile.training_age === 'beginner' && preference !== 'auto'"],
+    ['training-age transitions apply the ratified preference law', 'transitionLoadPreference('],
+    ['missing or malformed preference rows fail to the tier default', 'loadPreferenceFromRow('],
+    ['valid advanced/elite auto preferences survive hydration', "row?.preference === 'auto' || row?.preference === 'manual'"],
+    ['same-as-default explicit choices are persisted independently', 'loadPreferenceExplicit: prefExplicit'],
+    ['current-session carry-forward chooses the latest logged set', 'candidate.set_id > latest.set_id'],
+    ['screens resolve loads through the pure resolver', 'resolveLoadSelection('],
   ];
   for (const [label, needle] of guards) {
     const ok = src.includes(needle);
@@ -450,7 +469,8 @@ if (resetTables.length >= 15) {
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-    '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql'
+    '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
+    '035_profile_load_preference.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.

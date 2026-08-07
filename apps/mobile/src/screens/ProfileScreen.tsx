@@ -173,6 +173,8 @@ export default function ProfileScreen(): React.JSX.Element {
   const saveProfile = useStore((s) => s.saveProfile);
   const uiPreferences = useStore((s) => s.uiPreferences);
   const saveUiPreferences = useStore((s) => s.saveUiPreferences);
+  const loadPreference = useStore((s) => s.loadPreference);
+  const saveLoadPreference = useStore((s) => s.saveLoadPreference);
   const bandLadder = useStore((s) => s.bandLadder);
   const saveBandLevel = useStore((s) => s.saveBandLevel);
   const deleteBandLevel = useStore((s) => s.deleteBandLevel);
@@ -463,6 +465,34 @@ export default function ProfileScreen(): React.JSX.Element {
             />
           ))}
         </View>
+        {profile.training_age !== 'beginner' && (
+          <View testID="profile-load-selection-row">
+            <Text style={[styles.fieldLabel, styles.preferenceLabel]}>LOAD SELECTION</Text>
+            <View style={styles.chipWrap}>
+              <Chip
+                testID="profile-load-pref-auto"
+                label="COACH SUGGESTS"
+                selected={loadPreference === 'auto'}
+                disabled={session !== null}
+                onPress={() => saveLoadPreference('auto')}
+                accessibilityLabel="Coach suggests loads from your numbers and history"
+              />
+              <Chip
+                testID="profile-load-pref-manual"
+                label="I CHOOSE"
+                selected={loadPreference === 'manual'}
+                disabled={session !== null}
+                onPress={() => saveLoadPreference('manual')}
+                accessibilityLabel="You choose every load yourself, with coach suggestions as reference"
+              />
+            </View>
+            <Text style={styles.fieldHint}>
+              {session !== null
+                ? 'Finish the active session before changing load selection.'
+                : 'Coach suggests loads from your numbers and history, or you choose every load yourself. Applies to your next session.'}
+            </Text>
+          </View>
+        )}
         <Text style={styles.fieldHint}>
           Your device accessibility text size is always respected; this adds an optional app preference on top.
         </Text>

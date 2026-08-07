@@ -42,11 +42,12 @@ import m031 from './schema/031_planned_session_method.sql';
 import m032 from './schema/032_capability_content.sql';
 import m033 from './schema/033_goal_program.sql';
 import m034 from './schema/034_autopilot_attribution.sql';
+import m035 from './schema/035_profile_load_preference.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

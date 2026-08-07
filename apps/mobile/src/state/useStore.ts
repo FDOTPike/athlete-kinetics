@@ -123,9 +123,15 @@ import {
   type StateVectorRow,
   type TriageResult,
   type UserProfile,
+  defaultLoadPreference,
+  resolveLoadSelection,
+  transitionLoadPreference,
+  type LoadPreference,
+  type LoadSelection,
 } from '@ak/inference';
 
 export type { MovementAvailability };
+export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
 
 export const REASON_TEXT_MAP: Record<'tier' | 'equipment' | 'safety' | 'capability', string> = {
   tier: 'not for your experience level yet',
@@ -574,6 +580,31 @@ interface KineticsStore {
   refreshUiPreferences: () => void;
   /** Persist one or more utility-first preferences for the active profile slot. */
   saveUiPreferences: (patch: Partial<UiPreferences>) => void;
+  /** Durable four-mode load-selection preference for the active profile slot
+   *  (migration 035). Beginner is always 'auto' — never asked, never stored
+   *  otherwise. */
+  loadPreference: LoadPreference;
+  /** True only when the athlete explicitly selected the current preference.
+   *  Persisted per profile so same-as-default choices survive restart and
+   *  non-beginner tier changes. */
+  loadPreferenceExplicit: boolean;
+  /** Re-read the load preference for the active profile slot. Malformed or
+   *  missing rows fail safely to the tier default. */
+  refreshLoadPreference: () => void;
+  /** The single validated save action for the preference. Rejects changes
+   *  during an active session and rejects manual for beginners. */
+  saveLoadPreference: (preference: LoadPreference) => boolean;
+  /** Pure resolution of the effective load source for a movement/set from the
+   *  durable preference plus evidence. Screens render from this; they never
+   *  re-implement the resolver order. */
+  resolveSlotLoad: (input: {
+    movementId: number;
+    bodyweightMode: boolean;
+    targetReps: number | null;
+    targetRpe: number;
+    overrideLoadKg: number | null;
+    sessionPlanSlotId: number;
+  }) => LoadSelection;
   refreshBandLadder: () => void;
   saveBandLevel: (level: number, label: string) => void;
   deleteBandLevel: (level: number) => void;  /** Re-read the saved profile slots (013) into state. */
@@ -605,8 +636,14 @@ interface KineticsStore {
    *  and best-effort delete their DB file. */
   deleteAthlete: (id: string) => void;
   /** Onboarding completion: persist every answer in ONE save (no partial
-   *  profiles), name the athlete, and enter the app. */
-  completeOnboarding: (patch: Partial<UserProfile>, athleteName: string) => void;
+   *  profiles), name the athlete, and enter the app. The load preference is
+   *  committed in the same SQLite transaction as the profile fields. */
+  completeOnboarding: (
+    patch: Partial<UserProfile>,
+    athleteName: string,
+    loadPreference?: LoadPreference,
+    loadPreferenceExplicit?: boolean,
+  ) => void;
   /** Triage a free-text complaint with a forced 1-10 severity (Phase 12 Step
    *  5). The severity gates the matched guardrail by training age. */
   reportSubjective: (text: string, severity: number) => Promise<void>;
@@ -1088,6 +1125,32 @@ export interface ProfileSlot {
   trainingAge: string;
   isActive: boolean;
 }
+
+/** Read the active slot's durable load preference. Malformed or missing rows
+ *  fail safely to the tier default (WO §5). Beginner is always 'auto'. */
+const loadPreferenceFromRow = (
+  row: { preference: string | null; is_explicit: number | null } | undefined,
+  profile: UserProfile,
+): { preference: LoadPreference; explicit: boolean } => {
+  if (profile.training_age === 'beginner') return { preference: 'auto', explicit: false };
+  const preference = row?.preference === 'auto' || row?.preference === 'manual'
+    ? row.preference
+    : defaultLoadPreference(profile.training_age);
+  return { preference, explicit: row?.is_explicit === 1 };
+};
+
+/** Persist the active slot's preference (035). The upsert creates a missing
+ *  row or updates the existing row; schema CHECKs constrain both domains. */
+const persistLoadPreferenceRow = (d: DB, preference: LoadPreference, explicit: boolean): void => {
+  d.executeSync(
+    `INSERT INTO profile_load_preference (profile_slot_id, preference, is_explicit)
+     SELECT slot_id, ?, ? FROM profile_slot WHERE is_active = 1
+     ON CONFLICT(profile_slot_id) DO UPDATE SET
+       preference = excluded.preference,
+       is_explicit = excluded.is_explicit`,
+    [preference, explicit ? 1 : 0],
+  );
+};
 
 /** Write a profile into the single athlete_profile row (shared by saveProfile
  *  and the profile switch). */
@@ -1615,7 +1678,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
   block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [],
-  oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), bandLadder: [], onboarded: true,
+  oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), loadPreference: 'auto', loadPreferenceExplicit: false, bandLadder: [], onboarded: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -1655,6 +1718,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   biometricsStatus: 'off',
   profileSlots: [],
   uiPreferences: defaultUiPreferences(DEFAULT_PROFILE),
+  loadPreference: 'auto',
+  loadPreferenceExplicit: false,
   bandLadder: [],
   movementPrefixes: [],
   athletes: [],
@@ -1730,6 +1795,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // Saved profile slots (local multi-tenancy).
       get().refreshProfileSlots();
       get().refreshUiPreferences();
+      get().refreshLoadPreference();
       get().refreshBandLadder();
       // The block lives only in SQLite; the store is a read surface over it.
       get().refreshBlock();
@@ -1899,7 +1965,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   saveProfile: (patch) => {
-    const merged: UserProfile = { ...get().profile, ...patch };
+    const prior = get().profile;
+    const merged: UserProfile = { ...prior, ...patch };
     // Clamp numerics to the 006 CHECK domains (UI bugs must never throw).
     merged.weekly_frequency = Math.round(clamp(merged.weekly_frequency, 1, 7));
     merged.max_sessions_per_day = Math.round(clamp(merged.max_sessions_per_day, 1, 3));
@@ -1909,8 +1976,48 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // (the block generator's determinism depends on a stable order).
     const owned = new Set(merged.equipment_inventory);
     merged.equipment_inventory = EQUIPMENT_ITEMS.filter((i) => owned.has(i));
-    persistProfileFields(getDb(), merged);
-    set({ profile: merged });
+    // Training-age transition law (WO_FOUR_MODE_LOAD §2): entering beginner
+    // forces auto; leaving beginner applies the destination default; between
+    // non-beginner tiers the stored explicit choice survives. Beginners never
+    // persist manual regardless of the stored row.
+    let nextLoadPreference = get().loadPreference;
+    let nextLoadPreferenceExplicit = get().loadPreferenceExplicit;
+    if (patch.training_age !== undefined && patch.training_age !== prior.training_age) {
+      nextLoadPreference = transitionLoadPreference(
+        prior.training_age,
+        patch.training_age,
+        get().loadPreference,
+        get().loadPreferenceExplicit,
+      );
+      nextLoadPreferenceExplicit = prior.training_age !== 'beginner'
+        && patch.training_age !== 'beginner'
+        && get().loadPreferenceExplicit;
+    } else if (merged.training_age === 'beginner') {
+      nextLoadPreference = 'auto';
+      nextLoadPreferenceExplicit = false;
+    }
+    const preferenceChanged = nextLoadPreference !== get().loadPreference
+      || nextLoadPreferenceExplicit !== get().loadPreferenceExplicit;
+    const d = getDb();
+    if (preferenceChanged) {
+      d.executeSync('BEGIN');
+      try {
+        persistProfileFields(d, merged);
+        persistLoadPreferenceRow(d, nextLoadPreference, nextLoadPreferenceExplicit);
+        d.executeSync('COMMIT');
+      } catch (e) {
+        d.executeSync('ROLLBACK');
+        set({ error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+    } else {
+      persistProfileFields(d, merged);
+    }
+    set({
+      profile: merged,
+      loadPreference: nextLoadPreference,
+      loadPreferenceExplicit: nextLoadPreferenceExplicit,
+    });
     // Re-derive: profile clamps may have changed the operative prescription.
     if (get().prescription !== null) get().computePrescription([]);
   },
@@ -1973,6 +2080,58 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       ],
     );
     set({ uiPreferences: next });
+  },
+
+  refreshLoadPreference: () => {
+    const row = rowsOf<{ preference: string | null; is_explicit: number | null }>(
+      getDb().executeSync(
+        `SELECT p.preference, p.is_explicit
+         FROM profile_slot s
+         LEFT JOIN profile_load_preference p ON p.profile_slot_id = s.slot_id
+         WHERE s.is_active = 1
+         LIMIT 1`,
+      ),
+    )[0];
+    const loaded = loadPreferenceFromRow(row, get().profile);
+    set({ loadPreference: loaded.preference, loadPreferenceExplicit: loaded.explicit });
+  },
+
+  saveLoadPreference: (preference) => {
+    // WO §2/§5: the preference cannot change during an active session, and a
+    // beginner can never hold manual authority. UI gating is presentation;
+    // this store-side validation is the enforcement.
+    if (get().session !== null) {
+      set({ error: 'End the active session before changing load selection.' });
+      return false;
+    }
+    if (preference !== 'auto' && preference !== 'manual') return false;
+    if (get().profile.training_age === 'beginner' && preference !== 'auto') return false;
+    persistLoadPreferenceRow(getDb(), preference, true);
+    set({ loadPreference: preference, loadPreferenceExplicit: true });
+    return true;
+  },
+
+  resolveSlotLoad: (input) => {
+    const state = get();
+    const latestCurrentSessionSet = state.session?.sets.reduce<LoggedSet | null>(
+      (latest, candidate) => candidate.movement_id === input.movementId
+        && (latest === null || candidate.set_id > latest.set_id)
+        ? candidate
+        : latest,
+      null,
+    ) ?? null;
+    return resolveLoadSelection({
+      trainingAge: state.profile.training_age,
+      preference: state.loadPreference,
+      bodyweightMode: input.bodyweightMode,
+      targetReps: input.targetReps,
+      targetRpe: input.targetRpe,
+      oneRepMaxKg: state.oneRepMaxes[input.movementId] ?? null,
+      overrideLoadKg: input.overrideLoadKg,
+      lastLoggedLoadKg: state.lastLoggedLoads[input.movementId] ?? null,
+      currentSessionLoadKg: latestCurrentSessionSet?.load_kg ?? null,
+      isFirstSet: latestCurrentSessionSet === null,
+    });
   },
 
   refreshBandLadder: () => {
@@ -2039,6 +2198,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     });
     get().refreshProfileSlots();
     get().refreshUiPreferences();
+    get().refreshLoadPreference();
     get().refreshBandLadder();
     get().refreshNiggles();
     get().refreshBlock();
@@ -2238,11 +2398,45 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     })();
   },
 
-  completeOnboarding: (patch, athleteName) => {
-    // ONE atomic save: clamps + persists + stamps updated_at_ms (the trigger
-    // that marks this athlete onboarded on every future boot).
-    get().saveProfile(patch);
-    set({ onboarded: true });
+  completeOnboarding: (patch, athleteName, loadPreference, loadPreferenceExplicit) => {
+    // ONE atomic save: profile fields + load preference commit in a SINGLE
+    // SQLite transaction — no committed state may contain a completed
+    // onboarding profile with the wrong tier default (WO §5). The stamp on
+    // updated_at_ms is what marks this athlete onboarded on every future
+    // boot, so it must land in the same commit.
+    const merged: UserProfile = { ...get().profile, ...patch };
+    merged.weekly_frequency = Math.round(clamp(merged.weekly_frequency, 1, 7));
+    merged.max_sessions_per_day = Math.round(clamp(merged.max_sessions_per_day, 1, 3));
+    merged.session_duration_cap_min = Math.round(clamp(merged.session_duration_cap_min, 15, 240));
+    merged.base_rpe_cap = clamp(Math.round(merged.base_rpe_cap * 2) / 2, 5, 10);
+    const owned = new Set(merged.equipment_inventory);
+    merged.equipment_inventory = EQUIPMENT_ITEMS.filter((i) => owned.has(i));
+    // Beginner is never asked: force auto. Non-beginner uses the athlete's
+    // wizard choice, falling back to the tier default when absent.
+    const pref: LoadPreference = merged.training_age === 'beginner'
+      ? 'auto'
+      : loadPreference ?? defaultLoadPreference(merged.training_age);
+    const prefExplicit = merged.training_age !== 'beginner'
+      && loadPreference !== undefined
+      && (loadPreferenceExplicit ?? true);
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      persistProfileFields(d, merged);
+      persistLoadPreferenceRow(d, pref, prefExplicit);
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    set({
+      profile: merged,
+      loadPreference: pref,
+      loadPreferenceExplicit: prefExplicit,
+      onboarded: true,
+    });
+    if (get().prescription !== null) get().computePrescription([]);
     void (async () => {
       const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
       if (!(await saveRegistry(reg))) {
@@ -4268,6 +4462,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const state = get();
     const s = state.session;
     if (s === null) return;
+    if (!Number.isFinite(loadKg) || loadKg < 0) {
+      set({ error: 'Enter a finite load of 0 kg or more before logging the set.' });
+      return;
+    }
     if (state.lastTriage?.kind === 'matched' && state.lastTriage.directive.halt) {
       set({ error: 'Training is halted. Finish the session before logging more work.' });
       return;

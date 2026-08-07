@@ -41,7 +41,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '031_planned_session_method.sql',
   '032_capability_content.sql',
   '033_goal_program.sql',
-  '034_autopilot_attribution.sql'];
+  '034_autopilot_attribution.sql', '035_profile_load_preference.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -505,6 +505,101 @@ check('self-heal re-apply preserves hybrid objective + custom inventory',
   `${healed.objective} / ${healed.equipment_inventory}`);
 check('self-heal restored the dropped view',
   sentinelsMissing(d).length === 0 && uv(d) === MIGRATIONS.length);
+
+// --- 2i. 035 profile load preference: seeding law, CHECK, cascade, replay ---
+console.log('[2i] 035 profile load preference side-car');
+const prefDb = freshDb();
+runMigrations(prefDb, MIGRATIONS);
+// 013 seeds 4 slots; the slot matching the live athlete_profile.training_age
+// (DEFAULT_PROFILE = beginner) is active; the rest are inactive snapshots.
+const prefRows = Object.fromEntries(prefDb.raw.prepare(
+  `SELECT s.slot_id, s.is_active, json_extract(s.profile_json, '$.training_age') AS age, p.preference, p.is_explicit
+   FROM profile_slot s JOIN profile_load_preference p ON p.profile_slot_id = s.slot_id ORDER BY s.slot_id`,
+).all().map((r) => [r.slot_id, r]));
+check('035 seeds one preference row per profile slot', Object.keys(prefRows).length === 4,
+  JSON.stringify(Object.keys(prefRows)));
+check('035 beginner + intermediate slots seed auto',
+  prefRows[1]?.preference === 'auto' && prefRows[2]?.preference === 'auto',
+  JSON.stringify([prefRows[1]?.preference, prefRows[2]?.preference]));
+check('035 advanced + elite slots seed manual',
+  prefRows[3]?.preference === 'manual' && prefRows[4]?.preference === 'manual',
+  JSON.stringify([prefRows[3]?.preference, prefRows[4]?.preference]));
+check('035 tier-derived seeds are marked non-explicit',
+  Number(prefDb.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference WHERE is_explicit <> 0').get()?.c) === 0);
+// Active slot derives from the LIVE athlete_profile row, not the snapshot:
+// mutate the live profile to elite, drop the side-car, self-heal, and the
+// active slot must re-seed from the live row ('manual') even though its
+// frozen profile_json still says beginner.
+prefDb.executeSync(`UPDATE athlete_profile SET training_age = 'elite' WHERE profile_id = 1`);
+prefDb.executeSync(`UPDATE profile_slot SET is_active = 1 WHERE slot_id = 1`);
+prefDb.executeSync('DROP TABLE profile_load_preference');
+check('035 poison precondition marks the side-car sentinel missing',
+  sentinelsMissing(prefDb).includes('profile_load_preference'));
+runMigrations(prefDb, MIGRATIONS);
+check('035 self-heal restores the table and re-seeds the active slot from the LIVE profile',
+  !sentinelsMissing(prefDb).includes('profile_load_preference')
+    && prefDb.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 1').get()?.preference === 'manual'
+    && uv(prefDb) === MIGRATIONS.length);
+// Upgrade path: a 034-era DB gains the side-car without touching existing rows.
+const upDb035 = freshDb();
+const to034 = MIGRATIONS.slice(0, FILES.indexOf('035_profile_load_preference.sql'));
+// Stage the 034-era state without the runner: the runner's sentinel list
+// already knows 035, so a partial chain would (correctly) fail self-heal.
+for (const m of to034) upDb035.executeSync(m);
+upDb035.executeSync(`PRAGMA user_version = ${to034.length};`);
+runMigrations(upDb035, MIGRATIONS); // the app update ships 035
+upDb035.executeSync(`UPDATE profile_load_preference SET preference = 'manual', is_explicit = 1 WHERE profile_slot_id = 2`);
+check('034 -> 035 upgrade preserves an explicit existing preference (OR IGNORE)',
+  upDb035.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 2').get()?.preference === 'manual'
+    && upDb035.raw.prepare('SELECT is_explicit FROM profile_load_preference WHERE profile_slot_id = 2').get()?.is_explicit === 1
+    && Number(upDb035.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference').get().c) === 4);
+// Replay: re-running the full chain does not rewrite preferences.
+runMigrations(upDb035, MIGRATIONS);
+check('035 replay preserves stored preferences',
+  upDb035.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 2').get()?.preference === 'manual'
+    && upDb035.raw.prepare('SELECT is_explicit FROM profile_load_preference WHERE profile_slot_id = 2').get()?.is_explicit === 1);
+// Poison + self-heal on the upgrade DB: a DROPPED table loses its stored
+// rows, so the rebuild re-derives slot seeds from profile_json (the safe
+// tier-default fallback the WO mandates for missing rows).
+upDb035.executeSync('DROP TABLE profile_load_preference');
+check('035 poison precondition marks the sentinel missing on the upgrade DB',
+  sentinelsMissing(upDb035).includes('profile_load_preference'));
+runMigrations(upDb035, MIGRATIONS);
+check('035 poison/self-heal rebuilds the table (seeds re-derive to tier defaults)',
+  !sentinelsMissing(upDb035).includes('profile_load_preference')
+    && Number(upDb035.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference').get().c) === 4
+    && upDb035.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 2').get()?.preference === 'auto');
+// CHECK rejection: prove the preference domain independently on an EXISTING
+// slot (an unknown slot would only prove the foreign key).
+let badPrefRejected = 0;
+for (const bad of ["'guided'", "NULL", "''"]) {
+  try {
+    prefDb.executeSync(`UPDATE profile_load_preference SET preference = ${bad} WHERE profile_slot_id = 1`);
+  } catch {
+    badPrefRejected += 1;
+  }
+}
+check('035 CHECK rejects non auto|manual on an existing profile slot', badPrefRejected === 3);
+let badExplicitRejected = 0;
+for (const bad of [-1, 2]) {
+  try {
+    prefDb.executeSync(`UPDATE profile_load_preference SET is_explicit = ${bad} WHERE profile_slot_id = 1`);
+  } catch {
+    badExplicitRejected += 1;
+  }
+}
+check('035 CHECK constrains explicit-choice metadata to boolean 0|1', badExplicitRejected === 2);
+let unknownSlotRejected = false;
+try {
+  prefDb.executeSync("INSERT INTO profile_load_preference (profile_slot_id, preference) VALUES (99, 'auto')");
+} catch {
+  unknownSlotRejected = true;
+}
+check('035 foreign key rejects an unknown profile slot', unknownSlotRejected);
+// FK cascade: deleting a slot deletes its preference row.
+prefDb.executeSync('DELETE FROM profile_slot WHERE slot_id = 4');
+check('035 profile-slot delete cascades the preference row',
+  prefDb.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 4').get() === undefined);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

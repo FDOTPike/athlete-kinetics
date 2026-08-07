@@ -5,6 +5,17 @@ import OnboardingScreen from '../../src/screens/OnboardingScreen';
 
 let mockState;
 
+jest.mock('@ak/inference', () => ({
+  ...jest.requireActual('@ak/inference'),
+  defaultLoadPreference: (age) => age === 'advanced' || age === 'elite' ? 'manual' : 'auto',
+  transitionLoadPreference: (from, to, current, explicit) => {
+    if (to === 'beginner') return 'auto';
+    if (from === 'beginner') return to === 'advanced' || to === 'elite' ? 'manual' : 'auto';
+    if (explicit) return current;
+    return to === 'advanced' || to === 'elite' ? 'manual' : 'auto';
+  },
+}));
+
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
   useStore: (selector) => selector(mockState),
@@ -28,17 +39,22 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   let deleteAthleteMock;
   let wipeBlockStateMock;
   let switchProfileMock;
+  let saveLoadPreferenceMock;
 
   beforeEach(() => {
     deleteAthleteMock = jest.fn();
     wipeBlockStateMock = jest.fn();
     switchProfileMock = jest.fn();
+    saveLoadPreferenceMock = jest.fn();
 
     mockState = {
       profile: baseProfile,
       saveProfile: jest.fn(),
       uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
       saveUiPreferences: jest.fn(),
+      loadPreference: 'auto',
+      loadPreferenceExplicit: false,
+      saveLoadPreference: saveLoadPreferenceMock,
       bandLadder: [{ level: 1, label: 'Red Band' }],
       saveBandLevel: jest.fn(),
       deleteBandLevel: jest.fn(),
@@ -163,5 +179,85 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     // Navigate to goal step
     fireEvent.press(screen.getByLabelText('Next'));
     expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
+  });
+
+  test('Profile load selection is editable for non-beginners when no session is active', () => {
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('profile-load-selection-row')).toBeOnTheScreen();
+    expect(screen.getByTestId('profile-load-pref-auto').props.accessibilityState.selected).toBe(true);
+    fireEvent.press(screen.getByTestId('profile-load-pref-manual'));
+    expect(saveLoadPreferenceMock).toHaveBeenCalledWith('manual');
+    expect(screen.getByText(/Applies to your next session\./)).toBeOnTheScreen();
+  });
+
+  test('Profile load selection is disabled during an active session', () => {
+    mockState.session = { sessionId: 10, sets: [] };
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('profile-load-pref-auto').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('profile-load-pref-manual').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByText('Finish the active session before changing load selection.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByTestId('profile-load-pref-manual'));
+    expect(saveLoadPreferenceMock).not.toHaveBeenCalled();
+  });
+
+  test('Profile omits the load-selection choice for beginners', () => {
+    mockState.profile = { ...baseProfile, training_age: 'beginner' };
+    render(<ProfileScreen />);
+    expect(screen.queryByTestId('profile-load-selection-row')).toBeNull();
+  });
+
+  const advance = (count) => {
+    for (let i = 0; i < count; i += 1) fireEvent.press(screen.getByLabelText('Next'));
+  };
+  const retreat = (count) => {
+    for (let i = 0; i < count; i += 1) fireEvent.press(screen.getByLabelText('Back'));
+  };
+
+  test('onboarding omits the load question for beginners and explains first-use history on summary', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    advance(6);
+
+    expect(screen.queryByTestId('onboarding-loads-step')).toBeNull();
+    expect(screen.getByTestId('onboarding-summary-loads-row').props.children)
+      .toBe('LOADS — you choose the first; next time starts from what you logged');
+  });
+
+  test('onboarding preserves an explicit same-as-default choice across non-beginner tier churn', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
+    advance(4);
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
+
+    // Press the already-selected default: this is now an explicit athlete
+    // choice and must survive the destination tier's different default.
+    fireEvent.press(screen.getByTestId('onboarding-loads-auto'));
+    retreat(4);
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    advance(4);
+
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(false);
+  });
+
+  test('onboarding re-defaults a non-explicit preference after a non-beginner tier change', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
+    advance(4);
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
+
+    // No load chip was pressed, so the intermediate auto value is only a
+    // default. Advanced must independently derive its manual default.
+    retreat(4);
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    advance(4);
+
+    expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(false);
   });
 });
