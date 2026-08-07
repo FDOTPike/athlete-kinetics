@@ -40,7 +40,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '030_readiness_import_integration.sql',
   '031_planned_session_method.sql',
   '032_capability_content.sql',
-  '033_goal_program.sql'];
+  '033_goal_program.sql',
+  '034_autopilot_attribution.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -404,6 +405,58 @@ check('026 failure rolls both side-cars and all six triggers back atomically',
 runMigrations(phase18Rollback, MIGRATIONS);
 check('026 retry with the valid migration completes',
   uv(phase18Rollback) === MIGRATIONS.length && sentinelsMissing(phase18Rollback).length === 0);
+
+// --- 2h. 034 autopilot attribution side-car: replay, exact rows, cascade ---
+console.log('[2h] 034 autopilot attribution side-car');
+const attributionDb = freshDb();
+runMigrations(attributionDb, MIGRATIONS);
+attributionDb.executeSync(`
+  INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
+  VALUES (3300, '2030-02-01', 'strength', 1);
+  INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (3301, 3300, 1, 1, 'lower', 'accumulation', '2030-02-01');
+  INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (3301, 3301, 1, 1, 3, 5, 8.0), (3302, 3301, 2, 2, 3, 5, 8.0);
+  INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason)
+  VALUES (3301, -0.5, -1, 'eased');
+`);
+const attributionRow = attributionDb.raw.prepare(
+  'SELECT rpe_delta, set_delta, reason FROM planned_slot_autopilot WHERE planned_slot_id = 3301',
+).get();
+check('034 side-car round-trips the effective per-slot delta',
+  attributionRow?.rpe_delta === -0.5 && attributionRow?.set_delta === -1 && attributionRow?.reason === 'eased',
+  JSON.stringify(attributionRow));
+check('034 untouched slot has no side-car row',
+  Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot WHERE planned_slot_id = 3302').get().c) === 0);
+let invalidAttributionRejected = 0;
+for (const values of [
+  "3302, 1.0, 0, 'raised'",
+  "3302, 0.0, 2, 'raised'",
+  "3302, 0.0, 0, 'unknown'",
+]) {
+  try {
+    attributionDb.executeSync(`INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (${values})`);
+  } catch {
+    invalidAttributionRejected += 1;
+  }
+}
+check('034 rejects out-of-authority deltas and unknown reasons', invalidAttributionRejected === 3);
+attributionDb.executeSync(`PRAGMA user_version = ${FILES.indexOf('034_autopilot_attribution.sql')};`);
+runMigrations(attributionDb, MIGRATIONS);
+check('034 replay preserves the attribution row and exact row count',
+  Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot').get().c) === 1
+    && attributionDb.raw.prepare('SELECT reason FROM planned_slot_autopilot WHERE planned_slot_id = 3301').get()?.reason === 'eased');
+attributionDb.executeSync('DELETE FROM planned_slot WHERE planned_slot_id = 3301');
+check('034 parent delete cascades the side-car and leaves no joined stale row',
+  Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot').get().c) === 0
+    && Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot pa JOIN planned_slot ps USING (planned_slot_id)').get().c) === 0);
+attributionDb.executeSync('DROP TABLE planned_slot_autopilot');
+check('034 poison precondition marks the side-car sentinel missing', sentinelsMissing(attributionDb).includes('planned_slot_autopilot'));
+runMigrations(attributionDb, MIGRATIONS);
+check('034 self-heal restores the side-car table',
+  !sentinelsMissing(attributionDb).includes('planned_slot_autopilot')
+    && uv(attributionDb) === MIGRATIONS.length);
+
 // --- 3. failing migration: fail fast, recover on retry --------------------------
 console.log('[3] failing migration mid-chain (the device "ln" scenario)');
 const c = freshDb();

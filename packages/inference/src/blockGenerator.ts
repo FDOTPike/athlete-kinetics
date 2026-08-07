@@ -15,6 +15,7 @@
  *      (concurrent-training interference damping).
  */
 import type { DifficultyRating, MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
+import { EXPERIENCE_SEVERITY } from './types';
 import { DIFFICULTY_RANK } from './types';
 // Phase 13 Step 4 — the Block Generator Intercept: the generator imports the
 // autopilot controller and applies its forward-looking corrections to the next
@@ -54,6 +55,16 @@ export interface PlannedSlotPlan {
    *  (MOVEMENT_PREFIXES members). TS-only for now — not persisted, not set by
    *  the generator; conditionEngine folds their movement_prefix weights in. */
   applied_prefixes?: readonly MovementPrefix[];
+  /** Durable, plain-language attribution for an effective autopilot change. */
+  autopilotDelta?: AutopilotSlotDelta;
+}
+
+export type AutopilotSlotReason = 'eased' | 'raised' | 'held_safety';
+
+export interface AutopilotSlotDelta {
+  rpe_delta: number;
+  set_delta: number;
+  reason: AutopilotSlotReason;
 }
 
 export interface PlannedSessionPlan {
@@ -403,6 +414,12 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // in the block. Cuts remain applied to every occurrence.
   const positiveRpeApplied = new Set<MovementPattern>();
   const autopilotAdjusted = new Set<MovementPattern>();
+  const globalSafetyOverride = flawReport?.globalGuardrail;
+  const restrictiveGlobalSafety = globalSafetyOverride !== null
+    && globalSafetyOverride !== undefined
+    && (globalSafetyOverride.load_multiplier < 1
+      || globalSafetyOverride.set_delta < 0
+      || globalSafetyOverride.rpe_cap_max < 10);
   const scheme = SCHEMES[profile.objective];
   const phaseMod = PHASE_MODS[macroPhase];
   const frequency = clamp(profile.weekly_frequency, 1, 7);
@@ -555,6 +572,9 @@ export function generateBlock(input: BlockInput): BlockPlan {
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
           : Math.max(1, workingSets - (taxed ? accessoryCut : 0));
         let slotRpe = rpe;
+        const preAutopilotSets = slotSets;
+        const preAutopilotRpe = slotRpe;
+        let autopilotDelta: AutopilotSlotDelta | undefined;
         // Phase 13 Step 4: apply the autopilot's per-pattern correction. Only on
         // NON-deload weeks (the deload is sacred) and not locomotion rounds.
         // dRpe shifts the prescribed effort (re-clamped to [5, base_rpe_cap],
@@ -586,12 +606,31 @@ export function generateBlock(input: BlockInput): BlockPlan {
             autopilotAdjusted.add(m.pattern);
           }
         }
+        const rpeDelta = Math.round((slotRpe - preAutopilotRpe) * 2) / 2;
+        const setDelta = slotSets - preAutopilotSets;
+        if (rpeDelta !== 0 || setDelta !== 0) {
+          const flaw = flawReport?.patterns[m.pattern];
+          const heldForSafety = restrictiveGlobalSafety
+            || flaw?.flawClass === 'caution'
+            || (flaw !== undefined
+              && flaw.maxJointSev >= EXPERIENCE_SEVERITY[profile.training_age].triageMin);
+          autopilotDelta = {
+            rpe_delta: rpeDelta,
+            set_delta: setDelta,
+            reason: heldForSafety
+              ? 'held_safety'
+              : rpeDelta < 0 || setDelta < 0
+                ? 'eased'
+                : 'raised',
+          };
+        }
         slots.push({
           slot_index: slotIndex,
           movement_id: m.movement_id,
           sets: slotSets,
           reps: locomotion ? LOCOMOTION_REPS : reps,
           target_rpe: slotRpe,
+          ...(autopilotDelta === undefined ? {} : { autopilotDelta }),
         });
       }
       if (slots.length === 0) {

@@ -92,6 +92,43 @@ function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): strin
   }`;
 }
 
+const AUTOPILOT_BUDGET_NOTE = 'Held steady — effort only rises early in a cycle.';
+
+function autopilotExplanation(slot: TodaySlot): string | null {
+  switch (slot.autopilot?.reason) {
+    case 'eased': return 'Eased off — your recent sets felt harder than planned.';
+    case 'raised': return 'Nudged up — your recent sets felt easier than planned.';
+    case 'held_safety': return 'Eased for safety — a recent safety signal lowered this target.';
+    default: return null;
+  }
+}
+
+function AutopilotAttribution({
+  slot,
+  expanded,
+  onPress,
+}: {
+  slot: TodaySlot;
+  expanded: boolean;
+  onPress: () => void;
+}): React.JSX.Element | null {
+  const explanation = autopilotExplanation(slot);
+  if (explanation === null) return null;
+  return (
+    <View style={styles.attribution}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Why ${slot.movementName} target changed`}
+        accessibilityState={{ expanded }}
+      >
+        <Text style={styles.attributionMarker}>·</Text>
+      </Pressable>
+      {expanded && <Text style={styles.attributionText}>{explanation}</Text>}
+    </View>
+  );
+}
+
 function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
   return [1, 2, 3, 4].map((week) => {
     const inWeek = sessions.filter((session) => session.weekIndex === week);
@@ -141,6 +178,8 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
+  const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
+  const [macroBudgetOpen, setMacroBudgetOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(block === null);
   const scrollRef = useRef<ScrollView>(null);
   const trajectorySectionY = useRef(0);
@@ -209,7 +248,6 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     }
   };
 
-  if (editingTemplate !== null) {
   if (editingProgram) {
     return (
       <ProgramSetupScreen
@@ -220,6 +258,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     );
   }
 
+  if (editingTemplate !== null) {
     return (
       <RoutineTemplateBuilder
         initialTemplate={editingTemplate === 'new' ? null : editingTemplate}
@@ -447,6 +486,19 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
       >
         <Text style={styles.sectionTitle}>Four-week trajectory</Text>
+        {blockMeta !== null && blockMeta.macroBlockIndex >= 6 && (
+          <View style={styles.blockAttribution}>
+            <Pressable
+              onPress={() => setMacroBudgetOpen((open) => !open)}
+              accessibilityRole="button"
+              accessibilityLabel="Why effort is held steady"
+              accessibilityState={{ expanded: macroBudgetOpen }}
+            >
+              <Text style={styles.attributionMarker}>·</Text>
+            </Pressable>
+            {macroBudgetOpen && <Text style={styles.attributionText}>{AUTOPILOT_BUDGET_NOTE}</Text>}
+          </View>
+        )}
         {block === null ? (
           <View style={styles.emptyTrajectory}>
             <Text style={styles.bodyText}>No block is active yet.</Text>
@@ -533,6 +585,11 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                             <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
                             <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
                           </View>
+                          <AutopilotAttribution
+                            slot={slot}
+                            expanded={attributionSlotId === slot.plannedSlotId}
+                            onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
+                          />
                         </View>
                         {slot.overrideLoadKg !== null && (
                           <View style={styles.substitutedBadge} accessibilityRole="text">
@@ -593,6 +650,11 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   <View style={styles.slotMain}>
                     <Text style={styles.slotName}>{slot.movementName}</Text>
                     <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes)}</Text>
+                    <AutopilotAttribution
+                      slot={slot}
+                      expanded={attributionSlotId === slot.plannedSlotId}
+                      onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
+                    />
                   </View>
                 </View>
               ))}
@@ -1066,6 +1128,27 @@ const styles = StyleSheet.create({
   slotTarget: {
     ...theme.font.label,
     color: theme.color.textMid,
+  },
+  attribution: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space[2],
+  },
+  attributionMarker: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    paddingHorizontal: theme.space[1],
+  },
+  attributionText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    flex: 1,
+  },
+  blockAttribution: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space[2],
+    marginTop: theme.space[1],
   },
   disclosureContent: {
     gap: theme.space[3],

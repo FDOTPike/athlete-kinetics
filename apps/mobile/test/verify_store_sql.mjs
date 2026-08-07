@@ -31,7 +31,7 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-  '032_capability_content.sql', '033_goal_program.sql']) {
+  '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -126,6 +126,16 @@ check(
 check(
   'fresh onboarded athletes route into explicit guided program setup',
   appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen />'),
+);
+
+const previewProgramStart = src.indexOf('previewTrainingProgram: (input) => {');
+const previewProgramEnd = src.indexOf('createTrainingProgram: (input) => {', previewProgramStart);
+const previewProgramBody = src.slice(previewProgramStart, previewProgramEnd);
+check(
+  'program preview session guard lives on the preview action, not onboarding registry failure',
+  previewProgramBody.includes('get().session !== null')
+    && previewProgramBody.includes('End the active session before previewing program changes.')
+    && !onboardingBody.includes('End the active session before previewing program changes.'),
 );
 
 console.log('[planned-session completion contract]');
@@ -278,6 +288,36 @@ if (setAggSql && niggleWinSql && maxNigSql) {
   db.exec('ROLLBACK');
 }
 
+// --- planned-slot autopilot attribution hydration ---------------------------
+console.log('[autopilot attribution hydration]');
+const slotHydrationSql = statements.find((sql) =>
+  sql.includes('SELECT sl.slot_index') && sql.includes('planned_slot_autopilot'),
+);
+const attributionInsertSql = statements.find((sql) =>
+  sql.includes('INSERT INTO planned_slot_autopilot'),
+);
+a('store exposes the planned-slot attribution hydration SQL', Boolean(slotHydrationSql));
+a('store exposes the planned-slot attribution persistence SQL', Boolean(attributionInsertSql));
+if (slotHydrationSql && attributionInsertSql) {
+  db.exec('BEGIN');
+  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (930,'Attribution Squat','squat',1),(931,'Untouched Press','push_h',1)");
+  db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (930, '2030-03-01','strength',0)");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (930,930,1,1,'lower','accumulation','2030-03-01')");
+  db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (930,930,1,930,3,5,7.5),(931,930,2,931,3,5,7.5)");
+  db.prepare(attributionInsertSql).run(930, -0.5, -1, 'eased');
+  const hydratedSlots = db.prepare(slotHydrationSql).all(930);
+  a('store hydration round-trips one delta and leaves an untouched slot absent',
+    hydratedSlots.length === 2
+      && Number(hydratedSlots[0].autopilot_rpe_delta) === -0.5
+      && Number(hydratedSlots[0].autopilot_set_delta) === -1
+      && hydratedSlots[0].autopilot_reason === 'eased'
+      && hydratedSlots[1].autopilot_rpe_delta === null
+      && hydratedSlots[1].autopilot_set_delta === null
+      && hydratedSlots[1].autopilot_reason === null,
+    JSON.stringify(hydratedSlots));
+  db.exec('ROLLBACK');
+}
+
 // --- [Phase 13 Step 4] immutability + bounded-read source invariants -------------
 console.log('[autopilot wiring invariants]');
 const stripComments = (s) => s.replace(/\/\/[^\n]*/g, '');
@@ -291,7 +331,7 @@ a('the ONLY write targets are forward plan/program tables plus weekly frequency'
   [...gnb.matchAll(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi)]
     .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot', 'planned_slot_target',
       'training_program', 'training_program_day', 'training_program_movement_preference',
-      'training_block_program', 'athlete_profile'].includes(m[1])));
+      'training_block_program', 'planned_slot_autopilot', 'athlete_profile'].includes(m[1])));
 const hyd = stripComments((() => { const i = gnbRaw.indexOf('autopilot hydration'); const j = gnbRaw.indexOf('generateBlock({'); return i >= 0 && j > i ? gnbRaw.slice(i, j) : ''; })());
 a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match(/GROUP BY s\.session_date, m\.pattern/g) || []).length === 1);
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
@@ -313,6 +353,8 @@ a('reset NEVER clears athlete_profile / movement / profile_slot (settings surviv
   !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
 a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
+a('reset explicitly clears the autopilot attribution side-car',
+  resetTables.includes('planned_slot_autopilot'));
 a('reset removes each immutable side-car only after its parent',
   resetTables.indexOf('set_record') >= 0
     && resetTables.indexOf('set_dose_target') > resetTables.indexOf('set_record')
@@ -339,9 +381,10 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'lower','accumulation','2026-06-10')");
   db.exec("INSERT INTO planned_session_method (planned_session_id,schema_type,routine_template_id,template_name,frozen_at_ms) VALUES (701,'APRE',NULL,'Reset probe',0)");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
+  db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (701,-0.5,-1,'eased')");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
@@ -407,7 +450,7 @@ if (resetTables.length >= 15) {
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-    '032_capability_content.sql', '033_goal_program.sql'
+    '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.

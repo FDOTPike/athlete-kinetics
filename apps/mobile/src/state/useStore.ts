@@ -330,6 +330,14 @@ export interface BlockSessionSummary {
   completionStatus: 'complete' | 'halted' | null;
 }
 
+export type AutopilotAttributionReason = 'eased' | 'raised' | 'held_safety';
+
+export interface AutopilotAttribution {
+  rpeDelta: number;
+  setDelta: number;
+  reason: AutopilotAttributionReason;
+}
+
 export interface TodaySlot {
   slotIndex: number;
   plannedSlotId: number;
@@ -344,6 +352,8 @@ export interface TodaySlot {
   overrideLoadKg: number | null;
   /** WHY the load moved — rendered verbatim as a badge. */
   overrideReason: string | null;
+  /** Optional planned_slot_autopilot provenance; absent means untouched. */
+  autopilot?: AutopilotAttribution;
 }
 
 /** The active block's periodization metadata (block_meta side-car). */
@@ -2236,9 +2246,6 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     void (async () => {
       const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
       if (!(await saveRegistry(reg))) {
-    if (get().session !== null) {
-      throw new Error('End the active session before previewing program changes.');
-    }
         set({ error: 'Athlete name not saved — registry write failed. You can rename them in the ATHLETE tab.' });
         return;
       }
@@ -2247,6 +2254,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   previewTrainingProgram: (input) => {
+    if (get().session !== null) {
+      throw new Error('End the active session before previewing program changes.');
+    }
     const { profile, movements, vector, niggles } = get();
     if (!(['LINEAR', 'WAVE', 'STEP', 'APRE'] as readonly string[]).includes(input.schemaType)) {
       throw new Error('Choose a training method.');
@@ -2519,6 +2529,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
             [sessionId, sl.slot_index, sl.movement_id, plannedSets, legacyReps, sl.target_rpe],
           );
           const plannedSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+          if (sl.autopilotDelta !== undefined) {
+            d.executeSync(
+              'INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (?, ?, ?, ?)',
+              [plannedSlotId, sl.autopilotDelta.rpe_delta, sl.autopilotDelta.set_delta, sl.autopilotDelta.reason],
+            );
+          }
           d.executeSync(
             `INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds)
              VALUES (?, ?, ?, ?)`,
@@ -3409,14 +3425,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       movement_name: string; sets: number; reps: number; target_rpe: number;
       target_kind: string | null; target_reps: number | null; target_seconds: number | null;
       override_load_kg: number | null; override_reason: string | null;
+      autopilot_rpe_delta: number | null; autopilot_set_delta: number | null; autopilot_reason: AutopilotAttributionReason | null;
     }>(getDb().executeSync(
       `SELECT sl.slot_index, sl.planned_slot_id, sl.movement_id, m.name AS movement_name,
               sl.sets, sl.reps, sl.target_rpe,
               st.target_kind, st.target_reps, st.target_seconds,
+              pa.rpe_delta AS autopilot_rpe_delta, pa.set_delta AS autopilot_set_delta, pa.reason AS autopilot_reason,
               so.target_load_kg AS override_load_kg, so.reason AS override_reason
        FROM planned_slot sl
        JOIN movement m ON m.movement_id = sl.movement_id
        LEFT JOIN planned_slot_target st ON st.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_autopilot pa ON pa.planned_slot_id = sl.planned_slot_id
        LEFT JOIN slot_override so ON so.planned_slot_id = sl.planned_slot_id
        WHERE sl.planned_session_id = ?
          AND sl.planned_slot_id NOT IN (SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped')
@@ -3434,6 +3453,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       targetRpe: sl.target_rpe,
       overrideLoadKg: sl.override_load_kg,
       overrideReason: sl.override_reason,
+      autopilot: sl.autopilot_reason === null ? undefined : {
+        rpeDelta: sl.autopilot_rpe_delta ?? 0,
+        setDelta: sl.autopilot_set_delta ?? 0,
+        reason: sl.autopilot_reason,
+      },
     }));
   },
 
@@ -4814,6 +4838,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM session_runner_checkpoint');
       d.executeSync('DELETE FROM session_slot_target');
       d.executeSync('DELETE FROM planned_slot_disposition');
+      d.executeSync('DELETE FROM planned_slot_autopilot');
       d.executeSync('DELETE FROM planned_slot_target');
       d.executeSync('DELETE FROM planned_session_method');
       d.executeSync('DELETE FROM session_plan_slot');

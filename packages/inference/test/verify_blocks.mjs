@@ -664,6 +664,43 @@ const upSq = ndSlots(upPlan, 'squat');
 check('latent_headroom raises squat target_rpe vs baseline (≤ base_rpe_cap)',
   upSq.some((sl, i) => sl.target_rpe > baseSq[i].target_rpe) && upSq.every((sl) => sl.target_rpe <= prof().base_rpe_cap));
 
+// Direct attribution provenance: the side-car carries only the effective post-clamp change.
+const easedSlot = defSq.find((sl) => sl.autopilotDelta !== undefined);
+check('eased attribution records effective post-clamp deltas',
+  easedSlot?.autopilotDelta?.reason === 'eased'
+    && easedSlot.autopilotDelta.rpe_delta === easedSlot.target_rpe - baseSq[defSq.indexOf(easedSlot)].target_rpe
+    && easedSlot.autopilotDelta.set_delta === easedSlot.sets - baseSq[defSq.indexOf(easedSlot)].sets,
+  JSON.stringify(easedSlot?.autopilotDelta));
+const raisedSlot = upSq.find((sl) => sl.autopilotDelta !== undefined);
+check('raised attribution records the raised reason and effective deltas',
+  raisedSlot?.autopilotDelta?.reason === 'raised'
+    && raisedSlot.autopilotDelta.rpe_delta === 0.5
+    && raisedSlot.autopilotDelta.set_delta === 1,
+  JSON.stringify(raisedSlot?.autopilotDelta));
+const safetyPlan = genFR({ objective: 'strength' },
+  makeFlawReport({ squat: { phi: 0.5, flawClass: 'caution' } }));
+const safetySlot = ndSlots(safetyPlan, 'squat').find((sl) => sl.autopilotDelta !== undefined);
+check('held-safety attribution records the safety reason',
+  safetySlot?.autopilotDelta?.reason === 'held_safety'
+    && safetySlot.autopilotDelta.rpe_delta < 0
+    && safetySlot.autopilotDelta.set_delta < 0,
+  JSON.stringify(safetySlot?.autopilotDelta));
+const clampPlan = genFR({ objective: 'hybrid', training_age: 'beginner', base_rpe_cap: 5, session_duration_cap_min: 90, weekly_frequency: 2 },
+  makeFlawReport({ squat: { phi: 0.5 } }));
+const clampedSlot = clampPlan.sessions.filter((s) => s.week_index === 4)
+  .flatMap((s) => s.slots).find((sl) => patternOf(sl.movement_id) === 'squat');
+check('fully clamped/protected correction has no attribution row',
+  clampedSlot !== undefined && clampedSlot.sets === 1 && clampedSlot.target_rpe === 5
+    && clampedSlot.autopilotDelta === undefined,
+  JSON.stringify(clampedSlot));
+const locomotionPlan = genFR({ objective: 'hybrid', weekly_frequency: 6 },
+  makeFlawReport({ locomotion: { phi: 0.5 } }));
+check('deload and locomotion slots remain unattributed',
+  defPlan.sessions.filter((s) => s.week_index === 4).flatMap((s) => s.slots).every((sl) => sl.autopilotDelta === undefined)
+    && locomotionPlan.sessions.filter((s) => s.phase !== 'deload')
+      .flatMap((s) => s.slots.filter((sl) => patternOf(sl.movement_id) === 'locomotion'))
+      .every((sl) => sl.autopilotDelta === undefined));
+
 // halt supremacy: recovery template — every week deload, volume dropped, no corrections.
 const haltPlan = genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: 0.5 }, hinge: { phi: -0.5 } }, { halt: true }));
 check('halt → recovery=true and EVERY session phase is deload',
