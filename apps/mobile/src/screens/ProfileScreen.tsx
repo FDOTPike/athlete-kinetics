@@ -56,8 +56,10 @@ interface ChipRowProps<T extends string> {
   onSelect: (v: T) => void;
   /** Glossary key — renders an ⓘ tooltip next to the label. */
   tip?: string;
+  /** When true, every chip renders disabled and onSelect is not called. */
+  disabled?: boolean;
 }
-function ChipRow<T extends string>({ label, options, value, onSelect, tip }: ChipRowProps<T>): React.JSX.Element {
+function ChipRow<T extends string>({ label, options, value, onSelect, tip, disabled = false }: ChipRowProps<T>): React.JSX.Element {
   return (
     <View style={styles.field}>
       <View style={styles.fieldLabelRow}>
@@ -70,7 +72,8 @@ function ChipRow<T extends string>({ label, options, value, onSelect, tip }: Chi
             key={opt}
             label={opt.replace(/_/g, ' ').toUpperCase()}
             selected={opt === value}
-            onPress={() => onSelect(opt)}
+            disabled={disabled}
+            onPress={() => { if (!disabled) onSelect(opt); }}
             accessibilityLabel={`${label}: ${opt.replace(/_/g, ' ')}`}
           />
         ))}
@@ -283,8 +286,14 @@ export default function ProfileScreen(): React.JSX.Element {
         label="2 · TRAINING AGE"
         options={TRAINING_AGES}
         value={profile.training_age}
+        disabled={session !== null}
         onSelect={(training_age) => saveProfile({ training_age })}
       />
+      {session !== null && (
+        <Text style={styles.fieldHint}>
+          Training age cannot change during a session because it can change load authority.
+        </Text>
+      )}
       <NumberRow
         label="3 · TRAINING DAYS PER WEEK"
         display={String(profile.weekly_frequency)}

@@ -7,18 +7,14 @@
  * Run:  node apps/mobile/test/verify_store_sql.mjs
  */
 import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 const SCHEMA_DIR = join(ROOT, 'packages', 'core-db', 'src', 'schema');
 
-const db = new DatabaseSync(':memory:');
-try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
-  db.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
-  db.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
-}
-for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
+const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
   '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
@@ -32,7 +28,14 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql', '031_planned_session_method.sql',
   '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
-  '035_profile_load_preference.sql']) {
+  '035_profile_load_preference.sql'];
+
+const db = new DatabaseSync(':memory:');
+try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
+  db.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+  db.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+}
+for (const f of SCHEMA_FILES) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -76,6 +79,188 @@ for (const sql of statements) {
     fail += 1;
   }
 }
+
+// --- P2-1: executable profile_load_preference production behavior -----------
+// The production helper is compiled before this verifier. These checks invoke
+// the exact hydration, upsert, transition, and guarded-save code used by
+// useStore against an op-sqlite-shaped adapter over a real node:sqlite DB.
+console.log('[profile_load_preference executable behavior]');
+{
+  const require = createRequire(import.meta.url);
+  const production = require(join(ROOT, 'packages', 'core-db', 'test', '.build', 'loadPreferenceStore.js'));
+  const inference = require(join(ROOT, 'packages', 'inference', 'test', '.build', 'loadSelection.js'));
+  const raw = new DatabaseSync(':memory:');
+  try { raw.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
+    raw.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+    raw.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+  }
+  for (const file of SCHEMA_FILES) raw.exec(readFileSync(join(SCHEMA_DIR, file), 'utf-8'));
+
+  const calls = [];
+  const productionDb = {
+    executeSync(sql, params) {
+      calls.push({ sql, params: params ?? [] });
+      if (/^\s*SELECT/i.test(sql)) {
+        return { rows: raw.prepare(sql).all(...(params ?? [])) };
+      }
+      if (params && params.length > 0) raw.prepare(sql).run(...params);
+      else raw.exec(sql);
+      return { rows: [] };
+    },
+  };
+  const activate = (slotId) => {
+    raw.exec('UPDATE profile_slot SET is_active = 0');
+    raw.prepare('UPDATE profile_slot SET is_active = 1 WHERE slot_id = ?').run(slotId);
+  };
+
+  check('active slot is slot 2 (intermediate)',
+    raw.prepare('SELECT slot_id FROM profile_slot WHERE is_active = 1').get()?.slot_id === 2);
+
+  raw.exec('DELETE FROM profile_load_preference WHERE profile_slot_id = 2');
+  production.persistLoadPreferenceRow(productionDb, 'manual', true);
+  production.persistLoadPreferenceRow(productionDb, 'auto', false);
+  const upserted = raw.prepare('SELECT preference, is_explicit FROM profile_load_preference WHERE profile_slot_id = 2').get();
+  check('production active-slot upsert inserts then conflict-updates both fields',
+    upserted?.preference === 'auto' && upserted?.is_explicit === 0);
+
+  activate(3);
+  production.persistLoadPreferenceRow(productionDb, 'auto', true);
+  const advancedAuto = production.readActiveLoadPreference(productionDb, 'advanced', inference.defaultLoadPreference);
+  check('production hydration preserves persisted advanced auto over manual default',
+    advancedAuto.preference === 'auto' && advancedAuto.explicit === true);
+  production.persistLoadPreferenceRow(productionDb, 'manual', true);
+  const advancedManual = production.readActiveLoadPreference(productionDb, 'advanced', inference.defaultLoadPreference);
+  check('production non-beginner manual round-trips as manual',
+    advancedManual.preference === 'manual' && advancedManual.explicit === true);
+
+  activate(4);
+  raw.exec('DELETE FROM profile_load_preference WHERE profile_slot_id = 4');
+  const missingElite = production.readActiveLoadPreference(productionDb, 'elite', inference.defaultLoadPreference);
+  check('production missing-row hydration falls back to the elite manual default',
+    missingElite.preference === 'manual' && missingElite.explicit === false);
+  const malformedElite = production.loadPreferenceFromRow(
+    { preference: 'poison', is_explicit: 1 }, 'elite', inference.defaultLoadPreference,
+  );
+  check('production malformed-row hydration falls back without retaining invalid explicitness',
+    malformedElite.preference === 'manual' && malformedElite.explicit === false);
+
+  activate(2);
+  production.persistLoadPreferenceRow(productionDb, 'auto', true);
+  activate(3);
+  production.persistLoadPreferenceRow(productionDb, 'manual', true);
+  const switchedAdvanced = production.readActiveLoadPreference(productionDb, 'advanced', inference.defaultLoadPreference);
+  activate(2);
+  const switchedIntermediate = production.readActiveLoadPreference(productionDb, 'intermediate', inference.defaultLoadPreference);
+  check('production hydration is isolated per active profile slot',
+    switchedAdvanced.preference === 'manual' && switchedIntermediate.preference === 'auto');
+
+  const explicitDefault = production.planProfileLoadTransition(
+    'intermediate', 'advanced', switchedIntermediate, inference.transitionLoadPreference,
+  );
+  check('explicit same-as-default survives round-trip and non-beginner transition',
+    explicitDefault.preference === 'auto' && explicitDefault.explicit === true && explicitDefault.changed === false);
+  production.persistLoadPreferenceRow(productionDb, 'auto', false);
+  const defaultedIntermediate = production.readActiveLoadPreference(productionDb, 'intermediate', inference.defaultLoadPreference);
+  const redefaulted = production.planProfileLoadTransition(
+    'intermediate', 'advanced', defaultedIntermediate, inference.transitionLoadPreference,
+  );
+  check('non-explicit non-beginner transition independently re-defaults',
+    redefaulted.preference === 'manual' && redefaulted.explicit === false && redefaulted.changed === true);
+
+  const directStart = calls.length;
+  let directCommit = 0;
+  const beginnerManual = production.executeDirectLoadPreferenceSave({
+    getDb: () => productionDb,
+    sessionActive: false,
+    trainingAge: 'beginner',
+    preference: 'manual',
+    commitState: () => { directCommit += 1; },
+  });
+  check('production direct-save rejects beginner manual without DB or state mutation',
+    beginnerManual.ok === false && beginnerManual.error === null
+      && calls.length === directStart && directCommit === 0);
+
+  const assertActiveRejection = (label, priorAge, nextAge, current) => {
+    const next = production.planProfileLoadTransition(
+      priorAge, nextAge, current, inference.transitionLoadPreference,
+    );
+    let getDbCalls = 0;
+    let profileWrites = 0;
+    let stateCommits = 0;
+    const result = production.executeProfileLoadSave({
+      getDb: () => { getDbCalls += 1; return productionDb; },
+      sessionActive: true,
+      current,
+      next,
+      persistProfile: () => { profileWrites += 1; },
+      commitState: () => { stateCommits += 1; },
+    });
+    check(label, result.ok === false
+      && result.error === production.ACTIVE_LOAD_PREFERENCE_ERROR
+      && getDbCalls === 0 && profileWrites === 0 && stateCommits === 0);
+  };
+  assertActiveRejection(
+    'production guard rejects active advanced/manual/explicit -> beginner before all mutations',
+    'advanced', 'beginner', { preference: 'manual', explicit: true },
+  );
+  assertActiveRejection(
+    'production guard rejects active beginner/auto/non-explicit -> advanced before all mutations',
+    'beginner', 'advanced', { preference: 'auto', explicit: false },
+  );
+
+  const unchanged = production.planProfileLoadTransition(
+    'intermediate', 'advanced', { preference: 'auto', explicit: true }, inference.transitionLoadPreference,
+  );
+  const profileRow = () => raw.prepare(
+    'SELECT session_duration_cap_min, updated_at_ms, objective, training_age, weekly_frequency, max_sessions_per_day, base_rpe_cap, target_energy_system, progression_methodology, injury_flags, mobility_limits, equipment_inventory FROM athlete_profile WHERE profile_id = 1',
+  ).get();
+  const prefRow = () => raw.prepare(
+    'SELECT preference, is_explicit FROM profile_load_preference WHERE profile_slot_id = 2',
+  ).get();
+  const profileBefore = profileRow();
+  const prefBefore = prefRow();
+  check('athlete_profile row 1 exists before the ordinary active-session edit', profileBefore !== undefined);
+  const editedProfile = {
+    objective: profileBefore.objective,
+    training_age: profileBefore.training_age,
+    weekly_frequency: profileBefore.weekly_frequency,
+    max_sessions_per_day: profileBefore.max_sessions_per_day,
+    session_duration_cap_min: profileBefore.session_duration_cap_min === 60 ? 90 : 60,
+    base_rpe_cap: profileBefore.base_rpe_cap,
+    target_energy_system: profileBefore.target_energy_system,
+    progression_methodology: profileBefore.progression_methodology,
+    injury_flags: JSON.parse(profileBefore.injury_flags),
+    mobility_limits: JSON.parse(profileBefore.mobility_limits),
+    equipment_inventory: JSON.parse(profileBefore.equipment_inventory),
+  };
+  let ordinaryProfileWrites = 0;
+  let ordinaryStateCommits = 0;
+  const ordinary = production.executeProfileLoadSave({
+    getDb: () => productionDb,
+    sessionActive: true,
+    current: { preference: 'auto', explicit: true },
+    next: unchanged,
+    persistProfile: (db) => {
+      ordinaryProfileWrites += 1;
+      production.persistProfileFields(db, editedProfile);
+    },
+    commitState: () => { ordinaryStateCommits += 1; },
+  });
+  const profileAfter = profileRow();
+  const prefAfter = prefRow();
+  check('production guard permits an active-session profile edit when the preference tuple is unchanged',
+    ordinary.ok === true && ordinaryProfileWrites === 1 && ordinaryStateCommits === 1);
+  check('ordinary active-session edit durably persists the profile row via the production seam',
+    profileAfter !== undefined
+      && profileAfter.session_duration_cap_min === editedProfile.session_duration_cap_min
+      && profileAfter.session_duration_cap_min !== profileBefore.session_duration_cap_min
+      && profileAfter.updated_at_ms > profileBefore.updated_at_ms);
+  check('ordinary active-session edit leaves the preference row and tuple unchanged',
+    prefAfter?.preference === prefBefore?.preference
+      && prefAfter?.is_explicit === prefBefore?.is_explicit
+      && prefAfter?.preference === 'auto' && prefAfter?.is_explicit === 0);
+}
+
 // Wiring tripwires: mutation testing (2026-06-12) proved the layer-3 chain
 // could be silently unwired with every gate green. The pure derivation is
 // verified in verify:policy [6]; these assert the store actually routes
@@ -432,11 +617,10 @@ if (resetTables.length >= 15) {
     ['set logging rejects non-finite or negative load at the store boundary', 'Enter a finite load of 0 kg or more before logging the set.'],
     ['boot resumes an unfinished session (crash recovery)', 'RESUMES it on restart'],
     ['missing readiness vector clears the stale prescription', "vector === null) { set({ prescription: null })"],
-    ['load preference change refuses during an active session', 'End the active session before changing load selection.'],
-    ['beginner can never persist manual load authority', "profile.training_age === 'beginner' && preference !== 'auto'"],
-    ['training-age transitions apply the ratified preference law', 'transitionLoadPreference('],
-    ['missing or malformed preference rows fail to the tier default', 'loadPreferenceFromRow('],
-    ['valid advanced/elite auto preferences survive hydration', "row?.preference === 'auto' || row?.preference === 'manual'"],
+    ['direct preference saves delegate to the executable production seam', 'executeDirectLoadPreferenceSave('],
+    ['profile transitions delegate to the executable production seam', 'planProfileLoadTransition('],
+    ['guarded profile persistence delegates to the executable production seam', 'executeProfileLoadSave('],
+    ['preference hydration delegates to the executable production seam', 'readActiveLoadPreference('],
     ['same-as-default explicit choices are persisted independently', 'loadPreferenceExplicit: prefExplicit'],
     ['current-session carry-forward chooses the latest logged set', 'candidate.set_id > latest.set_id'],
     ['screens resolve loads through the pure resolver', 'resolveLoadSelection('],

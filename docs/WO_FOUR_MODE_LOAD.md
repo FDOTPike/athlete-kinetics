@@ -94,6 +94,13 @@ Additional laws:
 - logging an external-load set requires an explicit finite, non-negative entry;
 - bodyweight added load may initialize to `0`; this is the identity load, not a
   fiat starting-weight table;
+- **bodyweight 1RM carve-out (D1-A, ratified by Francis 2026-08-08):** a stored
+  movement 1RM does not distinguish total system load from added load for
+  bodyweight movements. Therefore reps + 1RM must not derive an operative or
+  advisory added load when `bodyweightMode` is true. A valid absolute APRE
+  override may still prescribe added load. Exact logged added-load history
+  remains valid. This is an intentional safety/domain rule, not an accidental
+  resolver omission;
 - after the athlete logs the first manual set for a movement in the active
   session, that actual current-session load may carry to the next set;
 - rerenders, preference hydration, and evidence refreshes must not overwrite a

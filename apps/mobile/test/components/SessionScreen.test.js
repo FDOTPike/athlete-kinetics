@@ -1,24 +1,29 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { targetLoadKg } from '@ak/inference';
+import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import SessionScreen from '../../src/screens/SessionScreen';
 
 let mockState;
 
-jest.mock('@ak/inference', () => ({
-  JOINTS: ['shoulder', 'knee'],
-  nextUp: jest.fn((runner) => {
-    const current = runner.slots[runner.slotIndex];
-    if (current === undefined) return null;
-    const completed = runner.slotSetCounts[runner.slotIndex] ?? 0;
-    const nextSetIndex = runner.phase === 'working' ? completed + 2 : completed + 1;
-    if (nextSetIndex <= current.sets) return { slot: current, setIndex: nextSetIndex };
-    const next = runner.slots.find((_, index) => index > runner.slotIndex);
-    return next === undefined ? null : { slot: next, setIndex: 1 };
-  }),
-  targetLoadKg: jest.fn(() => 42.5),
-}));
+jest.mock('@ak/inference', () => {
+  const actual = jest.requireActual('@ak/inference');
+  return {
+    JOINTS: ['shoulder', 'knee'],
+    nextUp: jest.fn((runner) => {
+      const current = runner.slots[runner.slotIndex];
+      if (current === undefined) return null;
+      const completed = runner.slotSetCounts[runner.slotIndex] ?? 0;
+      const nextSetIndex = runner.phase === 'working' ? completed + 2 : completed + 1;
+      if (nextSetIndex <= current.sets) return { slot: current, setIndex: nextSetIndex };
+      const next = runner.slots.find((_, index) => index > runner.slotIndex);
+      return next === undefined ? null : { slot: next, setIndex: 1 };
+    }),
+    targetLoadKg: actual.targetLoadKg,
+    resolveLoadSelection: actual.resolveLoadSelection,
+  };
+});
+const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
 jest.mock('../../src/state/useStore', () => {
   const storeFunc = (selector) => selector(mockState);
   storeFunc.setState = jest.fn((updates) => {
@@ -79,47 +84,35 @@ const state = (overrides = {}) => {
     }),
     ...overrides,
   };
-  // Test-side implementation of the store's resolver surface: mirrors
-  // useStore.resolveSlotLoad against the mock state's evidence. The resolver
-  // itself is exhaustively pinned in verify_load_selection.mjs; these tests
-  // assert the SCREEN's behavior per effective source.
+  // P2-1 (Opus audit): delegate to the REAL exported resolveLoadSelection.
+  // The test adapter gathers store inputs and selects the highest-set_id
+  // current-session load, but does NOT reimplement precedence, honesty,
+  // advisory, timed, beginner, or bodyweight rules.
   base.loadPreference = base.loadPreference ?? 'auto';
-  base.resolveSlotLoad = (input) => {
+  base.loadPreferenceExplicit = base.loadPreferenceExplicit ?? false;
+  base.resolveSlotLoad = jest.fn((input) => {
     const age = base.profile.training_age;
-    const pref = age === 'beginner' ? 'auto' : base.loadPreference;
+    const pref = base.loadPreference;
+    const oneRm = base.oneRepMaxes[input.movementId] ?? null;
     const history = Object.prototype.hasOwnProperty.call(base.lastLoggedLoads, input.movementId)
       ? base.lastLoggedLoads[input.movementId]
-      : null;
-    const apre = input.overrideLoadKg ?? null;
-    const oneRm = base.oneRepMaxes[input.movementId] ?? null;
-    const derived = !input.bodyweightMode && Number.isInteger(input.targetReps)
-      && input.targetReps > 0 && Number.isFinite(input.targetRpe)
-      && input.targetRpe >= 5 && input.targetRpe <= 10 && oneRm !== null
-      ? targetLoadKg(oneRm, input.targetReps, input.targetRpe)
       : null;
     const logged = (base.session?.sets ?? []).filter((s) => s.movement_id === input.movementId);
     const latestLogged = logged.reduce((latest, candidate) => latest === null || candidate.set_id > latest.set_id ? candidate : latest, null);
     const currentSessionLoad = latestLogged?.load_kg ?? null;
-    const advisory = apre !== null ? { kg: apre, kind: 'apre' }
-      : derived !== null ? { kg: derived, kind: 'onerm' }
-        : history !== null ? { kg: history, kind: 'history' }
-          : { kg: null, kind: null };
-    if (age === 'beginner') {
-      return history !== null
-        ? { source: 'history', initialLoadKg: history, advisoryKg: null, advisoryKind: null }
-        : { source: 'seeded', initialLoadKg: input.bodyweightMode ? 0 : null, advisoryKg: null, advisoryKind: null };
-    }
-    if (pref === 'manual') {
-      if (logged.length > 0 && currentSessionLoad !== null) {
-        return { source: 'manual', initialLoadKg: currentSessionLoad, advisoryKg: advisory.kg, advisoryKind: advisory.kind };
-      }
-      return { source: 'manual', initialLoadKg: input.bodyweightMode ? 0 : null, advisoryKg: advisory.kg, advisoryKind: advisory.kind };
-    }
-    if (apre !== null) return { source: 'derived', initialLoadKg: apre, advisoryKg: null, advisoryKind: null };
-    if (derived !== null) return { source: 'derived', initialLoadKg: derived, advisoryKg: null, advisoryKind: null };
-    if (history !== null) return { source: 'history', initialLoadKg: history, advisoryKg: null, advisoryKind: null };
-    return { source: 'seeded', initialLoadKg: input.bodyweightMode ? 0 : null, advisoryKg: null, advisoryKind: null };
-  };
+    return resolveLoadSelectionSpy({
+      trainingAge: age,
+      preference: pref,
+      bodyweightMode: input.bodyweightMode,
+      targetReps: input.targetReps,
+      targetRpe: input.targetRpe,
+      oneRepMaxKg: oneRm,
+      overrideLoadKg: input.overrideLoadKg,
+      lastLoggedLoadKg: history,
+      currentSessionLoadKg: currentSessionLoad,
+      isFirstSet: logged.length === 0,
+    });
+  });
   return base;
 };
 
@@ -186,7 +179,7 @@ test('externally loaded movement keeps its normal load and 1RM suggestion', () =
 
   render(<SessionScreen />);
 
-  expect(screen.getByTestId('session-load-input').props.value).toBe('42.5');
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
   expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
 });
 
@@ -329,7 +322,7 @@ test('invalid draft is distinct from blank, while explicit zero is valid and log
 
   expect(screen.queryByTestId('session-load-validation')).toBeNull();
   fireEvent.changeText(screen.getByTestId('session-load-input'), '12kg');
-  expect(screen.getByLabelText('Load validation. Enter a number, 0 or more.')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 2.5 kg increments.')).toBeOnTheScreen();
   fireEvent.changeText(screen.getByTestId('session-load-input'), '0');
   expect(screen.queryByTestId('session-load-validation')).toBeNull();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
@@ -758,4 +751,201 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
   fireEvent.press(screen.getByLabelText("Back to Ready"));
   expect(mockState.dismissOutcome).toHaveBeenCalled();
   unmount();
+});
+
+// --- P1-2: grid/range validation tests ---------------------------------------
+test('off-grid load 1 shows validation, disables Log set, and never calls logSet', () => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '1');
+  expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Log set 1 for First movement, unavailable — enter a load first')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test('off-grid load 61 shows validation and never calls logSet', () => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '61');
+  expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test('out-of-range load 500.1 is rejected rather than becoming 500', () => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '500.1');
+  expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['0', 0],
+  ['0.0', 0],
+  ['2.5', 2.5],
+  ['2,5', 2.5],
+  ['60', 60],
+  ['500', 500],
+])('valid grid value %s is loggable and reaches logSet unchanged', (value, expected) => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), value);
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, expected, null, undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+// --- Sol P2-02: direct-entry syntax boundary matrix ---------------------------
+test.each(['-2.5', '-0', '0x1F', 'NaN', 'Infinity', '1e2', '2.5.5'])(
+  'non-decimal draft %s shows validation, retains the draft, and never calls logSet',
+  (raw) => {
+    render(<SessionScreen />);
+    fireEvent.changeText(screen.getByTestId('session-load-input'), raw);
+    expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-load-input').props.value).toBe(raw);
+    expect(screen.getByLabelText('Log set 1 for First movement, unavailable — enter a load first')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+    expect(mockState.logSet).not.toHaveBeenCalled();
+  },
+);
+
+// --- Sol P2-01 falsifier: the adapter passes the persisted preference through -
+test('beginner fixture with persisted manual preference reaches the real resolver unnormalized', () => {
+  const fixture = () => state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+  });
+  mockState = fixture();
+  mockState.loadPreference = 'manual';
+  mockState.loadPreferenceExplicit = true;
+  const first = render(<SessionScreen />);
+  const manualInputs = resolveLoadSelectionSpy.mock.calls.map(([input]) => input);
+  expect(manualInputs.length).toBeGreaterThan(0);
+  expect(manualInputs.every((i) => i.trainingAge === 'beginner' && i.preference === 'manual')).toBe(true);
+  const manualValue = screen.getByTestId('session-load-input').props.value;
+  const manualSource = screen.getByTestId('session-load-source-line').props.children;
+  first.unmount();
+  const priorCallCount = resolveLoadSelectionSpy.mock.calls.length;
+  mockState = fixture();
+  render(<SessionScreen />);
+  const autoInputs = resolveLoadSelectionSpy.mock.calls.slice(priorCallCount).map(([input]) => input);
+  expect(autoInputs.length).toBeGreaterThan(0);
+  expect(autoInputs.every((i) => i.preference === 'auto')).toBe(true);
+  // Beginner authority lives in the resolver: identical output either way.
+  expect(screen.getByTestId('session-load-input').props.value).toBe(manualValue);
+  expect(screen.getByTestId('session-load-source-line').props.children).toBe(manualSource);
+});
+
+// --- P2-2: unknown implement fails toward blank ------------------------------
+test('unknown implement (empty supportedPrefixes) is treated as external load', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: [] }),
+      movement(2, 'Later movement'),
+    ],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-label').props.children).toBe('LOAD KG');
+  expect(screen.getByTestId('session-load-input').props.value).toBe('');
+  expect(screen.getByLabelText('Log set 1 for First movement, unavailable — enter a load first')).toBeOnTheScreen();
+});
+
+// --- P2-4: stable target RPE for provenance ----------------------------------
+test('nullable target RPE uses the same fallback for display and initialization', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { targetRpe: null })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+  const initialResolverInputs = resolveLoadSelectionSpy.mock.calls.map(([input]) => input);
+  expect(initialResolverInputs.length).toBeGreaterThanOrEqual(2);
+  expect(initialResolverInputs.every((input) => input.targetRpe === 8)).toBe(true);
+  expect(new Set(initialResolverInputs.map((input) => JSON.stringify(input))).size).toBe(1);
+
+  const sourceBefore = screen.getByTestId('session-load-source-line').props.children;
+  const draftBefore = screen.getByTestId('session-load-input').props.value;
+  fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
+  expect(screen.getByTestId('session-load-source-line').props.children).toBe(sourceBefore);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(draftBefore);
+  expect(resolveLoadSelectionSpy.mock.calls.every(([input]) => input.targetRpe === 8)).toBe(true);
+});
+
+// --- P2-1: invalid APRE regression via real resolver -------------------------
+test('negative APRE override falls through exactly as production does', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: -5 })],
+  });
+  render(<SessionScreen />);
+  // Invalid APRE falls through to 1RM derivation (real resolver behavior)
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+test('NaN APRE override falls through to 1RM derivation', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: NaN })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+test('infinite APRE override falls through to 1RM derivation', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: Infinity })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+// --- D1-A: bodyweight 1RM carve-out ------------------------------------------
+test('D1-A: bodyweight + 1RM only in auto mode does not derive (seeded identity zero)', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    oneRepMaxes: { 1: 100 },
+  });
+  render(<SessionScreen />);
+  // Bodyweight movement with 1RM: must NOT derive — identity zero
+  expect(screen.getByTestId('session-load-input').props.value).toBe('0.0');
+  expect(screen.getByText('0 kg means bodyweight only. Add weight when you need it.')).toBeOnTheScreen();
+});
+
+test('D1-A: bodyweight + valid APRE in auto mode derives (absolute prescription)', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: 10 })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('10.0');
+  expect(screen.getByText('Prescribed 10.0 kg added load')).toBeOnTheScreen();
 });

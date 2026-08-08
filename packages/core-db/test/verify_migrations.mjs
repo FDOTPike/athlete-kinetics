@@ -548,16 +548,26 @@ const to034 = MIGRATIONS.slice(0, FILES.indexOf('035_profile_load_preference.sql
 for (const m of to034) upDb035.executeSync(m);
 upDb035.executeSync(`PRAGMA user_version = ${to034.length};`);
 runMigrations(upDb035, MIGRATIONS); // the app update ships 035
+// Verify 035 created the table and seeded four tier-derived rows.
+const seededPrefs = upDb035.raw.prepare(
+  'SELECT profile_slot_id, preference, is_explicit FROM profile_load_preference ORDER BY profile_slot_id',
+).all();
+check('034 -> 035 upgrade creates the side-car and seeds four tier-derived rows (non-explicit)',
+  seededPrefs.length === 4
+    && seededPrefs.every((r) => r.is_explicit === 0)
+    && seededPrefs[0].preference === 'auto'   // beginner
+    && seededPrefs[1].preference === 'auto'   // intermediate
+    && seededPrefs[2].preference === 'manual' // advanced
+    && seededPrefs[3].preference === 'manual' // elite
+);
+// Make an explicit user update AFTER 035 has run.
 upDb035.executeSync(`UPDATE profile_load_preference SET preference = 'manual', is_explicit = 1 WHERE profile_slot_id = 2`);
-check('034 -> 035 upgrade preserves an explicit existing preference (OR IGNORE)',
+// Replay: re-running the full chain must preserve the explicit update (INSERT OR IGNORE).
+runMigrations(upDb035, MIGRATIONS);
+check('035 replay preserves an explicit user update (INSERT OR IGNORE does not overwrite)',
   upDb035.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 2').get()?.preference === 'manual'
     && upDb035.raw.prepare('SELECT is_explicit FROM profile_load_preference WHERE profile_slot_id = 2').get()?.is_explicit === 1
     && Number(upDb035.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference').get().c) === 4);
-// Replay: re-running the full chain does not rewrite preferences.
-runMigrations(upDb035, MIGRATIONS);
-check('035 replay preserves stored preferences',
-  upDb035.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 2').get()?.preference === 'manual'
-    && upDb035.raw.prepare('SELECT is_explicit FROM profile_load_preference WHERE profile_slot_id = 2').get()?.is_explicit === 1);
 // Poison + self-heal on the upgrade DB: a DROPPED table loses its stored
 // rows, so the rebuild re-derives slot seeds from profile_json (the safe
 // tier-default fallback the WO mandates for missing rows).

@@ -40,6 +40,14 @@ import {
 } from './athleteRegistryCore';
 import { loadRegistry, saveRegistry } from './athleteRegistry';
 import {
+  executeDirectLoadPreferenceSave,
+  executeProfileLoadSave,
+  persistLoadPreferenceRow,
+  persistProfileFields,
+  planProfileLoadTransition,
+  readActiveLoadPreference,
+} from './loadPreferenceStore';
+import {
   buildPatternWindow,
   addDaysIso,
   composeRoutine,
@@ -1126,52 +1134,6 @@ export interface ProfileSlot {
   isActive: boolean;
 }
 
-/** Read the active slot's durable load preference. Malformed or missing rows
- *  fail safely to the tier default (WO §5). Beginner is always 'auto'. */
-const loadPreferenceFromRow = (
-  row: { preference: string | null; is_explicit: number | null } | undefined,
-  profile: UserProfile,
-): { preference: LoadPreference; explicit: boolean } => {
-  if (profile.training_age === 'beginner') return { preference: 'auto', explicit: false };
-  const preference = row?.preference === 'auto' || row?.preference === 'manual'
-    ? row.preference
-    : defaultLoadPreference(profile.training_age);
-  return { preference, explicit: row?.is_explicit === 1 };
-};
-
-/** Persist the active slot's preference (035). The upsert creates a missing
- *  row or updates the existing row; schema CHECKs constrain both domains. */
-const persistLoadPreferenceRow = (d: DB, preference: LoadPreference, explicit: boolean): void => {
-  d.executeSync(
-    `INSERT INTO profile_load_preference (profile_slot_id, preference, is_explicit)
-     SELECT slot_id, ?, ? FROM profile_slot WHERE is_active = 1
-     ON CONFLICT(profile_slot_id) DO UPDATE SET
-       preference = excluded.preference,
-       is_explicit = excluded.is_explicit`,
-    [preference, explicit ? 1 : 0],
-  );
-};
-
-/** Write a profile into the single athlete_profile row (shared by saveProfile
- *  and the profile switch). */
-const persistProfileFields = (d: DB, p: UserProfile): void => {
-  d.executeSync(
-    `UPDATE athlete_profile SET
-       objective = ?, training_age = ?, weekly_frequency = ?,
-       max_sessions_per_day = ?, session_duration_cap_min = ?, base_rpe_cap = ?,
-       target_energy_system = ?, progression_methodology = ?,
-       injury_flags = ?, mobility_limits = ?, equipment_inventory = ?, updated_at_ms = ?
-     WHERE profile_id = 1`,
-    [
-      p.objective, p.training_age, p.weekly_frequency,
-      p.max_sessions_per_day, p.session_duration_cap_min, p.base_rpe_cap,
-      p.target_energy_system, p.progression_methodology,
-      JSON.stringify(p.injury_flags), JSON.stringify(p.mobility_limits),
-      JSON.stringify(p.equipment_inventory), Date.now(),
-    ],
-  );
-};
-
 /** Serialize a profile to the profile_slot JSON snapshot shape. */
 const profileToJsonString = (p: UserProfile): string => JSON.stringify({
   objective: p.objective, training_age: p.training_age,
@@ -1976,50 +1938,37 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // (the block generator's determinism depends on a stable order).
     const owned = new Set(merged.equipment_inventory);
     merged.equipment_inventory = EQUIPMENT_ITEMS.filter((i) => owned.has(i));
-    // Training-age transition law (WO_FOUR_MODE_LOAD §2): entering beginner
-    // forces auto; leaving beginner applies the destination default; between
-    // non-beginner tiers the stored explicit choice survives. Beginners never
-    // persist manual regardless of the stored row.
-    let nextLoadPreference = get().loadPreference;
-    let nextLoadPreferenceExplicit = get().loadPreferenceExplicit;
-    if (patch.training_age !== undefined && patch.training_age !== prior.training_age) {
-      nextLoadPreference = transitionLoadPreference(
-        prior.training_age,
-        patch.training_age,
-        get().loadPreference,
-        get().loadPreferenceExplicit,
-      );
-      nextLoadPreferenceExplicit = prior.training_age !== 'beginner'
-        && patch.training_age !== 'beginner'
-        && get().loadPreferenceExplicit;
-    } else if (merged.training_age === 'beginner') {
-      nextLoadPreference = 'auto';
-      nextLoadPreferenceExplicit = false;
+    const currentLoadPreference = {
+      preference: get().loadPreference,
+      explicit: get().loadPreferenceExplicit,
+    };
+    const nextLoadPreference = planProfileLoadTransition(
+      prior.training_age,
+      merged.training_age,
+      currentLoadPreference,
+      transitionLoadPreference,
+    );
+    try {
+      const result = executeProfileLoadSave({
+        getDb,
+        sessionActive: get().session !== null,
+        current: currentLoadPreference,
+        next: nextLoadPreference,
+        persistProfile: (d) => persistProfileFields(d as DB, merged),
+        commitState: () => {
+          set({
+            profile: merged,
+            loadPreference: nextLoadPreference.preference,
+            loadPreferenceExplicit: nextLoadPreference.explicit,
+          });
+          // Re-derive: profile clamps may have changed the operative prescription.
+          if (get().prescription !== null) get().computePrescription([]);
+        },
+      });
+      if (!result.ok) set({ error: result.error });
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
     }
-    const preferenceChanged = nextLoadPreference !== get().loadPreference
-      || nextLoadPreferenceExplicit !== get().loadPreferenceExplicit;
-    const d = getDb();
-    if (preferenceChanged) {
-      d.executeSync('BEGIN');
-      try {
-        persistProfileFields(d, merged);
-        persistLoadPreferenceRow(d, nextLoadPreference, nextLoadPreferenceExplicit);
-        d.executeSync('COMMIT');
-      } catch (e) {
-        d.executeSync('ROLLBACK');
-        set({ error: e instanceof Error ? e.message : String(e) });
-        return;
-      }
-    } else {
-      persistProfileFields(d, merged);
-    }
-    set({
-      profile: merged,
-      loadPreference: nextLoadPreference,
-      loadPreferenceExplicit: nextLoadPreferenceExplicit,
-    });
-    // Re-derive: profile clamps may have changed the operative prescription.
-    if (get().prescription !== null) get().computePrescription([]);
   },
 
   refreshProfileSlots: () => {
@@ -2083,32 +2032,24 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   refreshLoadPreference: () => {
-    const row = rowsOf<{ preference: string | null; is_explicit: number | null }>(
-      getDb().executeSync(
-        `SELECT p.preference, p.is_explicit
-         FROM profile_slot s
-         LEFT JOIN profile_load_preference p ON p.profile_slot_id = s.slot_id
-         WHERE s.is_active = 1
-         LIMIT 1`,
-      ),
-    )[0];
-    const loaded = loadPreferenceFromRow(row, get().profile);
+    const loaded = readActiveLoadPreference(
+      getDb(),
+      get().profile.training_age,
+      defaultLoadPreference,
+    );
     set({ loadPreference: loaded.preference, loadPreferenceExplicit: loaded.explicit });
   },
 
   saveLoadPreference: (preference) => {
-    // WO §2/§5: the preference cannot change during an active session, and a
-    // beginner can never hold manual authority. UI gating is presentation;
-    // this store-side validation is the enforcement.
-    if (get().session !== null) {
-      set({ error: 'End the active session before changing load selection.' });
-      return false;
-    }
-    if (preference !== 'auto' && preference !== 'manual') return false;
-    if (get().profile.training_age === 'beginner' && preference !== 'auto') return false;
-    persistLoadPreferenceRow(getDb(), preference, true);
-    set({ loadPreference: preference, loadPreferenceExplicit: true });
-    return true;
+    const result = executeDirectLoadPreferenceSave({
+      getDb,
+      sessionActive: get().session !== null,
+      trainingAge: get().profile.training_age,
+      preference,
+      commitState: () => set({ loadPreference: preference, loadPreferenceExplicit: true }),
+    });
+    if (!result.ok && result.error !== null) set({ error: result.error });
+    return result.ok;
   },
 
   resolveSlotLoad: (input) => {

@@ -128,6 +128,21 @@ check('auto bodyweight seeded also initializes to identity load 0',
 check('bodyweight never derives from 1RM even in auto',
   (() => { const r = resolve({ bodyweightMode: true, oneRepMaxKg: 100 }); return r.source === 'seeded' && r.initialLoadKg === 0; })());
 
+// --- D1-A: bodyweight 1RM carve-out (ratified by Francis 2026-08-08) ---------
+console.log('[D1-A bodyweight 1RM carve-out]');
+check('D1-A: non-beginner auto + bodyweight + reps + 1RM only -> seeded identity zero (never derived)',
+  (() => { const r = resolve({ trainingAge: 'intermediate', bodyweightMode: true, oneRepMaxKg: 100, targetReps: 5 }); return r.source === 'seeded' && r.initialLoadKg === 0 && r.advisoryKg === null; })());
+check('D1-A: non-beginner auto + bodyweight + reps + 1RM + history -> history (not derived)',
+  (() => { const r = resolve({ trainingAge: 'intermediate', bodyweightMode: true, oneRepMaxKg: 100, lastLoggedLoadKg: 5 }); return r.source === 'history' && r.initialLoadKg === 5; })());
+check('D1-A: non-beginner auto + bodyweight + valid APRE -> derived',
+  (() => { const r = resolve({ trainingAge: 'intermediate', bodyweightMode: true, overrideLoadKg: 10, oneRepMaxKg: 100 }); return r.source === 'derived' && r.initialLoadKg === 10; })());
+check('D1-A: manual + bodyweight + 1RM only -> no 1RM advisory, identity zero',
+  (() => { const r = resolve({ trainingAge: 'intermediate', preference: 'manual', bodyweightMode: true, oneRepMaxKg: 100 }); return r.source === 'manual' && r.initialLoadKg === 0 && r.advisoryKg === null && r.advisoryKind === null; })());
+check('D1-A: beginner ignores APRE even for bodyweight',
+  (() => { const r = resolve({ trainingAge: 'beginner', bodyweightMode: true, overrideLoadKg: 10 }); return r.source === 'seeded' && r.initialLoadKg === 0; })());
+check('D1-A: manual + bodyweight + APRE advisory stays supporting only',
+  (() => { const r = resolve({ trainingAge: 'intermediate', preference: 'manual', bodyweightMode: true, overrideLoadKg: 10 }); return r.source === 'manual' && r.initialLoadKg === 0 && r.advisoryKg === 10 && r.advisoryKind === 'apre'; })());
+
 // --- Current-session carry-forward (manual only) -----------------------------
 console.log('[carry-forward]');
 check('manual subsequent set carries the ACTUAL current-session load',

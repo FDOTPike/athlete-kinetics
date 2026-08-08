@@ -38,8 +38,22 @@ const parseLoadDraft = (text: string): number | null => {
   const value = Number(trimmed.replace(',', '.'));
   return Number.isFinite(value) && value >= 0 ? value : null;
 };
-/** True when the draft holds a loggable value (explicit zero included). */
-const isLoadDraftLoggable = (text: string): boolean => parseLoadDraft(text) !== null;
+
+/** P1-2 (Opus audit): a loggable load must sit on the 2.5 kg rack grid and be
+ *  within 0–500 inclusive. Reject — never silently snap — any draft that
+ *  would change numerically at commit time. */
+const LOAD_GRID = 2.5;
+const LOAD_MAX = 500;
+const isOnLoadGrid = (kg: number): boolean =>
+  Number.isFinite(kg) && kg >= 0 && kg <= LOAD_MAX
+  && Math.abs(kg / LOAD_GRID - Math.round(kg / LOAD_GRID)) < 1e-9;
+
+/** True when the draft holds a loggable value (explicit zero included).
+ *  Syntax + grid + range must all pass. */
+const isLoadDraftLoggable = (text: string): boolean => {
+  const parsed = parseLoadDraft(text);
+  return parsed !== null && isOnLoadGrid(parsed);
+};
 
 /** Athlete-facing source/advisory copy for the load field (Kimi spec §1a, Sol
  *  audit corrections 3–6). The effective source comes from the pure resolver;
@@ -303,16 +317,26 @@ export default function SessionScreen(): React.JSX.Element {
   const complete = !halted && sessionPlan.length > 0 && (runnerComplete || allDone);
   const target = currentSlot === null ? null : targetFor(currentSlot);
   const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
-  const primaryImplement = currentMovement?.supportedPrefixes[0] ?? 'Bodyweight';
+  // P2-2 (Opus audit): bodyweightMode is true ONLY when the canonical first
+  // supported prefix is exactly 'Bodyweight'. An absent, empty, unparseable,
+  // or non-canonical prefix list is NOT bodyweight evidence — it fails toward
+  // external-load safety behavior (blank first exposure, disabled LOG SET).
+  const primaryImplement = currentMovement?.supportedPrefixes[0];
   const bodyweightMode = primaryImplement === 'Bodyweight';
   const loadLabel = bodyweightMode ? 'Added kg (0 = bodyweight)' : 'Load kg';
+  // P2-4 (Opus audit): one stable target-RPE value for load resolution —
+  // the slot target when present, a fixed fallback when absent. Used by both
+  // the display resolver call and the one-time draft initializer so they
+  // never diverge. Mutable Actual RPE is completion evidence and must not
+  // recalculate source/advisory copy or rewrite load draft state.
+  const stableTargetRpe = currentSlot?.targetRpe ?? 8;
   const loadSelection: LoadSelection | null = currentSlot === null || target === null
     ? null
     : state.resolveSlotLoad({
         movementId: currentSlot.movementId,
         bodyweightMode,
         targetReps: target.kind === 'reps' ? target.reps : null,
-        targetRpe: currentSlot.targetRpe ?? rpe,
+        targetRpe: stableTargetRpe,
         overrideLoadKg: currentSlot.overrideLoadKg,
         sessionPlanSlotId: currentSlot.sessionPlanSlotId,
       });
@@ -358,7 +382,7 @@ export default function SessionScreen(): React.JSX.Element {
       movementId: currentSlot.movementId,
       bodyweightMode,
       targetReps: target.kind === 'reps' ? target.reps : null,
-      targetRpe: currentSlot.targetRpe ?? 8,
+      targetRpe: stableTargetRpe,
       overrideLoadKg: currentSlot.overrideLoadKg,
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
     }).initialLoadKg;
@@ -508,12 +532,19 @@ export default function SessionScreen(): React.JSX.Element {
     if (currentSlot === null || currentMovement === null || target === null || resting) return;
     const parsed = parseLoadDraft(loadText);
     // Logging an external-load set requires an explicit finite, non-negative
-    // entry; blank is absent evidence and never coerces to zero.
+    // entry; blank is absent evidence and never coerced to zero.
     if (parsed === null) {
       setLoadInvalid(loadText.trim() !== '');
       return;
     }
-    const safeLoad = clamp(Math.round(parsed / 2.5) * 2.5, 0, 500);
+    // P1-2: reject any draft that would change at commit time (off-grid or
+    // out of range). The screen passes the exact athlete-entered value to
+    // logSet — never a silently snapped or clamped rewrite.
+    if (!isOnLoadGrid(parsed)) {
+      setLoadInvalid(true);
+      return;
+    }
+    const safeLoad = parsed;
     const safeRpe = rpeTouched ? clamp(Math.round(rpe * 2) / 2, 5, 10) : null;
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
@@ -733,9 +764,9 @@ export default function SessionScreen(): React.JSX.Element {
                             style={styles.loadEvidence}
                             testID="session-load-validation"
                             accessibilityRole="alert"
-                            accessibilityLabel="Load validation. Enter a number, 0 or more."
+                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 2.5 kg increments."
                           >
-                            Enter a number, 0 or more.
+                            Enter a load from 0 to 500 in 2.5 kg increments.
                           </Text>
                         )}
                         {!loadInvalid && !loadLoggable && (
@@ -764,14 +795,14 @@ export default function SessionScreen(): React.JSX.Element {
                                   setLoadText(clamp(current - 2.5, 0, 500).toFixed(1));
                                   setLoadInvalid(false);
                                 }}
-                                disabled={parseLoadDraft(loadText) === null}
+                                disabled={!isLoadDraftLoggable(loadText)}
                                 accessibilityRole="button"
                                 accessibilityLabel="Decrease load by 2.5 kilograms"
-                                accessibilityState={{ disabled: parseLoadDraft(loadText) === null }}
+                                accessibilityState={{ disabled: !isLoadDraftLoggable(loadText) }}
                                 style={({ pressed }) => [
                                   styles.loadAdjust,
                                   pressed && styles.loadAdjustPressed,
-                                  parseLoadDraft(loadText) === null && styles.loadAdjustDisabled,
+                                  !isLoadDraftLoggable(loadText) && styles.loadAdjustDisabled,
                                 ]}
                               >
                                 <Text style={styles.loadAdjustText}>−</Text>
@@ -782,7 +813,8 @@ export default function SessionScreen(): React.JSX.Element {
                                 value={loadText}
                                 onChangeText={(t) => {
                                   setLoadText(t);
-                                  setLoadInvalid(t.trim() !== '' && parseLoadDraft(t) === null);
+                                  const parsed = parseLoadDraft(t);
+                                  setLoadInvalid(t.trim() !== '' && (parsed === null || !isOnLoadGrid(parsed)));
                                 }}
                                 keyboardType="numeric"
                                 placeholder="—"
@@ -802,14 +834,14 @@ export default function SessionScreen(): React.JSX.Element {
                                   setLoadText(clamp(current + 2.5, 0, 500).toFixed(1));
                                   setLoadInvalid(false);
                                 }}
-                                disabled={parseLoadDraft(loadText) === null}
+                                disabled={!isLoadDraftLoggable(loadText)}
                                 accessibilityRole="button"
                                 accessibilityLabel="Increase load by 2.5 kilograms"
-                                accessibilityState={{ disabled: parseLoadDraft(loadText) === null }}
+                                accessibilityState={{ disabled: !isLoadDraftLoggable(loadText) }}
                                 style={({ pressed }) => [
                                   styles.loadAdjust,
                                   pressed && styles.loadAdjustPressed,
-                                  parseLoadDraft(loadText) === null && styles.loadAdjustDisabled,
+                                  !isLoadDraftLoggable(loadText) && styles.loadAdjustDisabled,
                                 ]}
                               >
                                 <Text style={styles.loadAdjustText}>+</Text>

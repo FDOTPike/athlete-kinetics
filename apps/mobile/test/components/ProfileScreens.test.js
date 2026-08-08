@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
 
@@ -259,5 +260,37 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
 
     expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(true);
     expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(false);
+  });
+
+  test('active session disables all TRAINING AGE chips and shows the load-authority hint', () => {
+    mockState = { ...mockState, session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] } };
+    render(<ProfileScreen />);
+    // Every TRAINING AGE chip must be disabled
+    for (const age of TRAINING_AGES) {
+      const chip = screen.getByLabelText(`2 · TRAINING AGE: ${age}`);
+      expect(chip.props.accessibilityState.disabled).toBe(true);
+    }
+    expect(screen.getByText('Training age cannot change during a session because it can change load authority.')).toBeOnTheScreen();
+  });
+
+  test('active session pressing a disabled TRAINING AGE chip does not call saveProfile', () => {
+    mockState = { ...mockState, session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] } };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('2 · TRAINING AGE: advanced'));
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+  });
+
+  test('LOAD SELECTION chips remain disabled during active session', () => {
+    mockState = {
+      ...mockState,
+      session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },
+      profile: { ...baseProfile, training_age: 'intermediate' },
+      loadPreference: 'auto',
+      saveLoadPreference: jest.fn(),
+    };
+    render(<ProfileScreen />);
+    expect(screen.getByTestId('profile-load-pref-auto').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('profile-load-pref-manual').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByText('Finish the active session before changing load selection.')).toBeOnTheScreen();
   });
 });
