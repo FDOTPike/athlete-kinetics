@@ -1330,6 +1330,34 @@ if (resetTables.length >= 15) {
   a('AGENT_WORKFLOW.md documents exact verify:all gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
   a('ci.yml documents exact verify:all gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
 
+  const androidBuildContent = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'build.gradle'), 'utf-8');
+  const releaseBuildBlock = androidBuildContent.slice(androidBuildContent.lastIndexOf('release {'));
+  const signingNames = [
+    'AK_UPLOAD_STORE_FILE', 'AK_UPLOAD_STORE_PASSWORD',
+    'AK_UPLOAD_KEY_ALIAS', 'AK_UPLOAD_KEY_PASSWORD',
+  ];
+  a('Android release build never uses the committed debug signing config',
+    !releaseBuildBlock.includes('signingConfig signingConfigs.debug'));
+  a('Android release signing requires all four external secret inputs',
+    signingNames.every((name) => androidBuildContent.includes(name))
+      && androidBuildContent.includes('Release signing is not configured.')
+      && androidBuildContent.includes('gradle.taskGraph.whenReady'));
+  a('CI artifact is explicitly debug-only and never invokes assembleRelease',
+    ciYmlContent.includes('assembleDebug')
+      && ciYmlContent.includes('athlete-kinetics-debug-qa-apk')
+      && !ciYmlContent.includes('assembleRelease'));
+
+  const gitignoreContent = readFileSync(join(ROOT, '.gitignore'), 'utf-8');
+  a('upload keystores and local release credentials are ignored',
+    gitignoreContent.includes('*.jks')
+      && gitignoreContent.includes('**/keystore.properties')
+      && gitignoreContent.includes('.env.release'));
+
+  const profileScreenContent = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'screens', 'ProfileScreen.tsx'), 'utf-8');
+  a('ATHLETE surface carries visible medical-device and medical-advice positioning',
+    profileScreenContent.includes('not medical advice')
+      && profileScreenContent.includes('It is not a medical device.'));
+
   // --- [T11] _chain_projection.sql.tpl equivalence check ---
   console.log('[SQL chain projection template equivalence check]');
   const tplPath = join(SCHEMA_DIR, '_chain_projection.sql.tpl');

@@ -100,6 +100,9 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<ProfileScreen />);
 
     expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+    expect(screen.getByTestId('training-guidance-safety-notice')).toBeOnTheScreen();
+    expect(screen.getByLabelText(/Training guidance safety notice/)).toBeOnTheScreen();
+    expect(screen.getByText(/pikeMethods provides training guidance, not medical advice/)).toBeOnTheScreen();
     // Steppers render with Decrease/Increase accessibility labels
     expect(screen.getByLabelText('Decrease 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
     expect(screen.getByLabelText('Increase 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();

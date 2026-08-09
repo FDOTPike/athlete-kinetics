@@ -275,6 +275,19 @@ export default function ProfileScreen(): React.JSX.Element {
         them day to day, never exceed them.
       </Text>
 
+      <View
+        accessible
+        accessibilityLabel="Training guidance safety notice. pikeMethods provides training guidance, not medical advice. It is not a medical device. Stop if something feels unsafe and seek qualified professional advice when needed."
+        style={styles.safetyNotice}
+        testID="training-guidance-safety-notice"
+      >
+        <Text style={styles.safetyTitle}>TRAINING GUIDANCE</Text>
+        <Text style={styles.safetyText}>
+          pikeMethods provides training guidance, not medical advice. It is not a medical device.
+          Stop if something feels unsafe and seek qualified professional advice when needed.
+        </Text>
+      </View>
+
       <ChipRow
         label="1 · OBJECTIVE"
         tip="GPP"
@@ -943,6 +956,16 @@ const styles = StyleSheet.create({
     marginBottom: theme.space[1],
   },
   heading: { ...theme.font.title, color: theme.color.textHi },
+  safetyNotice: {
+    backgroundColor: theme.color.ink1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    borderWidth: 1,
+    marginBottom: theme.space[4],
+    padding: theme.space[3],
+  },
+  safetyTitle: { ...theme.font.eyebrow, color: theme.color.textHi, marginBottom: theme.space[1] },
+  safetyText: { ...theme.font.label, color: theme.color.textMid },
   mgmtSection: {
     marginTop: theme.space[3],
     paddingTop: theme.space[4],

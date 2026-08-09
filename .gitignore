@@ -19,6 +19,15 @@ apps/mobile/android/build/
 apps/mobile/ios/build/
 apps/mobile/android/app/.cxx/
 
+# Android upload keys and local release credentials. The committed template
+# debug key remains tracked solely for debug QA builds.
+*.jks
+*.keystore
+!apps/mobile/android/app/debug.keystore
+**/keystore.properties
+**/release.properties
+.env.release
+
 packages/biometrics/test/.build/
 .hermes/
 

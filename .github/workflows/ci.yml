@@ -53,7 +53,7 @@ jobs:
             --assets-dest build/assets
 
   android-apk:
-    name: Android APK (sideloadable)
+    name: Android debug APK (sideloadable, never for Play)
     runs-on: ubuntu-latest
     needs: verify
     steps:
@@ -82,16 +82,16 @@ jobs:
           mkdir -p apps/mobile/android/app/src/main/assets
           cp packages/inference/assets/minilm/model_quantized.onnx \
              apps/mobile/android/app/src/main/assets/minilm.onnx
-      # Release variant bundles JS + Hermes bytecode; the RN template signs
-      # release with the committed debug keystore, so the artifact installs
-      # directly on a phone with "install unknown apps" enabled.
-      - name: Build release APK
+      # This artifact is deliberately DEBUG-signed for local device QA. Play
+      # release artifacts require the external upload key documented in
+      # docs/PRE_RELEASE_ANDROID.md and are never signed with this key.
+      - name: Build debug QA APK
         working-directory: apps/mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v6
         with:
-          name: athlete-kinetics-apk
-          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          name: athlete-kinetics-debug-qa-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

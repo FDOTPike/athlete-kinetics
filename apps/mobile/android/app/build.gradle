@@ -72,6 +72,35 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Production signing material must live outside the repository. Gradle accepts
+// either -P properties or same-named environment variables so local builds and
+// CI can use their own secret stores without a checked-in properties file.
+def releaseStoreFile = project.findProperty('AK_UPLOAD_STORE_FILE') ?: System.getenv('AK_UPLOAD_STORE_FILE')
+def releaseStorePassword = project.findProperty('AK_UPLOAD_STORE_PASSWORD') ?: System.getenv('AK_UPLOAD_STORE_PASSWORD')
+def releaseKeyAlias = project.findProperty('AK_UPLOAD_KEY_ALIAS') ?: System.getenv('AK_UPLOAD_KEY_ALIAS')
+def releaseKeyPassword = project.findProperty('AK_UPLOAD_KEY_PASSWORD') ?: System.getenv('AK_UPLOAD_KEY_PASSWORD')
+def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+    .every { it != null && !it.toString().trim().isEmpty() }
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def requestedReleaseArtifact = taskGraph.allTasks.any { candidate ->
+        def task = candidate.name.toLowerCase()
+        candidate.project == project && task.contains('release')
+            && (task.contains('assemble') || task.contains('bundle')
+                || task.contains('install') || task.contains('publish')
+                || task.contains('package'))
+    }
+    if (requestedReleaseArtifact && !hasReleaseSigning) {
+        throw new GradleException(
+            'Release signing is not configured. Set AK_UPLOAD_STORE_FILE, '
+            + 'AK_UPLOAD_STORE_PASSWORD, AK_UPLOAD_KEY_ALIAS, and AK_UPLOAD_KEY_PASSWORD.'
+        )
+    }
+}
+
+def appVersionCode = project.findProperty('AK_VERSION_CODE') ?: System.getenv('AK_VERSION_CODE') ?: '1'
+def appVersionName = project.findProperty('AK_VERSION_NAME') ?: System.getenv('AK_VERSION_NAME') ?: '1.0'
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -90,8 +119,8 @@ android {
         applicationId "com.athletekinetics"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode Integer.parseInt(appVersionCode.toString())
+        versionName appVersionName.toString()
         // NOTE: this app module has no own CMake build (no src/main/cpp), so
         // these arguments affect nothing in this module. The 16 KB alignment
         // of autolinked native modules is governed by the NDK version pinned
@@ -106,15 +135,23 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
