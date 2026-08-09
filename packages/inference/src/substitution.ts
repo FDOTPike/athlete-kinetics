@@ -40,6 +40,7 @@ import {
   type MovementPreference,
   type TrainingAge,
 } from './types';
+import { isDifficultyAllowed } from './tierPolicy';
 
 // ---------------------------------------------------------------------------
 // Joint model (engine-local safety policy)
@@ -254,10 +255,11 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     m.capabilityAvailable !== false && m.required.every((item) => inventory.has(item));
   /** Plan P16 S4 tier gate: a beginner is only offered Beginner movements or
    *  whitelisted Intermediate staples — in EVERY layer, triage included. */
-  const beginnerBars = (m: SubstitutionMovement): boolean =>
-    input.trainingAge === 'beginner' &&
-    m.difficulty !== 'Beginner' &&
-    m.beginnerOk !== true;
+  const tierBars = (m: SubstitutionMovement): boolean => !isDifficultyAllowed(
+    input.trainingAge ?? 'intermediate',
+    m.difficulty,
+    m.beginnerOk,
+  );
   /** Guardrail predicate with the side effect of recording the block. */
   const guardrailBars = (m: SubstitutionMovement): boolean => {
     if (guarded && jointsOf(m).some((j) => injured.has(j))) {
@@ -276,7 +278,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     if (m.pattern !== input.target.pattern) continue;
     if (isAvoided(m) || !available(m)) continue;
     if (DIFFICULTY_RANK[m.difficulty] > targetRank) continue;
-    if (beginnerBars(m)) continue;
+    if (tierBars(m)) continue;
     if (guardrailBars(m)) continue;
     const easier = DIFFICULTY_RANK[m.difficulty] < targetRank;
     layer1.push({
@@ -302,7 +304,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     if (m.movement_id === input.target.movement_id) continue;
     if (PATTERN_TO_CATEGORY[m.pattern] !== targetCategory) continue;
     if (isAvoided(m) || !available(m)) continue;
-    if (beginnerBars(m)) continue;
+    if (tierBars(m)) continue;
     if (guardrailBars(m)) continue;
     layer2.push({
       movement_id: m.movement_id,
@@ -330,7 +332,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       if (m.movement_id === input.target.movement_id) continue;
       if (m.is_compound) continue;                 // isolation/accessory only
       if (isAvoided(m) || !available(m)) continue;
-      if (beginnerBars(m)) continue;               // tier gate holds in triage too
+      if (tierBars(m)) continue;                    // tier gate holds in triage too
       if (guardrailBars(m)) continue;              // never triage onto the niggle
       pool.push(m);
     }

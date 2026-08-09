@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "targetCount": 176,
+  "finalLibraryCount": 300,
+  "source": {
+    "url": "https://github.com/yuhonas/free-exercise-db",
+    "importedAt": "2026-07-12T02:08:04.446Z",
+    "stagingFileSha256AtSelection": "aa8de27530f8b08a6c341b8a37b4659ceeab164183b50e6f16f4461a39d3c859",
+    "canonicalSourceSha256": "ea841557c19b786753d23e5716fb1d8ad3ddc6156e85a05f6ef4f5890c704de9",
+    "upstreamRevision": "unknown-preexisting-import"
+  },
+  "selection": {
+    "scope": [
+      "strength",
+      "bjj"
+    ],
+    "excluded": [
+      "quarantine",
+      "do_not_seed",
+      "stretching",
+      "plyometric",
+      "olympic",
+      "strongman",
+      "unsupported_equipment",
+      "semantic_duplicates"
+    ],
+    "equipmentVocabularyExtended": false,
+    "beginnerWhitelistChanged": false,
+    "progressionGraphChanged": false
+  },
+  "balance": {
+    "sourceCategory": {
+      "accessory": 58,
+      "cardio": 1,
+      "core": 18,
+      "hinge": 9,
+      "push": 37,
+      "row": 27,
+      "squat": 10,
+      "unilateral": 16
+    },
+    "movementPattern": {
+      "hinge": 13,
+      "isolation": 60,
+      "locomotion": 1,
+      "lunge": 6,
+      "pull_h": 13,
+      "pull_v": 13,
+      "push_h": 32,
+      "push_v": 7,
+      "rotation": 21,
+      "squat": 10
+    },
+    "difficulty": {
+      "Advanced": 6,
+      "Beginner": 112,
+      "Intermediate": 58
+    },
+    "primaryPrefix": {
+      "Banded": 8,
+      "BB": 46,
+      "Bodyweight": 25,
+      "Cable": 43,
+      "DB": 42,
+      "KB": 12
+    },
+    "targetGroup": {
+      "accessory": 58,
+      "core": 18,
+      "hinge": 9,
+      "push": 37,
+      "row": 27,
+      "squat": 10,
+      "unilateral": 16,
+      "cardio": 1
+    }
+  },
+  "batches": [
+    {
+      "slot": "037",
+      "names": [
+        "3/4 Sit-Up",
+        "Alternate Hammer Curl",
+        "Alternating Cable Shoulder Press",
+        "Alternating Floor Press",
+        "Alternating Kettlebell Press",
+        "Alternating Kettlebell Row",
+        "Back Flyes - With Bands",
+        "Band Good Morning (Pull Through)",
+        "Barbell Bench Press - Medium Grip",
+        "Barbell Incline Bench Press - Medium Grip",
+        "Barbell Incline Shoulder Raise",
+        "Barbell Lunge",
+        "Barbell Rollout from Bench",
+        "Barbell Shrug Behind The Back",
+        "Barbell Side Split Squat"
+      ]
+    },
+    {
+      "slot": "038",
+      "names": [
+        "Barbell Squat To A Bench",
+        "Bench Press - With Bands",
+        "Bent Over Barbell Row",
+        "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
+        "Bent Over One-Arm Long Bar Row",
+        "Bent Over Two-Arm Long Bar Row",
+        "Bent Over Two-Dumbbell Row",
+        "Bent Over Two-Dumbbell Row With Palms In",
+        "Bent-Arm Barbell Pullover",
+        "Bent-Arm Dumbbell Pullover",
+        "Bent-Knee Hip Raise",
+        "Board Press",
+        "Body Tricep Press",
+        "Box Squat with Bands",
+        "Cable Incline Pushdown"
+      ]
+    },
+    {
+      "slot": "039",
+      "names": [
+        "Cable Incline Triceps Extension",
+        "Cable Lying Triceps Extension",
+        "Cable One Arm Tricep Extension",
+        "Cable Preacher Curl",
+        "Cable Rear Delt Fly",
+        "Cable Russian Twists",
+        "Cable Seated Crunch",
+        "Cable Seated Lateral Raise",
+        "Cable Shrugs",
+        "Cable Wrist Curl",
+        "Calf Raise On A Dumbbell",
+        "Clock Push-Up",
+        "Close-Grip EZ Bar Curl",
+        "Close-Grip EZ-Bar Press",
+        "Close-Grip Front Lat Pulldown"
+      ]
+    },
+    {
+      "slot": "040",
+      "names": [
+        "Close-Grip Push-Up off of a Dumbbell",
+        "Concentration Curls",
+        "Cross Body Hammer Curl",
+        "Cross-Body Crunch",
+        "Crunch - Hands Overhead",
+        "Crunches",
+        "Deadlift with Bands",
+        "Decline Close-Grip Bench To Skull Crusher",
+        "Decline Dumbbell Flyes",
+        "Decline Dumbbell Triceps Extension",
+        "Decline EZ Bar Triceps Extension",
+        "Decline Oblique Crunch",
+        "Decline Push-Up",
+        "Decline Reverse Crunch",
+        "Drag Curl"
+      ]
+    },
+    {
+      "slot": "041",
+      "names": [
+        "Dumbbell Bench Press with Neutral Grip",
+        "Dumbbell Bicep Curl",
+        "Dumbbell Incline Shoulder Raise",
+        "Dumbbell Lying Rear Lateral Raise",
+        "Dumbbell One-Arm Shoulder Press",
+        "Dumbbell Prone Incline Curl",
+        "Dumbbell Seated One-Leg Calf Raise",
+        "Dumbbell Squat To A Bench",
+        "Dumbbell Tricep Extension -Pronated Grip",
+        "Elevated Back Lunge",
+        "Elevated Cable Rows",
+        "Extended Range One-Arm Kettlebell Floor Press",
+        "External Rotation",
+        "External Rotation with Cable",
+        "EZ-Bar Curl"
+      ]
+    },
+    {
+      "slot": "042",
+      "names": [
+        "Finger Curls",
+        "Flat Bench Cable Flyes",
+        "Floor Glute-Ham Raise",
+        "Floor Press",
+        "Frog Sit-Ups",
+        "Front Barbell Squat To A Bench",
+        "Front Cable Raise",
+        "Front Incline Dumbbell Raise",
+        "Front Squat (Clean Grip)",
+        "Full Range-Of-Motion Lat Pulldown",
+        "Good Morning off Pins",
+        "Gorilla Chin/Crunch",
+        "Hammer Grip Incline DB Bench Press",
+        "High Cable Curls",
+        "Hip Extension with Bands"
+      ]
+    },
+    {
+      "slot": "043",
+      "names": [
+        "Incline Barbell Triceps Extension",
+        "Incline Cable Chest Press",
+        "Incline Cable Flye",
+        "Incline Dumbbell Bench With Palms Facing In",
+        "Incline Dumbbell Curl",
+        "Incline Dumbbell Flyes",
+        "Incline Hammer Curls",
+        "Incline Push-Up Close-Grip",
+        "Incline Push-Up Wide",
+        "Internal Rotation with Band",
+        "Jackknife Sit-Up",
+        "Janda Sit-Up",
+        "JM Press",
+        "Kettlebell Arnold Press",
+        "Kettlebell Seated Press"
+      ]
+    },
+    {
+      "slot": "044",
+      "names": [
+        "Kettlebell Seesaw Press",
+        "Kettlebell Turkish Get-Up (Lunge style)",
+        "Kneeling Cable Crunch With Alternating Oblique Twists",
+        "Kneeling Cable Triceps Extension",
+        "Kneeling High Pulley Row",
+        "Kneeling Squat",
+        "Lateral Raise - With Bands",
+        "Low Cable Triceps Extension",
+        "Low Pulley Row To Neck",
+        "Lunge Pass Through",
+        "Lying Cable Curl",
+        "Lying Rear Delt Raise",
+        "Lying Triceps Press",
+        "Middle Back Shrug",
+        "Natural Glute Ham Raise"
+      ]
+    },
+    {
+      "slot": "045",
+      "names": [
+        "Oblique Crunches",
+        "One Arm Dumbbell Bench Press",
+        "One-Arm Dumbbell Row",
+        "One-Arm High-Pulley Cable Side Bends",
+        "One-Arm Kettlebell Floor Press",
+        "One-Arm Kettlebell Swings",
+        "Pallof Press With Rotation",
+        "Pin Presses",
+        "Preacher Hammer Dumbbell Curl",
+        "Push Up to Side Plank",
+        "Push-Up Wide",
+        "Reverse Band Box Squat",
+        "Reverse Band Deadlift",
+        "Reverse Band Sumo Deadlift",
+        "Reverse Barbell Preacher Curls"
+      ]
+    },
+    {
+      "slot": "046",
+      "names": [
+        "Reverse Cable Curl",
+        "Reverse Flyes",
+        "Reverse Grip Triceps Pushdown",
+        "Rope Crunch",
+        "Rope Straight-Arm Pulldown",
+        "Seated Bent-Over Rear Delt Raise",
+        "Seated Cable Rows",
+        "Seated Cable Shoulder Press",
+        "Seated Dumbbell Palms-Down Wrist Curl",
+        "Seated Dumbbell Palms-Up Wrist Curl",
+        "Seated Dumbbell Press",
+        "Seated Good Mornings",
+        "Seated Side Lateral Raise",
+        "Shotgun Row",
+        "Shoulder Press - With Bands"
+      ]
+    },
+    {
+      "slot": "047",
+      "names": [
+        "Speed Box Squat",
+        "Spider Curl",
+        "Squat with Bands",
+        "Standing Biceps Cable Curl",
+        "Standing Cable Chest Press",
+        "Standing Dumbbell Press",
+        "Standing Dumbbell Reverse Curl",
+        "Standing Dumbbell Triceps Extension",
+        "Standing Overhead Barbell Triceps Extension",
+        "Standing Palm-In One-Arm Dumbbell Press",
+        "Standing Rope Crunch",
+        "Step-up with Knee Raise",
+        "Stiff Leg Barbell Good Morning",
+        "Stiff-Legged Barbell Deadlift",
+        "Straight-Arm Dumbbell Pullover"
+      ]
+    },
+    {
+      "slot": "048",
+      "names": [
+        "Sumo Deadlift with Bands",
+        "Trail Running/Walking",
+        "Triceps Pushdown - Rope Attachment",
+        "Two-Arm Kettlebell Row",
+        "Underhand Cable Pulldowns",
+        "Upright Barbell Row",
+        "Upright Cable Row",
+        "Upright Row - With Bands",
+        "V-Bar Pullup",
+        "Wide Stance Barbell Squat",
+        "Wide-Grip Lat Pulldown"
+      ]
+    }
+  ]
+}

@@ -174,6 +174,15 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.queryByText(/docs\/AK_HISTORY_V1\.md/)).toBeNull();
   });
 
+  test('ships the offline movement catalogue data-source acknowledgement', () => {
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('data-sources-acknowledgement')).toBeOnTheScreen();
+    expect(screen.getByText('DATA SOURCES')).toBeOnTheScreen();
+    expect(screen.getAllByText(/free-exercise-db/)).toHaveLength(2);
+    expect(screen.getByText(/released under the Unlicense/)).toBeOnTheScreen();
+  });
+
   test('renders OnboardingScreen wizard correctly using shared primitives', () => {
     render(<OnboardingScreen />);
 

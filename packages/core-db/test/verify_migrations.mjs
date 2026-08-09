@@ -41,7 +41,14 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '031_planned_session_method.sql',
   '032_capability_content.sql',
   '033_goal_program.sql',
-  '034_autopilot_attribution.sql', '035_profile_load_preference.sql'];
+  '034_autopilot_attribution.sql', '035_profile_load_preference.sql',
+  '036_movement_media.sql',
+  '037_movement_library_v2_batch.sql', '038_movement_library_v2_batch.sql',
+  '039_movement_library_v2_batch.sql', '040_movement_library_v2_batch.sql',
+  '041_movement_library_v2_batch.sql', '042_movement_library_v2_batch.sql',
+  '043_movement_library_v2_batch.sql', '044_movement_library_v2_batch.sql',
+  '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
+  '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -105,6 +112,20 @@ const coachingContentComplete = (db) => {
   return summary.count === 124
     && summary.feetElevatedUrl === 'https://www.youtube.com/watch?v=J_mB4TjUf6c';
 };
+const phase2aLibrarySummary = (db) => db.raw.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM movement) AS movements,
+    (SELECT COUNT(*) FROM movement_coaching_intent) AS coaching,
+    (SELECT COUNT(*) FROM movement_media) AS media,
+    (SELECT COUNT(*) FROM movement_media WHERE status = 'external_fallback') AS fallback,
+    (SELECT COUNT(*) FROM movement_media WHERE status = 'planned') AS planned,
+    (SELECT COUNT(*) FROM movement_media WHERE status = 'ready') AS ready
+`).get();
+const phase2aLibraryComplete = (db) => {
+  const summary = phase2aLibrarySummary(db);
+  return summary.movements === 300 && summary.coaching === 300 && summary.media === 300
+    && summary.fallback === 124 && summary.planned === 176 && summary.ready === 0;
+};
 
 // --- 1. fresh install ---------------------------------------------------------
 console.log('[1] fresh install');
@@ -117,6 +138,8 @@ check('024 fresh install applies all three ratified equipment-prefix corrections
   phase17PrefixesHold(a), JSON.stringify(phase17Prefixes(a)));
 check('025 fresh install applies all 124 attested coaching records and approved video replacement',
   coachingContentComplete(a), JSON.stringify(coachingContentSummary(a)));
+check('036-048 fresh install yields the exact 300-row media/content corpus',
+  phase2aLibraryComplete(a), JSON.stringify(phase2aLibrarySummary(a)));
 a.raw.exec("INSERT INTO import_readiness_daily (date, tonnage_kg, updated_at_ms) VALUES ('2030-01-01', 2800, 1)");
 a.raw.prepare(MATERIALIZE_SQL).run('2030-01-01');
 const importedReadiness = a.raw.prepare("SELECT acute_load_kg, chronic_load_kg FROM state_vector WHERE date = '2030-01-01'").get();
@@ -223,7 +246,8 @@ b2.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
 check('precondition: movement_progression missing', sentinelsMissing(b2).includes('movement_progression'));
 runMigrations(b2, MIGRATIONS);
 check('self-heal applied 016 (progression + whitelist sentinels present)', sentinelsMissing(b2).length === 0);
-check('016+017+019+020 seeds arrived: 124 movements', Number(b2.raw.prepare('SELECT COUNT(*) c FROM movement').get().c) === 124);
+check('all movement seed batches arrive after sentinel self-heal: 300 movements',
+  Number(b2.raw.prepare('SELECT COUNT(*) c FROM movement').get().c) === 300);
 
 // --- 2c. partial-018 damage: set_metric survives, siblings dropped (audit B4) --
 console.log('[2c] partial 018 damage: movement_logging_mode dropped post-apply');
@@ -234,8 +258,8 @@ check('precondition: movement_logging_mode missing, set_metric present',
   sentinelsMissing(b3).includes('movement_logging_mode') && !sentinelsMissing(b3).includes('set_metric'));
 runMigrations(b3, MIGRATIONS);
 check('self-heal restored the dropped 018 sibling', sentinelsMissing(b3).length === 0);
-check('time-mode seeds healed back (5 rows)',
-  Number(b3.raw.prepare('SELECT COUNT(*) c FROM movement_logging_mode').get().c) === 5);
+check('time-mode seeds healed back (6 rows including Trail Running/Walking)',
+  Number(b3.raw.prepare('SELECT COUNT(*) c FROM movement_logging_mode').get().c) === 6);
 
 // --- 2d. set_target + 022 tables dropped post-apply (Fix-1 provenance side-car, 022) -------
 console.log('[2d] 022 tables dropped post-apply (provenance self-heal)');
@@ -303,6 +327,7 @@ const expectedTimePolicy = {
   'Plank': '3/30',
   'Road Run': '1/1200',
   'Suitcase Carry': '3/40',
+  'Trail Running/Walking': '1/1200',
 };
 check('023 restores ratified time-policy defaults',
   Object.keys(timePolicy).length === Object.keys(expectedTimePolicy).length
@@ -610,6 +635,43 @@ check('035 foreign key rejects an unknown profile slot', unknownSlotRejected);
 prefDb.executeSync('DELETE FROM profile_slot WHERE slot_id = 4');
 check('035 profile-slot delete cascades the preference row',
   prefDb.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 4').get() === undefined);
+
+// --- 2j. 036-048 movement media + v2 catalogue: upgrade, poison, replay ---
+console.log('[2j] 036-048 Phase 2a movement library');
+const phase2aDb = freshDb();
+const mediaIndex = FILES.indexOf('036_movement_media.sql');
+for (let i = 0; i < mediaIndex; i += 1) phase2aDb.executeSync(MIGRATIONS[i]);
+phase2aDb.executeSync(`PRAGMA user_version = ${mediaIndex};`);
+check('035-era upgrade precondition has 124 movements and no media table',
+  Number(phase2aDb.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c) === 124
+    && phase2aDb.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='movement_media'").get() === undefined);
+runMigrations(phase2aDb, MIGRATIONS);
+check('clean 035 -> 048 upgrade yields the exact 300-row corpus',
+  phase2aLibraryComplete(phase2aDb), JSON.stringify(phase2aLibrarySummary(phase2aDb)));
+
+phase2aDb.executeSync('DROP TABLE movement_media');
+check('036 poison precondition marks movement_media missing',
+  sentinelsMissing(phase2aDb).includes('movement_media'));
+runMigrations(phase2aDb, MIGRATIONS);
+check('036 poison self-heal restores all 300 media rows and statuses',
+  sentinelsMissing(phase2aDb).length === 0 && phase2aLibraryComplete(phase2aDb),
+  JSON.stringify(phase2aLibrarySummary(phase2aDb)));
+
+let replayedBatches = 0;
+for (const file of FILES.filter((name) => /^0(?:3[7-9]|4[0-8])_movement_library_v2_batch\.sql$/.test(name))) {
+  phase2aDb.executeSync(`PRAGMA user_version = ${FILES.indexOf(file)};`);
+  runMigrations(phase2aDb, MIGRATIONS);
+  if (phase2aLibraryComplete(phase2aDb)) replayedBatches += 1;
+}
+check('all twelve v2 batch boundaries replay idempotently', replayedBatches === 12,
+  `${replayedBatches}/12`);
+
+const mediaCascadeId = Number(phase2aDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = '3/4 Sit-Up'",
+).get().movement_id);
+phase2aDb.executeSync(`DELETE FROM movement WHERE movement_id = ${mediaCascadeId}`);
+check('movement delete cascades its media side-car',
+  phase2aDb.raw.prepare('SELECT 1 FROM movement_media WHERE movement_id = ?').get(mediaCascadeId) === undefined);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

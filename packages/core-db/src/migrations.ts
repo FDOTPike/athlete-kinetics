@@ -43,11 +43,24 @@ import m032 from './schema/032_capability_content.sql';
 import m033 from './schema/033_goal_program.sql';
 import m034 from './schema/034_autopilot_attribution.sql';
 import m035 from './schema/035_profile_load_preference.sql';
+import m036 from './schema/036_movement_media.sql';
+import m037 from './schema/037_movement_library_v2_batch.sql';
+import m038 from './schema/038_movement_library_v2_batch.sql';
+import m039 from './schema/039_movement_library_v2_batch.sql';
+import m040 from './schema/040_movement_library_v2_batch.sql';
+import m041 from './schema/041_movement_library_v2_batch.sql';
+import m042 from './schema/042_movement_library_v2_batch.sql';
+import m043 from './schema/043_movement_library_v2_batch.sql';
+import m044 from './schema/044_movement_library_v2_batch.sql';
+import m045 from './schema/045_movement_library_v2_batch.sql';
+import m046 from './schema/046_movement_library_v2_batch.sql';
+import m047 from './schema/047_movement_library_v2_batch.sql';
+import m048 from './schema/048_movement_library_v2_batch.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035, m036, m037, m038, m039, m040, m041, m042, m043, m044, m045, m046, m047, m048];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

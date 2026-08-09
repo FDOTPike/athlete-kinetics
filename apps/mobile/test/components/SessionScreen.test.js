@@ -8,6 +8,7 @@ let mockState;
 
 jest.mock('@ak/inference', () => {
   const actual = jest.requireActual('@ak/inference');
+  const actualTierPolicy = jest.requireActual('../../../../packages/inference/src/tierPolicy');
   return {
     JOINTS: ['shoulder', 'knee'],
     nextUp: jest.fn((runner) => {
@@ -21,6 +22,7 @@ jest.mock('@ak/inference', () => {
     }),
     targetLoadKg: actual.targetLoadKg,
     resolveLoadSelection: actual.resolveLoadSelection,
+    isDifficultyAllowed: actualTierPolicy.isDifficultyAllowed,
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
@@ -43,7 +45,8 @@ const movement = (id, name, overrides = {}) => ({
   loggingMode: 'reps', required: [], baseName: name, supportedPrefixes: ['Bodyweight'],
   difficulty: 'Beginner', preference: 0,
   instructions: 'Plant your feet\nBrace your trunk', cues: 'Push the floor away\nKeep ribs down',
-  videoUrl: 'https://www.youtube.com/watch?v=test', coachingIntent: 'Build a simple, repeatable pressing pattern.', timePolicy: null,
+  media: { assetKey: `movement/test-${id}/demo/v1`, status: 'external_fallback', revision: 1, fallbackUrl: 'https://www.youtube.com/watch?v=test' },
+  targetMuscles: ['chest'], coachingIntent: 'Build a simple, repeatable pressing pattern.', timePolicy: null,
   ...overrides,
 });
 const slot = (id, movementId, reps = 5, overrides = {}) => ({
@@ -516,6 +519,16 @@ test('a beginner never renders a legacy plan containing an advanced movement', (
   expect(mockState.runnerHalt.mock.invocationCallOrder[0]).toBeLessThan(
     mockState.endSession.mock.invocationCallOrder[0],
   );
+});
+
+test('an intermediate athlete never renders a plan containing an advanced movement', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [movement(1, 'First movement'), movement(2, 'Advanced movement', { difficulty: 'Advanced', beginnerOk: false })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
+  expect(screen.queryByText('Advanced movement')).toBeNull();
 });
 
 test('a triage halt on a live runner persists safety before ending the session', () => {

@@ -1,0 +1,2106 @@
+{
+  "schemaVersion": 1,
+  "keyFormat": "movement/<canonical-kebab-name>/demo/v1",
+  "records": [
+    {
+      "name": "3/4 Sit-Up",
+      "assetKey": "movement/3-4-sit-up/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Alternate Hammer Curl",
+      "assetKey": "movement/alternate-hammer-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Alternating Cable Shoulder Press",
+      "assetKey": "movement/alternating-cable-shoulder-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Alternating Floor Press",
+      "assetKey": "movement/alternating-floor-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Alternating Kettlebell Press",
+      "assetKey": "movement/alternating-kettlebell-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Alternating Kettlebell Row",
+      "assetKey": "movement/alternating-kettlebell-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Arnold Press",
+      "assetKey": "movement/arnold-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Back Flyes - With Bands",
+      "assetKey": "movement/back-flyes-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Band External Rotation",
+      "assetKey": "movement/band-external-rotation/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Band Good Morning",
+      "assetKey": "movement/band-good-morning/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Band Good Morning (Pull Through)",
+      "assetKey": "movement/band-good-morning-pull-through/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Band Pull-Apart",
+      "assetKey": "movement/band-pull-apart/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Band Row",
+      "assetKey": "movement/band-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Ab Rollout",
+      "assetKey": "movement/barbell-ab-rollout/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Bench Press - Medium Grip",
+      "assetKey": "movement/barbell-bench-press-medium-grip/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Barbell Curl",
+      "assetKey": "movement/barbell-curl/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Hack Squat",
+      "assetKey": "movement/barbell-hack-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Hip Thrust",
+      "assetKey": "movement/barbell-hip-thrust/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Incline Bench Press - Medium Grip",
+      "assetKey": "movement/barbell-incline-bench-press-medium-grip/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Barbell Incline Shoulder Raise",
+      "assetKey": "movement/barbell-incline-shoulder-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Barbell Lunge",
+      "assetKey": "movement/barbell-lunge/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Barbell Rear Delt Row",
+      "assetKey": "movement/barbell-rear-delt-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Rollout from Bench",
+      "assetKey": "movement/barbell-rollout-from-bench/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Barbell Row",
+      "assetKey": "movement/barbell-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Seated Calf Raise",
+      "assetKey": "movement/barbell-seated-calf-raise/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Shrug",
+      "assetKey": "movement/barbell-shrug/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Barbell Shrug Behind The Back",
+      "assetKey": "movement/barbell-shrug-behind-the-back/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Barbell Side Split Squat",
+      "assetKey": "movement/barbell-side-split-squat/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Barbell Squat To A Bench",
+      "assetKey": "movement/barbell-squat-to-a-bench/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Barbell Step-Up",
+      "assetKey": "movement/barbell-step-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Bench Dip",
+      "assetKey": "movement/bench-dip/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Bench Press - With Bands",
+      "assetKey": "movement/bench-press-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent Over Barbell Row",
+      "assetKey": "movement/bent-over-barbell-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
+      "assetKey": "movement/bent-over-dumbbell-rear-delt-raise-with-head-on-bench/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent Over One-Arm Long Bar Row",
+      "assetKey": "movement/bent-over-one-arm-long-bar-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent Over Two-Arm Long Bar Row",
+      "assetKey": "movement/bent-over-two-arm-long-bar-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent Over Two-Dumbbell Row",
+      "assetKey": "movement/bent-over-two-dumbbell-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent Over Two-Dumbbell Row With Palms In",
+      "assetKey": "movement/bent-over-two-dumbbell-row-with-palms-in/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent Press",
+      "assetKey": "movement/bent-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Bent-Arm Barbell Pullover",
+      "assetKey": "movement/bent-arm-barbell-pullover/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent-Arm Dumbbell Pullover",
+      "assetKey": "movement/bent-arm-dumbbell-pullover/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bent-Knee Hip Raise",
+      "assetKey": "movement/bent-knee-hip-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "BJJ Sparring Round",
+      "assetKey": "movement/bjj-sparring-round/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Board Press",
+      "assetKey": "movement/board-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Body Tricep Press",
+      "assetKey": "movement/body-tricep-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bodyweight Squat",
+      "assetKey": "movement/bodyweight-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Box Squat",
+      "assetKey": "movement/box-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Box Squat with Bands",
+      "assetKey": "movement/box-squat-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Bulgarian Split Squat",
+      "assetKey": "movement/bulgarian-split-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Chest Press",
+      "assetKey": "movement/cable-chest-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Crunch",
+      "assetKey": "movement/cable-crunch/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Deadlifts",
+      "assetKey": "movement/cable-deadlifts/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Glute Kickback",
+      "assetKey": "movement/cable-glute-kickback/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Hammer Curls - Rope Attachment",
+      "assetKey": "movement/cable-hammer-curls-rope-attachment/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Incline Pushdown",
+      "assetKey": "movement/cable-incline-pushdown/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Incline Triceps Extension",
+      "assetKey": "movement/cable-incline-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Internal Rotation",
+      "assetKey": "movement/cable-internal-rotation/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Lying Triceps Extension",
+      "assetKey": "movement/cable-lying-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable One Arm Tricep Extension",
+      "assetKey": "movement/cable-one-arm-tricep-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Preacher Curl",
+      "assetKey": "movement/cable-preacher-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Pull-Through",
+      "assetKey": "movement/cable-pull-through/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Rear Delt Fly",
+      "assetKey": "movement/cable-rear-delt-fly/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Reverse Crunch",
+      "assetKey": "movement/cable-reverse-crunch/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Rope Overhead Triceps Extension",
+      "assetKey": "movement/cable-rope-overhead-triceps-extension/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Rope Rear-Delt Rows",
+      "assetKey": "movement/cable-rope-rear-delt-rows/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Row",
+      "assetKey": "movement/cable-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Russian Twists",
+      "assetKey": "movement/cable-russian-twists/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Seated Crunch",
+      "assetKey": "movement/cable-seated-crunch/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Seated Lateral Raise",
+      "assetKey": "movement/cable-seated-lateral-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Shoulder Press",
+      "assetKey": "movement/cable-shoulder-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Cable Shrugs",
+      "assetKey": "movement/cable-shrugs/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cable Wrist Curl",
+      "assetKey": "movement/cable-wrist-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Calf Raise On A Dumbbell",
+      "assetKey": "movement/calf-raise-on-a-dumbbell/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Calf Raises - With Bands",
+      "assetKey": "movement/calf-raises-with-bands/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Chest-Supported Dumbbell Row",
+      "assetKey": "movement/chest-supported-dumbbell-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Chin-up",
+      "assetKey": "movement/chin-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Clock Push-Up",
+      "assetKey": "movement/clock-push-up/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Close-Grip Bench Press",
+      "assetKey": "movement/close-grip-bench-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Close-Grip Dumbbell Press",
+      "assetKey": "movement/close-grip-dumbbell-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Close-Grip EZ Bar Curl",
+      "assetKey": "movement/close-grip-ez-bar-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Close-Grip EZ-Bar Press",
+      "assetKey": "movement/close-grip-ez-bar-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Close-Grip Front Lat Pulldown",
+      "assetKey": "movement/close-grip-front-lat-pulldown/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Close-Grip Push-Up off of a Dumbbell",
+      "assetKey": "movement/close-grip-push-up-off-of-a-dumbbell/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Competition Bench",
+      "assetKey": "movement/competition-bench/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Competition Squat",
+      "assetKey": "movement/competition-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Concentration Curls",
+      "assetKey": "movement/concentration-curls/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cross Body Hammer Curl",
+      "assetKey": "movement/cross-body-hammer-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cross-Body Crunch",
+      "assetKey": "movement/cross-body-crunch/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Crunch - Hands Overhead",
+      "assetKey": "movement/crunch-hands-overhead/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Crunches",
+      "assetKey": "movement/crunches/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Cuban Press",
+      "assetKey": "movement/cuban-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dead Bug",
+      "assetKey": "movement/dead-bug/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Deadlift",
+      "assetKey": "movement/deadlift/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Deadlift with Bands",
+      "assetKey": "movement/deadlift-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Decline Bench Press",
+      "assetKey": "movement/decline-bench-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Decline Close-Grip Bench To Skull Crusher",
+      "assetKey": "movement/decline-close-grip-bench-to-skull-crusher/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Decline Crunch",
+      "assetKey": "movement/decline-crunch/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Decline Dumbbell Bench Press",
+      "assetKey": "movement/decline-dumbbell-bench-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Decline Dumbbell Flyes",
+      "assetKey": "movement/decline-dumbbell-flyes/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Decline Dumbbell Triceps Extension",
+      "assetKey": "movement/decline-dumbbell-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Decline EZ Bar Triceps Extension",
+      "assetKey": "movement/decline-ez-bar-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Decline Oblique Crunch",
+      "assetKey": "movement/decline-oblique-crunch/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Decline Push-Up",
+      "assetKey": "movement/decline-push-up/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Decline Reverse Crunch",
+      "assetKey": "movement/decline-reverse-crunch/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Deficit Deadlift",
+      "assetKey": "movement/deficit-deadlift/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dip",
+      "assetKey": "movement/dip/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Double Kettlebell Front Squat",
+      "assetKey": "movement/double-kettlebell-front-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Double Kettlebell Push Press",
+      "assetKey": "movement/double-kettlebell-push-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Drag Curl",
+      "assetKey": "movement/drag-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell Bench Press",
+      "assetKey": "movement/dumbbell-bench-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Bench Press with Neutral Grip",
+      "assetKey": "movement/dumbbell-bench-press-with-neutral-grip/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell Bicep Curl",
+      "assetKey": "movement/dumbbell-bicep-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell Floor Press",
+      "assetKey": "movement/dumbbell-floor-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Flye",
+      "assetKey": "movement/dumbbell-flye/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Front Raise",
+      "assetKey": "movement/dumbbell-front-raise/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Incline Shoulder Raise",
+      "assetKey": "movement/dumbbell-incline-shoulder-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell Lateral Raise",
+      "assetKey": "movement/dumbbell-lateral-raise/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Lunge",
+      "assetKey": "movement/dumbbell-lunge/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Lying Rear Lateral Raise",
+      "assetKey": "movement/dumbbell-lying-rear-lateral-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell One-Arm Shoulder Press",
+      "assetKey": "movement/dumbbell-one-arm-shoulder-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell Prone Incline Curl",
+      "assetKey": "movement/dumbbell-prone-incline-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell Reverse Lunge",
+      "assetKey": "movement/dumbbell-reverse-lunge/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Romanian Deadlift",
+      "assetKey": "movement/dumbbell-romanian-deadlift/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Seated One-Leg Calf Raise",
+      "assetKey": "movement/dumbbell-seated-one-leg-calf-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell Shoulder Press",
+      "assetKey": "movement/dumbbell-shoulder-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Shrug",
+      "assetKey": "movement/dumbbell-shrug/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Split Squat",
+      "assetKey": "movement/dumbbell-split-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Squat",
+      "assetKey": "movement/dumbbell-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Squat To A Bench",
+      "assetKey": "movement/dumbbell-squat-to-a-bench/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Dumbbell Step-Up",
+      "assetKey": "movement/dumbbell-step-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Sumo Squat",
+      "assetKey": "movement/dumbbell-sumo-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Dumbbell Tricep Extension -Pronated Grip",
+      "assetKey": "movement/dumbbell-tricep-extension-pronated-grip/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Eccentric Wall Handstand Push-Up",
+      "assetKey": "movement/eccentric-wall-handstand-push-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Elevated Back Lunge",
+      "assetKey": "movement/elevated-back-lunge/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Elevated Cable Rows",
+      "assetKey": "movement/elevated-cable-rows/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Extended Range One-Arm Kettlebell Floor Press",
+      "assetKey": "movement/extended-range-one-arm-kettlebell-floor-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "External Rotation",
+      "assetKey": "movement/external-rotation/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "External Rotation with Cable",
+      "assetKey": "movement/external-rotation-with-cable/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "EZ-Bar Curl",
+      "assetKey": "movement/ez-bar-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Face Pull",
+      "assetKey": "movement/face-pull/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Farmer Carry",
+      "assetKey": "movement/farmer-carry/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Feet-Elevated Push-Up",
+      "assetKey": "movement/feet-elevated-push-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Finger Curls",
+      "assetKey": "movement/finger-curls/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Flat Bench Cable Flyes",
+      "assetKey": "movement/flat-bench-cable-flyes/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Floor Back Extension",
+      "assetKey": "movement/floor-back-extension/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Floor Glute-Ham Raise",
+      "assetKey": "movement/floor-glute-ham-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Floor Press",
+      "assetKey": "movement/floor-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Frog Sit-Ups",
+      "assetKey": "movement/frog-sit-ups/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Front Barbell Squat To A Bench",
+      "assetKey": "movement/front-barbell-squat-to-a-bench/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Front Cable Raise",
+      "assetKey": "movement/front-cable-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Front Incline Dumbbell Raise",
+      "assetKey": "movement/front-incline-dumbbell-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Front Squat",
+      "assetKey": "movement/front-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Front Squat (Clean Grip)",
+      "assetKey": "movement/front-squat-clean-grip/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Full Range-Of-Motion Lat Pulldown",
+      "assetKey": "movement/full-range-of-motion-lat-pulldown/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Glute Bridge",
+      "assetKey": "movement/glute-bridge/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Goblet Squat",
+      "assetKey": "movement/goblet-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Good Morning",
+      "assetKey": "movement/good-morning/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Good Morning off Pins",
+      "assetKey": "movement/good-morning-off-pins/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Gorilla Chin/Crunch",
+      "assetKey": "movement/gorilla-chin-crunch/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Hammer Curl",
+      "assetKey": "movement/hammer-curl/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Hammer Grip Incline DB Bench Press",
+      "assetKey": "movement/hammer-grip-incline-db-bench-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Handstand Push-Up",
+      "assetKey": "movement/handstand-push-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Hanging Leg Raise",
+      "assetKey": "movement/hanging-leg-raise/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "High Cable Curls",
+      "assetKey": "movement/high-cable-curls/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Hip Extension with Bands",
+      "assetKey": "movement/hip-extension-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Barbell Triceps Extension",
+      "assetKey": "movement/incline-barbell-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Cable Chest Press",
+      "assetKey": "movement/incline-cable-chest-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Cable Flye",
+      "assetKey": "movement/incline-cable-flye/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Dumbbell Bench With Palms Facing In",
+      "assetKey": "movement/incline-dumbbell-bench-with-palms-facing-in/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Dumbbell Curl",
+      "assetKey": "movement/incline-dumbbell-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Dumbbell Flyes",
+      "assetKey": "movement/incline-dumbbell-flyes/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Dumbbell Press",
+      "assetKey": "movement/incline-dumbbell-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Incline Hammer Curls",
+      "assetKey": "movement/incline-hammer-curls/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Push-Up",
+      "assetKey": "movement/incline-push-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Incline Push-Up Close-Grip",
+      "assetKey": "movement/incline-push-up-close-grip/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Incline Push-Up Wide",
+      "assetKey": "movement/incline-push-up-wide/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Internal Rotation with Band",
+      "assetKey": "movement/internal-rotation-with-band/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Inverted Row",
+      "assetKey": "movement/inverted-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Jackknife Sit-Up",
+      "assetKey": "movement/jackknife-sit-up/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Janda Sit-Up",
+      "assetKey": "movement/janda-sit-up/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Jefferson Squats",
+      "assetKey": "movement/jefferson-squats/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "JM Press",
+      "assetKey": "movement/jm-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Kettlebell Arnold Press",
+      "assetKey": "movement/kettlebell-arnold-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Kettlebell Dead Clean",
+      "assetKey": "movement/kettlebell-dead-clean/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Kettlebell Pistol Squat",
+      "assetKey": "movement/kettlebell-pistol-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Kettlebell Seated Press",
+      "assetKey": "movement/kettlebell-seated-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Kettlebell Seesaw Press",
+      "assetKey": "movement/kettlebell-seesaw-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Kettlebell Swing",
+      "assetKey": "movement/kettlebell-swing/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Kettlebell Turkish Get-Up",
+      "assetKey": "movement/kettlebell-turkish-get-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Kettlebell Turkish Get-Up (Lunge style)",
+      "assetKey": "movement/kettlebell-turkish-get-up-lunge-style/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Kneeling Cable Crunch With Alternating Oblique Twists",
+      "assetKey": "movement/kneeling-cable-crunch-with-alternating-oblique-twists/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Kneeling Cable Triceps Extension",
+      "assetKey": "movement/kneeling-cable-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Kneeling High Pulley Row",
+      "assetKey": "movement/kneeling-high-pulley-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Kneeling Single-Arm High Pulley Row",
+      "assetKey": "movement/kneeling-single-arm-high-pulley-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Kneeling Squat",
+      "assetKey": "movement/kneeling-squat/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Lat Pulldown",
+      "assetKey": "movement/lat-pulldown/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Lateral Raise - With Bands",
+      "assetKey": "movement/lateral-raise-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Low Cable Triceps Extension",
+      "assetKey": "movement/low-cable-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Low Pulley Row To Neck",
+      "assetKey": "movement/low-pulley-row-to-neck/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Lunge Pass Through",
+      "assetKey": "movement/lunge-pass-through/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Lying Cable Curl",
+      "assetKey": "movement/lying-cable-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Lying Dumbbell Triceps Extension",
+      "assetKey": "movement/lying-dumbbell-triceps-extension/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Lying Rear Delt Raise",
+      "assetKey": "movement/lying-rear-delt-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Lying Triceps Press",
+      "assetKey": "movement/lying-triceps-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Middle Back Shrug",
+      "assetKey": "movement/middle-back-shrug/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Narrow Stance Squats",
+      "assetKey": "movement/narrow-stance-squats/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Natural Glute Ham Raise",
+      "assetKey": "movement/natural-glute-ham-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Nordic Curl",
+      "assetKey": "movement/nordic-curl/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Oblique Crunches",
+      "assetKey": "movement/oblique-crunches/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "One Arm Dumbbell Bench Press",
+      "assetKey": "movement/one-arm-dumbbell-bench-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "One Arm Lat Pulldown",
+      "assetKey": "movement/one-arm-lat-pulldown/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "One-Arm Dumbbell Row",
+      "assetKey": "movement/one-arm-dumbbell-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "One-Arm High-Pulley Cable Side Bends",
+      "assetKey": "movement/one-arm-high-pulley-cable-side-bends/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "One-Arm Kettlebell Floor Press",
+      "assetKey": "movement/one-arm-kettlebell-floor-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "One-Arm Kettlebell Row",
+      "assetKey": "movement/one-arm-kettlebell-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "One-Arm Kettlebell Swings",
+      "assetKey": "movement/one-arm-kettlebell-swings/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "One-Arm Overhead Kettlebell Squat",
+      "assetKey": "movement/one-arm-overhead-kettlebell-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Overhead Press",
+      "assetKey": "movement/overhead-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Pallof Press",
+      "assetKey": "movement/pallof-press/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Pallof Press With Rotation",
+      "assetKey": "movement/pallof-press-with-rotation/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Pike Push-Up",
+      "assetKey": "movement/pike-push-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Pin Presses",
+      "assetKey": "movement/pin-presses/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Plank",
+      "assetKey": "movement/plank/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Power Clean",
+      "assetKey": "movement/power-clean/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Preacher Curl",
+      "assetKey": "movement/preacher-curl/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Preacher Hammer Dumbbell Curl",
+      "assetKey": "movement/preacher-hammer-dumbbell-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Pull-Up",
+      "assetKey": "movement/pull-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Push Up to Side Plank",
+      "assetKey": "movement/push-up-to-side-plank/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Push-up",
+      "assetKey": "movement/push-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Push-Up Wide",
+      "assetKey": "movement/push-up-wide/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Renegade Row",
+      "assetKey": "movement/renegade-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Reverse Band Box Squat",
+      "assetKey": "movement/reverse-band-box-squat/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Reverse Band Deadlift",
+      "assetKey": "movement/reverse-band-deadlift/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Reverse Band Sumo Deadlift",
+      "assetKey": "movement/reverse-band-sumo-deadlift/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Reverse Barbell Curl",
+      "assetKey": "movement/reverse-barbell-curl/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Reverse Barbell Preacher Curls",
+      "assetKey": "movement/reverse-barbell-preacher-curls/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Reverse Cable Curl",
+      "assetKey": "movement/reverse-cable-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Reverse Crunch",
+      "assetKey": "movement/reverse-crunch/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Reverse Flyes",
+      "assetKey": "movement/reverse-flyes/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Reverse Grip Bent-Over Rows",
+      "assetKey": "movement/reverse-grip-bent-over-rows/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Reverse Grip Triceps Pushdown",
+      "assetKey": "movement/reverse-grip-triceps-pushdown/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Road Run",
+      "assetKey": "movement/road-run/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Romanian Deadlift",
+      "assetKey": "movement/romanian-deadlift/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Rope Crunch",
+      "assetKey": "movement/rope-crunch/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Rope Straight-Arm Pulldown",
+      "assetKey": "movement/rope-straight-arm-pulldown/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Russian Twist",
+      "assetKey": "movement/russian-twist/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Scapular Pull-Up",
+      "assetKey": "movement/scapular-pull-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Seated Bent-Over Rear Delt Raise",
+      "assetKey": "movement/seated-bent-over-rear-delt-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Seated Cable Rows",
+      "assetKey": "movement/seated-cable-rows/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Seated Cable Shoulder Press",
+      "assetKey": "movement/seated-cable-shoulder-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Seated Dumbbell Palms-Down Wrist Curl",
+      "assetKey": "movement/seated-dumbbell-palms-down-wrist-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Seated Dumbbell Palms-Up Wrist Curl",
+      "assetKey": "movement/seated-dumbbell-palms-up-wrist-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Seated Dumbbell Press",
+      "assetKey": "movement/seated-dumbbell-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Seated Good Mornings",
+      "assetKey": "movement/seated-good-mornings/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Seated Side Lateral Raise",
+      "assetKey": "movement/seated-side-lateral-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Shotgun Row",
+      "assetKey": "movement/shotgun-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Shoulder Press - With Bands",
+      "assetKey": "movement/shoulder-press-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Single-Arm Dumbbell Row",
+      "assetKey": "movement/single-arm-dumbbell-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Single-Leg Glute Bridge",
+      "assetKey": "movement/single-leg-glute-bridge/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Single-Leg Romanian Deadlift",
+      "assetKey": "movement/single-leg-romanian-deadlift/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Sit-Up",
+      "assetKey": "movement/sit-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Speed Box Squat",
+      "assetKey": "movement/speed-box-squat/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Spider Curl",
+      "assetKey": "movement/spider-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Squat with Bands",
+      "assetKey": "movement/squat-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Standing Barbell Calf Raise",
+      "assetKey": "movement/standing-barbell-calf-raise/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Standing Biceps Cable Curl",
+      "assetKey": "movement/standing-biceps-cable-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Standing Cable Chest Press",
+      "assetKey": "movement/standing-cable-chest-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Standing Dumbbell Calf Raise",
+      "assetKey": "movement/standing-dumbbell-calf-raise/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Standing Dumbbell Press",
+      "assetKey": "movement/standing-dumbbell-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Standing Dumbbell Reverse Curl",
+      "assetKey": "movement/standing-dumbbell-reverse-curl/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Standing Dumbbell Triceps Extension",
+      "assetKey": "movement/standing-dumbbell-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Standing Overhead Barbell Triceps Extension",
+      "assetKey": "movement/standing-overhead-barbell-triceps-extension/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Standing Palm-In One-Arm Dumbbell Press",
+      "assetKey": "movement/standing-palm-in-one-arm-dumbbell-press/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Standing Rope Crunch",
+      "assetKey": "movement/standing-rope-crunch/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Step-up with Knee Raise",
+      "assetKey": "movement/step-up-with-knee-raise/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Stiff Leg Barbell Good Morning",
+      "assetKey": "movement/stiff-leg-barbell-good-morning/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Stiff-Legged Barbell Deadlift",
+      "assetKey": "movement/stiff-legged-barbell-deadlift/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Straight-Arm Dumbbell Pullover",
+      "assetKey": "movement/straight-arm-dumbbell-pullover/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Straight-Arm Pulldown",
+      "assetKey": "movement/straight-arm-pulldown/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Suitcase Carry",
+      "assetKey": "movement/suitcase-carry/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Sumo Deadlift",
+      "assetKey": "movement/sumo-deadlift/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Sumo Deadlift with Bands",
+      "assetKey": "movement/sumo-deadlift-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "T-Bar Row",
+      "assetKey": "movement/t-bar-row/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Trail Running/Walking",
+      "assetKey": "movement/trail-running-walking/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Triceps Pushdown",
+      "assetKey": "movement/triceps-pushdown/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Triceps Pushdown - Rope Attachment",
+      "assetKey": "movement/triceps-pushdown-rope-attachment/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Tuck Crunch",
+      "assetKey": "movement/tuck-crunch/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Two-Arm Kettlebell Row",
+      "assetKey": "movement/two-arm-kettlebell-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Underhand Cable Pulldowns",
+      "assetKey": "movement/underhand-cable-pulldowns/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Upright Barbell Row",
+      "assetKey": "movement/upright-barbell-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Upright Cable Row",
+      "assetKey": "movement/upright-cable-row/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Upright Row - With Bands",
+      "assetKey": "movement/upright-row-with-bands/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "V-Bar Pulldown",
+      "assetKey": "movement/v-bar-pulldown/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "V-Bar Pullup",
+      "assetKey": "movement/v-bar-pullup/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Walking Lunge",
+      "assetKey": "movement/walking-lunge/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Weighted Pull-up",
+      "assetKey": "movement/weighted-pull-up/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Wide Stance Barbell Squat",
+      "assetKey": "movement/wide-stance-barbell-squat/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Wide-Grip Lat Pulldown",
+      "assetKey": "movement/wide-grip-lat-pulldown/demo/v1",
+      "status": "planned",
+      "revision": 1,
+      "fallbackState": "none"
+    },
+    {
+      "name": "Zercher Squat",
+      "assetKey": "movement/zercher-squat/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    },
+    {
+      "name": "Zottman Curl",
+      "assetKey": "movement/zottman-curl/demo/v1",
+      "status": "external_fallback",
+      "revision": 1,
+      "fallbackState": "legacy_reviewed_url"
+    }
+  ]
+}

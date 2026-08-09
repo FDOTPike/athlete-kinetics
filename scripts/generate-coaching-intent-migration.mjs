@@ -243,9 +243,15 @@ function main() {
   const manifest = readJson(MANIFEST);
   const seeded = readJson(SEEDED);
   const emitted = emittedContentIndex(manifest);
+  // Phase 2a v2 batches own their coaching rows and intentionally carry no
+  // external video URL. Keep this legacy generator scoped to its frozen v1
+  // manifest so all 124 historical fingerprints remain readable without
+  // forcing v2 records through the obsolete YouTube-attestation contract.
+  const allKnown = seededMovementIndex(seeded);
+  const legacyKnown = new Map([...allKnown].filter(([nameKey]) => emitted.has(nameKey)));
   const { errors, fresh } = validateCoachingContent(
     staged.movements,
-    seededMovementIndex(seeded),
+    legacyKnown,
     emitted,
     { requireComplete: true },
   );

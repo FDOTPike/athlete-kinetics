@@ -736,6 +736,20 @@ export default function ProfileScreen(): React.JSX.Element {
         </Disclosure>
       </View>
 
+      {/* ---- Offline catalogue attribution ---- */}
+      <View style={styles.mgmtSection} testID="data-sources-acknowledgement">
+        <Text style={styles.mgmtHeading}>DATA SOURCES</Text>
+        <Text style={styles.fieldHint}>
+          Movement names and source taxonomy were adapted from free-exercise-db,
+          released under the Unlicense. Coaching instructions, tier decisions,
+          and safety wording are curated for pikeMethods. Source snapshot imported
+          12 July 2026; the app remains fully offline.
+        </Text>
+        <Text selectable style={styles.fieldHint}>
+          github.com/yuhonas/free-exercise-db · unlicense.org
+        </Text>
+      </View>
+
       {/* ---- Profile Management (local multi-tenancy + state wipe) ---- */}
       <View style={styles.mgmtSection}>
         <Text style={styles.mgmtHeading}>PROFILE MANAGEMENT</Text>

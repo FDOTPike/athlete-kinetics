@@ -67,6 +67,7 @@ import {
   PROGRESSION_METHODS,
   TRAINING_AGES,
   isNoOpGuardrail,
+  isDifficultyAllowed,
   JOINTS,
   PATTERN_JOINTS,
   loadCodebase,
@@ -187,6 +188,15 @@ export const palette = {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+export type MovementMediaStatus = 'planned' | 'external_fallback' | 'ready';
+
+export interface MovementMediaRef {
+  assetKey: string;
+  status: MovementMediaStatus;
+  revision: number;
+  fallbackUrl: string | null;
+}
+
 export interface Movement {
   movement_id: number;
   name: string;
@@ -202,7 +212,8 @@ export interface Movement {
    * a reviewed movement-library migration supplies it. */
   instructions: string;
   cues: string;
-  videoUrl: string;
+  media: MovementMediaRef | null;
+  targetMuscles: string[];
   coachingIntent: string | null;
   /** Frozen into slots at plan/session creation; never read as a live dose. */
   timePolicy: { defaultSets: number; targetSeconds: number } | null;
@@ -863,16 +874,28 @@ interface MovementRow {
   movement_id: number; name: string; pattern: string;
   is_compound: number; required_json: string | null;
   // 010 LEFT JOINs — null when no movement_detail / movement_preference row.
-  base_name: string | null; supported_prefixes: string | null;
+  base_name: string | null; supported_prefixes: string | null; target_muscles: string | null;
   difficulty_rating: string | null; preference: number | null;
   beginner_ok: number | null;
   logging_mode: string | null;
   instructions: string | null; cues: string | null; video_placeholder_uri: string | null;
+  media_asset_key: string | null; media_status: string | null; media_revision: number | null;
   coaching_intent: string | null;
   time_default_sets: number | null; time_target_seconds: number | null;
   progression_group: string | null; progression_rank: number | null;
 }
 const PREFIX_SET = new Set<string>(MOVEMENT_PREFIXES);
+const MEDIA_STATUS_SET = new Set<string>(['planned', 'external_fallback', 'ready']);
+const parseStringArray = (json: string | null): string[] => {
+  try {
+    const value = JSON.parse(json ?? '[]') as unknown;
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+};
 /** Parse movement_detail.supported_prefixes, keeping only canonical tokens —
  *  an unknown/garbage token is dropped rather than offered in the dropdown. */
 const parsePrefixes = (json: string | null): MovementPrefix[] => {
@@ -893,8 +916,7 @@ const toPreference = (n: number | null): MovementPreference =>
 const movementFromRow = (r: MovementRow): Movement => {
   let required: string[] = [];
   try {
-    const v = JSON.parse(r.required_json ?? '[]') as unknown;
-    if (Array.isArray(v)) required = v.filter((x): x is string => typeof x === 'string');
+    required = parseStringArray(r.required_json);
   } catch {
     /* unreadable requirement rows fail toward "needs nothing" */
   }
@@ -908,7 +930,20 @@ const movementFromRow = (r: MovementRow): Movement => {
     loggingMode: r.logging_mode === 'time' ? 'time' : 'reps',
     instructions: r.instructions ?? '',
     cues: r.cues ?? '',
-    videoUrl: r.video_placeholder_uri ?? '',
+    media: r.media_asset_key !== null
+      && r.media_status !== null
+      && MEDIA_STATUS_SET.has(r.media_status)
+      && r.media_revision !== null
+      ? {
+          assetKey: r.media_asset_key,
+          status: r.media_status as MovementMediaStatus,
+          revision: r.media_revision,
+          fallbackUrl: (r.video_placeholder_uri ?? '').trim().length > 0
+            ? r.video_placeholder_uri
+            : null,
+        }
+      : null,
+    targetMuscles: parseStringArray(r.target_muscles),
     coachingIntent: r.coaching_intent ?? null,
     timePolicy: r.time_default_sets !== null && r.time_target_seconds !== null
       ? { defaultSets: r.time_default_sets, targetSeconds: r.time_target_seconds }
@@ -921,10 +956,11 @@ const movementFromRow = (r: MovementRow): Movement => {
 
 const MOVEMENT_LIBRARY_SQL = `SELECT m.movement_id, m.name, m.pattern, m.is_compound,
   (SELECT json_group_array(me.item) FROM movement_equipment me WHERE me.movement_id = m.movement_id) AS required_json,
-  d.base_name, d.supported_prefixes, d.difficulty_rating, d.instructions, d.cues, d.video_placeholder_uri,
+  d.base_name, d.supported_prefixes, d.difficulty_rating, d.target_muscles, d.instructions, d.cues, d.video_placeholder_uri,
+  mm.asset_key AS media_asset_key, mm.status AS media_status, mm.revision AS media_revision,
   ci.coaching_intent, tp.default_sets AS time_default_sets, tp.target_seconds AS time_target_seconds, p.preference,
   (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode, mp.progression_group, mp.progression_rank
-  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id ORDER BY m.movement_id`;
+  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_media mm ON mm.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id ORDER BY m.movement_id`;
 
 /** Map the 023 side-car (or a conservative legacy rep fallback) into one
  * target union. Historic sessions without the side-car stay readable. */
@@ -958,8 +994,10 @@ const defaultSetsForTarget = (movement: Movement | undefined, fallbackSets: numb
  * admit an Intermediate staple, but an Advanced/Elite movement never leaks
  * through a plan picker, substitution, session start, or renderer. */
 const permittedForProfile = (movement: Movement | undefined, profile: UserProfile): boolean =>
-  movement !== undefined && (
-    profile.training_age !== 'beginner' || movement.difficulty === 'Beginner' || movement.beginnerOk
+  movement !== undefined && isDifficultyAllowed(
+    profile.training_age,
+    movement.difficulty,
+    movement.beginnerOk,
   );
 
 /** Project a store Movement onto the substitution engine's input shape. The
@@ -2402,16 +2440,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const startDate = localToday();
     const shape = trainingProgramShape(planningProfile, input, startDate);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
+    const d = getDb();
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, niggles),
+    );
     for (const preference of shape.movementPreferences) {
       const movement = byId.get(preference.movementId);
       if (movement === undefined || movement.pattern !== preference.pattern) {
         throw new Error('A preferred movement does not match that slot.');
       }
+      if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(movement.movement_id)) {
+        throw new Error('A preferred movement is teaching-only for this athlete.');
+      }
     }
-    const d = getDb();
-    const capabilityAvailable = capabilityAvailableMovementIds(
-      d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, niggles),
-    );
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id, name: m.name, pattern: m.pattern as MovementPattern,
       is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,

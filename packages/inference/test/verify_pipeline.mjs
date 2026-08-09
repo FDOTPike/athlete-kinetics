@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 const { resolveMovementAvailability } = require('./.build/capabilityResolver.js');
+const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
 const { parseHistoryImport, HISTORY_IMPORT_EXAMPLE } = require('./.build/historyImport.js');
 const { composeRoutine } = require('./.build/routineComposer.js');
 const { projectChainsFromGraph } = require('./.build/chainProjection.js');
@@ -28,6 +29,21 @@ check('tier, equipment, and safety remain outer gates', () => {
   const result = resolve({ safetyExcludedMovementIds: new Set([4]) });
   assert.deepEqual(result.find((row) => row.movementId === 3).reasons, ['tier', 'equipment']);
   assert.deepEqual(result.find((row) => row.movementId === 4).reasons, ['safety']);
+});
+check('progressive tier predicate gives Intermediate no Advanced access', () => {
+  assert.equal(isDifficultyAllowed('beginner', 'Intermediate', true), true);
+  assert.equal(isDifficultyAllowed('beginner', 'Advanced', true), false);
+  assert.equal(isDifficultyAllowed('intermediate', 'Intermediate'), true);
+  assert.equal(isDifficultyAllowed('intermediate', 'Advanced'), false);
+  assert.equal(isDifficultyAllowed('advanced', 'Advanced'), true);
+  assert.equal(isDifficultyAllowed('elite', 'Advanced'), true);
+});
+check('availability resolver applies the Intermediate ceiling and unlocks Advanced at Advanced', () => {
+  const intermediate = resolve({ trainingAge: 'intermediate', equipment: new Set(['Barbell']) });
+  assert.equal(intermediate.find((row) => row.movementId === 3).state, 'teaching_only');
+  assert.deepEqual(intermediate.find((row) => row.movementId === 3).reasons, ['tier']);
+  const advanced = resolve({ trainingAge: 'advanced', equipment: new Set(['Barbell']) });
+  assert.equal(advanced.find((row) => row.movementId === 3).state, 'available');
 });
 check('verified distinct sessions and attestation clear a prerequisite', () => assert.equal(resolve().find((row) => row.movementId === 2).state, 'available'));
 check('unverified evidence cannot advance capability', () => assert.equal(resolve({ evidence: evidence.map((row) => ({ ...row, verified: false })) }).find((row) => row.movementId === 2).state, 'teaching_only'));
@@ -52,6 +68,19 @@ check('history parser reports malformed, duplicate, and unknown records by line'
 check('routine composer uses shared eligibility, role maxima, duration, and RPE cap', () => {
   const result = composeRoutine({ selections: [{ movementId: 1, role: 'major' }, { movementId: 2, role: 'major' }, { movementId: 3, role: 'supplementary' }], schemaType: 'LINEAR', objective: 'strength', trainingAge: 'beginner', durationCapMin: 30, baseRpeCap: 7, availableMovementIds: new Set([1, 2]) });
   assert.equal(result.slots.length, 1); assert.ok(result.slots.every((slot) => slot.targetRpe <= 7)); assert.ok(result.warnings.length >= 2);
+});
+check('routine construction cannot retain an Advanced movement for Intermediate', () => {
+  const availability = resolve({ trainingAge: 'intermediate', equipment: new Set(['Barbell']) });
+  const availableMovementIds = new Set(
+    availability.filter((row) => row.state === 'available').map((row) => row.movementId),
+  );
+  const result = composeRoutine({
+    selections: [{ movementId: 1, role: 'major' }, { movementId: 3, role: 'supplementary' }],
+    schemaType: 'LINEAR', objective: 'strength', trainingAge: 'intermediate',
+    durationCapMin: 60, baseRpeCap: 9, availableMovementIds,
+  });
+  assert.deepEqual(result.slots.map((slot) => slot.movementId), [1]);
+  assert.ok(result.warnings.some((warning) => warning.includes('teaching-only')));
 });
 check('routine composer preserves the athlete-authored slot order', () => {
   const selections = [
@@ -191,7 +220,5 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
   assert.equal(parsed.sessions.length, 3, `Expected 3 sessions, got ${parsed.sessions.length}`);
   assert.equal(parsed.unknownMovementNames.length, 0, `Unknown movements: ${parsed.unknownMovementNames.join(', ')}`);
 });
-console.log(`pipeline verification: ${pass}/13 checks passed`);
+console.log(`pipeline verification: ${pass}/16 checks passed`);
 if (process.exitCode) process.exit(process.exitCode);
-
-

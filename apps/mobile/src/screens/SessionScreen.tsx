@@ -1,7 +1,7 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, nextUp as nextRunnerWork } from '@ak/inference';
+import { isDifficultyAllowed, JOINTS, nextUp as nextRunnerWork } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
@@ -491,12 +491,16 @@ export default function SessionScreen(): React.JSX.Element {
     );
   }
 
-  const beginnerPlanViolation = profile.training_age === 'beginner' && sessionPlan.some((slot) => {
+  const tierPlanViolation = sessionPlan.some((slot) => {
     const movement = byId.get(slot.movementId);
-    return movement === undefined || (movement.difficulty !== 'Beginner' && !movement.beginnerOk);
+    return movement === undefined || !isDifficultyAllowed(
+      profile.training_age,
+      movement.difficulty,
+      movement.beginnerOk,
+    );
   });
 
-  if (beginnerPlanViolation) {
+  if (tierPlanViolation) {
     return (
       <View style={styles.idle} accessibilityRole="alert">
         <View style={styles.header}>
@@ -651,6 +655,9 @@ export default function SessionScreen(): React.JSX.Element {
           <View style={styles.timeline}>
             {sessionPlan.map((slot) => {
               const movement = byId.get(slot.movementId);
+              const fallbackVideoUrl = movement?.media?.status === 'external_fallback'
+                ? movement.media.fallbackUrl
+                : null;
               const logged = loggedCount(slot);
               const finished = logged >= slot.plannedSets;
               // Cross-movement rest still belongs to the just-finished slot.
@@ -935,12 +942,12 @@ export default function SessionScreen(): React.JSX.Element {
                             {setup.length === 0 && cues.length === 0 && movement?.coachingIntent == null && (
                               <Text style={styles.missing}>Curated coaching for this movement is still being reviewed.</Text>
                             )}
-                            {movement?.videoUrl !== undefined && movement.videoUrl.trim().length > 0 && (
+                            {fallbackVideoUrl !== null && (
                               <View style={{ marginTop: theme.space[2] }}>
                                 <SecondaryButton
                                   label="Open form video"
-                                  onPress={() => { void Linking.openURL(movement.videoUrl); }}
-                                  accessibilityLabel={`Open video for ${movement.name} in your browser`}
+                                  onPress={() => { void Linking.openURL(fallbackVideoUrl); }}
+                                  accessibilityLabel={`Open video for ${movement?.name ?? 'movement'} in your browser`}
                                   style={{ alignSelf: 'stretch' }}
                                 />
                               </View>

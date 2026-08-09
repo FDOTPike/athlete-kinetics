@@ -585,12 +585,13 @@ policy = {r["name"]: (r["default_sets"], r["target_seconds"]) for r in p17.execu
     SELECT m.name, p.default_sets, p.target_seconds
     FROM movement_time_policy p JOIN movement m USING(movement_id)
 """)}
-check("023 seeds the ratified time policy exactly", policy == {
+check("migration chain seeds the ratified time policy exactly", policy == {
     "Plank": (3, 30),
     "Farmer Carry": (3, 40),
     "Suitcase Carry": (3, 40),
     "Road Run": (1, 1200),
     "BJJ Sparring Round": (5, 300),
+    "Trail Running/Walking": (1, 1200),
 }, str(policy))
 
 prefs = [tuple(r) for r in p17.execute("""

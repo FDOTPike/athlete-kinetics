@@ -1,4 +1,5 @@
 import type { DifficultyRating, TrainingAge } from './types';
+import { isDifficultyAllowed } from './tierPolicy';
 
 export type MovementAvailabilityState = 'available' | 'teaching_only';
 
@@ -83,9 +84,11 @@ export function resolveMovementAvailability(
     .sort((a, b) => a.movementId - b.movementId)
     .map((movement): MovementAvailability => {
       const reasons: ('tier' | 'equipment' | 'safety' | 'capability')[] = [];
-      const tierAllowed = input.trainingAge !== 'beginner'
-        || movement.difficulty === 'Beginner'
-        || movement.beginnerOk;
+      const tierAllowed = isDifficultyAllowed(
+        input.trainingAge,
+        movement.difficulty,
+        movement.beginnerOk,
+      );
       if (!tierAllowed) reasons.push('tier');
       if (!movement.requiredEquipment.every((item) => input.equipment.has(item))) reasons.push('equipment');
       if (input.safetyExcludedMovementIds.has(movement.movementId)) reasons.push('safety');

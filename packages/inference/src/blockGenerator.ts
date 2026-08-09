@@ -17,6 +17,7 @@
 import type { DifficultyRating, MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
 import { EXPERIENCE_SEVERITY } from './types';
 import { DIFFICULTY_RANK } from './types';
+import { isDifficultyAllowed } from './tierPolicy';
 // Phase 13 Step 4 — the Block Generator Intercept: the generator imports the
 // autopilot controller and applies its forward-looking corrections to the next
 // block (a recorded halt snaps the whole block to a recovery template).
@@ -467,10 +468,11 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // Plan P16 S4: "Beginner sees Beginner + whitelisted Intermediate staples;
   // Advanced sees all." Untagged rows (difficulty undefined) stay eligible so
   // legacy callers/fixtures are byte-identical.
-  const pool = profile.training_age !== 'beginner'
-    ? equipPool
-    : equipPool.filter((m) =>
-        m.difficulty === undefined || m.difficulty === 'Beginner' || m.beginner_ok === true);
+  const pool = equipPool.filter((movement) => isDifficultyAllowed(
+    profile.training_age,
+    movement.difficulty,
+    movement.beginner_ok,
+  ));
   // Session slot budget from the duration cap (~22 min per movement including
   // rest), bounded to the planned_session shape the UI is built around.
   const slotBudget = clamp(Math.round(profile.session_duration_cap_min / 22), 2, 5);

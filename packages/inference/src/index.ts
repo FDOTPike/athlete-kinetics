@@ -52,6 +52,7 @@ export {
   type UserProfile,
 } from './types';
 export { evaluatePolicy } from './policyReference';
+export { isDifficultyAllowed } from './tierPolicy';
 export {
   defaultLoadPreference,
   resolveLoadSelection,

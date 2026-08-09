@@ -29,6 +29,7 @@ const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
   SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
   programFocuses, programMacroIndex } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
+const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
   SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
@@ -817,7 +818,7 @@ const injSq = ndSlots(injuredThin, 'squat');
 check('thin-data severe-niggle headroom never raises squat in the block',
   injSq.every((sl, i) => sl.target_rpe <= baseSq[i].target_rpe && sl.sets <= baseSq[i].sets));
 
-// --- [7] Phase 16: tier gating (plan law: Beginner + whitelisted Intermediate staples)
+// --- [7] Phase 2a: one progressive tier ceiling across every selection route
 {
   const WL = new Set(['Romanian Deadlift', 'Dumbbell Shoulder Press']);
   const tagged = movements.map((m) => ({
@@ -837,7 +838,15 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   check('tier law: whitelisted Intermediate staples remain prescribable', [...wlIds].some((id) => begIds.has(id)));
   const intPlan = generateBlock({ profile: prof({ training_age: 'intermediate' }), movements: tagged, startDate: START });
   const intIds = new Set(intPlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
-  check('tier law: non-beginner keeps Advanced movements eligible', [...intIds].some((id) => advIds.has(id)));
+  check('tier law: Intermediate block contains no Advanced movement', [...intIds].every((id) => !advIds.has(id)));
+  const advancedPlan = generateBlock({ profile: prof({ training_age: 'advanced' }), movements: tagged, startDate: START });
+  const advancedIds = new Set(advancedPlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
+  check('tier law: Advanced profile keeps Advanced movements eligible', [...advancedIds].some((id) => advIds.has(id)));
+  const elitePlan = generateBlock({ profile: prof({ training_age: 'elite' }), movements: tagged, startDate: START });
+  const eliteIds = new Set(elitePlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
+  check('tier law: Elite profile keeps Advanced movements eligible', [...eliteIds].some((id) => advIds.has(id)));
+  check('tier predicate: whitelist never bypasses the Intermediate ceiling',
+    !isDifficultyAllowed('intermediate', 'Advanced', true));
   // The cap is HARD: an all-Advanced library prescribes a beginner NOTHING.
   const allAdv = movements.map((m) => ({ ...m, difficulty: 'Advanced' }));
   const begAll = generateBlock({ profile: prof({ training_age: 'beginner' }), movements: allAdv, startDate: START });
@@ -867,6 +876,13 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   const offered = gated.layer1Regression.options.map((o) => o.name);
   check('substitution L1 (beginner): only Beginner + whitelisted staples offered',
     offered.length > 0 && offered.every((n) => n === 'Beginner Squat' || n === 'Whitelisted Int Squat'), offered.join(','));
+  const intermediateSubs = computeSubstitutions({
+    target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'intermediate',
+  });
+  const intermediateOffered = intermediateSubs.layer1Regression.options.map((o) => o.name);
+  check('substitution L1 (Intermediate): Advanced movements are never offered',
+    intermediateOffered.length > 0 && intermediateOffered.every((name) => name !== 'Advanced Squat'),
+    intermediateOffered.join(','));
   const { EXPERIENCE_SEVERITY } = require('./.build/types.js');
   const triage = computeSubstitutions({
     target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
@@ -876,6 +892,14 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   check('substitution L3 triage (beginner): Advanced accessories never selected',
     cluster !== null && cluster.movements.every((m) => m.name !== 'Advanced Iso'),
     cluster === null ? 'no cluster' : cluster.movements.map((m) => m.name).join(','));
+  const intermediateTriage = computeSubstitutions({
+    target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'intermediate',
+    niggles: [{ region: 'general fatigue', severity: EXPERIENCE_SEVERITY.intermediate.triageMin }],
+  });
+  const intermediateCluster = intermediateTriage.layer3Triage.cluster;
+  check('substitution L3 triage (Intermediate): Advanced accessories never selected',
+    intermediateCluster !== null && intermediateCluster.movements.every((m) => m.name !== 'Advanced Iso'),
+    intermediateCluster === null ? 'no cluster' : intermediateCluster.movements.map((m) => m.name).join(','));
   // Untagged libraries remain byte-identical (legacy back-compat).
   const u1 = gen({ training_age: 'beginner' });
   const u2 = generateBlock({ profile: prof({ training_age: 'beginner' }), movements, startDate: START });
@@ -888,10 +912,17 @@ check('thin-data severe-niggle headroom never raises squat in the block',
     storeSrc.includes('beginner_ok: m.beginnerOk') && storeSrc.includes('beginnerOk: m.beginnerOk'));
   check('production: store movement query joins movement_beginner_whitelist', storeSrc.includes('movement_beginner_whitelist'));
   const screenSrc = readFileSync(join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'screens', 'SessionScreen.tsx'), 'utf-8');
-  check('production: picker applies the beginner whitelist rule',
-    storeSrc.includes("movement.difficulty === 'Beginner' || movement.beginnerOk")
+  const blockSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'blockGenerator.ts'), 'utf-8');
+  const substitutionSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'substitution.ts'), 'utf-8');
+  const capabilitySrc = readFileSync(join(import.meta.dirname, '..', 'src', 'capabilityResolver.ts'), 'utf-8');
+  check('production: shared tier predicate is wired across generation, substitution, capability, store, and renderer',
+    blockSrc.includes('isDifficultyAllowed(')
+    && substitutionSrc.includes('isDifficultyAllowed(')
+    && capabilitySrc.includes('isDifficultyAllowed(')
+    && storeSrc.includes('isDifficultyAllowed(')
     && storeSrc.includes('if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(m.movement_id))')
-    && screenSrc.includes('beginnerPlanViolation'));
+    && screenSrc.includes('isDifficultyAllowed(')
+    && screenSrc.includes('tierPlanViolation'));
 }
 
 // --- [17] guided goal-program schedule and preference laws -----------------

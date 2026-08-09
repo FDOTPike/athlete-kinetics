@@ -28,7 +28,13 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql', '031_planned_session_method.sql',
   '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
-  '035_profile_load_preference.sql'];
+  '035_profile_load_preference.sql', '036_movement_media.sql',
+  '037_movement_library_v2_batch.sql', '038_movement_library_v2_batch.sql',
+  '039_movement_library_v2_batch.sql', '040_movement_library_v2_batch.sql',
+  '041_movement_library_v2_batch.sql', '042_movement_library_v2_batch.sql',
+  '043_movement_library_v2_batch.sql', '044_movement_library_v2_batch.sql',
+  '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
+  '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql'];
 
 const db = new DatabaseSync(':memory:');
 try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
@@ -330,6 +336,12 @@ check(
     && previewProgramBody.includes('End the active session before previewing program changes.')
     && !onboardingBody.includes('End the active session before previewing program changes.'),
 );
+check(
+  'program preview rejects a preferred movement outside the shared tier/capability boundary',
+  previewProgramBody.includes('!permittedForProfile(movement, profile)')
+    && previewProgramBody.includes('!capabilityAvailable.has(movement.movement_id)')
+    && previewProgramBody.includes('A preferred movement is teaching-only for this athlete.'),
+);
 
 console.log('[planned-session completion contract]');
 const completionSql = statements.find((sql) => sql.includes('END AS completion_status')) ?? '';
@@ -585,7 +597,7 @@ if (resetTables.length >= 15) {
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
   a('reset cleared EVERY history table (demo can re-load)', resetTables.every((t) => cnt(t) === 0), seeded.map((t) => `${t}=${cnt(t)}`).filter((s) => !s.endsWith('=0')).join(',') || 'all empty');
   a('athlete_profile + movement library SURVIVE the reset',
-    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 124, // 30 shipped + 51 (016) + 15 (017) + 13 (019) + 15 (020)
+    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 300,
     `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}`);
   db.exec('ROLLBACK');
 }
