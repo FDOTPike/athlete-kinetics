@@ -1,6 +1,16 @@
 export { DB_NAME, closeKineticsDb, openKineticsDb, setInferenceMode } from './pragmas';
 export { migrate } from './migrations';
 export {
+  archiveActiveTrainingBlock,
+  insertTrainingProgram,
+  linkTrainingBlockProgram,
+  updateTrainingProgramEndDate,
+  type CreateProgramWrite,
+  type ExecDb,
+  type ProgramDayWrite,
+  type ProgramPreferenceWrite,
+} from './programTx';
+export {
   DEMO_DAYS,
   SPO2_FOLD_SQL,
   SPO2_TRIM_SQL,

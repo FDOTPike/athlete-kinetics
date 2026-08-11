@@ -26,7 +26,9 @@ import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
-  SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS } = require('./.build/blockGenerator.js');
+  SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
+  normalizeProgramHorizon, programFocuses, programHorizonAnchor,
+  programMacroIndex } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
@@ -663,6 +665,42 @@ const upSq = ndSlots(upPlan, 'squat');
 check('latent_headroom raises squat target_rpe vs baseline (≤ base_rpe_cap)',
   upSq.some((sl, i) => sl.target_rpe > baseSq[i].target_rpe) && upSq.every((sl) => sl.target_rpe <= prof().base_rpe_cap));
 
+// Direct attribution provenance: the side-car carries only the effective post-clamp change.
+const easedSlot = defSq.find((sl) => sl.autopilotDelta !== undefined);
+check('eased attribution records effective post-clamp deltas',
+  easedSlot?.autopilotDelta?.reason === 'eased'
+    && easedSlot.autopilotDelta.rpe_delta === easedSlot.target_rpe - baseSq[defSq.indexOf(easedSlot)].target_rpe
+    && easedSlot.autopilotDelta.set_delta === easedSlot.sets - baseSq[defSq.indexOf(easedSlot)].sets,
+  JSON.stringify(easedSlot?.autopilotDelta));
+const raisedSlot = upSq.find((sl) => sl.autopilotDelta !== undefined);
+check('raised attribution records the raised reason and effective deltas',
+  raisedSlot?.autopilotDelta?.reason === 'raised'
+    && raisedSlot.autopilotDelta.rpe_delta === 0.5
+    && raisedSlot.autopilotDelta.set_delta === 1,
+  JSON.stringify(raisedSlot?.autopilotDelta));
+const safetyPlan = genFR({ objective: 'strength' },
+  makeFlawReport({ squat: { phi: 0.5, flawClass: 'caution' } }));
+const safetySlot = ndSlots(safetyPlan, 'squat').find((sl) => sl.autopilotDelta !== undefined);
+check('held-safety attribution records the safety reason',
+  safetySlot?.autopilotDelta?.reason === 'held_safety'
+    && safetySlot.autopilotDelta.rpe_delta < 0
+    && safetySlot.autopilotDelta.set_delta < 0,
+  JSON.stringify(safetySlot?.autopilotDelta));
+const clampPlan = genFR({ objective: 'hybrid', training_age: 'beginner', base_rpe_cap: 5, session_duration_cap_min: 90, weekly_frequency: 2 },
+  makeFlawReport({ squat: { phi: 0.5 } }));
+const clampedSlot = clampPlan.sessions.filter((s) => s.week_index === 4)
+  .flatMap((s) => s.slots).find((sl) => patternOf(sl.movement_id) === 'squat');
+check('fully clamped/protected correction has no attribution row',
+  clampedSlot !== undefined && clampedSlot.sets === 1 && clampedSlot.target_rpe === 5
+    && clampedSlot.autopilotDelta === undefined,
+  JSON.stringify(clampedSlot));
+const locomotionPlan = genFR({ objective: 'hybrid', weekly_frequency: 6 },
+  makeFlawReport({ locomotion: { phi: 0.5 } }));
+check('deload and locomotion slots remain unattributed',
+  defPlan.sessions.filter((s) => s.week_index === 4).flatMap((s) => s.slots).every((sl) => sl.autopilotDelta === undefined)
+    && locomotionPlan.sessions.filter((s) => s.phase !== 'deload')
+      .flatMap((s) => s.slots.filter((sl) => patternOf(sl.movement_id) === 'locomotion'))
+      .every((sl) => sl.autopilotDelta === undefined));
 // halt supremacy: recovery template — every week deload, volume dropped, no corrections.
 const haltPlan = genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: 0.5 }, hinge: { phi: -0.5 } }, { halt: true }));
 check('halt → recovery=true and EVERY session phase is deload',
@@ -854,6 +892,170 @@ check('thin-data severe-niggle headroom never raises squat in the block',
     storeSrc.includes("movement.difficulty === 'Beginner' || movement.beginnerOk")
     && storeSrc.includes('if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(m.movement_id))')
     && screenSrc.includes('beginnerPlanViolation'));
+}
+
+// --- [17] guided goal-program schedule and preference laws -----------------
+console.log('[17] guided goal-program schedule and preference laws');
+{
+  const objective = 'strength';
+  const frequency = 3;
+  const legacy = gen({ objective, weekly_frequency: frequency });
+  const explicitDays = defaultProgramDayIndices(frequency).map((day_index, index) => ({
+    day_index, focus: programFocuses(objective, frequency)[index],
+  }));
+  const explicit = generateBlock({
+    profile: prof({ objective, weekly_frequency: frequency }), movements, startDate: START,
+    programDays: explicitDays,
+  });
+  check('explicit default schedule is byte-identical to the legacy generator',
+    JSON.stringify(explicit) === JSON.stringify(legacy));
+
+  const oneDay = [{ day_index: 2, focus: 'full' }];
+  const baseline = generateBlock({ profile: prof({ objective, weekly_frequency: 1 }), movements, startDate: START, programDays: oneDay });
+  const baselineSquat = baseline.sessions[0].slots.find((slot) =>
+    movements.find((movement) => movement.movement_id === slot.movement_id)?.pattern === 'squat');
+  const alternate = movements.find((movement) => movement.pattern === 'squat' && movement.movement_id !== baselineSquat?.movement_id);
+  const preferenceDays = [{
+    day_index: 2, focus: 'full',
+    movement_preferences: [{ slot_index: 1, pattern: 'squat', movement_id: alternate.movement_id }],
+  }];
+  const preferred = generateBlock({
+    profile: prof({ objective, weekly_frequency: 1 }), movements, startDate: START, programDays: preferenceDays,
+  });
+  check('preferred day index repeats unchanged through all four weeks',
+    preferred.sessions.length === 4 && preferred.sessions.every((session) => session.day_index === 2));
+  check('safe same-pattern preference is used in every block week',
+    preferred.sessions.every((session) => session.slots.some((slot) => slot.movement_id === alternate.movement_id)));
+  check('coach/custom program preview is deterministic', JSON.stringify(preferred) === JSON.stringify(generateBlock({
+    profile: prof({ objective, weekly_frequency: 1 }), movements, startDate: START, programDays: preferenceDays,
+  })));
+
+  const unsafeLibrary = movements.map((movement) => movement.movement_id === alternate.movement_id
+    ? { ...movement, capability_available: false } : movement);
+  const fallback = generateBlock({
+    profile: prof({ objective, weekly_frequency: 1 }), movements: unsafeLibrary, startDate: START, programDays: preferenceDays,
+  });
+  check('unsafe preferred movement uses deterministic same-pattern fallback',
+    fallback.sessions.every((session) => !session.slots.some((slot) => slot.movement_id === alternate.movement_id))
+      && fallback.warnings.some((warning) => warning.includes('safe fallback used')));
+
+  const noSquatLibrary = unsafeLibrary.filter((movement) => movement.pattern !== 'squat' || movement.movement_id === alternate.movement_id);
+  const dropped = generateBlock({
+    profile: prof({ objective, weekly_frequency: 1 }), movements: noSquatLibrary, startDate: START, programDays: preferenceDays,
+  });
+  check('preference is dropped only when no safe same-pattern fallback exists, with warning',
+    dropped.sessions.every((session) => session.slots.every((slot) =>
+      noSquatLibrary.find((movement) => movement.movement_id === slot.movement_id)?.pattern !== 'squat'))
+      && dropped.warnings.some((warning) => warning.includes('slot dropped')));
+}
+
+// --- [18] guided program macro-cycle ownership ------------------------------
+// Regression gate for AUD-GP-2: a guided program owns its macro progression.
+// Block N of a program starting at `starting` must sit at
+//   ((starting - 1) + (sequence_index - 1)) % 8 + 1
+// NOT at the athlete's global-cycle next position. This is the derivation
+// both preview and committed generation must share.
+console.log('[18] guided program macro-cycle ownership');
+{
+  const expected = (starting, sequenceIndex) =>
+    (((starting - 1) + (sequenceIndex - 1)) % 8) + 1;
+
+  check('programMacroIndex is exported and matches the specification formula',
+    typeof programMacroIndex === 'function'
+      && programMacroIndex(1, 1) === 1 && programMacroIndex(8, 1) === 8
+      && programMacroIndex(1, 8) === 8 && programMacroIndex(8, 8) === 7);
+
+  for (const starting of [6, 7, 8]) {
+    for (let sequenceIndex = 1; sequenceIndex <= 4; sequenceIndex += 1) {
+      const want = expected(starting, sequenceIndex);
+      const got = programMacroIndex(starting, sequenceIndex);
+      check(`program starting at macro ${starting}, block ${sequenceIndex} -> macro ${want}`,
+        got === want);
+    }
+  }
+
+  check('program starting at 6 wraps 6,7,8,1 (volume->peak->peak->gpp)',
+    [1, 2, 3, 4].map((n) => programMacroIndex(6, n)).join(',') === '6,7,8,1');
+
+  check('program starting at 7 wraps 7,8,1,2',
+    [1, 2, 3, 4].map((n) => programMacroIndex(7, n)).join(',') === '7,8,1,2');
+
+  check('program starting at 8 wraps 8,1,2,3',
+    [1, 2, 3, 4].map((n) => programMacroIndex(8, n)).join(',') === '8,1,2,3');
+
+  check('program phases derive from the OWNED index, not the global counter',
+    macroPhaseOf(programMacroIndex(6, 4)) === 'gpp'
+      && macroPhaseOf(programMacroIndex(6, 1)) === 'volume'
+      && macroPhaseOf(programMacroIndex(6, 2)) === 'peak');
+}
+
+// --- [19] guided program review-horizon ownership ---------------------------
+console.log('[19] guided program review-horizon ownership');
+{
+  const initial = normalizeProgramHorizon('2026-08-03', { kind: 'weeks', blockCount: 4 });
+  check('four-block horizon normalizes to four complete 28-day blocks',
+    initial.plannedBlockCount === 4
+      && initial.plannedEndDate === addDaysIso('2026-08-03', 112)
+      && initial.requestedReviewDate === null);
+
+  const lateEnd = addDaysIso(initial.plannedEndDate, 7);
+  const stableAnchor = programHorizonAnchor(lateEnd, 4);
+  const unchanged = normalizeProgramHorizon(stableAnchor, { kind: 'weeks', blockCount: 4 });
+  const extended = normalizeProgramHorizon(stableAnchor, { kind: 'weeks', blockCount: 5 });
+  check('editing an existing program preserves a late-continuation anchor',
+    unchanged.plannedEndDate === lateEnd
+      && extended.plannedEndDate === addDaysIso(lateEnd, 28));
+
+  const dateHorizon = normalizeProgramHorizon('2026-08-03', {
+    kind: 'date', requestedReviewDate: '2026-09-01',
+  });
+  check('date horizon rounds upward to a complete four-week boundary',
+    dateHorizon.plannedBlockCount === 2
+      && dateHorizon.plannedEndDate === addDaysIso('2026-08-03', 56)
+      && dateHorizon.requestedReviewDate === '2026-09-01');
+
+  let invalidDateRejected = false;
+  try { normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2026-02-30' }); }
+  catch { invalidDateRejected = true; }
+  check('invalid calendar review date is rejected', invalidDateRejected);
+}
+
+// --- [20] persisted set caps and effective autopilot attribution ------------
+console.log('[20] persisted set caps and effective autopilot attribution');
+{
+  const carry = movements.find((movement) => movement.pattern === 'carry');
+  const cappedCarry = { ...carry, required: [], set_cap: 3 };
+  const input = {
+    profile: prof({ objective: 'endurance', weekly_frequency: 1 }),
+    movements: [cappedCarry],
+    startDate: START,
+    macroBlockIndex: 6,
+    programDays: [{ day_index: 1, focus: 'conditioning' }],
+  };
+  const baseline = generateBlock(input);
+  const baselineCarry = baseline.sessions[0].slots[0];
+  check('movement set policy is applied in the returned plan, not after generation',
+    baselineCarry.sets === 3
+      && baseline.sessions.filter((session) => session.week_index === 4)[0].slots[0].sets < 3);
+
+  const clampedRaise = generateBlock({
+    ...input, flawReport: makeFlawReport({ carry: { phi: -0.5 } }),
+  });
+  const raisedCarry = clampedRaise.sessions[0].slots[0];
+  check('fully set-capped late-cycle raise emits no false attribution',
+    raisedCarry.sets === baselineCarry.sets
+      && raisedCarry.target_rpe === baselineCarry.target_rpe
+      && raisedCarry.autopilotDelta === undefined
+      && !clampedRaise.autopilotAdjusted.includes('carry'));
+
+  const eased = generateBlock({
+    ...input, flawReport: makeFlawReport({ carry: { phi: 0.5 } }),
+  });
+  const easedCarry = eased.sessions[0].slots[0];
+  check('effective cut below the set cap carries the exact persisted delta',
+    easedCarry.sets === baselineCarry.sets - 1
+      && easedCarry.autopilotDelta?.set_delta === -1
+      && easedCarry.autopilotDelta?.reason === 'eased');
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

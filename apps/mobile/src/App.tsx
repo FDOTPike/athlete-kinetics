@@ -21,6 +21,7 @@ import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
+import ProgramSetupScreen from './screens/ProgramSetupScreen';
 import BlockScreen from './screens/BlockScreen';
 import LibraryScreen from './screens/LibraryScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -75,6 +76,8 @@ export default function App(): React.JSX.Element {
 }
 
 function AppShell(): React.JSX.Element {
+  const showProgramSetup = useStore((s) =>
+    s.status === 'ready' && s.onboarded && s.block === null && s.program === null);
   const { tab, setTab } = useNavigation();
   const boot = useStore((s) => s.boot);
   const status = useStore((s) => s.status);
@@ -115,6 +118,8 @@ function AppShell(): React.JSX.Element {
       >
         {showOnboarding ? (
           <OnboardingScreen />
+        ) : showProgramSetup ? (
+          <ProgramSetupScreen />
         ) : (
           <>
             {tab === 'readiness' && (
@@ -132,7 +137,7 @@ function AppShell(): React.JSX.Element {
           </>
         )}
       </KeyboardAvoidingView>
-      {!showOnboarding && (
+      {!showOnboarding && !showProgramSetup && (
         <View style={styles.tabBar} accessibilityRole="tablist">
           {TABS.map((t) => {
             const active = t.key === tab;

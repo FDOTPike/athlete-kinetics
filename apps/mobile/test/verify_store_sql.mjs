@@ -31,7 +31,7 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-  '032_capability_content.sql']) {
+  '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -108,25 +108,89 @@ check(
   /tab === 'coach' && status === 'ready' && \(\s*<BlockScreen/.test(appSrc),
 );
 
-console.log('[onboarding first-block contract]');
+console.log('[onboarding guided-program contract]');
 const onboardingStart = src.indexOf('completeOnboarding: (patch, athleteName) => {');
-const onboardingEnd = src.indexOf('rolloverDay: () => {', onboardingStart);
+const onboardingEnd = src.indexOf('previewTrainingProgram: (input) => {', onboardingStart);
 const onboardingBody = onboardingStart >= 0 && onboardingEnd > onboardingStart
   ? src.slice(onboardingStart, onboardingEnd)
   : '';
 const onboardingSave = onboardingBody.indexOf('get().saveProfile(patch)');
-const onboardingGenerate = onboardingBody.indexOf("get().generateNewBlock('LINEAR')");
 check(
-  'completed questionnaire saves its profile before generating the first block',
-  onboardingSave >= 0 && onboardingGenerate > onboardingSave,
+  'completed questionnaire persists its profile',
+  onboardingSave >= 0,
 );
 check(
-  'completed questionnaire never replaces an existing athlete block',
-  onboardingBody.includes("if (get().block === null) get().generateNewBlock('LINEAR')"),
+  'completed questionnaire does not silently generate a LINEAR block',
+  !onboardingBody.includes('generateNewBlock'),
+);
+check(
+  'fresh onboarded athletes route into explicit guided program setup',
+  appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen />'),
+);
+
+const previewProgramStart = src.indexOf('previewTrainingProgram: (input) => {');
+const previewProgramEnd = src.indexOf('createTrainingProgram: (input) => {', previewProgramStart);
+const previewProgramBody = src.slice(previewProgramStart, previewProgramEnd);
+check(
+  'program preview session guard lives on the preview action, not onboarding registry failure',
+  previewProgramBody.includes('get().session !== null')
+    && previewProgramBody.includes('End the active session before previewing program changes.')
+    && !onboardingBody.includes('End the active session before previewing program changes.'),
 );
 
 console.log('[planned-session completion contract]');
 const completionSql = statements.find((sql) => sql.includes('END AS completion_status')) ?? '';
+
+console.log('[guided goal-program contract]');
+const shapeStart = src.indexOf('const trainingProgramShape =');
+const shapeEnd = src.indexOf('/** Everything per-athlete', shapeStart);
+const shapeBody = src.slice(shapeStart, shapeEnd);
+check('date horizon rejects under 4 and over 32 weeks and rounds up to a complete block boundary',
+  shapeBody.includes('normalizeProgramHorizon(horizonAnchorDate, input.horizon)')
+    && previewProgramBody.includes('programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount)'),
+);
+const createStart = src.indexOf('createTrainingProgram: (input) => {');
+const createEnd = src.indexOf('rolloverDay: () => {', createStart);
+const createBody = src.slice(createStart, createEnd);
+check('program creation refuses active sessions and existing blocks/programs',
+  createBody.includes('get().session !== null')
+    && createBody.includes('get().block !== null || get().program !== null'),
+);
+const generatorStart = src.indexOf('generateNewBlock: (schemaType =');
+const generatorEnd = src.indexOf('refreshBlock:', generatorStart);
+const generatorBody = src.slice(generatorStart, generatorEnd);
+check('program creation is transactional and calls the SHARED programTx helpers',
+  generatorBody.includes("d.executeSync('BEGIN')")
+    && generatorBody.includes('insertTrainingProgram(d, {')
+    && generatorBody.includes('linkTrainingBlockProgram(d, blockId, programId,')
+    && generatorBody.includes('archiveActiveTrainingBlock(d)')
+    && generatorBody.includes("d.executeSync('COMMIT')"),
+);
+const updateStart = src.indexOf('updateProgramPreferences: (input) => {');
+const updateEnd = src.indexOf('previewNextProgramBlock:', updateStart);
+const updateBody = src.slice(updateStart, updateEnd);
+check('future preference edits never write current or historical block tables',
+  !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(training_block|block_meta|planned_session|planned_slot)\b/i.test(updateBody),
+);
+check('program continuation is confirmation-only and refuses an active session',
+  src.includes('previewNextProgramBlock: () =>')
+    && src.includes('continueTrainingProgram: () =>')
+    && src.includes('End the active session before continuing the program.'),
+);
+
+console.log('[guided program macro ownership contract]');
+check('program-owned macro index is used in BOTH preview and committed generation',
+  src.includes('programMacroIndex(activeProgram.startingMacroBlockIndex, activeProgram.currentSequenceIndex + 1)')
+    && src.includes('programMacroIndex(pendingProgramContinuation.startingMacroBlockIndex, pendingProgramContinuation.sequenceIndex)'),
+);
+check('continuation carries the program anchor, never re-reads the global cycle',
+  src.includes('startingMacroBlockIndex: current.startingMacroBlockIndex')
+    && src.includes("pendingProgramContinuation.startingMacroBlockIndex"),
+);
+check('standalone block generation still advances the athlete global cycle',
+  src.includes('nextMacroPosition(d).macroBlockIndex'),
+);
+
 check(
   'planned completion is joined through exact session_origin provenance and immutable session_outcome',
   completionSql.includes('so.source_planned_session_id = ps.planned_session_id')
@@ -223,6 +287,74 @@ if (setAggSql && niggleWinSql && maxNigSql) {
   db.exec('ROLLBACK');
 }
 
+// --- planned-slot autopilot attribution hydration ---------------------------
+console.log('[autopilot attribution hydration]');
+const slotHydrationSql = statements.find((sql) =>
+  sql.includes('SELECT sl.slot_index') && sql.includes('planned_slot_autopilot'),
+);
+a('store exposes the planned-slot attribution hydration SQL', Boolean(slotHydrationSql));
+if (slotHydrationSql) {
+  db.exec('BEGIN');
+  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (930,'Attribution Squat','squat',1),(931,'Untouched Press','push_h',1)");
+  db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (930, '2030-03-01','strength',0)");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (930,930,1,1,'lower','accumulation','2030-03-01')");
+  db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (930,930,1,930,3,5,7.5),(931,930,2,931,3,5,7.5)");
+  db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (930,-0.5,-1,'eased')");
+  const hydratedSlots = db.prepare(slotHydrationSql).all(930);
+  a('store hydration round-trips one delta and leaves an untouched slot absent',
+    hydratedSlots.length === 2
+      && Number(hydratedSlots[0].autopilot_rpe_delta) === -0.5
+      && Number(hydratedSlots[0].autopilot_set_delta) === -1
+      && hydratedSlots[0].autopilot_reason === 'eased'
+      && hydratedSlots[1].autopilot_rpe_delta === null
+      && hydratedSlots[1].autopilot_set_delta === null
+      && hydratedSlots[1].autopilot_reason === null,
+    JSON.stringify(hydratedSlots));
+  db.exec('ROLLBACK');
+}
+
+const plannedSlotInsertSql = statements.find((sql) =>
+  sql.includes('INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES'));
+const attributionInsertSql = statements.find((sql) =>
+  sql.includes('INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES'));
+a('store exposes the exact planned-slot and attribution INSERT statements',
+  Boolean(plannedSlotInsertSql) && Boolean(attributionInsertSql));
+if (plannedSlotInsertSql && attributionInsertSql) {
+  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (940,'Atomic Attribution Squat','squat',1)");
+  db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (940,'2030-04-01','strength',0)");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (940,940,1,1,'lower','accumulation','2030-04-01')");
+  db.exec('BEGIN');
+  db.prepare(plannedSlotInsertSql).run(940, 1, 940, 2, 5, 7.5);
+  const validPlannedSlotId = Number(db.prepare('SELECT last_insert_rowid() AS id').get().id);
+  db.prepare(attributionInsertSql).run(validPlannedSlotId, -0.5, -1, 'eased');
+  db.exec('COMMIT');
+  const validAttribution = db.prepare(
+    'SELECT ps.sets, pa.rpe_delta, pa.set_delta, pa.reason FROM planned_slot ps JOIN planned_slot_autopilot pa USING (planned_slot_id) WHERE ps.planned_slot_id = ?',
+  ).get(validPlannedSlotId);
+  a('production plan transaction stores the exact effective target and attribution together',
+    Number(validAttribution?.sets) === 2
+      && Number(validAttribution?.rpe_delta) === -0.5
+      && Number(validAttribution?.set_delta) === -1
+      && validAttribution?.reason === 'eased',
+    JSON.stringify(validAttribution));
+
+  let poisonedPlannedSlotId = 0;
+  let poisonedInsertRejected = false;
+  db.exec('BEGIN');
+  try {
+    db.prepare(plannedSlotInsertSql).run(940, 2, 940, 3, 5, 7.5);
+    poisonedPlannedSlotId = Number(db.prepare('SELECT last_insert_rowid() AS id').get().id);
+    db.prepare(attributionInsertSql).run(poisonedPlannedSlotId, 0, 0, 'raised');
+    db.exec('COMMIT');
+  } catch {
+    poisonedInsertRejected = true;
+    db.exec('ROLLBACK');
+  }
+  a('invalid attribution rolls its parent planned slot back atomically',
+    poisonedInsertRejected && poisonedPlannedSlotId > 0
+      && Number(db.prepare('SELECT COUNT(*) AS c FROM planned_slot WHERE planned_slot_id = ?').get(poisonedPlannedSlotId).c) === 0);
+  db.exec('DELETE FROM training_block WHERE block_id = 940; DELETE FROM movement WHERE movement_id = 940');
+}
 // --- [Phase 13 Step 4] immutability + bounded-read source invariants -------------
 console.log('[autopilot wiring invariants]');
 const stripComments = (s) => s.replace(/\/\/[^\n]*/g, '');
@@ -232,14 +364,28 @@ const gnb = stripComments(gnbRaw);
 a('generateNewBlock body located', gnb.length > 0);
 a('IMMUTABILITY: generateNewBlock writes NO past/raw table (session/set_record/set_prefix/mech_daily/niggle/state_vector)',
   !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(session|set_record|set_prefix|set_target|mech_daily|niggle|state_vector)\b/i.test(gnb));
-a('the ONLY write targets are training_block / block_meta / planned_session / planned_slot / planned_slot_target',
+a('the ONLY write targets are forward plan/program tables plus weekly frequency',
   [...gnb.matchAll(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi)]
-    .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot', 'planned_slot_target'].includes(m[1])));
-const hyd = stripComments((() => { const i = gnbRaw.indexOf('autopilot hydration'); const j = gnbRaw.indexOf('generateBlock({'); return i >= 0 && j > i ? gnbRaw.slice(i, j) : ''; })());
+    .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot', 'planned_slot_target',
+      'training_program', 'training_program_day', 'training_program_movement_preference',
+      'training_block_program', 'planned_slot_autopilot', 'athlete_profile'].includes(m[1])));
+const hydRaw = (() => {
+  const i = src.indexOf('const hydrateAutopilotFlawReport =');
+  const j = src.indexOf('interface PendingProgramCreation', i);
+  return i >= 0 && j > i ? src.slice(i, j) : '';
+})();
+const hyd = stripComments(hydRaw);
+a('preview and committed generation share the exact autopilot hydration helper',
+  previewProgramBody.includes('hydrateAutopilotFlawReport(')
+    && gnbRaw.includes('hydrateAutopilotFlawReport('));
 a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match(/GROUP BY s\.session_date, m\.pattern/g) || []).length === 1);
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
 a('bounded: the set-aggregate carries a session_date window predicate', /WHERE s\.session_date >= \? AND s\.session_date <= \?/.test(hyd));
 a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for\s*\(|\.forEach\s*\(|\.map\s*\()[^;{]*executeSync/.test(hyd));
+a('generated slot set caps are applied before persistence and attribution',
+  previewProgramBody.includes('set_cap: m.timePolicy?.defaultSets')
+    && gnbRaw.includes('set_cap: m.timePolicy?.defaultSets')
+    && gnbRaw.includes('const plannedSets = sl.sets;'));
 
 // --- resetTrainingData: EXECUTE the store's wipe on seeded data -----------------
 // Proves the reset clears ALL history (so the demo can re-load) while KEEPING the
@@ -256,6 +402,8 @@ a('reset NEVER clears athlete_profile / movement / profile_slot (settings surviv
   !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
 a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
+a('reset explicitly clears the autopilot attribution side-car',
+  resetTables.includes('planned_slot_autopilot'));
 a('reset removes each immutable side-car only after its parent',
   resetTables.indexOf('set_record') >= 0
     && resetTables.indexOf('set_dose_target') > resetTables.indexOf('set_record')
@@ -282,9 +430,10 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'lower','accumulation','2026-06-10')");
   db.exec("INSERT INTO planned_session_method (planned_session_id,schema_type,routine_template_id,template_name,frozen_at_ms) VALUES (701,'APRE',NULL,'Reset probe',0)");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
+  db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (701,-0.5,-1,'eased')");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
@@ -350,7 +499,7 @@ if (resetTables.length >= 15) {
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-    '032_capability_content.sql'
+    '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
@@ -1006,6 +1155,24 @@ if (resetTables.length >= 15) {
 
     db.exec('ROLLBACK');
   }
+
+  // --- [F2] Android 16 KB ELF audit fail-closed contract ---
+  console.log('[Android ELF alignment audit contract]');
+  const elfAuditSrc = readFileSync(join(ROOT, 'tools', 'inspect_elf_alignment.sh'), 'utf-8');
+  a(
+    'zipalign receives a Windows-compatible APK path and a failed check marks the audit failed',
+    elfAuditSrc.includes('WINAPK="$(cygpath -w "$APK"')
+      && elfAuditSrc.includes('"$ZIPALIGN" -c -P 16 4 "$WINAPK"')
+      && /zipalign -P 16: FAIL[\s\S]{0,80}FAIL=1/.test(elfAuditSrc),
+  );
+  a(
+    'every ELF64 PT_LOAD segment is checked exactly and unknown inspection state fails closed',
+    elfAuditSrc.includes('for segment_align in')
+      && elfAuditSrc.includes('if [ "$segment_align" != "0x4000" ]')
+      && !elfAuditSrc.includes('*0x4000*')
+      && elfAuditSrc.includes('unknown ELF class')
+      && elfAuditSrc.includes('zero 64-bit libraries inspected'),
+  );
 
   // --- [F3] Gate count & documentation drift assertion ---
   console.log('[documentation & CI gate count drift check]');

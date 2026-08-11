@@ -32,6 +32,7 @@ const FILES = [
   '027_operational_safeguards.sql', '028_capability_graph.sql',
   '029_routine_history_analytics.sql', '030_readiness_import_integration.sql',
   '031_planned_session_method.sql', '032_capability_content.sql',
+  '033_goal_program.sql', '034_autopilot_attribution.sql',
 ];
 
 const db = new DatabaseSync(':memory:');

@@ -39,7 +39,9 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql',
   '031_planned_session_method.sql',
-  '032_capability_content.sql'];
+  '032_capability_content.sql',
+  '033_goal_program.sql',
+  '034_autopilot_attribution.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -142,6 +144,39 @@ check('031 preserves the frozen method snapshot after template deletion',
     && methodSnapshot?.template_name === 'APRE snapshot',
   JSON.stringify(methodSnapshot));
 
+a.raw.exec(`
+  INSERT INTO training_program
+    (objective, start_date, horizon_kind, requested_review_date, planned_end_date, planned_block_count,
+     starting_macro_block_index, schema_type, status, created_at_ms, updated_at_ms)
+  VALUES ('strength', '2030-01-01', 'weeks', NULL, '2030-01-29', 1, 1, 'LINEAR', 'active', 1, 1);
+  INSERT INTO training_program_day (program_id, day_index, focus) VALUES (1, 1, 'full');
+  INSERT INTO training_program_movement_preference (program_id, day_index, slot_index, pattern, movement_id)
+  SELECT 1, 1, 1, pattern, movement_id FROM movement WHERE pattern = 'squat' ORDER BY movement_id LIMIT 1;
+  INSERT INTO training_block_program (block_id, program_id, sequence_index) VALUES (31000, 1, 1);
+`);
+const programSidecars = a.raw.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM training_program_day WHERE program_id = 1) AS days,
+    (SELECT COUNT(*) FROM training_program_movement_preference WHERE program_id = 1) AS preferences,
+    (SELECT COUNT(*) FROM training_block_program WHERE program_id = 1) AS links
+`).get();
+check('033 stores goal-program days, movement preferences, and explicit block links',
+  programSidecars.days === 1 && programSidecars.preferences === 1 && programSidecars.links === 1,
+  JSON.stringify(programSidecars));
+let secondCurrentRejected = false;
+try {
+  a.raw.exec(`INSERT INTO training_program
+    (objective, start_date, horizon_kind, requested_review_date, planned_end_date, planned_block_count,
+     starting_macro_block_index, schema_type, status, created_at_ms, updated_at_ms)
+    VALUES ('gpp', '2030-01-01', 'weeks', NULL, '2030-01-29', 1, 1, 'LINEAR', 'review_due', 2, 2)`);
+} catch { secondCurrentRejected = true; }
+check('033 enforces only one active or review-due program', secondCurrentRejected);
+a.raw.exec('DROP INDEX idx_training_program_one_current');
+check('033 poison precondition marks the one-current correctness index missing',
+  sentinelsMissing(a).includes('idx_training_program_one_current'));
+runMigrations(a, MIGRATIONS);
+check('033 self-heal restores the one-current correctness index',
+  !sentinelsMissing(a).includes('idx_training_program_one_current'));
 runMigrations(a, MIGRATIONS); // second boot
 check('re-boot is a no-op (idempotent)', uv(a) === MIGRATIONS.length);
 check('024 corrections survive a normal no-op reboot',
@@ -377,6 +412,58 @@ check('026 retry with the valid migration completes',
   uv(phase18Rollback) === MIGRATIONS.length && sentinelsMissing(phase18Rollback).length === 0);
 // --- 3. failing migration: fail fast, recover on retry --------------------------
 console.log('[3] failing migration mid-chain (the device "ln" scenario)');
+// --- 2h. 034 autopilot attribution side-car: replay, exact rows, cascade ---
+console.log('[2h] 034 autopilot attribution side-car');
+const attributionDb = freshDb();
+runMigrations(attributionDb, MIGRATIONS);
+attributionDb.executeSync(`
+  INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
+  VALUES (3300, '2030-02-01', 'strength', 1);
+  INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (3301, 3300, 1, 1, 'lower', 'accumulation', '2030-02-01');
+  INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (3301, 3301, 1, 1, 3, 5, 8.0), (3302, 3301, 2, 2, 3, 5, 8.0);
+  INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason)
+  VALUES (3301, -0.5, -1, 'eased');
+`);
+const attributionRow = attributionDb.raw.prepare(
+  'SELECT rpe_delta, set_delta, reason FROM planned_slot_autopilot WHERE planned_slot_id = 3301',
+).get();
+check('034 side-car round-trips the effective per-slot delta',
+  attributionRow?.rpe_delta === -0.5 && attributionRow?.set_delta === -1 && attributionRow?.reason === 'eased',
+  JSON.stringify(attributionRow));
+check('034 untouched slot has no side-car row',
+  Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot WHERE planned_slot_id = 3302').get().c) === 0);
+let zeroDeltaRejected = false;
+try {
+  attributionDb.executeSync("INSERT INTO planned_slot_autopilot VALUES (3302, 0.0, 0, 'raised')");
+} catch { zeroDeltaRejected = true; }
+check('034 rejects a zero-delta attribution row', zeroDeltaRejected);
+let offGridRejected = false;
+try {
+  attributionDb.executeSync("INSERT INTO planned_slot_autopilot VALUES (3302, 0.25, 0, 'raised')");
+} catch { offGridRejected = true; }
+check('034 rejects an off-grid RPE delta', offGridRejected);
+let contradictoryReasonRejected = false;
+try {
+  attributionDb.executeSync("INSERT INTO planned_slot_autopilot VALUES (3302, -0.5, 0, 'raised')");
+} catch { contradictoryReasonRejected = true; }
+check('034 rejects a direction that contradicts its attribution reason', contradictoryReasonRejected);
+attributionDb.executeSync(`PRAGMA user_version = ${FILES.indexOf('034_autopilot_attribution.sql')};`);
+runMigrations(attributionDb, MIGRATIONS);
+check('034 replay preserves the attribution row and exact row count',
+  Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot').get().c) === 1
+    && attributionDb.raw.prepare('SELECT reason FROM planned_slot_autopilot WHERE planned_slot_id = 3301').get()?.reason === 'eased');
+attributionDb.executeSync('DELETE FROM planned_slot WHERE planned_slot_id = 3301');
+check('034 parent delete cascades the side-car and leaves no joined stale row',
+  Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot').get().c) === 0
+    && Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot pa JOIN planned_slot ps USING (planned_slot_id)').get().c) === 0);
+attributionDb.executeSync('DROP TABLE planned_slot_autopilot');
+check('034 poison precondition marks the side-car sentinel missing', sentinelsMissing(attributionDb).includes('planned_slot_autopilot'));
+runMigrations(attributionDb, MIGRATIONS);
+check('034 self-heal restores the side-car table',
+  !sentinelsMissing(attributionDb).includes('planned_slot_autopilot')
+    && uv(attributionDb) === MIGRATIONS.length);
 const c = freshDb();
 const broken = [...MIGRATIONS];
 broken[2] = 'CREATE TABLE will_fail (x INTEGER); SELECT no_such_fn(1);';

@@ -59,6 +59,7 @@ export {
   type ReportInput,
 } from './derivePrescription';
 export {
+  defaultProgramDayIndices,
   addDaysIso,
   availableMovements,
   BLOCK_WEEKS,
@@ -66,6 +67,10 @@ export {
   HYBRID_TAX_THRESHOLD,
   MACRO_BLOCKS,
   MACRO_TOTAL_WEEKS,
+  normalizeProgramHorizon,
+  programHorizonAnchor,
+  programFocuses,
+  programMacroIndex,
   macroPhaseOf,
   OVERREACH_ACWR,
   SCHEMA_FATIGUE_COST,
@@ -76,7 +81,11 @@ export {
   type BlockPhase,
   type BlockPlan,
   type GeneratorMovement,
+  type NormalizedProgramHorizon,
   type PlannedSessionPlan,
+  type ProgramDayPreference,
+  type ProgramMovementPreference,
+  type ProgramReviewHorizon,
   type PlannedSlotPlan,
 } from './blockGenerator';
 export {
