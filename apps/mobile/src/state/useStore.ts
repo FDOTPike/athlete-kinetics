@@ -40,6 +40,11 @@ import {
 } from './athleteRegistryCore';
 import { loadRegistry, saveRegistry } from './athleteRegistry';
 import {
+  inventoryFromRowCell,
+  inventoryFromSnapshot,
+  inventoryToSnapshot,
+} from './equipmentInventory';
+import {
   executeDirectLoadPreferenceSave,
   executeProfileLoadSave,
   persistLoadPreferenceRow,
@@ -57,6 +62,7 @@ import {
   derivePrescription,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
+  STANDARD_EQUIPMENT_ITEMS,
   EXPERIENCE_SEVERITY,
   generateBlock,
   historyContentFingerprint,
@@ -234,6 +240,10 @@ export interface Movement {
   /** Authored progression metadata. Null means no ordered skill chain. */
   progressionGroup: string | null;
   progressionRank: number | null;
+  /** movement_scope (049) — a training scope that cuts ACROSS `pattern`.
+   *  'full_body' marks a movement the generator prefers at a full-body
+   *  session's dedicated scope slot. Null = not scoped (no row). */
+  scope: 'full_body' | null;
 }
 
 /** STRICT boolean equipment filter: available iff every required item is in
@@ -883,6 +893,7 @@ interface MovementRow {
   coaching_intent: string | null;
   time_default_sets: number | null; time_target_seconds: number | null;
   progression_group: string | null; progression_rank: number | null;
+  scope: string | null;
 }
 const PREFIX_SET = new Set<string>(MOVEMENT_PREFIXES);
 const MEDIA_STATUS_SET = new Set<string>(['planned', 'external_fallback', 'ready']);
@@ -951,6 +962,9 @@ const movementFromRow = (r: MovementRow): Movement => {
     preference: toPreference(r.preference),
     progressionGroup: r.progression_group,
     progressionRank: r.progression_rank,
+    // 'full_body' is the only legal movement_scope.scope value; anything else
+    // (including a NULL LEFT JOIN) reads as "not scoped".
+    scope: r.scope === 'full_body' ? 'full_body' : null,
   };
 };
 
@@ -959,8 +973,9 @@ const MOVEMENT_LIBRARY_SQL = `SELECT m.movement_id, m.name, m.pattern, m.is_comp
   d.base_name, d.supported_prefixes, d.difficulty_rating, d.target_muscles, d.instructions, d.cues, d.video_placeholder_uri,
   mm.asset_key AS media_asset_key, mm.status AS media_status, mm.revision AS media_revision,
   ci.coaching_intent, tp.default_sets AS time_default_sets, tp.target_seconds AS time_target_seconds, p.preference,
-  (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode, mp.progression_group, mp.progression_rank
-  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_media mm ON mm.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id ORDER BY m.movement_id`;
+  (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode, mp.progression_group, mp.progression_rank,
+  ms.scope AS scope
+  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_media mm ON mm.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id LEFT JOIN movement_scope ms ON ms.movement_id = m.movement_id ORDER BY m.movement_id`;
 
 /** Map the 023 side-car (or a conservative legacy rep fallback) into one
  * target union. Historic sessions without the side-car stay readable. */
@@ -1145,16 +1160,13 @@ const parseBodyNotes = (json: string): UserProfile['injury_flags'] => {
     return [];
   }
 };
-const parseInventory = (json: string): UserProfile['equipment_inventory'] => {
-  try {
-    const v = JSON.parse(json) as unknown;
-    if (!Array.isArray(v)) return [...EQUIPMENT_ITEMS];
-    const seen = new Set(v.filter((x): x is string => typeof x === 'string'));
-    return EQUIPMENT_ITEMS.filter((i) => seen.has(i)); // canonical order, known items
-  } catch {
-    return [...EQUIPMENT_ITEMS];
-  }
-};
+/** Fail-closed inventory parsing: canonicalize an EXPLICIT selection against
+ *  the full persisted union (so a chosen specialist item survives), but recover
+ *  a damaged cell to STANDARD items only (so no fallback ever grants one).
+ *  The branch logic and its tests live in ./equipmentInventory; adjacent
+ *  parseBodyNotes above fails closed to [] the same way. */
+const parseInventory = (json: string): UserProfile['equipment_inventory'] =>
+  inventoryFromRowCell(json, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
 const profileFromRow = (r: ProfileRow): UserProfile => ({
   ...(DEFAULT_PROFILE as UserProfile),
   ...r,
@@ -1179,7 +1191,7 @@ const profileToJsonString = (p: UserProfile): string => JSON.stringify({
   session_duration_cap_min: p.session_duration_cap_min, base_rpe_cap: p.base_rpe_cap,
   target_energy_system: p.target_energy_system, progression_methodology: p.progression_methodology,
   injury_flags: p.injury_flags, mobility_limits: p.mobility_limits,
-  equipment_inventory: p.equipment_inventory,
+  equipment_inventory: inventoryToSnapshot(p.equipment_inventory),
 });
 
 /** Coerce a value into an enum, falling back to a default when it is not a
@@ -1210,7 +1222,9 @@ const profileFromJsonString = (json: string): UserProfile => {
       progression_methodology: inEnum(o.progression_methodology, PROGRESSION_METHODS, DEFAULT_PROFILE.progression_methodology),
       injury_flags: parseBodyNotes(JSON.stringify(o.injury_flags ?? [])),
       mobility_limits: parseBodyNotes(JSON.stringify(o.mobility_limits ?? [])),
-      equipment_inventory: parseInventory(JSON.stringify(o.equipment_inventory ?? [])),
+      equipment_inventory: inventoryFromSnapshot(
+        o.equipment_inventory, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS,
+      ),
     };
   } catch {
     return DEFAULT_PROFILE;
@@ -2457,6 +2471,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       movement_id: m.movement_id, name: m.name, pattern: m.pattern as MovementPattern,
       is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,
       beginner_ok: m.beginnerOk, capability_available: capabilityAvailable.has(m.movement_id),
+      // Store-side null <-> generator-side "absent": GeneratorMovement's optional
+      // fields all use undefined as their absent signal (see blockGenerator).
+      scope: m.scope ?? undefined,
     }));
     // Program-owned macro position (AUD-GP-2): when a program exists, the
     // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
@@ -2561,6 +2578,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       difficulty: m.difficulty,
       beginner_ok: m.beginnerOk,
       capability_available: capabilityAvailable.has(m.movement_id),
+      // Store-side null <-> generator-side "absent" (see blockGenerator).
+      scope: m.scope ?? undefined,
     }));
     // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
     // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate

@@ -162,9 +162,60 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // onnxruntime-react-native extracts this AAR to link its JSI shim, but does
+    // not add the AAR to the app runtime classpath. Declare it here so the APK
+    // contains libonnxruntime.so alongside libonnxruntimejsi.so.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:${rootProject.ext.onnxruntimeAndroidVersion}")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+def verifyOnnxRuntimeLibraries = { String variantName ->
+    def apk = layout.buildDirectory.file(
+        "outputs/apk/${variantName.toLowerCase()}/app-${variantName.toLowerCase()}.apk"
+    ).get().asFile
+    if (!apk.isFile()) {
+        throw new GradleException("Expected APK was not produced: ${apk}")
+    }
+
+    def archive = new java.util.zip.ZipFile(apk)
+    try {
+        def jsiEntries = []
+        def entries = archive.entries()
+        while (entries.hasMoreElements()) {
+            def entryName = entries.nextElement().name
+            if (entryName.startsWith("lib/")
+                && entryName.endsWith("/libonnxruntimejsi.so")) {
+                jsiEntries.add(entryName)
+            }
+        }
+        if (jsiEntries.isEmpty()) {
+            throw new GradleException("APK contains no libonnxruntimejsi.so: ${apk}")
+        }
+
+        def missingBaseEntries = jsiEntries.collect { entry ->
+            entry.replace("libonnxruntimejsi.so", "libonnxruntime.so")
+        }.findAll { entry -> archive.getEntry(entry) == null }
+        if (!missingBaseEntries.isEmpty()) {
+            throw new GradleException(
+                "APK is missing ONNX Runtime native libraries: ${missingBaseEntries.join(', ')}"
+            )
+        }
+    } finally {
+        archive.close()
+    }
+}
+
+// Keep a normal assemble from succeeding with only the JSI shim packaged. That
+// APK installs cleanly but crashes as soon as React Native loads ONNX Runtime.
+tasks.configureEach { task ->
+    if (task.name == "assembleDebug") {
+        task.doLast { verifyOnnxRuntimeLibraries("debug") }
+    } else if (task.name == "assembleRelease") {
+        task.doLast { verifyOnnxRuntimeLibraries("release") }
     }
 }

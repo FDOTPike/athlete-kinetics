@@ -45,10 +45,15 @@ const EQUIPMENT_LABELS: Record<string, string> = {
   squat_rack: 'Squat rack',
   bench: 'Bench',
   mats: 'Mats',
+  boards: 'Boards',
 };
+
+/** movement_scope (049): a training scope that cuts across `pattern`. */
+const FULL_BODY_LABEL = 'Full body';
 
 type AvailabilityView = 'available' | 'all';
 type KindFilter = 'all' | 'compound' | 'isolation';
+type ScopeFilter = 'all' | 'full_body';
 type DifficultyFilter = 'all' | Movement['difficulty'];
 
 const humanPattern = (pattern: string): string =>
@@ -86,6 +91,14 @@ const MovementRow = React.memo(function MovementRow({
       <View style={styles.movementInfo}>
         <Text style={styles.movementName}>{item.name}</Text>
         <Text style={styles.movementMeta}>{`${item.baseName} · ${item.difficulty}`}</Text>
+        {item.scope === 'full_body' && (
+          <Text
+            style={styles.scopeBadge}
+            accessibilityLabel={`${item.name} is a full body movement`}
+          >
+            {FULL_BODY_LABEL.toUpperCase()}
+          </Text>
+        )}
         {teachingOnly && (
           <Text style={styles.teachingOnlyBadge}>
             {formatTeachingOnlyReason(availability.reasons)}
@@ -123,6 +136,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
   const [equipmentFilter, setEquipmentFilter] = useState<string | null>(null);
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>('all');
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
   const [selectedMovementId, setSelectedMovementId] = useState<number | null>(initialMovementId ?? null);
 
   useEffect(() => {
@@ -135,6 +149,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
     setEquipmentFilter(null);
     setDifficultyFilter('all');
     setKindFilter('all');
+    setScopeFilter('all');
   }, []);
 
   const handleSelectMovement = useCallback((id: number) => setSelectedMovementId(id), []);
@@ -171,6 +186,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
       if (difficultyFilter !== 'all' && movement.difficulty !== difficultyFilter) return false;
       if (kindFilter === 'compound' && !movement.is_compound) return false;
       if (kindFilter === 'isolation' && movement.is_compound) return false;
+      if (scopeFilter === 'full_body' && movement.scope !== 'full_body') return false;
       if (query.length === 0) return true;
       return [
         movement.name,
@@ -188,6 +204,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
     kindFilter,
     movements,
     patternFilter,
+    scopeFilter,
     search,
   ]);
 
@@ -260,6 +277,14 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
                 onPress={() => {}}
               />
               <Chip label={selectedMovement.loggingMode.toUpperCase()} selected={false} onPress={() => {}} />
+              {selectedMovement.scope === 'full_body' && (
+                <Chip
+                  label={FULL_BODY_LABEL.toUpperCase()}
+                  selected={false}
+                  onPress={() => {}}
+                  accessibilityLabel={`${selectedMovement.name} is a full body movement`}
+                />
+              )}
               {selectedMovement.required.map((requirement) => (
                 <Chip
                   key={requirement}
@@ -428,6 +453,18 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           />
         ))}
       </View>
+      <Text style={styles.filterLabel}>Training scope</Text>
+      <View style={styles.wrapRow}>
+        {(['all', 'full_body'] as const).map((scope) => (
+          <Chip
+            key={scope}
+            label={scope === 'all' ? 'Any scope' : FULL_BODY_LABEL}
+            selected={scopeFilter === scope}
+            onPress={() => setScopeFilter(scope)}
+            accessibilityLabel={scope === 'all' ? 'Clear training scope filter' : `Filter scope by ${FULL_BODY_LABEL}`}
+          />
+        ))}
+      </View>
       <SecondaryButton label="Clear filters" onPress={clearFilters} accessibilityLabel="Clear search and filters" />
     </View>
   );
@@ -521,6 +558,7 @@ const styles = StyleSheet.create({
   movementName: { ...theme.font.body, fontWeight: '700', color: theme.color.textHi },
   movementMeta: { ...theme.font.label, color: theme.color.textMid },
   teachingOnlyBadge: { ...theme.font.label, color: theme.color.textLow },
+  scopeBadge: { ...theme.font.label, color: theme.color.chalk },
   chevron: { ...theme.font.cue, color: theme.color.textMid, marginLeft: theme.space[3] },
   emptyContainer: { alignItems: 'center', gap: theme.space[3], paddingVertical: theme.space[6] },
   emptyTitle: { ...theme.font.cue, color: theme.color.textHi },

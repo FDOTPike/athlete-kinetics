@@ -34,7 +34,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '041_movement_library_v2_batch.sql', '042_movement_library_v2_batch.sql',
   '043_movement_library_v2_batch.sql', '044_movement_library_v2_batch.sql',
   '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
-  '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql'];
+  '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
+  '049_movement_content_correction_v1.sql'];
 
 const db = new DatabaseSync(':memory:');
 try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
@@ -1379,6 +1380,202 @@ if (resetTables.length >= 15) {
 
   db.exec(tplSql);
   const sqlProgressionRows = db.prepare('SELECT movement_id, progression_group, progression_rank FROM movement_progression ORDER BY progression_group, progression_rank').all();
+}
+
+// --- [049] the store's movement query, prepared against the LIVE schema ------
+// MOVEMENT_LIBRARY_SQL is passed to executeSync by NAME, so the literal-scraping
+// pass above never sees it. Extract and prepare it explicitly: a typo in the
+// movement_scope LEFT JOIN would otherwise only surface on a device.
+console.log('[049 movement library query + full-body scope projection]');
+{
+  const literal = src.match(/const MOVEMENT_LIBRARY_SQL = `([\s\S]*?)`;/);
+  check('MOVEMENT_LIBRARY_SQL literal located in the store', literal !== null);
+  if (literal !== null) {
+    const librarySql = literal[1];
+    try {
+      const columns = db.prepare(librarySql).all();
+      check('MOVEMENT_LIBRARY_SQL prepares and runs against the live 001-049 schema', true);
+      check('the query projects a scope column for all 300 movements',
+        columns.length === 300 && columns.every((row) => 'scope' in row),
+        `${columns.length} rows`);
+      const scoped = columns.filter((row) => row.scope === 'full_body').map((row) => row.name).sort();
+      check('exactly the two ratified Turkish Get-Ups project scope full_body',
+        JSON.stringify(scoped) === JSON.stringify([
+          'Kettlebell Turkish Get-Up', 'Kettlebell Turkish Get-Up (Lunge style)']),
+        JSON.stringify(scoped));
+      check('every unscoped movement projects scope NULL (LEFT JOIN, row absent = not scoped)',
+        columns.filter((row) => row.scope !== 'full_body').every((row) => row.scope === null));
+      check('the scope LEFT JOIN adds no duplicate rows (one legal scope value per movement)',
+        new Set(columns.map((row) => row.movement_id)).size === columns.length);
+    } catch (e) {
+      check(`MOVEMENT_LIBRARY_SQL prepares against the live schema — ${e instanceof Error ? e.message : e}`, false);
+    }
+  }
+  a('movementFromRow narrows scope to the single legal value',
+    /scope: r\.scope === 'full_body' \? 'full_body' : null/.test(src));
+  a('both generator projections cross the null -> undefined boundary explicitly',
+    (src.match(/scope: m\.scope \?\? undefined/g) ?? []).length === 2);
+}
+
+// --- [O3] fail-closed inventory parsing (the specialist-equipment guarantee) --
+console.log('[O3 fail-closed equipment inventory parsing]');
+{
+  const requireCjs = createRequire(import.meta.url);
+  const { inventoryFromRowCell, inventoryFromSnapshot, inventoryToSnapshot } = requireCjs(
+    join(ROOT, 'apps', 'mobile', 'test', '.build', 'equipmentInventory.js'));
+  const { EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS, SPECIALIST_EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, DEFAULT_PROFILE } =
+    requireCjs(join(ROOT, 'packages', 'inference', 'test', '.build', 'types.js'));
+  const parseInventory = (json) => inventoryFromRowCell(json, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
+  const eq = (a2, b2) => JSON.stringify(a2) === JSON.stringify(b2);
+
+  check('the specialist vocabulary is a strict, non-empty subset of the persisted union',
+    SPECIALIST_EQUIPMENT_ITEMS.length > 0
+      && SPECIALIST_EQUIPMENT_ITEMS.every((i) => EQUIPMENT_ITEMS.includes(i))
+      && SPECIALIST_EQUIPMENT_ITEMS.every((i) => !STANDARD_EQUIPMENT_ITEMS.includes(i))
+      && EQUIPMENT_ITEMS.length === STANDARD_EQUIPMENT_ITEMS.length + SPECIALIST_EQUIPMENT_ITEMS.length);
+  check('malformed inventory JSON falls back to STANDARD items and grants no specialist item',
+    eq(parseInventory('{not json'), [...STANDARD_EQUIPMENT_ITEMS]),
+    JSON.stringify(parseInventory('{not json')));
+  const nonArrays = ['{}', '"x"', '7', 'null', 'true', '{"boards":true}'];
+  check('every non-array inventory cell falls back to STANDARD items, granting no specialist item',
+    nonArrays.every((json) => eq(parseInventory(json), [...STANDARD_EQUIPMENT_ITEMS])
+      && SPECIALIST_EQUIPMENT_ITEMS.every((i) => !parseInventory(json).includes(i))),
+    nonArrays.join(' '));
+  check('DEFAULT_PROFILE grants no specialist equipment',
+    SPECIALIST_EQUIPMENT_ITEMS.every((i) => !DEFAULT_PROFILE.equipment_inventory.includes(i))
+      && eq(DEFAULT_PROFILE.equipment_inventory, [...STANDARD_EQUIPMENT_ITEMS]));
+  check('the full_gym preset grants no specialist equipment',
+    eq(EQUIPMENT_PRESETS.full_gym, STANDARD_EQUIPMENT_ITEMS));
+  check('no preset anywhere grants specialist equipment',
+    Object.values(EQUIPMENT_PRESETS).every((bundle) =>
+      SPECIALIST_EQUIPMENT_ITEMS.every((i) => !bundle.includes(i))));
+  check('unknown persisted items are dropped rather than carried into the CHECK domain',
+    eq(parseInventory(JSON.stringify(['sled', 'boards', 'mats'])), ['mats', 'boards']));
+
+  // --- the two REAL persistence boundaries, driven through live SQLite -------
+  // These write to athlete_profile / profile_slot and read back out, so the
+  // claim being proved is "survives persistence", not "the parser is a
+  // function". The helpers below are the exact ones useStore calls at
+  // profileFromRow / profileToJsonString / profileFromJsonString; the
+  // source-text guards afterwards keep the test from drifting off production.
+  const CANONICAL_WITH_BOARDS = ['barbell', 'bands', 'boards'];
+  const hydrateProfileRow = (cell) => {
+    db.exec('BEGIN');
+    db.prepare('UPDATE athlete_profile SET equipment_inventory = ? WHERE profile_id = 1').run(cell);
+    const row = db.prepare('SELECT equipment_inventory FROM athlete_profile WHERE profile_id = 1').get();
+    db.exec('ROLLBACK');
+    return inventoryFromRowCell(row.equipment_inventory, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
+  };
+  const slotRoundTrip = (inventory) => {
+    // SAVE: exactly what profileToJsonString writes into profile_slot.profile_json.
+    const snapshot = JSON.stringify({
+      objective: 'gpp', training_age: 'intermediate', weekly_frequency: 4,
+      max_sessions_per_day: 1, session_duration_cap_min: 90, base_rpe_cap: 9.0,
+      target_energy_system: 'hybrid', progression_methodology: 'autoregulated',
+      injury_flags: [], mobility_limits: [],
+      equipment_inventory: inventoryToSnapshot(inventory),
+    });
+    db.exec('BEGIN');
+    db.prepare('UPDATE profile_slot SET profile_json = ?, updated_at_ms = ? WHERE slot_id = 1')
+      .run(snapshot, 1);
+    // LOAD: read the row back and parse it as profileFromJsonString does.
+    const row = db.prepare('SELECT profile_json FROM profile_slot WHERE slot_id = 1').get();
+    db.exec('ROLLBACK');
+    const parsed = JSON.parse(row.profile_json);
+    return inventoryFromSnapshot(parsed.equipment_inventory, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
+  };
+
+  const hydrated = hydrateProfileRow(JSON.stringify(['boards', 'bands', 'barbell']));
+  check('an explicit boards selection survives athlete_profile hydration, in canonical order',
+    eq(hydrated, CANONICAL_WITH_BOARDS), JSON.stringify(hydrated));
+  const slotted = slotRoundTrip(CANONICAL_WITH_BOARDS);
+  check('an explicit boards selection survives a real profile_slot save then load',
+    eq(slotted, CANONICAL_WITH_BOARDS), JSON.stringify(slotted));
+  check('the slot round trip preserves canonical order even when saved out of order',
+    eq(slotRoundTrip(['boards', 'barbell', 'bands']), CANONICAL_WITH_BOARDS));
+  check('boards survives a profile_slot -> athlete_profile -> profile_slot cycle',
+    eq(slotRoundTrip(hydrateProfileRow(JSON.stringify(slotRoundTrip(CANONICAL_WITH_BOARDS)))),
+      CANONICAL_WITH_BOARDS));
+  check('an empty inventory stays empty across BOTH boundaries, never repopulated',
+    eq(hydrateProfileRow('[]'), []) && eq(slotRoundTrip([]), []));
+  // Damage at either boundary must recover to STANDARD only — no boards.
+  // The 007 column CHECK is the first line: json_valid() means a non-JSON cell
+  // can never be STORED, so the parser's malformed-JSON branch is defence in
+  // depth for values that predate the CHECK or arrive by direct edit. The
+  // reachable damage through SQL is "valid JSON that is not an array".
+  let nonJsonRejected = false;
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE athlete_profile SET equipment_inventory = ? WHERE profile_id = 1').run('{not json');
+  } catch { nonJsonRejected = true; }
+  db.exec('ROLLBACK');
+  check('007 json_valid CHECK refuses to store a non-JSON inventory cell at all', nonJsonRejected);
+  check('the parser still fails closed if a non-JSON cell ever reaches it (defence in depth)',
+    eq(parseInventory('{not json'), [...STANDARD_EQUIPMENT_ITEMS]));
+  const storableDamage = ['{}', '"x"', '7', 'null', '{"boards":true}', '{"0":"boards"}'];
+  check('a storable non-array athlete_profile cell hydrates to STANDARD items and grants no boards',
+    storableDamage.every((cell) => eq(hydrateProfileRow(cell), [...STANDARD_EQUIPMENT_ITEMS])),
+    storableDamage.join(' '));
+  // Two distinct slot-damage shapes, with deliberately different results —
+  // both fail closed, one strictly harder than the other:
+  //   ABSENT  (missing key / null)  -> [] via the `?? []` coercion. "Own
+  //                                    nothing" is the strictest outcome there
+  //                                    is, so this is safe by construction.
+  //   PRESENT but not an array      -> the STANDARD recovery set. This was the
+  //                                    live hole: it used to return the FULL
+  //                                    union and would now have granted boards.
+  const loadSnapshot = (value) =>
+    inventoryFromSnapshot(value, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
+  check('an absent or null profile_slot inventory loads to the empty set, not a granted default',
+    [undefined, null].every((value) => eq(loadSnapshot(value), [])));
+  const nonArraySnapshots = [{}, 'boards', 7, { boards: true }, true];
+  check('a present-but-non-array profile_slot inventory loads to STANDARD items',
+    nonArraySnapshots.every((value) => eq(loadSnapshot(value), [...STANDARD_EQUIPMENT_ITEMS])),
+    JSON.stringify(nonArraySnapshots));
+  check('NO damaged profile_slot inventory shape grants boards, whichever branch it takes',
+    [undefined, null, ...nonArraySnapshots].every((value) =>
+      SPECIALIST_EQUIPMENT_ITEMS.every((i) => !loadSnapshot(value).includes(i))));
+  check('a slot whose JSON omits equipment_inventory entirely grants nothing at all', (() => {
+    db.exec('BEGIN');
+    db.prepare('UPDATE profile_slot SET profile_json = ? WHERE slot_id = 1')
+      .run(JSON.stringify({ objective: 'gpp', training_age: 'elite' }));
+    const row = db.prepare('SELECT profile_json FROM profile_slot WHERE slot_id = 1').get();
+    db.exec('ROLLBACK');
+    return eq(loadSnapshot(JSON.parse(row.profile_json).equipment_inventory), []);
+  })());
+  check('the snapshot writer COPIES the inventory (a later mutation cannot reach a saved slot)', (() => {
+    const live = ['barbell', 'boards'];
+    const saved = inventoryToSnapshot(live);
+    live.push('mats');
+    return eq(saved, ['barbell', 'boards']);
+  })());
+  // Production-drift guards: the helpers exercised above must be the ones the
+  // store actually calls at each boundary.
+  a('profileFromRow hydrates through inventoryFromRowCell',
+    /inventoryFromRowCell\(json, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS\)/.test(src)
+      && /equipment_inventory: parseInventory\(r\.equipment_inventory\)/.test(src));
+  a('profileToJsonString saves through inventoryToSnapshot',
+    /equipment_inventory: inventoryToSnapshot\(p\.equipment_inventory\)/.test(src));
+  a('profileFromJsonString loads through inventoryFromSnapshot',
+    /equipment_inventory: inventoryFromSnapshot\(\s*o\.equipment_inventory, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS,?\s*\)/.test(src));
+
+  // SQL defaults are already standard-only and must stay that way as the union
+  // widens — pinned here so nothing silently backfills a specialist item.
+  const sql007 = readFileSync(join(SCHEMA_DIR, '007_program_engine.sql'), 'utf-8');
+  const columnDefault = sql007.match(/equipment_inventory\s+TEXT NOT NULL DEFAULT\s+'(\[[^']+\])'/)?.[1];
+  const legacyFullGym = sql007.match(/ELSE '(\[[^']+\])'/)?.[1];
+  check('007 athlete_profile inventory default is exactly the STANDARD set',
+    columnDefault === JSON.stringify(STANDARD_EQUIPMENT_ITEMS), String(columnDefault));
+  check("007 legacy equipment_access 'full_gym' branch is exactly the STANDARD set",
+    legacyFullGym === JSON.stringify(STANDARD_EQUIPMENT_ITEMS), String(legacyFullGym));
+
+  // Live SQL proof: the persisted domain must ACCEPT a specialist item even
+  // though nothing defaults to it — otherwise an explicit opt-in could never
+  // be stored against a movement.
+  const boardPress = db.prepare("SELECT movement_id FROM movement WHERE name = 'Board Press'").get();
+  check('the persisted movement_equipment domain accepts the specialist item',
+    Number(db.prepare('SELECT COUNT(*) AS c FROM movement_equipment WHERE movement_id = ? AND item = ?')
+      .get(boardPress.movement_id, 'boards').c) === 1);
 }
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);
 process.exit(fail ? 1 : 0);

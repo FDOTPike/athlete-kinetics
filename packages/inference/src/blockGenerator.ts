@@ -36,6 +36,11 @@ export interface GeneratorMovement {
   beginner_ok?: boolean;
   /** Shared capability resolver verdict. False means teaching-only. */
   capability_available?: boolean;
+  /** movement_scope membership (049). Absent = not scoped; like the three
+   *  optional fields above, omitting it keeps legacy callers byte-identical.
+   *  A scoped movement is preferred at its focus's scope slot (FOCUS_SCOPE_SLOT)
+   *  — it is deliberately NOT a movement.pattern value. */
+  scope?: 'full_body';
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
@@ -160,6 +165,18 @@ const FOCUS_PATTERNS: Record<BlockFocus, readonly MovementPattern[]> = {
   full: ['squat', 'push_h', 'hinge', 'pull_h', 'carry'],
   conditioning: ['locomotion', 'carry', 'rotation'],
   bjj: ['locomotion', 'rotation', 'isolation'],
+};
+
+/** Focus slots that prefer a full-body-scoped movement before falling back to
+ *  the slot's pattern. Index into FOCUS_PATTERNS[focus]; null = no scope slot.
+ *
+ *  Why a separate axis: FOCUS_PATTERNS.full already holds exactly five entries
+ *  and slotBudget caps at 5, so a sixth pattern slot is unreachable — a
+ *  full-body movement cannot be routed by adding a pattern. The guard
+ *  "slotBudget === 5" is self-enforcing here: `patterns` is sliced to
+ *  slotBudget, so index 4 only exists when the budget reaches five. */
+const FOCUS_SCOPE_SLOT: Record<BlockFocus, number | null> = {
+  lower: null, upper: null, full: 4, conditioning: null, bjj: null,
 };
 
 /** Strength-side foci (the volume hybrid damping applies to). */
@@ -388,6 +405,29 @@ const pickForPattern = (
   return best;
 };
 
+/** Deterministic pick among scoped candidates, using the SAME ordering as
+ *  pickForPattern (compound first, then lowest movement_id) so the two
+ *  selectors never disagree about what "best" means. The pool handed in is
+ *  already filtered by equipment, tier, capability and safety. */
+const pickScoped = (
+  pool: readonly GeneratorMovement[],
+  scope: 'full_body',
+  usedIds: ReadonlySet<number>,
+): GeneratorMovement | null => {
+  let best: GeneratorMovement | null = null;
+  for (const m of pool) {
+    if (m.scope !== scope || usedIds.has(m.movement_id)) continue;
+    if (
+      best === null ||
+      (m.is_compound && !best.is_compound) ||
+      (m.is_compound === best.is_compound && m.movement_id < best.movement_id)
+    ) {
+      best = m;
+    }
+  }
+  return best;
+};
+
 // ---------------------------------------------------------------------------
 // Generator
 // ---------------------------------------------------------------------------
@@ -537,13 +577,25 @@ export function generateBlock(input: BlockInput): BlockPlan {
 
       const usedIds = new Set<number>();
       const slots: PlannedSlotPlan[] = [];
-      for (const pattern of patterns) {
+      for (const [slotIdx, pattern] of patterns.entries()) {
         const preferred = preferences.find((p) => p.pattern === pattern);
         const preferredMovement = preferred === undefined
           ? undefined
           : pool.find((candidate) => candidate.movement_id === preferred.movement_id
               && candidate.pattern === pattern && !usedIds.has(candidate.movement_id));
-        const m = preferredMovement ?? pickForPattern(pool, pattern, usedIds);
+        // Precedence is fixed: a valid explicit athlete preference ALWAYS wins,
+        // then a full-body-scoped candidate at this focus's scope slot, then the
+        // slot's own pattern. pickScoped runs ONLY when no preference resolved,
+        // so an explicit carry preference is never overridden.
+        // NOTE the off-by-one: ProgramMovementPreference.slot_index is 1-based
+        // (1..5) while FOCUS_SCOPE_SLOT indexes FOCUS_PATTERNS 0-based — scope
+        // slot 4 corresponds to preference slot_index 5. Preferences are matched
+        // by PATTERN, not slot_index, so the two never need to be reconciled.
+        const scopeSlot = FOCUS_SCOPE_SLOT[focus];
+        const scopeMovement = preferredMovement === undefined && scopeSlot === slotIdx
+          ? pickScoped(pool, 'full_body', usedIds) ?? undefined
+          : undefined;
+        const m = preferredMovement ?? scopeMovement ?? pickForPattern(pool, pattern, usedIds);
         if (preferred !== undefined && preferredMovement === undefined && m !== null) {
           warnings.add(`${focus}: preferred ${pattern} movement unavailable; safe fallback used`);
         }

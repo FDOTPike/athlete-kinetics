@@ -2,6 +2,92 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-08-11 - Phase 2a pre-release content correction (migration 049)
+
+1. **The five high-risk records ship on OWNER APPROVAL, with independent
+   professional technique review deferred to a non-blocking pre-release
+   recommendation.** Board Press (151), Kettlebell Turkish Get-Up (Lunge style)
+   (231), Floor Glute-Ham Raise (202), Natural Glute Ham Raise (244) and Seated
+   Good Mornings (271) carry loaded-overhead, board-retention or eccentric
+   hamstring demands. Their coaching copy and equipment sets were approved
+   together by Francis Saga Pike as owner. The approval records state
+   `approver_role: "owner"` and `approval_basis: "owner_release_decision"`:
+   **they assert owner authority, not a clinical or coaching credential, and no
+   reviewer is invented.** If professional review is later obtained it is
+   appended as a second, additive `professional_review` entry under the same
+   hash-binding rule; it never replaces the owner approval.
+
+2. **The corrected coaching copy derives from a community dataset whose
+   revision is unknown.** `yuhonas/free-exercise-db` is recorded in
+   `library_target_v1.json` with `upstreamRevision:
+   "unknown-preexisting-import"`, so the current upstream is **corroborating
+   evidence, not authority for the frozen bytes**. Each correction cites its
+   upstream `id` and carries `standing: "corroborating; frozen import revision
+   unknown"`. Every proposal was re-validated against the shipped dataset rather
+   than accepted on the audit's word; the rejected ones are recorded per record
+   in `movement_content_correction_v1.json` (`notes`).
+
+3. **The approval binds the hash, and that check is live.** Each record's
+   approval stores the `correction_sha256` it was granted against, so editing
+   one character of approved copy — or one item of an approved equipment set —
+   invalidates the approval and `generate-library-correction.mjs` refuses to
+   emit 049 until the record is re-approved. Machine-checked in
+   `scripts/test-library-correction-generator.mjs` and `verify_library.py [7]`.
+
+4. **O2: two records ship byte-identical coaching copy by design.** "Hammer Grip
+   Incline DB Bench Press" and "Incline Dumbbell Bench With Palms Facing In" are
+   genuine aliases whose upstream instructions are identical. Rather than
+   inventing a spurious difference or collapsing a shipped name, both retain
+   their names, media keys and the exact-300 corpus, and both carry the same
+   correct payload written out in full — no prose cross-reference leaks into
+   athlete-facing copy. The alias relationship is recorded here.
+
+5. **Accepted availability regression: Floor Glute-Ham Raise now requires a
+   `nordic_bench`.** It moves from bodyweight-anywhere to requiring a
+   purpose-built ankle anchor, because the partner/generic-anchor alternative
+   cannot be enforced by the equipment filter. This is the intended fail-closed
+   trade, not an oversight.
+
+6. **The `glutes` entry in the Turkish Get-Up (Lunge style) `target_muscles` is
+   owner-directed, not source-derived.** Upstream lists abdominals, hamstrings,
+   quadriceps and triceps only. Recorded in the correction record's `notes`.
+
+7. **Coaching text enforces nothing; only the equipment filter does.** Board
+   Press names bands as the board-retention method because that is the
+   executable configuration the strict subset filter can enforce
+   (`boards, bands, barbell, bench, squat_rack`). Its spotter sentence is
+   phrased "Use a spotter when available" and is **advisory only — the app does
+   not enforce, detect, or require a spotter, and no part of this change claims
+   otherwise.** A training partner is deliberately NOT offered as an alternative
+   retention method.
+
+8. **Out of scope, deliberately:** the corpus-wide P2 that all 176 v2 coaching
+   intents share one generated template remains a P2 against the v2 generator
+   and is not rewritten here. 049 writes no media of any kind — asset keys,
+   statuses, revisions and the 124 legacy YouTube fallbacks are byte-identical,
+   and Phase 2b video generation stays paused.
+
+## 2026-08-10 - Accepted pre-release scope for bodyweight and alternative volume
+
+1. **The current raw-tonnage limitation is accepted for internal pre-release
+   testing.** Readiness continues to use `reps * load_kg`; no unreviewed
+   coefficient or bodyweight estimate is introduced into the shipped history.
+   Product copy must not represent this value as total mechanical work for
+   bodyweight movements.
+
+2. **Later remediation is limited to Squat, Bench, Deadlift, and OHP anchor
+   volume.** Alternatives require explicit movement-to-anchor mappings and
+   owner-reviewed coefficients. A reviewed bodyweight alternative uses entered
+   added load plus the most recent valid bodyweight measurement on or before the
+   session date. Missing bodyweight fails closed. The complete decision and
+   non-decisions are recorded in
+   `docs/decisions/FOUR_LIFT_EQUIVALENT_VOLUME.md`.
+
+3. **No coefficient is inferred from existing capability or prefix data.** The
+   capability graph encodes progression families, while condition-prefix
+   multipliers encode a different model. Neither is evidence for leverage or
+   stability equivalence, so this checkpoint does not alter readiness math.
+
 ## 2026-07-31 - Completion-action evidence limits
 
 1. **A mean-only completion signal is direction-blind.** Equal-average

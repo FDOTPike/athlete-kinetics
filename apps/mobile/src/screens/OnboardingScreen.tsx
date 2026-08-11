@@ -23,6 +23,8 @@ import {
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
   EQUIPMENT_PRESETS,
+  STANDARD_EQUIPMENT_ITEMS,
+  SPECIALIST_EQUIPMENT_ITEMS,
   OBJECTIVES,
   TRAINING_AGES,
   defaultLoadPreference,
@@ -76,6 +78,7 @@ const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
   barbell: 'BARBELL', squat_rack: 'SQUAT RACK', bench: 'BENCH', dumbbells: 'DUMBBELLS',
   kettlebell: 'KETTLEBELL', pullup_bar: 'PULL-UP BAR', nordic_bench: 'NORDIC BENCH',
   bands: 'BANDS', cable_machine: 'CABLE MACHINE', mats: 'MATS',
+  boards: 'BOARDS',
 };
 
 /** Plain-language read of an RPE effort cap, shown live under the stepper. */
@@ -390,7 +393,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               ))}
             </View>
             <View style={styles.chipWrap}>
-              {EQUIPMENT_ITEMS.map((item) => {
+              {STANDARD_EQUIPMENT_ITEMS.map((item) => {
                 const owned = draft.equipment_inventory.includes(item);
                 return (
                   <Chip
@@ -403,8 +406,27 @@ export default function OnboardingScreen(): React.JSX.Element {
                 );
               })}
             </View>
+            {/* Specialist equipment is a SEPARATE, explicit opt-in: no preset and
+                no default ever grants it, so movements needing it stay
+                teaching-only until it is deliberately selected here. */}
+            <Text style={styles.fieldLabel}>SPECIALIST</Text>
+            <View style={styles.chipWrap}>
+              {SPECIALIST_EQUIPMENT_ITEMS.map((item) => {
+                const owned = draft.equipment_inventory.includes(item);
+                return (
+                  <Chip
+                    key={item}
+                    label={EQUIPMENT_LABEL[item]}
+                    selected={owned}
+                    onPress={() => toggleEquipment(item)}
+                    accessibilityLabel={`Specialist equipment ${EQUIPMENT_LABEL[item]}: ${owned ? 'owned' : 'not owned'}`}
+                  />
+                );
+              })}
+            </View>
             <Text style={styles.pDim}>
               The coach only ever prescribes movements your equipment allows.
+              Specialist items stay off unless you turn them on.
             </Text>
           </View>
         )}

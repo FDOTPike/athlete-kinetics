@@ -48,7 +48,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '041_movement_library_v2_batch.sql', '042_movement_library_v2_batch.sql',
   '043_movement_library_v2_batch.sql', '044_movement_library_v2_batch.sql',
   '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
-  '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql'];
+  '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
+  '049_movement_content_correction_v1.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -665,6 +666,112 @@ for (const file of FILES.filter((name) => /^0(?:3[7-9]|4[0-8])_movement_library_
 }
 check('all twelve v2 batch boundaries replay idempotently', replayedBatches === 12,
   `${replayedBatches}/12`);
+
+// --- 2k. 049 pre-release content correction: upgrade, replay, poison, rebuild ---
+console.log('[2k] 049 Phase 2a pre-release content correction');
+const correctionIndex = FILES.indexOf('049_movement_content_correction_v1.sql');
+const CORRECTED_EQUIPMENT = ['Board Press', 'Floor Glute-Ham Raise', 'Natural Glute Ham Raise', 'Seated Good Mornings'];
+const equipmentRows = (db) => db.raw.prepare(`
+  SELECT m.name, e.item FROM movement_equipment e JOIN movement m USING(movement_id)
+  ORDER BY m.name, e.item
+`).all().map((r) => `${r.name}|${r.item}`);
+const untouchedEquipment = (db) =>
+  equipmentRows(db).filter((row) => !CORRECTED_EQUIPMENT.includes(row.split('|')[0]));
+const correctionSummary = (db) => db.raw.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM movement_content_correction) AS corrections,
+    (SELECT COUNT(*) FROM movement_content_correction WHERE correction_version = 1) AS v1,
+    (SELECT COUNT(*) FROM movement_scope WHERE scope = 'full_body') AS scoped,
+    (SELECT COUNT(*) FROM movement_equipment WHERE item = 'boards') AS boards,
+    (SELECT m.pattern FROM movement m WHERE m.name = 'Kettlebell Turkish Get-Up (Lunge style)') AS tguPattern,
+    (SELECT t.category FROM movement_taxonomy t JOIN movement m USING(movement_id)
+      WHERE m.name = 'Kettlebell Turkish Get-Up (Lunge style)') AS tguCategory,
+    (SELECT d.video_placeholder_uri FROM movement_detail d JOIN movement m USING(movement_id)
+      WHERE m.name = 'Kettlebell Turkish Get-Up') AS canonicalTguUrl
+`).get();
+const correctionComplete = (db) => {
+  const s = correctionSummary(db);
+  return s.corrections === 32 && s.v1 === 32 && s.scoped === 2 && s.boards === 1
+    && s.tguPattern === 'rotation' && s.tguCategory === 'core'
+    && s.canonicalTguUrl === 'https://www.youtube.com/watch?v=lpltjWHd0ek';
+};
+
+// (1) clean 048 -> 049 upgrade: user_version 47 -> 48, derived from the list index.
+const correctionDb = freshDb();
+for (let i = 0; i < correctionIndex; i += 1) correctionDb.executeSync(MIGRATIONS[i]);
+correctionDb.executeSync(`PRAGMA user_version = ${correctionIndex};`);
+check('048-era upgrade precondition: user_version 47, no correction tables',
+  uv(correctionDb) === 47 && correctionIndex === 47
+    && correctionDb.raw.prepare("SELECT 1 FROM sqlite_master WHERE name='movement_scope'").get() === undefined,
+  String(uv(correctionDb)));
+const equipmentBefore = untouchedEquipment(correctionDb);
+runMigrations(correctionDb, MIGRATIONS);
+check('clean 048 -> 049 upgrade lands every correction and bumps user_version to 48',
+  uv(correctionDb) === 48 && uv(correctionDb) === MIGRATIONS.length && correctionComplete(correctionDb),
+  JSON.stringify(correctionSummary(correctionDb)));
+check('the movement_equipment rebuild preserves every untouched row, content for content',
+  JSON.stringify(untouchedEquipment(correctionDb)) === JSON.stringify(equipmentBefore),
+  `${equipmentBefore.length} rows`);
+check('049 moves no media: the 300-row media corpus is untouched',
+  phase2aLibraryComplete(correctionDb), JSON.stringify(phase2aLibrarySummary(correctionDb)));
+
+// (2) explicit replay from the 049 boundary.
+correctionDb.executeSync(`PRAGMA user_version = ${correctionIndex};`);
+runMigrations(correctionDb, MIGRATIONS);
+check('049 replays idempotently from its own boundary (no duplicate provenance rows)',
+  uv(correctionDb) === MIGRATIONS.length && correctionComplete(correctionDb)
+    && JSON.stringify(untouchedEquipment(correctionDb)) === JSON.stringify(equipmentBefore),
+  JSON.stringify(correctionSummary(correctionDb)));
+
+// (3) full re-apply from zero: 037-048 rewrite the originals, 049 re-asserts last.
+correctionDb.executeSync('PRAGMA user_version = 0;');
+runMigrations(correctionDb, MIGRATIONS);
+check('full re-apply from 0 leaves the corrections asserted last, not the originals',
+  correctionComplete(correctionDb) && phase2aLibraryComplete(correctionDb),
+  JSON.stringify(correctionSummary(correctionDb)));
+
+// (4) poisoned user_version = 48 while 049 never applied.
+const poisonedCorrection = freshDb();
+for (let i = 0; i < correctionIndex; i += 1) poisonedCorrection.executeSync(MIGRATIONS[i]);
+poisonedCorrection.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('049 poison precondition: user_version claims 48 but both sentinels are absent',
+  sentinelsMissing(poisonedCorrection).includes('movement_scope')
+    && sentinelsMissing(poisonedCorrection).includes('movement_content_correction'));
+runMigrations(poisonedCorrection, MIGRATIONS);
+check('049 poison self-heal re-applies the whole chain and restores both sentinels',
+  sentinelsMissing(poisonedCorrection).length === 0 && correctionComplete(poisonedCorrection),
+  JSON.stringify(correctionSummary(poisonedCorrection)));
+
+// Constraint surface of the two new tables + the widened equipment domain.
+const scopeMovementId = Number(correctionDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Kettlebell Turkish Get-Up'").get().movement_id);
+let scopeRejections = 0;
+for (const sql of [
+  `INSERT INTO movement_scope (movement_id, scope) VALUES (${scopeMovementId}, 'upper_body')`,
+  `INSERT INTO movement_scope (movement_id, scope) VALUES (${scopeMovementId}, 'full_body')`,
+  "INSERT INTO movement_scope (movement_id, scope) VALUES (999999, 'full_body')",
+  `INSERT INTO movement_content_correction (movement_id, correction_version, correction_sha256, applied_at_ms) VALUES (${scopeMovementId}, 0, 'x', 1)`,
+]) {
+  try { correctionDb.executeSync(sql); } catch { scopeRejections += 1; }
+}
+check('049 CHECK/PK/FK surface rejects a bad scope, a duplicate, an unknown movement, and version 0',
+  scopeRejections === 4, `${scopeRejections}/4`);
+const boardPressId = Number(correctionDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Board Press'").get().movement_id);
+let equipmentRejected = false;
+try {
+  correctionDb.executeSync(`INSERT INTO movement_equipment (movement_id, item) VALUES (${boardPressId}, 'sled')`);
+} catch { equipmentRejected = true; }
+check('the widened domain accepts boards (already stored) and still rejects a bogus item',
+  equipmentRejected
+    && Number(correctionDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM movement_equipment WHERE movement_id = ? AND item = ?',
+    ).get(boardPressId, 'boards').c) === 1);
+correctionDb.executeSync(`DELETE FROM movement WHERE movement_id = ${scopeMovementId}`);
+check('movement delete cascades both 049 side-cars',
+  Number(correctionDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_scope WHERE movement_id = ?').get(scopeMovementId).c) === 0
+    && Number(correctionDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_content_correction WHERE movement_id = ?').get(scopeMovementId).c) === 0
+    && Number(correctionDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_equipment WHERE movement_id = ?').get(scopeMovementId).c) === 0);
 
 const mediaCascadeId = Number(phase2aDb.raw.prepare(
   "SELECT movement_id FROM movement WHERE name = '3/4 Sit-Up'",

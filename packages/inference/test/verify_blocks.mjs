@@ -31,7 +31,8 @@ const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
 const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
-const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
+const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS,
+  STANDARD_EQUIPMENT_ITEMS, SPECIALIST_EQUIPMENT_ITEMS, OBJECTIVES,
   SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
   MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
   PATTERN_TO_CATEGORY } = require('./.build/types.js');
@@ -162,8 +163,10 @@ check('beginner block carries strictly less volume than elite',
 console.log('[3] equipment strictness bound');
 let violations = 0, sweepPlans = 0;
 for (const objective of OBJECTIVES) {
-  for (let mask = 0; mask < 1 << EQUIPMENT_ITEMS.length; mask++) {
-    const inventory = EQUIPMENT_ITEMS.filter((_, i) => mask & (1 << i));
+  // Swept over the STANDARD vocabulary: specialist items are explicit opt-in
+  // and get their own targeted test in [7] rather than doubling this powerset.
+  for (let mask = 0; mask < 1 << STANDARD_EQUIPMENT_ITEMS.length; mask++) {
+    const inventory = STANDARD_EQUIPMENT_ITEMS.filter((_, i) => mask & (1 << i));
     const plan = generateBlock({
       profile: prof({ objective, equipment_inventory: inventory }),
       movements,
@@ -203,7 +206,7 @@ check('every hybrid frequency contains bjj focus sessions', bjjAlways);
 check('hybrid strength set volume strictly below pure strength (all freqs)', damped);
 const noMats = gen({
   objective: 'hybrid',
-  equipment_inventory: EQUIPMENT_ITEMS.filter((i) => i !== 'mats'),
+  equipment_inventory: STANDARD_EQUIPMENT_ITEMS.filter((i) => i !== 'mats'),
 });
 const bjjRoundId = movements.find((m) => m.name === 'BJJ Sparring Round').movement_id;
 check('mats removed: bjj days fall back without ever emitting BJJ Sparring Round',
@@ -214,19 +217,33 @@ check('mats removed: bjj days fall back without ever emitting BJJ Sparring Round
 console.log('[5] SQL contract (007 <-> types.ts single source of truth)');
 const sql007 = readFileSync(join(SCHEMA_DIR, '007_program_engine.sql'), 'utf-8');
 const grab = (re) => { const m = sql007.match(re); return m === null ? null : m[1]; };
-check('athlete_profile default inventory == EQUIPMENT_ITEMS',
-  grab(/equipment_inventory\s+TEXT NOT NULL DEFAULT\s+'(\[[^']+\])'/) === JSON.stringify(EQUIPMENT_ITEMS));
+check('athlete_profile default inventory == STANDARD_EQUIPMENT_ITEMS (never the specialist union)',
+  grab(/equipment_inventory\s+TEXT NOT NULL DEFAULT\s+'(\[[^']+\])'/) === JSON.stringify(STANDARD_EQUIPMENT_ITEMS));
 check("legacy 'home_basic' bundle == EQUIPMENT_PRESETS.home_basic",
   grab(/WHEN 'home_basic' THEN '(\[[^']+\])'/) === JSON.stringify(EQUIPMENT_PRESETS.home_basic));
 check("legacy 'minimal' bundle == EQUIPMENT_PRESETS.minimal",
   grab(/WHEN 'minimal'\s+THEN '(\[[^']+\])'/) === JSON.stringify(EQUIPMENT_PRESETS.minimal));
-check("legacy 'full_gym' bundle == EQUIPMENT_ITEMS",
-  grab(/ELSE '(\[[^']+\])'/) === JSON.stringify(EQUIPMENT_ITEMS));
+check("legacy 'full_gym' bundle == STANDARD_EQUIPMENT_ITEMS (a preset never grants specialist gear)",
+  grab(/ELSE '(\[[^']+\])'/) === JSON.stringify(STANDARD_EQUIPMENT_ITEMS));
+check('EQUIPMENT_PRESETS.full_gym == STANDARD_EQUIPMENT_ITEMS',
+  JSON.stringify(EQUIPMENT_PRESETS.full_gym) === JSON.stringify(STANDARD_EQUIPMENT_ITEMS));
 const itemList = grab(/item\s+TEXT NOT NULL CHECK \(item IN\s*\(([\s\S]*?)\)\)/);
 const sqlItems = itemList === null ? [] : [...itemList.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
-check('movement_equipment item CHECK == EQUIPMENT_ITEMS (set equality)',
-  sqlItems.length === EQUIPMENT_ITEMS.length &&
-  EQUIPMENT_ITEMS.every((i) => sqlItems.includes(i)));
+check('007 movement_equipment item CHECK == STANDARD_EQUIPMENT_ITEMS (the pre-049 domain)',
+  sqlItems.length === STANDARD_EQUIPMENT_ITEMS.length &&
+  STANDARD_EQUIPMENT_ITEMS.every((i) => sqlItems.includes(i)));
+// 049 rebuilds the table to widen the CHECK; the PERSISTED domain must equal
+// the complete union, or an explicit specialist opt-in could never be stored.
+const sql049 = readFileSync(join(SCHEMA_DIR, '049_movement_content_correction_v1.sql'), 'utf-8');
+const item049 = sql049.match(/item\s+TEXT NOT NULL CHECK \(item IN\s*\(([\s\S]*?)\)\)/);
+const sql049Items = item049 === null ? [] : [...item049[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+check('049 movement_equipment item CHECK == EQUIPMENT_ITEMS (the complete union, set equality)',
+  sql049Items.length === EQUIPMENT_ITEMS.length &&
+  EQUIPMENT_ITEMS.every((i) => sql049Items.includes(i)),
+  JSON.stringify(sql049Items));
+check('the rebuilt table keeps STRICT, WITHOUT ROWID and the composite primary key',
+  /PRIMARY KEY \(movement_id, item\)\s*\)\s*STRICT, WITHOUT ROWID/.test(sql049)
+  && sql049.includes('REFERENCES movement ON DELETE CASCADE'));
 const sql008 = readFileSync(join(SCHEMA_DIR, '008_taxonomy.sql'), 'utf-8');
 const grab008 = (re) => { const m = sql008.match(re); return m === null ? '' : m[1]; };
 const sqlCats = [...grab008(/category\s+TEXT NOT NULL CHECK \(category IN\s*\(([\s\S]*?)\)\)/)
@@ -1018,6 +1035,200 @@ console.log('[18] guided program macro-cycle ownership');
     macroPhaseOf(programMacroIndex(6, 4)) === 'gpp'
       && macroPhaseOf(programMacroIndex(6, 1)) === 'volume'
       && macroPhaseOf(programMacroIndex(6, 2)) === 'peak');
+}
+
+// --- [7] full-body scope routing + specialist equipment (O3/O4, migration 049) --
+// The scope axis exists because FOCUS_PATTERNS.full already holds five entries
+// and slotBudget caps at five: a full-body movement CANNOT be routed by adding
+// a pattern. These are the laws that axis has to satisfy.
+console.log('[7] full-body scope routing and specialist equipment');
+{
+  const mv = (movement_id, name, pattern, over = {}) => ({
+    movement_id, name, pattern, is_compound: true, required: [], difficulty: 'Beginner', ...over,
+  });
+  // Mirrors the shipped rows: both TGUs are compound kettlebell rotation work,
+  // the canonical one Advanced (68) and the Lunge-style one Intermediate (231).
+  // Farmer Carry (19) is the lowest-id compound carry, so a naive union pool
+  // would always beat both — which is exactly why the union design was discarded.
+  const CANON_TGU = 68, LUNGE_TGU = 231, FARMER = 19, SUITCASE = 20, PLANK = 25;
+  const scopeLib = [
+    mv(1, 'Sq', 'squat'), mv(2, 'Ph', 'push_h'), mv(3, 'Hi', 'hinge'), mv(4, 'Pl', 'pull_h'),
+    mv(5, 'Lu', 'lunge'), mv(6, 'Is', 'isolation'), mv(7, 'Lo', 'locomotion'),
+    mv(FARMER, 'Farmer Carry', 'carry', { required: ['dumbbells'] }),
+    mv(SUITCASE, 'Suitcase Carry', 'carry', { required: ['kettlebell'] }),
+    // An UNSCOPED rotation movement: it must never inherit full-body routing.
+    mv(PLANK, 'Plank', 'rotation'),
+    mv(CANON_TGU, 'Kettlebell Turkish Get-Up', 'rotation',
+      { required: ['kettlebell'], difficulty: 'Advanced', scope: 'full_body' }),
+    mv(LUNGE_TGU, 'Kettlebell Turkish Get-Up (Lunge style)', 'rotation',
+      { required: ['kettlebell'], difficulty: 'Intermediate', scope: 'full_body' }),
+  ];
+  // session_duration_cap_min 110 -> slotBudget 5, the only budget with a slot 5.
+  const scopeProfile = (over = {}) => ({
+    ...DEFAULT_PROFILE,
+    objective: 'strength',
+    weekly_frequency: 1,          // STRENGTH_SPLITS[0] = ['full']
+    session_duration_cap_min: 110,
+    training_age: 'advanced',
+    equipment_inventory: ['dumbbells', 'kettlebell'],
+    ...over,
+  });
+  const scopePlan = (over = {}, extra = {}) => generateBlock({
+    profile: scopeProfile(over), movements: scopeLib, startDate: START, ...extra,
+  });
+  const slotFive = (plan) => {
+    const session = plan.sessions.find((s) => s.focus === 'full');
+    return session === undefined ? null : session.slots[4]?.movement_id ?? null;
+  };
+
+  check('slot budget 5 is a precondition: the full session really has five slots',
+    scopePlan().sessions.every((s) => s.slots.length === 5));
+  check('Advanced/Elite with a kettlebell draft the canonical TGU (compound tie -> lowest id)',
+    slotFive(scopePlan({ training_age: 'advanced' })) === CANON_TGU
+      && slotFive(scopePlan({ training_age: 'elite' })) === CANON_TGU,
+    String(slotFive(scopePlan({ training_age: 'advanced' }))));
+  check('Intermediate drafts the Lunge-style TGU (the canonical one is tier-barred at Advanced)',
+    slotFive(scopePlan({ training_age: 'intermediate' })) === LUNGE_TGU,
+    String(slotFive(scopePlan({ training_age: 'intermediate' }))));
+  check('Beginner falls back to the carry: neither TGU is on the ratified whitelist',
+    slotFive(scopePlan({ training_age: 'beginner' })) === FARMER,
+    String(slotFive(scopePlan({ training_age: 'beginner' }))));
+  check('no kettlebell: the strict subset filter removes both TGUs, carry fills the slot',
+    slotFive(scopePlan({ equipment_inventory: ['dumbbells'] })) === FARMER,
+    String(slotFive(scopePlan({ equipment_inventory: ['dumbbells'] }))));
+  check('an UNSCOPED rotation movement never inherits full-body routing',
+    scopePlan({ training_age: 'beginner' }).sessions
+      .every((s) => s.slots.every((sl) => sl.movement_id !== PLANK)));
+  check('scope never displaces the first four slots of a full session',
+    scopePlan().sessions.every((s) =>
+      JSON.stringify(s.slots.slice(0, 4).map((sl) => sl.movement_id)) === '[1,2,3,4]'));
+
+  // O4: the Turkish Get-Up is never lower-body lunge work, under any objective
+  // or inventory. FOCUS_PATTERNS.lower carries no rotation and has no scope slot.
+  let tguInLower = 0, lowerPlans = 0;
+  for (const objective of OBJECTIVES) {
+    for (const inventory of [[], ['kettlebell'], ['dumbbells', 'kettlebell'],
+      [...STANDARD_EQUIPMENT_ITEMS], [...EQUIPMENT_ITEMS]]) {
+      for (let f = 1; f <= 7; f++) {
+        const plan = generateBlock({
+          profile: scopeProfile({ objective, weekly_frequency: f, equipment_inventory: inventory }),
+          movements: scopeLib,
+          startDate: START,
+        });
+        for (const session of plan.sessions) {
+          if (session.focus !== 'lower') continue;
+          lowerPlans += 1;
+          if (session.slots.some((sl) => sl.movement_id === CANON_TGU || sl.movement_id === LUNGE_TGU)) {
+            tguInLower += 1;
+          }
+        }
+      }
+    }
+  }
+  check('neither TGU is EVER drafted into a lower-body session (all objectives x inventories)',
+    tguInLower === 0 && lowerPlans > 0, `${lowerPlans} lower sessions, ${tguInLower} violations`);
+
+  // Guardrail 1: precedence is preference > scope > carry, never reordered.
+  const withPrefs = (movement_preferences) => scopePlan({}, {
+    programDays: [{ day_index: 1, focus: 'full', movement_preferences }],
+  });
+  const carryPreference = withPrefs([{ slot_index: 5, pattern: 'carry', movement_id: FARMER }]);
+  check('a valid explicit carry preference WINS: the scope selector does not run',
+    slotFive(carryPreference) === FARMER
+      && carryPreference.warnings.length === 0,
+    `${slotFive(carryPreference)} / ${JSON.stringify(carryPreference.warnings)}`);
+  const suitcasePreference = withPrefs([{ slot_index: 5, pattern: 'carry', movement_id: SUITCASE }]);
+  check('an explicit preference for the OTHER carry is honoured too (not just the default pick)',
+    slotFive(suitcasePreference) === SUITCASE, String(slotFive(suitcasePreference)));
+  const squatPreference = withPrefs([{ slot_index: 1, pattern: 'squat', movement_id: 1 }]);
+  check('a preference on a different slot does not suppress the scope selector',
+    slotFive(squatPreference) === CANON_TGU, String(slotFive(squatPreference)));
+  const unavailablePreference = generateBlock({
+    profile: scopeProfile({ equipment_inventory: ['kettlebell'] }), // Farmer Carry needs dumbbells
+    movements: scopeLib,
+    startDate: START,
+    programDays: [{ day_index: 1, focus: 'full', movement_preferences: [
+      { slot_index: 5, pattern: 'carry', movement_id: FARMER },
+    ] }],
+  });
+  check('an unavailable preference still warns AND falls through to the scope candidate',
+    slotFive(unavailablePreference) === CANON_TGU
+      && unavailablePreference.warnings.includes('full: preferred carry movement unavailable; safe fallback used'),
+    `${slotFive(unavailablePreference)} / ${JSON.stringify(unavailablePreference.warnings)}`);
+
+  // Type boundary (3.5.2): the store maps null -> undefined; absent means unscoped.
+  const undefinedScope = generateBlock({
+    profile: scopeProfile(),
+    movements: scopeLib.map((m) => ({ ...m, scope: m.scope ?? undefined })),
+    startDate: START,
+  });
+  const noScopeField = generateBlock({
+    profile: scopeProfile(),
+    movements: scopeLib.map(({ scope, ...rest }) => rest),
+    startDate: START,
+  });
+  check('an explicit undefined scope is identical to an absent one',
+    JSON.stringify(undefinedScope) === JSON.stringify(scopePlan()));
+  check('a library with NO scope field at all is byte-identical to the pre-049 behaviour',
+    slotFive(noScopeField) === FARMER
+      && JSON.stringify(noScopeField.sessions.map((s) => s.slots.map((sl) => sl.movement_id)))
+        === JSON.stringify(scopePlan({ training_age: 'beginner' }).sessions.map((s) => s.slots.map((sl) => sl.movement_id))));
+  check('determinism holds with the scope selector active (double-run deep equality)',
+    JSON.stringify(scopePlan()) === JSON.stringify(scopePlan()));
+
+  // 3.7 row 13: substitution needs no scope threading — the CATEGORY gate
+  // already routes a rotation TGU into the `core` pool, beside its sibling.
+  check('PATTERN_TO_CATEGORY keeps rotation in core and lunge in unilateral',
+    PATTERN_TO_CATEGORY.rotation === 'core' && PATTERN_TO_CATEGORY.lunge === 'unilateral');
+  const subMovement = (m) => ({
+    movement_id: m.movement_id, name: m.name, pattern: m.pattern, is_compound: m.is_compound,
+    difficulty: m.difficulty, family: m.name.toLowerCase().replace(/[^a-z]+/g, '_'),
+    required: m.required, preference: 0,
+  });
+  const subLib = scopeLib.map(subMovement);
+  const tguTarget = subLib.find((m) => m.movement_id === LUNGE_TGU);
+  const subResult = computeSubstitutions({
+    target: tguTarget, library: subLib, inventory: [...EQUIPMENT_ITEMS],
+    niggles: [], futureSlots: [
+      { dayIndex: 3, plannedSlotId: 1, sets: 3, movement: subLib.find((m) => m.movement_id === CANON_TGU) },
+      { dayIndex: 3, plannedSlotId: 2, sets: 3, movement: subLib.find((m) => m.movement_id === 5) },
+    ], currentDayIndex: 1, trainingAge: 'elite',
+  });
+  check('the corrected TGU swaps within the core pool and never with lunge work',
+    subResult.layer2DaySwap.options.some((o) => o.movement_id === CANON_TGU)
+      && !subResult.layer2DaySwap.options.some((o) => o.movement_id === 5),
+    JSON.stringify(subResult.layer2DaySwap.options.map((o) => o.movement_id)));
+
+  // O3: specialist equipment is fail-closed at the ONLY enforcement point.
+  const boardPress = mv(151, 'Board Press', 'push_h',
+    { required: ['boards', 'bands', 'barbell', 'bench', 'squat_rack'] });
+  // Board Press is the ONLY push_h candidate here, so the single reason it can
+  // or cannot be drafted is the strict equipment-subset filter.
+  const boardLib = [...scopeLib.filter((m) => m.pattern !== 'push_h'), boardPress];
+  const withoutBoards = generateBlock({
+    profile: scopeProfile({ equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS] }),
+    movements: boardLib, startDate: START,
+  });
+  const withBoards = generateBlock({
+    profile: scopeProfile({ equipment_inventory: [...EQUIPMENT_ITEMS] }),
+    movements: boardLib, startDate: START,
+  });
+  check('a movement needing specialist equipment is unreachable on a full STANDARD inventory',
+    withoutBoards.sessions.every((s) => s.slots.every((sl) => sl.movement_id !== 151)));
+  check('every preset and the profile default leave that movement unreachable',
+    [...Object.values(EQUIPMENT_PRESETS), DEFAULT_PROFILE.equipment_inventory].every((inventory) =>
+      generateBlock({ profile: scopeProfile({ equipment_inventory: [...inventory] }), movements: boardLib, startDate: START })
+        .sessions.every((s) => s.slots.every((sl) => sl.movement_id !== 151))));
+  check('an explicit specialist opt-in is what makes it draftable — nothing else',
+    withBoards.sessions.some((s) => s.slots.some((sl) => sl.movement_id === 151)));
+  check('dropping any single required item alone makes it unreachable again',
+    boardPress.required.every((item) => generateBlock({
+      profile: scopeProfile({ equipment_inventory: EQUIPMENT_ITEMS.filter((i) => i !== item) }),
+      movements: boardLib, startDate: START,
+    }).sessions.every((s) => s.slots.every((sl) => sl.movement_id !== 151))));
+  check('SPECIALIST_EQUIPMENT_ITEMS is disjoint from every preset bundle',
+    Object.values(EQUIPMENT_PRESETS).every((bundle) =>
+      SPECIALIST_EQUIPMENT_ITEMS.every((i) => !bundle.includes(i))));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

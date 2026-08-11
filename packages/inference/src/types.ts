@@ -63,18 +63,35 @@ export const PROGRESSION_METHODS = [
 ] as const;
 export type ProgressionMethod = (typeof PROGRESSION_METHODS)[number];
 
-/** Equipment inventory items — order and spelling MUST mirror the
- *  movement_equipment.item CHECK and the athlete_profile default in
- *  007_program_engine.sql (machine-checked by verify:blocks). */
-export const EQUIPMENT_ITEMS = [
+/** Standard equipment — order and spelling MUST mirror the athlete_profile
+ *  inventory default and the legacy equipment_access CASE map in
+ *  007_program_engine.sql (machine-checked by verify:blocks). This is the
+ *  widest set any DEFAULT, PRESET, or PARSE FALLBACK may ever grant. */
+export const STANDARD_EQUIPMENT_ITEMS = [
   'barbell', 'squat_rack', 'bench', 'dumbbells', 'kettlebell',
   'pullup_bar', 'nordic_bench', 'bands', 'cable_machine', 'mats',
 ] as const;
+
+/** Specialist equipment (owner decision O3, migration 049). Fail-closed: it
+ *  appears in NO preset, NO profile default, NO SQL column default, and NO
+ *  parse fallback — an athlete reaches it only by explicit opt-in. A movement
+ *  requiring it therefore stays teaching-only until it is deliberately
+ *  selected. */
+export const SPECIALIST_EQUIPMENT_ITEMS = ['boards'] as const;
+
+/** The complete persisted domain — mirrors the movement_equipment.item CHECK
+ *  as widened by 049 (machine-checked by verify:blocks). Use this to
+ *  CANONICALIZE an explicit selection; never as a default or a fallback. */
+export const EQUIPMENT_ITEMS = [
+  ...STANDARD_EQUIPMENT_ITEMS, ...SPECIALIST_EQUIPMENT_ITEMS,
+] as const;
 export type EquipmentItem = (typeof EQUIPMENT_ITEMS)[number];
 
-/** UI presets; bundles MUST mirror 007's legacy equipment_access CASE map. */
+/** UI presets; bundles MUST mirror 007's legacy equipment_access CASE map.
+ *  `full_gym` is deliberately the STANDARD set, not the full union — a preset
+ *  never grants specialist equipment. */
 export const EQUIPMENT_PRESETS: Record<'full_gym' | 'home_basic' | 'minimal', readonly EquipmentItem[]> = {
-  full_gym: EQUIPMENT_ITEMS,
+  full_gym: STANDARD_EQUIPMENT_ITEMS,
   home_basic: ['dumbbells', 'kettlebell', 'pullup_bar', 'bands', 'mats'],
   minimal: ['bands', 'mats'],
 };
@@ -231,5 +248,6 @@ export const DEFAULT_PROFILE: UserProfile = Object.freeze({
   progression_methodology: 'autoregulated',
   injury_flags: [],
   mobility_limits: [],
-  equipment_inventory: [...EQUIPMENT_ITEMS],
+  // Standard-only: a fresh install never silently owns specialist equipment.
+  equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS],
 });

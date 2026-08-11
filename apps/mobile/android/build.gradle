@@ -6,6 +6,7 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "28.2.13676358" // r28: aligns native ELF LOAD segments to 16 KB by default (AUD-A16)
         kotlinVersion = "2.1.20"
+        onnxruntimeAndroidVersion = "1.28.0"
     }
     repositories {
         google()
@@ -32,7 +33,7 @@ subprojects { subproject ->
         configuration.resolutionStrategy.eachDependency { details ->
             if (details.requested.group == "com.microsoft.onnxruntime"
                 && details.requested.name == "onnxruntime-android") {
-                details.useVersion "1.28.0"
+                details.useVersion rootProject.ext.onnxruntimeAndroidVersion.toString()
             }
             if (details.requested.group == "com.facebook.fbjni"
                 && details.requested.name == "fbjni") {

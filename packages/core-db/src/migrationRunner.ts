@@ -88,6 +88,8 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'planned_slot_autopilot' },     // 034
   { type: 'table', name: 'profile_load_preference' },    // 035
   { type: 'table', name: 'movement_media' },             // 036
+  { type: 'table', name: 'movement_scope' },             // 049
+  { type: 'table', name: 'movement_content_correction' }, // 049
 ];
 
 function userVersion(db: MigrationDb): number {

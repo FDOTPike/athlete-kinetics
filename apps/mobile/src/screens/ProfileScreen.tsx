@@ -16,7 +16,8 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
-  EQUIPMENT_ITEMS,
+  STANDARD_EQUIPMENT_ITEMS,
+  SPECIALIST_EQUIPMENT_ITEMS,
   EQUIPMENT_PRESETS,
   HISTORY_IMPORT_AI_PROMPT,
   HISTORY_IMPORT_EXAMPLE,
@@ -590,7 +591,7 @@ export default function ProfileScreen(): React.JSX.Element {
           ))}
         </View>
         <View style={[styles.chipWrap, styles.inventoryWrap]}>
-          {EQUIPMENT_ITEMS.map((item: EquipmentItem) => {
+          {STANDARD_EQUIPMENT_ITEMS.map((item: EquipmentItem) => {
             const owned = profile.equipment_inventory.includes(item);
             return (
               <Chip
@@ -605,6 +606,32 @@ export default function ProfileScreen(): React.JSX.Element {
                   })
                 }
                 accessibilityLabel={`${item.replace(/_/g, ' ')}, ${owned ? 'owned' : 'not owned'}`}
+              />
+            );
+          })}
+        </View>
+        {/* Specialist equipment is an explicit opt-in kept out of every preset,
+            default and parse fallback: movements needing it stay teaching-only
+            until it is deliberately selected. */}
+        <Text style={styles.fieldHint}>
+          Specialist equipment — off unless you turn it on. No preset selects it.
+        </Text>
+        <View style={[styles.chipWrap, styles.inventoryWrap]}>
+          {SPECIALIST_EQUIPMENT_ITEMS.map((item: EquipmentItem) => {
+            const owned = profile.equipment_inventory.includes(item);
+            return (
+              <Chip
+                key={item}
+                label={item.replace(/_/g, ' ').toUpperCase()}
+                selected={owned}
+                onPress={() =>
+                  saveProfile({
+                    equipment_inventory: owned
+                      ? profile.equipment_inventory.filter((i) => i !== item)
+                      : [...profile.equipment_inventory, item],
+                  })
+                }
+                accessibilityLabel={`Specialist equipment ${item.replace(/_/g, ' ')}, ${owned ? 'owned' : 'not owned'}`}
               />
             );
           })}

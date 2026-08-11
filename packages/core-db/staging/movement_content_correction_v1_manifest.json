@@ -1,0 +1,598 @@
+{
+  "schemaVersion": 1,
+  "correctionVersion": 1,
+  "mediaExcluded": true,
+  "fingerprintFields": [
+    "name",
+    "correction_version",
+    "supersedes_v2_sha256",
+    "changes"
+  ],
+  "source": {
+    "dataset": "yuhonas/free-exercise-db",
+    "url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json",
+    "retrieved_at": "2026-08-11",
+    "standing": "corroborating; frozen import revision unknown"
+  },
+  "sourceProvenanceFields": [
+    "name",
+    "source_ref"
+  ],
+  "sourceProvenanceSha256": "5d689cb65008eefade68fc31c9389bdc7b55fca2c665ac6ed7606f48b190d868",
+  "build": {
+    "applied_at_ms": 1786406400000,
+    "approved_on": "2026-08-11"
+  },
+  "scopeAssignmentsSetSha256": "73499931dfa420d085cca3565d22de27bf1e24c41b9415ed48725cba8c0376cb",
+  "scopeAssignments": [
+    {
+      "name": "Kettlebell Turkish Get-Up",
+      "scope": "full_body",
+      "content_set": "legacy_v1",
+      "assignment_sha256": "ffff2a42bc54a397462a6658049687003829161e8729d3415a5f09bfb29a186e"
+    },
+    {
+      "name": "Kettlebell Turkish Get-Up (Lunge style)",
+      "scope": "full_body",
+      "content_set": "v2",
+      "assignment_sha256": "70a989b8f162cb0489fff806dfb2706b0fb57f44f660d585d8444f7bc5a71f0a"
+    }
+  ],
+  "records": [
+    {
+      "name": "Barbell Side Split Squat",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "a786f9ad65fa5598306b2f679a59abf369dd06ff6f84a0243c7fdfd09a2b4961",
+      "correction_sha256": "b50758455d04713009e5d6644d38ebf9bc0b71b72ac347aefeb62e6dd6d5c40e",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "b50758455d04713009e5d6644d38ebf9bc0b71b72ac347aefeb62e6dd6d5c40e"
+      }
+    },
+    {
+      "name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "4f74d0dbce667a809b0593eedc858eae1de2affb15497dc802d8eedf785ce245",
+      "correction_sha256": "d39f4dce066c5e72c8e73e8cb18a879a7304819e976227d3be44ba41943cf6aa",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "d39f4dce066c5e72c8e73e8cb18a879a7304819e976227d3be44ba41943cf6aa"
+      }
+    },
+    {
+      "name": "Bent-Arm Dumbbell Pullover",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "e061f9dc83ef0737cfbd871a073c2545e53513d018e2a1805e92a4f86e4e2300",
+      "correction_sha256": "29e3e284812ea3c97259fd713a65f28d6d86b4f5c25b5210e9416f198dcc98eb",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "29e3e284812ea3c97259fd713a65f28d6d86b4f5c25b5210e9416f198dcc98eb"
+      }
+    },
+    {
+      "name": "Bent-Knee Hip Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d04cc4a18236043250fbf924c9281c31019cc322faef84fa40a753a5b39deaf5",
+      "correction_sha256": "9460164a120fd400081098b22e2f89a5dcec456f2b7f215a840888f9ec819f0f",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "9460164a120fd400081098b22e2f89a5dcec456f2b7f215a840888f9ec819f0f"
+      }
+    },
+    {
+      "name": "Board Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "6199bdb77a280040d61bd4a0f6ad52aa7da83f310e48398ab06ae97a57898736",
+      "correction_sha256": "cc145660978190bceb59f0665221f0aa55c3af53b7dfe14f580fdb92b21273c3",
+      "changed_domains": [
+        "coaching",
+        "equipment"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "cc145660978190bceb59f0665221f0aa55c3af53b7dfe14f580fdb92b21273c3"
+      }
+    },
+    {
+      "name": "Cable Incline Pushdown",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "6ae77b3458e2f7b3d5aae917d4abec9f514ae113e14443a96551cb7ba679cf68",
+      "correction_sha256": "65ad8f64dc27ae96be1904977d618c2f5eeabffd8781989edb5b586cf3c299d5",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "65ad8f64dc27ae96be1904977d618c2f5eeabffd8781989edb5b586cf3c299d5"
+      }
+    },
+    {
+      "name": "Cable Rear Delt Fly",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "03daa8929f4257f4608ae330c0003ed635942246759382eeab9a99912744741b",
+      "correction_sha256": "51d5431e48adc9af459fdfc0ccf96fa944c323c4db36d2b08b07df5315f82f38",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "51d5431e48adc9af459fdfc0ccf96fa944c323c4db36d2b08b07df5315f82f38"
+      }
+    },
+    {
+      "name": "Drag Curl",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "956d62a343dfad3818b55ec39329cf7f67723b086144f51cba17b4cc2f525a8c",
+      "correction_sha256": "1f6dc1c99ff1ff722c91038c895a38614dd54555b8a9ad73961e5b7c941e41df",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "1f6dc1c99ff1ff722c91038c895a38614dd54555b8a9ad73961e5b7c941e41df"
+      }
+    },
+    {
+      "name": "Dumbbell Bench Press with Neutral Grip",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "e951f1e4224342c79242d3475a4ebe0b14a92ae4708fd6dc43b07c74a0eb336b",
+      "correction_sha256": "b97f9dcf9f745328c446128b8eac1401c52f6ae9dfd809cf8745a7e871a8b0b9",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "b97f9dcf9f745328c446128b8eac1401c52f6ae9dfd809cf8745a7e871a8b0b9"
+      }
+    },
+    {
+      "name": "Dumbbell Lying Rear Lateral Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "123ba40eb9a6353319526694d58fb5a00360d07df172cdbfc4e71713063164a0",
+      "correction_sha256": "5f257155cf916968e01f204f860d31886b6dc916cd6463ea593a4e7f633b8714",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "5f257155cf916968e01f204f860d31886b6dc916cd6463ea593a4e7f633b8714"
+      }
+    },
+    {
+      "name": "Floor Glute-Ham Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "9685a24215713f9e1b92aff6b8f1b6310bcb1a46d7f31589ce9367cfb40556f0",
+      "correction_sha256": "9f0856d24a6e4572e395d10abb3bb76eb110d4e0d20eff047d8928d0383ea1c3",
+      "changed_domains": [
+        "coaching",
+        "equipment"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "9f0856d24a6e4572e395d10abb3bb76eb110d4e0d20eff047d8928d0383ea1c3"
+      }
+    },
+    {
+      "name": "Front Incline Dumbbell Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "2c5d0df869916283483d9c0053695ea9a5dae869e3f60718ef60212d55be46e9",
+      "correction_sha256": "5f42c5b6c3d3394654cede5254491d8cc84e3236988978c394825c51fc01e333",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "5f42c5b6c3d3394654cede5254491d8cc84e3236988978c394825c51fc01e333"
+      }
+    },
+    {
+      "name": "Hammer Grip Incline DB Bench Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d7b0956d84e031c2c29fd1421143d9c6aa7367c58a81bd97c496cea9e0ae5284",
+      "correction_sha256": "83e34d6176b3b1c17cb9cfd526d11bf64cdecf59b531968beb61e85840c628a8",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "83e34d6176b3b1c17cb9cfd526d11bf64cdecf59b531968beb61e85840c628a8"
+      }
+    },
+    {
+      "name": "Incline Dumbbell Bench With Palms Facing In",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "e760b272444095dc76c040b5cb53b3ace9823b746be5c50fbfa0db587d65ff0e",
+      "correction_sha256": "911bc8ea4c6124456b146f5f98ee2bd3cfa36bd42de0230ed2b8991746fb35bf",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "911bc8ea4c6124456b146f5f98ee2bd3cfa36bd42de0230ed2b8991746fb35bf"
+      }
+    },
+    {
+      "name": "Janda Sit-Up",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "2e1d568451dd95932b4fe47980915a4320e2eaf61c528e62b1ea41b7010201f2",
+      "correction_sha256": "a1603d324734aac719dd781ad9d31372437f4aa7ecc42d550a07c48c68ff22a6",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "a1603d324734aac719dd781ad9d31372437f4aa7ecc42d550a07c48c68ff22a6"
+      }
+    },
+    {
+      "name": "Kettlebell Seated Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d0a80d975bed4ee1c42e0fdb139395164581872ce969b68d0e595b7da56def6c",
+      "correction_sha256": "d3586fc137e583413ae0b90869fafc06c1f1b2cc0cbc045684fb8e997d934771",
+      "changed_domains": [
+        "movement",
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "d3586fc137e583413ae0b90869fafc06c1f1b2cc0cbc045684fb8e997d934771"
+      }
+    },
+    {
+      "name": "Kettlebell Turkish Get-Up (Lunge style)",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "26496e297f8813a741ca36105ff99d3c74653324b34ba4eff02c680e827bd51c",
+      "correction_sha256": "0fe12ef5517daa52df0e21b43c0cc5165fb36466be9e8b5f3aea6c021891c2a4",
+      "changed_domains": [
+        "movement",
+        "detail",
+        "coaching",
+        "taxonomy"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "0fe12ef5517daa52df0e21b43c0cc5165fb36466be9e8b5f3aea6c021891c2a4"
+      }
+    },
+    {
+      "name": "Kneeling Squat",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "6873d6d2af27c28203183d2f8fe9db56f50d320dafc5056e3fed5d6e0f7576a5",
+      "correction_sha256": "86f7db1cad30888774bf11834a745608fecfc04e4e90d9c344a3005de441e936",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "86f7db1cad30888774bf11834a745608fecfc04e4e90d9c344a3005de441e936"
+      }
+    },
+    {
+      "name": "Lying Rear Delt Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "a91e802da5d27cb7e15eafe009c0ef24753c218c66dbfd52a38c6ea2325ae7ea",
+      "correction_sha256": "4894e791b2707d2afc2cfcbfc0ca6dd6d4045800e98e9f5e31e842ba4a7cc3c7",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "4894e791b2707d2afc2cfcbfc0ca6dd6d4045800e98e9f5e31e842ba4a7cc3c7"
+      }
+    },
+    {
+      "name": "Middle Back Shrug",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "a4984cf933ec3a0049de46e9be5450d40bed4a1fc0ff28efad5be502a30cdf17",
+      "correction_sha256": "416625095b92b1dd54ec99e13d1960ba86e49a3bc897704503aabeca9481ddda",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "416625095b92b1dd54ec99e13d1960ba86e49a3bc897704503aabeca9481ddda"
+      }
+    },
+    {
+      "name": "Natural Glute Ham Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d3261f0836947242f99ed3d4dfb070060ccad4911e1115c4d3a89c0e799ebd85",
+      "correction_sha256": "7ef766a4317be9b4904c3cfe5cfedca32fe1d72fcb43458dcaa605f87782c539",
+      "changed_domains": [
+        "coaching",
+        "equipment"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "7ef766a4317be9b4904c3cfe5cfedca32fe1d72fcb43458dcaa605f87782c539"
+      }
+    },
+    {
+      "name": "Reverse Flyes",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "447311554333729206d01c4fc1e6046b95eefe92dc03ee087df5441e217c545d",
+      "correction_sha256": "85c337efc8b85079c9b3d3198d56c5d0b685a0c623ee4a6ae676e495ebaa34cf",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "85c337efc8b85079c9b3d3198d56c5d0b685a0c623ee4a6ae676e495ebaa34cf"
+      }
+    },
+    {
+      "name": "Rope Straight-Arm Pulldown",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "bcff11a60737db5e882b53155010b61d49ce87277116ac3311c2df536b8c22fe",
+      "correction_sha256": "5e5189d79ab81c893792462607e17218324f85bb76634f689dc9c59bcef71f87",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "5e5189d79ab81c893792462607e17218324f85bb76634f689dc9c59bcef71f87"
+      }
+    },
+    {
+      "name": "Seated Dumbbell Palms-Down Wrist Curl",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "235cd71c960a5aaa005e3e8bb147b72781ae2b5500d8be31dfd26027808da032",
+      "correction_sha256": "786e7fd8fa513b66d7a142da7002bea6045ac2521249c4ac4fb4c8ad5951a15b",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "786e7fd8fa513b66d7a142da7002bea6045ac2521249c4ac4fb4c8ad5951a15b"
+      }
+    },
+    {
+      "name": "Seated Dumbbell Palms-Up Wrist Curl",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "2d242975b25a9265b20f107dec8450ecf0ae0e1c3fc3b1136090071b069358d9",
+      "correction_sha256": "a79d3273500581b8991b56a443cebbfe3cd4c6db97e8e29b16cb0db36dbb40b3",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "a79d3273500581b8991b56a443cebbfe3cd4c6db97e8e29b16cb0db36dbb40b3"
+      }
+    },
+    {
+      "name": "Seated Dumbbell Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "ec6cbb3ccfcace162bc5efafced14c2d2ed9848c4863d19a7c68cfef730eb2fb",
+      "correction_sha256": "da8037f2b028a0b4501e8881c21e0f8cc7c2e9abfd41f0a8aa8acabfed188ee0",
+      "changed_domains": [
+        "movement",
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "da8037f2b028a0b4501e8881c21e0f8cc7c2e9abfd41f0a8aa8acabfed188ee0"
+      }
+    },
+    {
+      "name": "Seated Good Mornings",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "c8ae30a8767557bed77aa623ef8a18f6def77558dd8ccefb88ccd8c11c96d8e3",
+      "correction_sha256": "3880f5cd394c4e1bba6fefdbf3b7b1b410f5f49c5b9ac25b241a8db1dd38cd58",
+      "changed_domains": [
+        "coaching",
+        "equipment"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "3880f5cd394c4e1bba6fefdbf3b7b1b410f5f49c5b9ac25b241a8db1dd38cd58"
+      }
+    },
+    {
+      "name": "Seated Side Lateral Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "2664b8f3366dd00f36a9422e9d2de79a293d930b4699e7231e4bf3b432e0e9a8",
+      "correction_sha256": "f5a703b1c1d69a7d2ace0a563b6e0583f21c500db37f5fd0515a495d17db7f94",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "f5a703b1c1d69a7d2ace0a563b6e0583f21c500db37f5fd0515a495d17db7f94"
+      }
+    },
+    {
+      "name": "Standing Dumbbell Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d891c7ee8780e4166275a858bf0a2957743d95d3f6f7bffde5b0a5c72a50ee8d",
+      "correction_sha256": "03400d1846566719252d57541ecb9d843ce8f8e1b93b558ea9b0241848078718",
+      "changed_domains": [
+        "movement",
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "03400d1846566719252d57541ecb9d843ce8f8e1b93b558ea9b0241848078718"
+      }
+    },
+    {
+      "name": "Standing Palm-In One-Arm Dumbbell Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "e2cb1d0570fedbc1201a3bd52c82a350799ddb518bb46eecd585dc4c94f19064",
+      "correction_sha256": "00371501f0a201c3430c741d5d3c188bc8e9baf35e0189740baf0e1da35e3899",
+      "changed_domains": [
+        "movement",
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "00371501f0a201c3430c741d5d3c188bc8e9baf35e0189740baf0e1da35e3899"
+      }
+    },
+    {
+      "name": "Step-up with Knee Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "600a38c66cb1dd279e21a368354c8cc97cd282c72a77406754c86b84d445be3f",
+      "correction_sha256": "120c678ec47b9811443b371039c77e9f48cad96874dbbd4cff19a25b93e51b9d",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "120c678ec47b9811443b371039c77e9f48cad96874dbbd4cff19a25b93e51b9d"
+      }
+    },
+    {
+      "name": "Straight-Arm Dumbbell Pullover",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "a8174023ff6389b037f8f538148cff1344fd52887468087336a1abfff26d1ce0",
+      "correction_sha256": "94f454bad821e3e2c357f21856c2d2ffc322f10358735fac909ce15a22827dc6",
+      "changed_domains": [
+        "coaching"
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "94f454bad821e3e2c357f21856c2d2ffc322f10358735fac909ce15a22827dc6"
+      }
+    }
+  ]
+}
