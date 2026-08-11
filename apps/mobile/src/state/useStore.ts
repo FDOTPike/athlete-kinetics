@@ -35,6 +35,7 @@ import {
   addAthlete,
   removeAthlete as regRemoveAthlete,
   renameAthlete as regRenameAthlete,
+  setAdvancedToolsUnlocked as regSetAdvancedToolsUnlocked,
   setActiveAthlete,
   type AthleteEntry,
 } from './athleteRegistryCore';
@@ -493,6 +494,10 @@ export interface MeasuredDailyPoint {
   readonly restingHr: number | null;
   readonly sleepMinutes: number | null;
 }
+export interface CoachDiagnosticContext {
+  readonly sessionsToday: number;
+  readonly trainedDaysLast7: number;
+}
 interface KineticsStore {
   status: BootStatus;
   error: string | null;
@@ -556,6 +561,9 @@ interface KineticsStore {
    *  live inside one). */
   athletes: AthleteEntry[];
   activeAthleteId: string;
+  /** Device-wide hidden coaching/debug surfaces. Persisted in the registry,
+   *  deliberately outside every athlete database. */
+  advancedToolsUnlocked: boolean;
   /** False until this athlete's profile has been saved at least once
    *  (athlete_profile.updated_at_ms > 0) — routes first run to the
    *  onboarding questionnaire. Defaults true pre-boot to avoid a wizard
@@ -586,6 +594,8 @@ interface KineticsStore {
   saveBodyweight: (date: string, kg: number | null) => void;
   /** Indexed daily rollups for local charts; imported sessions always appear. */
   loadMeasuredHistory: (limit?: number) => MeasuredDailyPoint[];
+  /** Exact read-only profile-clamp context for the in-memory verification Lab. */
+  loadCoachDiagnosticContext: () => CoachDiagnosticContext;
   /** Attach/replace a free-text note on the last completed session. */
   saveSessionNote: (text: string) => void;
   /** Wire the Health Connect bridge (null = unavailable). READ-ONLY at
@@ -664,6 +674,8 @@ interface KineticsStore {
   /** Coach Mode: remove a non-active, non-default athlete from the registry
    *  and best-effort delete their DB file. */
   deleteAthlete: (id: string) => void;
+  /** Unlock or explicitly relock the advanced coaching/debug surfaces. */
+  setAdvancedToolsUnlocked: (unlocked: boolean) => void;
   /** Onboarding completion: persist every answer in ONE save (no partial
    *  profiles), name the athlete, and enter the app. The load preference is
    *  committed in the same SQLite transaction as the profile fields. */
@@ -1738,6 +1750,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   movementPrefixes: [],
   athletes: [],
   activeAthleteId: 'default',
+  advancedToolsUnlocked: false,
   onboarded: true,
 
   boot: () => {
@@ -1752,7 +1765,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     try {
       const reg = await loadRegistry();
       const entry = activeEntry(reg);
-      set({ athletes: reg.athletes, activeAthleteId: entry.id });
+      set({
+        athletes: reg.athletes,
+        activeAthleteId: entry.id,
+        advancedToolsUnlocked: reg.advancedToolsUnlocked,
+      });
       db = openKineticsDb(entry.dbName);
       migrate(db);
       // Catch-up materialization: idempotent upsert over the trailing week so
@@ -2388,6 +2405,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         athletes: reg.athletes,
         error: fileGone ? null : 'Athlete removed from the list, but their database file could not be deleted. It holds no visible data and can be cleared by reinstalling.',
       });
+    })();
+  },
+
+  setAdvancedToolsUnlocked: (unlocked) => {
+    void (async () => {
+      const reg = regSetAdvancedToolsUnlocked(await loadRegistry(), unlocked);
+      if (!(await saveRegistry(reg))) {
+        set({ error: 'Advanced tools setting not saved — registry write failed.' });
+        return;
+      }
+      set({ advancedToolsUnlocked: unlocked, error: null });
     })();
   },
 
@@ -3604,6 +3632,23 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     bodyweightKg: row.weight_kg, hrvRmssdMs: row.rmssd_ms,
     restingHr: row.resting_hr, sleepMinutes: row.asleep_min,
   })),
+  loadCoachDiagnosticContext: () => {
+    const today = get().today;
+    const row = rowsOf<{ sessions_today: number; trained_days_last_7: number }>(getDb().executeSync(
+      `SELECT
+         (SELECT COUNT(DISTINCT s.session_id) FROM session s
+          WHERE s.session_date = ?
+            AND EXISTS (SELECT 1 FROM set_record sr WHERE sr.session_id = s.session_id)) AS sessions_today,
+         (SELECT COUNT(DISTINCT s.session_date) FROM session s
+          WHERE s.session_date >= ? AND s.session_date <= ?
+            AND EXISTS (SELECT 1 FROM set_record sr WHERE sr.session_id = s.session_id)) AS trained_days_last_7`,
+      [today, addDaysIso(today, -6), today],
+    ))[0];
+    return {
+      sessionsToday: row?.sessions_today ?? 0,
+      trainedDaysLast7: row?.trained_days_last_7 ?? 0,
+    };
+  },
   saveSessionNote: (text) => {
     const sessionId = get().lastEndedSessionId;
     const raw = text.trim().slice(0, 1000);

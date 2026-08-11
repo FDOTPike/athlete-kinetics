@@ -20,7 +20,8 @@ const core = require(join(import.meta.dirname, '.build', 'athleteRegistryCore.js
 const {
   DEFAULT_ATHLETE_ID, LEGACY_DB_NAME,
   defaultRegistry, parseRegistry, serializeRegistry, sanitizeName,
-  addAthlete, renameAthlete, removeAthlete, setActiveAthlete, activeEntry,
+  addAthlete, renameAthlete, removeAthlete, setActiveAthlete,
+  setAdvancedToolsUnlocked, activeEntry,
 } = core;
 
 let n = 0;
@@ -45,6 +46,7 @@ check('parse: garbage input yields the default registry', () => {
     assert.equal(reg.activeId, DEFAULT_ATHLETE_ID);
     assert.equal(reg.athletes.length, 1);
     assert.equal(reg.athletes[0].dbName, LEGACY_DB_NAME);
+    assert.equal(reg.advancedToolsUnlocked, false);
   }
 });
 
@@ -102,9 +104,19 @@ check('add: generated names/ids/dbs are unique and well-formed', () => {
 });
 
 check('add: round-trips through serialize/parse unchanged', () => {
-  const { reg } = addAthlete(defaultRegistry(), 'Test Athlete B', 1712);
+  const unlocked = setAdvancedToolsUnlocked(defaultRegistry(), true);
+  const { reg } = addAthlete(unlocked, 'Test Athlete B', 1712);
   const back = parseRegistry(serializeRegistry(reg));
   assert.deepEqual(back, reg);
+});
+
+check('advanced tools: strict boolean persists device-wide and explicit relock clears it', () => {
+  const unlocked = setAdvancedToolsUnlocked(defaultRegistry(), true);
+  assert.equal(parseRegistry(serializeRegistry(unlocked)).advancedToolsUnlocked, true);
+  const switched = setActiveAthlete(addAthlete(unlocked, 'Alex', 7).reg, 'default');
+  assert.equal(switched.advancedToolsUnlocked, true);
+  assert.equal(setAdvancedToolsUnlocked(switched, false).advancedToolsUnlocked, false);
+  assert.equal(parseRegistry('{"advancedToolsUnlocked":"true"}').advancedToolsUnlocked, false);
 });
 
 // --- I4: removal guards ----------------------------------------------------
@@ -151,6 +163,25 @@ check('IO shell reads/writes REGISTRY_FILE in the document dir', () => {
   assert.ok(shell.includes('REGISTRY_FILE'), 'shell must use the shared constant');
   assert.ok(shell.includes('DocumentDir'), 'registry must live in the document dir');
   assert.ok(!shell.match(/from 'react-native-blob-util'/), 'blob-util must be deferred-required, not imported');
+});
+
+check('verification Lab core is pure and the UI imports no athlete-data mutator', () => {
+  const labCore = readFileSync(
+    join(ROOT, 'apps', 'mobile', 'src', 'diagnostics', 'coachVerificationLab.ts'), 'utf-8');
+  const labScreen = readFileSync(
+    join(ROOT, 'apps', 'mobile', 'src', 'screens', 'CoachVerificationLabScreen.tsx'), 'utf-8');
+  for (const forbidden of ['useStore', 'executeSync', 'Date.now', 'saveRegistry', "from 'react-native'"]) {
+    assert.ok(!labCore.includes(forbidden), `pure Lab core must not contain ${forbidden}`);
+  }
+  for (const forbidden of [
+    'saveProfile', 'generateNewBlock', 'createTrainingProgram', 'startSession',
+    'logSet', 'endSession', 'saveBodyweight', 'importHistory', 'resetTrainingData',
+  ]) {
+    assert.ok(!labScreen.includes(forbidden), `Lab UI must not select ${forbidden}`);
+  }
+  assert.ok(labScreen.includes('loadMeasuredHistory'));
+  assert.ok(labScreen.includes('loadCoachDiagnosticContext'));
+  assert.ok(labScreen.includes('getMovementAvailabilityVerdicts'));
 });
 
 if (process.exitCode !== 1) console.log(`verify:coach — all ${n} checks green`);

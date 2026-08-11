@@ -11,7 +11,7 @@
  * Law 3: Zero red/amber/green anywhere.
  * Law 4: Touch targets >= 56pt.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
@@ -33,6 +33,7 @@ import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
 import InfoTip from '../components/InfoTip';
+import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -198,6 +199,8 @@ export default function ProfileScreen(): React.JSX.Element {
   const createAthlete = useStore((s) => s.createAthlete);
   const renameAthleteEntry = useStore((s) => s.renameAthleteEntry);
   const deleteAthlete = useStore((s) => s.deleteAthlete);
+  const advancedToolsUnlocked = useStore((s) => s.advancedToolsUnlocked);
+  const setAdvancedToolsUnlocked = useStore((s) => s.setAdvancedToolsUnlocked);
   const loadRecentOutcomes = useStore((s) => s.loadRecentOutcomes);
   const today = useStore((s) => s.today);
   const importHistory = useStore((s) => s.importHistory);
@@ -225,10 +228,17 @@ export default function ProfileScreen(): React.JSX.Element {
   const [includeImportReadiness, setIncludeImportReadiness] = useState(false);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
   const [bodyweightText, setBodyweightText] = useState('');
+  const [labOpen, setLabOpen] = useState(false);
+  const buildTapCount = useRef(0);
+  const buildTapReset = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (buildTapReset.current !== null) clearTimeout(buildTapReset.current);
+  }, []);
 
-  const hasConfirm = confirmingDeleteAthleteId !== null || confirmingWipeBlock || confirmingSwitchProfileId !== null || confirmingDeleteBandLevel !== null;
-  useSubViewBack(hasConfirm, () => {
-    if (confirmingDeleteAthleteId !== null) setConfirmingDeleteAthleteId(null);
+  const hasSubView = labOpen || confirmingDeleteAthleteId !== null || confirmingWipeBlock || confirmingSwitchProfileId !== null || confirmingDeleteBandLevel !== null;
+  useSubViewBack(hasSubView, () => {
+    if (labOpen) setLabOpen(false);
+    else if (confirmingDeleteAthleteId !== null) setConfirmingDeleteAthleteId(null);
     else if (confirmingWipeBlock) setConfirmingWipeBlock(false);
     else if (confirmingSwitchProfileId !== null) setConfirmingSwitchProfileId(null);
     else if (confirmingDeleteBandLevel !== null) setConfirmingDeleteBandLevel(null);
@@ -266,6 +276,23 @@ export default function ProfileScreen(): React.JSX.Element {
           ? { region: line.slice(0, idx).trim(), note: line.slice(idx + 1).trim() }
           : { region: line, note: '' };
       });
+
+  const recordBuildTap = (): void => {
+    if (advancedToolsUnlocked) return;
+    buildTapCount.current += 1;
+    if (buildTapReset.current !== null) clearTimeout(buildTapReset.current);
+    if (buildTapCount.current >= 7) {
+      buildTapCount.current = 0;
+      buildTapReset.current = null;
+      setAdvancedToolsUnlocked(true);
+      return;
+    }
+    buildTapReset.current = setTimeout(() => { buildTapCount.current = 0; }, 5000);
+  };
+
+  if (labOpen && advancedToolsUnlocked) {
+    return <CoachVerificationLabScreen onClose={() => setLabOpen(false)} />;
+  }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -854,8 +881,9 @@ export default function ProfileScreen(): React.JSX.Element {
         )}
       </View>
 
-      {/* ---- Coach Mode (Phase 15): one database file per athlete ---- */}
-      <View style={styles.mgmtSection}>
+      {/* Advanced athlete-database management stays hidden until the local
+          seven-tap build gesture is deliberately completed. */}
+      {advancedToolsUnlocked && <View style={styles.mgmtSection} testID="advanced-athlete-manager">
         <Pressable
           onPress={() => setCoachOpen((o) => !o)}
           accessibilityRole="button"
@@ -863,7 +891,7 @@ export default function ProfileScreen(): React.JSX.Element {
           accessibilityLabel={`Coach mode, ${athletes.length} athletes, ${coachOpen ? 'expanded' : 'collapsed'}`}
           style={styles.coachHeader}
         >
-          <Text style={styles.mgmtHeading}>COACH MODE</Text>
+          <Text style={styles.mgmtHeading}>MANAGE ATHLETES</Text>
           <Text style={styles.coachToggle}>
             {athletes.length} {coachOpen ? '▾' : '▸'}
           </Text>
@@ -982,7 +1010,37 @@ export default function ProfileScreen(): React.JSX.Element {
             </View>
           </View>
         )}
-      </View>
+      </View>}
+
+      {advancedToolsUnlocked && (
+        <View style={styles.mgmtSection} testID="advanced-tools-section">
+          <Text style={styles.mgmtHeading}>ADVANCED TOOLS</Text>
+          <Text style={styles.fieldHint}>Coach verification is sandbox-only. Athlete training remains in the focused app screens.</Text>
+          <QuietAction
+            label="OPEN COACH VERIFICATION LAB"
+            onPress={() => setLabOpen(true)}
+            accessibilityLabel="Open Coach Verification Lab"
+          />
+          <QuietAction
+            label="RELOCK ADVANCED TOOLS"
+            onPress={() => {
+              setLabOpen(false);
+              setCoachOpen(false);
+              setAdvancedToolsUnlocked(false);
+            }}
+            accessibilityLabel="Relock advanced tools"
+          />
+        </View>
+      )}
+
+      <Pressable
+        onPress={recordBuildTap}
+        accessibilityRole="button"
+        accessibilityLabel="Build 0.1.0"
+        style={styles.buildLabel}
+      >
+        <Text style={styles.buildText}>BUILD 0.1.0</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -1150,4 +1208,11 @@ const styles = StyleSheet.create({
   clinicalRow: {
     borderBottomColor: theme.color.ink1,
   },
+  buildLabel: {
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.space[4],
+  },
+  buildText: { ...theme.font.eyebrow, color: theme.color.textLow },
 });

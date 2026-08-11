@@ -66,6 +66,10 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       importHistory: jest.fn(() => ({ committed: false, duplicate: false, preview: { sessions: [], errors: [], warnings: [], unknownMovementNames: [], formatVersion: null } })),
       saveBodyweight: jest.fn(),
       loadMeasuredHistory: jest.fn(() => []),
+      loadCoachDiagnosticContext: jest.fn(() => ({ sessionsToday: 0, trainedDaysLast7: 0 })),
+      vector: null,
+      blockSessions: [],
+      getMovementAvailabilityVerdicts: jest.fn(() => []),
       biometricsStatus: 'idle',
       syncBiometrics: jest.fn(),
       requestBiometricsAccess: jest.fn(),
@@ -85,6 +89,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       createAthlete: jest.fn(),
       renameAthleteEntry: jest.fn(),
       deleteAthlete: deleteAthleteMock,
+      advancedToolsUnlocked: false,
+      setAdvancedToolsUnlocked: jest.fn(),
       completeOnboarding: jest.fn(),
       loadDemoAthlete: jest.fn(),
       loadRecentOutcomes: () => [
@@ -109,6 +115,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   });
 
   test('b) Coach Mode athlete delete requires two presses before store action fires', () => {
+    mockState.advancedToolsUnlocked = true;
     render(<ProfileScreen />);
 
     // Expand Coach Mode
@@ -128,6 +135,34 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
 
     // Assert action IS called on 2nd press
     expect(deleteAthleteMock).toHaveBeenCalledWith('ath-2');
+  });
+
+  test('advanced athlete management and Lab are hidden until the seven-tap gesture', () => {
+    render(<ProfileScreen />);
+
+    expect(screen.queryByTestId('advanced-athlete-manager')).toBeNull();
+    expect(screen.queryByTestId('advanced-tools-section')).toBeNull();
+    for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Build 0.1.0'));
+    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledTimes(1);
+    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(true);
+  });
+
+  test('unlocked tools expose the sandbox Lab and explicit relock', () => {
+    mockState.advancedToolsUnlocked = true;
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('advanced-athlete-manager')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Open Coach Verification Lab'));
+    expect(screen.getByTestId('coach-verification-lab')).toBeOnTheScreen();
+    expect(screen.getByTestId('lab-no-write-notice')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Run all verification scenarios'));
+    expect(screen.getByTestId('lab-module-prescription')).toBeOnTheScreen();
+    expect(screen.getByTestId('lab-module-session')).toBeOnTheScreen();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+    expect(mockState.saveBodyweight).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Close Coach Verification Lab'));
+    fireEvent.press(screen.getByLabelText('Relock advanced tools'));
+    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(false);
   });
 
   test('b) Block wipe requires two presses before store action fires', () => {
