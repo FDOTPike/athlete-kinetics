@@ -49,11 +49,17 @@ staged.
 
 ```powershell
 Push-Location apps\mobile\android
-.\gradlew.bat bundleRelease assembleRelease --no-daemon
+.\gradlew.bat :app:verifyOnnxRuntimePackagingContract bundleRelease assembleRelease --no-daemon
 Pop-Location
 jarsigner -verify -verbose -certs apps\mobile\android\app\build\outputs\bundle\release\app-release.aab
 Get-FileHash apps\mobile\android\app\build\outputs\bundle\release\app-release.aab -Algorithm SHA256
 ```
+
+The APK and AAB producer tasks verify that every packaged
+`libonnxruntimejsi.so` has a same-ABI `libonnxruntime.so`. A failed check removes
+the rejected artifact before failing the build. This protection also runs for
+`installDebug` / `react-native run-android`, because those paths depend on
+`packageDebug` rather than the `assembleDebug` lifecycle task.
 
 Expected outputs:
 

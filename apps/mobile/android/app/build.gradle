@@ -174,48 +174,142 @@ dependencies {
     }
 }
 
-def verifyOnnxRuntimeLibraries = { String variantName ->
-    def apk = layout.buildDirectory.file(
-        "outputs/apk/${variantName.toLowerCase()}/app-${variantName.toLowerCase()}.apk"
-    ).get().asFile
-    if (!apk.isFile()) {
-        throw new GradleException("Expected APK was not produced: ${apk}")
+def verifyOnnxRuntimeArchive = { File artifact, String libraryRoot ->
+    if (!artifact.isFile()) {
+        throw new GradleException("Expected Android artifact was not produced: ${artifact}")
     }
 
-    def archive = new java.util.zip.ZipFile(apk)
+    def failure = null
+    def archive = null
     try {
+        archive = new java.util.zip.ZipFile(artifact)
         def jsiEntries = []
         def entries = archive.entries()
         while (entries.hasMoreElements()) {
             def entryName = entries.nextElement().name
-            if (entryName.startsWith("lib/")
+            if (entryName.startsWith(libraryRoot)
                 && entryName.endsWith("/libonnxruntimejsi.so")) {
                 jsiEntries.add(entryName)
             }
         }
         if (jsiEntries.isEmpty()) {
-            throw new GradleException("APK contains no libonnxruntimejsi.so: ${apk}")
+            failure = "contains no libonnxruntimejsi.so"
+        } else {
+            def missingBaseEntries = jsiEntries.collect { entry ->
+                entry.replace("libonnxruntimejsi.so", "libonnxruntime.so")
+            }.findAll { entry -> archive.getEntry(entry) == null }
+            if (!missingBaseEntries.isEmpty()) {
+                failure = "is missing ONNX Runtime native libraries: ${missingBaseEntries.join(', ')}"
+            }
         }
+    } catch (Exception error) {
+        failure = "could not be inspected as a ZIP archive (${error.class.simpleName})"
+    } finally {
+        if (archive != null) archive.close()
+    }
 
-        def missingBaseEntries = jsiEntries.collect { entry ->
-            entry.replace("libonnxruntimejsi.so", "libonnxruntime.so")
-        }.findAll { entry -> archive.getEntry(entry) == null }
-        if (!missingBaseEntries.isEmpty()) {
+    if (failure != null) {
+        // Never leave a failed, apparently uploadable/installable artifact in
+        // the output directory after the build has been rejected.
+        if (artifact.exists() && !artifact.delete()) {
             throw new GradleException(
-                "APK is missing ONNX Runtime native libraries: ${missingBaseEntries.join(', ')}"
+                "Android artifact ${failure}; also failed to delete rejected artifact: ${artifact}"
             )
         }
+        throw new GradleException("Android artifact ${failure}: ${artifact}")
+    }
+    logger.lifecycle("[onnx-packaging] verified ${artifact.name}")
+}
+
+def writeOnnxRuntimeFixture = { File artifact, List<String> entries ->
+    artifact.parentFile.mkdirs()
+    def output = new java.util.zip.ZipOutputStream(new FileOutputStream(artifact))
+    try {
+        entries.each { entryName ->
+            output.putNextEntry(new java.util.zip.ZipEntry(entryName))
+            output.write(0)
+            output.closeEntry()
+        }
     } finally {
-        archive.close()
+        output.close()
     }
 }
 
-// Keep a normal assemble from succeeding with only the JSI shim packaged. That
-// APK installs cleanly but crashes as soon as React Native loads ONNX Runtime.
+def onnxPackagingContract = tasks.register("verifyOnnxRuntimePackagingContract") {
+    group = "verification"
+    description = "Exercises APK/AAB ONNX native-library pairing and rejection behavior."
+    outputs.upToDateWhen { false }
+    doLast {
+        def fixtureDir = layout.buildDirectory.dir("tmp/onnx-packaging-contract").get().asFile
+        def restrictedApk = new File(fixtureDir, "restricted.apk")
+        writeOnnxRuntimeFixture(restrictedApk, [
+            "lib/arm64-v8a/libonnxruntimejsi.so",
+            "lib/arm64-v8a/libonnxruntime.so",
+        ])
+        verifyOnnxRuntimeArchive(restrictedApk, "lib/")
+
+        def validBundle = new File(fixtureDir, "valid.aab")
+        writeOnnxRuntimeFixture(validBundle, [
+            "base/lib/arm64-v8a/libonnxruntimejsi.so",
+            "base/lib/arm64-v8a/libonnxruntime.so",
+            "base/lib/x86_64/libonnxruntimejsi.so",
+            "base/lib/x86_64/libonnxruntime.so",
+        ])
+        verifyOnnxRuntimeArchive(validBundle, "base/lib/")
+
+        [
+            [new File(fixtureDir, "missing-apk-base.apk"), "lib/arm64-v8a/libonnxruntimejsi.so", "lib/"],
+            [new File(fixtureDir, "missing-aab-base.aab"), "base/lib/arm64-v8a/libonnxruntimejsi.so", "base/lib/"],
+            [new File(fixtureDir, "missing-jsi.apk"), "lib/arm64-v8a/libonnxruntime.so", "lib/"],
+        ].each { fixture ->
+            def rejectedArtifact = fixture[0] as File
+            writeOnnxRuntimeFixture(rejectedArtifact, [fixture[1] as String])
+            def rejected = false
+            try {
+                verifyOnnxRuntimeArchive(rejectedArtifact, fixture[2] as String)
+            } catch (GradleException expected) {
+                rejected = true
+            }
+            if (!rejected || rejectedArtifact.exists()) {
+                throw new GradleException(
+                    "ONNX packaging contract failed to reject and remove ${rejectedArtifact.name}"
+                )
+            }
+        }
+
+        def corruptArtifact = new File(fixtureDir, "corrupt.aab")
+        corruptArtifact.withOutputStream { output -> output.write(0) }
+        def corruptRejected = false
+        try {
+            verifyOnnxRuntimeArchive(corruptArtifact, "base/lib/")
+        } catch (GradleException expected) {
+            corruptRejected = true
+        }
+        if (!corruptRejected || corruptArtifact.exists()) {
+            throw new GradleException("ONNX packaging contract failed to reject and remove corrupt.aab")
+        }
+    }
+}
+
+// Guard the artifact-producing task itself. This covers assemble, bundle,
+// package, installDebug/run-android, and direct package/bundle invocations.
+// Force the small packaging step to execute so an old unverified artifact can
+// never be reused solely because Gradle considered the task up to date.
+def onnxArtifactTasks = [
+    packageDebug: ["outputs/apk/debug/app-debug.apk", "lib/"],
+    packageRelease: ["outputs/apk/release/app-release.apk", "lib/"],
+    bundleDebug: ["outputs/bundle/debug/app-debug.aab", "base/lib/"],
+    bundleRelease: ["outputs/bundle/release/app-release.aab", "base/lib/"],
+]
+
 tasks.configureEach { task ->
-    if (task.name == "assembleDebug") {
-        task.doLast { verifyOnnxRuntimeLibraries("debug") }
-    } else if (task.name == "assembleRelease") {
-        task.doLast { verifyOnnxRuntimeLibraries("release") }
+    def artifactSpec = onnxArtifactTasks[task.name]
+    if (artifactSpec != null) {
+        task.dependsOn(onnxPackagingContract)
+        task.outputs.upToDateWhen { false }
+        task.doLast {
+            def artifact = layout.buildDirectory.file(artifactSpec[0]).get().asFile
+            verifyOnnxRuntimeArchive(artifact, artifactSpec[1])
+        }
     }
 }

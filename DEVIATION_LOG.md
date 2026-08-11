@@ -2,6 +2,24 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-08-12 - Pre-release hardening audit follow-up
+
+1. **Poisoned-database self-heal can widen supplementary role eligibility;
+   correction is required before public release, not before signed QA.**
+   Migration 028 assigns `supplementary` to every movement present when it is
+   applied. A fresh chain reaches 028 with 124 movements, while the documented
+   poison-repair path replays 028 after all 300 movements exist. That path can
+   therefore add supplementary eligibility to the 176 Phase 2a movements and
+   diverge from fresh-install routine-template behavior. Tier, equipment,
+   safety and capability ceilings still apply, so this is not a safety bypass.
+   Remediation must be additive and must prove fresh install, incremental
+   upgrade and poison-repair convergence before a public build is authorized.
+
+2. **Generated-video work remains paused.** The signed pre-release phase keeps
+   the frozen 124 legacy fallback links and 176 planned demonstrations. No
+   media generation, hosting or asset-key status transition is reopened by the
+   Android release-hardening work.
+
 ## 2026-08-11 - Phase 2a pre-release content correction (migration 049)
 
 1. **The five high-risk records ship on OWNER APPROVAL, with independent
