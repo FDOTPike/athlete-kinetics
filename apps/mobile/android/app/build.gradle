@@ -110,7 +110,7 @@ android {
             // CMake 3.22.1 hits a Windows ninja regeneration loop
             // ("manifest 'build.ninja' still dirty after 100 tries").
             // 3.30.x also ships a newer ninja. Installed via sdkmanager.
-            version "3.30.5"
+            version rootProject.ext.cmakeVersion
         }
     }
 
@@ -291,15 +291,16 @@ def onnxPackagingContract = tasks.register("verifyOnnxRuntimePackagingContract")
     }
 }
 
-// Guard the artifact-producing task itself. This covers assemble, bundle,
-// package, installDebug/run-android, and direct package/bundle invocations.
+// Guard the artifact-producing task itself. APKs are written by package*;
+// final signed AABs are written by sign*Bundle. This covers assemble, bundle,
+// package, installDebug/run-android, and direct producer-task invocations.
 // Force the small packaging step to execute so an old unverified artifact can
 // never be reused solely because Gradle considered the task up to date.
 def onnxArtifactTasks = [
     packageDebug: ["outputs/apk/debug/app-debug.apk", "lib/"],
     packageRelease: ["outputs/apk/release/app-release.apk", "lib/"],
-    bundleDebug: ["outputs/bundle/debug/app-debug.aab", "base/lib/"],
-    bundleRelease: ["outputs/bundle/release/app-release.aab", "base/lib/"],
+    signDebugBundle: ["outputs/bundle/debug/app-debug.aab", "base/lib/"],
+    signReleaseBundle: ["outputs/bundle/release/app-release.aab", "base/lib/"],
 ]
 
 tasks.configureEach { task ->

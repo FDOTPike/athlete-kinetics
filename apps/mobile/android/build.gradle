@@ -5,6 +5,7 @@ buildscript {
         compileSdkVersion = 36
         targetSdkVersion = 36
         ndkVersion = "28.2.13676358" // r28: aligns native ELF LOAD segments to 16 KB by default (AUD-A16)
+        cmakeVersion = "3.30.5" // avoids the CMake 3.22.1/Ninja regeneration loop on Windows
         kotlinVersion = "2.1.20"
         onnxruntimeAndroidVersion = "1.28.0"
     }
@@ -29,6 +30,20 @@ apply plugin: "com.facebook.react.rootproject"
 // resolved versions here at the root so every module builds against the
 // pinned artifacts.
 subprojects { subproject ->
+    // Autolinked native-library modules do not inherit the app module's native
+    // toolchain selection. Pin them here so every externalNativeBuild task uses
+    // the supported CMake/NDK pair instead of platform defaults on Windows.
+    subproject.plugins.withId("com.android.library") {
+        subproject.extensions.configure("android") { androidExtension ->
+            androidExtension.ndkVersion = rootProject.ext.ndkVersion
+            androidExtension.externalNativeBuild {
+                cmake {
+                    version rootProject.ext.cmakeVersion
+                }
+            }
+        }
+    }
+
     subproject.configurations.configureEach { configuration ->
         configuration.resolutionStrategy.eachDependency { details ->
             if (details.requested.group == "com.microsoft.onnxruntime"

@@ -5,7 +5,9 @@ material in the repository. Debug CI artifacts are for sideload QA only.
 
 ## 1. One-time setup on the trusted home PC
 
-Install Node.js, Java 17, Android Studio/SDK, and the repository dependencies.
+Install Node.js, Java 17, Android Studio/SDK, CMake 3.30.5, NDK
+28.2.13676358, and the repository dependencies. The Gradle build pins this
+CMake/NDK pair for both the app and autolinked native-library modules.
 Generate the Play upload key on that PC and back it up offline:
 
 ```powershell
