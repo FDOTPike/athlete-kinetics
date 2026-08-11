@@ -49,7 +49,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '043_movement_library_v2_batch.sql', '044_movement_library_v2_batch.sql',
   '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
   '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
-  '049_movement_content_correction_v1.sql'];
+  '049_movement_content_correction_v1.sql',
+  '050_movement_role_convergence.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -696,7 +697,8 @@ const correctionComplete = (db) => {
     && s.canonicalTguUrl === 'https://www.youtube.com/watch?v=lpltjWHd0ek';
 };
 
-// (1) clean 048 -> 049 upgrade: user_version 47 -> 48, derived from the list index.
+// (1) clean 048 -> current upgrade: 049 applies the correction, then 050
+// converges supplementary-role eligibility.
 const correctionDb = freshDb();
 for (let i = 0; i < correctionIndex; i += 1) correctionDb.executeSync(MIGRATIONS[i]);
 correctionDb.executeSync(`PRAGMA user_version = ${correctionIndex};`);
@@ -706,8 +708,8 @@ check('048-era upgrade precondition: user_version 47, no correction tables',
   String(uv(correctionDb)));
 const equipmentBefore = untouchedEquipment(correctionDb);
 runMigrations(correctionDb, MIGRATIONS);
-check('clean 048 -> 049 upgrade lands every correction and bumps user_version to 48',
-  uv(correctionDb) === 48 && uv(correctionDb) === MIGRATIONS.length && correctionComplete(correctionDb),
+check('clean 048 -> current upgrade lands every correction and reaches the latest user_version',
+  uv(correctionDb) === MIGRATIONS.length && correctionComplete(correctionDb),
   JSON.stringify(correctionSummary(correctionDb)));
 check('the movement_equipment rebuild preserves every untouched row, content for content',
   JSON.stringify(untouchedEquipment(correctionDb)) === JSON.stringify(equipmentBefore),
@@ -730,11 +732,11 @@ check('full re-apply from 0 leaves the corrections asserted last, not the origin
   correctionComplete(correctionDb) && phase2aLibraryComplete(correctionDb),
   JSON.stringify(correctionSummary(correctionDb)));
 
-// (4) poisoned user_version = 48 while 049 never applied.
+// (4) poisoned user_version claims the latest chain while 049 never applied.
 const poisonedCorrection = freshDb();
 for (let i = 0; i < correctionIndex; i += 1) poisonedCorrection.executeSync(MIGRATIONS[i]);
 poisonedCorrection.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
-check('049 poison precondition: user_version claims 48 but both sentinels are absent',
+check('049 poison precondition: user_version claims latest but both sentinels are absent',
   sentinelsMissing(poisonedCorrection).includes('movement_scope')
     && sentinelsMissing(poisonedCorrection).includes('movement_content_correction'));
 runMigrations(poisonedCorrection, MIGRATIONS);
@@ -779,6 +781,62 @@ const mediaCascadeId = Number(phase2aDb.raw.prepare(
 phase2aDb.executeSync(`DELETE FROM movement WHERE movement_id = ${mediaCascadeId}`);
 check('movement delete cascades its media side-car',
   phase2aDb.raw.prepare('SELECT 1 FROM movement_media WHERE movement_id = ?').get(mediaCascadeId) === undefined);
+
+// --- 2l. 050 movement-role convergence --------------------------------------
+console.log('[2l] 050 supplementary-role convergence');
+const roleIndex = FILES.indexOf('050_movement_role_convergence.sql');
+const roleDb = freshDb();
+for (let i = 0; i < roleIndex; i += 1) roleDb.executeSync(MIGRATIONS[i]);
+roleDb.executeSync(`PRAGMA user_version = ${roleIndex};`);
+const roleCounts = (database) => database.raw.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM movement) AS movements,
+    (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'supplementary') AS supplementary,
+    (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'major') AS major,
+    (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'conditional') AS conditional
+`).get();
+check('049-era precondition exposes the fresh/poison divergence: 300 movements but 124 supplementary',
+  roleCounts(roleDb).movements === 300 && roleCounts(roleDb).supplementary === 124,
+  JSON.stringify(roleCounts(roleDb)));
+runMigrations(roleDb, MIGRATIONS);
+check('clean 049 -> 050 upgrade converges every live movement without widening explicit roles',
+  uv(roleDb) === MIGRATIONS.length
+    && roleCounts(roleDb).supplementary === roleCounts(roleDb).movements
+    && roleCounts(roleDb).major === 8 && roleCounts(roleDb).conditional === 12,
+  JSON.stringify(roleCounts(roleDb)));
+
+roleDb.executeSync(`PRAGMA user_version = ${roleIndex};`);
+runMigrations(roleDb, MIGRATIONS);
+check('050 replay is idempotent and duplicate-free',
+  roleCounts(roleDb).supplementary === 300
+    && Number(roleDb.raw.prepare(`
+      SELECT COUNT(*) AS c FROM (
+        SELECT movement_id, role, COUNT(*) AS n FROM movement_role_eligibility
+        GROUP BY movement_id, role HAVING n > 1
+      )
+    `).get().c) === 0);
+
+const poisonedRole = freshDb();
+for (let i = 0; i < roleIndex; i += 1) poisonedRole.executeSync(MIGRATIONS[i]);
+poisonedRole.executeSync(MIGRATIONS[FILES.indexOf('028_capability_graph.sql')]);
+poisonedRole.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('poison precondition has widened data but lacks the 050 trigger sentinel',
+  roleCounts(poisonedRole).supplementary === 300
+    && sentinelsMissing(poisonedRole).includes('trg_movement_supplementary_ai'));
+runMigrations(poisonedRole, MIGRATIONS);
+check('poison self-heal and clean upgrade converge byte-for-byte on role counts',
+  sentinelsMissing(poisonedRole).length === 0
+    && JSON.stringify(roleCounts(poisonedRole)) === JSON.stringify(roleCounts(roleDb)),
+  JSON.stringify(roleCounts(poisonedRole)));
+
+roleDb.executeSync("INSERT INTO movement (name, pattern, is_compound) VALUES ('050 Future Movement', 'isolation', 0)");
+const futureMovementId = Number(roleDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = '050 Future Movement'",
+).get().movement_id);
+check('050 trigger gives a future live movement supplementary eligibility exactly once',
+  Number(roleDb.raw.prepare(
+    "SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ? AND role = 'supplementary'",
+  ).get(futureMovementId).c) === 1);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

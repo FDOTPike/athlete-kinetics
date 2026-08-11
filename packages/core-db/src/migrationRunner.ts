@@ -90,6 +90,7 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'movement_media' },             // 036
   { type: 'table', name: 'movement_scope' },             // 049
   { type: 'table', name: 'movement_content_correction' }, // 049
+  { type: 'trigger', name: 'trg_movement_supplementary_ai' }, // 050
 ];
 
 function userVersion(db: MigrationDb): number {
