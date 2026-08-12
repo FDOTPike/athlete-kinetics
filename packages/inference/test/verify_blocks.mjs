@@ -71,7 +71,16 @@ const movements = db.prepare(
   pattern: r.pattern,
   is_compound: Number(r.is_compound) === 1,
   required: JSON.parse(r.required_json ?? '[]'),
+  difficulty: 'Beginner',
+  beginner_ok: false,
+  sportTracking: false,
+  capability_available_weight_room: true,
+  capability_available_sport_conditioning: true,
 }));
+check('generator fixture explicitly carries both contexts and sport status', movements.every((movement) =>
+  typeof movement.sportTracking === 'boolean'
+  && typeof movement.capability_available_weight_room === 'boolean'
+  && typeof movement.capability_available_sport_conditioning === 'boolean'));
 const requiredById = new Map(movements.map((m) => [m.movement_id, m.required]));
 const prof = (over = {}) => ({ ...DEFAULT_PROFILE, ...over });
 const gen = (over = {}) => generateBlock({ profile: prof(over), movements, startDate: START });
@@ -474,6 +483,9 @@ const subLib = movements.map((m) => ({
   family: detailById.get(m.movement_id).base_name,
   required: m.required,
   preference: 0,
+  beginnerOk: m.beginner_ok,
+  capabilityAvailable: true,
+  sportTracking: m.sportTracking,
 }));
 const byName = (n) => subLib.find((m) => m.name === n);
 const idOf = (n) => byName(n).movement_id;
@@ -481,6 +493,7 @@ const RANK = { Beginner: 0, Intermediate: 1, Advanced: 2 };
 const baseInput = {
   target: byName('Competition Squat'), library: subLib,
   inventory: [...EQUIPMENT_ITEMS], niggles: [], futureSlots: [], currentDayIndex: 1,
+  trainingAge: 'intermediate', accessContext: 'weight_room',
 };
 
 // determinism
@@ -490,7 +503,8 @@ let subDet = true;
 const detFuture = [{ plannedSlotId: 77, dayIndex: 5, movement: byName('Cable Row'), sets: 4 }];
 for (const m of subLib) {
   const inp = { target: m, library: subLib, inventory: [...EQUIPMENT_ITEMS],
-    niggles: [{ region: 'knee', severity: 4 }], futureSlots: detFuture, currentDayIndex: 2 };
+    niggles: [{ region: 'knee', severity: 4 }], futureSlots: detFuture, currentDayIndex: 2,
+    trainingAge: 'intermediate', accessContext: 'weight_room' };
   if (JSON.stringify(computeSubstitutions(inp)) !== JSON.stringify(computeSubstitutions(inp))) subDet = false;
 }
 check('determinism across all 30 targets (niggle + future slots)', subDet, `${subLib.length} targets`);
@@ -538,7 +552,8 @@ const futureSlots = [
   { plannedSlotId: 79, dayIndex: 1, movement: byName('Single-Arm Dumbbell Row'), sets: 5 }, // row but not later
 ];
 const ds = computeSubstitutions({ target: byName('Barbell Row'), library: subLib,
-  inventory: [...EQUIPMENT_ITEMS], niggles: [], futureSlots, currentDayIndex: 2 }).layer2DaySwap;
+  inventory: [...EQUIPMENT_ITEMS], niggles: [], futureSlots, currentDayIndex: 2,
+  trainingAge: 'intermediate', accessContext: 'weight_room' }).layer2DaySwap;
 check('Layer 2 colour is purple', ds.color === 'purple');
 check('Layer 2 pulls only same-category, strictly-later slots',
   ds.options.length === 1 && ds.options[0].name === 'Cable Row' && ds.options[0].fromDayIndex === 5,
@@ -591,11 +606,11 @@ check('elite severity 6: halt advised, no triage cluster, guardrail still bars',
   sub(6, 'elite').haltAdvised === true &&
   sub(6, 'elite').layer3Triage.cluster === null &&
   sub(6, 'elite').blockedByGuardrail.length > 0);
-// Default (no trainingAge) == intermediate baseline: trips at 4, not at 3.
-check('default trainingAge == intermediate (severity 4 trips, 3 does not)',
-  computeSubstitutions({ ...baseInput, niggles: [{ region: 'knee', severity: 4 }] })
+// Intermediate baseline is explicit: context/experience omission is forbidden.
+check('explicit Intermediate thresholds trip at severity 4, not at 3',
+  computeSubstitutions({ ...baseInput, trainingAge: 'intermediate', niggles: [{ region: 'knee', severity: 4 }] })
     .layer3Triage.cluster !== null &&
-  computeSubstitutions({ ...baseInput, niggles: [{ region: 'knee', severity: 3 }] })
+  computeSubstitutions({ ...baseInput, trainingAge: 'intermediate', niggles: [{ region: 'knee', severity: 3 }] })
     .layer3Triage.cluster === null);
 
 console.log('[15] condition multipliers (014 movement_prefix + conditionEngine)');
@@ -863,10 +878,10 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   const eliteIds = new Set(elitePlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
   check('tier law: Elite profile keeps Advanced movements eligible', [...eliteIds].some((id) => advIds.has(id)));
   check('tier predicate: whitelist never bypasses the Intermediate ceiling',
-    !isDifficultyAllowed('intermediate', 'Advanced', true));
+    !isDifficultyAllowed('intermediate', 'Advanced', true, 'weight_room', false));
   // The cap is HARD: an all-Advanced library prescribes a beginner NOTHING.
   const allAdv = movements.map((m) => ({ ...m, difficulty: 'Advanced' }));
-  const begAll = generateBlock({ profile: prof({ training_age: 'beginner' }), movements: allAdv, startDate: START });
+  const begAll = generateBlock({ profile: prof({ objective: 'strength', training_age: 'beginner' }), movements: allAdv, startDate: START });
   const slotsAll = begAll.sessions.reduce((a, s) => a + s.slots.length, 0);
   check('tier law is HARD: all-Advanced library prescribes a beginner nothing', slotsAll === 0, `slots=${slotsAll}`);
   check('tier law: dropped patterns carry tier warnings',
@@ -876,6 +891,7 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   const subMv = (id, name, difficulty, opts = {}) => ({
     movement_id: id, name, pattern: opts.pattern ?? 'squat', is_compound: opts.compound ?? true,
     difficulty, family: `f${id}`, required: [], preference: 0,
+    capabilityAvailable: true, sportTracking: false,
     ...(opts.beginnerOk !== undefined ? { beginnerOk: opts.beginnerOk } : {}),
   });
   const subLib = [
@@ -889,12 +905,14 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   const subTarget = subMv(999, 'Target', 'Advanced');
   const gated = computeSubstitutions({
     target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
+    accessContext: 'weight_room',
   });
   const offered = gated.layer1Regression.options.map((o) => o.name);
   check('substitution L1 (beginner): only Beginner + whitelisted staples offered',
     offered.length > 0 && offered.every((n) => n === 'Beginner Squat' || n === 'Whitelisted Int Squat'), offered.join(','));
   const intermediateSubs = computeSubstitutions({
     target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'intermediate',
+    accessContext: 'weight_room',
   });
   const intermediateOffered = intermediateSubs.layer1Regression.options.map((o) => o.name);
   check('substitution L1 (Intermediate): Advanced movements are never offered',
@@ -903,6 +921,7 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   const { EXPERIENCE_SEVERITY } = require('./.build/types.js');
   const triage = computeSubstitutions({
     target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
+    accessContext: 'weight_room',
     niggles: [{ region: 'general fatigue', severity: EXPERIENCE_SEVERITY.beginner.triageMin }],
   });
   const cluster = triage.layer3Triage.cluster;
@@ -911,6 +930,7 @@ check('thin-data severe-niggle headroom never raises squat in the block',
     cluster === null ? 'no cluster' : cluster.movements.map((m) => m.name).join(','));
   const intermediateTriage = computeSubstitutions({
     target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'intermediate',
+    accessContext: 'weight_room',
     niggles: [{ region: 'general fatigue', severity: EXPERIENCE_SEVERITY.intermediate.triageMin }],
   });
   const intermediateCluster = intermediateTriage.layer3Triage.cluster;
@@ -925,6 +945,7 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   // PRODUCTION wiring contract (audit R1): the live app passes the gate inputs.
   const storeSrc = readFileSync(join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
   check('production: store passes trainingAge into computeSubstitutions', storeSrc.includes('trainingAge: profile.training_age'));
+  check('production: store passes explicit accessContext into computeSubstitutions', storeSrc.includes('accessContext,'));
   check('production: store maps beginner_ok into generator + substitution inputs',
     storeSrc.includes('beginner_ok: m.beginnerOk') && storeSrc.includes('beginnerOk: m.beginnerOk'));
   check('production: store movement query joins movement_beginner_whitelist', storeSrc.includes('movement_beginner_whitelist'));
@@ -937,9 +958,77 @@ check('thin-data severe-niggle headroom never raises squat in the block',
     && substitutionSrc.includes('isDifficultyAllowed(')
     && capabilitySrc.includes('isDifficultyAllowed(')
     && storeSrc.includes('isDifficultyAllowed(')
-    && storeSrc.includes('if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(m.movement_id))')
-    && screenSrc.includes('isDifficultyAllowed(')
+    && storeSrc.includes('permittedForProfile(')
+    && screenSrc.includes("availabilityMap.get(slot.movementId)?.state !== 'available'")
     && screenSrc.includes('tierPlanViolation'));
+}
+
+// --- [16b] day-local sport/weight access context -----------------------------
+console.log('[16b] day-local sport/weight access context');
+{
+  const mixedDays = [
+    { day_index: 1, focus: 'conditioning' },
+    { day_index: 2, focus: 'full' },
+  ];
+  const sportOnly = movements.map((movement) => ({
+    ...movement,
+    difficulty: 'Advanced',
+    capability_available_weight_room: false,
+    capability_available_sport_conditioning: true,
+  }));
+  const beginnerMixed = generateBlock({
+    profile: prof({ objective: 'endurance', weekly_frequency: 2, training_age: 'beginner' }),
+    movements: sportOnly,
+    startDate: START,
+    programDays: mixedDays,
+  });
+  const conditioningSessions = beginnerMixed.sessions.filter((session) => session.focus === 'conditioning');
+  const weightSessions = beginnerMixed.sessions.filter((session) => session.focus === 'full');
+  check('conditioning ignores Advanced difficulty across every slot for Beginner',
+    conditioningSessions.length === 4
+      && conditioningSessions.every((session) => session.slots.length > 0)
+      && conditioningSessions.flatMap((session) => session.slots)
+        .every((slot) => sportOnly.find((movement) => movement.movement_id === slot.movement_id)?.difficulty === 'Advanced'));
+  check('the same mixed plan keeps its weight-room days behind the weight-room tier/capability law',
+    weightSessions.length === 0
+      && beginnerMixed.warnings.some((warning) => warning === 'full: session dropped, no available movements at all'));
+  check('warning classification uses the day-local tier pool',
+    beginnerMixed.warnings.some((warning) => warning.startsWith('full: no tier-eligible'))
+      && !beginnerMixed.warnings.some((warning) => warning.startsWith('conditioning: no tier-eligible')));
+
+  const weightOnly = movements.map((movement) => ({
+    ...movement,
+    difficulty: 'Advanced',
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: false,
+  }));
+  const advancedMixed = generateBlock({
+    profile: prof({ objective: 'endurance', weekly_frequency: 2, training_age: 'advanced' }),
+    movements: weightOnly,
+    startDate: START,
+    programDays: mixedDays,
+  });
+  check('Advanced bypass cannot leak into sport/conditioning capability availability',
+    advancedMixed.sessions.filter((session) => session.focus === 'conditioning')
+      .every((session) => session.slots.length === 0)
+      && advancedMixed.warnings.some((warning) => warning.startsWith('conditioning: no capability-available')));
+  check('weight-room capability remains independently usable in the same mixed plan',
+    advancedMixed.sessions.filter((session) => session.focus === 'full')
+      .every((session) => session.slots.length > 0));
+
+  const sportSubMovement = (movement_id, name) => ({
+    movement_id, name, pattern: 'squat', is_compound: true, difficulty: 'Advanced',
+    family: `sport-${movement_id}`, required: [], preference: 0,
+    beginnerOk: false, capabilityAvailable: true, sportTracking: false,
+  });
+  const sportSubstitutions = computeSubstitutions({
+    target: sportSubMovement(900, 'Sport target'),
+    library: [sportSubMovement(901, 'Advanced sport option')],
+    inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
+    accessContext: 'sport_conditioning',
+  });
+  check('substitution applies the same sport tier relief',
+    sportSubstitutions.layer1Regression.options.some((option) => option.movement_id === 901));
 }
 
 // --- [17] guided goal-program schedule and preference laws -----------------
@@ -979,7 +1068,11 @@ console.log('[17] guided goal-program schedule and preference laws');
   })));
 
   const unsafeLibrary = movements.map((movement) => movement.movement_id === alternate.movement_id
-    ? { ...movement, capability_available: false } : movement);
+    ? {
+        ...movement,
+        capability_available_weight_room: false,
+        capability_available_sport_conditioning: false,
+      } : movement);
   const fallback = generateBlock({
     profile: prof({ objective, weekly_frequency: 1 }), movements: unsafeLibrary, startDate: START, programDays: preferenceDays,
   });
@@ -1044,7 +1137,11 @@ console.log('[18] guided program macro-cycle ownership');
 console.log('[7] full-body scope routing and specialist equipment');
 {
   const mv = (movement_id, name, pattern, over = {}) => ({
-    movement_id, name, pattern, is_compound: true, required: [], difficulty: 'Beginner', ...over,
+    movement_id, name, pattern, is_compound: true, required: [], difficulty: 'Beginner',
+    beginner_ok: false, sportTracking: false,
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: true,
+    ...over,
   });
   // Mirrors the shipped rows: both TGUs are compound kettlebell rotation work,
   // the canonical one Advanced (68) and the Lunge-style one Intermediate (231).
@@ -1183,7 +1280,8 @@ console.log('[7] full-body scope routing and specialist equipment');
   const subMovement = (m) => ({
     movement_id: m.movement_id, name: m.name, pattern: m.pattern, is_compound: m.is_compound,
     difficulty: m.difficulty, family: m.name.toLowerCase().replace(/[^a-z]+/g, '_'),
-    required: m.required, preference: 0,
+    required: m.required, preference: 0, beginnerOk: m.beginner_ok,
+    capabilityAvailable: true, sportTracking: m.sportTracking,
   });
   const subLib = scopeLib.map(subMovement);
   const tguTarget = subLib.find((m) => m.movement_id === LUNGE_TGU);
@@ -1192,7 +1290,7 @@ console.log('[7] full-body scope routing and specialist equipment');
     niggles: [], futureSlots: [
       { dayIndex: 3, plannedSlotId: 1, sets: 3, movement: subLib.find((m) => m.movement_id === CANON_TGU) },
       { dayIndex: 3, plannedSlotId: 2, sets: 3, movement: subLib.find((m) => m.movement_id === 5) },
-    ], currentDayIndex: 1, trainingAge: 'elite',
+    ], currentDayIndex: 1, trainingAge: 'elite', accessContext: 'weight_room',
   });
   check('the corrected TGU swaps within the core pool and never with lunge work',
     subResult.layer2DaySwap.options.some((o) => o.movement_id === CANON_TGU)

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SCHEMA_TYPES, defaultProgramDayIndices, type SchemaType } from '@ak/inference';
+import { accessContextForBlockFocus, SCHEMA_TYPES, defaultProgramDayIndices, type BlockFocus, type SchemaType } from '@ak/inference';
 import { Chip, PrimaryButton, SecondaryButton } from '../components/ui';
 import { theme } from '../theme/theme';
 import {
@@ -28,10 +28,12 @@ export default function ProgramSetupScreen({
   const today = useStore((s) => s.today);
   const program = useStore((s) => s.program);
   const movements = useStore((s) => s.movements);
+  const niggles = useStore((s) => s.niggles);
   const previewTrainingProgram = useStore((s) => s.previewTrainingProgram);
   const createTrainingProgram = useStore((s) => s.createTrainingProgram);
   const updateProgramPreferences = useStore((s) => s.updateProgramPreferences);
   const getVerdicts = useStore((s) => s.getMovementAvailabilityVerdicts);
+  const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
   const storeError = useStore((s) => s.error);
 
   const initialFrequency = program?.days.length ?? profile.weekly_frequency;
@@ -78,10 +80,12 @@ export default function ProgramSetupScreen({
     }
   }, [input, previewTrainingProgram]);
 
-  const availableIds = useMemo(
-    () => new Set(getVerdicts().filter((verdict) => verdict.state === 'available').map((v) => v.movementId)),
-    [getVerdicts, profile, movements],
-  );
+  const availableIdsByContext = useMemo(() => ({
+    weight_room: new Set(getVerdicts('weight_room')
+      .filter((verdict) => verdict.state === 'available').map((v) => v.movementId)),
+    sport_conditioning: new Set(getVerdicts('sport_conditioning')
+      .filter((verdict) => verdict.state === 'available').map((v) => v.movementId)),
+  }), [getVerdicts, movementAvailabilityRevision, profile, movements, niggles]);
 
   const toggleDay = (day: number): void => {
     setDayIndices((current) => current.includes(day)
@@ -179,7 +183,9 @@ export default function ProgramSetupScreen({
                 if (movement === undefined) return null;
                 const selectedId = preferences.find((item) =>
                   item.dayIndex === session.day_index && item.slotIndex === slot.slot_index)?.movementId ?? slot.movement_id;
-                const choices = movements.filter((item) => item.pattern === movement.pattern && availableIds.has(item.movement_id));
+                const accessContext = accessContextForBlockFocus(session.focus as BlockFocus);
+                const choices = movements.filter((item) => item.pattern === movement.pattern
+                  && availableIdsByContext[accessContext].has(item.movement_id));
                 return (
                   <View key={slot.slot_index} style={styles.slot}>
                     <Text style={styles.slotTitle}>{movement.pattern.replace('_', ' ')}</Text>
@@ -227,4 +233,3 @@ const styles = StyleSheet.create({
   slotTitle: { color: theme.color.textMid, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   error: { color: theme.color.textHi, borderLeftWidth: 3, borderLeftColor: theme.color.textHi, paddingLeft: 10 },
 });
-

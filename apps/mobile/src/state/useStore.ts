@@ -66,6 +66,7 @@ import {
   STANDARD_EQUIPMENT_ITEMS,
   EXPERIENCE_SEVERITY,
   generateBlock,
+  accessContextForBlockFocus,
   historyContentFingerprint,
   parseHistoryImport,
   defaultProgramDayIndices,
@@ -75,6 +76,7 @@ import {
   TRAINING_AGES,
   isNoOpGuardrail,
   isDifficultyAllowed,
+  isRoutineRoleSnapshotExecutable,
   JOINTS,
   PATTERN_JOINTS,
   loadCodebase,
@@ -92,10 +94,13 @@ import {
   type CapabilityEvidence,
   type DaySwapOption,
   type MovementAvailability,
+  type MovementAccessContext,
+  type ExecutableMovementAccessContext,
   type RoutineRole,
   type DifficultyRating,
   type Embedder,
   type BlockPlan,
+  type BlockFocus,
   type ProgramDayPreference,
   type FutureSlot,
   type GeneratorMovement,
@@ -156,9 +161,15 @@ export const REASON_TEXT_MAP: Record<'tier' | 'equipment' | 'safety' | 'capabili
   capability: 'build the movement below it first',
 };
 
-export const formatTeachingOnlyReason = (reasons: readonly ('tier' | 'equipment' | 'safety' | 'capability')[]): string => {
-  if (reasons.length === 0) return 'Teaching only';
-  const humanReasons = reasons.map((r) => REASON_TEXT_MAP[r] ?? r).join('; ');
+export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefined): string => {
+  if (verdict === undefined) return 'Access cannot be verified right now.';
+  if (verdict.reasons.length === 0) return 'Teaching only';
+  const humanReasons = verdict.reasons.map((reason) => {
+    if (reason !== 'capability') return REASON_TEXT_MAP[reason];
+    if (verdict.separateAttestationRequired) return 'requires separate movement approval';
+    if (verdict.confirmationWouldClear) return 'prior-experience confirmation is available';
+    return REASON_TEXT_MAP.capability;
+  }).join('; ');
   return `Teaching only — ${humanReasons}`;
 };
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
@@ -245,6 +256,16 @@ export interface Movement {
    *  'full_body' marks a movement the generator prefers at a full-body
    *  session's dedicated scope slot. Null = not scoped (no row). */
   scope: 'full_body' | null;
+  /** movement_sport_tracking membership. */
+  sportTracking: boolean;
+}
+
+export interface CoachMovementAccessContext {
+  edges: CapabilityEdge[];
+  evidence: CapabilityEvidence[];
+  attestedEdgeKeys: string[];
+  safetyExcludedMovementIds: number[];
+  priorExperienceMovementIds: number[];
 }
 
 /** STRICT boolean equipment filter: available iff every required item is in
@@ -538,6 +559,12 @@ interface KineticsStore {
   /** Today's active niggles (region + severity), fed verbatim into
    *  computeSubstitutions — they drive the injury guardrail and Layer 3. */
   niggles: NiggleInput[];
+  /** Active athlete-local movement declarations, hydrated from migration 051. */
+  activePriorExperienceMovementIds: number[];
+  /** Explicit invalidation token for every memoized availability consumer. */
+  movementAvailabilityRevision: number;
+  /** Frozen execution context for the active/restored session. */
+  activeSessionAccessContext: ExecutableMovementAccessContext | null;
   /** Active 4-week block, its grid, and today's planned session. */
   block: ActiveBlock | null;
   blockMeta: BlockMeta | null;
@@ -596,6 +623,8 @@ interface KineticsStore {
   loadMeasuredHistory: (limit?: number) => MeasuredDailyPoint[];
   /** Exact read-only profile-clamp context for the in-memory verification Lab. */
   loadCoachDiagnosticContext: () => CoachDiagnosticContext;
+  /** Exact read-only capability facts for the Lab's production resolver call. */
+  loadCoachMovementAccessContext: () => CoachMovementAccessContext;
   /** Attach/replace a free-text note on the last completed session. */
   saveSessionNote: (text: string) => void;
   /** Wire the Health Connect bridge (null = unavailable). READ-ONLY at
@@ -663,6 +692,11 @@ interface KineticsStore {
   /** Capability attestation: manual coach/athlete override for attestation-gated edges. */
   attestEdge: (prerequisiteMovementId: number, movementId: number) => void;
   revokeAttestation: (prerequisiteMovementId: number, movementId: number) => void;
+  confirmMovementPriorExperience: (
+    movementId: number,
+    context: MovementAccessContext,
+  ) => boolean;
+  revokeMovementPriorExperience: (movementId: number) => boolean;
   /** Coach Mode: close the current athlete's DB and re-boot against the
    *  target athlete's file. Refused while a session is active. */
   switchAthlete: (id: string) => void;
@@ -778,7 +812,9 @@ interface KineticsStore {
     sessionDate?: string,
     dayIndex?: number,
   ) => { plannedSessionId: number; archivedPreviousBlock: boolean };
-  getMovementAvailabilityVerdicts: () => readonly MovementAvailability[];
+  getMovementAvailabilityVerdicts: (
+    context: MovementAccessContext,
+  ) => readonly MovementAvailability[];
   getRoutineRoleEligibleMovementIds: () => Record<RoutineRole, readonly number[]>;
 }
 
@@ -906,6 +942,7 @@ interface MovementRow {
   time_default_sets: number | null; time_target_seconds: number | null;
   progression_group: string | null; progression_rank: number | null;
   scope: string | null;
+  sport_tracking: number | null;
 }
 const PREFIX_SET = new Set<string>(MOVEMENT_PREFIXES);
 const MEDIA_STATUS_SET = new Set<string>(['planned', 'external_fallback', 'ready']);
@@ -977,6 +1014,7 @@ const movementFromRow = (r: MovementRow): Movement => {
     // 'full_body' is the only legal movement_scope.scope value; anything else
     // (including a NULL LEFT JOIN) reads as "not scoped".
     scope: r.scope === 'full_body' ? 'full_body' : null,
+    sportTracking: r.sport_tracking === 1,
   };
 };
 
@@ -986,8 +1024,8 @@ const MOVEMENT_LIBRARY_SQL = `SELECT m.movement_id, m.name, m.pattern, m.is_comp
   mm.asset_key AS media_asset_key, mm.status AS media_status, mm.revision AS media_revision,
   ci.coaching_intent, tp.default_sets AS time_default_sets, tp.target_seconds AS time_target_seconds, p.preference,
   (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode, mp.progression_group, mp.progression_rank,
-  ms.scope AS scope
-  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_media mm ON mm.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id LEFT JOIN movement_scope ms ON ms.movement_id = m.movement_id ORDER BY m.movement_id`;
+  ms.scope AS scope, (mst.movement_id IS NOT NULL) AS sport_tracking
+  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_media mm ON mm.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id LEFT JOIN movement_scope ms ON ms.movement_id = m.movement_id LEFT JOIN movement_sport_tracking mst ON mst.movement_id = m.movement_id ORDER BY m.movement_id`;
 
 /** Map the 023 side-car (or a conservative legacy rep fallback) into one
  * target union. Historic sessions without the side-car stay readable. */
@@ -1020,23 +1058,30 @@ const defaultSetsForTarget = (movement: Movement | undefined, fallbackSets: numb
 /** Beginner routes are defensive at every entry point: a curated whitelist may
  * admit an Intermediate staple, but an Advanced/Elite movement never leaks
  * through a plan picker, substitution, session start, or renderer. */
-const permittedForProfile = (movement: Movement | undefined, profile: UserProfile): boolean =>
+const permittedForProfile = (
+  movement: Movement | undefined,
+  profile: UserProfile,
+  accessContext: ExecutableMovementAccessContext,
+): boolean =>
   movement !== undefined && isDifficultyAllowed(
     profile.training_age,
     movement.difficulty,
     movement.beginnerOk,
+    accessContext,
+    movement.sportTracking,
   );
 
 /** Project a store Movement onto the substitution engine's input shape. The
  *  engine never reads SQL; the store assembles this from 001 + 010 columns. */
-const toSubMovement = (m: Movement, availableIds?: ReadonlySet<number>): SubstitutionMovement => ({
+const toSubMovement = (m: Movement, availableIds: ReadonlySet<number>): SubstitutionMovement => ({
   movement_id: m.movement_id,
   name: m.name,
   pattern: m.pattern as MovementPattern,
   is_compound: m.is_compound,
   difficulty: m.difficulty,
   beginnerOk: m.beginnerOk,
-  capabilityAvailable: availableIds?.has(m.movement_id),
+  capabilityAvailable: availableIds.has(m.movement_id),
+  sportTracking: m.sportTracking,
   family: m.baseName,
   required: m.required,
   preference: m.preference,
@@ -1066,14 +1111,16 @@ const safetyExcludedMovementIdsFor = (
   );
 };
 
-/** Resolve the one shared selection law from indexed sidecars. This reads the
- * compact capability evidence table, never historical set_record rows. */
-const capabilityMovementAvailability = (
-  d: DB,
-  movements: readonly Movement[],
-  profile: UserProfile,
-  safetyExcludedMovementIds: ReadonlySet<number> = new Set<number>(),
-): readonly MovementAvailability[] => {
+interface CapabilityFacts {
+  edges: CapabilityEdge[];
+  evidence: CapabilityEvidence[];
+  attestedEdgeKeys: string[];
+  priorExperienceMovementIds: number[];
+}
+
+/** Read only the compact access sidecars; historical set rows never enter the
+ * runtime resolver or the diagnostic adapter. */
+const loadCapabilityFacts = (d: DB): CapabilityFacts => {
   const edges = rowsOf<{
     prerequisite_movement_id: number; movement_id: number; relationship: CapabilityEdge['relationship'];
     min_sessions: number; min_sets_per_session: number; min_value: number;
@@ -1099,11 +1146,10 @@ const capabilityMovementAvailability = (
   const attestations = rowsOf<{ prerequisite_movement_id: number; movement_id: number }>(
     d.executeSync('SELECT prerequisite_movement_id, movement_id FROM movement_capability_attestation'),
   );
-  return resolveMovementAvailability({
-    movements: movements.map((movement) => ({
-      movementId: movement.movement_id, difficulty: movement.difficulty,
-      beginnerOk: movement.beginnerOk, requiredEquipment: movement.required,
-    })),
+  const priorExperience = rowsOf<{ movement_id: number }>(d.executeSync(
+    'SELECT movement_id FROM movement_prior_experience WHERE revoked_at_ms IS NULL ORDER BY movement_id',
+  ));
+  return {
     edges: edges.map((edge): CapabilityEdge => ({
       prerequisiteMovementId: edge.prerequisite_movement_id, movementId: edge.movement_id,
       relationship: edge.relationship, minSessions: edge.min_sessions,
@@ -1123,8 +1169,33 @@ const capabilityMovementAvailability = (
         maximumRpe: row.maximum_rpe, verified: true,
       })),
     ],
-    attestedEdgeKeys: new Set(attestations.map((row) => `${row.prerequisite_movement_id}:${row.movement_id}`)),
+    attestedEdgeKeys: attestations.map((row) => `${row.prerequisite_movement_id}:${row.movement_id}`),
+    priorExperienceMovementIds: priorExperience.map((row) => row.movement_id),
+  };
+};
+
+/** Resolve the shared law for one explicit presentation/execution context. */
+const capabilityMovementAvailability = (
+  d: DB,
+  movements: readonly Movement[],
+  profile: UserProfile,
+  accessContext: MovementAccessContext,
+  priorExperienceMovementIds: ReadonlySet<number>,
+  safetyExcludedMovementIds: ReadonlySet<number>,
+): readonly MovementAvailability[] => {
+  const facts = loadCapabilityFacts(d);
+  return resolveMovementAvailability({
+    movements: movements.map((movement) => ({
+      movementId: movement.movement_id, difficulty: movement.difficulty,
+      beginnerOk: movement.beginnerOk, sportTracking: movement.sportTracking,
+      requiredEquipment: movement.required,
+    })),
+    edges: facts.edges,
+    evidence: facts.evidence,
+    attestedEdgeKeys: new Set(facts.attestedEdgeKeys),
+    priorExperienceMovementIds,
     trainingAge: profile.training_age,
+    accessContext,
     equipment: new Set(profile.equipment_inventory),
     safetyExcludedMovementIds,
   });
@@ -1134,12 +1205,30 @@ const capabilityAvailableMovementIds = (
   d: DB,
   movements: readonly Movement[],
   profile: UserProfile,
-  safetyExcludedMovementIds: ReadonlySet<number> = new Set<number>(),
+  accessContext: ExecutableMovementAccessContext,
+  priorExperienceMovementIds: ReadonlySet<number>,
+  safetyExcludedMovementIds: ReadonlySet<number>,
 ): ReadonlySet<number> => new Set(
-  capabilityMovementAvailability(d, movements, profile, safetyExcludedMovementIds)
+  capabilityMovementAvailability(
+    d, movements, profile, accessContext, priorExperienceMovementIds, safetyExcludedMovementIds,
+  )
     .filter((row) => row.state === 'available')
     .map((row) => row.movementId),
 );
+
+/** Before session start, mutations belong to today's performance context. Once
+ * a session exists, its frozen context is the only authority. */
+const executionContextForState = (state: Pick<
+  KineticsStore,
+  'session' | 'todayPlan' | 'activeSessionAccessContext'
+>): ExecutableMovementAccessContext | null => {
+  // Active-session mutations must use the frozen context. Missing context is
+  // an unverifiable state, not permission to infer a different one.
+  if (state.session !== null) return state.activeSessionAccessContext;
+  return state.todayPlan === null
+    ? 'weight_room'
+    : accessContextForBlockFocus(state.todayPlan.focus as BlockFocus);
+};
 
 const routineRoleEligibility = (d: DB): Record<RoutineRole, ReadonlySet<number>> => {
   const result: Record<RoutineRole, Set<number>> = {
@@ -1703,6 +1792,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   vector: null, trend: [], session: null, prescription: null,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
+  activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
   block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [],
   oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), loadPreference: 'auto', loadPreferenceExplicit: false, bandLadder: [], onboarded: true,
 };
@@ -1731,6 +1821,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   sessionMode: null,
   substitution: null,
   niggles: [],
+  activePriorExperienceMovementIds: [],
+  movementAvailabilityRevision: 0,
+  activeSessionAccessContext: null,
   block: null,
   blockMeta: null,
   blockSessions: [],
@@ -1790,6 +1883,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         getDb().executeSync('SELECT movement_id, load_kg FROM one_rep_max'),
       );
       const lastLoggedLoads = latestLoadMap(getDb());
+      const capabilityFacts = loadCapabilityFacts(getDb());
       const prefixRows = rowsOf<{
         prefix_name: string; cns_load_modifier: number;
         stability_requirement_modifier: number; difficulty_modifier: number;
@@ -1809,6 +1903,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         error: null,
         onboarded: onboardStamp !== undefined && onboardStamp.updated_at_ms > 0,
         movements,
+        activePriorExperienceMovementIds: capabilityFacts.priorExperienceMovementIds,
+        movementAvailabilityRevision: 0,
         today: localToday(),
         profile: profileRow !== undefined ? profileFromRow(profileRow) : DEFAULT_PROFILE,
         movementPrefixes: prefixRows
@@ -1842,6 +1938,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         ),
       )[0];
       if (openSession !== undefined) {
+        const restoredOrigin = rowsOf<{ origin_kind: string; focus: string | null }>(
+          db!.executeSync(
+            `SELECT so.origin_kind, ps.focus
+             FROM session_origin so
+             LEFT JOIN planned_session ps ON ps.planned_session_id = so.source_planned_session_id
+             WHERE so.session_id = ?`,
+            [openSession.session_id],
+          ),
+        )[0];
+        const restoredAccessContext: ExecutableMovementAccessContext =
+          restoredOrigin?.origin_kind === 'planned' && restoredOrigin.focus !== null
+            ? accessContextForBlockFocus(restoredOrigin.focus as BlockFocus)
+            : 'weight_room';
         const restored = rowsOf<{
           set_id: number;
           movement_id: number;
@@ -1980,6 +2089,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           },
           sessionPlan,
           sessionMode: restoredMode,
+          activeSessionAccessContext: restoredAccessContext,
           ...runnerSelection(restoredRunner),
         });
       }
@@ -2290,7 +2400,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    get().refreshVector();
+    set((state) => ({ movementAvailabilityRevision: state.movementAvailabilityRevision + 1 }));
   },
 
   revokeAttestation: (prerequisiteMovementId, movementId) => {
@@ -2307,7 +2417,77 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    get().refreshVector();
+    set((state) => ({ movementAvailabilityRevision: state.movementAvailabilityRevision + 1 }));
+  },
+
+  confirmMovementPriorExperience: (movementId, context) => {
+    const verdict = get().getMovementAvailabilityVerdicts(context)
+      .find((candidate) => candidate.movementId === movementId);
+    if (
+      verdict === undefined
+      || verdict.state !== 'teaching_only'
+      || !verdict.confirmationWouldClear
+      || verdict.separateAttestationRequired
+      || verdict.reasons.length !== 1
+      || verdict.reasons[0] !== 'capability'
+    ) {
+      set({ error: 'Prior experience cannot clear every current access requirement for this movement.' });
+      return false;
+    }
+    const d = getDb();
+    const now = Date.now();
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        `INSERT INTO movement_prior_experience
+           (movement_id, confirmed_at_ms, revoked_at_ms, basis)
+         VALUES (?, ?, NULL, 'local_user_confirmation')
+         ON CONFLICT(movement_id) DO UPDATE SET
+           confirmed_at_ms = excluded.confirmed_at_ms,
+           revoked_at_ms = NULL,
+           basis = 'local_user_confirmation'`,
+        [movementId, now],
+      );
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* no partial declaration */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
+    const active = [...new Set([...get().activePriorExperienceMovementIds, movementId])]
+      .sort((a, b) => a - b);
+    set((state) => ({
+      activePriorExperienceMovementIds: active,
+      movementAvailabilityRevision: state.movementAvailabilityRevision + 1,
+      error: null,
+    }));
+    return true;
+  },
+
+  revokeMovementPriorExperience: (movementId) => {
+    if (!get().activePriorExperienceMovementIds.includes(movementId)) return false;
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        `UPDATE movement_prior_experience
+         SET revoked_at_ms = MAX(confirmed_at_ms, ?)
+         WHERE movement_id = ? AND revoked_at_ms IS NULL`,
+        [Date.now(), movementId],
+      );
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* no partial revocation */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
+    set((state) => ({
+      activePriorExperienceMovementIds: state.activePriorExperienceMovementIds
+        .filter((id) => id !== movementId),
+      movementAvailabilityRevision: state.movementAvailabilityRevision + 1,
+      error: null,
+    }));
+    return true;
   },
 
   // --- Coach Mode (Phase 15): one DB file per athlete ------------------------
@@ -2483,22 +2663,36 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const shape = trainingProgramShape(planningProfile, input, startDate);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
     const d = getDb();
-    const capabilityAvailable = capabilityAvailableMovementIds(
-      d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, niggles),
+    const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
+    const priorExperience = new Set(get().activePriorExperienceMovementIds);
+    const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
+      d, movements, profile, 'weight_room', priorExperience, safetyExcluded,
+    );
+    const capabilityAvailableSport = capabilityAvailableMovementIds(
+      d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
     );
     for (const preference of shape.movementPreferences) {
       const movement = byId.get(preference.movementId);
+      const day = shape.days.find((candidate) => candidate.dayIndex === preference.dayIndex);
+      const accessContext = day === undefined
+        ? 'weight_room'
+        : accessContextForBlockFocus(day.focus as BlockFocus);
+      const capabilityAvailable = accessContext === 'sport_conditioning'
+        ? capabilityAvailableSport
+        : capabilityAvailableWeightRoom;
       if (movement === undefined || movement.pattern !== preference.pattern) {
         throw new Error('A preferred movement does not match that slot.');
       }
-      if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(movement.movement_id)) {
+      if (!permittedForProfile(movement, profile, accessContext) || !capabilityAvailable.has(movement.movement_id)) {
         throw new Error('A preferred movement is teaching-only for this athlete.');
       }
     }
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id, name: m.name, pattern: m.pattern as MovementPattern,
       is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,
-      beginner_ok: m.beginnerOk, capability_available: capabilityAvailable.has(m.movement_id),
+      beginner_ok: m.beginnerOk, sportTracking: m.sportTracking,
+      capability_available_weight_room: capabilityAvailableWeightRoom.has(m.movement_id),
+      capability_available_sport_conditioning: capabilityAvailableSport.has(m.movement_id),
       // Store-side null <-> generator-side "absent": GeneratorMovement's optional
       // fields all use undefined as their absent signal (see blockGenerator).
       scope: m.scope ?? undefined,
@@ -2595,7 +2789,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       : nextMacroPosition(d).macroBlockIndex;
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
-    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
+    const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
+    const priorExperience = new Set(get().activePriorExperienceMovementIds);
+    const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
+      d, movements, profile, 'weight_room', priorExperience, safetyExcluded,
+    );
+    const capabilityAvailableSport = capabilityAvailableMovementIds(
+      d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
+    );
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id,
       name: m.name,
@@ -2605,7 +2806,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // Phase 16: tier gating — beginners see Beginner + whitelisted staples.
       difficulty: m.difficulty,
       beginner_ok: m.beginnerOk,
-      capability_available: capabilityAvailable.has(m.movement_id),
+      sportTracking: m.sportTracking,
+      capability_available_weight_room: capabilityAvailableWeightRoom.has(m.movement_id),
+      capability_available_sport_conditioning: capabilityAvailableSport.has(m.movement_id),
       // Store-side null <-> generator-side "absent" (see blockGenerator).
       scope: m.scope ?? undefined,
     }));
@@ -3066,13 +3269,15 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshProgram();
   },
 
-  getMovementAvailabilityVerdicts: () => {
+  getMovementAvailabilityVerdicts: (context) => {
     const d = getDb();
-    const { movements, profile, niggles } = get();
+    const { movements, profile, niggles, activePriorExperienceMovementIds } = get();
     return capabilityMovementAvailability(
       d,
       movements,
       profile,
+      context,
+      new Set(activePriorExperienceMovementIds),
       safetyExcludedMovementIdsFor(movements, profile, niggles),
     );
   },
@@ -3146,7 +3351,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       throw new Error('A routine template must contain between 1 and 6 movements.');
     }
 
-    const verdicts = get().getMovementAvailabilityVerdicts();
+    if (profile.training_age === 'beginner') {
+      throw new Error('Standalone routines unlock after the Beginner stage. Generated training remains available.');
+    }
+    const verdicts = get().getMovementAvailabilityVerdicts('weight_room');
     const availableSet = new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
     const roleEligibility = routineRoleEligibility(d);
     const counts: Record<RoutineRole, number> = { major: 0, supplementary: 0, conditional: 0 };
@@ -3279,7 +3487,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     if (template === undefined) throw new Error(`Routine template ${routineTemplateId} not found.`);
 
     const { profile, movements } = get();
-    const verdicts = get().getMovementAvailabilityVerdicts();
+    if (profile.training_age === 'beginner') {
+      throw new Error('Standalone routines unlock after the Beginner stage. Generated training remains available.');
+    }
+    const verdicts = get().getMovementAvailabilityVerdicts('weight_room');
     const availableSet = new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
     const roleEligibility = routineRoleEligibility(d);
     const daySlots = template.slots.filter((slot) => slot.dayIndex === routineDayIndex);
@@ -3580,6 +3791,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         }
       }
       d.executeSync('COMMIT');
+      set((state) => ({ movementAvailabilityRevision: state.movementAvailabilityRevision + 1 }));
       if (verified && readinessEligible) {
         for (const date of demoDates(localToday(), 29)) d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
         get().refreshVector();
@@ -3647,6 +3859,21 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     return {
       sessionsToday: row?.sessions_today ?? 0,
       trainedDaysLast7: row?.trained_days_last_7 ?? 0,
+    };
+  },
+  loadCoachMovementAccessContext: () => {
+    const state = get();
+    const facts = loadCapabilityFacts(getDb());
+    return {
+      edges: facts.edges,
+      evidence: facts.evidence,
+      attestedEdgeKeys: facts.attestedEdgeKeys,
+      safetyExcludedMovementIds: [...safetyExcludedMovementIdsFor(
+        state.movements,
+        state.profile,
+        state.niggles,
+      )].sort((a, b) => a - b),
+      priorExperienceMovementIds: facts.priorExperienceMovementIds,
     };
   },
   saveSessionNote: (text) => {
@@ -3730,22 +3957,66 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
 
     const { prescription, todayPlan, movements, profile, uiPreferences } = get();
-    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
-    if (todayPlan !== null && todayPlan.slots.some((slot) =>
-      !permittedForProfile(
-        movements.find((movement) => movement.movement_id === slot.movementId), profile,
-      ) || !capabilityAvailable.has(slot.movementId)
-    )) {
-      set({ error: 'This plan contains a movement outside the athlete tier or capability boundary. Regenerate the block before starting.' });
-      return;
-    }
-
     const alreadyPlannedToday = todayPlan !== null ? rowsOf<{ c: number }>(d.executeSync(
       `SELECT COUNT(*) AS c FROM session_origin
        WHERE source_planned_session_id = ?`,
       [todayPlan.plannedSessionId]
     ))[0]?.c ?? 0 : 0;
     const consumePlan = todayPlan !== null && (alreadyPlannedToday === 0 || repeatPlanned === true);
+    const planToConsume = consumePlan ? todayPlan : null;
+    const executionContext: ExecutableMovementAccessContext = planToConsume === null
+      ? 'weight_room'
+      : accessContextForBlockFocus(planToConsume.focus as BlockFocus);
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d,
+      movements,
+      profile,
+      executionContext,
+      new Set(get().activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, get().niggles),
+    );
+    if (planToConsume !== null && planToConsume.slots.some((slot) =>
+      !permittedForProfile(
+        movements.find((movement) => movement.movement_id === slot.movementId),
+        profile,
+        executionContext,
+      ) || !capabilityAvailable.has(slot.movementId)
+    )) {
+      set({ error: 'This plan contains a movement outside the current access boundary. Regenerate or edit it before starting.' });
+      return;
+    }
+    if (planToConsume !== null) {
+      const routineProvenance = rowsOf<{ routine_template_id: number | null }>(d.executeSync(
+        'SELECT routine_template_id FROM planned_session_method WHERE planned_session_id = ?',
+        [planToConsume.plannedSessionId],
+      ))[0];
+      // The snapshot survives template deletion, so row existence is the
+      // durable routine provenance—not a still-live routine_template_id.
+      if (routineProvenance !== undefined && profile.training_age === 'beginner') {
+        set({ error: 'Standalone routines unlock after the Beginner stage. Generated training remains available.' });
+        return;
+      }
+      if (routineProvenance !== undefined) {
+        if (routineProvenance.routine_template_id === null) {
+          set({ error: 'This routine\'s source template no longer exists, so its role eligibility cannot be verified. Rebuild it before starting.' });
+          return;
+        }
+        const frozenTemplateRoles = rowsOf<{ movement_id: number; role: RoutineRole }>(d.executeSync(
+          `SELECT movement_id, role FROM routine_template_slot
+           WHERE routine_template_id = ? ORDER BY day_index, slot_index`,
+          [routineProvenance.routine_template_id],
+        ));
+        const currentRoleEligibility = routineRoleEligibility(d);
+        if (!isRoutineRoleSnapshotExecutable(
+          planToConsume.slots.map((slot) => slot.movementId),
+          frozenTemplateRoles.map((row) => ({ movementId: row.movement_id, role: row.role })),
+          currentRoleEligibility,
+        )) {
+          set({ error: 'This routine no longer satisfies its current movement-role policy. Edit and refreeze it before starting.' });
+          return;
+        }
+      }
+    }
     const originKind = consumePlan ? 'planned' : 'free_form';
 
     const setDelta = prescription !== null && prescription.forDate === today
@@ -3755,7 +4026,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     let sessionPlan: PlanSlot[];
     if (consumePlan) {
       const rpeSafetyCap = prescription?.vector.rpe_cap ?? 10.0;
-      sessionPlan = todayPlan.slots.map((sl) => {
+      sessionPlan = planToConsume!.slots.map((sl) => {
         const effectiveRpe = Math.min(sl.targetRpe, rpeSafetyCap);
         const movement = movements.find((m) => m.movement_id === sl.movementId);
         const adjustedSets = Math.round(clamp(sl.sets + setDelta, 1, 6));
@@ -3793,7 +4064,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         const movement = movements.find((item) => item.movement_id === m.movement_id);
         // Repeating old history is still a prescription route. A beginner may
         // never inherit an Advanced movement from a prior athlete tier.
-        if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(m.movement_id)) return [];
+        if (!permittedForProfile(movement, profile, 'weight_room') || !capabilityAvailable.has(m.movement_id)) return [];
         const target = targetForMovement(movement, 5);
         return [{
           sessionPlanSlotId: 0,
@@ -3824,7 +4095,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
       d.executeSync(
         'INSERT INTO session_origin (session_id, origin_kind, source_planned_session_id) VALUES (?, ?, ?)',
-        [sessionId, originKind, consumePlan ? todayPlan.plannedSessionId : null],
+        [sessionId, originKind, planToConsume?.plannedSessionId ?? null],
       );
 
       const updatedSessionPlan: PlanSlot[] = [];
@@ -3870,7 +4141,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
 
       if (consumePlan) {
-        for (const sl of todayPlan.slots) {
+        for (const sl of planToConsume!.slots) {
           d.executeSync(
             `INSERT INTO planned_slot_disposition (planned_slot_id, disposition, session_id)
              VALUES (?, 'consumed', ?)
@@ -3886,6 +4157,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         session: { sessionId, date: today, startedAtMs, sets: [] },
         sessionPlan: updatedSessionPlan,
         sessionMode,
+        activeSessionAccessContext: executionContext,
         ...runnerSelection(runner),
       });
     } catch (e) {
@@ -4093,7 +4365,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   addPlanSlot: (movementId) => {
-    const { sessionPlan, prescription, today, session, movements, profile, runner } = get();
+    const state = get();
+    const { sessionPlan, prescription, today, session, movements, profile, runner } = state;
     // The legacy library picker stays outside Phase 17. Refusing late inserts
     // avoids creating a session slot that the durable runner cannot replay.
     if (session !== null && runner !== null) {
@@ -4101,10 +4374,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     const movement = movements.find((m) => m.movement_id === movementId);
-    const availability = capabilityMovementAvailability(getDb(), movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles))
+    const accessContext = executionContextForState(state);
+    if (accessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before editing it.' });
+      return;
+    }
+    const availability = capabilityMovementAvailability(
+      getDb(), movements, profile, accessContext,
+      new Set(state.activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, state.niggles),
+    )
       .find((r) => r.movementId === movementId);
-    if (!permittedForProfile(movement, profile) || availability?.state !== 'available') {
-      set({ error: formatTeachingOnlyReason(availability?.reasons ?? []) });
+    if (!permittedForProfile(movement, profile, accessContext) || availability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(availability) });
       return;
     }
     const baseSets = Math.round(clamp(
@@ -4152,16 +4434,26 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   swapMovement: (oldMovementId, newMovementId) => {
-    const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = get();
+    const state = get();
+    const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
     const slot = activeSessionPlanSlotId !== null
       ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === activeSessionPlanSlotId)
       : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
     const replacement = movements.find((movement) => movement.movement_id === newMovementId);
     if (slot === undefined || replacement === undefined) return;
-    const availability = capabilityMovementAvailability(getDb(), movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles))
+    const accessContext = executionContextForState(state);
+    if (accessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before editing it.' });
+      return;
+    }
+    const availability = capabilityMovementAvailability(
+      getDb(), movements, profile, accessContext,
+      new Set(state.activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, state.niggles),
+    )
       .find((r) => r.movementId === newMovementId);
-    if (!permittedForProfile(replacement, profile) || availability?.state !== 'available') {
-      set({ error: formatTeachingOnlyReason(availability?.reasons ?? []) });
+    if (!permittedForProfile(replacement, profile, accessContext) || availability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(availability) });
       return;
     }
 
@@ -4241,7 +4533,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   openSubstitution: (targetMovementId) => {
-    const { movements, profile, block } = get();
+    const state = get();
+    const { movements, profile, block } = state;
     const target = movements.find((m) => m.movement_id === targetMovementId);
     if (target === undefined) return;
     // Re-read today's niggles from 011 so a midnight crossing while the app sat
@@ -4252,7 +4545,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
     const today = localToday();
     const byId = new Map(movements.map((m) => [m.movement_id, m]));
-    const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
+    const accessContext = executionContextForState(get());
+    if (accessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
+      return;
+    }
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d, movements, profile, accessContext,
+      new Set(get().activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, get().niggles),
+    );
     let futureSlots: FutureSlot[] = [];
     let currentDayIndex = 0;
     // Layer 2 (day-swap) needs the active block's later days. With no block,
@@ -4293,6 +4595,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       futureSlots,
       currentDayIndex,
       trainingAge: profile.training_age, // experience-weighted severity thresholds
+      accessContext,
     });
     set({ substitution: { targetId: targetMovementId, result } });
   },
@@ -4353,7 +4656,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   applyDaySwap: (targetMovementId, option) => {
-    const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = get();
+    const state = get();
+    const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
     const targetSlot = activeSessionPlanSlotId !== null
       ? sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId)
       : sessionPlan.find((slot) => slot.movementId === targetMovementId);
@@ -4398,10 +4702,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const overrideLoad = overrideRow?.target_load_kg ?? null;
     const overrideReason = overrideRow?.reason ?? null;
     const replacement = movements.find((movement) => movement.movement_id === option.movement_id);
-    const availability = capabilityMovementAvailability(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles))
+    const accessContext = executionContextForState(state);
+    if (accessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
+      return;
+    }
+    const availability = capabilityMovementAvailability(
+      d, movements, profile, accessContext,
+      new Set(state.activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, state.niggles),
+    )
       .find((r) => r.movementId === option.movement_id);
-    if (!permittedForProfile(replacement, profile) || availability?.state !== 'available') {
-      set({ error: formatTeachingOnlyReason(availability?.reasons ?? []) });
+    if (!permittedForProfile(replacement, profile, accessContext) || availability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(availability) });
       return;
     }
 
@@ -4900,7 +5213,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       activeMovementId: null,
       runner: null,
       sessionMode: null,
+      activeSessionAccessContext: null,
       substitution: null,
+      movementAvailabilityRevision: get().movementAvailabilityRevision + 1,
       lastEndedSessionId: outcomeDecision === null ? null : activeSession.sessionId,
       error: null,
     });
@@ -5077,6 +5392,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM import_readiness_daily');
       d.executeSync('DELETE FROM bodyweight_daily');
       d.executeSync('DELETE FROM movement_capability_attestation');
+      d.executeSync('DELETE FROM movement_prior_experience');
       d.executeSync('DELETE FROM capability_session_evidence');
       d.executeSync('DELETE FROM set_target');
       d.executeSync('DELETE FROM session_runner_checkpoint');
@@ -5132,6 +5448,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       oneRepMaxes: {},
       lastLoggedLoads: {},
       session: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null,
+      activeSessionAccessContext: null, activePriorExperienceMovementIds: [],
+      movementAvailabilityRevision: get().movementAvailabilityRevision + 1,
       prescription: null, substitution: null, lastTriage: null, niggles: [],
       block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
       lastEndedSessionId: null,

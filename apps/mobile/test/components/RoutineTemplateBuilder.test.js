@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { RoutineTemplateBuilder } from '../../src/components/RoutineTemplateBuilder';
 
@@ -7,15 +7,22 @@ let mockState;
 
 jest.mock('../../src/state/useStore', () => ({
   useStore: (selector) => selector(mockState),
+  formatTeachingOnlyReason: (verdict) => verdict === undefined
+    ? 'Access cannot be verified right now.'
+    : verdict.reasons.includes('capability') ? 'Capability evidence is required.' : 'Teaching only.',
 }));
 
 const movements = [
-  { movement_id: 1, name: 'Competition Squat' },
-  { movement_id: 2, name: 'Dumbbell Row' },
-  { movement_id: 3, name: 'Advanced Skill' },
+  { movement_id: 1, name: 'Competition Squat', baseName: 'Squat', pattern: 'squat', cues: 'Brace', targetMuscles: ['quadriceps'], difficulty: 'Advanced' },
+  { movement_id: 2, name: 'Dumbbell Row', baseName: 'Row', pattern: 'pull_h', cues: 'Pull', targetMuscles: ['lats'], difficulty: 'Intermediate' },
+  { movement_id: 3, name: 'Advanced Skill', baseName: 'Skill', pattern: 'push_v', cues: 'Control', targetMuscles: ['shoulders'], difficulty: 'Intermediate' },
 ];
 
-const available = (movementId) => ({ movementId, state: 'available', reasons: [] });
+const available = (movementId) => ({
+  movementId, state: 'available', reasons: [], effectiveContext: 'weight_room',
+  capabilitySource: 'not_required', blockingPrerequisiteMovementIds: [],
+  confirmationWouldClear: false, separateAttestationRequired: false,
+});
 
 describe('RoutineTemplateBuilder', () => {
   let saveRoutineTemplate;
@@ -50,13 +57,18 @@ describe('RoutineTemplateBuilder', () => {
       getMovementAvailabilityVerdicts: () => [
         available(1),
         available(2),
-        { movementId: 3, state: 'teaching_only', reasons: ['capability'] },
+        { ...available(3), state: 'teaching_only', reasons: ['capability'],
+          capabilitySource: 'blocked', blockingPrerequisiteMovementIds: [2], confirmationWouldClear: true },
       ],
       getRoutineRoleEligibleMovementIds: () => ({
         major: [1],
         supplementary: [1, 2, 3],
         conditional: [],
       }),
+      movementAvailabilityRevision: 0,
+      activePriorExperienceMovementIds: [],
+      confirmMovementPriorExperience: jest.fn(() => true),
+      revokeMovementPriorExperience: jest.fn(() => true),
     };
   });
 
@@ -70,11 +82,16 @@ describe('RoutineTemplateBuilder', () => {
     expect(screen.getByText('Ordered Movements (3/6)')).toBeOnTheScreen();
   });
 
-  test('keeps role-ineligible and capability-blocked movements teaching-only', () => {
+  test('filters by role before rendering and shows capability education in All / Learn', () => {
     render(<RoutineTemplateBuilder />);
     fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
-    expect(screen.getByText('Teaching only (not ratified for major)')).toBeOnTheScreen();
-    expect(screen.getByText('Teaching only (capability, not ratified for major)')).toBeOnTheScreen();
+    expect(screen.getByText('Competition Squat')).toBeOnTheScreen();
+    expect(screen.queryByText('Dumbbell Row')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Advanced Skill')).not.toBeOnTheScreen();
+    fireEvent.press(screen.getAllByLabelText('Close movement picker')[0]);
+    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
+    fireEvent.press(screen.getByLabelText('All / Learn (3)'));
+    expect(screen.getByText('Capability evidence is required.')).toBeOnTheScreen();
   });
 
   test('renders every seeded movement in a bounded picker list', () => {
@@ -85,10 +102,52 @@ describe('RoutineTemplateBuilder', () => {
       height: '80%',
     });
     expect(screen.getByTestId('movement-picker-list')).toBeOnTheScreen();
-    movements.forEach((movement) => {
-      expect(screen.getByTestId(`movement-picker-row-${movement.movement_id}`)).toBeOnTheScreen();
-      expect(screen.getByLabelText(`Choose ${movement.name}`)).toBeOnTheScreen();
-    });
+    expect(screen.getByTestId('movement-picker-list').props.initialNumToRender).toBe(14);
+    expect(screen.getByTestId('movement-picker-row-1')).toBeOnTheScreen();
+    expect(screen.queryByTestId('movement-picker-row-2')).toBeNull();
+    expect(screen.queryByTestId('movement-picker-row-3')).toBeNull();
+  });
+
+  test('search and live role-filtered counts stay independent', () => {
+    render(<RoutineTemplateBuilder />);
+    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
+    expect(screen.getByLabelText('Available (2)')).toBeOnTheScreen();
+    expect(screen.getByLabelText('All / Learn (3)')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByLabelText('Search routine movements'), 'lats');
+    expect(screen.getByLabelText('Available (1)')).toBeOnTheScreen();
+    expect(screen.getByLabelText('All / Learn (1)')).toBeOnTheScreen();
+    expect(screen.getByText('Dumbbell Row')).toBeOnTheScreen();
+    expect(screen.queryByText('Competition Squat')).toBeNull();
+  });
+
+  test('prior experience uses a second confirmation and revision-driven revoke state', () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { rerender } = render(<RoutineTemplateBuilder />);
+    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
+    fireEvent.press(screen.getByLabelText('All / Learn (3)'));
+    fireEvent.press(screen.getByLabelText('Confirm prior experience for Advanced Skill'));
+    const confirmButtons = alert.mock.calls[0][2];
+    expect(confirmButtons.map((button) => button.text)).toEqual(['Cancel', 'Confirm']);
+    confirmButtons.find((button) => button.text === 'Confirm').onPress();
+    expect(mockState.confirmMovementPriorExperience).toHaveBeenCalledWith(3, 'weight_room');
+
+    mockState.activePriorExperienceMovementIds = [3];
+    mockState.movementAvailabilityRevision += 1;
+    mockState.getMovementAvailabilityVerdicts = () => [available(1), available(2), available(3)];
+    rerender(<RoutineTemplateBuilder />);
+    fireEvent.press(screen.getByLabelText('Revoke prior experience for Advanced Skill'));
+    const revokeButtons = alert.mock.calls[1][2];
+    revokeButtons.find((button) => button.text === 'Revoke').onPress();
+    expect(mockState.revokeMovementPriorExperience).toHaveBeenCalledWith(3);
+    alert.mockRestore();
+  });
+
+  test('Beginner sees the deliberate standalone-routine lock', () => {
+    mockState.profile = { ...mockState.profile, training_age: 'beginner' };
+    render(<RoutineTemplateBuilder />);
+    expect(screen.getByTestId('routine-builder-beginner-lock')).toBeOnTheScreen();
+    expect(screen.getByText('Standalone routines are locked')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('Routine template name')).toBeNull();
   });
 
   test('shows an honest empty state instead of a blank picker', () => {
@@ -103,7 +162,7 @@ describe('RoutineTemplateBuilder', () => {
     render(<RoutineTemplateBuilder />);
     fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
 
-    expect(screen.getByText('No movements are available.')).toBeOnTheScreen();
+    expect(screen.getByText('No currently available movements match this role and search.')).toBeOnTheScreen();
   });
 
   test('preserves athlete-authored ordering when saving', () => {

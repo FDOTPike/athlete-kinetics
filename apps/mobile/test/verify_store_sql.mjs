@@ -35,7 +35,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '043_movement_library_v2_batch.sql', '044_movement_library_v2_batch.sql',
   '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
   '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
-  '049_movement_content_correction_v1.sql', '050_movement_role_convergence.sql'];
+  '049_movement_content_correction_v1.sql', '050_movement_role_convergence.sql',
+  '051_routine_access_context.sql'];
 
 const db = new DatabaseSync(':memory:');
 try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
@@ -339,8 +340,9 @@ check(
 );
 check(
   'program preview rejects a preferred movement outside the shared tier/capability boundary',
-  previewProgramBody.includes('!permittedForProfile(movement, profile)')
+  previewProgramBody.includes('!permittedForProfile(movement, profile, accessContext)')
     && previewProgramBody.includes('!capabilityAvailable.has(movement.movement_id)')
+    && previewProgramBody.includes('accessContextForBlockFocus')
     && previewProgramBody.includes('A preferred movement is teaching-only for this athlete.'),
 );
 
@@ -1323,6 +1325,63 @@ if (resetTables.length >= 15) {
 
     db.exec('ROLLBACK');
   }
+
+  // --- [T6] 051 prior-experience lifecycle + state propagation --------------
+  console.log('[051 prior-experience lifecycle and context propagation]');
+  const experienceUpsertSql = statements.find((s) => s.includes('INSERT INTO movement_prior_experience'));
+  const experienceRevokeSql = statements.find((s) => s.includes('UPDATE movement_prior_experience'));
+  a('store exposes the reconfirming UPSERT and non-destructive revoke SQL',
+    Boolean(experienceUpsertSql) && Boolean(experienceRevokeSql));
+  if (experienceUpsertSql && experienceRevokeSql) {
+    db.exec('BEGIN');
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (973,'Experience Target','push_v',1)");
+    db.prepare(experienceUpsertSql).run(973, 100);
+    let declaration = db.prepare('SELECT * FROM movement_prior_experience WHERE movement_id = 973').get();
+    a('confirmation creates one active local declaration', declaration?.confirmed_at_ms === 100
+      && declaration?.revoked_at_ms === null && declaration?.basis === 'local_user_confirmation');
+    db.prepare(experienceRevokeSql).run(200, 973);
+    declaration = db.prepare('SELECT * FROM movement_prior_experience WHERE movement_id = 973').get();
+    a('revocation preserves the row and records an ordered timestamp', declaration?.confirmed_at_ms === 100
+      && declaration?.revoked_at_ms === 200);
+    db.prepare(experienceUpsertSql).run(973, 300);
+    declaration = db.prepare('SELECT * FROM movement_prior_experience WHERE movement_id = 973').get();
+    a('reconfirmation updates the timestamp and clears revocation', declaration?.confirmed_at_ms === 300
+      && declaration?.revoked_at_ms === null);
+    db.exec('ROLLBACK');
+  }
+  a('training-data reset deletes declarations but block/profile-slot wipes preserve them',
+    src.includes("d.executeSync('DELETE FROM movement_prior_experience')")
+      && !src.slice(src.indexOf('const runBlockWipe ='), src.indexOf('const defaultUiPreferences'))
+        .includes('movement_prior_experience')
+      && !src.slice(src.indexOf('switchProfile: (slotId)'), src.indexOf('resolveGoalRung:'))
+        .includes('movement_prior_experience'));
+  a('availability revision is independent of refreshVector and updates on declarations, attestations, imports, finalization, and reset',
+    (src.match(/movementAvailabilityRevision: state\.movementAvailabilityRevision \+ 1/g) ?? []).length >= 5
+      && src.includes('movementAvailabilityRevision: get().movementAvailabilityRevision + 1')
+      && !src.slice(
+        src.indexOf('  confirmMovementPriorExperience: (movementId, context) => {'),
+        src.indexOf('  // --- Coach Mode (Phase 15)'),
+      )
+        .includes('refreshVector()'));
+  const startBody = src.slice(src.indexOf('startSession: (repeatPlanned)'), src.indexOf('selectMovement: (movementId)'));
+  a('start computes consumePlan before validating only the plan it will consume',
+    startBody.indexOf('const consumePlan') >= 0
+      && startBody.indexOf('const planToConsume') > startBody.indexOf('const consumePlan')
+      && startBody.indexOf('planToConsume !== null && planToConsume.slots.some') > startBody.indexOf('const planToConsume'));
+  a('Beginner routine provenance survives source-template deletion and still blocks start',
+    startBody.includes('SELECT routine_template_id FROM planned_session_method WHERE planned_session_id = ?')
+      && startBody.includes("routineProvenance !== undefined && profile.training_age === 'beginner'")
+      && !startBody.includes("profile.training_age === 'beginner' && routineProvenance?.routine_template_id"));
+  a('routine start fails closed when source roles are missing, ambiguous, or no longer eligible',
+    startBody.includes('const frozenTemplateRoles =')
+      && startBody.includes('const currentRoleEligibility = routineRoleEligibility(d)')
+      && startBody.includes('isRoutineRoleSnapshotExecutable('));
+  a('active sessions persist one frozen access context and restoration derives planned focus or free-form weight room',
+    src.includes('activeSessionAccessContext: executionContext')
+      && src.includes('activeSessionAccessContext: restoredAccessContext')
+      && src.includes("restoredOrigin?.origin_kind === 'planned'")
+      && src.includes("? accessContextForBlockFocus(restoredOrigin.focus as BlockFocus)")
+      && src.includes(": 'weight_room'"));
 
   // --- [F3] Gate count & documentation drift assertion ---
   console.log('[documentation & CI gate count drift check]');

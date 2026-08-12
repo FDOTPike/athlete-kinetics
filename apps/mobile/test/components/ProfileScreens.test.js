@@ -67,6 +67,13 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       saveBodyweight: jest.fn(),
       loadMeasuredHistory: jest.fn(() => []),
       loadCoachDiagnosticContext: jest.fn(() => ({ sessionsToday: 0, trainedDaysLast7: 0 })),
+      loadCoachMovementAccessContext: jest.fn(() => ({
+        edges: [],
+        evidence: [],
+        attestedEdgeKeys: [],
+        safetyExcludedMovementIds: [],
+        priorExperienceMovementIds: [],
+      })),
       vector: null,
       blockSessions: [],
       getMovementAvailabilityVerdicts: jest.fn(() => []),

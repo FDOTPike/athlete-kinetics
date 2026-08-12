@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
+import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import SessionScreen from '../../src/screens/SessionScreen';
 
 let mockState;
@@ -35,7 +36,7 @@ jest.mock('../../src/state/useStore', () => {
 
   return {
     palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-    formatTeachingOnlyReason: (reasons) => reasons.length === 0 ? 'Teaching only' : `Teaching only — ${reasons.map((r) => r === 'capability' ? 'build the movement below it first' : r).join('; ')}`,
+    formatTeachingOnlyReason: (verdict) => verdict?.reasons.length === 0 ? 'Teaching only' : `Teaching only — ${(verdict?.reasons ?? []).map((r) => r === 'capability' ? 'build the movement below it first' : r).join('; ')}`,
     useStore: storeFunc,
   };
 });
@@ -43,7 +44,7 @@ jest.mock('../../src/state/useStore', () => {
 const movement = (id, name, overrides = {}) => ({
   movement_id: id, name, pattern: 'push_h', is_compound: true, beginnerOk: true,
   loggingMode: 'reps', required: [], baseName: name, supportedPrefixes: ['Bodyweight'],
-  difficulty: 'Beginner', preference: 0,
+  difficulty: 'Beginner', preference: 0, sportTracking: false, scope: null,
   instructions: 'Plant your feet\nBrace your trunk', cues: 'Push the floor away\nKeep ribs down',
   media: { assetKey: `movement/test-${id}/demo/v1`, status: 'external_fallback', revision: 1, fallbackUrl: 'https://www.youtube.com/watch?v=test' },
   targetMuscles: ['chest'], coachingIntent: 'Build a simple, repeatable pressing pattern.', timePolicy: null,
@@ -73,7 +74,8 @@ const state = (overrides = {}) => {
     session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },
     sessionPlan: [slot(1, 1), slot(2, 2, 8)], activeSessionPlanSlotId: 1,
     profile: { training_age: 'beginner', equipment_inventory: [], session_duration_cap_min: 60 },
-    getMovementAvailabilityVerdicts: () => [],
+    getMovementAvailabilityVerdicts: undefined,
+    movementAvailabilityRevision: 0, activeSessionAccessContext: 'weight_room', niggles: [],
     oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
     startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
     openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
@@ -87,6 +89,27 @@ const state = (overrides = {}) => {
     }),
     ...overrides,
   };
+  base.getMovementAvailabilityVerdicts = overrides.getMovementAvailabilityVerdicts ?? (() =>
+    base.movements.map((item) => {
+      const effectiveContext = base.activeSessionAccessContext ?? 'weight_room';
+      const tierAllowed = actualIsDifficultyAllowed(
+        base.profile.training_age,
+        item.difficulty,
+        item.beginnerOk,
+        effectiveContext,
+        item.sportTracking,
+      );
+      return {
+        movementId: item.movement_id,
+        state: tierAllowed ? 'available' : 'teaching_only',
+        reasons: tierAllowed ? [] : ['tier'],
+        effectiveContext,
+        capabilitySource: 'not_required',
+        blockingPrerequisiteMovementIds: [],
+        confirmationWouldClear: false,
+        separateAttestationRequired: false,
+      };
+    }));
   // P2-1 (Opus audit): delegate to the REAL exported resolveLoadSelection.
   // The test adapter gathers store inputs and selects the highest-set_id
   // current-session load, but does NOT reimplement precedence, honesty,
@@ -529,6 +552,13 @@ test('an intermediate athlete never renders a plan containing an advanced moveme
   render(<SessionScreen />);
   expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
   expect(screen.queryByText('Advanced movement')).toBeNull();
+});
+
+test('an active session with no frozen access context fails closed', () => {
+  mockState = state({ activeSessionAccessContext: null });
+  render(<SessionScreen />);
+  expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
+  expect(screen.queryByText('First movement')).toBeNull();
 });
 
 test('a triage halt on a live runner persists safety before ending the session', () => {

@@ -19,6 +19,8 @@ import {
   resolveMovementAvailability,
   startRunner,
   type GeneratorMovement,
+  type CapabilityEdge,
+  type CapabilityEvidence,
   type MovementPattern,
   type PatternDailyDelta,
   type StateVectorRow,
@@ -50,6 +52,13 @@ export interface CoachVerificationInput {
   readonly profileContext: {
     readonly sessionsToday: number;
     readonly trainedDaysLast7: number;
+  };
+  readonly movementAccess: {
+    readonly edges: readonly CapabilityEdge[];
+    readonly evidence: readonly CapabilityEvidence[];
+    readonly attestedEdgeKeys: readonly string[];
+    readonly safetyExcludedMovementIds: readonly number[];
+    readonly priorExperienceMovementIds: readonly number[];
   };
 }
 
@@ -270,14 +279,17 @@ function routingScenario(input: CoachVerificationInput): LabModuleResult {
         movementId: movement.movement_id,
         difficulty: movement.difficulty ?? 'Intermediate',
         beginnerOk: movement.beginner_ok,
+        sportTracking: movement.sportTracking,
         requiredEquipment: movement.required,
       })),
-      edges: [],
-      evidence: [],
-      attestedEdgeKeys: new Set<string>(),
+      edges: input.movementAccess.edges,
+      evidence: input.movementAccess.evidence,
+      attestedEdgeKeys: new Set(input.movementAccess.attestedEdgeKeys),
+      priorExperienceMovementIds: new Set(input.movementAccess.priorExperienceMovementIds),
       trainingAge: input.profile.training_age,
+      accessContext: 'library',
       equipment: new Set(input.profile.equipment_inventory),
-      safetyExcludedMovementIds: new Set<number>(),
+      safetyExcludedMovementIds: new Set(input.movementAccess.safetyExcludedMovementIds),
     });
     const available = verdicts.filter((item) => item.state === 'available').length;
     const tier = verdicts.filter((item) => item.reasons.includes('tier')).length;
@@ -289,13 +301,16 @@ function routingScenario(input: CoachVerificationInput): LabModuleResult {
       valid ? 'pass' : 'attention',
       valid ? 'The shared tier/equipment predicate classified the current library.' : 'The movement router returned incomplete or unusable coverage.',
       [
-        `${available}/${verdicts.length} movements executable for this profile`,
+        `movement_count=${verdicts.length}`,
+        `available_count=${available}`,
         `${tier} teaching-only by tier · ${equipment} teaching-only by equipment`,
-        'Progression/capability edges remain enforced by the live store projection; this sandbox adds none.',
+        `safety_blocked_count=${verdicts.filter((item) => item.reasons.includes('safety')).length}`,
+        `capability_blocked_count=${verdicts.filter((item) => item.reasons.includes('capability')).length}`,
       ],
     );
-  } catch (error) {
-    return attention('routing', 'Movement routing', error);
+  } catch {
+    return result('routing', 'Movement routing', 'attention',
+      'The production movement resolver refused the diagnostic input.', []);
   }
 }
 
@@ -390,12 +405,19 @@ export function serializeRedactedCoachReport(report: CoachVerificationReport): s
   return JSON.stringify({
     report: 'pikeMethods Coach Verification Lab',
     version: report.version,
-    generatedAtMs: report.generatedAtMs,
-    today: report.today,
     passed: report.passed,
     attention: report.attention,
-    modules: report.modules,
-    evidenceCoverage: report.evidence,
-    redaction: 'Names, free text, database identifiers, raw dates, and raw health readings omitted.',
+    modules: report.modules.map((module) => ({ id: module.id, status: module.status })),
+    evidenceCoverage: report.evidence.map((window) => ({
+      days: window.days,
+      sampleDays: window.sampleDays,
+      trainingDays: window.trainingDays,
+      setCount: window.setCount,
+      tonnageKg: window.tonnageKg,
+      bodyweightDays: window.bodyweightDays,
+      hrvDays: window.hrvDays,
+      sleepDays: window.sleepDays,
+    })),
+    redaction: 'Names, free text, movement identifiers, database identifiers, dates, raw verdicts, and raw health readings omitted.',
   }, null, 2);
 }

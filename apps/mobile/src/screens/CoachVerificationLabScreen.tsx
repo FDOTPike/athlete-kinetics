@@ -23,6 +23,7 @@ export default function CoachVerificationLabScreen({ onClose }: Props): React.JS
   const today = useStore((state) => state.today);
   const loadMeasuredHistory = useStore((state) => state.loadMeasuredHistory);
   const loadCoachDiagnosticContext = useStore((state) => state.loadCoachDiagnosticContext);
+  const loadCoachMovementAccessContext = useStore((state) => state.loadCoachMovementAccessContext);
   const getMovementAvailabilityVerdicts = useStore((state) => state.getMovementAvailabilityVerdicts);
   const [evidence, setEvidence] = useState<readonly DiagnosticEvidencePoint[]>([]);
   const [report, setReport] = useState<CoachVerificationReport | null>(null);
@@ -39,8 +40,11 @@ export default function CoachVerificationLabScreen({ onClose }: Props): React.JS
   );
 
   const run = (): void => {
-    const available = new Map(
-      getMovementAvailabilityVerdicts().map((verdict) => [verdict.movementId, verdict.state === 'available']),
+    const availableWeightRoom = new Map(
+      getMovementAvailabilityVerdicts('weight_room').map((verdict) => [verdict.movementId, verdict.state === 'available']),
+    );
+    const availableSport = new Map(
+      getMovementAvailabilityVerdicts('sport_conditioning').map((verdict) => [verdict.movementId, verdict.state === 'available']),
     );
     setReport(runCoachVerificationLab({
       profile,
@@ -49,6 +53,7 @@ export default function CoachVerificationLabScreen({ onClose }: Props): React.JS
       generatedAtMs: Date.now(),
       evidence,
       profileContext: loadCoachDiagnosticContext(),
+      movementAccess: loadCoachMovementAccessContext(),
       movements: movements.map((movement) => ({
         movement_id: movement.movement_id,
         name: movement.name,
@@ -57,7 +62,9 @@ export default function CoachVerificationLabScreen({ onClose }: Props): React.JS
         required: movement.required,
         difficulty: movement.difficulty,
         beginner_ok: movement.beginnerOk,
-        capability_available: available.get(movement.movement_id) === true,
+        sportTracking: movement.sportTracking,
+        capability_available_weight_room: availableWeightRoom.get(movement.movement_id) === true,
+        capability_available_sport_conditioning: availableSport.get(movement.movement_id) === true,
         scope: movement.scope ?? undefined,
       })),
     }));

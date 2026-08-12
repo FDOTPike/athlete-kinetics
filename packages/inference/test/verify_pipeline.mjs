@@ -8,22 +8,45 @@ const require = createRequire(import.meta.url);
 const { resolveMovementAvailability } = require('./.build/capabilityResolver.js');
 const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
 const { parseHistoryImport, HISTORY_IMPORT_EXAMPLE } = require('./.build/historyImport.js');
-const { composeRoutine } = require('./.build/routineComposer.js');
+const { composeRoutine, isRoutineRoleSnapshotExecutable } = require('./.build/routineComposer.js');
 const { projectChainsFromGraph } = require('./.build/chainProjection.js');
 let pass = 0;
 const check = (name, fn) => { try { fn(); console.log(`  PASS ${name}`); pass += 1; } catch (error) { console.error(`  FAIL ${name}: ${error.message}`); process.exitCode = 1; } };
 const movements = [
-  { movementId: 1, difficulty: 'Beginner', beginnerOk: false, requiredEquipment: [] },
-  { movementId: 2, difficulty: 'Intermediate', beginnerOk: true, requiredEquipment: [] },
-  { movementId: 3, difficulty: 'Advanced', beginnerOk: false, requiredEquipment: ['Barbell'] },
-  { movementId: 4, difficulty: 'Beginner', beginnerOk: false, requiredEquipment: [] },
+  { movementId: 1, difficulty: 'Beginner', beginnerOk: false, sportTracking: false, requiredEquipment: [] },
+  { movementId: 2, difficulty: 'Intermediate', beginnerOk: true, sportTracking: false, requiredEquipment: [] },
+  { movementId: 3, difficulty: 'Advanced', beginnerOk: false, sportTracking: false, requiredEquipment: ['Barbell'] },
+  { movementId: 4, difficulty: 'Beginner', beginnerOk: false, sportTracking: false, requiredEquipment: [] },
+  { movementId: 5, difficulty: 'Advanced', beginnerOk: false, sportTracking: true, requiredEquipment: [] },
 ];
 const edge = { prerequisiteMovementId: 1, movementId: 2, relationship: 'prerequisite', minSessions: 2, minSetsPerSession: 3, minValue: 5, valueKind: 'reps', maxRpe: 8, requiresAttestation: true };
 const evidence = [
   { movementId: 1, sessionId: 10, qualifyingSets: 3, minimumValue: 5, maximumRpe: 8, verified: true },
   { movementId: 1, sessionId: 11, qualifyingSets: 3, minimumValue: 5, maximumRpe: 7.5, verified: true },
 ];
-const resolve = (over = {}) => resolveMovementAvailability({ movements, edges: [edge], evidence, attestedEdgeKeys: new Set(['1:2']), trainingAge: 'beginner', equipment: new Set(), safetyExcludedMovementIds: new Set(), ...over });
+const resolve = (over = {}) => resolveMovementAvailability({
+  movements, edges: [edge], evidence, attestedEdgeKeys: new Set(['1:2']),
+  priorExperienceMovementIds: new Set(), trainingAge: 'beginner', accessContext: 'weight_room',
+  equipment: new Set(), safetyExcludedMovementIds: new Set(), ...over,
+});
+check('resolver fixtures carry explicit access context and sport status', () => {
+  assert.ok(movements.every((movement) => typeof movement.sportTracking === 'boolean'));
+  assert.ok(['weight_room', 'sport_conditioning'].includes('weight_room'));
+});
+check('frozen routine role validation fails closed after role drift or an unverifiable snapshot', () => {
+  const eligible = {
+    major: new Set([1]), supplementary: new Set([2]), conditional: new Set([3]),
+  };
+  const source = [
+    { movementId: 1, role: 'major' },
+    { movementId: 2, role: 'supplementary' },
+  ];
+  assert.equal(isRoutineRoleSnapshotExecutable([1, 2], source, eligible), true);
+  assert.equal(isRoutineRoleSnapshotExecutable([1, 2], source, { ...eligible, major: new Set() }), false);
+  assert.equal(isRoutineRoleSnapshotExecutable([1, 999], source, eligible), false);
+  assert.equal(isRoutineRoleSnapshotExecutable([1], [...source, { movementId: 1, role: 'supplementary' }], eligible), false);
+  assert.equal(isRoutineRoleSnapshotExecutable([2], source, eligible), false);
+});
 check('resolver is deterministic and ordered', () => assert.deepEqual(resolve(), resolve()));
 check('tier, equipment, and safety remain outer gates', () => {
   const result = resolve({ safetyExcludedMovementIds: new Set([4]) });
@@ -31,12 +54,13 @@ check('tier, equipment, and safety remain outer gates', () => {
   assert.deepEqual(result.find((row) => row.movementId === 4).reasons, ['safety']);
 });
 check('progressive tier predicate gives Intermediate no Advanced access', () => {
-  assert.equal(isDifficultyAllowed('beginner', 'Intermediate', true), true);
-  assert.equal(isDifficultyAllowed('beginner', 'Advanced', true), false);
-  assert.equal(isDifficultyAllowed('intermediate', 'Intermediate'), true);
-  assert.equal(isDifficultyAllowed('intermediate', 'Advanced'), false);
-  assert.equal(isDifficultyAllowed('advanced', 'Advanced'), true);
-  assert.equal(isDifficultyAllowed('elite', 'Advanced'), true);
+  assert.equal(isDifficultyAllowed('beginner', 'Intermediate', true, 'weight_room', false), true);
+  assert.equal(isDifficultyAllowed('beginner', 'Advanced', true, 'weight_room', false), false);
+  assert.equal(isDifficultyAllowed('intermediate', 'Intermediate', false, 'weight_room', false), true);
+  assert.equal(isDifficultyAllowed('intermediate', 'Advanced', false, 'weight_room', false), false);
+  assert.equal(isDifficultyAllowed('advanced', 'Advanced', false, 'weight_room', false), true);
+  assert.equal(isDifficultyAllowed('elite', 'Advanced', false, 'weight_room', false), true);
+  assert.equal(isDifficultyAllowed('beginner', 'Advanced', false, 'sport_conditioning', false), true);
 });
 check('availability resolver applies the Intermediate ceiling and unlocks Advanced at Advanced', () => {
   const intermediate = resolve({ trainingAge: 'intermediate', equipment: new Set(['Barbell']) });
@@ -51,6 +75,66 @@ check('RPE ceiling and attestation are enforced', () => {
   assert.equal(resolve({ attestedEdgeKeys: new Set() }).find((row) => row.movementId === 2).state, 'teaching_only');
   assert.equal(resolve({ evidence: evidence.map((row) => ({ ...row, maximumRpe: 9 })) }).find((row) => row.movementId === 2).state, 'teaching_only');
   assert.equal(resolve({ attestedEdgeKeys: new Set(['1:2']) }).find((row) => row.movementId === 2).state, 'available');
+});
+check('Intermediate prior experience clears ordinary evidence only in weight-room context', () => {
+  const ordinaryEdge = { ...edge, requiresAttestation: false };
+  const blocked = resolve({ trainingAge: 'intermediate', edges: [ordinaryEdge], evidence: [], attestedEdgeKeys: new Set() })
+    .find((row) => row.movementId === 2);
+  assert.equal(blocked.capabilitySource, 'blocked');
+  assert.equal(blocked.confirmationWouldClear, true);
+  const confirmed = resolve({
+    trainingAge: 'intermediate', edges: [ordinaryEdge], evidence: [], attestedEdgeKeys: new Set(),
+    priorExperienceMovementIds: new Set([2]),
+  }).find((row) => row.movementId === 2);
+  assert.equal(confirmed.state, 'available');
+  assert.equal(confirmed.capabilitySource, 'prior_experience');
+});
+check('Beginner cannot confirm and Advanced bypass applies only to ordinary weight-room evidence', () => {
+  const ordinaryEdge = { ...edge, requiresAttestation: false };
+  const beginner = resolve({ edges: [ordinaryEdge], evidence: [], priorExperienceMovementIds: new Set([2]) })
+    .find((row) => row.movementId === 2);
+  assert.equal(beginner.capabilitySource, 'blocked');
+  assert.equal(beginner.confirmationWouldClear, false);
+  const advanced = resolve({ trainingAge: 'advanced', edges: [ordinaryEdge], evidence: [] })
+    .find((row) => row.movementId === 2);
+  assert.equal(advanced.capabilitySource, 'advanced_bypass');
+  const attested = resolve({ trainingAge: 'advanced', edges: [edge], evidence: [], attestedEdgeKeys: new Set() })
+    .find((row) => row.movementId === 2);
+  assert.equal(attested.capabilitySource, 'blocked');
+  assert.equal(attested.separateAttestationRequired, true);
+});
+check('confirmation never overrides tier, equipment, or safety outer gates', () => {
+  const advancedEdge = { ...edge, movementId: 3, requiresAttestation: false };
+  const verdict = resolve({
+    trainingAge: 'intermediate', edges: [advancedEdge], evidence: [],
+    priorExperienceMovementIds: new Set([3]), safetyExcludedMovementIds: new Set([3]),
+  }).find((row) => row.movementId === 3);
+  assert.equal(verdict.capabilitySource, 'prior_experience');
+  assert.deepEqual(verdict.reasons, ['tier', 'equipment', 'safety']);
+  assert.equal(verdict.state, 'teaching_only');
+});
+check('sport context is tier-free but never receives the Advanced evidence bypass', () => {
+  const sportEdge = { ...edge, movementId: 3, requiresAttestation: false };
+  const blocked = resolve({
+    trainingAge: 'advanced', accessContext: 'sport_conditioning', edges: [sportEdge], evidence: [],
+    equipment: new Set(['Barbell']),
+  }).find((row) => row.movementId === 3);
+  assert.equal(blocked.reasons.includes('tier'), false);
+  assert.equal(blocked.capabilitySource, 'blocked');
+  assert.equal(blocked.confirmationWouldClear, true);
+  const confirmed = resolve({
+    trainingAge: 'advanced', accessContext: 'sport_conditioning', edges: [sportEdge], evidence: [],
+    equipment: new Set(['Barbell']), priorExperienceMovementIds: new Set([3]),
+  }).find((row) => row.movementId === 3);
+  assert.equal(confirmed.state, 'available');
+  assert.equal(confirmed.capabilitySource, 'prior_experience');
+});
+check('library resolves sport-tracking rows tier-free and non-sport rows as weight-room work', () => {
+  const rows = resolve({ trainingAge: 'beginner', accessContext: 'library' });
+  assert.equal(rows.find((row) => row.movementId === 5).effectiveContext, 'sport_conditioning');
+  assert.equal(rows.find((row) => row.movementId === 5).state, 'available');
+  assert.equal(rows.find((row) => row.movementId === 3).effectiveContext, 'weight_room');
+  assert.ok(rows.find((row) => row.movementId === 3).reasons.includes('tier'));
 });
 const library = [{ movementId: 1, name: 'Pull-Up' }, { movementId: 2, name: 'Deadlift' }];
 check('history example parses without writes or errors', () => {
@@ -220,5 +304,5 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
   assert.equal(parsed.sessions.length, 3, `Expected 3 sessions, got ${parsed.sessions.length}`);
   assert.equal(parsed.unknownMovementNames.length, 0, `Unknown movements: ${parsed.unknownMovementNames.join(', ')}`);
 });
-console.log(`pipeline verification: ${pass}/16 checks passed`);
+console.log(`pipeline verification: ${pass} checks passed`);
 if (process.exitCode) process.exit(process.exitCode);

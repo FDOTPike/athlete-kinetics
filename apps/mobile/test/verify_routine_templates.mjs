@@ -207,11 +207,13 @@ check('starts session from frozen template with plan provenance and crash recove
 });
 
 const storeSource = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
-check('production save/freeze paths enforce role eligibility and current capability verdicts', () => {
+check('production save/freeze/start paths enforce role eligibility and current capability verdicts', () => {
   assert.ok(storeSource.includes('routineRoleEligibility(d)'));
-  assert.ok(storeSource.includes('get().getMovementAvailabilityVerdicts()'));
+  assert.ok(storeSource.includes("get().getMovementAvailabilityVerdicts('weight_room')"));
   assert.ok(storeSource.includes('is not ratified for the'));
   assert.ok(storeSource.includes('is currently teaching-only'));
+  assert.ok(storeSource.includes('const currentRoleEligibility = routineRoleEligibility(d)'));
+  assert.ok(storeSource.includes('isRoutineRoleSnapshotExecutable('));
 
   // NOTE: the teaching-only refusal itself cannot be exercised here. It lives in
   // a zustand action in useStore.ts, and nothing in this repo can invoke a store

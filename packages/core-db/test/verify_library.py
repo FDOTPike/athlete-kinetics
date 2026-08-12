@@ -373,6 +373,44 @@ trail = con.execute("""
 """).fetchone()
 check("Trail Running/Walking uses explicit time logging", tuple(trail or ()) == ("time", 1, 1200))
 
+sport_rows = list(con.execute("""
+  SELECT m.name, mt.category
+  FROM movement_sport_tracking st
+  JOIN movement m USING(movement_id)
+  JOIN movement_taxonomy mt USING(movement_id)
+  ORDER BY m.name
+"""))
+check("sport tracking holds exactly the three ratified cardio movements",
+      [(row["name"], row["category"]) for row in sport_rows] == [
+          ("BJJ Sparring Round", "cardio"),
+          ("Road Run", "cardio"),
+          ("Trail Running/Walking", "cardio"),
+      ])
+sport_edge_count = con.execute("""
+  SELECT COUNT(*) FROM movement_capability_edge edge
+  WHERE edge.prerequisite_movement_id IN (SELECT movement_id FROM movement_sport_tracking)
+     OR edge.movement_id IN (SELECT movement_id FROM movement_sport_tracking)
+""").fetchone()[0]
+check("sport-tracking movements have no capability-edge endpoint", sport_edge_count == 0)
+sport_roles = {
+    row["name"]: row["roles"]
+    for row in con.execute("""
+      SELECT m.name, group_concat(role, '|') AS roles FROM (
+        SELECT re.movement_id, re.role FROM movement_role_eligibility re
+        WHERE re.movement_id IN (SELECT movement_id FROM movement_sport_tracking)
+        ORDER BY re.movement_id, re.role
+      ) ordered
+      JOIN movement m USING(movement_id)
+      GROUP BY m.movement_id ORDER BY m.name
+    """)
+}
+check("sport membership grants no role and preserves the ratified role rows",
+      sport_roles == {
+          "BJJ Sparring Round": "conditional|supplementary",
+          "Road Run": "conditional|supplementary",
+          "Trail Running/Walking": "supplementary",
+      }, str(sport_roles))
+
 print("\n[6] STRICT media checks")
 movement_id = con.execute("SELECT movement_id FROM movement LIMIT 1").fetchone()[0]
 try:
@@ -449,7 +487,7 @@ check("one provenance row per corrected movement, at version 1, hash-matched",
               and provenance[r["name"]]["applied_at_ms"] == correction_overlay["build"]["applied_at_ms"]
               for r in correction_records))
 
-print("\n[8] domain-aware patch merge: live == pre-049 baseline + declared changes")
+print("\n[8] domain-aware patch merge: live == pre-049 baseline + declared additive changes")
 
 def snapshot(connection):
     rows = {}
@@ -517,11 +555,15 @@ for name in sorted(names_db):
     record = correction_by_name.get(name)
     if record is not None:
         expected = apply_correction(expected, record)
+    if name == "BJJ Sparring Round":
+        expected["taxonomy"] = {
+            "category": "cardio", "implement": "bodyweight", "family": "bjj_sparring_round"
+        }
     if live_snapshot[name] != expected:
         drift.append(name)
     if live_snapshot[name]["media"] != base_snapshot[name]["media"]:
         media_drift.append(name)
-check("every one of the 300 movements equals baseline + merge, field for field",
+check("every movement equals baseline + 049 merge + the declared 051 BJJ taxonomy completion",
       not drift, str(drift[:3]))
 check("049 writes NO media: asset keys, statuses and revisions are byte-identical",
       not media_drift, str(media_drift[:3]))
@@ -533,7 +575,8 @@ check("049 leaves every video_placeholder_uri byte-identical (legacy YouTube fal
 coaching_only = [r["name"] for r in correction_records if set(r["changes"]) == {"coaching"}]
 untouched_domains = [name for name in coaching_only
                      if live_snapshot[name]["movement"] != base_snapshot[name]["movement"]
-                     or live_snapshot[name]["taxonomy"] != base_snapshot[name]["taxonomy"]
+                     or (name != "BJJ Sparring Round"
+                         and live_snapshot[name]["taxonomy"] != base_snapshot[name]["taxonomy"])
                      or live_snapshot[name]["equipment"] != base_snapshot[name]["equipment"]
                      or live_snapshot[name]["detail"]["difficulty_rating"]
                      != base_snapshot[name]["detail"]["difficulty_rating"]]

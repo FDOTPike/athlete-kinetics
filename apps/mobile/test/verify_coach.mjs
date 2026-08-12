@@ -181,6 +181,7 @@ check('verification Lab core is pure and the UI imports no athlete-data mutator'
   }
   assert.ok(labScreen.includes('loadMeasuredHistory'));
   assert.ok(labScreen.includes('loadCoachDiagnosticContext'));
+  assert.ok(labScreen.includes('loadCoachMovementAccessContext'));
   assert.ok(labScreen.includes('getMovementAvailabilityVerdicts'));
 });
 

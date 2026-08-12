@@ -1,8 +1,8 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { isDifficultyAllowed, JOINTS, nextUp as nextRunnerWork } from '@ak/inference';
-import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { JOINTS, nextUp as nextRunnerWork } from '@ak/inference';
+import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
 import {
@@ -250,12 +250,14 @@ export default function SessionScreen(): React.JSX.Element {
   const runnerPhase = runner?.phase ?? 'working';
 
   const getMovementAvailabilityVerdicts = state.getMovementAvailabilityVerdicts;
+  const sessionAccessContext = session === null ? 'weight_room' : state.activeSessionAccessContext;
   const availabilityMap = useMemo(() => {
-    const verdicts = getMovementAvailabilityVerdicts !== undefined ? getMovementAvailabilityVerdicts() : [];
+    if (sessionAccessContext === null) return new Map<number, MovementAvailability>();
+    const verdicts = getMovementAvailabilityVerdicts(sessionAccessContext);
     const map = new Map<number, (typeof verdicts)[number]>();
     for (const v of verdicts) map.set(v.movementId, v);
     return map;
-  }, [getMovementAvailabilityVerdicts]);
+  }, [getMovementAvailabilityVerdicts, sessionAccessContext, state.movementAvailabilityRevision, movements, profile, state.niggles]);
 
   const [nowMs, setNowMs] = useState(Date.now());
   const [localRest, setLocalRest] = useState<LocalRest | null>(null);
@@ -491,14 +493,8 @@ export default function SessionScreen(): React.JSX.Element {
     );
   }
 
-  const tierPlanViolation = sessionPlan.some((slot) => {
-    const movement = byId.get(slot.movementId);
-    return movement === undefined || !isDifficultyAllowed(
-      profile.training_age,
-      movement.difficulty,
-      movement.beginnerOk,
-    );
-  });
+  const tierPlanViolation = sessionPlan.some((slot) =>
+    availabilityMap.get(slot.movementId)?.state !== 'available');
 
   if (tierPlanViolation) {
     return (
@@ -1068,7 +1064,7 @@ export default function SessionScreen(): React.JSX.Element {
                       <Text style={styles.optionReason}>{option.rationale}</Text>
                       {isTeachingOnly && (
                         <Text style={styles.teachingOnlyOption}>
-                          {formatTeachingOnlyReason(avail.reasons)}
+                          {formatTeachingOnlyReason(avail)}
                         </Text>
                       )}
                     </View>
@@ -1086,7 +1082,7 @@ export default function SessionScreen(): React.JSX.Element {
                       <Text style={styles.optionReason}>{option.rationale}</Text>
                       {isTeachingOnly && (
                         <Text style={styles.teachingOnlyOption}>
-                          {formatTeachingOnlyReason(avail.reasons)}
+                          {formatTeachingOnlyReason(avail)}
                         </Text>
                       )}
                     </View>

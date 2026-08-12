@@ -60,6 +60,11 @@ const baseState = (overrides = {}) => ({
   status: 'ready',
   error: null,
   today: TODAY,
+  profile: {
+    objective: 'strength', training_age: 'intermediate', weekly_frequency: 4,
+    equipment_inventory: ['barbell', 'dumbbells', 'bench'], base_rpe_cap: 8.5,
+    session_duration_cap_min: 60,
+  },
   vector,
   trend: [{ date: '2026-07-14', readiness_score: 76 }],
   session: null,

@@ -20,7 +20,7 @@ let mockState;
 jest.mock('../../src/state/useStore', () => ({
   localToday: () => '2026-08-11',
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-  formatTeachingOnlyReason: (reasons) => `Teaching only — ${reasons.join('; ')}`,
+  formatTeachingOnlyReason: (verdict) => `Teaching only — ${verdict.reasons.join('; ')}`,
   useStore: (selector) => selector(mockState),
 }));
 
@@ -45,6 +45,7 @@ const movement = (over) => ({
   progressionGroup: null,
   progressionRank: null,
   scope: null,
+  sportTracking: false,
   ...over,
 });
 
@@ -91,8 +92,11 @@ describe('049 full-body scope in the movement library', () => {
       movements: libraryMovements,
       profile: { training_age: 'advanced', equipment_inventory: ['kettlebell'] },
       getMovementAvailabilityVerdicts: () => libraryMovements.map((m) => ({
-        movementId: m.movement_id, state: 'available', reasons: [],
+        movementId: m.movement_id, state: 'available', reasons: [], effectiveContext: 'weight_room',
+        capabilitySource: 'not_required', blockingPrerequisiteMovementIds: [],
+        confirmationWouldClear: false, separateAttestationRequired: false,
       })),
+      movementAvailabilityRevision: 0,
       resolveGoalRung: () => null,
     };
   });

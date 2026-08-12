@@ -80,7 +80,7 @@ const MovementRow = React.memo(function MovementRow({
   availability,
   onSelect,
 }: MovementRowProps): React.JSX.Element {
-  const teachingOnly = availability?.state === 'teaching_only';
+  const teachingOnly = availability?.state !== 'available';
   return (
     <Pressable
       onPress={() => onSelect(item.movement_id)}
@@ -101,7 +101,7 @@ const MovementRow = React.memo(function MovementRow({
         )}
         {teachingOnly && (
           <Text style={styles.teachingOnlyBadge}>
-            {formatTeachingOnlyReason(availability.reasons)}
+            {formatTeachingOnlyReason(availability)}
           </Text>
         )}
       </View>
@@ -116,17 +116,20 @@ export interface LibraryScreenProps {
 
 export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProps): React.JSX.Element {
   const movements = useStore((state) => state.movements);
-  const trainingAge = useStore((state) => state.profile.training_age);
+  const profile = useStore((state) => state.profile);
+  const trainingAge = profile.training_age;
+  const niggles = useStore((state) => state.niggles);
   const resolveGoalRung = useStore((state) => state.resolveGoalRung);
   const getMovementAvailabilityVerdicts = useStore((state) => state.getMovementAvailabilityVerdicts);
+  const movementAvailabilityRevision = useStore((state) => state.movementAvailabilityRevision);
 
   const availabilityMap = useMemo(() => {
     const map = new Map<number, MovementAvailability>();
-    for (const verdict of getMovementAvailabilityVerdicts?.() ?? []) {
+    for (const verdict of getMovementAvailabilityVerdicts('library')) {
       map.set(verdict.movementId, verdict);
     }
     return map;
-  }, [getMovementAvailabilityVerdicts]);
+  }, [getMovementAvailabilityVerdicts, movementAvailabilityRevision, movements, niggles, profile]);
 
   const [search, setSearch] = useState('');
   const [availabilityView, setAvailabilityView] = useState<AvailabilityView>(
@@ -180,7 +183,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
     const query = search.trim().toLocaleLowerCase();
     return movements.filter((movement) => {
       const availability = availabilityMap.get(movement.movement_id);
-      if (availabilityView === 'available' && availability?.state === 'teaching_only') return false;
+      if (availabilityView === 'available' && availability?.state !== 'available') return false;
       if (patternFilter !== null && movement.pattern !== patternFilter) return false;
       if (equipmentFilter !== null && !movementHasEquipment(movement, equipmentFilter)) return false;
       if (difficultyFilter !== 'all' && movement.difficulty !== difficultyFilter) return false;
@@ -258,10 +261,10 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
               <Text style={styles.detailName}>{selectedMovement.name}</Text>
               <Text style={styles.detailBase}>{selectedMovement.baseName}</Text>
             </View>
-            {availability?.state === 'teaching_only' && (
+            {availability?.state !== 'available' && (
               <View style={styles.teachingOnlyBanner}>
                 <Text style={styles.teachingOnlyBannerText}>
-                  {formatTeachingOnlyReason(availability.reasons)}
+                  {formatTeachingOnlyReason(availability)}
                 </Text>
               </View>
             )}

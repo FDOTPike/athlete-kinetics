@@ -2,6 +2,8 @@ import type { Objective, SchemaType, TrainingAge } from './types';
 
 export type RoutineRole = 'major' | 'supplementary' | 'conditional';
 export interface RoutineSelection { readonly movementId: number; readonly role: RoutineRole; }
+export interface RoutineRoleSnapshotRow extends RoutineSelection {}
+export type RoutineRoleEligibility = Readonly<Record<RoutineRole, ReadonlySet<number>>>;
 export interface RoutinePrescription extends RoutineSelection { readonly slotIndex: number; readonly sets: number; readonly reps: number; readonly targetRpe: number; }
 export interface ComposeRoutineInput {
   readonly selections: readonly RoutineSelection[];
@@ -19,6 +21,31 @@ const baseDose: Record<RoutineRole, readonly [number, number, number]> = {
   major: [4, 5, 8], supplementary: [3, 8, 7.5], conditional: [2, 12, 7],
 };
 const ageSetDelta: Record<TrainingAge, number> = { beginner: -1, intermediate: 0, advanced: 1, elite: 1 };
+
+/** Revalidate a frozen routine against its live, DB-derived role policy.
+ * Missing and duplicated source rows are deliberately unverifiable because
+ * the planned-session method snapshot does not carry a template day index. */
+export function isRoutineRoleSnapshotExecutable(
+  planMovementIds: readonly number[],
+  sourceRows: readonly RoutineRoleSnapshotRow[],
+  eligibility: RoutineRoleEligibility,
+): boolean {
+  const rolesByMovement = new Map<number, RoutineRole[]>();
+  for (const row of sourceRows) {
+    const roles = rolesByMovement.get(row.movementId) ?? [];
+    roles.push(row.role);
+    rolesByMovement.set(row.movementId, roles);
+  }
+  let majorCount = 0;
+  for (const movementId of planMovementIds) {
+    const roles = rolesByMovement.get(movementId) ?? [];
+    if (roles.length !== 1) return false;
+    const [role] = roles;
+    if (!eligibility[role].has(movementId)) return false;
+    if (role === 'major') majorCount += 1;
+  }
+  return majorCount === 1;
+}
 
 /** Deterministic pre-session composer. It enforces role counts, duration, the
  * shared availability verdict, and the existing RPE cap before freezing slots. */

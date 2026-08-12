@@ -54,7 +54,12 @@ export {
   type UserProfile,
 } from './types';
 export { evaluatePolicy } from './policyReference';
-export { isDifficultyAllowed } from './tierPolicy';
+export {
+  effectiveMovementAccessContext,
+  isDifficultyAllowed,
+  type ExecutableMovementAccessContext,
+  type MovementAccessContext,
+} from './tierPolicy';
 export {
   defaultLoadPreference,
   resolveLoadSelection,
@@ -74,6 +79,7 @@ export {
 export {
   defaultProgramDayIndices,
   addDaysIso,
+  accessContextForBlockFocus,
   availableMovements,
   BLOCK_WEEKS,
   generateBlock,
@@ -215,6 +221,7 @@ export {
   type CapabilityEdge,
   type CapabilityEvidence,
   type CapabilityMovement,
+  type CapabilitySource,
   type MovementAvailability,
   type MovementAvailabilityState,
   type ResolveMovementAvailabilityInput,
@@ -233,8 +240,11 @@ export {
 } from './historyImport';
 export {
   composeRoutine,
+  isRoutineRoleSnapshotExecutable,
   type ComposeRoutineInput,
   type ComposedRoutine,
+  type RoutineRoleEligibility,
+  type RoutineRoleSnapshotRow,
   type RoutinePrescription,
   type RoutineRole,
   type RoutineSelection,

@@ -61,6 +61,10 @@ const movements: readonly GeneratorMovement[] = MOVEMENT_PATTERNS.map(
     pattern,
     is_compound: pattern !== 'isolation' && pattern !== 'locomotion',
     required: [],
+    beginner_ok: false,
+    sportTracking: false,
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: true,
   }),
 );
 

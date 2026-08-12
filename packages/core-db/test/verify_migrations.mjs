@@ -50,7 +50,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
   '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
   '049_movement_content_correction_v1.sql',
-  '050_movement_role_convergence.sql'];
+  '050_movement_role_convergence.sql',
+  '051_routine_access_context.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -837,6 +838,97 @@ check('050 trigger gives a future live movement supplementary eligibility exactl
   Number(roleDb.raw.prepare(
     "SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ? AND role = 'supplementary'",
   ).get(futureMovementId).c) === 1);
+
+// --- 2m. 051 routine access context ----------------------------------------
+console.log('[2m] 051 routine access context');
+const accessIndex = FILES.indexOf('051_routine_access_context.sql');
+const accessDb = freshDb();
+for (let i = 0; i < accessIndex; i += 1) accessDb.executeSync(MIGRATIONS[i]);
+accessDb.executeSync(`PRAGMA user_version = ${accessIndex};`);
+const roleFingerprint = (database) => database.raw.prepare(`
+  SELECT group_concat(movement_id || ':' || role, '|') AS value
+  FROM (SELECT movement_id, role FROM movement_role_eligibility ORDER BY movement_id, role)
+`).get().value;
+const rolesBefore051 = roleFingerprint(accessDb);
+const accessSummary = (database) => ({
+  sport: database.raw.prepare(`
+    SELECT group_concat(name, '|') AS names FROM (
+      SELECT m.name FROM movement_sport_tracking st
+      JOIN movement m USING (movement_id) ORDER BY m.name
+    )
+  `).get().names,
+  nonCardio: Number(database.raw.prepare(`
+    SELECT COUNT(*) AS c FROM movement_sport_tracking st
+    JOIN movement_taxonomy mt USING (movement_id) WHERE mt.category <> 'cardio'
+  `).get().c),
+  taxonomyRows: Number(database.raw.prepare(`
+    SELECT COUNT(*) AS c FROM movement_sport_tracking st
+    JOIN movement_taxonomy mt USING (movement_id)
+  `).get().c),
+  edgeEndpoints: Number(database.raw.prepare(`
+    SELECT COUNT(*) AS c FROM movement_capability_edge edge
+    WHERE edge.prerequisite_movement_id IN (SELECT movement_id FROM movement_sport_tracking)
+       OR edge.movement_id IN (SELECT movement_id FROM movement_sport_tracking)
+  `).get().c),
+  movements: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c),
+  media: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_media').get().c),
+  corrections: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_content_correction').get().c),
+  roleFingerprint: roleFingerprint(database),
+});
+runMigrations(accessDb, MIGRATIONS);
+const cleanAccessSummary = accessSummary(accessDb);
+check('clean 050 -> 051 upgrade seeds the exact cardio-only sport set without role or content drift',
+  uv(accessDb) === MIGRATIONS.length
+    && cleanAccessSummary.sport === 'BJJ Sparring Round|Road Run|Trail Running/Walking'
+    && cleanAccessSummary.nonCardio === 0
+    && cleanAccessSummary.taxonomyRows === 3
+    && cleanAccessSummary.edgeEndpoints === 0
+    && cleanAccessSummary.movements === 300
+    && cleanAccessSummary.media === 300
+    && cleanAccessSummary.corrections === 32
+    && cleanAccessSummary.roleFingerprint === rolesBefore051,
+  JSON.stringify(cleanAccessSummary));
+
+const roadRunId = Number(accessDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Road Run'",
+).get().movement_id);
+accessDb.raw.prepare(`INSERT INTO movement_prior_experience
+  (movement_id, confirmed_at_ms, revoked_at_ms, basis) VALUES (?, 100, NULL, 'local_user_confirmation')`).run(roadRunId);
+accessDb.executeSync(`PRAGMA user_version = ${accessIndex};`);
+runMigrations(accessDb, MIGRATIONS);
+check('051 replay is idempotent and preserves athlete declarations',
+  Number(accessDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_sport_tracking').get().c) === 3
+    && Number(accessDb.raw.prepare(
+      'SELECT confirmed_at_ms FROM movement_prior_experience WHERE movement_id = ?',
+    ).get(roadRunId).confirmed_at_ms) === 100);
+
+let accessConstraintRejections = 0;
+for (const sql of [
+  `INSERT INTO movement_prior_experience (movement_id, confirmed_at_ms, basis) VALUES (${roadRunId}, 1, 'other')`,
+  `INSERT INTO movement_prior_experience (movement_id, confirmed_at_ms, revoked_at_ms) VALUES (${roadRunId + 1}, 10, 9)`,
+  `INSERT INTO movement_prior_experience (movement_id, confirmed_at_ms) VALUES (999999, 1)`,
+  `INSERT INTO movement_sport_tracking (movement_id) VALUES (999999)`,
+]) {
+  try { accessDb.executeSync(sql); } catch { accessConstraintRejections += 1; }
+}
+check('051 STRICT/CHECK/PK/FK surface rejects invalid basis, time ordering, and unknown movements',
+  accessConstraintRejections === 4, `${accessConstraintRejections}/4`);
+
+const poisonedAccess = freshDb();
+for (let i = 0; i < accessIndex; i += 1) poisonedAccess.executeSync(MIGRATIONS[i]);
+poisonedAccess.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('051 poison precondition claims completion while both access sentinels are absent',
+  sentinelsMissing(poisonedAccess).includes('movement_prior_experience')
+    && sentinelsMissing(poisonedAccess).includes('movement_sport_tracking'));
+runMigrations(poisonedAccess, MIGRATIONS);
+check('051 poison repair converges on the clean exact state',
+  sentinelsMissing(poisonedAccess).length === 0
+    && JSON.stringify(accessSummary(poisonedAccess)) === JSON.stringify({
+      ...cleanAccessSummary,
+      // The clean DB's declaration is athlete data and intentionally excluded
+      // from the structural summary used for convergence.
+    }),
+  JSON.stringify(accessSummary(poisonedAccess)));
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

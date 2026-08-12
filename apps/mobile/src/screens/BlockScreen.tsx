@@ -145,6 +145,7 @@ function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
 export default function BlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX.Element {
   const vector = useStore((s) => s.vector);
   const today = useStore((s) => s.today);
+  const profile = useStore((s) => s.profile);
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
   const triageReady = useStore((s) => s.triageReady);
@@ -218,6 +219,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   });
 
   const requestRoutineAction = (kind: 'use' | 'delete', routineTemplateId: number): void => {
+    if (kind === 'use' && profile.training_age === 'beginner') {
+      setRoutineActionMessage('Standalone routines unlock after the Beginner stage. Generated training remains available.');
+      return;
+    }
     setRoutineActionMessage(null);
     setBlockArchivedNotice(null);
     setConfirmRoutineAction({ kind, routineTemplateId });
@@ -277,11 +282,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.bodyText}>
             Sync telemetry or load the demo athlete before asking Coach to adjust today's plan.
           </Text>
-          <SecondaryButton
-            label="Build a standalone routine"
-            onPress={() => setEditingTemplate('new')}
-            accessibilityLabel="Build a standalone routine template"
-          />
+          {profile.training_age === 'beginner' ? (
+            <Text style={styles.captionText}>Standalone routines unlock after the Beginner stage. Generated training remains available.</Text>
+          ) : (
+            <SecondaryButton
+              label="Build a standalone routine"
+              onPress={() => setEditingTemplate('new')}
+              accessibilityLabel="Build a standalone routine template"
+            />
+          )}
         </View>
       </View>
     );
@@ -664,7 +673,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
         <Disclosure
           label="Routine templates"
-          hint="Create, edit, and freeze custom routine templates"
+          hint={profile.training_age === 'beginner'
+            ? 'Stored templates can be deleted; use and editing unlock later'
+            : 'Create, edit, and freeze custom routine templates'}
         >
           <View style={styles.disclosureContent}>
             {routineTemplates.length === 0 ? (
@@ -690,8 +701,12 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                       </>
                     ) : (
                       <>
-                        <Chip label="Use today" selected={false} onPress={() => requestRoutineAction('use', t.routineTemplateId)} />
-                        <Chip label="Edit" selected={false} onPress={() => setEditingTemplate(t)} />
+                        {profile.training_age !== 'beginner' && (
+                          <>
+                            <Chip label="Use today" selected={false} onPress={() => requestRoutineAction('use', t.routineTemplateId)} />
+                            <Chip label="Edit" selected={false} onPress={() => setEditingTemplate(t)} />
+                          </>
+                        )}
                         <Chip label="Delete" selected={false} onPress={() => requestRoutineAction('delete', t.routineTemplateId)} />
                       </>
                     )}
@@ -702,11 +717,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             {routineActionMessage !== null && (
               <Text style={styles.captionText}>{routineActionMessage}</Text>
             )}
-            <PrimaryButton
-              label="+ Build new routine template"
-              onPress={() => setEditingTemplate('new')}
-              accessibilityLabel="Build new routine template"
-            />
+            {profile.training_age === 'beginner' ? (
+              <Text style={styles.captionText}>Generated training stays available while standalone routines are locked.</Text>
+            ) : (
+              <PrimaryButton
+                label="+ Build new routine template"
+                onPress={() => setEditingTemplate('new')}
+                accessibilityLabel="Build new routine template"
+              />
+            )}
           </View>
         </Disclosure>
 

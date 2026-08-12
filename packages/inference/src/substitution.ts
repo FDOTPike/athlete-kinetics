@@ -40,7 +40,7 @@ import {
   type MovementPreference,
   type TrainingAge,
 } from './types';
-import { isDifficultyAllowed } from './tierPolicy';
+import { isDifficultyAllowed, type ExecutableMovementAccessContext } from './tierPolicy';
 
 // ---------------------------------------------------------------------------
 // Joint model (engine-local safety policy)
@@ -99,7 +99,9 @@ export interface SubstitutionMovement {
    *  staple a beginner may be offered. Absent = not whitelisted. */
   beginnerOk?: boolean;
   /** Shared capability resolver verdict. False stays visible for teaching but cannot be offered. */
-  capabilityAvailable?: boolean;
+  capabilityAvailable: boolean;
+  /** Frozen movement_sport_tracking membership. */
+  sportTracking: boolean;
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
@@ -146,9 +148,10 @@ export interface SubstitutionInput {
 
   /** CNS tax cap override (clamped 1..DEFAULT_ACCESSORY_RATIO). */
   maxAccessoryRatio?: number;
-  /** Athlete training age — scales the niggle severity thresholds via
-   *  EXPERIENCE_SEVERITY (DOMS-vs-structural). Defaults to 'intermediate'. */
-  trainingAge?: TrainingAge;
+  /** Athlete training age — scales niggle thresholds and the weight-room tier. */
+  trainingAge: TrainingAge;
+  /** Context where every candidate will actually be performed. */
+  accessContext: ExecutableMovementAccessContext;
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +246,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   const niggles = input.niggles ?? [];
   // Experience-weighted thresholds (DOMS-vs-structural): a beginner tolerates
   // more before a niggle bars a joint or triages; an elite reacts sooner.
-  const { triageMin, haltMin } = EXPERIENCE_SEVERITY[input.trainingAge ?? 'intermediate'];
+  const { triageMin, haltMin } = EXPERIENCE_SEVERITY[input.trainingAge];
   const injured = injuredJoints(niggles, triageMin);
   const guarded = injured.size > 0;
   const haltAdvised = niggles.some((n) => n.severity >= haltMin);
@@ -252,13 +255,15 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   const blocked = new Set<number>();
 
   const available = (m: SubstitutionMovement): boolean =>
-    m.capabilityAvailable !== false && m.required.every((item) => inventory.has(item));
+    m.capabilityAvailable && m.required.every((item) => inventory.has(item));
   /** Plan P16 S4 tier gate: a beginner is only offered Beginner movements or
    *  whitelisted Intermediate staples — in EVERY layer, triage included. */
   const tierBars = (m: SubstitutionMovement): boolean => !isDifficultyAllowed(
-    input.trainingAge ?? 'intermediate',
+    input.trainingAge,
     m.difficulty,
-    m.beginnerOk,
+    m.beginnerOk === true,
+    input.accessContext,
+    m.sportTracking,
   );
   /** Guardrail predicate with the side effect of recording the block. */
   const guardrailBars = (m: SubstitutionMovement): boolean => {

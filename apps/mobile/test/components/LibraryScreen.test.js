@@ -8,9 +8,11 @@ let mockState;
 
 jest.mock('../../src/state/useStore', () => ({
   localToday: () => '2026-06-01',
-  formatTeachingOnlyReason: (reasons) => reasons.length === 0
-    ? 'Teaching only'
-    : `Teaching only — ${reasons.map((reason) => reason === 'capability' ? 'build the movement below it first' : reason).join('; ')}`,
+  formatTeachingOnlyReason: (verdict) => verdict === undefined
+    ? 'Access cannot be verified right now.'
+    : verdict.reasons.length === 0
+      ? 'Teaching only'
+      : `Teaching only — ${verdict.reasons.map((reason) => reason === 'capability' ? 'build the movement below it first' : reason).join('; ')}`,
   useStore: (selector) => selector(mockState),
 }));
 
@@ -40,6 +42,7 @@ const sampleMovements = [
     preference: 0,
     progressionGroup: 'squat-skill',
     progressionRank: 0,
+    sportTracking: false,
   },
   {
     movement_id: 2,
@@ -66,6 +69,7 @@ const sampleMovements = [
     preference: 0,
     progressionGroup: 'squat-skill',
     progressionRank: 1,
+    sportTracking: false,
   },
   {
     movement_id: 3,
@@ -92,6 +96,7 @@ const sampleMovements = [
     preference: 0,
     progressionGroup: null,
     progressionRank: null,
+    sportTracking: false,
   },
 ];
 
@@ -99,6 +104,9 @@ const availableVerdicts = sampleMovements.map((movement) => ({
   movementId: movement.movement_id,
   state: 'available',
   reasons: [],
+  effectiveContext: 'weight_room', capabilitySource: 'not_required',
+  blockingPrerequisiteMovementIds: [], confirmationWouldClear: false,
+  separateAttestationRequired: false,
 }));
 
 describe('LibraryScreen Phase 2a', () => {
@@ -107,6 +115,7 @@ describe('LibraryScreen Phase 2a', () => {
       movements: sampleMovements,
       profile: { training_age: 'intermediate', equipment_inventory: ['barbell', 'squat_rack', 'dumbbells', 'bench'] },
       getMovementAvailabilityVerdicts: () => availableVerdicts,
+      movementAvailabilityRevision: 0,
       resolveGoalRung: () => ({
         active: { movementName: 'Goblet Squat', progressionGroup: 'squat-skill', progressionRank: 0 },
         passed: [],
@@ -151,7 +160,7 @@ describe('LibraryScreen Phase 2a', () => {
     mockState.profile.training_age = 'beginner';
     mockState.getMovementAvailabilityVerdicts = () => [
       availableVerdicts[0],
-      { movementId: 2, state: 'teaching_only', reasons: ['tier'] },
+      { ...availableVerdicts[1], state: 'teaching_only', reasons: ['tier'] },
       availableVerdicts[2],
     ];
     render(<LibraryScreen />);
@@ -166,6 +175,16 @@ describe('LibraryScreen Phase 2a', () => {
     render(<LibraryScreen />);
     expect(screen.getByText('Back Squat · Advanced')).toBeOnTheScreen();
     expect(screen.getByText('Bench Press · Intermediate')).toBeOnTheScreen();
+  });
+
+  test('a missing resolver verdict fails closed in list and detail views', () => {
+    mockState.getMovementAvailabilityVerdicts = () => availableVerdicts.slice(0, 2);
+    render(<LibraryScreen initialMovementId={3} />);
+    expect(screen.getByText('Access cannot be verified right now.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Back to movement list'));
+    expect(screen.getByText('Access cannot be verified right now.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Show available movements'));
+    expect(screen.queryByText('Dumbbell Bench Press')).not.toBeOnTheScreen();
   });
 
   test('opens external fallback media through the OS handler', () => {

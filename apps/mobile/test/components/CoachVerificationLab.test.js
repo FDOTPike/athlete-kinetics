@@ -30,7 +30,9 @@ const movements = patterns.map((pattern, index) => ({
   required: [],
   difficulty: 'Beginner',
   beginner_ok: false,
-  capability_available: true,
+  sportTracking: false,
+  capability_available_weight_room: true,
+  capability_available_sport_conditioning: true,
 }));
 
 const evidence = Array.from({ length: 90 }, (_, index) => {
@@ -55,6 +57,13 @@ const input = {
   today: '2026-08-12',
   generatedAtMs: 1786500000000,
   profileContext: { sessionsToday: 0, trainedDaysLast7: 3 },
+  movementAccess: {
+    edges: [],
+    evidence: [],
+    attestedEdgeKeys: [],
+    safetyExcludedMovementIds: [],
+    priorExperienceMovementIds: [],
+  },
 };
 
 describe('Coach Verification Lab pure sandbox', () => {
@@ -88,11 +97,42 @@ describe('Coach Verification Lab pure sandbox', () => {
 
   test('share export omits raw evidence, names, database identifiers, and health readings', () => {
     const exportText = serializeRedactedCoachReport(runCoachVerificationLab(input));
-    expect(exportText).toContain('Names, free text, database identifiers');
+    expect(exportText).toContain('Names, free text, movement identifiers, database identifiers');
     expect(exportText).not.toContain('Diagnostic squat');
     expect(exportText).not.toContain('athlete_kinetics.db');
     expect(exportText).not.toContain('82.5');
     expect(exportText).not.toContain('430');
     expect(exportText).not.toContain('hrvRmssdMs');
+  });
+
+  test('share export cannot carry movement, safety, or thrown-error sentinels', () => {
+    const movementName = 'SENTINEL MOVEMENT NAME';
+    const movementId = 987654321;
+    const errorText = 'SENTINEL PRIVATE ERROR';
+    const report = runCoachVerificationLab({
+      ...input,
+      movements: [{
+        ...movements[0],
+        movement_id: movementId,
+        name: movementName,
+        required: new Proxy([], {
+          get(target, property, receiver) {
+            if (property === Symbol.iterator) throw new Error(errorText);
+            return Reflect.get(target, property, receiver);
+          },
+        }),
+      }],
+      movementAccess: {
+        ...input.movementAccess,
+        safetyExcludedMovementIds: [movementId],
+      },
+    });
+    const exportText = serializeRedactedCoachReport(report);
+    expect(exportText).not.toContain(movementName);
+    expect(exportText).not.toContain(String(movementId));
+    expect(exportText).not.toContain(errorText);
+    expect(JSON.parse(exportText).modules).toEqual(
+      report.modules.map((module) => ({ id: module.id, status: module.status })),
+    );
   });
 });

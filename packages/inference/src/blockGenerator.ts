@@ -17,7 +17,7 @@
 import type { DifficultyRating, MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
 import { EXPERIENCE_SEVERITY } from './types';
 import { DIFFICULTY_RANK } from './types';
-import { isDifficultyAllowed } from './tierPolicy';
+import { isDifficultyAllowed, type ExecutableMovementAccessContext } from './tierPolicy';
 // Phase 13 Step 4 — the Block Generator Intercept: the generator imports the
 // autopilot controller and applies its forward-looking corrections to the next
 // block (a recorded halt snaps the whole block to a recovery template).
@@ -33,9 +33,12 @@ export interface GeneratorMovement {
   difficulty?: DifficultyRating;
   /** movement_beginner_whitelist membership: an Intermediate staple a
    *  beginner may be prescribed (plan P16 S4). Absent = not whitelisted. */
-  beginner_ok?: boolean;
-  /** Shared capability resolver verdict. False means teaching-only. */
-  capability_available?: boolean;
+  beginner_ok: boolean;
+  /** Frozen movement_sport_tracking membership. */
+  sportTracking: boolean;
+  /** Shared capability resolver verdict in each executable context. */
+  capability_available_weight_room: boolean;
+  capability_available_sport_conditioning: boolean;
   /** movement_scope membership (049). Absent = not scoped; like the three
    *  optional fields above, omitting it keeps legacy callers byte-identical.
    *  A scoped movement is preferred at its focus's scope slot (FOCUS_SCOPE_SLOT)
@@ -50,6 +53,18 @@ export interface GeneratorMovement {
 
 export type BlockFocus = 'lower' | 'upper' | 'full' | 'conditioning' | 'bjj';
 export type BlockPhase = 'accumulation' | 'intensification' | 'realization' | 'deload';
+
+export const accessContextForBlockFocus = (
+  focus: BlockFocus,
+): ExecutableMovementAccessContext =>
+  focus === 'conditioning' || focus === 'bjj' ? 'sport_conditioning' : 'weight_room';
+
+const capabilityAvailableForContext = (
+  movement: GeneratorMovement,
+  context: ExecutableMovementAccessContext,
+): boolean => context === 'sport_conditioning'
+  ? movement.capability_available_sport_conditioning
+  : movement.capability_available_weight_room;
 
 export interface PlannedSlotPlan {
   slot_index: number;   // 1-based
@@ -498,21 +513,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
   const schedule = programSchedule ?? split.map((focus, i) => ({
     day_index: spread[i], focus, movement_preferences: [] as ProgramMovementPreference[],
   }));
-  const equipPool = availableMovements(input.movements, profile.equipment_inventory)
-    .filter((movement) => movement.capability_available !== false);
-  // Phase 16: tier gating — a beginner is never PRESCRIBED an Advanced
-  // movement. Untagged rows (difficulty undefined) stay eligible so legacy
-  // callers/fixtures are byte-identical; a pattern with no in-tier candidate
-  // yields a dropped slot + warning at the pick site (strictness over
-  // substitution — the tier cap is a hard safety bound, like equipment).
-  // Plan P16 S4: "Beginner sees Beginner + whitelisted Intermediate staples;
-  // Advanced sees all." Untagged rows (difficulty undefined) stay eligible so
-  // legacy callers/fixtures are byte-identical.
-  const pool = equipPool.filter((movement) => isDifficultyAllowed(
-    profile.training_age,
-    movement.difficulty,
-    movement.beginner_ok,
-  ));
+  const equipPool = availableMovements(input.movements, profile.equipment_inventory);
   // Session slot budget from the duration cap (~22 min per movement including
   // rest), bounded to the planned_session shape the UI is built around.
   const slotBudget = clamp(Math.round(profile.session_duration_cap_min / 22), 2, 5);
@@ -549,6 +550,16 @@ export function generateBlock(input: BlockInput): BlockPlan {
     const wmod = SCHEMA_WEEKS[schemaType][progIdx as 0 | 1 | 2];
 
     for (const { focus, day_index: dayIndex, movement_preferences: preferences } of schedule) {
+      const accessContext = accessContextForBlockFocus(focus);
+      const tierPool = equipPool.filter((movement) => isDifficultyAllowed(
+        profile.training_age,
+        movement.difficulty,
+        movement.beginner_ok,
+        accessContext,
+        movement.sportTracking,
+      ));
+      const pool = tierPool.filter((movement) =>
+        capabilityAvailableForContext(movement, accessContext));
       const patterns = FOCUS_PATTERNS[focus].slice(0, slotBudget);
 
       // Working sets: objective scheme + macro phase + schema row, damped for
@@ -608,10 +619,13 @@ export function generateBlock(input: BlockInput): BlockPlan {
           // athlete's tier cap — is dropped with a warning, never filled
           // upward. (Audit F1: the previous ungated fallback could hand a
           // beginner an Advanced movement.)
-          const tierBlocked = pickForPattern(equipPool, pattern, usedIds) !== null;
-          warnings.add(tierBlocked
-            ? `${focus}: no tier-eligible movement for ${pattern}`
-            : `${focus}: no equipment-available movement for ${pattern}`);
+          const equipmentCandidate = pickForPattern(equipPool, pattern, usedIds);
+          const tierCandidate = pickForPattern(tierPool, pattern, usedIds);
+          warnings.add(equipmentCandidate === null
+            ? `${focus}: no equipment-available movement for ${pattern}`
+            : tierCandidate === null
+              ? `${focus}: no tier-eligible movement for ${pattern}`
+              : `${focus}: no capability-available movement for ${pattern}`);
           continue;
         }
         usedIds.add(m.movement_id);
