@@ -7,6 +7,14 @@ Cumulative product range: `6cfb990a33eabfa36f885e3239dac62e1d414c8f..HEAD`
 Status: implementation and local gates complete; awaiting two independent,
 manually launched read-only audits
 
+> **Final-audit correction (2026-08-14):** An independent audit at
+> `4a956793474c8de962dc2b407f11a1b8a5b2f05e` found that the downstream
+> half-step weekly projection could round a quarter-step authored major RPE
+> upward after the microcycle non-increasing invariant had run. That defect is
+> corrected and verified in
+> `HANDOVER_2026-08-14_FINAL_AUDIT_RPE_CORRECTION.md`. This original handover is
+> retained as historical evidence rather than silently rewritten.
+
 ## Corrections delivered
 
 - Purpose assignment is dose-neutral. Initial authored/defaulted stress is

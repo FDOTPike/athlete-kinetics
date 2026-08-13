@@ -176,7 +176,11 @@ export function projectRoutineMajorRpe(
   schemaType: SchemaType,
   baseRpeCap: number,
 ): RoutineMajorRpeProjection {
-  const maxRpe = clampRpe(Number.isFinite(peakTargetRpe) ? peakTargetRpe : 5, baseRpeCap);
+  const authoredPeakRpe = Math.max(5, Number.isFinite(peakTargetRpe) ? peakTargetRpe : 5);
+  // Half-step projection may round the derived weekly targets, but it must
+  // never round the persisted authored peak upward. Freeze consumes maxRpe
+  // after the microcycle's non-increasing invariant has already run.
+  const maxRpe = Math.min(clampRpe(authoredPeakRpe, baseRpeCap), authoredPeakRpe);
   const lowRpe = clampRpe(maxRpe - 2.5, maxRpe);
   const midpoint = clampRpe((lowRpe + maxRpe) / 2, maxRpe);
   const deload = clampRpe(lowRpe - 1, maxRpe);

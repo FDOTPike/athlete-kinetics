@@ -330,6 +330,24 @@ check('major RPE projection exposes start/max and freezes the correct target for
   assert.equal(routineMajorRpeForWeek(8.5, 'LINEAR', 3, 9), 8.5);
   assert.equal(routineMajorRpeForWeek(9.5, 'LINEAR', 3, 8), 8,
     'the athlete RPE cap must still bound the projected maximum');
+  assert.deepEqual(projectRoutineMajorRpe(8.75, 'LINEAR', 9), {
+    startRpe: 6.5,
+    maxRpe: 8.75,
+    weekTargets: [6.5, 7.5, 8.75, 5.5],
+  });
+  for (const authoredPeak of [5.25, 7.25, 8.75]) {
+    for (const schemaType of ['LINEAR', 'WAVE', 'STEP', 'APRE']) {
+      const projection = projectRoutineMajorRpe(authoredPeak, schemaType, 9);
+      assert.ok(projection.maxRpe <= authoredPeak,
+        `${schemaType} max ${projection.maxRpe} expanded authored ${authoredPeak}`);
+      assert.ok(projection.weekTargets.every((target) => target <= authoredPeak),
+        `${schemaType} projection expanded authored ${authoredPeak}: ${projection.weekTargets.join(',')}`);
+      for (const weekIndex of [1, 2, 3, 4]) {
+        assert.ok(routineMajorRpeForWeek(authoredPeak, schemaType, weekIndex, 9) <= authoredPeak,
+          `${schemaType} week ${weekIndex} expanded authored ${authoredPeak}`);
+      }
+    }
+  }
   assert.throws(() => routineMajorRpeForWeek(8.5, 'LINEAR', 5, 9), /integer from 1 to 4/);
 });
 check('supplementary recommendations preserve curated order and deterministically backfill unavailable choices', () => {

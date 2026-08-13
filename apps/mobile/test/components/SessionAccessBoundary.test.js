@@ -398,6 +398,45 @@ describe('bounded routine store path (real store, real production chain)', () =>
     expect(useStore.getState().sessionPlan.map((slot) => slot.plannedSets)).toEqual([2, 3]);
   });
 
+  test('week-three freeze preserves an authored quarter-step major RPE ceiling', async () => {
+    const { useStore, raw } = await bootStore();
+    useStore.getState().saveProfile({
+      training_age: 'elite',
+      base_rpe_cap: 9,
+      session_duration_cap_min: 120,
+      equipment_inventory: OWNED_EQUIPMENT,
+    });
+    const competitionBenchId = Number(raw.prepare(
+      "SELECT movement_id FROM movement WHERE name = 'Competition Bench'",
+    ).get().movement_id);
+    const authoredTargetRpe = 8.75;
+    const template = useStore.getState().saveRoutineTemplate({
+      name: 'Quarter-step peak',
+      schemaType: 'LINEAR',
+      slots: [{
+        dayIndex: 1, slotIndex: 1, movementId: competitionBenchId,
+        role: 'major', sets: 3, reps: 5, targetRpe: authoredTargetRpe,
+      }],
+    });
+    raw.prepare(`
+      INSERT INTO training_block (start_date, objective, created_at_ms)
+      VALUES (date(?, '-14 days'), 'strength', 1)
+    `).run(useStore.getState().today);
+
+    const frozen = useStore.getState().freezeRoutineTemplateToPlannedSession(
+      template.routineTemplateId, undefined, 1,
+    );
+    const persisted = raw.prepare(`
+      SELECT session.week_index, slot.target_rpe
+      FROM planned_session session
+      JOIN planned_slot slot USING (planned_session_id)
+      WHERE session.planned_session_id = ?
+    `).get(frozen.plannedSessionId);
+    expect(persisted.week_index).toBe(3);
+    expect(persisted.target_rpe).toBe(authoredTargetRpe);
+    expect(persisted.target_rpe).toBeLessThanOrEqual(authoredTargetRpe);
+  });
+
   test('strict authoring rejects above-cap RPE while freeze clamps stored drift and never expands timed sets', async () => {
     const { useStore, raw } = await bootStore();
     useStore.getState().saveProfile({
