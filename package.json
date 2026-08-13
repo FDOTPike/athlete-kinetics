@@ -16,7 +16,7 @@
     "verify:migrations": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/migrationRunner.ts && node packages/core-db/test/verify_migrations.mjs",
     "verify:policy": "npm run build:inference-test && node packages/inference/test/verify_policy.mjs",
     "verify:blocks": "npm run build:inference-test && node packages/inference/test/verify_blocks.mjs && node packages/inference/test/verify_load_selection.mjs",
-    "verify:autopilot": "npm run build:inference-test && node packages/inference/test/verify_autopilot.mjs && node packages/inference/test/verify_completion_action.mjs",
+    "verify:autopilot": "npm run build:inference-test && node packages/inference/test/verify_autopilot.mjs && node packages/inference/test/verify_completion_action.mjs && node packages/inference/test/verify_longitudinal_bounds.mjs",
     "verify:autopilot-counterexamples": "tsc --strict --target es2020 --module commonjs --lib es2020,dom --rootDir . --outDir packages/inference/test/.build packages/inference/test/verify_autopilot_counterexamples.ts && node packages/inference/test/.build/packages/inference/test/verify_autopilot_counterexamples.js",
     "verify:biometrics": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/biometrics/test/.build packages/biometrics/src/aggregate.ts && node packages/biometrics/test/verify_biometrics.mjs",
     "verify:semantic": "npm run build:inference-test && node packages/inference/test/verify_semantic.mjs",
