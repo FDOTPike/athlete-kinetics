@@ -22,7 +22,7 @@ module.exports = {
     // excludes (babelrc/configFile off), so without this entry any module that
     // reaches packages/core-db's migration list is a parse error under jest.
     // With it, a component test can boot the REAL store against the REAL
-    // 001-051 chain. Separator-agnostic on purpose: an anchored pattern using
+    // complete migration chain. Separator-agnostic on purpose: an anchored pattern using
     // `\\\\` does not match a POSIX-normalized path.
     '\\.sql$': path.join(__dirname, 'test', 'sqlRawTransformer.js'),
   },

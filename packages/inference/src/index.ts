@@ -245,9 +245,7 @@ export {
   projectRoutineMajorRpe,
   rankRoutineSupplementaryRecommendations,
   routineMajorRpeForWeek,
-  ROUTINE_DAY_ROLE_MAXIMA,
   ROUTINE_TEMPLATE_MAX_DAYS,
-  ROUTINE_TEMPLATE_MAX_SLOTS,
   type ComposeRoutineInput,
   type ComposedRoutine,
   type RoutineTemplateSlotPlacement,
@@ -260,6 +258,23 @@ export {
   type RoutineSelection,
   type RoutineSupplementaryRecommendation,
 } from './routineComposer';
+export {
+  ROUTINE_FAMILY_STRESS_BUDGETS,
+  composeRoutineMicrocycle,
+  contextualRoutineRoles,
+  rankRoutineAccessoryRecommendations,
+  type ComposeRoutineMicrocycleInput,
+  type ComposedRoutineMicrocycle,
+  type RoutineAccessoryRecommendation,
+  type RoutineAssistanceContract,
+  type RoutineFamilyStressDecision,
+  type RoutineLiftFamilyContract,
+  type RoutineMicrocycleMovement,
+  type RoutineMicrocyclePrescription,
+  type RoutineMicrocycleSelection,
+  type RoutineSessionFamilyStress,
+  type RoutineStressPurpose,
+} from './routineMicrocycle';
 export {
   RUNNER_CHECKPOINT_VERSION,
   RunnerCheckpointError,

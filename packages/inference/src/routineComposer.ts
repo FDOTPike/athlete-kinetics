@@ -1,6 +1,6 @@
 import type { Objective, SchemaType, TrainingAge } from './types';
 
-export type RoutineRole = 'major' | 'supplementary' | 'conditional';
+export type RoutineRole = 'major' | 'supplementary' | 'accessory' | 'conditional';
 export interface RoutineSelection { readonly movementId: number; readonly role: RoutineRole; }
 export interface RoutineRoleSnapshotRow extends RoutineSelection {}
 export type RoutineRoleEligibility = Readonly<Record<RoutineRole, ReadonlySet<number>>>;
@@ -205,26 +205,15 @@ export interface RoutineTemplateSlotPlacement extends RoutineSelection {
   readonly slotIndex: number;
 }
 
-/** Role budget for ONE routine day. Every populated day is an independently
- *  executable session, so these are never a template-wide allowance. */
-export const ROUTINE_DAY_ROLE_MAXIMA: Readonly<Record<RoutineRole, number>> = {
-  major: 1, supplementary: 2, conditional: 3,
-};
-
-/** Overall supported template size, unchanged by multi-day support. */
-export const ROUTINE_TEMPLATE_MAX_SLOTS = 6;
+/** A microcycle is calendar-bound, not exposure-count-bound. */
 export const ROUTINE_TEMPLATE_MAX_DAYS = 7;
 
 /**
  * Group an authored template into its populated days and enforce the
  * structural routine law, throwing the athlete-facing message for the first
- * violation. Two scopes are deliberately different:
- *
- *   PER DAY   role maxima and exactly one major — a day is one session;
- *   PER TEMPLATE  the slot ceiling, position uniqueness, and MOVEMENT
- *                 IDENTITY. A movement may appear once in the whole template
- *                 so the day-index-free planned-session snapshot stays
- *                 decidable for isRoutineRoleSnapshotExecutable at start time.
+ * violation. Every populated day needs at least one major, but movement and
+ * role counts are otherwise uncapped. Movement identity is unique only within
+ * a day; the same lift may be selected on multiple microcycle days.
  *
  * Role ratification, capability verdicts and dose bounds are the caller's
  * (database-backed) half; this function is pure and knows no athlete.
@@ -232,33 +221,29 @@ export const ROUTINE_TEMPLATE_MAX_DAYS = 7;
 export function groupRoutineTemplateDays(
   placements: readonly RoutineTemplateSlotPlacement[],
 ): ReadonlyMap<number, readonly RoutineTemplateSlotPlacement[]> {
-  if (placements.length < 1 || placements.length > ROUTINE_TEMPLATE_MAX_SLOTS) {
-    throw new Error(`A routine template must contain between 1 and ${ROUTINE_TEMPLATE_MAX_SLOTS} movements.`);
-  }
+  if (placements.length < 1) throw new Error('A routine template must contain at least one movement.');
   const byDay = new Map<number, RoutineTemplateSlotPlacement[]>();
-  const countsByDay = new Map<number, Record<RoutineRole, number>>();
-  const seenMovements = new Set<number>();
+  const majorCountsByDay = new Map<number, number>();
+  const seenMovementsByDay = new Map<number, Set<number>>();
   const seenPositions = new Set<string>();
 
   for (const placement of placements) {
     const { dayIndex, slotIndex } = placement;
     if (!Number.isInteger(dayIndex) || dayIndex < 1 || dayIndex > ROUTINE_TEMPLATE_MAX_DAYS
-      || !Number.isInteger(slotIndex) || slotIndex < 1 || slotIndex > ROUTINE_TEMPLATE_MAX_SLOTS) {
-      throw new Error('Routine day and slot positions must stay inside the supported 1-7 / 1-6 bounds.');
+      || !Number.isInteger(slotIndex) || slotIndex < 1) {
+      throw new Error('Routine days must be 1-7 and slot positions must be positive integers.');
     }
     const positionKey = `${dayIndex}:${slotIndex}`;
     if (seenPositions.has(positionKey)) throw new Error('Routine slot positions must be unique.');
     seenPositions.add(positionKey);
+    const seenMovements = seenMovementsByDay.get(dayIndex) ?? new Set<number>();
+    seenMovementsByDay.set(dayIndex, seenMovements);
     if (seenMovements.has(placement.movementId)) {
-      throw new Error('A movement can appear only once in a routine template.');
+      throw new Error(`Movement ${placement.movementId} appears more than once on routine day ${dayIndex}.`);
     }
     seenMovements.add(placement.movementId);
-    const counts = countsByDay.get(dayIndex) ?? { major: 0, supplementary: 0, conditional: 0 };
-    countsByDay.set(dayIndex, counts);
-    counts[placement.role] += 1;
-    const maximum = ROUTINE_DAY_ROLE_MAXIMA[placement.role];
-    if (counts[placement.role] > maximum) {
-      throw new Error(`A routine day supports at most ${maximum} ${placement.role} movement${maximum === 1 ? '' : 's'}.`);
+    if (placement.role === 'major') {
+      majorCountsByDay.set(dayIndex, (majorCountsByDay.get(dayIndex) ?? 0) + 1);
     }
     const day = byDay.get(dayIndex) ?? [];
     day.push(placement);
@@ -267,16 +252,18 @@ export function groupRoutineTemplateDays(
 
   const ordered = [...byDay.keys()].sort((a, b) => a - b);
   for (const dayIndex of ordered) {
-    if (countsByDay.get(dayIndex)!.major !== 1) {
-      throw new Error(`Routine day ${dayIndex} must contain exactly one major movement.`);
+    if ((majorCountsByDay.get(dayIndex) ?? 0) < 1) {
+      throw new Error(`Routine day ${dayIndex} must contain at least one major movement.`);
     }
   }
   return new Map(ordered.map((dayIndex) => [dayIndex, byDay.get(dayIndex)!]));
 }
 
-const roleMinutes: Record<RoutineRole, number> = { major: 18, supplementary: 12, conditional: 8 };
+const roleMinutes: Record<RoutineRole, number> = {
+  major: 18, supplementary: 12, accessory: 8, conditional: 8,
+};
 const baseDose: Record<RoutineRole, readonly [number, number, number]> = {
-  major: [4, 5, 8], supplementary: [3, 8, 7.5], conditional: [2, 12, 7],
+  major: [4, 5, 8], supplementary: [3, 8, 7.5], accessory: [2, 12, 6.5], conditional: [2, 12, 7],
 };
 const ageSetDelta: Record<TrainingAge, number> = { beginner: -1, intermediate: 0, advanced: 1, elite: 1 };
 
@@ -287,8 +274,9 @@ const ageSetDelta: Record<TrainingAge, number> = { beginner: -1, intermediate: 0
  * never over the source. Missing and duplicated source rows are deliberately
  * unverifiable: the planned-session method snapshot does not carry a template
  * day index, so a movement that resolves to more than one role — or to none —
- * cannot be attributed to the day being started. The store keeps movement
- * identity unique template-wide precisely so this stays decidable. */
+ * cannot be attributed to the day being started. Historical templates—the
+ * only plans using this fallback—kept movement identity unique template-wide,
+ * so their frozen role snapshot remains decidable. */
 export function isRoutineRoleSnapshotExecutable(
   planMovementIds: readonly number[],
   sourceRows: readonly RoutineRoleSnapshotRow[],
@@ -308,16 +296,14 @@ export function isRoutineRoleSnapshotExecutable(
     if (!eligibility[role].has(movementId)) return false;
     if (role === 'major') majorCount += 1;
   }
-  return majorCount === 1;
+  return majorCount >= 1;
 }
 
-/** Deterministic pre-session composer. It enforces role counts, duration, the
- * shared availability verdict, and the existing RPE cap before freezing slots. */
+/** Deterministic pre-session compatibility composer. It enforces availability,
+ * duration priority, and the existing RPE cap without imposing role counts. */
 export function composeRoutine(input: ComposeRoutineInput): ComposedRoutine {
   const warnings: string[] = [];
   const seen = new Set<number>();
-  const counts: Record<RoutineRole, number> = { major: 0, supplementary: 0, conditional: 0 };
-  const maxima: Record<RoutineRole, number> = { major: 1, supplementary: 2, conditional: 3 };
   const candidates: Array<RoutinePrescription & { readonly minutes: number }> = [];
 
   for (const selection of input.selections) {
@@ -328,10 +314,6 @@ export function composeRoutine(input: ComposeRoutineInput): ComposedRoutine {
     seen.add(selection.movementId);
     if (!input.availableMovementIds.has(selection.movementId)) {
       warnings.push(`Movement ${selection.movementId} is teaching-only.`);
-      continue;
-    }
-    if (counts[selection.role] >= maxima[selection.role]) {
-      warnings.push(`Too many ${selection.role} movements.`);
       continue;
     }
     const [baseSets, baseReps, baseRpe] = baseDose[selection.role];
@@ -347,15 +329,15 @@ export function composeRoutine(input: ComposeRoutineInput): ComposedRoutine {
       targetRpe: Math.max(5, Math.min(input.baseRpeCap, baseRpe + methodRpeDelta)),
       minutes: roleMinutes[selection.role],
     });
-    counts[selection.role] += 1;
   }
 
   const included = new Set(candidates.map((_, index) => index));
   const durationCap = Math.max(15, input.durationCapMin);
   let totalMinutes = candidates.reduce((total, candidate) => total + candidate.minutes, 0);
-  // Preserve athlete-authored order, but trim lowest-priority work first so a
-  // short cap never keeps conditional work by sacrificing the sole major lift.
-  for (const role of ['conditional', 'supplementary', 'major'] as const) {
+  // Preserve athlete-authored order and every selected major. A short cap sheds
+  // accessory and supplementary work before complete microcycle analysis
+  // adapts any major dose.
+  for (const role of ['accessory', 'supplementary', 'conditional'] as const) {
     for (let index = candidates.length - 1; index >= 0 && totalMinutes > durationCap; index -= 1) {
       const candidate = candidates[index];
       if (!included.has(index) || candidate.role !== role || included.size === 1) continue;
@@ -363,6 +345,9 @@ export function composeRoutine(input: ComposeRoutineInput): ComposedRoutine {
       totalMinutes -= candidate.minutes;
       warnings.push(`Duration cap omitted movement ${candidate.movementId}.`);
     }
+  }
+  if (totalMinutes > durationCap) {
+    warnings.push('Selected major movements exceed the session duration estimate; bounded-dose analysis must adapt their prescriptions.');
   }
 
   const slots = candidates

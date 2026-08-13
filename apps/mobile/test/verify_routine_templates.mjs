@@ -3,7 +3,7 @@
  *
  * Verifies:
  * 1. Template persistence (INSERT, SELECT, UPDATE, DELETE on routine_template / routine_template_slot)
- * 2. Ordered session slots and role constraints (1 major, 2 supplementary, 0–3 conditional)
+ * 2. Ordered session slots, uncapped selection, and at least one major per day
  * 3. Ratified movement-role eligibility and production capability gating hooks
  * 4. Planned-session date coordinates and method snapshots
  * 5. Method selection (Linear, Undulating, Step Loading, Autoregulated; rejection of Conjugate)
@@ -43,6 +43,16 @@ const schemaFiles = [
   '031_planned_session_method.sql',
   '032_capability_content.sql',
   '033_goal_program.sql',
+  '034_autopilot_attribution.sql', '035_profile_load_preference.sql',
+  '036_movement_media.sql', '037_movement_library_v2_batch.sql',
+  '038_movement_library_v2_batch.sql', '039_movement_library_v2_batch.sql',
+  '040_movement_library_v2_batch.sql', '041_movement_library_v2_batch.sql',
+  '042_movement_library_v2_batch.sql', '043_movement_library_v2_batch.sql',
+  '044_movement_library_v2_batch.sql', '045_movement_library_v2_batch.sql',
+  '046_movement_library_v2_batch.sql', '047_movement_library_v2_batch.sql',
+  '048_movement_library_v2_batch.sql', '049_movement_content_correction_v1.sql',
+  '050_movement_role_convergence.sql', '051_routine_access_context.sql',
+  '052_bounded_microcycle_roles.sql',
 ];
 
 for (const f of schemaFiles) {
@@ -103,13 +113,15 @@ check('deletes routine_template with cascading slot cleanup', () => {
   assert.equal(sCount, 0);
 });
 
-check('role eligibility tracks ratified major (8) and conditional (12) movements', () => {
+check('role eligibility tracks the curated multi-role movement contract', () => {
   const counts = Object.fromEntries(db.prepare(
     'SELECT role, COUNT(*) AS count FROM movement_role_eligibility GROUP BY role ORDER BY role',
   ).all().map((row) => [row.role, Number(row.count)]));
   const movementCount = Number(db.prepare('SELECT COUNT(*) AS count FROM movement').get().count);
-  assert.equal(counts.supplementary, movementCount);
-  assert.equal(counts.major, 8);
+  assert.equal(movementCount, 300);
+  assert.equal(counts.supplementary, 84);
+  assert.equal(counts.major, 79);
+  assert.equal(counts.accessory, 14);
   assert.equal(counts.conditional, 12);
 });
 
@@ -210,8 +222,8 @@ const storeSource = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'state', 'u
 check('production save/freeze/start paths enforce role eligibility and current capability verdicts', () => {
   assert.ok(storeSource.includes('routineRoleEligibility(d)'));
   assert.ok(storeSource.includes("get().getMovementAvailabilityVerdicts('weight_room')"));
-  assert.ok(storeSource.includes('is not ratified for the'));
-  assert.ok(storeSource.includes('is currently teaching-only'));
+  assert.ok(storeSource.includes('composeRoutineMicrocycle({'));
+  assert.ok(storeSource.includes('if (analysis.blockers.length > 0) throw new Error(analysis.blockers[0])'));
   assert.ok(storeSource.includes('const currentRoleEligibility = routineRoleEligibility(d)'));
   assert.ok(storeSource.includes('isRoutineRoleSnapshotExecutable('));
 
@@ -326,20 +338,21 @@ check('freezeRoutineTemplateToPlannedSession sets archivedPreviousBlock ONLY whe
 });
 
 check('routine freeze resolves a major peak RPE to the active block week', () => {
-  assert.ok(storeSource.includes('routineMajorRpeForWeek(savedSlot.targetRpe, template.schemaType, weekIndex, profile.base_rpe_cap)'),
+  assert.ok(storeSource.includes('routineMajorRpeForWeek(composedSlot.targetRpe, template.schemaType, weekIndex, profile.base_rpe_cap)'),
     'major RPE must be projected from the saved peak and current block week');
-  assert.ok(storeSource.includes("savedSlot.role === 'major'"),
+  assert.ok(storeSource.includes("composedSlot.role === 'major'"),
     'only the major slot should receive block RPE projection');
-  assert.ok(storeSource.includes(': Math.min(savedSlot.targetRpe, profile.base_rpe_cap)'),
+  assert.ok(storeSource.includes(': Math.min(composedSlot.targetRpe, profile.base_rpe_cap)'),
     'supplementary and conditional targets must remain constant and capped');
 });
 
-check('the routine builder offers 3 conditional slots when conditional movements are ratified (12)', () => {
+check('the routine builder offers uncapped conditional slots only when conditional movements are ratified', () => {
   const builderSource = readFileSync(
     join(ROOT, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8',
   );
-  assert.ok(builderSource.includes('conditional: roleEligibleSets.conditional.size === 0 ? 0 : 3'),
+  assert.ok(builderSource.includes('disabled={roleEligibleSets.conditional.size === 0}'),
     'conditional slots must be withheld while the role has zero ratified movements');
+  assert.ok(!builderSource.includes('roleMaxima'), 'the UI must not impose fixed role maxima');
   const conditional = db.prepare(
     "SELECT COUNT(*) c FROM movement_role_eligibility WHERE role = 'conditional'",
   ).get().c;
@@ -629,7 +642,7 @@ if (fail > 0) {
     }
   };
 
-  console.log('\n[multi-day routine templates — real 001-051 chain + shared production law]');
+  console.log('\n[multi-day routine templates — real 001-052 chain + shared production law]');
 
   const idOf = (name) => {
     const row = mdb.prepare('SELECT movement_id FROM movement WHERE name = ?').get(name);
@@ -664,7 +677,7 @@ if (fail > 0) {
   });
 
   const liveRoleEligibility = () => {
-    const eligible = { major: new Set(), supplementary: new Set(), conditional: new Set() };
+    const eligible = { major: new Set(), supplementary: new Set(), accessory: new Set(), conditional: new Set() };
     for (const row of mdb.prepare(
       'SELECT movement_id, role FROM movement_role_eligibility ORDER BY role, movement_id',
     ).all()) eligible[row.role].add(Number(row.movement_id));
@@ -778,36 +791,45 @@ if (fail > 0) {
     ), false);
   });
 
-  mcheck('a populated day with no major is refused, as is a second major inside one day', () => {
+  mcheck('a populated day needs a major while same-day majors and repeated weekly exposure remain uncapped', () => {
     assert.throws(() => groupRoutineTemplateDays([
       { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
       { dayIndex: 2, slotIndex: 1, movementId: DB_BENCH, role: 'supplementary' },
-    ]), /Routine day 2 must contain exactly one major movement\./);
+    ]), /Routine day 2 must contain at least one major movement\./);
 
-    assert.throws(() => groupRoutineTemplateDays([
+    assert.doesNotThrow(() => groupRoutineTemplateDays([
       { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
       { dayIndex: 2, slotIndex: 1, movementId: OVERHEAD_PRESS, role: 'major' },
       { dayIndex: 2, slotIndex: 2, movementId: SUMO_DEADLIFT, role: 'major' },
-    ]), /A routine day supports at most 1 major movement\./);
+    ]));
 
-    // The template ceiling and template-wide movement identity are unchanged.
-    assert.throws(() => groupRoutineTemplateDays([
+    assert.doesNotThrow(() => groupRoutineTemplateDays([
       { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
       { dayIndex: 2, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
-    ]), /A movement can appear only once in a routine template\./);
+    ]));
+    assert.throws(() => groupRoutineTemplateDays([
+      { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
+      { dayIndex: 1, slotIndex: 2, movementId: FRONT_SQUAT, role: 'major' },
+    ]), /appears more than once on routine day 1/);
   });
 
-  mcheck('the store applies the shared per-day law and freezes exactly one day', () => {
-    assert.ok(storeSource.includes('const daysByIndex = groupRoutineTemplateDays(placements);'),
+  mcheck('the store applies the shared microcycle law and freezes exactly one reviewed day', () => {
+    assert.ok(storeSource.includes('groupRoutineTemplateDays(placements);'),
       'saveRoutineTemplate must delegate the structural law to the shared function');
-    assert.ok(storeSource.includes('for (const [dayIndex, daySlots] of daysByIndex) {'),
-      'composition must iterate populated days, not the flat slot list');
+    assert.ok((storeSource.match(/composeRoutineMicrocycle\(\{/g) ?? []).length >= 2,
+      'save and freeze must analyse the complete microcycle');
     assert.ok(!/const maxima: Record<RoutineRole, number> = \{ major: 1/.test(storeSource),
       'the template-wide role maxima must be gone from the store');
     assert.ok(storeSource.includes('const daySlots = template.slots.filter((slot) => slot.dayIndex === routineDayIndex);'),
       'freeze must scope to the selected executable day');
-    assert.ok(storeSource.includes("throw new Error(`Routine day ${routineDayIndex} must contain exactly one major movement.`);"),
-      'freeze must revalidate the selected day\'s sole-major law');
+    assert.ok(storeSource.includes('const composedDay = analysis.prescriptions'),
+      'freeze must select the reviewed executable day from the full analysis');
+    assert.ok(storeSource.includes('executionGateDayIndices: new Set([routineDayIndex])'),
+      'freeze must enforce live execution gates only on its selected day');
+    assert.ok(storeSource.includes('const sets = prescribed.authoredSets;')
+      && storeSource.includes('const reps = prescribed.authoredReps;')
+      && storeSource.includes('const targetRpe = prescribed.authoredTargetRpe;'),
+    'templates must preserve authored dose so frozen adaptations remain reviewable');
   });
 }
 

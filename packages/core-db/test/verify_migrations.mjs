@@ -51,7 +51,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
   '049_movement_content_correction_v1.sql',
   '050_movement_role_convergence.sql',
-  '051_routine_access_context.sql'];
+  '051_routine_access_context.sql',
+  '052_bounded_microcycle_roles.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -794,21 +795,23 @@ const roleCounts = (database) => database.raw.prepare(`
     (SELECT COUNT(*) FROM movement) AS movements,
     (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'supplementary') AS supplementary,
     (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'major') AS major,
+    (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'accessory') AS accessory,
     (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'conditional') AS conditional
 `).get();
 check('049-era precondition exposes the fresh/poison divergence: 300 movements but 124 supplementary',
   roleCounts(roleDb).movements === 300 && roleCounts(roleDb).supplementary === 124,
   JSON.stringify(roleCounts(roleDb)));
-runMigrations(roleDb, MIGRATIONS);
-check('clean 049 -> 050 upgrade converges every live movement without widening explicit roles',
-  uv(roleDb) === MIGRATIONS.length
+roleDb.executeSync(MIGRATIONS[roleIndex]);
+roleDb.executeSync(`PRAGMA user_version = ${roleIndex + 1};`);
+check('clean 049 -> historical 050 boundary converges every live movement without widening explicit roles',
+  uv(roleDb) === roleIndex + 1
     && roleCounts(roleDb).supplementary === roleCounts(roleDb).movements
-    && roleCounts(roleDb).major === 8 && roleCounts(roleDb).conditional === 12,
+    && roleCounts(roleDb).major === 8 && roleCounts(roleDb).accessory === 0
+    && roleCounts(roleDb).conditional === 12,
   JSON.stringify(roleCounts(roleDb)));
 
-roleDb.executeSync(`PRAGMA user_version = ${roleIndex};`);
-runMigrations(roleDb, MIGRATIONS);
-check('050 replay is idempotent and duplicate-free',
+roleDb.executeSync(MIGRATIONS[roleIndex]);
+check('historical 050 replay is idempotent and duplicate-free',
   roleCounts(roleDb).supplementary === 300
     && Number(roleDb.raw.prepare(`
       SELECT COUNT(*) AS c FROM (
@@ -820,13 +823,13 @@ check('050 replay is idempotent and duplicate-free',
 const poisonedRole = freshDb();
 for (let i = 0; i < roleIndex; i += 1) poisonedRole.executeSync(MIGRATIONS[i]);
 poisonedRole.executeSync(MIGRATIONS[FILES.indexOf('028_capability_graph.sql')]);
-poisonedRole.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+poisonedRole.executeSync(`PRAGMA user_version = ${roleIndex + 1};`);
 check('poison precondition has widened data but lacks the 050 trigger sentinel',
   roleCounts(poisonedRole).supplementary === 300
-    && sentinelsMissing(poisonedRole).includes('trg_movement_supplementary_ai'));
-runMigrations(poisonedRole, MIGRATIONS);
-check('poison self-heal and clean upgrade converge byte-for-byte on role counts',
-  sentinelsMissing(poisonedRole).length === 0
+    && poisonedRole.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='trg_movement_supplementary_ai'").get() === undefined);
+poisonedRole.executeSync(MIGRATIONS[roleIndex]);
+check('historical 050 repair and clean upgrade converge byte-for-byte on role counts',
+  poisonedRole.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='trg_movement_supplementary_ai'").get() !== undefined
     && JSON.stringify(roleCounts(poisonedRole)) === JSON.stringify(roleCounts(roleDb)),
   JSON.stringify(roleCounts(poisonedRole)));
 
@@ -834,7 +837,7 @@ roleDb.executeSync("INSERT INTO movement (name, pattern, is_compound) VALUES ('0
 const futureMovementId = Number(roleDb.raw.prepare(
   "SELECT movement_id FROM movement WHERE name = '050 Future Movement'",
 ).get().movement_id);
-check('050 trigger gives a future live movement supplementary eligibility exactly once',
+check('historical 050 trigger gives a future live movement supplementary eligibility exactly once',
   Number(roleDb.raw.prepare(
     "SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ? AND role = 'supplementary'",
   ).get(futureMovementId).c) === 1);
@@ -875,10 +878,11 @@ const accessSummary = (database) => ({
   corrections: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_content_correction').get().c),
   roleFingerprint: roleFingerprint(database),
 });
-runMigrations(accessDb, MIGRATIONS);
+accessDb.executeSync(MIGRATIONS[accessIndex]);
+accessDb.executeSync(`PRAGMA user_version = ${accessIndex + 1};`);
 const cleanAccessSummary = accessSummary(accessDb);
-check('clean 050 -> 051 upgrade seeds the exact cardio-only sport set without role or content drift',
-  uv(accessDb) === MIGRATIONS.length
+check('clean 050 -> historical 051 boundary seeds the exact cardio-only sport set without role or content drift',
+  uv(accessDb) === accessIndex + 1
     && cleanAccessSummary.sport === 'BJJ Sparring Round|Road Run|Trail Running/Walking'
     && cleanAccessSummary.nonCardio === 0
     && cleanAccessSummary.taxonomyRows === 3
@@ -894,9 +898,8 @@ const roadRunId = Number(accessDb.raw.prepare(
 ).get().movement_id);
 accessDb.raw.prepare(`INSERT INTO movement_prior_experience
   (movement_id, confirmed_at_ms, revoked_at_ms, basis) VALUES (?, 100, NULL, 'local_user_confirmation')`).run(roadRunId);
-accessDb.executeSync(`PRAGMA user_version = ${accessIndex};`);
-runMigrations(accessDb, MIGRATIONS);
-check('051 replay is idempotent and preserves athlete declarations',
+accessDb.executeSync(MIGRATIONS[accessIndex]);
+check('historical 051 replay is idempotent and preserves athlete declarations',
   Number(accessDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_sport_tracking').get().c) === 3
     && Number(accessDb.raw.prepare(
       'SELECT confirmed_at_ms FROM movement_prior_experience WHERE movement_id = ?',
@@ -921,14 +924,180 @@ check('051 poison precondition claims completion while both access sentinels are
   sentinelsMissing(poisonedAccess).includes('movement_prior_experience')
     && sentinelsMissing(poisonedAccess).includes('movement_sport_tracking'));
 runMigrations(poisonedAccess, MIGRATIONS);
-check('051 poison repair converges on the clean exact state',
+check('051 poison repair converges on the current exact state through 052',
   sentinelsMissing(poisonedAccess).length === 0
-    && JSON.stringify(accessSummary(poisonedAccess)) === JSON.stringify({
-      ...cleanAccessSummary,
-      // The clean DB's declaration is athlete data and intentionally excluded
-      // from the structural summary used for convergence.
-    }),
+    && JSON.stringify(accessSummary(poisonedAccess)) === JSON.stringify(accessSummary(a)),
   JSON.stringify(accessSummary(poisonedAccess)));
+
+// --- 2n. 052 bounded microcycle roles ---------------------------------------
+console.log('[2n] 052 bounded microcycle roles');
+const boundedIndex = FILES.indexOf('052_bounded_microcycle_roles.sql');
+const boundedDb = freshDb();
+for (let i = 0; i < boundedIndex; i += 1) boundedDb.executeSync(MIGRATIONS[i]);
+boundedDb.executeSync(`PRAGMA user_version = ${boundedIndex};`);
+boundedDb.executeSync("INSERT INTO routine_template (name, schema_type, created_at_ms, updated_at_ms) VALUES ('052 preserved', 'LINEAR', 1, 1)");
+const preservedTemplateId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+const competitionBenchId = Number(boundedDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Competition Bench'",
+).get().movement_id);
+const boardPress052Id = Number(boundedDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Board Press'",
+).get().movement_id);
+const hammerCurlId = Number(boundedDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Hammer Curl'",
+).get().movement_id);
+boundedDb.raw.prepare(`INSERT INTO routine_template_slot
+  (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, 1, 'major', ?, 3, 7, 8.5)`).run(preservedTemplateId, competitionBenchId);
+const preservedRoutineSlotId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+
+runMigrations(boundedDb, MIGRATIONS);
+const boundedSummary = (database) => ({
+  liftFamilies: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_lift_family').get().c),
+  namedFamilies: Number(database.raw.prepare('SELECT COUNT(DISTINCT family) AS c FROM movement_lift_family').get().c),
+  assistance: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_assistance_relationship').get().c),
+  roles: roleCounts(database),
+  oldAutoTrigger: database.raw.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='trg_movement_supplementary_ai'",
+  ).get() !== undefined,
+});
+check('clean 051 -> 052 upgrade installs the exact curated family/relationship and multi-role surface',
+  uv(boundedDb) === MIGRATIONS.length
+    && boundedSummary(boundedDb).liftFamilies === 79
+    && boundedSummary(boundedDb).namedFamilies === 7
+    && boundedSummary(boundedDb).assistance === 54
+    && boundedSummary(boundedDb).roles.supplementary === 84
+    && boundedSummary(boundedDb).roles.major === 79
+    && boundedSummary(boundedDb).roles.accessory === 14
+    && boundedSummary(boundedDb).roles.conditional === 12
+    && !boundedSummary(boundedDb).oldAutoTrigger,
+  JSON.stringify(boundedSummary(boundedDb)));
+
+const benchCoefficients = boundedDb.raw.prepare(`
+  SELECT group_concat(name || ':' || printf('%.2f', stress_coefficient), '|') AS value
+  FROM (
+    SELECT m.name, lf.stress_coefficient FROM movement_lift_family lf
+    JOIN movement m USING (movement_id)
+    WHERE m.name IN ('Competition Bench', 'Board Press') ORDER BY m.name
+  )
+`).get().value;
+check('052 ratifies weighted same-family bench variations without using the capability graph',
+  benchCoefficients === 'Board Press:0.90|Competition Bench:1.00', String(benchCoefficients));
+const hammerContext = boundedDb.raw.prepare(`
+  SELECT group_concat(major_family || ':' || distance, '|') AS value FROM (
+    SELECT ar.major_family, ar.distance FROM movement_assistance_relationship ar
+    WHERE ar.movement_id = ? ORDER BY ar.major_family
+  )
+`).get(hammerCurlId).value;
+check('052 classifies Hammer Curl contextually: direct after pulls, accessory after other major families',
+  hammerContext === 'bench_press:2|deadlift:2|horizontal_pull:1|overhead_press:2|power_clean:2|squat:2|vertical_pull:1',
+  String(hammerContext));
+check('052 table rebuild preserves existing routine slot identity and authored dose',
+  JSON.stringify(boundedDb.raw.prepare(`
+    SELECT routine_template_slot_id, role, movement_id, sets, reps, target_rpe
+    FROM routine_template_slot WHERE routine_template_slot_id = ?
+  `).get(preservedRoutineSlotId)) === JSON.stringify({
+    routine_template_slot_id: preservedRoutineSlotId, role: 'major', movement_id: competitionBenchId,
+    sets: 3, reps: 7, target_rpe: 8.5,
+  }));
+
+boundedDb.raw.prepare(`INSERT INTO routine_template_slot
+  (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, 7, 'major', ?, 2, 6, 8.0)`).run(preservedTemplateId, boardPress052Id);
+boundedDb.raw.prepare(`INSERT INTO routine_template_slot
+  (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, 8, 'accessory', ?, 2, 12, 6.5)`).run(preservedTemplateId, hammerCurlId);
+check('052 routine slots accept multiple same-day majors and positions beyond the old six-slot ceiling',
+  Number(boundedDb.raw.prepare(`
+    SELECT COUNT(*) AS c FROM routine_template_slot
+    WHERE routine_template_id = ? AND day_index = 1 AND role = 'major'
+  `).get(preservedTemplateId).c) === 2
+    && Number(boundedDb.raw.prepare(`
+      SELECT MAX(slot_index) AS n FROM routine_template_slot WHERE routine_template_id = ?
+    `).get(preservedTemplateId).n) === 8);
+
+boundedDb.executeSync("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2035-01-01', 'strength', 1)");
+const boundedBlockId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+boundedDb.raw.prepare(`INSERT INTO planned_session
+  (block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (?, 1, 1, 'full', 'accumulation', '2035-01-01')`).run(boundedBlockId);
+const boundedSessionId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+boundedDb.raw.prepare(`INSERT INTO planned_slot
+  (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, ?, 2, 6, 8.0)`).run(boundedSessionId, boardPress052Id);
+const boundedPlannedSlotId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+const boundedFamilyDecisionJson = JSON.stringify([{
+  family: 'bench_press', exposureCount: 1, variationCount: 1,
+  equivalentVolume: 10.8, initialStress: 9.5, finalStress: 9.5,
+  weeklyBudget: 100, level: 'low', purposes: ['heavy'], adaptations: [],
+  sessions: [{
+    dayIndex: 1, exposureCount: 1, variationCount: 1,
+    equivalentVolume: 10.8, initialStress: 9.5, finalStress: 9.5,
+    budget: 48, level: 'low',
+  }],
+}]);
+boundedDb.raw.prepare(`INSERT INTO planned_session_routine_context
+  (planned_session_id, routine_day_index, family_decisions_json, warnings_json,
+   recommendations_json, adaptations_json) VALUES (?, 1, ?, '[]', '[]', '[]')`
+).run(boundedSessionId, boundedFamilyDecisionJson);
+boundedDb.raw.prepare(`INSERT INTO planned_slot_routine_decision
+  (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+   equivalent_volume, stress_dose, adaptations_json)
+  VALUES (?, 'major', 'bench_press', 'heavy', 0.9, 10.8, 9.5, '[]')`).run(boundedPlannedSlotId);
+check('052 frozen session and slot stress decisions round-trip as athlete-local side-cars',
+  boundedDb.raw.prepare(`
+    SELECT routine_day_index FROM planned_session_routine_context WHERE planned_session_id = ?
+  `).get(boundedSessionId).routine_day_index === 1
+    && boundedDb.raw.prepare(`
+      SELECT lift_family, stress_coefficient, equivalent_volume
+      FROM planned_slot_routine_decision WHERE planned_slot_id = ?
+    `).get(boundedPlannedSlotId).lift_family === 'bench_press');
+
+let boundedConstraintRejections = 0;
+for (const sql of [
+  `UPDATE movement_lift_family SET stress_coefficient = 2 WHERE movement_id = ${boardPress052Id}`,
+  `UPDATE movement_assistance_relationship SET distance = 4 WHERE movement_id = ${hammerCurlId} AND major_family = 'bench_press'`,
+  `UPDATE routine_template_slot SET role = 'other' WHERE routine_template_slot_id = ${preservedRoutineSlotId}`,
+  `UPDATE planned_session_routine_context SET warnings_json = 'not-json' WHERE planned_session_id = ${boundedSessionId}`,
+  `UPDATE planned_session_routine_context SET warnings_json = '{}' WHERE planned_session_id = ${boundedSessionId}`,
+  `UPDATE planned_session_routine_context SET family_decisions_json = '[]' WHERE planned_session_id = ${boundedSessionId}`,
+  `UPDATE planned_slot_routine_decision SET role = 'supplementary' WHERE planned_slot_id = ${boundedPlannedSlotId}`,
+  "INSERT INTO movement_lift_family (movement_id, family, stress_coefficient) VALUES (999999, 'squat', 1)",
+]) {
+  try { boundedDb.executeSync(sql); } catch { boundedConstraintRejections += 1; }
+}
+check('052 STRICT/CHECK/FK surface rejects invalid stress, distance, roles, JSON shape, decision shape, and movement FK',
+  boundedConstraintRejections === 8, `${boundedConstraintRejections}/8`);
+
+boundedDb.executeSync("INSERT INTO movement (name, pattern, is_compound) VALUES ('052 Future Movement', 'isolation', 0)");
+const future052Id = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+check('052 fails future movement roles closed until a curator adds a relationship',
+  Number(boundedDb.raw.prepare(
+    'SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ?',
+  ).get(future052Id).c) === 0);
+boundedDb.executeSync(`PRAGMA user_version = ${boundedIndex};`);
+runMigrations(boundedDb, MIGRATIONS);
+check('052 replay is idempotent and preserves routine and frozen stress data',
+  uv(boundedDb) === MIGRATIONS.length
+    && Number(boundedDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_slot WHERE routine_template_id = ?',
+    ).get(preservedTemplateId).c) === 3
+    && Number(boundedDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM planned_slot_routine_decision WHERE planned_slot_id = ?',
+    ).get(boundedPlannedSlotId).c) === 1);
+
+const poisonedBounded = freshDb();
+for (let i = 0; i < boundedIndex; i += 1) poisonedBounded.executeSync(MIGRATIONS[i]);
+poisonedBounded.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('052 poison precondition claims completion while all four current sentinels are absent',
+  ['movement_lift_family', 'movement_assistance_relationship',
+    'planned_session_routine_context', 'planned_slot_routine_decision']
+    .every((name) => sentinelsMissing(poisonedBounded).includes(name)));
+runMigrations(poisonedBounded, MIGRATIONS);
+check('052 poison repair converges on the curated structural contract',
+  sentinelsMissing(poisonedBounded).length === 0
+    && JSON.stringify(boundedSummary(poisonedBounded)) === JSON.stringify(boundedSummary(a)),
+  JSON.stringify(boundedSummary(poisonedBounded)));
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

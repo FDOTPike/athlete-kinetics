@@ -15,9 +15,12 @@ const {
   projectRoutineMajorRpe,
   rankRoutineSupplementaryRecommendations,
   routineMajorRpeForWeek,
-  ROUTINE_DAY_ROLE_MAXIMA,
-  ROUTINE_TEMPLATE_MAX_SLOTS,
 } = require('./.build/routineComposer.js');
+const {
+  composeRoutineMicrocycle,
+  contextualRoutineRoles,
+  rankRoutineAccessoryRecommendations,
+} = require('./.build/routineMicrocycle.js');
 const { projectChainsFromGraph } = require('./.build/chainProjection.js');
 let pass = 0;
 const check = (name, fn) => { try { fn(); console.log(`  PASS ${name}`); pass += 1; } catch (error) { console.error(`  FAIL ${name}: ${error.message}`); process.exitCode = 1; } };
@@ -44,7 +47,7 @@ check('resolver fixtures carry explicit access context and sport status', () => 
 });
 check('frozen routine role validation fails closed after role drift or an unverifiable snapshot', () => {
   const eligible = {
-    major: new Set([1]), supplementary: new Set([2]), conditional: new Set([3]),
+    major: new Set([1]), supplementary: new Set([2]), accessory: new Set(), conditional: new Set([3]),
   };
   const source = [
     { movementId: 1, role: 'major' },
@@ -56,10 +59,7 @@ check('frozen routine role validation fails closed after role drift or an unveri
   assert.equal(isRoutineRoleSnapshotExecutable([1], [...source, { movementId: 1, role: 'supplementary' }], eligible), false);
   assert.equal(isRoutineRoleSnapshotExecutable([2], source, eligible), false);
 });
-// --- P2-2: per-day routine role accounting -----------------------------------
-// A routine template may hold several days; each populated day is one
-// executable session. Role maxima and the sole-major law are therefore per
-// day, while the slot ceiling and movement identity stay template-wide.
+// --- bounded microcycle structural law ---------------------------------------
 const placement = (dayIndex, slotIndex, movementId, role) => ({ dayIndex, slotIndex, movementId, role });
 const twoDayTemplate = [
   placement(1, 1, 1, 'major'),
@@ -67,7 +67,7 @@ const twoDayTemplate = [
   placement(2, 1, 3, 'major'),
   placement(2, 2, 4, 'supplementary'),
 ];
-check('a two-day template with one major on each day is accepted and grouped in day order', () => {
+check('a multi-day template is grouped in day order', () => {
   const days = groupRoutineTemplateDays(twoDayTemplate);
   assert.deepEqual([...days.keys()], [1, 2]);
   assert.deepEqual([...days.get(1)].map((slot) => slot.movementId), [1, 2]);
@@ -80,70 +80,43 @@ check('a populated day with no major is refused, naming the offending day', () =
       placement(1, 1, 1, 'major'),
       placement(2, 1, 3, 'supplementary'),
     ]),
-    /Routine day 2 must contain exactly one major movement\./,
+    /Routine day 2 must contain at least one major movement\./,
   );
   assert.throws(
     () => groupRoutineTemplateDays([
       placement(1, 1, 1, 'supplementary'),
       placement(2, 1, 3, 'major'),
     ]),
-    /Routine day 1 must contain exactly one major movement\./,
+    /Routine day 1 must contain at least one major movement\./,
   );
 });
-check('more than one major inside a single day is refused even across a valid sibling day', () => {
-  assert.throws(
-    () => groupRoutineTemplateDays([
-      placement(1, 1, 1, 'major'),
-      placement(2, 1, 3, 'major'),
-      placement(2, 2, 4, 'major'),
-    ]),
-    /A routine day supports at most 1 major movement\./,
-  );
-  assert.equal(ROUTINE_DAY_ROLE_MAXIMA.major, 1);
-  // The same budget is per day for the other roles too: three supplementary
-  // slots across two days is fine, three inside one day is not.
+check('same-day major and support selection is uncapped', () => {
   assert.doesNotThrow(() => groupRoutineTemplateDays([
-    placement(1, 1, 1, 'major'), placement(1, 2, 2, 'supplementary'), placement(1, 3, 5, 'supplementary'),
-    placement(2, 1, 3, 'major'), placement(2, 2, 4, 'supplementary'),
+    placement(1, 1, 1, 'major'), placement(1, 2, 2, 'major'),
+    placement(1, 3, 3, 'major'), placement(1, 4, 4, 'supplementary'),
+    placement(1, 5, 5, 'supplementary'), placement(1, 6, 6, 'supplementary'),
+    placement(1, 7, 7, 'accessory'), placement(1, 8, 8, 'conditional'),
   ]));
-  assert.throws(
-    () => groupRoutineTemplateDays([
-      placement(1, 1, 1, 'major'), placement(1, 2, 2, 'supplementary'),
-      placement(1, 3, 5, 'supplementary'), placement(1, 4, 6, 'supplementary'),
-    ]),
-    /A routine day supports at most 2 supplementary movements\./,
-  );
 });
-check('the template-wide slot ceiling and movement identity survive multi-day support', () => {
-  assert.equal(ROUTINE_TEMPLATE_MAX_SLOTS, 6);
-  assert.throws(() => groupRoutineTemplateDays([]), /between 1 and 6 movements/);
-  assert.throws(
-    () => groupRoutineTemplateDays([
-      placement(1, 1, 1, 'major'), placement(1, 2, 2, 'supplementary'), placement(1, 3, 5, 'supplementary'),
-      placement(2, 1, 3, 'major'), placement(2, 2, 4, 'supplementary'), placement(2, 3, 6, 'supplementary'),
-      placement(3, 1, 7, 'major'),
-    ]),
-    /between 1 and 6 movements/,
-  );
-  // Identity is template-wide, NOT per day: the start-time snapshot carries no
-  // day index, so one movement on two days would be unverifiable at start.
-  assert.throws(
-    () => groupRoutineTemplateDays([
-      placement(1, 1, 1, 'major'),
-      placement(2, 1, 1, 'major'),
-    ]),
-    /A movement can appear only once in a routine template\./,
-  );
+check('movement identity is unique per day but may repeat across weekly exposures', () => {
+  assert.throws(() => groupRoutineTemplateDays([]), /at least one movement/);
+  assert.doesNotThrow(() => groupRoutineTemplateDays([
+    placement(1, 1, 1, 'major'), placement(2, 1, 1, 'major'),
+    placement(3, 1, 1, 'major'), placement(4, 1, 1, 'major'), placement(5, 1, 1, 'major'),
+  ]));
+  assert.throws(() => groupRoutineTemplateDays([
+    placement(1, 1, 1, 'major'), placement(1, 2, 1, 'major'),
+  ]), /appears more than once on routine day 1/);
   assert.throws(
     () => groupRoutineTemplateDays([placement(1, 1, 1, 'major'), placement(1, 1, 2, 'supplementary')]),
     /Routine slot positions must be unique\./,
   );
   assert.throws(
     () => groupRoutineTemplateDays([placement(8, 1, 1, 'major')]),
-    /supported 1-7 \/ 1-6 bounds/,
+    /days must be 1-7 and slot positions must be positive integers/,
   );
 });
-check('each populated day composes independently against its own role budget', () => {
+check('legacy single-session composition no longer rejects a selection count', () => {
   const days = groupRoutineTemplateDays(twoDayTemplate);
   const composedDays = [...days.values()].map((daySlots) => composeRoutine({
     selections: daySlots.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
@@ -154,19 +127,18 @@ check('each populated day composes independently against its own role budget', (
   assert.deepEqual(composedDays.flatMap((day) => day.warnings), []);
   // Slot indices restart per day, so a frozen day-2 session is slot 1..n.
   assert.deepEqual(composedDays[1].slots.map((slot) => slot.slotIndex), [1, 2]);
-  // Composing both days as one selection list is exactly the defect P2-2
-  // reports: the second major is dropped with a "too many" warning.
   const merged = composeRoutine({
     selections: twoDayTemplate.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
     schemaType: 'LINEAR', objective: 'strength', trainingAge: 'intermediate',
     durationCapMin: 66, baseRpeCap: 9, availableMovementIds: new Set([1, 2, 3, 4]),
   });
-  assert.ok(merged.warnings.some((warning) => warning.includes('Too many major')));
+  assert.equal(merged.slots.length, 4);
+  assert.ok(!merged.warnings.some((warning) => warning.includes('Too many')));
 });
 check('starting day 2 revalidates only that day and still fails closed on role drift', () => {
   const sourceRows = twoDayTemplate.map((slot) => ({ movementId: slot.movementId, role: slot.role }));
   const eligible = {
-    major: new Set([1, 3]), supplementary: new Set([2, 4]), conditional: new Set(),
+    major: new Set([1, 3]), supplementary: new Set([2, 4]), accessory: new Set(), conditional: new Set(),
   };
   const dayOne = [1, 2];
   const dayTwo = [3, 4];
@@ -295,9 +267,9 @@ check('history parser reports malformed, duplicate, and unknown records by line'
   const duplicate = parseHistoryImport('AK_HISTORY_V1\nSESSION|2026-02-20||\nSET|Pull-Up|1|5|0||\nSET|Pull-Up|1|5|0||\nEND_SESSION', library);
   assert.ok(duplicate.errors.some((issue) => issue.message.includes('Duplicate')));
 });
-check('routine composer uses shared eligibility, role maxima, duration, and RPE cap', () => {
+check('legacy routine composer preserves selected majors while enforcing availability and RPE cap', () => {
   const result = composeRoutine({ selections: [{ movementId: 1, role: 'major' }, { movementId: 2, role: 'major' }, { movementId: 3, role: 'supplementary' }], schemaType: 'LINEAR', objective: 'strength', trainingAge: 'beginner', durationCapMin: 30, baseRpeCap: 7, availableMovementIds: new Set([1, 2]) });
-  assert.equal(result.slots.length, 1); assert.ok(result.slots.every((slot) => slot.targetRpe <= 7)); assert.ok(result.warnings.length >= 2);
+  assert.equal(result.slots.length, 2); assert.ok(result.slots.every((slot) => slot.targetRpe <= 7)); assert.ok(result.warnings.length >= 2);
 });
 check('routine construction cannot retain an Advanced movement for Intermediate', () => {
   const availability = resolve({ trainingAge: 'intermediate', equipment: new Set(['Barbell']) });
@@ -489,7 +461,7 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
 // P2-4: named acceptance coverage against the REAL migration chain.
 //
 // Every check above runs on synthetic fixtures. This block builds the shipped
-// library from migrations 001-051 and pins the ratified records BY NAME, so a
+// library from migrations 001-052 and pins the ratified records BY NAME, so a
 // future content batch that re-tiers a competition lift, moves a role row, or
 // re-parents a capability edge fails here instead of in an athlete's hands.
 //
@@ -511,10 +483,10 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
   }
   for (const file of fullChain) db.exec(readFileSync(join(schemaDir, file), 'utf-8'));
 
-  check('the acceptance database is the real 001-051 chain, not a trimmed subset', () => {
+  check('the acceptance database is the real 001-052 chain, not a trimmed subset', () => {
     assert.equal(fullChain[0], '001_mechanical_input.sql');
-    assert.equal(fullChain[fullChain.length - 1], '051_routine_access_context.sql');
-    assert.equal(fullChain.length, 50, `applied ${fullChain.length} migrations`);
+    assert.equal(fullChain[fullChain.length - 1], '052_bounded_microcycle_roles.sql');
+    assert.equal(fullChain.length, 51, `applied ${fullChain.length} migrations`);
     assert.equal(Number(db.prepare('SELECT COUNT(*) AS c FROM movement').get().c), 300);
   });
 
@@ -648,19 +620,20 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     }
   });
 
-  check('the DB-derived role sets hold exactly eight major and twelve conditional rows', () => {
+  check('the DB-derived role sets expose the curated multi-role contract', () => {
     const counts = Object.fromEntries(db.prepare(
       'SELECT role, COUNT(*) AS c FROM movement_role_eligibility GROUP BY role',
     ).all().map((row) => [row.role, Number(row.c)]));
-    assert.equal(counts.major, 8);
+    assert.equal(counts.major, 79);
     assert.equal(counts.conditional, 12);
-    assert.equal(counts.supplementary, 300);
+    assert.equal(counts.supplementary, 84);
+    assert.equal(counts.accessory, 14);
     const majors = db.prepare(`SELECT m.name FROM movement_role_eligibility re
       JOIN movement m USING(movement_id) WHERE re.role = 'major' ORDER BY m.name`).all().map((row) => row.name);
-    assert.deepEqual(majors, [
+    for (const name of [
       'Barbell Row', 'Competition Bench', 'Competition Squat', 'Deadlift',
       'Front Squat', 'Overhead Press', 'Power Clean', 'Sumo Deadlift',
-    ]);
+    ]) assert.ok(majors.includes(name), `${name} must remain major-eligible`);
     const conditionals = db.prepare(`SELECT m.name FROM movement_role_eligibility re
       JOIN movement m USING(movement_id) WHERE re.role = 'conditional' ORDER BY m.name`).all().map((row) => row.name);
     assert.equal(conditionals.length, 12);
@@ -711,14 +684,247 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     }
   });
 
+  const routineMovements = db.prepare(`
+    SELECT m.movement_id, m.name, m.pattern, m.is_compound, md.target_muscles
+    FROM movement m JOIN movement_detail md USING (movement_id) ORDER BY m.movement_id
+  `).all().map((row) => ({
+    movementId: Number(row.movement_id), name: row.name, pattern: row.pattern,
+    targetMuscles: JSON.parse(row.target_muscles), isCompound: row.is_compound === 1,
+  }));
+  const roleSet = (role) => new Set(db.prepare(
+    'SELECT movement_id FROM movement_role_eligibility WHERE role = ? ORDER BY movement_id',
+  ).all(role).map((row) => Number(row.movement_id)));
+  const routineRoleEligibility = {
+    major: roleSet('major'), supplementary: roleSet('supplementary'),
+    accessory: roleSet('accessory'), conditional: roleSet('conditional'),
+  };
+  const liftFamilies = db.prepare(`
+    SELECT movement_id, family, stress_coefficient, preferred_purpose
+    FROM movement_lift_family ORDER BY family, movement_id
+  `).all().map((row) => ({
+    movementId: Number(row.movement_id), family: row.family,
+    stressCoefficient: Number(row.stress_coefficient), preferredPurpose: row.preferred_purpose,
+  }));
+  const assistance = db.prepare(`
+    SELECT major_family, movement_id, distance, stress_factor, fatigue_cost, reason
+    FROM movement_assistance_relationship ORDER BY major_family, distance, movement_id
+  `).all().map((row) => ({
+    family: row.major_family, movementId: Number(row.movement_id), distance: Number(row.distance),
+    stressFactor: Number(row.stress_factor), fatigueCost: Number(row.fatigue_cost), reason: row.reason,
+  }));
+  const allAvailable = new Set(routineMovements.map((movement) => movement.movementId));
+  const composeReal = (selections, overrides = {}) => composeRoutineMicrocycle({
+    selections, movements: routineMovements, liftFamilies, assistance,
+    roleEligibility: routineRoleEligibility, schemaType: 'LINEAR', objective: 'strength',
+    trainingAge: 'elite', durationCapMin: 120, baseRpeCap: 9,
+    availableMovementIds: allAvailable, ...overrides,
+  });
+
+  check('same-day Board Press plus Competition Bench is one weighted family exposure across two locked variations', () => {
+    const boardId = idOf('Board Press');
+    const benchId = idOf('Competition Bench');
+    const result = composeReal([
+      { dayIndex: 1, slotIndex: 1, movementId: boardId, role: 'major', sets: 2, reps: 6, targetRpe: 8 },
+      { dayIndex: 1, slotIndex: 2, movementId: benchId, role: 'major', sets: 3, reps: 7, targetRpe: 8 },
+    ]);
+    assert.deepEqual(result.blockers, []);
+    assert.deepEqual(result.prescriptions.map((row) => [row.movementId, row.sets, row.reps]), [
+      [boardId, 2, 6], [benchId, 3, 7],
+    ]);
+    assert.deepEqual(result.prescriptions.map((row) => [row.authoredSets, row.authoredReps]), [
+      [2, 6], [3, 7],
+    ]);
+    const decision = result.familyDecisions.find((row) => row.family === 'bench_press');
+    assert.ok(decision);
+    assert.equal(decision.exposureCount, 1);
+    assert.equal(decision.variationCount, 2);
+    assert.equal(decision.sessions[0].exposureCount, 1);
+    assert.equal(decision.sessions[0].variationCount, 2);
+    assert.equal(decision.equivalentVolume, 31.8, '0.9*(2*6) + 1.0*(3*7)');
+    assert.ok(result.warnings.some((warning) => warning.includes('form one major-family exposure')));
+  });
+
+  check('weighted same-day variation accumulation applies to every curated major family', () => {
+    const byFamily = new Map();
+    for (const row of liftFamilies) {
+      const familyRows = byFamily.get(row.family) ?? [];
+      familyRows.push(row);
+      byFamily.set(row.family, familyRows);
+    }
+    assert.equal(byFamily.size, 7);
+    for (const [family, familyRows] of byFamily) {
+      assert.ok(familyRows.length >= 2, `${family} needs at least two curated variations`);
+      const chosen = familyRows.slice(0, 2);
+      const result = composeReal(chosen.map((row, index) => ({
+        dayIndex: 1, slotIndex: index + 1, movementId: row.movementId,
+        role: 'major', sets: 1, reps: index + 1, targetRpe: 5,
+      })));
+      assert.deepEqual(result.blockers, [], family);
+      const decision = result.familyDecisions.find((row) => row.family === family);
+      assert.equal(decision.exposureCount, 1, family);
+      assert.equal(decision.variationCount, 2, family);
+      assert.equal(decision.equivalentVolume,
+        Math.round(chosen.reduce((sum, row, index) => sum + row.stressCoefficient * (index + 1), 0) * 10) / 10,
+        family);
+    }
+  });
+
+  check('Elite five-times-weekly bench-family plan is accepted and distributed across distinct stress purposes', () => {
+    const benchId = idOf('Competition Bench');
+    const result = composeReal([1, 2, 3, 4, 5].map((dayIndex) => ({
+      dayIndex, slotIndex: 1, movementId: benchId, role: 'major', sets: 2, reps: 3, targetRpe: 6,
+    })));
+    assert.deepEqual(result.blockers, []);
+    assert.equal(result.prescriptions.length, 5);
+    assert.ok(result.prescriptions.every((row) => row.included && row.movementId === benchId));
+    const decision = result.familyDecisions[0];
+    assert.equal(decision.exposureCount, 5);
+    assert.equal(decision.variationCount, 1);
+    assert.equal(decision.sessions.length, 5);
+    assert.equal(new Set(result.prescriptions.map((row) => row.purpose)).size, 5);
+    assert.ok(decision.finalStress <= decision.weeklyBudget);
+    assert.ok(result.recommendations.some((row) => row.includes('consecutive-day exposure is preserved')));
+  });
+
+  check('rising major-family stress reduces accessory and supplementary work before preserving bounded majors', () => {
+    const boardId = idOf('Board Press');
+    const benchId = idOf('Competition Bench');
+    const tricepsId = idOf('Triceps Pushdown');
+    const hammerId = idOf('Hammer Curl');
+    const result = composeReal([
+      { dayIndex: 1, slotIndex: 1, movementId: benchId, role: 'major', sets: 10, reps: 10, targetRpe: 9 },
+      { dayIndex: 1, slotIndex: 2, movementId: boardId, role: 'major', sets: 10, reps: 10, targetRpe: 9 },
+      { dayIndex: 1, slotIndex: 3, movementId: tricepsId, role: 'supplementary', sets: 5, reps: 20, targetRpe: 9 },
+      { dayIndex: 1, slotIndex: 4, movementId: hammerId, role: 'accessory', sets: 5, reps: 20, targetRpe: 9 },
+    ]);
+    assert.deepEqual(result.blockers, []);
+    const majors = result.prescriptions.filter((row) => row.role === 'major');
+    const support = result.prescriptions.filter((row) => row.role !== 'major');
+    assert.equal(majors.length, 2);
+    assert.ok(majors.every((row) => row.included && row.sets >= 1 && row.reps >= 1));
+    assert.ok(support.every((row) => !row.included));
+    assert.ok(support.every((row) => row.adaptations.some(
+      (text) => text.includes('before changing bench_press major exposure'),
+    )));
+    assert.ok(majors.some((row) => row.sets < 10 || row.reps < 10 || row.targetRpe < 9));
+    assert.ok(majors.every((row) => row.authoredSets === 10
+      && row.authoredReps === 10 && row.authoredTargetRpe === 9));
+    assert.ok(result.familyDecisions[0].finalStress <= result.familyDecisions[0].weeklyBudget);
+  });
+
+  check('moderate family pressure sheds accessory work before direct supplementary work', () => {
+    const benchId = idOf('Competition Bench');
+    const tricepsId = idOf('Triceps Pushdown');
+    const hammerId = idOf('Hammer Curl');
+    const result = composeReal([
+      { dayIndex: 1, slotIndex: 1, movementId: benchId, role: 'major', sets: 4, reps: 8, targetRpe: 9 },
+      { dayIndex: 1, slotIndex: 2, movementId: tricepsId, role: 'supplementary', sets: 2, reps: 10, targetRpe: 7 },
+      { dayIndex: 1, slotIndex: 3, movementId: hammerId, role: 'accessory', sets: 5, reps: 20, targetRpe: 9 },
+    ], { trainingAge: 'intermediate' });
+    assert.deepEqual(result.blockers, []);
+    assert.equal(result.prescriptions.find((row) => row.movementId === hammerId).included, false);
+    assert.equal(result.prescriptions.find((row) => row.movementId === tricepsId).included, true);
+    assert.equal(result.prescriptions.find((row) => row.movementId === benchId).sets, 4);
+  });
+
+  check('freezing one day enforces its live access gates while retaining all-day weekly stress context', () => {
+    const benchId = idOf('Competition Bench');
+    const overheadId = idOf('Overhead Press');
+    const selections = [
+      { dayIndex: 1, slotIndex: 1, movementId: benchId, role: 'major', sets: 2, reps: 5, targetRpe: 7 },
+      { dayIndex: 2, slotIndex: 1, movementId: overheadId, role: 'major', sets: 2, reps: 5, targetRpe: 7 },
+    ];
+    const dayTwoRoleDrift = {
+      ...routineRoleEligibility,
+      major: new Set([...routineRoleEligibility.major].filter((movementId) => movementId !== overheadId)),
+    };
+    const dayOneFreeze = composeReal(selections, {
+      availableMovementIds: new Set([benchId]),
+      roleEligibility: dayTwoRoleDrift,
+      executionGateDayIndices: new Set([1]),
+    });
+    assert.deepEqual(dayOneFreeze.blockers, []);
+    assert.equal(dayOneFreeze.prescriptions.length, 2);
+    assert.deepEqual(dayOneFreeze.familyDecisions.map((decision) => decision.family).sort(), [
+      'bench_press', 'overhead_press',
+    ]);
+    const dayTwoFreeze = composeReal(selections, {
+      availableMovementIds: new Set([benchId]),
+      roleEligibility: dayTwoRoleDrift,
+      executionGateDayIndices: new Set([2]),
+    });
+    assert.ok(dayTwoFreeze.blockers.some((blocker) => blocker.includes('Overhead Press is unavailable')));
+    assert.ok(dayTwoFreeze.blockers.some((blocker) => blocker.includes('not ratified for the major role')));
+  });
+
+  check('Hammer Curl role is contextual and accessory ranking may correctly reduce to zero', () => {
+    const hammerId = idOf('Hammer Curl');
+    const rowId = idOf('Barbell Row');
+    const benchId = idOf('Competition Bench');
+    const afterPull = contextualRoutineRoles(
+      hammerId, [rowId], liftFamilies, assistance, routineRoleEligibility,
+    );
+    const afterBench = contextualRoutineRoles(
+      hammerId, [benchId], liftFamilies, assistance, routineRoleEligibility,
+    );
+    const mixedBenchAndPull = contextualRoutineRoles(
+      hammerId, [benchId, rowId], liftFamilies, assistance, routineRoleEligibility,
+    );
+    assert.equal(afterPull.has('supplementary'), true);
+    assert.equal(afterPull.has('accessory'), false);
+    assert.equal(afterBench.has('supplementary'), false);
+    assert.equal(afterBench.has('accessory'), true);
+    assert.equal(mixedBenchAndPull.has('supplementary'), true);
+    assert.equal(mixedBenchAndPull.has('accessory'), false,
+      'the closest direct relationship wins in a mixed-family session');
+    const accessoryCandidates = routineMovements.filter((movement) =>
+      routineRoleEligibility.accessory.has(movement.movementId));
+    assert.deepEqual(rankRoutineAccessoryRecommendations({
+      majorMovementIds: [benchId], selectedMovementIds: [benchId], candidates: accessoryCandidates,
+      allMovements: routineMovements, liftFamilies, assistance, objective: 'hypertrophy',
+      remainingMinutes: 3, remainingFatigue: 5,
+    }), []);
+    const ranked = rankRoutineAccessoryRecommendations({
+      majorMovementIds: [benchId], selectedMovementIds: [benchId], candidates: accessoryCandidates,
+      allMovements: routineMovements, liftFamilies, assistance, objective: 'hypertrophy',
+      remainingMinutes: 20, remainingFatigue: 5,
+    });
+    assert.ok(ranked.length > 0 && ranked.length <= 3);
+    assert.ok(ranked.every((row) => row.distance >= 2));
+    const mixedRanked = rankRoutineAccessoryRecommendations({
+      majorMovementIds: [benchId, rowId], selectedMovementIds: [benchId, rowId],
+      candidates: accessoryCandidates, allMovements: routineMovements,
+      liftFamilies, assistance, objective: 'hypertrophy',
+      remainingMinutes: 20, remainingFatigue: 5,
+    });
+    assert.equal(mixedRanked.some((row) => row.movementId === hammerId), false,
+      'direct pull assistance must not be reintroduced as a bench accessory');
+  });
+
+  check('genuine Beginner, availability, contextual-role, and missing-family blockers remain fail closed', () => {
+    const benchId = idOf('Competition Bench');
+    const hammerId = idOf('Hammer Curl');
+    const selection = [{
+      dayIndex: 1, slotIndex: 1, movementId: benchId, role: 'major', sets: 3, reps: 5, targetRpe: 8,
+    }];
+    assert.ok(composeReal(selection, { trainingAge: 'beginner' }).blockers.some((row) => row.includes('Beginner stage')));
+    assert.ok(composeReal(selection, { availableMovementIds: new Set() }).blockers.some((row) => row.includes('unavailable')));
+    assert.ok(composeReal([...selection, {
+      dayIndex: 1, slotIndex: 2, movementId: hammerId, role: 'supplementary', sets: 2, reps: 10, targetRpe: 7,
+    }]).blockers.some((row) => row.includes('not supplementary-eligible')));
+    assert.ok(composeReal(selection, { liftFamilies: [] }).blockers.some((row) => row.includes('no curated lift-family')));
+  });
+
   check('the routine picker derives its role sets from the database, not hardcoded names', () => {
     const builder = readFileSync(
       join(root, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8');
     const store = readFileSync(join(root, 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
     assert.ok(builder.includes('getRoutineRoleEligibleMovementIds()'),
       'the picker must read the DB-derived role sets');
-    assert.ok(builder.includes('roleEligibleSets[pickerRole].has(movement.movement_id)'),
-      'role eligibility must be the picker\'s first predicate');
+    assert.ok(builder.includes("contextualRolesFor(movement.movement_id).has(pickerRole)"),
+      'contextual role eligibility must be the picker\'s first predicate');
+    assert.ok(builder.includes('getRoutinePlanningContract()'),
+      'the picker must read the curated family and assistance-distance contract');
     assert.ok(store.includes("'SELECT movement_id, role FROM movement_role_eligibility ORDER BY role, movement_id'"),
       'the store must derive role eligibility from movement_role_eligibility');
     for (const name of [...CONFIRMABLE, ...COMPETITION, CONTROL, 'Power Clean']) {

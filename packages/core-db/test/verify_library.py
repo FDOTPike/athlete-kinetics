@@ -404,11 +404,10 @@ sport_roles = {
       GROUP BY m.movement_id ORDER BY m.name
     """)
 }
-check("sport membership grants no role and preserves the ratified role rows",
+check("sport membership grants no role; 052 removes automatic supplementary while preserving explicit conditional rows",
       sport_roles == {
-          "BJJ Sparring Round": "conditional|supplementary",
-          "Road Run": "conditional|supplementary",
-          "Trail Running/Walking": "supplementary",
+          "BJJ Sparring Round": "conditional",
+          "Road Run": "conditional",
       }, str(sport_roles))
 
 print("\n[6] STRICT media checks")

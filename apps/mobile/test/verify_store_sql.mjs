@@ -36,7 +36,7 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
   '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
   '049_movement_content_correction_v1.sql', '050_movement_role_convergence.sql',
-  '051_routine_access_context.sql'];
+  '051_routine_access_context.sql', '052_bounded_microcycle_roles.sql'];
 
 const db = new DatabaseSync(':memory:');
 try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
@@ -1369,13 +1369,17 @@ if (resetTables.length >= 15) {
       && startBody.indexOf('const planToConsume') > startBody.indexOf('const consumePlan')
       && startBody.indexOf('planToConsume !== null && planToConsume.slots.some') > startBody.indexOf('const planToConsume'));
   a('Beginner routine provenance survives source-template deletion and still blocks start',
-    startBody.includes('SELECT routine_template_id FROM planned_session_method WHERE planned_session_id = ?')
+    startBody.includes('SELECT psm.routine_template_id, prc.routine_day_index')
       && startBody.includes("routineProvenance !== undefined && profile.training_age === 'beginner'")
       && !startBody.includes("profile.training_age === 'beginner' && routineProvenance?.routine_template_id"));
   a('routine start fails closed when source roles are missing, ambiguous, or no longer eligible',
     startBody.includes('const frozenTemplateRoles =')
       && startBody.includes('const currentRoleEligibility = routineRoleEligibility(d)')
       && startBody.includes('isRoutineRoleSnapshotExecutable('));
+  a('routine start revalidates the frozen contextual family role contract',
+    startBody.includes('const planningContract = routinePlanningContract(d)')
+      && startBody.includes('contextualRoutineRoles(')
+      && startBody.includes('planned_slot_routine_decision'));
   a('active sessions persist one frozen access context and restoration derives planned focus or free-form weight room',
     src.includes('activeSessionAccessContext: executionContext')
       && src.includes('activeSessionAccessContext: restoredAccessContext')

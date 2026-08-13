@@ -20,9 +20,14 @@ import {
 } from 'react-native';
 import {
   composeRoutine,
+  composeRoutineMicrocycle,
+  contextualRoutineRoles,
   projectRoutineMajorRpe,
+  rankRoutineAccessoryRecommendations,
   rankRoutineSupplementaryRecommendations,
   type MovementAvailability,
+  type RoutineAccessoryRecommendation,
+  type RoutineMicrocyclePrescription,
   type RoutineSupplementaryRecommendation,
   type RoutineRole,
   type SchemaType,
@@ -46,6 +51,7 @@ const SCHEMAS: SchemaType[] = ['LINEAR', 'WAVE', 'STEP', 'APRE'];
 
 interface SlotItem {
   id: string;
+  dayIndex: number;
   role: RoutineRole;
   movementId: number | null;
   sets?: number;
@@ -58,7 +64,7 @@ interface PickerRow {
   verdict: MovementAvailability | undefined;
   selectedElsewhere: boolean;
   executable: boolean;
-  recommendation: RoutineSupplementaryRecommendation | undefined;
+  recommendation: (RoutineSupplementaryRecommendation | RoutineAccessoryRecommendation) | undefined;
 }
 
 interface RoutineTemplateBuilderProps {
@@ -86,6 +92,7 @@ export function RoutineTemplateBuilder({
   const getRoutineRoleEligibleMovementIds = useStore(
     (s) => s.getRoutineRoleEligibleMovementIds,
   );
+  const getRoutinePlanningContract = useStore((s) => s.getRoutinePlanningContract);
 
   const [name, setName] = useState(initialTemplate?.name ?? '');
   const [schemaType, setSchemaType] = useState<SchemaType>(
@@ -97,6 +104,7 @@ export function RoutineTemplateBuilder({
     if (initialTemplate && initialTemplate.slots.length > 0) {
       return initialTemplate.slots.map((s, idx) => ({
         id: `slot-${idx}-${s.movementId}`,
+        dayIndex: s.dayIndex,
         role: s.role,
         movementId: s.movementId,
         sets: s.sets,
@@ -105,12 +113,13 @@ export function RoutineTemplateBuilder({
       }));
     }
     return [
-      { id: 'slot-0', role: 'major', movementId: null },
-      { id: 'slot-1', role: 'supplementary', movementId: null },
-      { id: 'slot-2', role: 'supplementary', movementId: null },
+      { id: 'slot-0', dayIndex: 1, role: 'major', movementId: null },
+      { id: 'slot-1', dayIndex: 1, role: 'supplementary', movementId: null },
+      { id: 'slot-2', dayIndex: 1, role: 'supplementary', movementId: null },
     ];
   });
 
+  const [activeDay, setActiveDay] = useState(() => initialTemplate?.slots[0]?.dayIndex ?? 1);
   const [pickerSlotIndex, setPickerSlotIndex] = useState<number | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerView, setPickerView] = useState<'available' | 'all'>('available');
@@ -131,17 +140,37 @@ export function RoutineTemplateBuilder({
   const roleEligibleSets = useMemo(() => ({
     major: new Set(roleEligibleIds.major),
     supplementary: new Set(roleEligibleIds.supplementary),
+    accessory: new Set(roleEligibleIds.accessory),
     conditional: new Set(roleEligibleIds.conditional),
   }), [roleEligibleIds]);
+  const planningContract = useMemo(
+    () => getRoutinePlanningContract(),
+    [getRoutinePlanningContract, movements],
+  );
   const availableSet = useMemo(
     () => new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId)),
     [verdicts],
   );
 
+  const activeSlots = useMemo(() => slots
+    .map((slot, index) => ({ slot, index }))
+    .filter((entry) => entry.slot.dayIndex === activeDay), [activeDay, slots]);
+  const activeMajorIds = useMemo(() => activeSlots
+    .filter((entry): entry is { slot: SlotItem & { movementId: number }; index: number } =>
+      entry.slot.role === 'major' && entry.slot.movementId !== null)
+    .map((entry) => entry.slot.movementId), [activeSlots]);
   const selectedMajor = useMemo(() => {
-    const majorId = slots.find((slot) => slot.role === 'major' && slot.movementId !== null)?.movementId;
+    const majorId = activeMajorIds[0];
     return majorId === undefined ? undefined : movements.find((movement) => movement.movement_id === majorId);
-  }, [movements, slots]);
+  }, [activeMajorIds, movements]);
+
+  const contextualRolesFor = (movementId: number): ReadonlySet<RoutineRole> => contextualRoutineRoles(
+    movementId,
+    activeMajorIds,
+    planningContract.liftFamilies,
+    planningContract.assistance,
+    roleEligibleSets,
+  );
 
   const supplementaryRecommendationMap = useMemo(() => {
     if (pickerSlotIndex === null || slots[pickerSlotIndex]?.role !== 'supplementary'
@@ -149,9 +178,10 @@ export function RoutineTemplateBuilder({
       return new Map<number, RoutineSupplementaryRecommendation>();
     }
     const candidates = movements.filter((movement) =>
-      roleEligibleSets.supplementary.has(movement.movement_id)
+      contextualRolesFor(movement.movement_id).has('supplementary')
       && availableSet.has(movement.movement_id)
-      && !slots.some((slot, index) => index !== pickerSlotIndex && slot.movementId === movement.movement_id));
+      && !slots.some((slot, index) => slot.dayIndex === activeDay
+        && index !== pickerSlotIndex && slot.movementId === movement.movement_id));
     const recommendations = rankRoutineSupplementaryRecommendations(
       {
         movementId: selectedMajor.movement_id,
@@ -169,7 +199,98 @@ export function RoutineTemplateBuilder({
       })),
     );
     return new Map(recommendations.map((recommendation) => [recommendation.movementId, recommendation]));
-  }, [availableSet, movements, pickerSlotIndex, roleEligibleSets.supplementary, selectedMajor, slots]);
+  }, [activeDay, activeMajorIds, availableSet, movements, pickerSlotIndex,
+    planningContract, roleEligibleSets, selectedMajor, slots]);
+
+  const accessoryRecommendationMap = useMemo(() => {
+    if (pickerSlotIndex === null || slots[pickerSlotIndex]?.role !== 'accessory'
+        || activeMajorIds.length === 0) {
+      return new Map<number, RoutineAccessoryRecommendation>();
+    }
+    const selectedMovementIds = activeSlots
+      .map((entry) => entry.slot.movementId)
+      .filter((movementId): movementId is number => movementId !== null);
+    const positions = new Map<number, number>();
+    const stressPreview = composeRoutineMicrocycle({
+      selections: slots.flatMap((slot) => {
+        if (slot.movementId === null) return [];
+        const slotIndex = (positions.get(slot.dayIndex) ?? 0) + 1;
+        positions.set(slot.dayIndex, slotIndex);
+        return [{
+          dayIndex: slot.dayIndex,
+          slotIndex,
+          movementId: slot.movementId,
+          role: slot.role,
+          sets: slot.sets,
+          reps: slot.reps,
+          targetRpe: slot.targetRpe,
+        }];
+      }),
+      movements: movements.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+      liftFamilies: planningContract.liftFamilies,
+      assistance: planningContract.assistance,
+      roleEligibility: roleEligibleSets,
+      schemaType,
+      objective: profile.objective,
+      trainingAge: profile.training_age,
+      durationCapMin: profile.session_duration_cap_min,
+      baseRpeCap: profile.base_rpe_cap,
+      availableMovementIds: availableSet,
+    });
+    const activePrescriptions = stressPreview.prescriptions.filter((row) => row.dayIndex === activeDay);
+    const activeComposedMinutes = activePrescriptions.reduce((sum, row) => {
+      if (!row.included) return sum;
+      if (row.role === 'major') return sum + 3 + row.sets * 2.5;
+      if (row.role === 'supplementary') return sum + 2 + row.sets * 1.5;
+      if (row.role === 'conditional') return sum + 1.5 + row.sets * 1.25;
+      return sum + 1 + row.sets;
+    }, 0);
+    const alreadyConstrained = stressPreview.blockers.length > 0
+      || activePrescriptions.some((row) => !row.included
+        || row.adaptations.some((adaptation) => adaptation.startsWith('Dose bounded from')));
+    const activeHeadroom = stressPreview.familyDecisions.flatMap((decision) => {
+      const session = decision.sessions.find((candidate) => candidate.dayIndex === activeDay);
+      return session === undefined ? [] : [Math.max(0, (session.budget - session.finalStress) / 5)];
+    });
+    const remainingFatigue = alreadyConstrained || activeHeadroom.length === 0
+      ? 0
+      : Math.min(5, ...activeHeadroom);
+    const candidates = movements.filter((movement) =>
+      contextualRolesFor(movement.movement_id).has('accessory')
+      && availableSet.has(movement.movement_id));
+    const recommendations = rankRoutineAccessoryRecommendations({
+      majorMovementIds: activeMajorIds,
+      selectedMovementIds,
+      candidates: candidates.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+      allMovements: movements.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+      liftFamilies: planningContract.liftFamilies,
+      assistance: planningContract.assistance,
+      objective: profile.objective,
+      remainingMinutes: Math.max(0, profile.session_duration_cap_min - activeComposedMinutes),
+      remainingFatigue,
+    });
+    return new Map(recommendations.map((recommendation) => [recommendation.movementId, recommendation]));
+  }, [activeDay, activeMajorIds, activeSlots, availableSet, movements, pickerSlotIndex,
+    planningContract, profile.base_rpe_cap, profile.objective, profile.session_duration_cap_min,
+    profile.training_age, roleEligibleSets, schemaType, slots]);
 
   const pickerRows = useMemo((): PickerRow[] => {
     if (pickerSlotIndex === null) return [];
@@ -178,7 +299,7 @@ export function RoutineTemplateBuilder({
     const rows = movements
       // Role eligibility is the first predicate: non-role rows never reach the
       // virtualized picker or its counts.
-      .filter((movement) => roleEligibleSets[pickerRole].has(movement.movement_id))
+      .filter((movement) => contextualRolesFor(movement.movement_id).has(pickerRole))
       .filter((movement) => query.length === 0 || [
         movement.name,
         movement.baseName,
@@ -188,14 +309,16 @@ export function RoutineTemplateBuilder({
       ].some((value) => value.toLocaleLowerCase().includes(query)))
       .map((movement): PickerRow => {
         const verdict = verdictMap.get(movement.movement_id);
-        const selectedElsewhere = slots.some((slot, index) =>
-          index !== pickerSlotIndex && slot.movementId === movement.movement_id);
+        const selectedElsewhere = slots.some((slot, index) => slot.dayIndex === activeDay
+          && index !== pickerSlotIndex && slot.movementId === movement.movement_id);
         return {
           movement,
           verdict,
           selectedElsewhere,
           executable: verdict?.state === 'available' && !selectedElsewhere,
-          recommendation: supplementaryRecommendationMap.get(movement.movement_id),
+          recommendation: pickerRole === 'accessory'
+            ? accessoryRecommendationMap.get(movement.movement_id)
+            : supplementaryRecommendationMap.get(movement.movement_id),
         };
       })
       .sort((a, b) => Number(b.executable) - Number(a.executable)
@@ -203,7 +326,8 @@ export function RoutineTemplateBuilder({
           - (b.recommendation?.rank ?? Number.MAX_SAFE_INTEGER)
         || a.movement.name.localeCompare(b.movement.name));
     return pickerView === 'available' ? rows.filter((row) => row.executable) : rows;
-  }, [movements, pickerSearch, pickerSlotIndex, pickerView, roleEligibleSets, slots,
+  }, [accessoryRecommendationMap, activeDay, activeMajorIds, movements, pickerSearch,
+    pickerSlotIndex, pickerView, planningContract, roleEligibleSets, slots,
     supplementaryRecommendationMap, verdictMap]);
 
   const pickerCounts = useMemo(() => {
@@ -211,27 +335,50 @@ export function RoutineTemplateBuilder({
     const role = slots[pickerSlotIndex]?.role ?? 'supplementary';
     const query = pickerSearch.trim().toLocaleLowerCase();
     const rows = movements
-      .filter((movement) => roleEligibleSets[role].has(movement.movement_id))
+      .filter((movement) => contextualRolesFor(movement.movement_id).has(role))
       .filter((movement) => query.length === 0 || [movement.name, movement.baseName,
         movement.pattern, movement.cues, ...movement.targetMuscles]
         .some((value) => value.toLocaleLowerCase().includes(query)));
     const available = rows.filter((movement) => {
-      const selectedElsewhere = slots.some((slot, index) =>
-        index !== pickerSlotIndex && slot.movementId === movement.movement_id);
+      const selectedElsewhere = slots.some((slot, index) => slot.dayIndex === activeDay
+        && index !== pickerSlotIndex && slot.movementId === movement.movement_id);
       return verdictMap.get(movement.movement_id)?.state === 'available' && !selectedElsewhere;
     }).length;
     const teaching = rows.filter((movement) =>
       verdictMap.get(movement.movement_id)?.state !== 'available').length;
     return { available, teaching, total: rows.length };
-  }, [movements, pickerSearch, pickerSlotIndex, roleEligibleSets, slots, verdictMap]);
+  }, [activeDay, activeMajorIds, movements, pickerSearch, pickerSlotIndex,
+    planningContract, roleEligibleSets, slots, verdictMap]);
 
-  // Live routine composition preview
   const validSelections = slots.filter(
     (slot): slot is SlotItem & { movementId: number } => slot.movementId !== null,
   );
-
-  const composed = composeRoutine({
-    selections: validSelections,
+  const dayPositions = new Map<number, number>();
+  const microcycleSelections = validSelections.map((slot) => {
+    const slotIndex = (dayPositions.get(slot.dayIndex) ?? 0) + 1;
+    dayPositions.set(slot.dayIndex, slotIndex);
+    return {
+      dayIndex: slot.dayIndex,
+      slotIndex,
+      movementId: slot.movementId,
+      role: slot.role,
+      sets: slot.sets,
+      reps: slot.reps,
+      targetRpe: slot.targetRpe,
+    };
+  });
+  const composed = composeRoutineMicrocycle({
+    selections: microcycleSelections,
+    movements: movements.map((movement) => ({
+      movementId: movement.movement_id,
+      name: movement.name,
+      pattern: movement.pattern,
+      targetMuscles: movement.targetMuscles,
+      isCompound: movement.is_compound,
+    })),
+    liftFamilies: planningContract.liftFamilies,
+    assistance: planningContract.assistance,
+    roleEligibility: roleEligibleSets,
     schemaType,
     objective: profile.objective,
     trainingAge: profile.training_age,
@@ -239,33 +386,56 @@ export function RoutineTemplateBuilder({
     baseRpeCap: profile.base_rpe_cap,
     availableMovementIds: availableSet,
   });
-  const defaultComposition = composeRoutine({
-    selections: validSelections,
-    schemaType,
-    objective: profile.objective,
-    trainingAge: profile.training_age,
-    durationCapMin: Math.max(profile.session_duration_cap_min, 66),
-    baseRpeCap: profile.base_rpe_cap,
-    availableMovementIds: availableSet,
-  });
-
-  // A role with no ratified movements is not offered. Conditional work is
-  // seeded empty (028 leaves it curator-owned), so offering the slot produced a
-  // picker where all 124 movements rendered disabled. Re-enables itself the
-  // moment conditional movements are ratified -- no code change needed.
-  const roleMaxima: Record<RoutineRole, number> = {
-    major: 1,
-    supplementary: 2,
-    conditional: roleEligibleSets.conditional.size === 0 ? 0 : 3,
-  };
-  const roleCount = (role: RoutineRole): number => slots.filter((slot) => slot.role === role).length;
+  const defaultBySlotId = new Map<string, RoutineMicrocyclePrescription>();
+  for (const slot of validSelections) {
+    const fallback = composeRoutine({
+      selections: [slot],
+      schemaType,
+      objective: profile.objective,
+      trainingAge: profile.training_age,
+      durationCapMin: Math.max(profile.session_duration_cap_min, 66),
+      baseRpeCap: profile.base_rpe_cap,
+      availableMovementIds: availableSet,
+    }).slots[0];
+    if (fallback !== undefined) {
+      defaultBySlotId.set(slot.id, {
+        dayIndex: slot.dayIndex,
+        sourceSlotIndex: 1,
+        executionSlotIndex: 1,
+        movementId: fallback.movementId,
+        role: fallback.role,
+        authoredSets: fallback.sets,
+        authoredReps: fallback.reps,
+        authoredTargetRpe: fallback.targetRpe,
+        sets: fallback.sets,
+        reps: fallback.reps,
+        targetRpe: fallback.targetRpe,
+        included: true,
+        family: null,
+        stressCoefficient: 0,
+        purpose: null,
+        equivalentVolume: 0,
+        stressDose: 0,
+        adaptations: [],
+      });
+    }
+  }
 
   const addSlot = (role: RoutineRole): void => {
-    if (slots.length >= 6 || roleCount(role) >= roleMaxima[role]) return;
     setSlots([
       ...slots,
-      { id: `slot-${Date.now()}-${Math.random()}`, role, movementId: null },
+      { id: `slot-${Date.now()}-${slots.length}`, dayIndex: activeDay, role, movementId: null },
     ]);
+  };
+
+  const addTrainingDay = (): void => {
+    const populated = new Set(slots.map((slot) => slot.dayIndex));
+    const nextDay = [1, 2, 3, 4, 5, 6, 7].find((day) => !populated.has(day));
+    if (nextDay === undefined) return;
+    setSlots([...slots, {
+      id: `slot-day-${nextDay}-${Date.now()}`, dayIndex: nextDay, role: 'major', movementId: null,
+    }]);
+    setActiveDay(nextDay);
   };
 
   const removeSlot = (index: number): void => {
@@ -273,24 +443,25 @@ export function RoutineTemplateBuilder({
   };
 
   const moveSlot = (index: number, direction: -1 | 1): void => {
-    const destination = index + direction;
-    if (destination < 0 || destination >= slots.length) return;
+    const activeIndices = slots
+      .map((slot, slotIndex) => ({ slot, slotIndex }))
+      .filter((entry) => entry.slot.dayIndex === activeDay)
+      .map((entry) => entry.slotIndex);
+    const activeIndex = activeIndices.indexOf(index);
+    const destination = activeIndices[activeIndex + direction];
+    if (destination === undefined) return;
     const updated = [...slots];
     [updated[index], updated[destination]] = [updated[destination], updated[index]];
     setSlots(updated);
   };
 
   const updateRole = (index: number, role: RoutineRole): void => {
-    if (slots[index].role !== role && roleCount(role) >= roleMaxima[role]) {
-      setErrorText(`A routine supports at most ${roleMaxima[role]} ${role} movement${roleMaxima[role] === 1 ? '' : 's'}.`);
-      return;
-    }
     const updated = [...slots];
     const movementId = updated[index].movementId;
     updated[index] = {
       ...updated[index],
       role,
-      movementId: movementId !== null && roleEligibleSets[role].has(movementId) ? movementId : null,
+      movementId: movementId !== null && contextualRolesFor(movementId).has(role) ? movementId : null,
       ...(updated[index].role === role ? {} : { sets: undefined, reps: undefined, targetRpe: undefined }),
     };
     setErrorText(null);
@@ -373,8 +544,12 @@ export function RoutineTemplateBuilder({
       setErrorText('Please select at least one movement for your routine template.');
       return;
     }
-    if (validSelections.filter((selection) => selection.role === 'major').length !== 1) {
-      setErrorText('Choose exactly one major movement.');
+    const populatedDays = [...new Set(validSelections.map((selection) => selection.dayIndex))];
+    const missingMajorDay = populatedDays.find((dayIndex) => !validSelections.some(
+      (selection) => selection.dayIndex === dayIndex && selection.role === 'major',
+    ));
+    if (missingMajorDay !== undefined) {
+      setErrorText(`Choose at least one major movement for day ${missingMajorDay}.`);
       return;
     }
 
@@ -383,15 +558,7 @@ export function RoutineTemplateBuilder({
         routineTemplateId: initialTemplate?.routineTemplateId,
         name: trimmed,
         schemaType,
-        slots: validSelections.map((s, idx) => ({
-          dayIndex: 1,
-          slotIndex: idx + 1,
-          role: s.role,
-          movementId: s.movementId,
-          sets: s.sets,
-          reps: s.reps,
-          targetRpe: s.targetRpe,
-        })),
+        slots: microcycleSelections,
       });
       onSaved?.(saved);
     } catch (e) {
@@ -476,47 +643,70 @@ export function RoutineTemplateBuilder({
         </View>
       </View>
 
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Microcycle Days</Text>
+        <View style={styles.pickerViewRow}>
+          {[1, 2, 3, 4, 5, 6, 7]
+            .filter((dayIndex) => dayIndex === activeDay || slots.some((slot) => slot.dayIndex === dayIndex))
+            .map((dayIndex) => (
+              <Chip
+                key={dayIndex}
+                label={`Day ${dayIndex}`}
+                selected={dayIndex === activeDay}
+                onPress={() => setActiveDay(dayIndex)}
+              />
+            ))}
+          <Chip
+            label="+ Training day"
+            selected={false}
+            disabled={new Set(slots.map((slot) => slot.dayIndex)).size >= 7}
+            onPress={addTrainingDay}
+          />
+        </View>
+        <Text style={styles.reasonText}>
+          Major selection and weekly exposure are uncapped within the seven-day microcycle; the engine bounds dose and recovery burden.
+        </Text>
+      </View>
+
       {/* Session Slots Manager */}
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Ordered Movements ({slots.length}/6)</Text>
+        <Text style={styles.label}>Day {activeDay} Ordered Movements ({activeSlots.length})</Text>
 
-        {slots.map((slot, index) => {
+        {activeSlots.map(({ slot, index }, activeSlotIndex) => {
           const m = movements.find((item) => item.movement_id === slot.movementId);
           return (
             <View key={slot.id} style={styles.slotCard}>
               <View style={styles.slotHeader}>
-                <Text style={styles.slotIndexLabel}>Slot {index + 1}</Text>
+                <Text style={styles.slotIndexLabel}>Slot {activeSlotIndex + 1}</Text>
                 <View style={styles.roleRow}>
                   <Pressable
-                    disabled={index === 0}
+                    disabled={activeSlotIndex === 0}
                     onPress={() => moveSlot(index, -1)}
-                    style={[styles.orderButton, index === 0 && styles.orderButtonDisabled]}
+                    style={[styles.orderButton, activeSlotIndex === 0 && styles.orderButtonDisabled]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Move slot ${index + 1} up`}
+                    accessibilityLabel={`Move day ${activeDay} slot ${activeSlotIndex + 1} up`}
                   >
                     <Text style={styles.orderButtonText}>Up</Text>
                   </Pressable>
                   <Pressable
-                    disabled={index === slots.length - 1}
+                    disabled={activeSlotIndex === activeSlots.length - 1}
                     onPress={() => moveSlot(index, 1)}
-                    style={[styles.orderButton, index === slots.length - 1 && styles.orderButtonDisabled]}
+                    style={[styles.orderButton, activeSlotIndex === activeSlots.length - 1 && styles.orderButtonDisabled]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Move slot ${index + 1} down`}
+                    accessibilityLabel={`Move day ${activeDay} slot ${activeSlotIndex + 1} down`}
                   >
                     <Text style={styles.orderButtonText}>Down</Text>
                   </Pressable>
-                  {(['major', 'supplementary', 'conditional'] as const).map((r) => (
+                  {(['major', 'supplementary', 'conditional', 'accessory'] as const).map((r) => (
                     <Pressable
                       key={r}
-                      disabled={slot.role !== r && roleCount(r) >= roleMaxima[r]}
                       onPress={() => updateRole(index, r)}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: slot.role === r, disabled: slot.role !== r && roleCount(r) >= roleMaxima[r] }}
-                      accessibilityLabel={`Set slot ${index + 1} role to ${r}`}
+                      accessibilityState={{ selected: slot.role === r }}
+                      accessibilityLabel={`Set day ${activeDay} slot ${activeSlotIndex + 1} role to ${r}`}
                       style={[
                         styles.roleChip,
                         slot.role === r && styles.roleChipSelected,
-                        slot.role !== r && roleCount(r) >= roleMaxima[r] && styles.orderButtonDisabled,
                       ]}
                     >
                       <Text
@@ -532,7 +722,7 @@ export function RoutineTemplateBuilder({
                   <Pressable
                     onPress={() => removeSlot(index)}
                     style={styles.removeButton}
-                    accessibilityLabel={`Remove slot ${index + 1}`}
+                    accessibilityLabel={`Remove day ${activeDay} slot ${activeSlotIndex + 1}`}
                   >
                     <Text style={styles.removeText}>X</Text>
                   </Pressable>
@@ -543,14 +733,14 @@ export function RoutineTemplateBuilder({
                 onPress={() => openPicker(index)}
                 style={styles.pickerButton}
                 accessibilityRole="button"
-                accessibilityLabel={`Select movement for slot ${index + 1}`}
+                accessibilityLabel={`Select movement for day ${activeDay} slot ${activeSlotIndex + 1}`}
               >
                 <Text style={styles.pickerButtonText}>
                   {m ? m.name : 'Select movement...'}
                 </Text>
               </Pressable>
               {m !== undefined && (() => {
-                const defaults = defaultComposition.slots.find((candidate) => candidate.movementId === m.movement_id);
+                const defaults = defaultBySlotId.get(slot.id);
                 const peakRpe = slot.targetRpe ?? defaults?.targetRpe;
                 const majorProjection = slot.role === 'major' && peakRpe !== undefined
                   ? projectRoutineMajorRpe(peakRpe, schemaType, profile.base_rpe_cap)
@@ -585,7 +775,7 @@ export function RoutineTemplateBuilder({
                             style={[styles.doseInput, styles.projectedDose]}
                             accessible
                             accessibilityRole="text"
-                            accessibilityLabel={`Projected starting RPE for slot ${index + 1}: ${majorProjection.startRpe.toFixed(1)}`}
+                            accessibilityLabel={`Projected starting RPE for day ${activeDay} slot ${activeSlotIndex + 1}: ${majorProjection.startRpe.toFixed(1)}`}
                           >
                             <Text style={styles.projectedDoseText}>{majorProjection.startRpe.toFixed(1)}</Text>
                           </View>
@@ -605,7 +795,7 @@ export function RoutineTemplateBuilder({
                       </View>
                     </View>
                     {majorProjection !== undefined && (
-                      <Text style={styles.projectionNote} testID={`major-rpe-projection-note-${index + 1}`}>
+                      <Text style={styles.projectionNote} testID={`major-rpe-projection-note-${activeSlotIndex + 1}`}>
                         Projected loading range: RPE {majorProjection.startRpe.toFixed(1)} start to {majorProjection.maxRpe.toFixed(1)} max. Week 4 deloads to RPE {majorProjection.weekTargets[3].toFixed(1)}; readiness and autoregulation can lower the live target.
                       </Text>
                     )}
@@ -616,43 +806,72 @@ export function RoutineTemplateBuilder({
           );
         })}
 
-        {/* Add Slot Actions */}
-        {slots.length < 6 && (
-          <View style={styles.addSlotRow}>
-            <Text style={styles.captionText}>Add slot:</Text>
-            <Chip label="+ Major" selected={false} disabled={roleCount('major') >= roleMaxima.major} onPress={() => addSlot('major')} />
-            <Chip label="+ Supp" selected={false} disabled={roleCount('supplementary') >= roleMaxima.supplementary} onPress={() => addSlot('supplementary')} />
-            <Chip label="+ Cond" selected={false} disabled={roleCount('conditional') >= roleMaxima.conditional} onPress={() => addSlot('conditional')} />
-          </View>
-        )}
+        {/* Add Slot Actions: accessory remains last because it depends on all chosen work. */}
+        <View style={styles.addSlotRow}>
+          <Text style={styles.captionText}>Add slot:</Text>
+          <Chip label="+ Major" selected={false} onPress={() => addSlot('major')} />
+          <Chip label="+ Supp" selected={false} onPress={() => addSlot('supplementary')} />
+          <Chip label="+ Cond" selected={false} disabled={roleEligibleSets.conditional.size === 0} onPress={() => addSlot('conditional')} />
+          <Chip label="+ Accessory last" selected={false} disabled={activeMajorIds.length === 0} onPress={() => addSlot('accessory')} />
+        </View>
       </View>
 
       {/* Composition Preview */}
-      {composed.slots.length > 0 && (
+      {validSelections.length > 0 && (
         <View style={styles.previewCard}>
-          <Text style={styles.previewTitle}>Prescription Preview</Text>
+          <Text style={styles.previewTitle}>Complete Microcycle Stress Review</Text>
+          {composed.blockers.map((blocker, i) => (
+            <Text key={`blocker-${i}`} style={styles.errorText}>Blocked: {blocker}</Text>
+          ))}
           {composed.warnings.map((warn, i) => (
-            <Text key={i} style={styles.warningText}>
+            <Text key={`warning-${i}`} style={styles.warningText}>
               Warning: {warn}
             </Text>
           ))}
-          {composed.slots.map((s) => {
+          {composed.recommendations.map((recommendation, i) => (
+            <Text key={`recommendation-${i}`} style={styles.reasonText}>
+              Recommendation: {recommendation}
+            </Text>
+          ))}
+          {composed.familyDecisions.map((decision) => {
+            const session = decision.sessions.find((candidate) => candidate.dayIndex === activeDay);
+            return (
+              <View key={decision.family} style={styles.suggestionNote} testID={`family-stress-${decision.family}`}>
+                <Text style={styles.suggestionTitle}>
+                  {decision.family.replace('_', ' ')}: week {decision.initialStress.toFixed(1)} → {decision.finalStress.toFixed(1)}/{decision.weeklyBudget.toFixed(1)} ({decision.level})
+                </Text>
+                <Text style={styles.reasonText}>
+                  {decision.exposureCount} weekly exposure{decision.exposureCount === 1 ? '' : 's'} · {decision.variationCount} distinct variation{decision.variationCount === 1 ? '' : 's'} · {decision.equivalentVolume.toFixed(1)} weighted equivalent reps
+                </Text>
+                {session !== undefined && (
+                  <Text style={styles.reasonText}>
+                    Day {activeDay}: {session.initialStress.toFixed(1)} → {session.finalStress.toFixed(1)}/{session.budget.toFixed(1)} · one family exposure across {session.variationCount} variation{session.variationCount === 1 ? '' : 's'}
+                  </Text>
+                )}
+                {decision.adaptations.map((adaptation, index) => (
+                  <Text key={index} style={styles.warningText}>Adaptation: {adaptation}</Text>
+                ))}
+              </View>
+            );
+          })}
+          <Text style={styles.previewTitle}>Day {activeDay} Prescription</Text>
+          {composed.prescriptions.filter((s) => s.dayIndex === activeDay).map((s) => {
             const m = movements.find((item) => item.movement_id === s.movementId);
-            const authored = slots.find((slot) => slot.movementId === s.movementId);
-            const sets = authored?.sets ?? s.sets;
-            const reps = authored?.reps ?? s.reps;
-            const targetRpe = authored?.targetRpe ?? s.targetRpe;
             const majorProjection = s.role === 'major'
-              ? projectRoutineMajorRpe(targetRpe, schemaType, profile.base_rpe_cap)
+              ? projectRoutineMajorRpe(s.targetRpe, schemaType, profile.base_rpe_cap)
               : undefined;
             return (
-              <View key={s.slotIndex} style={styles.previewSlotRow}>
+              <View key={`${s.dayIndex}:${s.sourceSlotIndex}`} style={styles.previewSlotRow}>
                 <Text style={styles.previewSlotName}>{m?.name ?? `Movement ${s.movementId}`}</Text>
                 <Text style={styles.previewSlotDose}>
-                  {sets} sets x {reps} reps @ {majorProjection === undefined
-                    ? `RPE ${targetRpe.toFixed(1)}`
+                  {s.included ? `${s.sets} sets x ${s.reps} reps @ ` : 'OMITTED · '}{majorProjection === undefined
+                    ? `RPE ${s.targetRpe.toFixed(1)}`
                     : `RPE ${majorProjection.startRpe.toFixed(1)} start / ${majorProjection.maxRpe.toFixed(1)} max`}
+                  {s.family === null ? '' : ` · ${s.stressCoefficient.toFixed(2)}x · ${s.purpose?.replace('_', '-')}`}
                 </Text>
+                {s.adaptations.map((adaptation, index) => (
+                  <Text key={index} style={styles.reasonText}>{adaptation}</Text>
+                ))}
               </View>
             );
           })}
@@ -700,8 +919,17 @@ export function RoutineTemplateBuilder({
                 </Text>
               </View>
             )}
+            {accessoryRecommendationMap.size > 0
+              && pickerSlotIndex !== null && slots[pickerSlotIndex]?.role === 'accessory' && (
+              <View style={styles.suggestionNote} testID="accessory-recommendation-note">
+                <Text style={styles.suggestionTitle}>Accessories offered last</Text>
+                <Text style={styles.reasonText}>
+                  Ranked from uncovered stimulus, goal, current availability, duplication, time and remaining fatigue. Zero recommendations is valid.
+                </Text>
+              </View>
+            )}
             <FlatList
-              key={`movement-picker-${pickerSlotIndex ?? 'closed'}-${selectedMajor?.movement_id ?? 'none'}`}
+              key={`movement-picker-${pickerSlotIndex ?? 'closed'}-${activeMajorIds.join('-') || 'none'}`}
               testID="movement-picker-list"
               style={styles.pickerList}
               data={pickerRows}
@@ -749,7 +977,7 @@ export function RoutineTemplateBuilder({
                       {recommendation !== undefined && (
                         <Text
                           style={styles.suggestionBadgeText}
-                          accessibilityLabel={`Suggested supplementary movement rank ${recommendation.rank}: ${recommendation.reason}`}
+                          accessibilityLabel={`Suggested ${slots[pickerSlotIndex ?? 0]?.role ?? 'movement'} rank ${recommendation.rank}: ${recommendation.reason}`}
                         >
                           #{recommendation.rank} SUGGESTED · {recommendation.reason}
                         </Text>
@@ -1008,6 +1236,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.space[2],
     marginTop: theme.space[1],
+    flexWrap: 'wrap',
   },
   captionText: {
     ...theme.font.label,
@@ -1030,9 +1259,8 @@ const styles = StyleSheet.create({
     color: theme.color.chalk,
   },
   previewSlotRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingVertical: theme.space[1],
+    gap: theme.space[1],
   },
   previewSlotName: {
     ...theme.font.body,

@@ -56,7 +56,8 @@ import {
 import {
   buildPatternWindow,
   addDaysIso,
-  composeRoutine,
+  composeRoutineMicrocycle,
+  contextualRoutineRoles,
   computeSubstitutions,
   DEFAULT_PROFILE,
   detectFlaws,
@@ -94,12 +95,16 @@ import {
   triage,
   type CapabilityEdge,
   type CapabilityEvidence,
-  type ComposedRoutine,
   type DaySwapOption,
   type MovementAvailability,
   type MovementAccessContext,
   type ExecutableMovementAccessContext,
   type RoutineRole,
+  type RoutineAssistanceContract,
+  type RoutineFamilyStressDecision,
+  type RoutineLiftFamilyContract,
+  type RoutineSessionFamilyStress,
+  type RoutineStressPurpose,
   type DifficultyRating,
   type Embedder,
   type BlockPlan,
@@ -414,6 +419,16 @@ export interface TodaySlot {
   overrideReason: string | null;
   /** Optional planned_slot_autopilot provenance; absent means untouched. */
   autopilot?: AutopilotAttribution;
+  /** Frozen bounded-dose decision for routine-derived slots. */
+  routineDecision?: {
+    role: RoutineRole;
+    family: string | null;
+    purpose: RoutineStressPurpose | null;
+    stressCoefficient: number;
+    equivalentVolume: number;
+    stressDose: number;
+    adaptations: string[];
+  };
 }
 
 /** The active block's periodization metadata (block_meta side-car). */
@@ -430,6 +445,18 @@ export interface TodayPlan {
   focus: string;
   phase: string;
   slots: TodaySlot[];
+  routineStress: {
+    routineDayIndex: number;
+    familyDecisions: RoutineFamilyStressDecision[];
+    warnings: string[];
+    recommendations: string[];
+    adaptations: string[];
+  } | null;
+}
+
+export interface RoutinePlanningContract {
+  liftFamilies: RoutineLiftFamilyContract[];
+  assistance: RoutineAssistanceContract[];
 }
 
 export interface TrainingProgramMovementPreference {
@@ -819,6 +846,7 @@ interface KineticsStore {
     context: MovementAccessContext,
   ) => readonly MovementAvailability[];
   getRoutineRoleEligibleMovementIds: () => Record<RoutineRole, readonly number[]>;
+  getRoutinePlanningContract: () => RoutinePlanningContract;
 }
 
 // ---------------------------------------------------------------------------
@@ -1235,13 +1263,87 @@ const executionContextForState = (state: Pick<
 
 const routineRoleEligibility = (d: DB): Record<RoutineRole, ReadonlySet<number>> => {
   const result: Record<RoutineRole, Set<number>> = {
-    major: new Set<number>(), supplementary: new Set<number>(), conditional: new Set<number>(),
+    major: new Set<number>(), supplementary: new Set<number>(), accessory: new Set<number>(), conditional: new Set<number>(),
   };
   const rows = rowsOf<{ movement_id: number; role: RoutineRole }>(d.executeSync(
     'SELECT movement_id, role FROM movement_role_eligibility ORDER BY role, movement_id',
   ));
   for (const row of rows) result[row.role].add(row.movement_id);
   return result;
+};
+
+const routinePlanningContract = (d: DB): RoutinePlanningContract => ({
+  liftFamilies: rowsOf<{
+    movement_id: number; family: string; stress_coefficient: number;
+    preferred_purpose: RoutineStressPurpose | null;
+  }>(d.executeSync(
+    `SELECT movement_id, family, stress_coefficient, preferred_purpose
+       FROM movement_lift_family ORDER BY family, movement_id`,
+  )).map((row) => ({
+    movementId: row.movement_id,
+    family: row.family,
+    stressCoefficient: row.stress_coefficient,
+    preferredPurpose: row.preferred_purpose,
+  })),
+  assistance: rowsOf<{
+    major_family: string; movement_id: number; distance: number;
+    stress_factor: number; fatigue_cost: number; reason: string;
+  }>(d.executeSync(
+    `SELECT major_family, movement_id, distance, stress_factor, fatigue_cost, reason
+       FROM movement_assistance_relationship ORDER BY major_family, distance, movement_id`,
+  )).map((row) => ({
+    family: row.major_family,
+    movementId: row.movement_id,
+    distance: row.distance as 1 | 2 | 3,
+    stressFactor: row.stress_factor,
+    fatigueCost: row.fatigue_cost,
+    reason: row.reason,
+  })),
+});
+
+const ROUTINE_STRESS_PURPOSES = new Set<RoutineStressPurpose>([
+  'heavy', 'volume', 'technique', 'speed', 'low_fatigue',
+]);
+const ROUTINE_STRESS_LEVELS = new Set(['low', 'moderate', 'high']);
+const isFiniteNonnegative = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const isRoutineSessionFamilyStress = (value: unknown): value is RoutineSessionFamilyStress => {
+  if (typeof value !== 'object' || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return Number.isInteger(row.dayIndex) && Number(row.dayIndex) >= 1 && Number(row.dayIndex) <= 7
+    && row.exposureCount === 1
+    && Number.isInteger(row.variationCount) && Number(row.variationCount) >= 1
+    && isFiniteNonnegative(row.equivalentVolume)
+    && isFiniteNonnegative(row.initialStress)
+    && isFiniteNonnegative(row.finalStress)
+    && isFiniteNonnegative(row.budget)
+    && typeof row.level === 'string' && ROUTINE_STRESS_LEVELS.has(row.level);
+};
+const isRoutineFamilyStressDecision = (value: unknown): value is RoutineFamilyStressDecision => {
+  if (typeof value !== 'object' || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.family === 'string' && row.family.length > 0
+    && Number.isInteger(row.exposureCount) && Number(row.exposureCount) >= 1
+    && Number.isInteger(row.variationCount) && Number(row.variationCount) >= 1
+    && isFiniteNonnegative(row.equivalentVolume)
+    && isFiniteNonnegative(row.initialStress)
+    && isFiniteNonnegative(row.finalStress)
+    && isFiniteNonnegative(row.weeklyBudget)
+    && typeof row.level === 'string' && ROUTINE_STRESS_LEVELS.has(row.level)
+    && Array.isArray(row.purposes) && row.purposes.every(
+      (purpose) => typeof purpose === 'string'
+        && ROUTINE_STRESS_PURPOSES.has(purpose as RoutineStressPurpose),
+    )
+    && Array.isArray(row.sessions) && row.sessions.every(isRoutineSessionFamilyStress)
+    && Array.isArray(row.adaptations) && row.adaptations.every((item) => typeof item === 'string');
+};
+const parseRoutineFamilyDecisions = (json: string | null): RoutineFamilyStressDecision[] => {
+  try {
+    const value = JSON.parse(json ?? '[]') as unknown;
+    return Array.isArray(value) ? value.filter(isRoutineFamilyStressDecision) : [];
+  } catch {
+    return [];
+  }
 };
 // --- profile row <-> object mapping ------------------------------------------
 interface ProfileRow {
@@ -3053,6 +3155,15 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // Rest-day fallback: no planned session today is a normal, renderable
     // state (todayPlan null) — never an error.
     const todayRow = blockSessions.find((s) => s.sessionDate === today);
+    const routineStressRow = todayRow === undefined ? undefined : rowsOf<{
+      routine_day_index: number; family_decisions_json: string; warnings_json: string;
+      recommendations_json: string; adaptations_json: string;
+    }>(d.executeSync(
+      `SELECT routine_day_index, family_decisions_json, warnings_json,
+              recommendations_json, adaptations_json
+         FROM planned_session_routine_context WHERE planned_session_id = ?`,
+      [todayRow.plannedSessionId],
+    ))[0];
     const todayPlan: TodayPlan | null = todayRow === undefined
       ? null
       : {
@@ -3060,6 +3171,13 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           focus: todayRow.focus,
           phase: todayRow.phase,
           slots: get().loadSessionSlots(todayRow.plannedSessionId),
+          routineStress: routineStressRow === undefined ? null : {
+            routineDayIndex: routineStressRow.routine_day_index,
+            familyDecisions: parseRoutineFamilyDecisions(routineStressRow.family_decisions_json),
+            warnings: parseStringArray(routineStressRow.warnings_json),
+            recommendations: parseStringArray(routineStressRow.recommendations_json),
+            adaptations: parseStringArray(routineStressRow.adaptations_json),
+          },
         };
     set({
       block: {
@@ -3290,9 +3408,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     return {
       major: [...eligible.major],
       supplementary: [...eligible.supplementary],
+      accessory: [...eligible.accessory],
       conditional: [...eligible.conditional],
     };
   },
+  getRoutinePlanningContract: () => routinePlanningContract(getDb()),
   loadRoutineTemplates: () => {
     const d = getDb();
     const templates = rowsOf<{
@@ -3350,9 +3470,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     if (!validSchemas.includes(input.schemaType)) {
       throw new Error(`Invalid schema type: ${input.schemaType}`);
     }
-    if (input.slots.length < 1 || input.slots.length > 6) {
-      throw new Error('A routine template must contain between 1 and 6 movements.');
-    }
+    if (input.slots.length < 1) throw new Error('A routine template must contain at least one movement.');
 
     if (profile.training_age === 'beginner') {
       throw new Error('Standalone routines unlock after the Beginner stage. Generated training remains available.');
@@ -3360,59 +3478,43 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const verdicts = get().getMovementAvailabilityVerdicts('weight_room');
     const availableSet = new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
     const roleEligibility = routineRoleEligibility(d);
-    // P2-2 (movement-access audit): every POPULATED routine day is its own
-    // executable session, so role maxima and the sole-major law are accounted
-    // per day rather than across the template, while the overall template
-    // ceiling and movement identity stay template-wide. That structural law is
-    // the shared pure groupRoutineTemplateDays; this store adds only the
-    // database-backed half (ratification, capability verdicts, dose bounds).
-    const placements = input.slots.map((item, index) => ({
-      dayIndex: item.dayIndex ?? 1,
-      slotIndex: item.slotIndex ?? index + 1,
-      movementId: item.movementId,
-      role: item.role,
-    }));
-    const daysByIndex = groupRoutineTemplateDays(placements);
-
-    for (const item of input.slots) {
-      if (!roleEligibility[item.role].has(item.movementId)) {
-        throw new Error(`Movement ${item.movementId} is not ratified for the ${item.role} role.`);
-      }
-      if (!availableSet.has(item.movementId)) {
-        throw new Error(`Movement ${item.movementId} is unavailable under the capability resolver.`);
-      }
-      if (item.sets !== undefined && (!Number.isInteger(item.sets) || item.sets < 1 || item.sets > 10)) {
-        throw new Error('Routine sets must be a whole number between 1 and 10.');
-      }
-      if (item.reps !== undefined && (!Number.isInteger(item.reps) || item.reps < 1 || item.reps > 100)) {
-        throw new Error('Routine reps must be a whole number between 1 and 100.');
-      }
-      if (item.targetRpe !== undefined &&
-          (!Number.isFinite(item.targetRpe) || item.targetRpe < 5 || item.targetRpe > profile.base_rpe_cap)) {
-        throw new Error(`Routine RPE must be between 5 and the athlete cap of ${profile.base_rpe_cap}.`);
-      }
-    }
-
-    // Each populated day composes independently: one day's duration cap, role
-    // budget and warnings can never be paid for out of another day's slots.
-    const composedByDay = new Map<number, ComposedRoutine>();
-    for (const [dayIndex, daySlots] of daysByIndex) {
-      const composedDay = composeRoutine({
-        selections: daySlots.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
-        schemaType: input.schemaType,
-        objective: profile.objective,
-        trainingAge: profile.training_age,
-        // Persist defaults for the complete six-slot day. The athlete's live
-        // duration cap is applied later when a particular session is frozen.
-        durationCapMin: Math.max(profile.session_duration_cap_min, 66),
-        baseRpeCap: profile.base_rpe_cap,
-        availableMovementIds: availableSet,
-      });
-      if (composedDay.slots.length !== daySlots.length) {
-        throw new Error(composedDay.warnings[0] ?? 'The routine could not be composed safely.');
-      }
-      composedByDay.set(dayIndex, composedDay);
-    }
+    const planningContract = routinePlanningContract(d);
+    const nextSlotByDay = new Map<number, number>();
+    const placements = input.slots.map((item) => {
+      const dayIndex = item.dayIndex ?? 1;
+      const automaticSlot = (nextSlotByDay.get(dayIndex) ?? 0) + 1;
+      nextSlotByDay.set(dayIndex, automaticSlot);
+      return {
+        dayIndex,
+        slotIndex: item.slotIndex ?? automaticSlot,
+        movementId: item.movementId,
+        role: item.role,
+      };
+    });
+    groupRoutineTemplateDays(placements);
+    const { movements } = get();
+    const analysis = composeRoutineMicrocycle({
+      selections: input.slots.map((item, index) => ({
+        ...placements[index], sets: item.sets, reps: item.reps, targetRpe: item.targetRpe,
+      })),
+      movements: movements.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+      liftFamilies: planningContract.liftFamilies,
+      assistance: planningContract.assistance,
+      roleEligibility,
+      schemaType: input.schemaType,
+      objective: profile.objective,
+      trainingAge: profile.training_age,
+      durationCapMin: profile.session_duration_cap_min,
+      baseRpeCap: profile.base_rpe_cap,
+      availableMovementIds: availableSet,
+    });
+    if (analysis.blockers.length > 0) throw new Error(analysis.blockers[0]);
 
     const now = Date.now();
     let templateId = input.routineTemplateId;
@@ -3440,13 +3542,15 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       for (let index = 0; index < input.slots.length; index += 1) {
         const item = input.slots[index];
         const placement = placements[index];
-        // Movement identity is unique template-wide, so the day's composition
-        // resolves to exactly one prescription for this slot.
-        const prescribed = composedByDay.get(placement.dayIndex)!.slots
-          .find((candidate) => candidate.movementId === item.movementId)!;
-        const sets = item.sets ?? prescribed.sets;
-        const reps = item.reps ?? prescribed.reps;
-        const targetRpe = item.targetRpe ?? prescribed.targetRpe;
+        const prescribed = analysis.prescriptions.find((candidate) =>
+          candidate.dayIndex === placement.dayIndex
+          && candidate.sourceSlotIndex === placement.slotIndex)!;
+        // A template stores the athlete-authored/defaulted request. Bounded
+        // values belong to the frozen session sidecars so a later freeze can
+        // still explain every support-first and major-dose adaptation.
+        const sets = prescribed.authoredSets;
+        const reps = prescribed.authoredReps;
+        const targetRpe = prescribed.authoredTargetRpe;
         d.executeSync(
           `INSERT INTO routine_template_slot (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -3501,31 +3605,44 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // P2-2: freezing executes ONE routine day. Only that day's movements are
     // validated and composed — another day's drifted role or teaching-only
     // movement neither blocks nor licenses this session.
+    const planningContract = routinePlanningContract(d);
     const daySlots = template.slots.filter((slot) => slot.dayIndex === routineDayIndex);
     if (daySlots.length === 0) throw new Error(`Routine template ${routineTemplateId} has no movements for day ${routineDayIndex}.`);
-    if (daySlots.filter((slot) => slot.role === 'major').length !== 1) {
-      throw new Error(`Routine day ${routineDayIndex} must contain exactly one major movement.`);
-    }
-    for (const slot of daySlots) {
-      if (!roleEligibility[slot.role].has(slot.movementId)) {
-        throw new Error(`${slot.movementName} is no longer ratified for the ${slot.role} role.`);
-      }
-      if (!availableSet.has(slot.movementId)) {
-        throw new Error(`${slot.movementName} is currently teaching-only. Edit the template before using it.`);
-      }
-    }
-
-    const composed = composeRoutine({
-      selections: daySlots.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
+    const analysis = composeRoutineMicrocycle({
+      selections: template.slots.map((slot) => ({
+        dayIndex: slot.dayIndex,
+        slotIndex: slot.slotIndex,
+        movementId: slot.movementId,
+        role: slot.role,
+        sets: slot.sets,
+        reps: slot.reps,
+        targetRpe: slot.targetRpe,
+      })),
+      movements: movements.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+      liftFamilies: planningContract.liftFamilies,
+      assistance: planningContract.assistance,
+      roleEligibility,
       schemaType: template.schemaType,
       objective: profile.objective,
       trainingAge: profile.training_age,
       durationCapMin: profile.session_duration_cap_min,
       baseRpeCap: profile.base_rpe_cap,
       availableMovementIds: availableSet,
+      executionGateDayIndices: new Set([routineDayIndex]),
     });
-    if (composed.slots.length === 0) {
-      throw new Error('The current duration cap cannot fit any movement from this template.');
+    if (analysis.blockers.length > 0) throw new Error(analysis.blockers[0]);
+    const composedDay = analysis.prescriptions
+      .filter((slot) => slot.dayIndex === routineDayIndex && slot.included)
+      .sort((a, b) => (a.executionSlotIndex ?? Number.MAX_SAFE_INTEGER)
+        - (b.executionSlotIndex ?? Number.MAX_SAFE_INTEGER));
+    if (composedDay.length === 0 || !composedDay.some((slot) => slot.role === 'major')) {
+      throw new Error('The current constraints cannot produce a valid major prescription for this routine day.');
     }
 
     d.executeSync('BEGIN');
@@ -3605,27 +3722,63 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         [plannedSessionId, template.schemaType, template.routineTemplateId, template.name, Date.now()],
       );
 
-      for (const composedSlot of composed.slots) {
-        const savedSlot = daySlots.find((slot) => slot.movementId === composedSlot.movementId)!;
+      d.executeSync(
+        `INSERT INTO planned_session_routine_context
+           (planned_session_id, routine_day_index, family_decisions_json, warnings_json,
+            recommendations_json, adaptations_json)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(planned_session_id) DO UPDATE SET
+           routine_day_index = excluded.routine_day_index,
+           family_decisions_json = excluded.family_decisions_json,
+           warnings_json = excluded.warnings_json,
+           recommendations_json = excluded.recommendations_json,
+           adaptations_json = excluded.adaptations_json`,
+        [
+          plannedSessionId,
+          routineDayIndex,
+          JSON.stringify(analysis.familyDecisions),
+          JSON.stringify(analysis.warnings),
+          JSON.stringify(analysis.recommendations),
+          JSON.stringify(analysis.adaptations),
+        ],
+      );
+
+      for (const composedSlot of composedDay) {
         const movement = movements.find((candidate) => candidate.movement_id === composedSlot.movementId);
-        const target = targetForMovement(movement, savedSlot.reps);
-        const plannedSets = defaultSetsForTarget(movement, savedSlot.sets);
-        const legacyReps = target.kind === 'reps' ? Math.min(30, target.reps) : Math.min(30, savedSlot.reps);
+        const target = targetForMovement(movement, composedSlot.reps);
+        const plannedSets = defaultSetsForTarget(movement, composedSlot.sets);
+        const legacyReps = target.kind === 'reps' ? Math.min(30, target.reps) : Math.min(30, composedSlot.reps);
         // A major slot persists its peak target for backward compatibility;
         // freezing resolves the selected loading method to this block week's
         // actual target. Supplementary/conditional work retains its authored
         // constant target.
-        const frozenTargetRpe = savedSlot.role === 'major'
-          ? routineMajorRpeForWeek(savedSlot.targetRpe, template.schemaType, weekIndex, profile.base_rpe_cap)
-          : Math.min(savedSlot.targetRpe, profile.base_rpe_cap);
+        const frozenTargetRpe = composedSlot.role === 'major'
+          ? routineMajorRpeForWeek(composedSlot.targetRpe, template.schemaType, weekIndex, profile.base_rpe_cap)
+          : Math.min(composedSlot.targetRpe, profile.base_rpe_cap);
         d.executeSync(
           'INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, ?, ?, ?, ?)',
-          [plannedSessionId, composedSlot.slotIndex, savedSlot.movementId, plannedSets, legacyReps, frozenTargetRpe],
+          [plannedSessionId, composedSlot.executionSlotIndex, composedSlot.movementId, plannedSets, legacyReps, frozenTargetRpe],
         );
         const plannedSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
         d.executeSync(
           'INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds) VALUES (?, ?, ?, ?)',
           [plannedSlotId, target.kind, target.kind === 'reps' ? target.reps : null, target.kind === 'time' ? target.seconds : null],
+        );
+        d.executeSync(
+          `INSERT INTO planned_slot_routine_decision
+             (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+              equivalent_volume, stress_dose, adaptations_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            plannedSlotId,
+            composedSlot.role,
+            composedSlot.family,
+            composedSlot.purpose,
+            composedSlot.stressCoefficient,
+            composedSlot.equivalentVolume,
+            composedSlot.stressDose,
+            JSON.stringify(composedSlot.adaptations),
+          ],
         );
       }
 
@@ -3911,17 +4064,25 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       target_kind: string | null; target_reps: number | null; target_seconds: number | null;
       override_load_kg: number | null; override_reason: string | null;
       autopilot_rpe_delta: number | null; autopilot_set_delta: number | null; autopilot_reason: AutopilotAttributionReason | null;
+      routine_role: RoutineRole | null; lift_family: string | null;
+      stress_purpose: RoutineStressPurpose | null; stress_coefficient: number | null;
+      equivalent_volume: number | null; stress_dose: number | null;
+      routine_adaptations_json: string | null;
     }>(getDb().executeSync(
       `SELECT sl.slot_index, sl.planned_slot_id, sl.movement_id, m.name AS movement_name,
               sl.sets, sl.reps, sl.target_rpe,
               st.target_kind, st.target_reps, st.target_seconds,
               pa.rpe_delta AS autopilot_rpe_delta, pa.set_delta AS autopilot_set_delta, pa.reason AS autopilot_reason,
-              so.target_load_kg AS override_load_kg, so.reason AS override_reason
+              so.target_load_kg AS override_load_kg, so.reason AS override_reason,
+              rd.role AS routine_role, rd.lift_family, rd.stress_purpose,
+              rd.stress_coefficient, rd.equivalent_volume, rd.stress_dose,
+              rd.adaptations_json AS routine_adaptations_json
        FROM planned_slot sl
        JOIN movement m ON m.movement_id = sl.movement_id
        LEFT JOIN planned_slot_target st ON st.planned_slot_id = sl.planned_slot_id
        LEFT JOIN planned_slot_autopilot pa ON pa.planned_slot_id = sl.planned_slot_id
        LEFT JOIN slot_override so ON so.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_routine_decision rd ON rd.planned_slot_id = sl.planned_slot_id
        WHERE sl.planned_session_id = ?
          AND sl.planned_slot_id NOT IN (SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped')
        ORDER BY sl.slot_index`,
@@ -3942,6 +4103,15 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         rpeDelta: sl.autopilot_rpe_delta ?? 0,
         setDelta: sl.autopilot_set_delta ?? 0,
         reason: sl.autopilot_reason,
+      },
+      routineDecision: sl.routine_role === null ? undefined : {
+        role: sl.routine_role,
+        family: sl.lift_family,
+        purpose: sl.stress_purpose,
+        stressCoefficient: sl.stress_coefficient ?? 0,
+        equivalentVolume: sl.equivalent_volume ?? 0,
+        stressDose: sl.stress_dose ?? 0,
+        adaptations: parseStringArray(sl.routine_adaptations_json),
       },
     }));
   },
@@ -4004,8 +4174,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     if (planToConsume !== null) {
-      const routineProvenance = rowsOf<{ routine_template_id: number | null }>(d.executeSync(
-        'SELECT routine_template_id FROM planned_session_method WHERE planned_session_id = ?',
+      const routineProvenance = rowsOf<{
+        routine_template_id: number | null; routine_day_index: number | null;
+      }>(d.executeSync(
+        `SELECT psm.routine_template_id, prc.routine_day_index
+           FROM planned_session_method psm
+           LEFT JOIN planned_session_routine_context prc
+             ON prc.planned_session_id = psm.planned_session_id
+          WHERE psm.planned_session_id = ?`,
         [planToConsume.plannedSessionId],
       ))[0];
       // The snapshot survives template deletion, so row existence is the
@@ -4015,15 +4191,31 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         return;
       }
       if (routineProvenance !== undefined) {
-        if (routineProvenance.routine_template_id === null) {
+        if (routineProvenance.routine_day_index === null && routineProvenance.routine_template_id === null) {
           set({ error: 'This routine\'s source template no longer exists, so its role eligibility cannot be verified. Rebuild it before starting.' });
           return;
         }
-        const frozenTemplateRoles = rowsOf<{ movement_id: number; role: RoutineRole }>(d.executeSync(
-          `SELECT movement_id, role FROM routine_template_slot
-           WHERE routine_template_id = ? ORDER BY day_index, slot_index`,
-          [routineProvenance.routine_template_id],
-        ));
+        if (routineProvenance.routine_day_index !== null
+            && (planToConsume.routineStress === null
+              || planToConsume.routineStress.familyDecisions.length === 0)) {
+          set({ error: 'This routine\'s frozen stress review is missing or invalid. Edit and refreeze it before starting.' });
+          return;
+        }
+        const frozenTemplateRoles = routineProvenance.routine_day_index !== null
+          ? rowsOf<{ movement_id: number; role: RoutineRole }>(d.executeSync(
+              `SELECT ps.movement_id, rd.role
+                 FROM planned_slot ps
+                 JOIN planned_slot_routine_decision rd USING (planned_slot_id)
+                WHERE ps.planned_session_id = ? ORDER BY ps.slot_index`,
+              [planToConsume.plannedSessionId],
+            ))
+          : routineProvenance.routine_template_id === null
+            ? []
+            : rowsOf<{ movement_id: number; role: RoutineRole }>(d.executeSync(
+                `SELECT movement_id, role FROM routine_template_slot
+                 WHERE routine_template_id = ? ORDER BY day_index, slot_index`,
+                [routineProvenance.routine_template_id],
+              ));
         const currentRoleEligibility = routineRoleEligibility(d);
         if (!isRoutineRoleSnapshotExecutable(
           planToConsume.slots.map((slot) => slot.movementId),
@@ -4031,6 +4223,22 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           currentRoleEligibility,
         )) {
           set({ error: 'This routine no longer satisfies its current movement-role policy. Edit and refreeze it before starting.' });
+          return;
+        }
+        const planningContract = routinePlanningContract(d);
+        const plannedMovementIds = new Set(planToConsume.slots.map((slot) => slot.movementId));
+        const frozenPlanRoles = frozenTemplateRoles.filter((row) => plannedMovementIds.has(row.movement_id));
+        const majorMovementIds = frozenPlanRoles
+          .filter((row) => row.role === 'major')
+          .map((row) => row.movement_id);
+        if (frozenPlanRoles.some((row) => !contextualRoutineRoles(
+          row.movement_id,
+          majorMovementIds,
+          planningContract.liftFamilies,
+          planningContract.assistance,
+          currentRoleEligibility,
+        ).has(row.role))) {
+          set({ error: 'This routine no longer satisfies its current lift-family role contract. Edit and refreeze it before starting.' });
           return;
         }
       }
@@ -4048,9 +4256,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         const effectiveRpe = Math.min(sl.targetRpe, rpeSafetyCap);
         const movement = movements.find((m) => m.movement_id === sl.movementId);
         const adjustedSets = Math.round(clamp(sl.sets + setDelta, 1, 6));
-        // A readiness adjustment can only remove timed work; policy bounds the
-        // default dose and a good-readiness day never expands it.
-        const plannedSets = sl.target.kind === 'time'
+        // Timed policies and complete-microcycle routine analysis both own a
+        // hard upper dose. Readiness may ease either prescription, but a good
+        // day cannot silently grow it past the frozen bound.
+        const plannedSets = sl.target.kind === 'time' || sl.routineDecision !== undefined
           ? Math.min(sl.sets, adjustedSets)
           : adjustedSets;
         return {
@@ -5449,7 +5658,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM session_slot_target');
       d.executeSync('DELETE FROM planned_slot_disposition');
       d.executeSync('DELETE FROM planned_slot_autopilot');
+      d.executeSync('DELETE FROM planned_slot_routine_decision');
       d.executeSync('DELETE FROM planned_slot_target');
+      d.executeSync('DELETE FROM planned_session_routine_context');
       d.executeSync('DELETE FROM planned_session_method');
       d.executeSync('DELETE FROM session_plan_slot');
       d.executeSync('DELETE FROM session_origin');

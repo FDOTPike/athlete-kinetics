@@ -9,7 +9,7 @@
  * a `.sql` import would otherwise be a parse error. This transformer
  * reproduces exactly the same contract — a `.sql` module's default export is
  * its file contents — which is what lets a component test boot the REAL
- * zustand store against the REAL 001-051 migration chain instead of a
+ * zustand store against the REAL production migration chain instead of a
  * hand-written schema subset.
  *
  * It is a test-only loader: it introduces no production behaviour and cannot

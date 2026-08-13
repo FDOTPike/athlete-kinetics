@@ -192,7 +192,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     RoutineTemplate | 'new' | null
   >(null);
   const [confirmRoutineAction, setConfirmRoutineAction] = useState<{
-    kind: 'use' | 'delete'; routineTemplateId: number;
+    kind: 'use' | 'delete'; routineTemplateId: number; routineDayIndex?: number;
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
@@ -218,14 +218,16 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     else if (confirmUnplannedStart) setConfirmUnplannedStart(false);
   });
 
-  const requestRoutineAction = (kind: 'use' | 'delete', routineTemplateId: number): void => {
+  const requestRoutineAction = (
+    kind: 'use' | 'delete', routineTemplateId: number, routineDayIndex?: number,
+  ): void => {
     if (kind === 'use' && profile.training_age === 'beginner') {
       setRoutineActionMessage('Standalone routines unlock after the Beginner stage. Generated training remains available.');
       return;
     }
     setRoutineActionMessage(null);
     setBlockArchivedNotice(null);
-    setConfirmRoutineAction({ kind, routineTemplateId });
+    setConfirmRoutineAction({ kind, routineTemplateId, routineDayIndex });
   };
 
   const confirmSelectedRoutineAction = (template: RoutineTemplate): void => {
@@ -237,8 +239,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         setRoutineActionMessage(`${template.name} was deleted.`);
         setBlockArchivedNotice(null);
       } else {
-        const result = freezeRoutineTemplateToPlannedSession(template.routineTemplateId);
-        setRoutineActionMessage(`${template.name} is frozen into today's plan.`);
+        const routineDayIndex = action.routineDayIndex ?? 1;
+        const result = freezeRoutineTemplateToPlannedSession(template.routineTemplateId, undefined, routineDayIndex);
+        setRoutineActionMessage(`${template.name} day ${routineDayIndex} is frozen into today's plan.`);
         if (result.archivedPreviousBlock) {
           setBlockArchivedNotice('Your previous block had ended. A new block was started.');
         } else {
@@ -659,6 +662,19 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   <View style={styles.slotMain}>
                     <Text style={styles.slotName}>{slot.movementName}</Text>
                     <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes)}</Text>
+                    {slot.routineDecision !== undefined && (
+                      <>
+                        <Text style={styles.captionText}>
+                          {slot.routineDecision.role.toUpperCase()}
+                          {slot.routineDecision.family === null ? '' : ` · ${slot.routineDecision.family.replace('_', ' ')}`}
+                          {slot.routineDecision.purpose === null ? '' : ` · ${slot.routineDecision.purpose.replace('_', '-')}`}
+                          {slot.routineDecision.family === null ? '' : ` · ${slot.routineDecision.stressCoefficient.toFixed(2)}x coefficient · ${slot.routineDecision.equivalentVolume.toFixed(1)} equivalent reps`}
+                        </Text>
+                        {slot.routineDecision.adaptations.map((adaptation, index) => (
+                          <Text key={index} style={styles.adjustedText}>Adaptation: {adaptation}</Text>
+                        ))}
+                      </>
+                    )}
                     <AutopilotAttribution
                       slot={slot}
                       expanded={attributionSlotId === slot.plannedSlotId}
@@ -667,6 +683,38 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   </View>
                 </View>
               ))}
+              {todayPlan.routineStress != null && (
+                <View style={styles.disclosureContent} testID="today-routine-stress-review">
+                  <Text style={styles.eyebrow}>ROUTINE DAY {todayPlan.routineStress.routineDayIndex} STRESS</Text>
+                  {todayPlan.routineStress.familyDecisions.map((decision) => {
+                    const sessionDecision = decision.sessions.find(
+                      (sessionStress) => sessionStress.dayIndex === todayPlan.routineStress?.routineDayIndex,
+                    );
+                    return (
+                      <View key={decision.family}>
+                        <Text style={styles.slotName}>{decision.family.replace('_', ' ')}</Text>
+                        <Text style={styles.captionText}>
+                          Week {decision.initialStress.toFixed(1)} → {decision.finalStress.toFixed(1)}/{decision.weeklyBudget.toFixed(1)} · {decision.exposureCount} exposure{decision.exposureCount === 1 ? '' : 's'} · {decision.variationCount} distinct variation{decision.variationCount === 1 ? '' : 's'}
+                        </Text>
+                        {sessionDecision !== undefined && (
+                          <Text style={styles.captionText}>
+                            Session {sessionDecision.initialStress.toFixed(1)} → {sessionDecision.finalStress.toFixed(1)}/{sessionDecision.budget.toFixed(1)} · one family exposure across {sessionDecision.variationCount} variation{sessionDecision.variationCount === 1 ? '' : 's'}
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                  {todayPlan.routineStress.warnings.map((warning, index) => (
+                    <Text key={`warning-${index}`} style={styles.adjustedText}>Warning: {warning}</Text>
+                  ))}
+                  {todayPlan.routineStress.recommendations.map((recommendation, index) => (
+                    <Text key={`recommendation-${index}`} style={styles.captionText}>Recommendation: {recommendation}</Text>
+                  ))}
+                  {todayPlan.routineStress.adaptations.map((adaptation, index) => (
+                    <Text key={`adaptation-${index}`} style={styles.adjustedText}>Adaptation: {adaptation}</Text>
+                  ))}
+                </View>
+              )}
             </View>
           </Disclosure>
         )}
@@ -686,14 +734,16 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   <View style={styles.slotMain}>
                     <Text style={styles.slotName}>{t.name}</Text>
                     <Text style={styles.slotTarget}>
-                      {SCHEMA_LABEL[t.schemaType]} - {t.slots.length} movements
+                      {SCHEMA_LABEL[t.schemaType]} - {t.slots.length} movements across {new Set(t.slots.map((slot) => slot.dayIndex)).size} day{new Set(t.slots.map((slot) => slot.dayIndex)).size === 1 ? '' : 's'}
                     </Text>
                   </View>
                   <View style={styles.routineActions}>
                     {confirmRoutineAction?.routineTemplateId === t.routineTemplateId ? (
                       <>
                         <Chip
-                          label={confirmRoutineAction.kind === 'delete' ? 'Confirm delete' : 'Confirm replace'}
+                          label={confirmRoutineAction.kind === 'delete'
+                            ? 'Confirm delete'
+                            : `Confirm day ${confirmRoutineAction.routineDayIndex ?? 1}`}
                           selected={false}
                           onPress={() => confirmSelectedRoutineAction(t)}
                         />
@@ -703,7 +753,14 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                       <>
                         {profile.training_age !== 'beginner' && (
                           <>
-                            <Chip label="Use today" selected={false} onPress={() => requestRoutineAction('use', t.routineTemplateId)} />
+                            {[...new Set(t.slots.map((slot) => slot.dayIndex))].sort((a, b) => a - b).map((dayIndex) => (
+                              <Chip
+                                key={dayIndex}
+                                label={`Use day ${dayIndex} today`}
+                                selected={false}
+                                onPress={() => requestRoutineAction('use', t.routineTemplateId, dayIndex)}
+                              />
+                            ))}
                             <Chip label="Edit" selected={false} onPress={() => setEditingTemplate(t)} />
                           </>
                         )}

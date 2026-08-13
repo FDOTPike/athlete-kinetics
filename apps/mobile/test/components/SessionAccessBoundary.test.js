@@ -9,7 +9,7 @@
  *
  * These are behavioural tests, not source-string assertions. They run the REAL
  * zustand store, booted by the REAL production boot path, over the REAL
- * 001-051 migration chain, against real library records pinned by name. The
+ * production migration chain, against real library records pinned by name. The
  * only substitution is the storage driver: op-sqlite's synchronous JSI handle
  * is replaced by node:sqlite behind the exact `executeSync` surface the
  * production DAO speaks. Everything above that line — pragmas, the migration
@@ -131,7 +131,7 @@ const startSessionWith = async (movementIds, { confirmPriorExperienceFor = [] } 
   return { useStore, raw, sessionId: state.session.sessionId };
 };
 
-describe('logSet access boundary (real store, real 001-051 chain)', () => {
+describe('logSet access boundary (real store, real production chain)', () => {
   test('an available control movement still logs, and the write lands in full', async () => {
     const { useStore, raw, sessionId } = await startSessionWith([SUMO_DEADLIFT]);
     const slot = useStore.getState().sessionPlan[0];
@@ -290,5 +290,111 @@ describe('logSet access boundary (real store, real 001-051 chain)', () => {
       'Training is halted. Finish the session before logging more work.',
     );
     expect(count(raw, 'SELECT COUNT(*) AS c FROM set_record WHERE session_id = ?', [sessionId])).toBe(0);
+  });
+});
+
+describe('bounded routine store path (real store, real production chain)', () => {
+  test('freezes Board Press plus Competition Bench as one weighted exposure and survives template deletion', async () => {
+    const { useStore, raw } = await bootStore();
+    useStore.getState().saveProfile({
+      training_age: 'elite',
+      session_duration_cap_min: 120,
+      equipment_inventory: [...OWNED_EQUIPMENT, 'bands', 'boards'],
+    });
+    const idOf = (name) => Number(raw.prepare(
+      'SELECT movement_id FROM movement WHERE name = ?',
+    ).get(name).movement_id);
+    const boardPressId = idOf('Board Press');
+    const competitionBenchId = idOf('Competition Bench');
+
+    const template = useStore.getState().saveRoutineTemplate({
+      name: 'Distributed bench day',
+      schemaType: 'LINEAR',
+      slots: [
+        { dayIndex: 1, slotIndex: 1, movementId: boardPressId, role: 'major', sets: 2, reps: 6, targetRpe: 8 },
+        { dayIndex: 1, slotIndex: 2, movementId: competitionBenchId, role: 'major', sets: 3, reps: 7, targetRpe: 8 },
+      ],
+    });
+    expect(template.slots.map((slot) => [slot.movementId, slot.sets, slot.reps])).toEqual([
+      [boardPressId, 2, 6], [competitionBenchId, 3, 7],
+    ]);
+
+    const frozen = useStore.getState().freezeRoutineTemplateToPlannedSession(
+      template.routineTemplateId, undefined, 1,
+    );
+    const context = raw.prepare(`
+      SELECT family_decisions_json FROM planned_session_routine_context
+      WHERE planned_session_id = ?
+    `).get(frozen.plannedSessionId);
+    const benchDecision = JSON.parse(context.family_decisions_json)
+      .find((decision) => decision.family === 'bench_press');
+    expect(benchDecision).toMatchObject({
+      exposureCount: 1,
+      variationCount: 2,
+      equivalentVolume: 31.8,
+    });
+    expect(benchDecision.sessions[0]).toMatchObject({
+      exposureCount: 1,
+      variationCount: 2,
+      equivalentVolume: 31.8,
+    });
+    const frozenSlots = raw.prepare(`
+      SELECT ps.movement_id, ps.sets, ps.reps, rd.lift_family, rd.stress_purpose,
+             rd.stress_coefficient, rd.equivalent_volume
+      FROM planned_slot ps
+      JOIN planned_slot_routine_decision rd USING (planned_slot_id)
+      WHERE ps.planned_session_id = ? ORDER BY ps.slot_index
+    `).all(frozen.plannedSessionId);
+    expect(frozenSlots).toEqual([
+      expect.objectContaining({
+        movement_id: boardPressId, sets: 2, reps: 6, lift_family: 'bench_press',
+        stress_purpose: 'heavy', stress_coefficient: 0.9, equivalent_volume: 10.8,
+      }),
+      expect.objectContaining({
+        movement_id: competitionBenchId, sets: 3, reps: 7, lift_family: 'bench_press',
+        stress_purpose: 'volume', stress_coefficient: 1, equivalent_volume: 21,
+      }),
+    ]);
+
+    // Structurally valid but semantically corrupt review JSON must fail closed
+    // instead of silently starting a routine with no reviewable family stress.
+    raw.prepare(`
+      UPDATE planned_session_routine_context SET family_decisions_json = '[{}]'
+      WHERE planned_session_id = ?
+    `).run(frozen.plannedSessionId);
+    useStore.getState().refreshBlock();
+    useStore.getState().startSession();
+    expect(useStore.getState().session).toBeNull();
+    expect(useStore.getState().error).toContain('frozen stress review is missing or invalid');
+    raw.prepare(`
+      UPDATE planned_session_routine_context SET family_decisions_json = ?
+      WHERE planned_session_id = ?
+    `).run(context.family_decisions_json, frozen.plannedSessionId);
+    useStore.setState({ error: null });
+    useStore.getState().refreshBlock();
+
+    // A positive readiness day cannot grow a dose that the complete
+    // microcycle already bounded and froze.
+    useStore.setState({
+      prescription: {
+        vector: {
+          load_modifier: 1.05,
+          set_modifier: 1,
+          rpe_cap: 10,
+          coaching_cue: 'Good readiness supports the frozen routine as written.',
+        },
+        source: 'policy',
+        forDate: useStore.getState().today,
+      },
+    });
+
+    // The frozen sidecars, not a mutable template, own execution provenance.
+    useStore.getState().deleteRoutineTemplate(template.routineTemplateId);
+    useStore.getState().startSession();
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().sessionPlan.map((slot) => slot.movementId)).toEqual([
+      boardPressId, competitionBenchId,
+    ]);
+    expect(useStore.getState().sessionPlan.map((slot) => slot.plannedSets)).toEqual([2, 3]);
   });
 });

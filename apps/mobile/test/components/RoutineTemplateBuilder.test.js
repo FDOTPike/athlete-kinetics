@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { RoutineTemplateBuilder } from '../../src/components/RoutineTemplateBuilder';
 
 let mockState;
@@ -22,6 +22,28 @@ const available = (movementId) => ({
   movementId, state: 'available', reasons: [], effectiveContext: 'weight_room',
   capabilitySource: 'not_required', blockingPrerequisiteMovementIds: [],
   confirmationWouldClear: false, separateAttestationRequired: false,
+});
+
+const planningContract = (contractMovements) => ({
+  liftFamilies: contractMovements.map((movement) => ({
+    movementId: movement.movement_id,
+    family: movement.name.includes('Squat') || movement.name.includes('Hip Thrust')
+      ? 'squat'
+      : movement.name.includes('Deadlift') ? 'deadlift'
+        : movement.name.includes('Row') ? 'horizontal_pull' : 'overhead_press',
+    stressCoefficient: 1,
+    preferredPurpose: null,
+  })),
+  assistance: contractMovements.flatMap((movement) => [
+    'squat', 'deadlift', 'horizontal_pull', 'overhead_press',
+  ].map((family) => ({
+    family,
+    movementId: movement.movement_id,
+    distance: 1,
+    stressFactor: 0.4,
+    fatigueCost: 2,
+    reason: 'Test fixture direct assistance.',
+  }))),
 });
 
 describe('RoutineTemplateBuilder', () => {
@@ -63,8 +85,10 @@ describe('RoutineTemplateBuilder', () => {
       getRoutineRoleEligibleMovementIds: () => ({
         major: [1],
         supplementary: [1, 2, 3],
+        accessory: [],
         conditional: [],
       }),
+      getRoutinePlanningContract: () => planningContract(mockState.movements),
       movementAvailabilityRevision: 0,
       activePriorExperienceMovementIds: [],
       confirmMovementPriorExperience: jest.fn(() => true),
@@ -79,24 +103,24 @@ describe('RoutineTemplateBuilder', () => {
     expect(screen.getByText('Step Loading')).toBeOnTheScreen();
     expect(screen.getByText('Autoregulated')).toBeOnTheScreen();
     expect(screen.queryByText(/Conjugate/i)).toBeNull();
-    expect(screen.getByText('Ordered Movements (3/6)')).toBeOnTheScreen();
+    expect(screen.getByText('Day 1 Ordered Movements (3)')).toBeOnTheScreen();
   });
 
   test('filters by role before rendering and shows capability education in All / Learn', () => {
     render(<RoutineTemplateBuilder />);
-    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
     expect(screen.getByText('Competition Squat')).toBeOnTheScreen();
     expect(screen.queryByText('Dumbbell Row')).not.toBeOnTheScreen();
     expect(screen.queryByText('Advanced Skill')).not.toBeOnTheScreen();
-    fireEvent.press(screen.getAllByLabelText('Close movement picker')[0]);
-    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
+    fireEvent.press(screen.getByText('Competition Squat'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 2'));
     fireEvent.press(screen.getByLabelText('All / Learn (3)'));
     expect(screen.getByText('Capability evidence is required.')).toBeOnTheScreen();
   });
 
   test('renders every seeded movement in a bounded picker list', () => {
     render(<RoutineTemplateBuilder />);
-    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
 
     expect(StyleSheet.flatten(screen.getByTestId('movement-picker-card').props.style)).toMatchObject({
       height: '80%',
@@ -110,20 +134,24 @@ describe('RoutineTemplateBuilder', () => {
 
   test('search and live role-filtered counts stay independent', () => {
     render(<RoutineTemplateBuilder />);
-    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
-    expect(screen.getByLabelText('Available (2)')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
+    fireEvent.press(screen.getByText('Competition Squat'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 2'));
+    expect(screen.getByLabelText('Available (1)')).toBeOnTheScreen();
     expect(screen.getByLabelText('All / Learn (3)')).toBeOnTheScreen();
     fireEvent.changeText(screen.getByLabelText('Search routine movements'), 'lats');
     expect(screen.getByLabelText('Available (1)')).toBeOnTheScreen();
     expect(screen.getByLabelText('All / Learn (1)')).toBeOnTheScreen();
     expect(screen.getByText('Dumbbell Row')).toBeOnTheScreen();
-    expect(screen.queryByText('Competition Squat')).toBeNull();
+    expect(within(screen.getByTestId('movement-picker-list')).queryByText('Competition Squat')).toBeNull();
   });
 
   test('prior experience uses a second confirmation and revision-driven revoke state', () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { rerender } = render(<RoutineTemplateBuilder />);
-    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
+    fireEvent.press(screen.getByText('Competition Squat'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 2'));
     fireEvent.press(screen.getByLabelText('All / Learn (3)'));
     fireEvent.press(screen.getByLabelText('Confirm prior experience for Advanced Skill'));
     const confirmButtons = alert.mock.calls[0][2];
@@ -156,11 +184,12 @@ describe('RoutineTemplateBuilder', () => {
     mockState.getRoutineRoleEligibleMovementIds = () => ({
       major: [],
       supplementary: [],
+      accessory: [],
       conditional: [],
     });
 
     render(<RoutineTemplateBuilder />);
-    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
 
     expect(screen.getByText('No currently available movements match this role and search.')).toBeOnTheScreen();
   });
@@ -170,16 +199,16 @@ describe('RoutineTemplateBuilder', () => {
     render(<RoutineTemplateBuilder onSaved={onSaved} />);
     fireEvent.changeText(screen.getByLabelText('Routine template name'), 'Ordered day');
 
-    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
     fireEvent.press(screen.getByText('Competition Squat'));
     fireEvent.changeText(screen.getByLabelText('Sets for slot 1'), '6');
     fireEvent.changeText(screen.getByLabelText('Reps for slot 1'), '4');
     fireEvent.changeText(screen.getByLabelText('Maximum RPE for slot 1'), '8.5');
-    expect(screen.getByText('6 sets x 4 reps @ RPE 6.0 start / 8.5 max')).toBeOnTheScreen();
-    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
+    expect(screen.getByText(/6 sets x 4 reps @ RPE 6.0 start \/ 8.5 max/)).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 2'));
     fireEvent.press(screen.getByText('Dumbbell Row'));
-    fireEvent.press(screen.getByLabelText('Remove slot 3'));
-    fireEvent.press(screen.getByLabelText('Move slot 1 down'));
+    fireEvent.press(screen.getByLabelText('Remove day 1 slot 3'));
+    fireEvent.press(screen.getByLabelText('Move day 1 slot 1 down'));
     fireEvent.press(screen.getByLabelText('Save routine template'));
 
     expect(saveRoutineTemplate).toHaveBeenCalledTimes(1);
@@ -191,13 +220,13 @@ describe('RoutineTemplateBuilder', () => {
 
   test('projects separate start and max RPE columns for the major lift', () => {
     render(<RoutineTemplateBuilder />);
-    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
     fireEvent.press(screen.getByText('Competition Squat'));
 
-    expect(screen.getByLabelText('Projected starting RPE for slot 1: 5.5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Projected starting RPE for day 1 slot 1: 5.5')).toBeOnTheScreen();
     expect(screen.getByLabelText('Maximum RPE for slot 1')).toHaveProp('value', '8');
     fireEvent.changeText(screen.getByLabelText('Maximum RPE for slot 1'), '8.5');
-    expect(screen.getByLabelText('Projected starting RPE for slot 1: 6.0')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Projected starting RPE for day 1 slot 1: 6.0')).toBeOnTheScreen();
     expect(screen.getByTestId('major-rpe-projection-note-1').props.children.join('')).toContain(
       'Projected loading range: RPE 6.0 start to 8.5 max.',
     );
@@ -208,11 +237,11 @@ describe('RoutineTemplateBuilder', () => {
       { movement_id: 10, name: 'Deadlift', baseName: 'Deadlift', pattern: 'hinge', cues: 'Brace', targetMuscles: ['glutes', 'hamstrings'], difficulty: 'Intermediate', is_compound: true },
       { movement_id: 11, name: 'Barbell Hip Thrust', baseName: 'Hip Thrust', pattern: 'hinge', cues: 'Extend', targetMuscles: ['glutes'], difficulty: 'Intermediate', is_compound: true },
       { movement_id: 12, name: 'Bulgarian Split Squat', baseName: 'Split Squat', pattern: 'lunge', cues: 'Balance', targetMuscles: ['quadriceps', 'glutes'], difficulty: 'Intermediate', is_compound: true },
-      { movement_id: 13, name: 'Chest-Supported Dumbbell Row', baseName: 'Row', pattern: 'pull_h', cues: 'Pull', targetMuscles: ['lats'], difficulty: 'Intermediate', is_compound: true },
+      { movement_id: 13, name: 'Back Extension', baseName: 'Back Extension', pattern: 'hinge', cues: 'Extend', targetMuscles: ['erectors', 'glutes'], difficulty: 'Intermediate', is_compound: true },
       { movement_id: 14, name: 'Romanian Deadlift', baseName: 'Romanian Deadlift', pattern: 'hinge', cues: 'Hinge', targetMuscles: ['hamstrings'], difficulty: 'Intermediate', is_compound: true },
     ];
     mockState.getRoutineRoleEligibleMovementIds = () => ({
-      major: [10], supplementary: [11, 12, 13, 14], conditional: [],
+      major: [10], supplementary: [11, 12, 13, 14], accessory: [], conditional: [],
     });
     // Hip thrust is deliberately unavailable: it must not be resurrected by
     // recommendation ranking, and the next compatible movement fills rank 3.
@@ -222,32 +251,29 @@ describe('RoutineTemplateBuilder', () => {
     ];
 
     render(<RoutineTemplateBuilder />);
-    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
     fireEvent.press(screen.getByText('Deadlift'));
-    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 2'));
 
     expect(screen.getByTestId('supplementary-recommendation-note')).toBeOnTheScreen();
     expect(screen.getByText('Top 3 for Deadlift')).toBeOnTheScreen();
     expect(screen.getByText('Ranked only from supplementary movements currently available to this athlete.')).toBeOnTheScreen();
     const rows = screen.getByTestId('movement-picker-list').props.data;
     expect(rows.slice(0, 3).map((row) => row.movement.name)).toEqual([
-      'Bulgarian Split Squat', 'Chest-Supported Dumbbell Row', 'Romanian Deadlift',
+      'Bulgarian Split Squat', 'Back Extension', 'Romanian Deadlift',
     ]);
     expect(rows.slice(0, 3).map((row) => row.recommendation.rank)).toEqual([1, 2, 3]);
     expect(rows.some((row) => row.movement.name === 'Barbell Hip Thrust')).toBe(false);
   });
 
-  test('enforces role maxima and disables + Cond chip when conditional role has zero ratified movements', () => {
+  test('keeps major and supplementary selection uncapped while genuine role eligibility still fails closed', () => {
     render(<RoutineTemplateBuilder />);
 
-    // In default mockState:
-    // conditional has 0 ratified movements -> roleMaxima.conditional is 0 -> + Cond chip is disabled
+    // Conditional has no eligible movements, so its genuine role gate remains closed.
     expect(screen.getByLabelText('+ Cond').props.accessibilityState?.disabled).toBe(true);
 
-    // major has 1 ratified movement -> roleMaxima.major is 1 (1/1 slots filled) -> + Major chip is disabled
-    expect(screen.getByLabelText('+ Major').props.accessibilityState?.disabled).toBe(true);
-
-    // supplementary has 2/2 slots filled -> + Supp chip is disabled
-    expect(screen.getByLabelText('+ Supp').props.accessibilityState?.disabled).toBe(true);
+    // Movement counts do not disable major or supplementary slot creation.
+    expect(screen.getByLabelText('+ Major').props.accessibilityState?.disabled).not.toBe(true);
+    expect(screen.getByLabelText('+ Supp').props.accessibilityState?.disabled).not.toBe(true);
   });
 });

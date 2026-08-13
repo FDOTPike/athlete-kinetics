@@ -90,9 +90,12 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'movement_media' },             // 036
   { type: 'table', name: 'movement_scope' },             // 049
   { type: 'table', name: 'movement_content_correction' }, // 049
-  { type: 'trigger', name: 'trg_movement_supplementary_ai' }, // 050
   { type: 'table', name: 'movement_prior_experience' },       // 051
   { type: 'table', name: 'movement_sport_tracking' },         // 051
+  { type: 'table', name: 'movement_lift_family' },             // 052
+  { type: 'table', name: 'movement_assistance_relationship' }, // 052
+  { type: 'table', name: 'planned_session_routine_context' },  // 052
+  { type: 'table', name: 'planned_slot_routine_decision' },    // 052
 ];
 
 function userVersion(db: MigrationDb): number {
