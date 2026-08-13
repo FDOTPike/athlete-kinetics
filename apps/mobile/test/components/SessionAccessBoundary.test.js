@@ -397,4 +397,229 @@ describe('bounded routine store path (real store, real production chain)', () =>
     ]);
     expect(useStore.getState().sessionPlan.map((slot) => slot.plannedSets)).toEqual([2, 3]);
   });
+
+  test('strict authoring rejects above-cap RPE while freeze clamps stored drift and never expands timed sets', async () => {
+    const { useStore, raw } = await bootStore();
+    useStore.getState().saveProfile({
+      training_age: 'elite',
+      base_rpe_cap: 7.5,
+      session_duration_cap_min: 120,
+      equipment_inventory: [...OWNED_EQUIPMENT, 'pullup_bar', 'bands', 'mats'],
+    });
+    const idOf = (name) => Number(raw.prepare(
+      'SELECT movement_id FROM movement WHERE name = ?',
+    ).get(name).movement_id);
+    const competitionBenchId = idOf('Competition Bench');
+    const competitionSquatId = idOf('Competition Squat');
+    const farmerCarryId = idOf('Farmer Carry');
+
+    expect(() => useStore.getState().saveRoutineTemplate({
+      name: 'New above-cap request',
+      schemaType: 'LINEAR',
+      slots: [{
+        dayIndex: 1, slotIndex: 1, movementId: competitionBenchId,
+        role: 'major', sets: 3, reps: 5, targetRpe: 9,
+      }],
+    })).toThrow('Competition Bench RPE must be between 5 and 7.5');
+    expect(count(raw, "SELECT COUNT(*) AS c FROM routine_template WHERE name = 'New above-cap request'"))
+      .toBe(0);
+
+    raw.exec(`INSERT INTO routine_template (name, schema_type, created_at_ms, updated_at_ms)
+              VALUES ('Stored cap drift', 'LINEAR', 1, 1)`);
+    const templateId = Number(raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+    for (const slot of [
+      [1, 1, 'major', competitionBenchId, 3, 5, 9],
+      [1, 2, 'supplementary', farmerCarryId, 1, 40, 7],
+      [2, 1, 'major', competitionSquatId, 3, 5, 8],
+    ]) {
+      raw.prepare(`INSERT INTO routine_template_slot
+        (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(templateId, ...slot);
+    }
+    raw.prepare(`INSERT INTO routine_template_legacy_role_allowance
+      (routine_template_id, day_index, movement_id, role)
+      VALUES (?, 1, ?, 'supplementary')`).run(templateId, farmerCarryId);
+    useStore.getState().loadRoutineTemplates();
+
+    const frozen = useStore.getState().freezeRoutineTemplateToPlannedSession(templateId, undefined, 1);
+    const context = raw.prepare(`SELECT family_decisions_json, adaptations_json
+      FROM planned_session_routine_context WHERE planned_session_id = ?`
+    ).get(frozen.plannedSessionId);
+    const decisions = JSON.parse(context.family_decisions_json);
+    expect(decisions.find((decision) => decision.family === 'bench_press').initialStress)
+      .toBeGreaterThan(decisions.find((decision) => decision.family === 'bench_press').finalStress);
+    expect(decisions.find((decision) => decision.family === 'squat').initialStress)
+      .toBeGreaterThan(decisions.find((decision) => decision.family === 'squat').finalStress);
+    expect(JSON.parse(context.adaptations_json)).toEqual(expect.arrayContaining([
+      expect.stringContaining('Competition Bench: Target RPE capped from 9.0 to 7.5'),
+      expect.stringContaining('Competition Squat: Target RPE capped from 8.0 to 7.5'),
+    ]));
+
+    const frozenRows = raw.prepare(`
+      SELECT ps.planned_slot_id, ps.movement_id, ps.sets, ps.target_rpe,
+             target.target_kind, target.target_seconds, decision.adaptations_json,
+             legacy.role AS legacy_role
+      FROM planned_slot ps
+      JOIN planned_slot_target target USING (planned_slot_id)
+      JOIN planned_slot_routine_decision decision USING (planned_slot_id)
+      LEFT JOIN planned_slot_legacy_role_allowance legacy USING (planned_slot_id)
+      WHERE ps.planned_session_id = ? ORDER BY ps.slot_index
+    `).all(frozen.plannedSessionId);
+    const bench = frozenRows.find((row) => Number(row.movement_id) === competitionBenchId);
+    const carry = frozenRows.find((row) => Number(row.movement_id) === farmerCarryId);
+    expect(bench.target_rpe).toBe(5,
+      'week-one projected major RPE still derives from the normalized 7.5 maximum');
+    expect(JSON.parse(bench.adaptations_json)).toEqual(expect.arrayContaining([
+      expect.stringContaining('Target RPE capped from 9.0 to 7.5'),
+    ]));
+    expect(carry).toMatchObject({
+      sets: 1,
+      target_kind: 'time',
+      target_seconds: 40,
+      legacy_role: 'supplementary',
+    });
+    expect(raw.prepare(
+      'SELECT default_sets FROM movement_time_policy WHERE movement_id = ?',
+    ).get(farmerCarryId).default_sets).toBe(3);
+
+    useStore.getState().deleteRoutineTemplate(templateId);
+    useStore.getState().startSession();
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().sessionPlan.map((slot) => [slot.movementId, slot.plannedSets]))
+      .toEqual([[competitionBenchId, 3], [farmerCarryId, 1]]);
+  });
+
+  test('another day duration overflow is warning-only until that day is saved or frozen', async () => {
+    const { useStore, raw } = await bootStore();
+    useStore.getState().saveProfile({
+      training_age: 'elite',
+      session_duration_cap_min: 30,
+      equipment_inventory: [
+        'barbell', 'squat_rack', 'bench', 'dumbbells', 'kettlebell',
+        'pullup_bar', 'nordic_bench', 'bands', 'cable_machine', 'mats', 'boards',
+      ],
+    });
+    const available = new Set(useStore.getState().getMovementAvailabilityVerdicts('weight_room')
+      .filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
+    const majorEligible = new Set(raw.prepare(
+      "SELECT movement_id FROM movement_role_eligibility WHERE role = 'major'",
+    ).all().map((row) => Number(row.movement_id)));
+    const representatives = new Map();
+    for (const row of raw.prepare(`
+      SELECT family, movement_id FROM movement_lift_family ORDER BY family, movement_id
+    `).all()) {
+      const movementId = Number(row.movement_id);
+      if (!representatives.has(row.family) && available.has(movementId) && majorEligible.has(movementId)) {
+        representatives.set(row.family, movementId);
+      }
+    }
+    expect(representatives.size).toBe(7);
+    const movementIds = [...representatives.values()];
+    const slots = [
+      { dayIndex: 1, slotIndex: 1, movementId: movementIds[0], role: 'major', sets: 3, reps: 5, targetRpe: 8 },
+      ...movementIds.slice(1).map((movementId, index) => ({
+        dayIndex: 2, slotIndex: index + 1, movementId, role: 'major', sets: 3, reps: 5, targetRpe: 8,
+      })),
+    ];
+    expect(() => useStore.getState().saveRoutineTemplate({
+      name: 'Duration save blocker', schemaType: 'LINEAR', slots,
+    })).toThrow('Day 2 cannot fit every selected major at a safe minimum dose inside 30 minutes');
+
+    raw.exec(`INSERT INTO routine_template (name, schema_type, created_at_ms, updated_at_ms)
+              VALUES ('Stored duration overflow', 'LINEAR', 1, 1)`);
+    const templateId = Number(raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+    for (const slot of slots) {
+      raw.prepare(`INSERT INTO routine_template_slot
+        (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+        VALUES (?, ?, ?, 'major', ?, ?, ?, ?)`
+      ).run(templateId, slot.dayIndex, slot.slotIndex, slot.movementId, slot.sets, slot.reps, slot.targetRpe);
+    }
+    useStore.getState().loadRoutineTemplates();
+    const frozen = useStore.getState().freezeRoutineTemplateToPlannedSession(templateId, undefined, 1);
+    const warnings = JSON.parse(raw.prepare(`
+      SELECT warnings_json FROM planned_session_routine_context WHERE planned_session_id = ?
+    `).get(frozen.plannedSessionId).warnings_json);
+    expect(warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('Day 2 cannot fit every selected major'),
+      expect.stringContaining('Edit that day before freezing it.'),
+    ]));
+    expect(count(raw, 'SELECT COUNT(*) AS c FROM planned_slot WHERE planned_session_id = ?', [frozen.plannedSessionId]))
+      .toBe(1);
+    expect(() => useStore.getState().freezeRoutineTemplateToPlannedSession(templateId, undefined, 2))
+      .toThrow('Day 2 cannot fit every selected major at a safe minimum dose inside 30 minutes');
+  });
+
+  test('legacy allowance survives reordering but movement replacement removes it without role-count drift', async () => {
+    const { useStore, raw } = await bootStore();
+    useStore.getState().saveProfile({
+      training_age: 'elite',
+      session_duration_cap_min: 120,
+      equipment_inventory: [...OWNED_EQUIPMENT, 'mats'],
+    });
+    const idOf = (name) => Number(raw.prepare(
+      'SELECT movement_id FROM movement WHERE name = ?',
+    ).get(name).movement_id);
+    const competitionBenchId = idOf('Competition Bench');
+    const sitUpId = idOf('3/4 Sit-Up');
+    const dumbbellBenchId = idOf('Dumbbell Bench Press');
+    const roleCounts = () => raw.prepare(`
+      SELECT role, COUNT(*) AS c FROM movement_role_eligibility GROUP BY role ORDER BY role
+    `).all();
+    const beforeRoles = roleCounts();
+
+    raw.exec(`INSERT INTO routine_template (name, schema_type, created_at_ms, updated_at_ms)
+              VALUES ('Exact legacy edit', 'LINEAR', 1, 1)`);
+    const templateId = Number(raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+    raw.prepare(`INSERT INTO routine_template_slot
+      (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+      VALUES (?, 1, 1, 'major', ?, 3, 5, 8)`).run(templateId, competitionBenchId);
+    raw.prepare(`INSERT INTO routine_template_slot
+      (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+      VALUES (?, 1, 2, 'supplementary', ?, 2, 10, 6)`).run(templateId, sitUpId);
+    raw.prepare(`INSERT INTO routine_template_legacy_role_allowance
+      (routine_template_id, day_index, movement_id, role)
+      VALUES (?, 1, ?, 'supplementary')`).run(templateId, sitUpId);
+    useStore.getState().loadRoutineTemplates();
+
+    const reordered = useStore.getState().saveRoutineTemplate({
+      routineTemplateId: templateId,
+      name: 'Exact legacy edit',
+      schemaType: 'LINEAR',
+      slots: [
+        {
+          dayIndex: 1, slotIndex: 1, movementId: sitUpId, role: 'supplementary',
+          sets: 2, reps: 10, targetRpe: 6, preserveLegacyRoleAllowance: true,
+        },
+        {
+          dayIndex: 1, slotIndex: 2, movementId: competitionBenchId, role: 'major',
+          sets: 3, reps: 5, targetRpe: 8,
+        },
+      ],
+    });
+    expect(reordered.slots.map((slot) => [slot.movementId, slot.legacyRoleAllowed]))
+      .toEqual([[sitUpId, true], [competitionBenchId, false]]);
+    expect(count(raw, `SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance
+      WHERE routine_template_id = ?`, [templateId])).toBe(1);
+
+    const replaced = useStore.getState().saveRoutineTemplate({
+      routineTemplateId: templateId,
+      name: 'Exact legacy edit',
+      schemaType: 'LINEAR',
+      slots: [
+        {
+          dayIndex: 1, slotIndex: 1, movementId: dumbbellBenchId, role: 'supplementary',
+          sets: 2, reps: 10, targetRpe: 6, preserveLegacyRoleAllowance: true,
+        },
+        {
+          dayIndex: 1, slotIndex: 2, movementId: competitionBenchId, role: 'major',
+          sets: 3, reps: 5, targetRpe: 8,
+        },
+      ],
+    });
+    expect(replaced.slots.map((slot) => slot.legacyRoleAllowed)).toEqual([false, false]);
+    expect(count(raw, `SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance
+      WHERE routine_template_id = ?`, [templateId])).toBe(0);
+    expect(roleCounts()).toEqual(beforeRoles);
+  });
 });

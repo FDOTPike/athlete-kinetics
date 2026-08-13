@@ -103,6 +103,7 @@ import {
   type RoutineAssistanceContract,
   type RoutineFamilyStressDecision,
   type RoutineLiftFamilyContract,
+  type RoutineLegacyRoleAllowance,
   type RoutineSessionFamilyStress,
   type RoutineStressPurpose,
   type DifficultyRating,
@@ -520,6 +521,8 @@ export interface RoutineTemplateSlot {
   sets: number;
   reps: number;
   targetRpe: number;
+  /** Exact pre-contract supplementary selection. Never used for new pickers. */
+  legacyRoleAllowed: boolean;
 }
 
 export interface RoutineTemplate {
@@ -834,6 +837,7 @@ interface KineticsStore {
       sets?: number;
       reps?: number;
       targetRpe?: number;
+      preserveLegacyRoleAllowance?: boolean;
     }>;
   }) => RoutineTemplate;
   deleteRoutineTemplate: (routineTemplateId: number) => void;
@@ -1271,6 +1275,29 @@ const routineRoleEligibility = (d: DB): Record<RoutineRole, ReadonlySet<number>>
   for (const row of rows) result[row.role].add(row.movement_id);
   return result;
 };
+
+const routineLegacyRoleAllowanceKey = (
+  dayIndex: number,
+  movementId: number,
+  role: RoutineRole,
+): string => `${dayIndex}:${movementId}:${role}`;
+
+const routineLegacyRoleAllowances = (
+  d: DB,
+  routineTemplateId: number,
+): readonly RoutineLegacyRoleAllowance[] => rowsOf<{
+  day_index: number; movement_id: number; role: 'supplementary';
+}>(d.executeSync(
+  `SELECT day_index, movement_id, role
+     FROM routine_template_legacy_role_allowance
+    WHERE routine_template_id = ?
+    ORDER BY day_index, movement_id`,
+  [routineTemplateId],
+)).map((row) => ({
+  dayIndex: row.day_index,
+  movementId: row.movement_id,
+  role: row.role,
+}));
 
 const routinePlanningContract = (d: DB): RoutinePlanningContract => ({
   liftFamilies: rowsOf<{
@@ -3425,13 +3452,20 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       const slots = rowsOf<{
         routine_template_slot_id: number; routine_template_id: number; day_index: number;
         slot_index: number; role: RoutineRole; movement_id: number; movement_name: string;
-        sets: number; reps: number; target_rpe: number;
+        sets: number; reps: number; target_rpe: number; legacy_role_allowed: number;
       }>(d.executeSync(
         `SELECT rts.routine_template_slot_id, rts.routine_template_id, rts.day_index,
                 rts.slot_index, rts.role, rts.movement_id, m.name AS movement_name,
-                rts.sets, rts.reps, rts.target_rpe
+                rts.sets, rts.reps, rts.target_rpe,
+                CASE WHEN legacy.routine_template_id IS NULL THEN 0 ELSE 1 END
+                  AS legacy_role_allowed
          FROM routine_template_slot rts
          JOIN movement m ON m.movement_id = rts.movement_id
+         LEFT JOIN routine_template_legacy_role_allowance legacy
+           ON legacy.routine_template_id = rts.routine_template_id
+          AND legacy.day_index = rts.day_index
+          AND legacy.movement_id = rts.movement_id
+          AND legacy.role = rts.role
          WHERE rts.routine_template_id = ?
          ORDER BY rts.day_index, rts.slot_index`,
         [t.routine_template_id]
@@ -3453,6 +3487,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           sets: s.sets,
           reps: s.reps,
           targetRpe: s.target_rpe,
+          legacyRoleAllowed: s.legacy_role_allowed === 1,
         })),
       });
     }
@@ -3492,6 +3527,28 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       };
     });
     groupRoutineTemplateDays(placements);
+    const existingLegacyAllowanceKeys = new Set(
+      input.routineTemplateId === undefined
+        ? []
+        : routineLegacyRoleAllowances(d, input.routineTemplateId).map((allowance) =>
+          routineLegacyRoleAllowanceKey(
+            allowance.dayIndex, allowance.movementId, allowance.role,
+          )),
+    );
+    const retainedLegacyRoleAllowances: RoutineLegacyRoleAllowance[] = input.slots.flatMap(
+      (item, index) => {
+        const placement = placements[index];
+        if (item.role !== 'supplementary' || item.preserveLegacyRoleAllowance !== true) return [];
+        const key = routineLegacyRoleAllowanceKey(
+          placement.dayIndex, item.movementId, item.role,
+        );
+        return existingLegacyAllowanceKeys.has(key) ? [{
+          dayIndex: placement.dayIndex,
+          movementId: item.movementId,
+          role: item.role,
+        }] : [];
+      },
+    );
     const { movements } = get();
     const analysis = composeRoutineMicrocycle({
       selections: input.slots.map((item, index) => ({
@@ -3513,6 +3570,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       durationCapMin: profile.session_duration_cap_min,
       baseRpeCap: profile.base_rpe_cap,
       availableMovementIds: availableSet,
+      legacyRoleAllowances: retainedLegacyRoleAllowances,
     });
     if (analysis.blockers.length > 0) throw new Error(analysis.blockers[0]);
 
@@ -3555,6 +3613,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           `INSERT INTO routine_template_slot (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [templateId, placement.dayIndex, placement.slotIndex, item.role, item.movementId, sets, reps, targetRpe],
+        );
+      }
+      if (templateId === undefined) throw new Error('Routine template identity was not created.');
+      d.executeSync(
+        'DELETE FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+        [templateId],
+      );
+      for (const allowance of retainedLegacyRoleAllowances) {
+        d.executeSync(
+          `INSERT INTO routine_template_legacy_role_allowance
+             (routine_template_id, day_index, movement_id, role)
+           VALUES (?, ?, ?, ?)`,
+          [templateId, allowance.dayIndex, allowance.movementId, allowance.role],
         );
       }
       d.executeSync('COMMIT');
@@ -3602,10 +3673,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const verdicts = get().getMovementAvailabilityVerdicts('weight_room');
     const availableSet = new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
     const roleEligibility = routineRoleEligibility(d);
-    // P2-2: freezing executes ONE routine day. Only that day's movements are
-    // validated and composed — another day's drifted role or teaching-only
-    // movement neither blocks nor licenses this session.
+    // Freeze executes one routine day while analysing the complete microcycle.
+    // Live access/context and irreducible duration block only the selected day;
+    // other-day stress and duration remain visible in the persisted review.
     const planningContract = routinePlanningContract(d);
+    const templateLegacyRoleAllowances = routineLegacyRoleAllowances(
+      d, template.routineTemplateId,
+    );
+    const templateLegacyRoleAllowanceKeys = new Set(templateLegacyRoleAllowances.map((allowance) =>
+      routineLegacyRoleAllowanceKey(
+        allowance.dayIndex, allowance.movementId, allowance.role,
+      )));
     const daySlots = template.slots.filter((slot) => slot.dayIndex === routineDayIndex);
     if (daySlots.length === 0) throw new Error(`Routine template ${routineTemplateId} has no movements for day ${routineDayIndex}.`);
     const analysis = composeRoutineMicrocycle({
@@ -3634,6 +3712,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       durationCapMin: profile.session_duration_cap_min,
       baseRpeCap: profile.base_rpe_cap,
       availableMovementIds: availableSet,
+      rpeCapBehavior: 'clamp',
+      legacyRoleAllowances: templateLegacyRoleAllowances,
       executionGateDayIndices: new Set([routineDayIndex]),
     });
     if (analysis.blockers.length > 0) throw new Error(analysis.blockers[0]);
@@ -3746,7 +3826,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       for (const composedSlot of composedDay) {
         const movement = movements.find((candidate) => candidate.movement_id === composedSlot.movementId);
         const target = targetForMovement(movement, composedSlot.reps);
-        const plannedSets = defaultSetsForTarget(movement, composedSlot.sets);
+        // The analyzer owns the routine dose ceiling. Timed target conversion
+        // may supply seconds, but it must never re-expand the bounded set count.
+        const plannedSets = composedSlot.sets;
         const legacyReps = target.kind === 'reps' ? Math.min(30, target.reps) : Math.min(30, composedSlot.reps);
         // A major slot persists its peak target for backward compatibility;
         // freezing resolves the selected loading method to this block week's
@@ -3780,6 +3862,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
             JSON.stringify(composedSlot.adaptations),
           ],
         );
+        if (composedSlot.role === 'supplementary'
+            && templateLegacyRoleAllowanceKeys.has(routineLegacyRoleAllowanceKey(
+              composedSlot.dayIndex, composedSlot.movementId, composedSlot.role,
+            ))) {
+          d.executeSync(
+            `INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id, role)
+             VALUES (?, ?)`,
+            [plannedSlotId, composedSlot.role],
+          );
+        }
       }
 
       d.executeSync('COMMIT');
@@ -4202,24 +4294,42 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           return;
         }
         const frozenTemplateRoles = routineProvenance.routine_day_index !== null
-          ? rowsOf<{ movement_id: number; role: RoutineRole }>(d.executeSync(
-              `SELECT ps.movement_id, rd.role
+          ? rowsOf<{ movement_id: number; role: RoutineRole; legacy_role_allowed: number }>(d.executeSync(
+              `SELECT ps.movement_id, rd.role,
+                      CASE WHEN legacy.planned_slot_id IS NULL THEN 0 ELSE 1 END
+                        AS legacy_role_allowed
                  FROM planned_slot ps
                  JOIN planned_slot_routine_decision rd USING (planned_slot_id)
-                WHERE ps.planned_session_id = ? ORDER BY ps.slot_index`,
+                 LEFT JOIN planned_slot_legacy_role_allowance legacy
+                   ON legacy.planned_slot_id = ps.planned_slot_id
+                  AND legacy.role = rd.role
+                 WHERE ps.planned_session_id = ? ORDER BY ps.slot_index`,
               [planToConsume.plannedSessionId],
             ))
           : routineProvenance.routine_template_id === null
             ? []
-            : rowsOf<{ movement_id: number; role: RoutineRole }>(d.executeSync(
-                `SELECT movement_id, role FROM routine_template_slot
-                 WHERE routine_template_id = ? ORDER BY day_index, slot_index`,
+            : rowsOf<{ movement_id: number; role: RoutineRole; legacy_role_allowed: number }>(d.executeSync(
+                `SELECT slot.movement_id, slot.role,
+                        CASE WHEN legacy.routine_template_id IS NULL THEN 0 ELSE 1 END
+                          AS legacy_role_allowed
+                   FROM routine_template_slot slot
+                   LEFT JOIN routine_template_legacy_role_allowance legacy
+                     ON legacy.routine_template_id = slot.routine_template_id
+                    AND legacy.day_index = slot.day_index
+                    AND legacy.movement_id = slot.movement_id
+                    AND legacy.role = slot.role
+                  WHERE slot.routine_template_id = ?
+                  ORDER BY slot.day_index, slot.slot_index`,
                 [routineProvenance.routine_template_id],
               ));
         const currentRoleEligibility = routineRoleEligibility(d);
         if (!isRoutineRoleSnapshotExecutable(
           planToConsume.slots.map((slot) => slot.movementId),
-          frozenTemplateRoles.map((row) => ({ movementId: row.movement_id, role: row.role })),
+          frozenTemplateRoles.map((row) => ({
+            movementId: row.movement_id,
+            role: row.role,
+            legacyRoleAllowed: row.legacy_role_allowed === 1,
+          })),
           currentRoleEligibility,
         )) {
           set({ error: 'This routine no longer satisfies its current movement-role policy. Edit and refreeze it before starting.' });
@@ -4227,17 +4337,32 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         }
         const planningContract = routinePlanningContract(d);
         const plannedMovementIds = new Set(planToConsume.slots.map((slot) => slot.movementId));
-        const frozenPlanRoles = frozenTemplateRoles.filter((row) => plannedMovementIds.has(row.movement_id));
+        const resolvedFrozenPlanRoles = new Map<number, {
+          movement_id: number; role: RoutineRole; legacy_role_allowed: number;
+        }>();
+        for (const row of frozenTemplateRoles) {
+          if (!plannedMovementIds.has(row.movement_id)) continue;
+          const existing = resolvedFrozenPlanRoles.get(row.movement_id);
+          if (existing === undefined) {
+            resolvedFrozenPlanRoles.set(row.movement_id, row);
+          } else if (existing.role === row.role && row.legacy_role_allowed === 1) {
+            resolvedFrozenPlanRoles.set(row.movement_id, {
+              ...existing, legacy_role_allowed: 1,
+            });
+          }
+        }
+        const frozenPlanRoles = [...resolvedFrozenPlanRoles.values()];
         const majorMovementIds = frozenPlanRoles
           .filter((row) => row.role === 'major')
           .map((row) => row.movement_id);
-        if (frozenPlanRoles.some((row) => !contextualRoutineRoles(
-          row.movement_id,
-          majorMovementIds,
-          planningContract.liftFamilies,
-          planningContract.assistance,
-          currentRoleEligibility,
-        ).has(row.role))) {
+        if (frozenPlanRoles.some((row) => row.legacy_role_allowed !== 1
+          && !contextualRoutineRoles(
+            row.movement_id,
+            majorMovementIds,
+            planningContract.liftFamilies,
+            planningContract.assistance,
+            currentRoleEligibility,
+          ).has(row.role))) {
           set({ error: 'This routine no longer satisfies its current lift-family role contract. Edit and refreeze it before starting.' });
           return;
         }
@@ -5658,6 +5783,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM session_slot_target');
       d.executeSync('DELETE FROM planned_slot_disposition');
       d.executeSync('DELETE FROM planned_slot_autopilot');
+      d.executeSync('DELETE FROM planned_slot_legacy_role_allowance');
       d.executeSync('DELETE FROM planned_slot_routine_decision');
       d.executeSync('DELETE FROM planned_slot_target');
       d.executeSync('DELETE FROM planned_session_routine_context');

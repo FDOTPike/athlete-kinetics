@@ -2,7 +2,11 @@ import type { Objective, SchemaType, TrainingAge } from './types';
 
 export type RoutineRole = 'major' | 'supplementary' | 'accessory' | 'conditional';
 export interface RoutineSelection { readonly movementId: number; readonly role: RoutineRole; }
-export interface RoutineRoleSnapshotRow extends RoutineSelection {}
+export interface RoutineRoleSnapshotRow extends RoutineSelection {
+  /** Exact persisted pre-contract support allowance. It does not broaden live
+   * role eligibility and cannot override conflicting historical roles. */
+  readonly legacyRoleAllowed?: boolean;
+}
 export type RoutineRoleEligibility = Readonly<Record<RoutineRole, ReadonlySet<number>>>;
 export interface RoutinePrescription extends RoutineSelection { readonly slotIndex: number; readonly sets: number; readonly reps: number; readonly targetRpe: number; }
 export interface ComposeRoutineInput {
@@ -270,30 +274,29 @@ const ageSetDelta: Record<TrainingAge, number> = { beginner: -1, intermediate: 0
 /** Revalidate a frozen routine against its live, DB-derived role policy.
  *
  * `planMovementIds` is one executable day's frozen plan; `sourceRows` is the
- * whole template, which is why the sole-major law is counted over the plan and
- * never over the source. Missing and duplicated source rows are deliberately
- * unverifiable: the planned-session method snapshot does not carry a template
- * day index, so a movement that resolves to more than one role — or to none —
- * cannot be attributed to the day being started. Historical templates—the
- * only plans using this fallback—kept movement identity unique template-wide,
- * so their frozen role snapshot remains decidable. */
+ * whole template, which is why the major law is counted over the plan and never
+ * over the source. Repeated rows carrying the same role are redundant and
+ * remain decidable; only a missing row or conflicting roles fail closed. An
+ * exact legacy marker on any identical historical row preserves that role,
+ * while later contextual checks still validate the majors in the frozen plan. */
 export function isRoutineRoleSnapshotExecutable(
   planMovementIds: readonly number[],
   sourceRows: readonly RoutineRoleSnapshotRow[],
   eligibility: RoutineRoleEligibility,
 ): boolean {
-  const rolesByMovement = new Map<number, RoutineRole[]>();
+  const rolesByMovement = new Map<number, Map<RoutineRole, boolean>>();
   for (const row of sourceRows) {
-    const roles = rolesByMovement.get(row.movementId) ?? [];
-    roles.push(row.role);
+    const roles = rolesByMovement.get(row.movementId) ?? new Map<RoutineRole, boolean>();
+    const legacyRoleAllowed = row.legacyRoleAllowed === true;
+    roles.set(row.role, (roles.get(row.role) ?? false) || legacyRoleAllowed);
     rolesByMovement.set(row.movementId, roles);
   }
   let majorCount = 0;
   for (const movementId of planMovementIds) {
-    const roles = rolesByMovement.get(movementId) ?? [];
-    if (roles.length !== 1) return false;
-    const [role] = roles;
-    if (!eligibility[role].has(movementId)) return false;
+    const roles = rolesByMovement.get(movementId);
+    if (roles === undefined || roles.size !== 1) return false;
+    const [role, legacyRoleAllowed] = [...roles.entries()][0];
+    if (!legacyRoleAllowed && !eligibility[role].has(movementId)) return false;
     if (role === 'major') majorCount += 1;
   }
   return majorCount >= 1;

@@ -54,10 +54,17 @@ check('frozen routine role validation fails closed after role drift or an unveri
     { movementId: 2, role: 'supplementary' },
   ];
   assert.equal(isRoutineRoleSnapshotExecutable([1, 2], source, eligible), true);
+  assert.equal(isRoutineRoleSnapshotExecutable(
+    [1, 2], [...source, { movementId: 1, role: 'major' }], eligible,
+  ), true, 'duplicate identical historical roles are redundant');
   assert.equal(isRoutineRoleSnapshotExecutable([1, 2], source, { ...eligible, major: new Set() }), false);
   assert.equal(isRoutineRoleSnapshotExecutable([1, 999], source, eligible), false);
   assert.equal(isRoutineRoleSnapshotExecutable([1], [...source, { movementId: 1, role: 'supplementary' }], eligible), false);
   assert.equal(isRoutineRoleSnapshotExecutable([2], source, eligible), false);
+  assert.equal(isRoutineRoleSnapshotExecutable(
+    [1, 2], [source[0], source[1], { ...source[1], legacyRoleAllowed: true }],
+    { ...eligible, supplementary: new Set() },
+  ), true, 'an exact legacy allowance survives a duplicate identical source row');
 });
 // --- bounded microcycle structural law ---------------------------------------
 const placement = (dayIndex, slotIndex, movementId, role) => ({ dayIndex, slotIndex, movementId, role });
@@ -143,6 +150,9 @@ check('starting day 2 revalidates only that day and still fails closed on role d
   const dayOne = [1, 2];
   const dayTwo = [3, 4];
   assert.equal(isRoutineRoleSnapshotExecutable(dayTwo, sourceRows, eligible), true);
+  assert.equal(isRoutineRoleSnapshotExecutable(
+    dayTwo, [...sourceRows, { movementId: 3, role: 'major' }], eligible,
+  ), true);
   assert.equal(isRoutineRoleSnapshotExecutable(dayOne, sourceRows, eligible), true);
   // Day 1 losing its major does not stop day 2 from starting, and vice versa.
   assert.equal(isRoutineRoleSnapshotExecutable(dayTwo, sourceRows, {
@@ -461,7 +471,7 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
 // P2-4: named acceptance coverage against the REAL migration chain.
 //
 // Every check above runs on synthetic fixtures. This block builds the shipped
-// library from migrations 001-052 and pins the ratified records BY NAME, so a
+// library from migrations 001-053 and pins the ratified records BY NAME, so a
 // future content batch that re-tiers a competition lift, moves a role row, or
 // re-parents a capability edge fails here instead of in an athlete's hands.
 //
@@ -483,10 +493,10 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
   }
   for (const file of fullChain) db.exec(readFileSync(join(schemaDir, file), 'utf-8'));
 
-  check('the acceptance database is the real 001-052 chain, not a trimmed subset', () => {
+  check('the acceptance database is the real 001-053 chain, not a trimmed subset', () => {
     assert.equal(fullChain[0], '001_mechanical_input.sql');
-    assert.equal(fullChain[fullChain.length - 1], '052_bounded_microcycle_roles.sql');
-    assert.equal(fullChain.length, 51, `applied ${fullChain.length} migrations`);
+    assert.equal(fullChain[fullChain.length - 1], '053_routine_role_compatibility.sql');
+    assert.equal(fullChain.length, 52, `applied ${fullChain.length} migrations`);
     assert.equal(Number(db.prepare('SELECT COUNT(*) AS c FROM movement').get().c), 300);
   });
 
@@ -744,6 +754,30 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     assert.ok(result.warnings.some((warning) => warning.includes('form one major-family exposure')));
   });
 
+  check('identical same-day bench variations keep authored volume and report the true purpose adaptation', () => {
+    const boardId = idOf('Board Press');
+    const pinId = idOf('Pin Presses');
+    const result = composeReal([
+      { dayIndex: 1, slotIndex: 1, movementId: boardId, role: 'major', sets: 3, reps: 5, targetRpe: 8 },
+      { dayIndex: 1, slotIndex: 2, movementId: pinId, role: 'major', sets: 3, reps: 5, targetRpe: 8 },
+    ]);
+    assert.deepEqual(result.blockers, []);
+    assert.deepEqual(result.prescriptions.map((row) => [
+      row.authoredSets, row.authoredReps, row.authoredTargetRpe,
+      row.sets, row.reps, row.targetRpe,
+    ]), [
+      [3, 5, 8, 3, 5, 8],
+      [3, 5, 8, 3, 5, 7.5],
+    ]);
+    const decision = result.familyDecisions.find((row) => row.family === 'bench_press');
+    assert.ok(decision);
+    assert.equal(decision.initialStress, 24.4);
+    assert.equal(decision.finalStress, 23.9);
+    assert.equal(decision.equivalentVolume, 27,
+      '0.9*(3*5) + 0.9*(3*5) remains the sum of two variations in one exposure');
+    assert.ok(result.prescriptions[1].adaptations.some((row) => row.includes('Distinct volume exposure')));
+  });
+
   check('weighted same-day variation accumulation applies to every curated major family', () => {
     const byFamily = new Map();
     for (const row of liftFamilies) {
@@ -757,15 +791,22 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
       const chosen = familyRows.slice(0, 2);
       const result = composeReal(chosen.map((row, index) => ({
         dayIndex: 1, slotIndex: index + 1, movementId: row.movementId,
-        role: 'major', sets: 1, reps: index + 1, targetRpe: 5,
+        role: 'major', sets: 2, reps: 3, targetRpe: 6,
       })));
       assert.deepEqual(result.blockers, [], family);
+      assert.ok(result.prescriptions.every((row) => row.sets <= row.authoredSets
+        && row.reps <= row.authoredReps && row.targetRpe <= row.authoredTargetRpe), family);
+      assert.ok(result.prescriptions.every((row) => row.authoredSets === 2
+        && row.authoredReps === 3 && row.authoredTargetRpe === 6), family);
       const decision = result.familyDecisions.find((row) => row.family === family);
       assert.equal(decision.exposureCount, 1, family);
       assert.equal(decision.variationCount, 2, family);
       assert.equal(decision.equivalentVolume,
-        Math.round(chosen.reduce((sum, row, index) => sum + row.stressCoefficient * (index + 1), 0) * 10) / 10,
+        Math.round(result.prescriptions.reduce(
+          (sum, row) => sum + row.stressCoefficient * row.sets * row.reps, 0,
+        ) * 10) / 10,
         family);
+      assert.ok(decision.initialStress >= decision.finalStress, family);
     }
   });
 
@@ -782,6 +823,12 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     assert.equal(decision.variationCount, 1);
     assert.equal(decision.sessions.length, 5);
     assert.equal(new Set(result.prescriptions.map((row) => row.purpose)).size, 5);
+    assert.ok(result.prescriptions.every((row) => row.sets === 2 && row.reps === 3),
+      'purpose assignment must not expand the repeated authored dose');
+    assert.deepEqual(result.prescriptions.map((row) => row.authoredReps), [3, 3, 3, 3, 3]);
+    assert.equal(decision.equivalentVolume, 30);
+    assert.equal(decision.initialStress, 16.4);
+    assert.equal(decision.finalStress, 16.2);
     assert.ok(decision.finalStress <= decision.weeklyBudget);
     assert.ok(result.recommendations.some((row) => row.includes('consecutive-day exposure is preserved')));
   });
@@ -855,6 +902,94 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     });
     assert.ok(dayTwoFreeze.blockers.some((blocker) => blocker.includes('Overhead Press is unavailable')));
     assert.ok(dayTwoFreeze.blockers.some((blocker) => blocker.includes('not ratified for the major role')));
+  });
+
+  check('duration overflow blocks only the day being saved or frozen while every day remains analysed', () => {
+    const representativeByFamily = new Map();
+    for (const row of liftFamilies) {
+      if (!representativeByFamily.has(row.family)) representativeByFamily.set(row.family, row.movementId);
+    }
+    const representatives = [...representativeByFamily.values()];
+    assert.equal(representatives.length, 7);
+    const selections = [
+      { dayIndex: 1, slotIndex: 1, movementId: representatives[0], role: 'major', sets: 3, reps: 5, targetRpe: 8 },
+      ...representatives.slice(1).map((movementId, index) => ({
+        dayIndex: 2, slotIndex: index + 1, movementId, role: 'major', sets: 3, reps: 5, targetRpe: 8,
+      })),
+    ];
+    const dayOneFreeze = composeReal(selections, {
+      durationCapMin: 30,
+      executionGateDayIndices: new Set([1]),
+    });
+    assert.deepEqual(dayOneFreeze.blockers, []);
+    assert.ok(dayOneFreeze.warnings.some((warning) =>
+      warning.includes('Day 2 cannot fit every selected major')
+      && warning.includes('Edit that day before freezing it.')));
+    assert.equal(dayOneFreeze.prescriptions.filter((row) => row.dayIndex === 2).length, 6,
+      'the overflowing day remains in weekly stress decisions');
+
+    const dayTwoFreeze = composeReal(selections, {
+      durationCapMin: 30,
+      executionGateDayIndices: new Set([2]),
+    });
+    assert.ok(dayTwoFreeze.blockers.some((blocker) =>
+      blocker.includes('Day 2 cannot fit every selected major')));
+    const wholeTemplateSave = composeReal(selections, { durationCapMin: 30 });
+    assert.ok(wholeTemplateSave.blockers.some((blocker) =>
+      blocker.includes('Day 2 cannot fit every selected major')));
+  });
+
+  check('new above-cap RPE is rejected while freeze normalizes stored drift across the microcycle', () => {
+    const benchId = idOf('Competition Bench');
+    const squatId = idOf('Competition Squat');
+    const selections = [
+      { dayIndex: 1, slotIndex: 1, movementId: benchId, role: 'major', sets: 3, reps: 5, targetRpe: 7 },
+      { dayIndex: 2, slotIndex: 1, movementId: squatId, role: 'major', sets: 3, reps: 5, targetRpe: 8 },
+    ];
+    const authored = composeReal(selections, { baseRpeCap: 7.5 });
+    assert.ok(authored.blockers.some((blocker) =>
+      blocker.includes('Competition Squat RPE must be between 5 and 7.5')));
+
+    const frozen = composeReal(selections, {
+      baseRpeCap: 7.5,
+      rpeCapBehavior: 'clamp',
+      executionGateDayIndices: new Set([1]),
+    });
+    assert.deepEqual(frozen.blockers, []);
+    const drifted = frozen.prescriptions.find((row) => row.movementId === squatId);
+    assert.equal(drifted.authoredTargetRpe, 8);
+    assert.equal(drifted.targetRpe, 7.5);
+    assert.ok(drifted.adaptations.some((adaptation) => adaptation.includes('current limit')));
+    const squatDecision = frozen.familyDecisions.find((row) => row.family === 'squat');
+    assert.ok(squatDecision.initialStress > squatDecision.finalStress);
+  });
+
+  check('legacy support allowance is exact and never bypasses live availability', () => {
+    const benchId = idOf('Competition Bench');
+    const sitUpId = idOf('3/4 Sit-Up');
+    assert.equal(routineRoleEligibility.supplementary.has(sitUpId), false);
+    const selections = [
+      { dayIndex: 1, slotIndex: 1, movementId: benchId, role: 'major', sets: 3, reps: 5, targetRpe: 7 },
+      { dayIndex: 1, slotIndex: 2, movementId: sitUpId, role: 'supplementary', sets: 2, reps: 10, targetRpe: 6 },
+    ];
+    assert.ok(composeReal(selections).blockers.some((blocker) =>
+      blocker.includes('3/4 Sit-Up is not ratified for the supplementary role')));
+    assert.ok(composeReal(selections, {
+      legacyRoleAllowances: [{ dayIndex: 2, movementId: sitUpId, role: 'supplementary' }],
+    }).blockers.length > 0, 'a different day does not inherit the allowance');
+
+    const preserved = composeReal(selections, {
+      legacyRoleAllowances: [{ dayIndex: 1, movementId: sitUpId, role: 'supplementary' }],
+    });
+    assert.deepEqual(preserved.blockers, []);
+    assert.ok(preserved.warnings.some((warning) => warning.includes('preserved only for its existing day 1 supplementary slot')));
+    assert.equal(preserved.prescriptions.find((row) => row.movementId === sitUpId).included, true);
+
+    const unavailable = composeReal(selections, {
+      availableMovementIds: new Set([benchId]),
+      legacyRoleAllowances: [{ dayIndex: 1, movementId: sitUpId, role: 'supplementary' }],
+    });
+    assert.ok(unavailable.blockers.some((blocker) => blocker.includes('3/4 Sit-Up is unavailable')));
   });
 
   check('Hammer Curl role is contextual and accessory ranking may correctly reduce to zero', () => {

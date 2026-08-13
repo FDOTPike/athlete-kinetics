@@ -60,11 +60,12 @@ import m049 from './schema/049_movement_content_correction_v1.sql';
 import m050 from './schema/050_movement_role_convergence.sql';
 import m051 from './schema/051_routine_access_context.sql';
 import m052 from './schema/052_bounded_microcycle_roles.sql';
+import m053 from './schema/053_routine_role_compatibility.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
  *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035, m036, m037, m038, m039, m040, m041, m042, m043, m044, m045, m046, m047, m048, m049, m050, m051, m052];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035, m036, m037, m038, m039, m040, m041, m042, m043, m044, m045, m046, m047, m048, m049, m050, m051, m052, m053];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

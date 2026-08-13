@@ -53,6 +53,7 @@ const schemaFiles = [
   '048_movement_library_v2_batch.sql', '049_movement_content_correction_v1.sql',
   '050_movement_role_convergence.sql', '051_routine_access_context.sql',
   '052_bounded_microcycle_roles.sql',
+  '053_routine_role_compatibility.sql',
 ];
 
 for (const f of schemaFiles) {
@@ -642,7 +643,7 @@ if (fail > 0) {
     }
   };
 
-  console.log('\n[multi-day routine templates — real 001-052 chain + shared production law]');
+  console.log('\n[multi-day routine templates — real 001-053 chain + shared production law]');
 
   const idOf = (name) => {
     const row = mdb.prepare('SELECT movement_id FROM movement WHERE name = ?').get(name);
@@ -668,7 +669,7 @@ if (fail > 0) {
   const insertSlotSql = storeSource
     .match(/`(INSERT INTO routine_template_slot \(routine_template_id[\s\S]*?VALUES \(\?, \?, \?, \?, \?, \?, \?, \?\))`/)?.[1];
   const startRolesSql = storeSource
-    .match(/`(SELECT movement_id, role FROM routine_template_slot[\s\S]*?ORDER BY day_index, slot_index)`/)?.[1];
+    .match(/`(SELECT slot\.movement_id, slot\.role,[\s\S]*?ORDER BY slot\.day_index, slot\.slot_index)`/)?.[1];
 
   mcheck('the production template read/write/start statements are still recognisable in the store', () => {
     assert.ok(loadSlotsSql, 'loadRoutineTemplates SELECT not found in useStore.ts');
@@ -767,7 +768,11 @@ if (fail > 0) {
       'SELECT movement_id FROM planned_slot WHERE planned_session_id = 7201 ORDER BY slot_index',
     ).all().map((row) => Number(row.movement_id));
     const sourceRows = mdb.prepare(startRolesSql).all(7001)
-      .map((row) => ({ movementId: Number(row.movement_id), role: row.role }));
+      .map((row) => ({
+        movementId: Number(row.movement_id),
+        role: row.role,
+        legacyRoleAllowed: row.legacy_role_allowed === 1,
+      }));
     assert.equal(sourceRows.length, 4, 'the snapshot query reads the whole template, day index unavailable');
 
     const eligible = liveRoleEligibility();
@@ -784,6 +789,12 @@ if (fail > 0) {
     // So must a supplementary row that is no longer ratified for its role.
     const suppDrift = { ...eligible, supplementary: new Set([...eligible.supplementary].filter((id) => id !== DB_BENCH)) };
     assert.equal(isRoutineRoleSnapshotExecutable(planMovementIds, sourceRows, suppDrift), false);
+
+    // Repeated historical template rows with the same role are redundant, not ambiguous.
+    const duplicateMajor = sourceRows.find((row) => row.movementId === OVERHEAD_PRESS);
+    assert.equal(isRoutineRoleSnapshotExecutable(
+      planMovementIds, [...sourceRows, duplicateMajor], eligible,
+    ), true);
 
     // And an ambiguous snapshot row remains unverifiable rather than assumed.
     assert.equal(isRoutineRoleSnapshotExecutable(
@@ -826,6 +837,13 @@ if (fail > 0) {
       'freeze must select the reviewed executable day from the full analysis');
     assert.ok(storeSource.includes('executionGateDayIndices: new Set([routineDayIndex])'),
       'freeze must enforce live execution gates only on its selected day');
+    assert.ok(storeSource.includes("rpeCapBehavior: 'clamp'"),
+      'freeze must normalize stored RPE drift without weakening strict template authoring');
+    assert.ok(storeSource.includes('const plannedSets = composedSlot.sets;')
+      && !storeSource.includes('defaultSetsForTarget(movement, composedSlot.sets)'),
+    'timed-target conversion must not expand the bounded routine set count');
+    assert.ok(storeSource.includes('INSERT INTO planned_slot_legacy_role_allowance'),
+      'freeze must snapshot an exact legacy allowance onto the planned slot');
     assert.ok(storeSource.includes('const sets = prescribed.authoredSets;')
       && storeSource.includes('const reps = prescribed.authoredReps;')
       && storeSource.includes('const targetRpe = prescribed.authoredTargetRpe;'),

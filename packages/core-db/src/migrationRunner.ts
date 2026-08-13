@@ -96,6 +96,8 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'movement_assistance_relationship' }, // 052
   { type: 'table', name: 'planned_session_routine_context' },  // 052
   { type: 'table', name: 'planned_slot_routine_decision' },    // 052
+  { type: 'table', name: 'routine_template_legacy_role_allowance' }, // 053
+  { type: 'table', name: 'planned_slot_legacy_role_allowance' },     // 053
 ];
 
 function userVersion(db: MigrationDb): number {

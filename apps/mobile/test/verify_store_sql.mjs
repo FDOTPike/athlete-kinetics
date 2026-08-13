@@ -36,7 +36,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
   '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
   '049_movement_content_correction_v1.sql', '050_movement_role_convergence.sql',
-  '051_routine_access_context.sql', '052_bounded_microcycle_roles.sql'];
+  '051_routine_access_context.sql', '052_bounded_microcycle_roles.sql',
+  '053_routine_role_compatibility.sql'];
 
 const db = new DatabaseSync(':memory:');
 try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
@@ -565,6 +566,9 @@ a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',
   resetTables.includes('planned_slot_autopilot'));
+a('reset explicitly clears frozen legacy-role snapshots before their planned slots',
+  resetTables.includes('planned_slot_legacy_role_allowance')
+    && resetTables.indexOf('planned_slot_legacy_role_allowance') < resetTables.indexOf('planned_slot'));
 a('reset removes each immutable side-car only after its parent',
   resetTables.indexOf('set_record') >= 0
     && resetTables.indexOf('set_dose_target') > resetTables.indexOf('set_record')
@@ -592,9 +596,11 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO planned_session_method (planned_session_id,schema_type,routine_template_id,template_name,frozen_at_ms) VALUES (701,'APRE',NULL,'Reset probe',0)");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
   db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (701,-0.5,-1,'eased')");
+  db.exec("INSERT INTO planned_slot_routine_decision (planned_slot_id,role,lift_family,stress_purpose,stress_coefficient,equivalent_volume,stress_dose,adaptations_json) VALUES (701,'supplementary',NULL,NULL,0,0,0,'[]')");
+  db.exec("INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id,role) VALUES (701,'supplementary')");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence

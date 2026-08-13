@@ -47,6 +47,15 @@ export interface RoutineMicrocycleSelection {
   readonly targetRpe?: number;
 }
 
+/** Exact compatibility allowance for support work authored before the curated
+ * assistance contract existed. It is deliberately selection-scoped: callers
+ * must not use it to populate pickers or global role eligibility. */
+export interface RoutineLegacyRoleAllowance {
+  readonly dayIndex: number;
+  readonly movementId: number;
+  readonly role: 'supplementary';
+}
+
 export interface ComposeRoutineMicrocycleInput {
   readonly selections: readonly RoutineMicrocycleSelection[];
   readonly movements: readonly RoutineMicrocycleMovement[];
@@ -59,6 +68,12 @@ export interface ComposeRoutineMicrocycleInput {
   readonly durationCapMin: number;
   readonly baseRpeCap: number;
   readonly availableMovementIds: ReadonlySet<number>;
+  /** Builder/save reject newly authored values above the athlete cap. Freeze
+   * clamps previously valid stored values after initial stress is captured. */
+  readonly rpeCapBehavior?: 'reject' | 'clamp';
+  /** Persisted, exact pre-contract support selections. These never broaden the
+   * current role contract and never bypass live movement availability. */
+  readonly legacyRoleAllowances?: readonly RoutineLegacyRoleAllowance[];
   /** Omit to validate every day (builder/save). A freeze supplies only the
    * selected day so future-day capability or role drift cannot block today,
    * while every day still contributes to weekly stress analysis. */
@@ -347,13 +362,18 @@ const estimatedMinutes = (row: MutablePrescription): number => {
   }
 };
 
+const legacyRoleKey = (
+  dayIndex: number,
+  movementId: number,
+  role: RoutineRole,
+): string => `${dayIndex}:${movementId}:${role}`;
+
 const adaptDuplicatePurpose = (row: MutablePrescription): void => {
   const purpose = row.purpose;
   if (purpose === null) return;
   const before = `${row.sets}x${row.reps}@${row.targetRpe.toFixed(1)}`;
   switch (purpose) {
     case 'volume':
-      row.reps = clamp(row.reps + 2, 1, 100);
       row.targetRpe = Math.max(5, row.targetRpe - 0.5);
       break;
     case 'technique':
@@ -379,8 +399,9 @@ const adaptDuplicatePurpose = (row: MutablePrescription): void => {
   if (before !== after) row.adaptations.push(`Distinct ${purpose.replace('_', '-')} exposure: ${before} -> ${after}.`);
 };
 
-const assignPurposes = (rows: MutablePrescription[]): void => {
+const assignPurposes = (rows: MutablePrescription[]): MutablePrescription[] => {
   const byFamily = new Map<string, MutablePrescription[]>();
+  const repeatedDoseRows: MutablePrescription[] = [];
   for (const row of rows) {
     if (row.role !== 'major' || row.family === null) continue;
     const familyRows = byFamily.get(row.family) ?? [];
@@ -414,9 +435,10 @@ const assignPurposes = (rows: MutablePrescription[]): void => {
       const signature = `${row.sets}:${row.reps}:${row.targetRpe}`;
       const seen = signatures.get(signature) ?? 0;
       signatures.set(signature, seen + 1);
-      if (seen > 0) adaptDuplicatePurpose(row);
+      if (seen > 0) repeatedDoseRows.push(row);
     }
   }
+  return repeatedDoseRows;
 };
 
 /** Build a complete, deterministic microcycle. Selection is uncapped; dose is
@@ -429,6 +451,8 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
   const globalAdaptations: string[] = [];
   const movementById = new Map(input.movements.map((movement) => [movement.movementId, movement] as const));
   const familyByMovement = familyMapOf(input.liftFamilies);
+  const legacyRoleAllowances = new Set((input.legacyRoleAllowances ?? []).map((allowance) =>
+    legacyRoleKey(allowance.dayIndex, allowance.movementId, allowance.role)));
 
   if (input.trainingAge === 'beginner') {
     blockers.push('Standalone routines unlock after the Beginner stage. Generated training remains available.');
@@ -443,11 +467,16 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
     const movement = movementById.get(selection.movementId);
     const enforceExecutionGate = input.executionGateDayIndices === undefined
       || input.executionGateDayIndices.has(selection.dayIndex);
+    const legacyRoleAllowed = selection.role === 'supplementary'
+      && legacyRoleAllowances.has(legacyRoleKey(
+        selection.dayIndex, selection.movementId, selection.role,
+      ));
     if (movement === undefined) blockers.push(`Movement ${selection.movementId} is missing from the live library.`);
     if (enforceExecutionGate && !input.availableMovementIds.has(selection.movementId)) {
       blockers.push(`${movement?.name ?? `Movement ${selection.movementId}`} is unavailable under equipment, safety, tier, capability, or attestation gates.`);
     }
-    if (enforceExecutionGate && !input.roleEligibility[selection.role].has(selection.movementId)) {
+    if (enforceExecutionGate && !legacyRoleAllowed
+        && !input.roleEligibility[selection.role].has(selection.movementId)) {
       blockers.push(`${movement?.name ?? `Movement ${selection.movementId}`} is not ratified for the ${selection.role} role.`);
     }
     if (selection.role === 'major' && familyByMovement.get(selection.movementId) === undefined) {
@@ -460,8 +489,12 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
       blockers.push(`${movement?.name ?? `Movement ${selection.movementId}`} reps must be a whole number from 1 to 100.`);
     }
     if (selection.targetRpe !== undefined && (!Number.isFinite(selection.targetRpe)
-        || selection.targetRpe < 5 || selection.targetRpe > input.baseRpeCap)) {
+        || selection.targetRpe < 5 || selection.targetRpe > 10
+        || (input.rpeCapBehavior !== 'clamp' && selection.targetRpe > input.baseRpeCap))) {
       blockers.push(`${movement?.name ?? `Movement ${selection.movementId}`} RPE must be between 5 and ${input.baseRpeCap}.`);
+    }
+    if (legacyRoleAllowed) {
+      warnings.push(`${movement?.name ?? `Movement ${selection.movementId}`} is preserved only for its existing day ${selection.dayIndex} supplementary slot; it is not available for new routine selections without a curated relationship.`);
     }
   }
 
@@ -476,10 +509,14 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
         && !input.executionGateDayIndices.has(dayIndex)) continue;
     const majors = day.filter((selection) => selection.role === 'major').map((selection) => selection.movementId);
     for (const selection of day) {
+      const legacyRoleAllowed = selection.role === 'supplementary'
+        && legacyRoleAllowances.has(legacyRoleKey(
+          selection.dayIndex, selection.movementId, selection.role,
+        ));
       const contextual = contextualRoutineRoles(
         selection.movementId, majors, input.liftFamilies, input.assistance, input.roleEligibility,
       );
-      if (!contextual.has(selection.role)) {
+      if (!legacyRoleAllowed && !contextual.has(selection.role)) {
         const movement = movementById.get(selection.movementId);
         blockers.push(`${movement?.name ?? `Movement ${selection.movementId}`} is not ${selection.role}-eligible for the major families on day ${dayIndex}.`);
       }
@@ -520,7 +557,9 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
     };
   });
 
-  assignPurposes(rows);
+  // Purpose identity is required by stress math, but no dose may change before
+  // the authored/defaulted review baseline is captured.
+  const repeatedDoseRows = assignPurposes(rows);
   const budgets = ROUTINE_FAMILY_STRESS_BUDGETS[input.trainingAge];
   const families = [...new Set(rows
     .filter((row) => row.role === 'major' && row.family !== null)
@@ -538,6 +577,16 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
       ));
     }
   }
+
+  if (input.rpeCapBehavior === 'clamp') {
+    for (const row of rows) {
+      if (row.targetRpe <= input.baseRpeCap) continue;
+      const before = row.targetRpe;
+      row.targetRpe = input.baseRpeCap;
+      row.adaptations.push(`Target RPE capped from ${before.toFixed(1)} to ${row.targetRpe.toFixed(1)} under the athlete's current limit.`);
+    }
+  }
+  for (const row of repeatedDoseRows) adaptDuplicatePurpose(row);
 
   const boundFamily = (family: string, budget: number, dayIndex?: number): void => {
     const inScope = (row: MutablePrescription): boolean => dayIndex === undefined || row.dayIndex === dayIndex;
@@ -621,8 +670,19 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
       reducible.sets -= 1;
     }
     if (duration() > durationCap + 0.05) {
-      blockers.push(`Day ${dayIndex} cannot fit every selected major at a safe minimum dose inside ${durationCap} minutes.`);
+      const message = `Day ${dayIndex} cannot fit every selected major at a safe minimum dose inside ${durationCap} minutes.`;
+      if (input.executionGateDayIndices === undefined
+          || input.executionGateDayIndices.has(dayIndex)) {
+        blockers.push(message);
+      } else {
+        warnings.push(`${message} Edit that day before freezing it.`);
+      }
     }
+  }
+
+  if (rows.some((row) => row.sets > row.originalSets || row.reps > row.originalReps
+      || row.targetRpe > row.originalTargetRpe)) {
+    blockers.push('The routine engine could not produce a non-increasing bounded prescription.');
   }
 
   for (const row of rows) {

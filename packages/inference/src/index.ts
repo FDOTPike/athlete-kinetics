@@ -269,6 +269,7 @@ export {
   type RoutineAssistanceContract,
   type RoutineFamilyStressDecision,
   type RoutineLiftFamilyContract,
+  type RoutineLegacyRoleAllowance,
   type RoutineMicrocycleMovement,
   type RoutineMicrocyclePrescription,
   type RoutineMicrocycleSelection,

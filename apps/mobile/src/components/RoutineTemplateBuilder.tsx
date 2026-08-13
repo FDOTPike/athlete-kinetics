@@ -57,6 +57,7 @@ interface SlotItem {
   sets?: number;
   reps?: number;
   targetRpe?: number;
+  legacyRoleAllowed?: boolean;
 }
 
 interface PickerRow {
@@ -109,7 +110,8 @@ export function RoutineTemplateBuilder({
         movementId: s.movementId,
         sets: s.sets,
         reps: s.reps,
-        targetRpe: s.targetRpe,
+        targetRpe: Math.min(s.targetRpe, profile.base_rpe_cap),
+        legacyRoleAllowed: s.legacyRoleAllowed,
       }));
     }
     return [
@@ -124,6 +126,9 @@ export function RoutineTemplateBuilder({
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerView, setPickerView] = useState<'available' | 'all'>('available');
   const [errorText, setErrorText] = useState<string | null>(null);
+  const normalizedRpeSlots = initialTemplate?.slots.filter(
+    (slot) => slot.targetRpe > profile.base_rpe_cap,
+  ).length ?? 0;
 
   const verdicts: readonly MovementAvailability[] = useMemo(
     () => getMovementAvailabilityVerdicts('weight_room'),
@@ -242,6 +247,11 @@ export function RoutineTemplateBuilder({
       durationCapMin: profile.session_duration_cap_min,
       baseRpeCap: profile.base_rpe_cap,
       availableMovementIds: availableSet,
+      legacyRoleAllowances: slots.flatMap((slot) =>
+        slot.movementId !== null && slot.role === 'supplementary'
+          && slot.legacyRoleAllowed === true
+          ? [{ dayIndex: slot.dayIndex, movementId: slot.movementId, role: slot.role }]
+          : []),
     });
     const activePrescriptions = stressPreview.prescriptions.filter((row) => row.dayIndex === activeDay);
     const activeComposedMinutes = activePrescriptions.reduce((sum, row) => {
@@ -365,6 +375,7 @@ export function RoutineTemplateBuilder({
       sets: slot.sets,
       reps: slot.reps,
       targetRpe: slot.targetRpe,
+      preserveLegacyRoleAllowance: slot.legacyRoleAllowed,
     };
   });
   const composed = composeRoutineMicrocycle({
@@ -385,6 +396,11 @@ export function RoutineTemplateBuilder({
     durationCapMin: profile.session_duration_cap_min,
     baseRpeCap: profile.base_rpe_cap,
     availableMovementIds: availableSet,
+    legacyRoleAllowances: slots.flatMap((slot) =>
+      slot.movementId !== null && slot.role === 'supplementary'
+        && slot.legacyRoleAllowed === true
+        ? [{ dayIndex: slot.dayIndex, movementId: slot.movementId, role: slot.role }]
+        : []),
   });
   const defaultBySlotId = new Map<string, RoutineMicrocyclePrescription>();
   for (const slot of validSelections) {
@@ -458,11 +474,15 @@ export function RoutineTemplateBuilder({
   const updateRole = (index: number, role: RoutineRole): void => {
     const updated = [...slots];
     const movementId = updated[index].movementId;
+    const sameRole = updated[index].role === role;
     updated[index] = {
       ...updated[index],
       role,
-      movementId: movementId !== null && contextualRolesFor(movementId).has(role) ? movementId : null,
-      ...(updated[index].role === role ? {} : { sets: undefined, reps: undefined, targetRpe: undefined }),
+      movementId: sameRole
+        ? movementId
+        : movementId !== null && contextualRolesFor(movementId).has(role) ? movementId : null,
+      legacyRoleAllowed: sameRole ? updated[index].legacyRoleAllowed : undefined,
+      ...(sameRole ? {} : { sets: undefined, reps: undefined, targetRpe: undefined }),
     };
     setErrorText(null);
     setSlots(updated);
@@ -474,6 +494,7 @@ export function RoutineTemplateBuilder({
     updated[pickerSlotIndex] = {
       ...updated[pickerSlotIndex],
       movementId,
+      legacyRoleAllowed: undefined,
       sets: undefined,
       reps: undefined,
       targetRpe: undefined,
@@ -552,6 +573,10 @@ export function RoutineTemplateBuilder({
       setErrorText(`Choose at least one major movement for day ${missingMajorDay}.`);
       return;
     }
+    if (composed.blockers.length > 0) {
+      setErrorText(composed.blockers[0]);
+      return;
+    }
 
     try {
       const saved = saveRoutineTemplate({
@@ -589,6 +614,14 @@ export function RoutineTemplateBuilder({
       {errorText !== null && (
         <View style={styles.errorCard}>
           <Text style={styles.errorText}>{errorText}</Text>
+        </View>
+      )}
+
+      {normalizedRpeSlots > 0 && (
+        <View style={styles.errorCard} testID="routine-rpe-normalization-notice">
+          <Text style={styles.warningText}>
+            {normalizedRpeSlots} stored routine RPE value{normalizedRpeSlots === 1 ? '' : 's'} exceeded the athlete's current cap and {normalizedRpeSlots === 1 ? 'was' : 'were'} normalized to {profile.base_rpe_cap.toFixed(1)} for review. Newly entered values above the cap are not accepted.
+          </Text>
         </View>
       )}
 
@@ -676,6 +709,11 @@ export function RoutineTemplateBuilder({
           const m = movements.find((item) => item.movement_id === slot.movementId);
           return (
             <View key={slot.id} style={styles.slotCard}>
+                {slot.legacyRoleAllowed === true && (
+                  <Text style={styles.warningText} testID={`legacy-role-notice-${activeSlotIndex + 1}`}>
+                    Preserved legacy supplementary selection. It remains valid only in this existing day/role pairing and will not appear for new selections.
+                  </Text>
+                )}
               <View style={styles.slotHeader}>
                 <Text style={styles.slotIndexLabel}>Slot {activeSlotIndex + 1}</Text>
                 <View style={styles.roleRow}>

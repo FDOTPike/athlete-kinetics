@@ -52,7 +52,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '049_movement_content_correction_v1.sql',
   '050_movement_role_convergence.sql',
   '051_routine_access_context.sql',
-  '052_bounded_microcycle_roles.sql'];
+  '052_bounded_microcycle_roles.sql',
+  '053_routine_role_compatibility.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -1098,6 +1099,170 @@ check('052 poison repair converges on the curated structural contract',
   sentinelsMissing(poisonedBounded).length === 0
     && JSON.stringify(boundedSummary(poisonedBounded)) === JSON.stringify(boundedSummary(a)),
   JSON.stringify(boundedSummary(poisonedBounded)));
+
+// --- 2o. 053 exact legacy routine-role compatibility -----------------------
+console.log('[2o] 053 exact legacy routine-role compatibility');
+const compatibilityIndex = FILES.indexOf('053_routine_role_compatibility.sql');
+const compatibilityDb = freshDb();
+for (let i = 0; i < boundedIndex; i += 1) compatibilityDb.executeSync(MIGRATIONS[i]);
+compatibilityDb.executeSync("INSERT INTO routine_template (name, schema_type, created_at_ms, updated_at_ms) VALUES ('pre-052 compatibility', 'LINEAR', 1, 1)");
+const compatibilityTemplateId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+const compatibilityMovementId = (name) => Number(compatibilityDb.raw.prepare(
+  'SELECT movement_id FROM movement WHERE name = ?',
+).get(name).movement_id);
+const compatibilityBenchId = compatibilityMovementId('Competition Bench');
+const compatibilitySitUpId = compatibilityMovementId('3/4 Sit-Up');
+const compatibilityDbBenchId = compatibilityMovementId('Dumbbell Bench Press');
+for (const slot of [
+  [1, 'major', compatibilityBenchId, 3, 5, 8],
+  [2, 'supplementary', compatibilitySitUpId, 2, 10, 6],
+  [3, 'supplementary', compatibilityDbBenchId, 3, 8, 7],
+]) {
+  compatibilityDb.raw.prepare(`INSERT INTO routine_template_slot
+    (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?)`
+  ).run(compatibilityTemplateId, ...slot);
+}
+
+// Apply 052, then create an already-frozen reviewed session before 053. The
+// append-only migration must snapshot the exact compatibility marker in-place.
+compatibilityDb.executeSync(MIGRATIONS[boundedIndex]);
+compatibilityDb.executeSync(`PRAGMA user_version = ${compatibilityIndex};`);
+compatibilityDb.executeSync("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2036-01-01', 'strength', 1)");
+const compatibilityBlockId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+compatibilityDb.raw.prepare(`INSERT INTO planned_session
+  (block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (?, 1, 1, 'full', 'accumulation', '2036-01-01')`).run(compatibilityBlockId);
+const compatibilitySessionId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+compatibilityDb.raw.prepare(`INSERT INTO planned_session_method
+  (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+  VALUES (?, 'LINEAR', ?, 'pre-052 compatibility', 1)`
+).run(compatibilitySessionId, compatibilityTemplateId);
+compatibilityDb.raw.prepare(`INSERT INTO planned_session_routine_context
+  (planned_session_id, routine_day_index, family_decisions_json, warnings_json,
+   recommendations_json, adaptations_json) VALUES (?, 1, ?, '[]', '[]', '[]')`
+).run(compatibilitySessionId, boundedFamilyDecisionJson);
+compatibilityDb.raw.prepare(`INSERT INTO planned_slot
+  (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, ?, 3, 5, 8)`).run(compatibilitySessionId, compatibilityBenchId);
+const compatibilityMajorSlotId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+compatibilityDb.raw.prepare(`INSERT INTO planned_slot_routine_decision
+  (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+   equivalent_volume, stress_dose, adaptations_json)
+  VALUES (?, 'major', 'bench_press', 'heavy', 1, 15, 14.2, '[]')`
+).run(compatibilityMajorSlotId);
+compatibilityDb.raw.prepare(`INSERT INTO planned_slot
+  (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (?, 2, ?, 2, 10, 6)`).run(compatibilitySessionId, compatibilitySitUpId);
+const compatibilitySupportSlotId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+compatibilityDb.raw.prepare(`INSERT INTO planned_slot_routine_decision
+  (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+   equivalent_volume, stress_dose, adaptations_json)
+  VALUES (?, 'supplementary', NULL, NULL, 0, 0, 0, '[]')`
+).run(compatibilitySupportSlotId);
+
+runMigrations(compatibilityDb, MIGRATIONS);
+const compatibilityAllowanceRows = compatibilityDb.raw.prepare(`
+  SELECT day_index, movement_id, role
+  FROM routine_template_legacy_role_allowance
+  WHERE routine_template_id = ? ORDER BY day_index, movement_id
+`).all(compatibilityTemplateId);
+check('053 upgrade backfills only the exact unrelated supplementary slot',
+  JSON.stringify(compatibilityAllowanceRows) === JSON.stringify([{
+    day_index: 1, movement_id: compatibilitySitUpId, role: 'supplementary',
+  }])
+    && Number(compatibilityDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_slot WHERE routine_template_id = ?',
+    ).get(compatibilityTemplateId).c) === 3,
+  JSON.stringify(compatibilityAllowanceRows));
+check('053 does not broaden global roles or grandfather current same-family work',
+  JSON.stringify(roleCounts(compatibilityDb)) === JSON.stringify(roleCounts(a))
+    && Number(compatibilityDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ?',
+    ).get(compatibilitySitUpId).c) === 0
+    && !compatibilityAllowanceRows.some((row) => Number(row.movement_id) === compatibilityDbBenchId),
+  JSON.stringify(roleCounts(compatibilityDb)));
+check('053 snapshots an existing frozen legacy slot during upgrade',
+  compatibilityDb.raw.prepare(`
+    SELECT role FROM planned_slot_legacy_role_allowance WHERE planned_slot_id = ?
+  `).get(compatibilitySupportSlotId)?.role === 'supplementary');
+
+let compatibilityConstraintRejections = 0;
+for (const [sql, params] of [
+  [`INSERT INTO routine_template_legacy_role_allowance
+      (routine_template_id, day_index, movement_id, role) VALUES (?, 1, ?, 'major')`,
+    [compatibilityTemplateId, compatibilitySitUpId]],
+  [`INSERT INTO routine_template_legacy_role_allowance
+      (routine_template_id, day_index, movement_id, role) VALUES (?, 8, ?, 'supplementary')`,
+    [compatibilityTemplateId, compatibilitySitUpId]],
+  [`INSERT INTO routine_template_legacy_role_allowance
+      (routine_template_id, day_index, movement_id, role) VALUES (?, 1, 999999, 'supplementary')`,
+    [compatibilityTemplateId]],
+  [`INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id, role) VALUES (?, 'major')`,
+    [compatibilityMajorSlotId]],
+  [`INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id, role) VALUES (999999, 'supplementary')`,
+    []],
+]) {
+  try { compatibilityDb.raw.prepare(sql).run(...params); } catch { compatibilityConstraintRejections += 1; }
+}
+const compatibilityStrict = compatibilityDb.raw.prepare(`
+  SELECT name, strict FROM pragma_table_list
+  WHERE name IN ('routine_template_legacy_role_allowance', 'planned_slot_legacy_role_allowance')
+  ORDER BY name
+`).all();
+check('053 tables are STRICT and reject wrong roles, days, and foreign keys',
+  compatibilityConstraintRejections === 5
+    && compatibilityStrict.length === 2
+    && compatibilityStrict.every((row) => Number(row.strict) === 1),
+  `${compatibilityConstraintRejections}/5 ${JSON.stringify(compatibilityStrict)}`);
+
+compatibilityDb.executeSync(`PRAGMA user_version = ${compatibilityIndex};`);
+runMigrations(compatibilityDb, MIGRATIONS);
+check('053 replay is idempotent and preserves exact template and frozen allowances',
+  Number(compatibilityDb.raw.prepare(
+    'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+  ).get(compatibilityTemplateId).c) === 1
+    && Number(compatibilityDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance WHERE planned_slot_id = ?',
+    ).get(compatibilitySupportSlotId).c) === 1);
+
+compatibilityDb.raw.prepare('DELETE FROM routine_template WHERE routine_template_id = ?')
+  .run(compatibilityTemplateId);
+check('053 frozen allowance survives source-template deletion',
+  compatibilityDb.raw.prepare(`
+    SELECT role FROM planned_slot_legacy_role_allowance WHERE planned_slot_id = ?
+  `).get(compatibilitySupportSlotId)?.role === 'supplementary'
+    && compatibilityDb.raw.prepare(`
+      SELECT routine_template_id FROM planned_session_method WHERE planned_session_id = ?
+    `).get(compatibilitySessionId)?.routine_template_id === null);
+
+const poisonedCompatibility = freshDb();
+runMigrations(poisonedCompatibility, MIGRATIONS);
+poisonedCompatibility.executeSync('DROP TABLE planned_slot_legacy_role_allowance');
+poisonedCompatibility.executeSync('DROP TABLE routine_template_legacy_role_allowance');
+poisonedCompatibility.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('053 poison precondition claims completion while both compatibility sentinels are absent',
+  ['routine_template_legacy_role_allowance', 'planned_slot_legacy_role_allowance']
+    .every((name) => sentinelsMissing(poisonedCompatibility).includes(name)));
+runMigrations(poisonedCompatibility, MIGRATIONS);
+check('053 poison repair restores both exact compatibility tables',
+  sentinelsMissing(poisonedCompatibility).length === 0
+    && poisonedCompatibility.raw.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'routine_template_legacy_role_allowance'",
+    ).get() !== undefined
+    && poisonedCompatibility.raw.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'planned_slot_legacy_role_allowance'",
+    ).get() !== undefined);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

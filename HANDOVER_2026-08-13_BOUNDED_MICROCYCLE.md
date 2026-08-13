@@ -1,9 +1,14 @@
 # Athlete Kinetics bounded-microcycle checkpoint handover
 
+> Historical checkpoint record for `f41712de0364498c721c3c7fa1235763759213a2`.
+> The P1/P2 audit findings against that checkpoint are corrected in
+> `HANDOVER_2026-08-13_BOUNDED_MICROCYCLE_AUDIT_REMEDIATION.md`; use that
+> handover and its two independent audit prompts for current `HEAD`.
+
 Date: 2026-08-13
 Baseline: `6cfb990a33eabfa36f885e3239dac62e1d414c8f`
 Audit range after the checkpoint commit: `6cfb990a33eabfa36f885e3239dac62e1d414c8f..HEAD`
-Status: implementation and local gates complete; awaiting one read-only Opus audit
+Status: superseded by the post-Opus remediation handover
 
 ## What shipped
 
@@ -12,7 +17,10 @@ Status: implementation and local gates complete; awaiting one read-only Opus aud
 - `composeRoutineMicrocycle` evaluates the whole authored microcycle, preserves
   every selected major/variation at a safe minimum, sheds accessory then other
   related support first, and bounds sets, reps, RPE, stress purpose, order, and
-  duration. Beginner standalone policy and live access gates remain fail closed.
+  duration. Current `HEAD` additionally guarantees that final sets, reps, and
+  RPE never exceed the authored/defaulted dose and captures initial stress
+  before any non-increasing purpose or RPE adaptation. Beginner standalone
+  policy and live access gates remain fail closed.
 - Same-day same-family majors are one family exposure across executable
   variations. Board Press `2x6` at `0.90` plus Competition Bench `3x7` at
   `1.00` produces `31.8` bench-family equivalent reps. The same contract is
@@ -25,7 +33,9 @@ Status: implementation and local gates complete; awaiting one read-only Opus aud
   closest relationship: Hammer Curl is supplementary after pulls and accessory
   after squat/bench/deadlift/overhead/power-clean work, including mixed-family
   sessions. Current role counts are major 79, supplementary 84, accessory 14,
-  conditional 12; future movements fail closed until curated.
+  conditional 12; future movements fail closed until curated. Migration 053 at
+  current `HEAD` adds exact athlete-local compatibility only for persisted
+  pre-contract supplementary slots without broadening those role counts.
 - Accessories are offered last and ranked by uncovered muscles, objective,
   live availability/restrictions, duplication, composed time headroom, and
   remaining family-stress headroom. Zero recommendations is valid; selection
@@ -44,7 +54,10 @@ Status: implementation and local gates complete; awaiting one read-only Opus aud
 The product contract is documented in
 `docs/decisions/ROUTINE_BOUNDED_MICROCYCLE_POLICY.md`.
 
-## Verification evidence
+## Historical verification evidence at f41712d
+
+The results in this section predate the remediation. Current results are
+recorded only in the correction handover.
 
 - `npm ci`: PASS from the frozen baseline.
 - `npm run verify:all`: PASS, exit 0, 134.9 s on the final source. All 20
@@ -93,11 +106,15 @@ resolver messages; Android dependency deprecation/manifest/CMake path warnings.
 - Same-day variations may carry different component purposes (for example,
   heavy Board Press plus volume Competition Bench) while the session remains
   one aggregated family exposure.
-- Freeze enforces live availability/contextual-role gates on the selected day
-  while retaining every template day for weekly stress. A missing movement or
-  family contract anywhere still blocks because weekly analysis is impossible.
+- Freeze enforces live availability/contextual-role gates and irreducible
+  duration only on the selected day while retaining every template day for
+  weekly stress. Other-day duration overflow is a warning; missing movement or
+  major-family contract and an invalid complete-week safe minimum remain global
+  blockers because weekly analysis would otherwise be impossible.
 - Pre-052 frozen routines have no stress sidecars and retain the historical
-  source-template role fallback. There is no speculative backfill.
+  source-template role fallback. Current migration 053 snapshots only exact
+  recoverable compatibility; a plan whose source template was already deleted
+  before that migration remains unrecoverable.
 - The device result is a native install/launch smoke, not the full manual
   acceptance matrix or a measured on-device memory profile. Debug variants use
   Metro for JavaScript; the separately built production bundle proves current
@@ -107,7 +124,11 @@ resolver messages; Android dependency deprecation/manifest/CMake path warnings.
 - No release artifact, release signing, upload, push, publication, or release
   authorization was performed.
 
-## Copy-paste Opus audit prompt
+## Superseded audit prompt
+
+Do not use the historical prompt below for the remediation audit. Use the two
+independent prompts in
+`HANDOVER_2026-08-13_BOUNDED_MICROCYCLE_AUDIT_REMEDIATION.md`.
 
 ```text
 Act as Claude Code Opus 5 Maximum performing the single read-only checkpoint

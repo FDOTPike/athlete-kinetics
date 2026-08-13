@@ -266,6 +266,90 @@ describe('RoutineTemplateBuilder', () => {
     expect(rows.some((row) => row.movement.name === 'Barbell Hip Thrust')).toBe(false);
   });
 
+  test('normalizes stored RPE drift to the current cap and explains the edit', () => {
+    mockState.profile = { ...mockState.profile, base_rpe_cap: 7.5 };
+    const initialTemplate = {
+      routineTemplateId: 20,
+      name: 'Stored RPE drift',
+      schemaType: 'LINEAR',
+      createdAtMs: 1,
+      updatedAtMs: 1,
+      slots: [{
+        routineTemplateSlotId: 1,
+        routineTemplateId: 20,
+        dayIndex: 1,
+        slotIndex: 1,
+        role: 'major',
+        movementId: 1,
+        movementName: 'Competition Squat',
+        sets: 3,
+        reps: 5,
+        targetRpe: 9,
+        legacyRoleAllowed: false,
+      }],
+    };
+
+    render(<RoutineTemplateBuilder initialTemplate={initialTemplate} />);
+    expect(screen.getByTestId('routine-rpe-normalization-notice')).toHaveTextContent(
+      /1 stored routine RPE value exceeded the athlete's current cap/,
+    );
+    expect(screen.getByLabelText('Maximum RPE for slot 1')).toHaveProp('value', '7.5');
+    fireEvent.press(screen.getByLabelText('Save routine template'));
+    expect(saveRoutineTemplate).toHaveBeenCalledWith(expect.objectContaining({
+      routineTemplateId: 20,
+      slots: [expect.objectContaining({ targetRpe: 7.5 })],
+    }));
+  });
+
+  test('rejects a newly entered RPE above the athlete cap before store mutation', () => {
+    render(<RoutineTemplateBuilder />);
+    fireEvent.changeText(screen.getByLabelText('Routine template name'), 'Above cap');
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
+    fireEvent.press(screen.getByText('Competition Squat'));
+    fireEvent.changeText(screen.getByLabelText('Maximum RPE for slot 1'), '9.5');
+    fireEvent.press(screen.getByLabelText('Save routine template'));
+
+    expect(saveRoutineTemplate).not.toHaveBeenCalled();
+    expect(screen.getAllByText(/Competition Squat RPE must be between 5 and 9/).length).toBeGreaterThan(0);
+  });
+
+  test('shows and preserves an exact legacy role allowance through reordering', () => {
+    const initialTemplate = {
+      routineTemplateId: 21,
+      name: 'Legacy support',
+      schemaType: 'LINEAR',
+      createdAtMs: 1,
+      updatedAtMs: 1,
+      slots: [
+        {
+          routineTemplateSlotId: 1, routineTemplateId: 21, dayIndex: 1, slotIndex: 1,
+          role: 'major', movementId: 1, movementName: 'Competition Squat',
+          sets: 3, reps: 5, targetRpe: 8, legacyRoleAllowed: false,
+        },
+        {
+          routineTemplateSlotId: 2, routineTemplateId: 21, dayIndex: 1, slotIndex: 2,
+          role: 'supplementary', movementId: 2, movementName: 'Dumbbell Row',
+          sets: 2, reps: 10, targetRpe: 7, legacyRoleAllowed: true,
+        },
+      ],
+    };
+
+    render(<RoutineTemplateBuilder initialTemplate={initialTemplate} />);
+    expect(screen.getByTestId('legacy-role-notice-2')).toHaveTextContent(
+      /Preserved legacy supplementary selection/,
+    );
+    fireEvent.press(screen.getByLabelText('Move day 1 slot 2 up'));
+    fireEvent.press(screen.getByLabelText('Save routine template'));
+
+    const savedSlots = saveRoutineTemplate.mock.calls[0][0].slots;
+    expect(savedSlots.map((slot) => slot.movementId)).toEqual([2, 1]);
+    expect(savedSlots[0]).toMatchObject({
+      dayIndex: 1,
+      role: 'supplementary',
+      preserveLegacyRoleAllowance: true,
+    });
+  });
+
   test('keeps major and supplementary selection uncapped while genuine role eligibility still fails closed', () => {
     render(<RoutineTemplateBuilder />);
 
