@@ -24,9 +24,30 @@ export interface MigrationDb {
   executeSync(sql: string): { rows: Record<string, unknown>[] };
 }
 
-/** Objects whose absence proves the schema is incomplete regardless of
- *  what user_version claims. One per migration that creates core state. */
-export const SENTINELS: readonly { type: string; name: string }[] = [
+interface MigrationSentinel {
+  readonly type: string;
+  readonly name: string;
+  /** A durable-row invariant can be stronger than sqlite_master presence. */
+  readonly presenceSql?: string;
+  /** Applied before a full replay when lost provenance must fail closed. */
+  readonly failClosedRepairSql?: string;
+}
+
+const ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL = `
+  CREATE TABLE IF NOT EXISTS routine_template_contract_cutoff (
+    cutoff_template_id INTEGER NOT NULL CHECK (cutoff_template_id >= 0),
+    capture_epoch       INTEGER PRIMARY KEY CHECK (capture_epoch = 1)
+  ) STRICT, WITHOUT ROWID;
+  DROP TRIGGER IF EXISTS trg_routine_template_contract_cutoff_bu;
+  DROP TRIGGER IF EXISTS trg_routine_template_contract_cutoff_bd;
+  UPDATE routine_template_contract_cutoff
+    SET cutoff_template_id = 0 WHERE capture_epoch = 1;
+  INSERT OR IGNORE INTO routine_template_contract_cutoff
+    (cutoff_template_id, capture_epoch) VALUES (0, 1);`;
+
+/** Objects or durable rows whose absence proves the schema is incomplete
+ *  regardless of what user_version claims. */
+export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'set_record' },          // 001
   { type: 'table', name: 'hrv_daily' },           // 002
   { type: 'table', name: 'state_vector' },        // 003
@@ -98,6 +119,28 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'planned_slot_routine_decision' },    // 052
   { type: 'table', name: 'routine_template_legacy_role_allowance' }, // 053
   { type: 'table', name: 'planned_slot_legacy_role_allowance' },     // 053
+  {
+    type: 'row',
+    name: 'routine_template_contract_cutoff',                         // 054
+    presenceSql: `SELECT 1 AS ok
+      FROM routine_template_contract_cutoff
+      WHERE capture_epoch = 1`,
+    // If the cutoff table or singleton row is lost after 054 has applied, its
+    // original value cannot be reconstructed safely. Persist zero BEFORE the
+    // full-chain replay so 053 cannot grandfather any current template and so
+    // a failure in an earlier replayed migration cannot later recapture MAX(id).
+    failClosedRepairSql: ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL,
+  },
+  {
+    type: 'trigger',
+    name: 'trg_routine_template_contract_cutoff_bu',                 // 054
+    failClosedRepairSql: ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL,
+  },
+  {
+    type: 'trigger',
+    name: 'trg_routine_template_contract_cutoff_bd',                 // 054
+    failClosedRepairSql: ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL,
+  },
 ];
 
 function userVersion(db: MigrationDb): number {
@@ -123,19 +166,46 @@ function applyFrom(db: MigrationDb, migrations: readonly string[], start: number
 }
 
 export function sentinelsMissing(db: MigrationDb): string[] {
-  return SENTINELS.filter(
-    (s) =>
-      db.executeSync(
-        `SELECT 1 AS ok FROM sqlite_master WHERE type = '${s.type}' AND name = '${s.name}'`,
-      ).rows.length === 0,
-  ).map((s) => s.name);
+  return SENTINELS.filter((sentinel) => {
+    try {
+      const sql = sentinel.presenceSql
+        ?? `SELECT 1 AS ok FROM sqlite_master WHERE type = '${sentinel.type}' AND name = '${sentinel.name}'`;
+      return db.executeSync(sql).rows.length === 0;
+    } catch {
+      return true;
+    }
+  }).map((sentinel) => sentinel.name);
+}
+
+function applyFailClosedRepairs(db: MigrationDb, missing: readonly string[]): void {
+  const repairs = [...new Set(SENTINELS
+    .filter((sentinel) => missing.includes(sentinel.name))
+    .map((sentinel) => sentinel.failClosedRepairSql)
+    .filter((sql): sql is string => sql !== undefined))];
+  if (repairs.length === 0) return;
+
+  db.executeSync('BEGIN');
+  try {
+    for (const repairSql of repairs) db.executeSync(repairSql);
+    db.executeSync('COMMIT');
+  } catch (error) {
+    try {
+      db.executeSync('ROLLBACK');
+    } catch {
+      /* connection-level failure; nothing left to roll back */
+    }
+    throw error;
+  }
 }
 
 export function runMigrations(db: MigrationDb, migrations: readonly string[]): void {
   applyFrom(db, migrations, userVersion(db));
-  if (sentinelsMissing(db).length > 0) {
+  const missing = sentinelsMissing(db);
+  if (missing.length > 0) {
     // user_version lied (poisoned field DB) — re-apply everything; all
-    // migrations are idempotent by contract.
+    // migrations are idempotent by contract. Any irrecoverable provenance is
+    // first persisted in its conservative state so replay can never widen it.
+    applyFailClosedRepairs(db, missing);
     db.executeSync('PRAGMA user_version = 0;');
     applyFrom(db, migrations, 0);
     const still = sentinelsMissing(db);

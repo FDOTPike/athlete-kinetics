@@ -29,9 +29,14 @@ bounded set count with the movement's larger default.
 A template save validates every day being saved. A freeze still analyses the
 complete microcycle, but an irreducible duration overflow blocks only the day
 being frozen; another day's overflow is retained as a visible warning until
-that day is edited or frozen. Weekly inability to reach a valid safe minimum
-remains a global blocker because the weekly stress decision would otherwise be
-invalid.
+that day is edited or frozen. Because the weekly analysis must stay valid for
+every day, the remaining conditions block a freeze globally even when only one
+day is being frozen: a selection whose movement is missing from the live
+library, a major selection without a curated lift-family stress contract, an
+out-of-range stored sets/reps/target-RPE value on any analysed day, a per-day
+session stress budget that cannot be reduced to a valid safe minimum, and the
+complete-week safe-minimum failure. The engine's final non-increasing
+invariant remains a terminal safety blocker.
 
 Newly authored RPE above the athlete's current cap is rejected. If the athlete
 lowers the cap after a template was saved, freeze normalizes stored RPE drift
@@ -109,3 +114,20 @@ source rows that repeat the same movement and same role are redundant and
 accepted; conflicting roles remain unverifiable and fail closed. A pre-052
 frozen plan whose source template was already deleted before migration 053 has
 no trustworthy role snapshot and cannot be recovered speculatively.
+
+Re-derivation is bounded to the pre-contract era by append-only migration 054.
+Migration 053 re-evaluates its backfill against live family and assistance rows
+on every self-heal; if a future curation migration removes or re-parents a
+`movement_lift_family` or `movement_assistance_relationship` row, 053 would
+otherwise grandfather a template authored AFTER the contract. 054 snapshots the
+contract cutoff once — the highest `routine_template_id` present when it first
+ran on the install (AUTOINCREMENT ids are monotonic, so no wall-clock is
+involved) — and prunes any allowance 053 re-derived for a template above that
+watermark, including frozen planned-slot markers whose source template is
+identifiable. A pre-contract template keeps every exact allowance, including
+ones a later curation change makes newly relevant. A frozen marker whose source
+template was already deleted cannot be re-verified and is preserved, never
+deleted speculatively. The migration runner validates the cutoff table, its
+singleton row, and both immutability guards. If any is lost, it persists cutoff
+zero before the full replay; all reconstructable template allowances are then
+pruned rather than recapturing the current maximum and inventing access.

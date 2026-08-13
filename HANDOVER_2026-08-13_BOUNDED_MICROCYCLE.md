@@ -5,6 +5,17 @@
 > `HANDOVER_2026-08-13_BOUNDED_MICROCYCLE_AUDIT_REMEDIATION.md`; use that
 > handover and its two independent audit prompts for current `HEAD`.
 
+> **Documentation correction (2026-08-13).** The "Judgment calls and known
+> limitations" section below lists only "missing movement or major-family
+> contract and an invalid complete-week safe minimum" as global freeze
+> blockers. That enumeration is incomplete: an out-of-range stored
+> sets/reps/target-RPE value on any analysed day and an irreducible per-day
+> session stress budget also block a freeze globally, because the weekly
+> analysis must remain valid for every day. The authoritative, complete
+> enumeration now lives in `docs/decisions/ROUTINE_BOUNDED_MICROCYCLE_POLICY.md`
+> (see "Selection and dose"). This historical record is superseded on that
+> point.
+
 Date: 2026-08-13
 Baseline: `6cfb990a33eabfa36f885e3239dac62e1d414c8f`
 Audit range after the checkpoint commit: `6cfb990a33eabfa36f885e3239dac62e1d414c8f..HEAD`

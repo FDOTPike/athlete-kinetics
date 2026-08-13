@@ -37,7 +37,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
   '049_movement_content_correction_v1.sql', '050_movement_role_convergence.sql',
   '051_routine_access_context.sql', '052_bounded_microcycle_roles.sql',
-  '053_routine_role_compatibility.sql'];
+  '053_routine_role_compatibility.sql',
+  '054_contract_cutoff_provenance.sql'];
 
 const db = new DatabaseSync(':memory:');
 try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {

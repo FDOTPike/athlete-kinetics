@@ -53,7 +53,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '050_movement_role_convergence.sql',
   '051_routine_access_context.sql',
   '052_bounded_microcycle_roles.sql',
-  '053_routine_role_compatibility.sql'];
+  '053_routine_role_compatibility.sql',
+  '054_contract_cutoff_provenance.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -1263,6 +1264,300 @@ check('053 poison repair restores both exact compatibility tables',
     && poisonedCompatibility.raw.prepare(
       "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'planned_slot_legacy_role_allowance'",
     ).get() !== undefined);
+
+// --- 2p. 054 exact contract-cutoff provenance ---------------------------------
+// Migration 053 is shipped and its backfill re-derives from LIVE family and
+// assistance rows on every self-heal. 054 bounds that re-derivation to
+// templates authored before the contract (the first-run watermark), so a
+// future curation change that removes or re-parents a relationship row can
+// never grandfather a post-contract template. This block pins the required
+// adversarial coverage: (1) exact 053 allowances survive upgrade + replay,
+// (2) a post-contract template does NOT become legacy after its relationship
+// is removed and the full chain self-heals, (3) poisoned provenance (a
+// missing or over-reached marker) fails closed and grants nothing.
+console.log('[2p] 054 exact contract-cutoff provenance');
+const cutoffIndex = FILES.indexOf('054_contract_cutoff_provenance.sql');
+const cutoffDb = freshDb();
+// Land the contract the way the eventual release does: an install that never
+// saw 053 upgrades through 053 + 054 in one batch.
+for (let i = 0; i < boundedIndex; i += 1) cutoffDb.executeSync(MIGRATIONS[i]);
+cutoffDb.executeSync(MIGRATIONS[boundedIndex]); // 052: curated families, assistance, frozen-decision side-cars
+const cutoffMovementId = (name) => Number(cutoffDb.raw.prepare(
+  'SELECT movement_id FROM movement WHERE name = ?',
+).get(name).movement_id);
+const cutoffBenchId = cutoffMovementId('Competition Bench');
+const cutoffSitUpId = cutoffMovementId('3/4 Sit-Up');
+const cutoffDbBenchId = cutoffMovementId('Dumbbell Bench Press');
+
+// A pre-contract template: one unrelated supplementary slot (053 grandfathers
+// it) plus one same-family supplementary slot (valid today, never marked).
+cutoffDb.raw.prepare(`INSERT INTO routine_template
+  (name, schema_type, created_at_ms, updated_at_ms) VALUES ('pre-contract cutoff', 'LINEAR', 1, 1)`).run();
+const cutoffPreTemplateId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+for (const slot of [
+  [1, 'major', cutoffBenchId, 3, 5, 8],
+  [2, 'supplementary', cutoffSitUpId, 2, 10, 6],
+  [3, 'supplementary', cutoffDbBenchId, 3, 8, 7],
+]) {
+  cutoffDb.raw.prepare(`INSERT INTO routine_template_slot
+    (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?)`).run(cutoffPreTemplateId, ...slot);
+}
+cutoffDb.executeSync(MIGRATIONS[compatibilityIndex]); // 053 backfills the Sit-Up allowance
+cutoffDb.executeSync(MIGRATIONS[cutoffIndex]);        // 054 captures the watermark, prunes nothing
+const cutoffWatermark = () => Number(cutoffDb.raw.prepare(
+  'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+).get().cutoff_template_id);
+const cutoffPreAllowances = (templateId) => cutoffDb.raw.prepare(
+  'SELECT day_index, movement_id, role FROM routine_template_legacy_role_allowance WHERE routine_template_id = ? ORDER BY movement_id',
+).all(templateId);
+check('054 upgrade captures the pre-contract watermark exactly',
+  cutoffWatermark() === cutoffPreTemplateId, String(cutoffWatermark()));
+check('054 preserves every exact 053 allowance on the upgrade path',
+  JSON.stringify(cutoffPreAllowances(cutoffPreTemplateId)) === JSON.stringify([
+    { day_index: 1, movement_id: cutoffSitUpId, role: 'supplementary' },
+  ]), JSON.stringify(cutoffPreAllowances(cutoffPreTemplateId)));
+
+// A template authored AFTER the contract (id above the watermark).
+cutoffDb.raw.prepare(`INSERT INTO routine_template
+  (name, schema_type, created_at_ms, updated_at_ms) VALUES ('post-contract cutoff', 'LINEAR', 1, 1)`).run();
+const cutoffPostTemplateId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+for (const slot of [
+  [1, 'major', cutoffBenchId, 3, 5, 8],
+  [2, 'supplementary', cutoffDbBenchId, 3, 8, 7],
+]) {
+  cutoffDb.raw.prepare(`INSERT INTO routine_template_slot
+    (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?)`).run(cutoffPostTemplateId, ...slot);
+}
+check('the post-contract supplementary slot is justified under the contract and carries no allowance',
+  Number(cutoffDb.raw.prepare(
+    'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+  ).get(cutoffPostTemplateId).c) === 0);
+
+// Freeze an executable day from each template BEFORE the heal, exactly as the
+// store would, so a full self-heal has frozen slots it could contaminate.
+const cutoffFrozenSession = (templateId) => {
+  cutoffDb.executeSync("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2037-01-01', 'strength', 1)");
+  const blockId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+  cutoffDb.raw.prepare(`INSERT INTO planned_session
+    (block_id, week_index, day_index, focus, phase, session_date)
+    VALUES (?, 1, 1, 'full', 'accumulation', '2037-01-01')`).run(blockId);
+  const sessionId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+  cutoffDb.raw.prepare(`INSERT INTO planned_session_method
+    (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+    VALUES (?, 'LINEAR', ?, 'cutoff freeze', 1)`).run(sessionId, templateId);
+  cutoffDb.raw.prepare(`INSERT INTO planned_session_routine_context
+    (planned_session_id, routine_day_index, family_decisions_json, warnings_json,
+     recommendations_json, adaptations_json)
+    VALUES (?, 1, ?, '[]', '[]', '[]')`).run(sessionId, boundedFamilyDecisionJson);
+  const slotIds = [];
+  for (const [slotIndex, movementId] of [[1, cutoffBenchId], [2, cutoffSitUpId], [2, cutoffDbBenchId]]) {
+    if (slotIndex === 2 && movementId === cutoffSitUpId && templateId !== cutoffPreTemplateId) continue;
+    if (slotIndex === 2 && movementId === cutoffDbBenchId && templateId !== cutoffPostTemplateId) continue;
+    cutoffDb.raw.prepare(`INSERT INTO planned_slot
+      (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+      VALUES (?, ?, ?, 3, 5, 8)`).run(sessionId, slotIndex, movementId);
+    const plannedSlotId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+    const isMajor = movementId === cutoffBenchId;
+    cutoffDb.raw.prepare(`INSERT INTO planned_slot_routine_decision
+      (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+       equivalent_volume, stress_dose, adaptations_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        plannedSlotId, isMajor ? 'major' : 'supplementary',
+        isMajor ? 'bench_press' : null,
+        isMajor ? 'heavy' : null,
+        isMajor ? 1 : 0,
+        isMajor ? 15 : 0,
+        isMajor ? 14.2 : 0,
+        '[]');
+    slotIds.push({ plannedSlotId, movementId });
+  }
+  return { sessionId, slotIds };
+};
+cutoffFrozenSession(cutoffPreTemplateId);   // Sit-Up supplementary slot
+cutoffFrozenSession(cutoffPostTemplateId);  // Dumbbell Bench Press supplementary slot
+check('pre-heal: no frozen legacy marker exists for either frozen day',
+  Number(cutoffDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance').get().c) === 0);
+
+// A future curation migration re-parents Dumbbell Bench Press out of the bench
+// family. Re-parenting via UPDATE survives a full heal (052's INSERT OR IGNORE
+// seed never overwrites the existing row), so 053's next backfill sees the
+// db-bench slot as unjustified and re-derives an allowance for BOTH templates;
+// 054 must keep the pre-contract one (authored before the contract) and prune
+// the post-contract one.
+cutoffDb.raw.prepare("UPDATE movement_lift_family SET family = 'deadlift' WHERE movement_id = ?").run(cutoffDbBenchId);
+check('precondition: re-parenting removes the bench-family membership of the db-bench movement',
+  Number(cutoffDb.raw.prepare(
+    "SELECT COUNT(*) AS c FROM movement_lift_family WHERE movement_id = ? AND family = 'bench_press'",
+  ).get(cutoffDbBenchId).c) === 0
+    && Number(cutoffDb.raw.prepare(
+      "SELECT COUNT(*) AS c FROM movement_lift_family WHERE movement_id = ? AND family = 'deadlift'",
+    ).get(cutoffDbBenchId).c) === 1);
+cutoffDb.executeSync('DROP TABLE planned_slot_legacy_role_allowance');
+cutoffDb.executeSync('DROP TABLE routine_template_legacy_role_allowance');
+check('precondition: full self-heal is armed by missing 053 sentinels',
+  sentinelsMissing(cutoffDb).includes('routine_template_legacy_role_allowance')
+    && sentinelsMissing(cutoffDb).includes('planned_slot_legacy_role_allowance'));
+runMigrations(cutoffDb, MIGRATIONS);
+
+check('full self-heal restores every sentinel and preserves the original watermark',
+  sentinelsMissing(cutoffDb).length === 0
+    && cutoffWatermark() === cutoffPreTemplateId, String(cutoffWatermark()));
+check('pre-contract allowances survive a narrowed contract + full self-heal, including the newly re-derived slot',
+  JSON.stringify(cutoffPreAllowances(cutoffPreTemplateId)) === JSON.stringify([
+    { day_index: 1, movement_id: cutoffDbBenchId, role: 'supplementary' },
+    { day_index: 1, movement_id: cutoffSitUpId, role: 'supplementary' },
+  ]), JSON.stringify(cutoffPreAllowances(cutoffPreTemplateId)));
+check('the post-contract template does NOT become legacy after its relationship is removed + full self-heal',
+  Number(cutoffDb.raw.prepare(
+    'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+  ).get(cutoffPostTemplateId).c) === 0);
+check('the pre-contract frozen legacy marker is reconstructed and survives the heal',
+  Number(cutoffDb.raw.prepare(`SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance pla
+    JOIN planned_slot ps USING (planned_slot_id)
+    JOIN planned_session_method psm USING (planned_session_id)
+    WHERE psm.routine_template_id = ?`).get(cutoffPreTemplateId).c) === 1);
+check('the post-contract frozen marker reconstructed by the heal is pruned (poisoned provenance grants nothing)',
+  Number(cutoffDb.raw.prepare(`SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance pla
+    JOIN planned_slot ps USING (planned_slot_id)
+    JOIN planned_session_method psm USING (planned_session_id)
+    WHERE psm.routine_template_id = ?`).get(cutoffPostTemplateId).c) === 0);
+check('role counts and eligibility are untouched by the 054 prune',
+  JSON.stringify(roleCounts(cutoffDb)) === JSON.stringify(roleCounts(a))
+    && cutoffDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ? AND role = ?',
+    ).get(cutoffDbBenchId, 'major').c === 1);
+
+cutoffDb.executeSync(`PRAGMA user_version = ${cutoffIndex};`);
+runMigrations(cutoffDb, MIGRATIONS);
+check('054 replay is idempotent: watermark, allowances, and prunes are stable',
+  cutoffWatermark() === cutoffPreTemplateId
+    && cutoffPreAllowances(cutoffPreTemplateId).length === 2
+    && Number(cutoffDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+    ).get(cutoffPostTemplateId).c) === 0
+    && cutoffDb.raw.prepare(`SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance pla
+      JOIN planned_slot ps USING (planned_slot_id)
+      JOIN planned_session_method psm USING (planned_session_id)
+      WHERE psm.routine_template_id = ?`).get(cutoffPostTemplateId).c === 0,
+  String(cutoffWatermark()));
+
+let cutoffConstraintRejections = 0;
+for (const sql of [
+  'INSERT INTO routine_template_contract_cutoff (cutoff_template_id, capture_epoch) VALUES (1, 1)',
+  'INSERT INTO routine_template_contract_cutoff (cutoff_template_id, capture_epoch) VALUES (-5, 2)',
+  'INSERT INTO routine_template_contract_cutoff (cutoff_template_id, capture_epoch) VALUES (1.5, 1)',
+  'UPDATE routine_template_contract_cutoff SET cutoff_template_id = 99 WHERE capture_epoch = 1',
+  'DELETE FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+]) {
+  try { cutoffDb.executeSync(sql); } catch { cutoffConstraintRejections += 1; }
+}
+const cutoffTable = cutoffDb.raw.prepare(`
+  SELECT strict, wr FROM pragma_table_list WHERE name = 'routine_template_contract_cutoff'
+`).get();
+check('054 cutoff is STRICT, WITHOUT ROWID, immutable, and rejects re-capture and bad watermarks',
+  cutoffConstraintRejections === 5 && cutoffTable?.strict === 1 && cutoffTable?.wr === 1,
+  `${cutoffConstraintRejections}/5 ${JSON.stringify(cutoffTable)}`);
+
+// Poison of the cutoff marker itself must fail closed. A post-contract
+// template already exists BEFORE the marker is lost; recapturing MAX(id)
+// would silently classify it as pre-contract. The production runner instead
+// commits cutoff zero before replay, including when an earlier replayed
+// migration fails and the next boot must retry from that boundary.
+console.log('[2p-b] 054 cutoff sentinel poison');
+const cutoffPoison = freshDb();
+runMigrations(cutoffPoison, MIGRATIONS);
+check('fresh-install watermark is zero (no pre-contract templates exist)',
+  Number(cutoffPoison.raw.prepare(
+    'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+).get().cutoff_template_id) === 0);
+const cutoffPoisonMovementId = (name) => Number(cutoffPoison.raw.prepare(
+  'SELECT movement_id FROM movement WHERE name = ?',
+).get(name).movement_id);
+const cutoffPoisonBenchId = cutoffPoisonMovementId('Competition Bench');
+const cutoffPoisonDbBenchId = cutoffPoisonMovementId('Dumbbell Bench Press');
+cutoffPoison.raw.prepare(`INSERT INTO routine_template
+  (name, schema_type, created_at_ms, updated_at_ms) VALUES ('pre-poison post-contract', 'LINEAR', 1, 1)`).run();
+const cutoffPoisonTemplateId = Number(cutoffPoison.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+for (const slot of [
+  [1, 'major', cutoffPoisonBenchId, 3, 5, 8],
+  [2, 'supplementary', cutoffPoisonDbBenchId, 3, 8, 7],
+]) {
+  cutoffPoison.raw.prepare(`INSERT INTO routine_template_slot
+    (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?)`).run(cutoffPoisonTemplateId, ...slot);
+}
+cutoffPoison.raw.prepare("UPDATE movement_lift_family SET family = 'deadlift' WHERE movement_id = ?")
+  .run(cutoffPoisonDbBenchId);
+cutoffPoison.executeSync('DROP TABLE routine_template_contract_cutoff');
+check('precondition: the cutoff sentinel is missing',
+  sentinelsMissing(cutoffPoison).includes('routine_template_contract_cutoff'));
+const brokenCutoffReplay = [
+  `${MIGRATIONS[0]}\nSELECT no_such_cutoff_repair_fn(1);`,
+  ...MIGRATIONS.slice(1),
+];
+let cutoffReplayThrew = false;
+try { runMigrations(cutoffPoison, brokenCutoffReplay); } catch { cutoffReplayThrew = true; }
+check('cutoff loss is persisted as zero before a failing full replay',
+  cutoffReplayThrew
+    && uv(cutoffPoison) === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === 0);
+runMigrations(cutoffPoison, MIGRATIONS);
+check('cutoff poison retry restores every sentinel without recapturing MAX(id)',
+  sentinelsMissing(cutoffPoison).length === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === 0);
+check('a template that existed before cutoff loss cannot become legacy after replay',
+  Number(cutoffPoison.raw.prepare(
+    'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+  ).get(cutoffPoisonTemplateId).c) === 0);
+
+// The sentinel is row-aware as well as table-aware. Losing only the singleton
+// row takes the same conservative repair path and cannot retain a fabricated
+// post-contract allowance.
+cutoffPoison.raw.prepare(`INSERT INTO routine_template_legacy_role_allowance
+  (routine_template_id, day_index, movement_id, role) VALUES (?, 1, ?, 'supplementary')`)
+  .run(cutoffPoisonTemplateId, cutoffPoisonDbBenchId);
+cutoffPoison.executeSync('DROP TRIGGER trg_routine_template_contract_cutoff_bd');
+cutoffPoison.executeSync('DELETE FROM routine_template_contract_cutoff');
+check('precondition: a missing cutoff row is detected even while its table exists',
+  sentinelsMissing(cutoffPoison).includes('routine_template_contract_cutoff'));
+runMigrations(cutoffPoison, MIGRATIONS);
+check('missing-row poison also restores cutoff zero and prunes fabricated access',
+  sentinelsMissing(cutoffPoison).length === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+    ).get(cutoffPoisonTemplateId).c) === 0);
+
+// Losing an immutability guard is itself compromised provenance: the value may
+// have been widened before boot. The runner conservatively resets it to zero.
+cutoffPoison.executeSync('DROP TRIGGER trg_routine_template_contract_cutoff_bu');
+cutoffPoison.executeSync(`UPDATE routine_template_contract_cutoff
+  SET cutoff_template_id = ${cutoffPoisonTemplateId} WHERE capture_epoch = 1`);
+cutoffPoison.raw.prepare(`INSERT INTO routine_template_legacy_role_allowance
+  (routine_template_id, day_index, movement_id, role) VALUES (?, 1, ?, 'supplementary')`)
+  .run(cutoffPoisonTemplateId, cutoffPoisonDbBenchId);
+check('precondition: a missing update guard leaves detectably widened provenance',
+  sentinelsMissing(cutoffPoison).includes('trg_routine_template_contract_cutoff_bu')
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === cutoffPoisonTemplateId);
+runMigrations(cutoffPoison, MIGRATIONS);
+check('guard poison resets cutoff zero, restores both guards, and prunes fabricated access',
+  sentinelsMissing(cutoffPoison).length === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+    ).get(cutoffPoisonTemplateId).c) === 0);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);
