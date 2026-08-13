@@ -20,7 +20,7 @@
     "verify:autopilot-counterexamples": "tsc --strict --target es2020 --module commonjs --lib es2020,dom --rootDir . --outDir packages/inference/test/.build packages/inference/test/verify_autopilot_counterexamples.ts && node packages/inference/test/.build/packages/inference/test/verify_autopilot_counterexamples.js",
     "verify:biometrics": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/biometrics/test/.build packages/biometrics/src/aggregate.ts && node packages/biometrics/test/verify_biometrics.mjs",
     "verify:semantic": "npm run build:inference-test && node packages/inference/test/verify_semantic.mjs",
-    "verify:embedder": "npm run build:inference-test && node packages/inference/test/verify_embedder.mjs",
+    "verify:embedder": "npm run build:inference-test && node packages/inference/test/verify_embedder.mjs && node packages/inference/test/verify_embedder_integrity.mjs",
     "verify:store": "npm run build:inference-test && npm run build:load-preference-store-test && npm run build:equipment-inventory-test && tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/programTx.ts && node apps/mobile/test/verify_store_sql.mjs && node apps/mobile/test/verify_routine_templates.mjs",
     "verify:coach": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir apps/mobile/test/.build apps/mobile/src/state/athleteRegistryCore.ts && node apps/mobile/test/verify_coach.mjs",
     "verify:memory": "node tools/memory-audit/audit.mjs",

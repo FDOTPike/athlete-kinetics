@@ -44,6 +44,25 @@ New-Item -ItemType Directory -Force apps\mobile\android\app\src\main\assets | Ou
 Copy-Item packages\inference\assets\minilm\model_quantized.onnx apps\mobile\android\app\src\main\assets\minilm.onnx
 ```
 
+The embedder supply chain is pinned to an immutable Hugging Face revision — no
+mutable `main`:
+
+- Model: `Xenova/all-MiniLM-L6-v2`
+- Revision: `751bff37182d3f1213fa05d7196b954e230abad9`
+  (https://huggingface.co/Xenova/all-MiniLM-L6-v2/commit/751bff37182d3f1213fa05d7196b954e230abad9)
+- `onnx/model_quantized.onnx` sha256 `afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1`
+- `tokenizer.json` sha256 `da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0`
+- distilled `tokenizer.min.json` sha256 `ed2e443c24f234f62dd05a039ca0c489d8d1a7039f1f42fc876aaae9cb32cff6`
+
+`fetch:embedder` stages every artifact to a temporary path, verifies it against
+the pinned byte hashes, and only then installs it; an already-present output
+file is re-verified (never accepted unseen), and a checksum mismatch fails
+closed with the artifact name, actual hash, and expected hash. A stale or
+corrupt cache is rejected and re-fetched only from the pinned revision. The
+single source of truth for these pins is `scripts/embedder-integrity.mjs`;
+`npm run verify:embedder` includes a deterministic integrity gate
+(`packages/inference/test/verify_embedder_integrity.mjs`).
+
 The copied ONNX file and all Android build output are ignored and must not be
 staged.
 

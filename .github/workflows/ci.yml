@@ -27,14 +27,16 @@ jobs:
           python-version: '3.12'
       - run: npm ci
       # MiniLM (~25 MB) used by verify:semantic + verify:embedder; cached.
+      # Keyed on the pin-bearing integrity module: any revision/hash change
+      # busts the cache, and there is NO broad restore-keys fallback (a stale
+      # cache may only be rejected/replaced through the pinned-download path).
       - name: Cache embedding model
         uses: actions/cache@v5
         with:
           path: node_modules/@xenova/transformers/.cache
-          key: minilm-${{ hashFiles('packages/inference/assets/phrase-codebase.json') }}
-          restore-keys: minilm-
+          key: minilm-${{ hashFiles('scripts/embedder-integrity.mjs') }}
       # Materialize the gitignored ONNX into assets/minilm (cache-first,
-      # Hugging Face download on a cold cache).
+      # Hugging Face download on a cold cache, always byte-verified).
       - name: Fetch embedder assets
         run: npm run fetch:embedder
       - name: verify:all (20 gates + typecheck)
@@ -70,12 +72,13 @@ jobs:
       - run: npm ci
       # The triage embedding model ships inside the APK (Android assets);
       # cache-first fetch, then stage it where AGP packages assets from.
+      # Cache key is bound to the pin-bearing integrity module; no broad
+      # restore-keys fallback (stale caches fail closed at fetch).
       - name: Cache embedding model
         uses: actions/cache@v5
         with:
           path: node_modules/@xenova/transformers/.cache
-          key: minilm-${{ hashFiles('packages/inference/assets/phrase-codebase.json') }}
-          restore-keys: minilm-
+          key: minilm-${{ hashFiles('scripts/embedder-integrity.mjs') }}
       - name: Stage embedder model into Android assets
         run: |
           npm run fetch:embedder

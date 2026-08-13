@@ -16,6 +16,11 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// The reference pipeline must load the SAME immutable revision as the device
+// ONNX (scripts/embedder-integrity.mjs); a mutable default could compare the
+// parity proof against different weights than the shipped artifact.
+import { PINNED_REVISION } from '../../../scripts/embedder-integrity.mjs';
+
 const require = createRequire(import.meta.url);
 const cosineMod = require('./.build/semantic/cosine.js');
 const cbMod = require('./.build/semantic/codebase.js');
@@ -51,8 +56,13 @@ const device = createMiniLmEmbedder({ session, Tensor: ort.Tensor, tokenizer: to
 
 // --- reference pipeline (built the codebase vectors) --------------------------
 const { AutoTokenizer, pipeline } = await import('@xenova/transformers');
-const refTokenizer = await AutoTokenizer.from_pretrained(codebase.embeddingModel);
-const refPipe = await pipeline('feature-extraction', codebase.embeddingModel, { quantized: true });
+const refTokenizer = await AutoTokenizer.from_pretrained(codebase.embeddingModel, {
+  revision: PINNED_REVISION,
+});
+const refPipe = await pipeline('feature-extraction', codebase.embeddingModel, {
+  quantized: true,
+  revision: PINNED_REVISION,
+});
 const refEmbed = async (t) => {
   const o = await refPipe(t, { pooling: 'mean', normalize: true });
   return Float32Array.from(o.data);
