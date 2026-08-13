@@ -174,8 +174,8 @@ describe('RoutineTemplateBuilder', () => {
     fireEvent.press(screen.getByText('Competition Squat'));
     fireEvent.changeText(screen.getByLabelText('Sets for slot 1'), '6');
     fireEvent.changeText(screen.getByLabelText('Reps for slot 1'), '4');
-    fireEvent.changeText(screen.getByLabelText('Target RPE for slot 1'), '8.5');
-    expect(screen.getByText('6 sets x 4 reps @ RPE 8.5')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByLabelText('Maximum RPE for slot 1'), '8.5');
+    expect(screen.getByText('6 sets x 4 reps @ RPE 6.0 start / 8.5 max')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
     fireEvent.press(screen.getByText('Dumbbell Row'));
     fireEvent.press(screen.getByLabelText('Remove slot 3'));
@@ -187,6 +187,54 @@ describe('RoutineTemplateBuilder', () => {
     expect(saveRoutineTemplate.mock.calls[0][0].slots.map((slot) => slot.slotIndex)).toEqual([1, 2]);
     expect(saveRoutineTemplate.mock.calls[0][0].slots[1]).toMatchObject({ sets: 6, reps: 4, targetRpe: 8.5 });
     expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  test('projects separate start and max RPE columns for the major lift', () => {
+    render(<RoutineTemplateBuilder />);
+    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+    fireEvent.press(screen.getByText('Competition Squat'));
+
+    expect(screen.getByLabelText('Projected starting RPE for slot 1: 5.5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Maximum RPE for slot 1')).toHaveProp('value', '8');
+    fireEvent.changeText(screen.getByLabelText('Maximum RPE for slot 1'), '8.5');
+    expect(screen.getByLabelText('Projected starting RPE for slot 1: 6.0')).toBeOnTheScreen();
+    expect(screen.getByTestId('major-rpe-projection-note-1').props.children.join('')).toContain(
+      'Projected loading range: RPE 6.0 start to 8.5 max.',
+    );
+  });
+
+  test('pins three available supplementary recommendations for the selected major', () => {
+    mockState.movements = [
+      { movement_id: 10, name: 'Deadlift', baseName: 'Deadlift', pattern: 'hinge', cues: 'Brace', targetMuscles: ['glutes', 'hamstrings'], difficulty: 'Intermediate', is_compound: true },
+      { movement_id: 11, name: 'Barbell Hip Thrust', baseName: 'Hip Thrust', pattern: 'hinge', cues: 'Extend', targetMuscles: ['glutes'], difficulty: 'Intermediate', is_compound: true },
+      { movement_id: 12, name: 'Bulgarian Split Squat', baseName: 'Split Squat', pattern: 'lunge', cues: 'Balance', targetMuscles: ['quadriceps', 'glutes'], difficulty: 'Intermediate', is_compound: true },
+      { movement_id: 13, name: 'Chest-Supported Dumbbell Row', baseName: 'Row', pattern: 'pull_h', cues: 'Pull', targetMuscles: ['lats'], difficulty: 'Intermediate', is_compound: true },
+      { movement_id: 14, name: 'Romanian Deadlift', baseName: 'Romanian Deadlift', pattern: 'hinge', cues: 'Hinge', targetMuscles: ['hamstrings'], difficulty: 'Intermediate', is_compound: true },
+    ];
+    mockState.getRoutineRoleEligibleMovementIds = () => ({
+      major: [10], supplementary: [11, 12, 13, 14], conditional: [],
+    });
+    // Hip thrust is deliberately unavailable: it must not be resurrected by
+    // recommendation ranking, and the next compatible movement fills rank 3.
+    mockState.getMovementAvailabilityVerdicts = () => [
+      available(10), { ...available(11), state: 'teaching_only', reasons: ['equipment'] },
+      available(12), available(13), available(14),
+    ];
+
+    render(<RoutineTemplateBuilder />);
+    fireEvent.press(screen.getByLabelText('Select movement for slot 1'));
+    fireEvent.press(screen.getByText('Deadlift'));
+    fireEvent.press(screen.getByLabelText('Select movement for slot 2'));
+
+    expect(screen.getByTestId('supplementary-recommendation-note')).toBeOnTheScreen();
+    expect(screen.getByText('Top 3 for Deadlift')).toBeOnTheScreen();
+    expect(screen.getByText('Ranked only from supplementary movements currently available to this athlete.')).toBeOnTheScreen();
+    const rows = screen.getByTestId('movement-picker-list').props.data;
+    expect(rows.slice(0, 3).map((row) => row.movement.name)).toEqual([
+      'Bulgarian Split Squat', 'Chest-Supported Dumbbell Row', 'Romanian Deadlift',
+    ]);
+    expect(rows.slice(0, 3).map((row) => row.recommendation.rank)).toEqual([1, 2, 3]);
+    expect(rows.some((row) => row.movement.name === 'Barbell Hip Thrust')).toBe(false);
   });
 
   test('enforces role maxima and disables + Cond chip when conditional role has zero ratified movements', () => {

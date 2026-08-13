@@ -242,6 +242,9 @@ export {
   composeRoutine,
   groupRoutineTemplateDays,
   isRoutineRoleSnapshotExecutable,
+  projectRoutineMajorRpe,
+  rankRoutineSupplementaryRecommendations,
+  routineMajorRpeForWeek,
   ROUTINE_DAY_ROLE_MAXIMA,
   ROUTINE_TEMPLATE_MAX_DAYS,
   ROUTINE_TEMPLATE_MAX_SLOTS,
@@ -251,8 +254,11 @@ export {
   type RoutineRoleEligibility,
   type RoutineRoleSnapshotRow,
   type RoutinePrescription,
+  type RoutineMajorRpeProjection,
+  type RoutineRecommendationMovement,
   type RoutineRole,
   type RoutineSelection,
+  type RoutineSupplementaryRecommendation,
 } from './routineComposer';
 export {
   RUNNER_CHECKPOINT_VERSION,

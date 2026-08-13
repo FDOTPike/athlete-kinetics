@@ -78,6 +78,7 @@ import {
   isNoOpGuardrail,
   isDifficultyAllowed,
   isRoutineRoleSnapshotExecutable,
+  routineMajorRpeForWeek,
   JOINTS,
   PATTERN_JOINTS,
   loadCodebase,
@@ -3610,9 +3611,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         const target = targetForMovement(movement, savedSlot.reps);
         const plannedSets = defaultSetsForTarget(movement, savedSlot.sets);
         const legacyReps = target.kind === 'reps' ? Math.min(30, target.reps) : Math.min(30, savedSlot.reps);
+        // A major slot persists its peak target for backward compatibility;
+        // freezing resolves the selected loading method to this block week's
+        // actual target. Supplementary/conditional work retains its authored
+        // constant target.
+        const frozenTargetRpe = savedSlot.role === 'major'
+          ? routineMajorRpeForWeek(savedSlot.targetRpe, template.schemaType, weekIndex, profile.base_rpe_cap)
+          : Math.min(savedSlot.targetRpe, profile.base_rpe_cap);
         d.executeSync(
           'INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, ?, ?, ?, ?)',
-          [plannedSessionId, composedSlot.slotIndex, savedSlot.movementId, plannedSets, legacyReps, Math.min(savedSlot.targetRpe, profile.base_rpe_cap)],
+          [plannedSessionId, composedSlot.slotIndex, savedSlot.movementId, plannedSets, legacyReps, frozenTargetRpe],
         );
         const plannedSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
         d.executeSync(

@@ -20,7 +20,10 @@ import {
 } from 'react-native';
 import {
   composeRoutine,
+  projectRoutineMajorRpe,
+  rankRoutineSupplementaryRecommendations,
   type MovementAvailability,
+  type RoutineSupplementaryRecommendation,
   type RoutineRole,
   type SchemaType,
 } from '@ak/inference';
@@ -55,6 +58,7 @@ interface PickerRow {
   verdict: MovementAvailability | undefined;
   selectedElsewhere: boolean;
   executable: boolean;
+  recommendation: RoutineSupplementaryRecommendation | undefined;
 }
 
 interface RoutineTemplateBuilderProps {
@@ -134,6 +138,39 @@ export function RoutineTemplateBuilder({
     [verdicts],
   );
 
+  const selectedMajor = useMemo(() => {
+    const majorId = slots.find((slot) => slot.role === 'major' && slot.movementId !== null)?.movementId;
+    return majorId === undefined ? undefined : movements.find((movement) => movement.movement_id === majorId);
+  }, [movements, slots]);
+
+  const supplementaryRecommendationMap = useMemo(() => {
+    if (pickerSlotIndex === null || slots[pickerSlotIndex]?.role !== 'supplementary'
+        || selectedMajor === undefined) {
+      return new Map<number, RoutineSupplementaryRecommendation>();
+    }
+    const candidates = movements.filter((movement) =>
+      roleEligibleSets.supplementary.has(movement.movement_id)
+      && availableSet.has(movement.movement_id)
+      && !slots.some((slot, index) => index !== pickerSlotIndex && slot.movementId === movement.movement_id));
+    const recommendations = rankRoutineSupplementaryRecommendations(
+      {
+        movementId: selectedMajor.movement_id,
+        name: selectedMajor.name,
+        pattern: selectedMajor.pattern,
+        targetMuscles: selectedMajor.targetMuscles,
+        isCompound: selectedMajor.is_compound,
+      },
+      candidates.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+    );
+    return new Map(recommendations.map((recommendation) => [recommendation.movementId, recommendation]));
+  }, [availableSet, movements, pickerSlotIndex, roleEligibleSets.supplementary, selectedMajor, slots]);
+
   const pickerRows = useMemo((): PickerRow[] => {
     if (pickerSlotIndex === null) return [];
     const pickerRole = slots[pickerSlotIndex]?.role ?? 'supplementary';
@@ -158,12 +195,16 @@ export function RoutineTemplateBuilder({
           verdict,
           selectedElsewhere,
           executable: verdict?.state === 'available' && !selectedElsewhere,
+          recommendation: supplementaryRecommendationMap.get(movement.movement_id),
         };
       })
       .sort((a, b) => Number(b.executable) - Number(a.executable)
+        || (a.recommendation?.rank ?? Number.MAX_SAFE_INTEGER)
+          - (b.recommendation?.rank ?? Number.MAX_SAFE_INTEGER)
         || a.movement.name.localeCompare(b.movement.name));
     return pickerView === 'available' ? rows.filter((row) => row.executable) : rows;
-  }, [movements, pickerSearch, pickerSlotIndex, pickerView, roleEligibleSets, slots, verdictMap]);
+  }, [movements, pickerSearch, pickerSlotIndex, pickerView, roleEligibleSets, slots,
+    supplementaryRecommendationMap, verdictMap]);
 
   const pickerCounts = useMemo(() => {
     if (pickerSlotIndex === null) return { available: 0, teaching: 0, total: 0 };
@@ -510,38 +551,64 @@ export function RoutineTemplateBuilder({
               </Pressable>
               {m !== undefined && (() => {
                 const defaults = defaultComposition.slots.find((candidate) => candidate.movementId === m.movement_id);
+                const peakRpe = slot.targetRpe ?? defaults?.targetRpe;
+                const majorProjection = slot.role === 'major' && peakRpe !== undefined
+                  ? projectRoutineMajorRpe(peakRpe, schemaType, profile.base_rpe_cap)
+                  : undefined;
                 return (
-                  <View style={styles.doseRow}>
-                    <View style={styles.doseField}>
-                      <Text style={styles.captionText}>Sets</Text>
-                      <TextInput
-                        style={styles.doseInput}
-                        value={String(slot.sets ?? defaults?.sets ?? '')}
-                        onChangeText={(value) => updateDose(index, 'sets', value)}
-                        keyboardType="number-pad"
-                        accessibilityLabel={`Sets for slot ${index + 1}`}
-                      />
+                  <View style={styles.doseGroup}>
+                    <View style={styles.doseRow}>
+                      <View style={styles.doseField}>
+                        <Text style={styles.captionText}>Sets</Text>
+                        <TextInput
+                          style={styles.doseInput}
+                          value={String(slot.sets ?? defaults?.sets ?? '')}
+                          onChangeText={(value) => updateDose(index, 'sets', value)}
+                          keyboardType="number-pad"
+                          accessibilityLabel={`Sets for slot ${index + 1}`}
+                        />
+                      </View>
+                      <View style={styles.doseField}>
+                        <Text style={styles.captionText}>Reps</Text>
+                        <TextInput
+                          style={styles.doseInput}
+                          value={String(slot.reps ?? defaults?.reps ?? '')}
+                          onChangeText={(value) => updateDose(index, 'reps', value)}
+                          keyboardType="number-pad"
+                          accessibilityLabel={`Reps for slot ${index + 1}`}
+                        />
+                      </View>
+                      {majorProjection !== undefined && (
+                        <View style={styles.doseField}>
+                          <Text style={styles.captionText}>RPE START</Text>
+                          <View
+                            style={[styles.doseInput, styles.projectedDose]}
+                            accessible
+                            accessibilityRole="text"
+                            accessibilityLabel={`Projected starting RPE for slot ${index + 1}: ${majorProjection.startRpe.toFixed(1)}`}
+                          >
+                            <Text style={styles.projectedDoseText}>{majorProjection.startRpe.toFixed(1)}</Text>
+                          </View>
+                        </View>
+                      )}
+                      <View style={styles.doseField}>
+                        <Text style={styles.captionText}>{majorProjection === undefined ? 'RPE' : 'RPE MAX'}</Text>
+                        <TextInput
+                          style={styles.doseInput}
+                          value={String(peakRpe ?? '')}
+                          onChangeText={(value) => updateDose(index, 'targetRpe', value)}
+                          keyboardType="decimal-pad"
+                          accessibilityLabel={majorProjection === undefined
+                            ? `Target RPE for slot ${index + 1}`
+                            : `Maximum RPE for slot ${index + 1}`}
+                        />
+                      </View>
                     </View>
-                    <View style={styles.doseField}>
-                      <Text style={styles.captionText}>Reps</Text>
-                      <TextInput
-                        style={styles.doseInput}
-                        value={String(slot.reps ?? defaults?.reps ?? '')}
-                        onChangeText={(value) => updateDose(index, 'reps', value)}
-                        keyboardType="number-pad"
-                        accessibilityLabel={`Reps for slot ${index + 1}`}
-                      />
-                    </View>
-                    <View style={styles.doseField}>
-                      <Text style={styles.captionText}>RPE</Text>
-                      <TextInput
-                        style={styles.doseInput}
-                        value={String(slot.targetRpe ?? defaults?.targetRpe ?? '')}
-                        onChangeText={(value) => updateDose(index, 'targetRpe', value)}
-                        keyboardType="decimal-pad"
-                        accessibilityLabel={`Target RPE for slot ${index + 1}`}
-                      />
-                    </View>
+                    {majorProjection !== undefined && (
+                      <Text style={styles.projectionNote} testID={`major-rpe-projection-note-${index + 1}`}>
+                        Projected loading range: RPE {majorProjection.startRpe.toFixed(1)} start to {majorProjection.maxRpe.toFixed(1)} max. Week 4 deloads to RPE {majorProjection.weekTargets[3].toFixed(1)}; readiness and autoregulation can lower the live target.
+                      </Text>
+                    )}
                   </View>
                 );
               })()}
@@ -575,11 +642,16 @@ export function RoutineTemplateBuilder({
             const sets = authored?.sets ?? s.sets;
             const reps = authored?.reps ?? s.reps;
             const targetRpe = authored?.targetRpe ?? s.targetRpe;
+            const majorProjection = s.role === 'major'
+              ? projectRoutineMajorRpe(targetRpe, schemaType, profile.base_rpe_cap)
+              : undefined;
             return (
               <View key={s.slotIndex} style={styles.previewSlotRow}>
                 <Text style={styles.previewSlotName}>{m?.name ?? `Movement ${s.movementId}`}</Text>
                 <Text style={styles.previewSlotDose}>
-                  {sets} sets x {reps} reps @ RPE {targetRpe.toFixed(1)}
+                  {sets} sets x {reps} reps @ {majorProjection === undefined
+                    ? `RPE ${targetRpe.toFixed(1)}`
+                    : `RPE ${majorProjection.startRpe.toFixed(1)} start / ${majorProjection.maxRpe.toFixed(1)} max`}
                 </Text>
               </View>
             );
@@ -601,7 +673,7 @@ export function RoutineTemplateBuilder({
               <View>
                 <Text style={styles.pickerTitle}>Choose Movement</Text>
                 <Text style={styles.reasonText} accessibilityLabel={`${pickerCounts.available} available and ${pickerCounts.teaching} teaching only`}>
-                  {pickerCounts.available} available Â· {pickerCounts.teaching} teaching only
+                  {pickerCounts.available} available · {pickerCounts.teaching} teaching only
                 </Text>
               </View>
               <SecondaryButton label="Close" onPress={closePicker} accessibilityLabel="Close movement picker" />
@@ -619,7 +691,17 @@ export function RoutineTemplateBuilder({
               <Chip label={`Available (${pickerCounts.available})`} selected={pickerView === 'available'} onPress={() => setPickerView('available')} />
               <Chip label={`All / Learn (${pickerCounts.total})`} selected={pickerView === 'all'} onPress={() => setPickerView('all')} />
             </View>
+            {selectedMajor !== undefined && supplementaryRecommendationMap.size > 0
+              && pickerSlotIndex !== null && slots[pickerSlotIndex]?.role === 'supplementary' && (
+              <View style={styles.suggestionNote} testID="supplementary-recommendation-note">
+                <Text style={styles.suggestionTitle}>Top 3 for {selectedMajor.name}</Text>
+                <Text style={styles.reasonText}>
+                  Ranked only from supplementary movements currently available to this athlete.
+                </Text>
+              </View>
+            )}
             <FlatList
+              key={`movement-picker-${pickerSlotIndex ?? 'closed'}-${selectedMajor?.movement_id ?? 'none'}`}
               testID="movement-picker-list"
               style={styles.pickerList}
               data={pickerRows}
@@ -636,7 +718,7 @@ export function RoutineTemplateBuilder({
                 </Text>
               )}
               renderItem={({ item: row }) => {
-                const { movement, verdict, selectedElsewhere, executable } = row;
+                const { movement, verdict, selectedElsewhere, executable, recommendation } = row;
                 const canConfirm = !selectedElsewhere
                   && verdict?.state === 'teaching_only'
                   && verdict.confirmationWouldClear
@@ -664,8 +746,16 @@ export function RoutineTemplateBuilder({
                       <Text style={[styles.pickerItemName, !executable && styles.pickerItemNameDisabled]}>
                         {movement.name}
                       </Text>
+                      {recommendation !== undefined && (
+                        <Text
+                          style={styles.suggestionBadgeText}
+                          accessibilityLabel={`Suggested supplementary movement rank ${recommendation.rank}: ${recommendation.reason}`}
+                        >
+                          #{recommendation.rank} SUGGESTED · {recommendation.reason}
+                        </Text>
+                      )}
                       <Text style={styles.reasonText}>
-                        {executable ? `${movement.difficulty} Â· Available` : reason}
+                        {executable ? `${movement.difficulty} · Available` : reason}
                       </Text>
                     </Pressable>
                     {canConfirm && (
@@ -883,6 +973,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space[2],
   },
+  doseGroup: {
+    gap: theme.space[2],
+  },
   doseField: {
     flex: 1,
     gap: theme.space[1],
@@ -896,6 +989,19 @@ const styles = StyleSheet.create({
     color: theme.color.textHi,
     textAlign: 'center',
     paddingHorizontal: theme.space[2],
+  },
+  projectedDose: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  projectedDoseText: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+  },
+  projectionNote: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    lineHeight: 17,
   },
   addSlotRow: {
     flexDirection: 'row',
@@ -969,6 +1075,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.space[2],
+  },
+  suggestionNote: {
+    borderLeftWidth: 2,
+    borderLeftColor: theme.color.textHi,
+    paddingLeft: theme.space[2],
+    gap: theme.space[1],
+  },
+  suggestionTitle: {
+    ...theme.font.eyebrow,
+    color: theme.color.textHi,
+  },
+  suggestionBadgeText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textHi,
+    fontSize: 10,
   },
   pickerList: {
     flex: 1,

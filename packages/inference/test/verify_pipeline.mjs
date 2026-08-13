@@ -12,6 +12,9 @@ const {
   composeRoutine,
   groupRoutineTemplateDays,
   isRoutineRoleSnapshotExecutable,
+  projectRoutineMajorRpe,
+  rankRoutineSupplementaryRecommendations,
+  routineMajorRpeForWeek,
   ROUTINE_DAY_ROLE_MAXIMA,
   ROUTINE_TEMPLATE_MAX_SLOTS,
 } = require('./.build/routineComposer.js');
@@ -333,6 +336,41 @@ check('four method strategies are deterministic and distinct', () => {
   assert.equal(new Set(signatures).size, 4);
   assert.deepEqual(composeRoutine({ ...base, schemaType: 'APRE' }), composeRoutine({ ...base, schemaType: 'APRE' }));
 });
+check('major RPE projection exposes start/max and freezes the correct target for every block week', () => {
+  assert.deepEqual(projectRoutineMajorRpe(8.5, 'LINEAR', 9), {
+    startRpe: 6,
+    maxRpe: 8.5,
+    weekTargets: [6, 7.5, 8.5, 5],
+  });
+  assert.deepEqual(projectRoutineMajorRpe(8.5, 'WAVE', 9).weekTargets, [6, 8.5, 7.5, 5]);
+  assert.deepEqual(projectRoutineMajorRpe(8.5, 'STEP', 9).weekTargets, [6, 6, 8.5, 5]);
+  assert.deepEqual(projectRoutineMajorRpe(8.5, 'APRE', 9).weekTargets, [7.5, 7.5, 8.5, 5]);
+  assert.equal(routineMajorRpeForWeek(8.5, 'LINEAR', 3, 9), 8.5);
+  assert.equal(routineMajorRpeForWeek(9.5, 'LINEAR', 3, 8), 8,
+    'the athlete RPE cap must still bound the projected maximum');
+  assert.throws(() => routineMajorRpeForWeek(8.5, 'LINEAR', 5, 9), /integer from 1 to 4/);
+});
+check('supplementary recommendations preserve curated order and deterministically backfill unavailable choices', () => {
+  const major = { movementId: 1, name: 'Deadlift', pattern: 'hinge', targetMuscles: ['glutes', 'hamstrings'], isCompound: true };
+  const candidates = [
+    { movementId: 11, name: 'Bulgarian Split Squat', pattern: 'lunge', targetMuscles: ['quadriceps', 'glutes'], isCompound: true },
+    { movementId: 12, name: 'Chest-Supported Dumbbell Row', pattern: 'pull_h', targetMuscles: ['lats'], isCompound: true },
+    { movementId: 10, name: 'Barbell Hip Thrust', pattern: 'hinge', targetMuscles: ['glutes'], isCompound: true },
+    { movementId: 13, name: 'Romanian Deadlift', pattern: 'hinge', targetMuscles: ['hamstrings'], isCompound: true },
+  ];
+  const ranked = rankRoutineSupplementaryRecommendations(major, candidates);
+  assert.deepEqual(ranked.map((row) => row.movementId), [10, 11, 12]);
+  assert.deepEqual(ranked.map((row) => row.rank), [1, 2, 3]);
+  assert.ok(ranked.every((row) => row.curated));
+
+  const withoutHipThrust = rankRoutineSupplementaryRecommendations(
+    major,
+    candidates.filter((candidate) => candidate.movementId !== 10),
+  );
+  assert.deepEqual(withoutHipThrust.map((row) => row.movementId), [11, 12, 13]);
+  assert.equal(withoutHipThrust[2].curated, false,
+    'an unavailable curated choice is backfilled, never force-included');
+});
 check('chain projection throws on cycles and branching ambiguity', () => {
   const families = [{ movementId: 1, family: 'f' }, { movementId: 2, family: 'f' }, { movementId: 3, family: 'f' }];
   assert.throws(
@@ -632,6 +670,45 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
       'Kettlebell Turkish Get-Up', 'Pallof Press', 'Plank', 'Road Run',
       'Suitcase Carry',
     ]);
+  });
+
+  check('all eight live major lifts resolve to three curated, supplementary-eligible recommendations', () => {
+    const recommendationRows = db.prepare(`
+      SELECT m.movement_id, m.name, m.pattern, m.is_compound, md.target_muscles
+        FROM movement_role_eligibility re
+        JOIN movement m USING(movement_id)
+        JOIN movement_detail md USING(movement_id)
+       WHERE re.role = 'supplementary'
+       ORDER BY m.movement_id`).all().map((row) => ({
+      movementId: Number(row.movement_id),
+      name: row.name,
+      pattern: row.pattern,
+      targetMuscles: JSON.parse(row.target_muscles),
+      isCompound: row.is_compound === 1,
+    }));
+    const byName = new Map(recommendationRows.map((row) => [row.name, row]));
+    const expected = {
+      'Competition Squat': ['Romanian Deadlift', 'Bulgarian Split Squat', 'Barbell Hip Thrust'],
+      'Front Squat': ['Romanian Deadlift', 'Bulgarian Split Squat', 'Barbell Hip Thrust'],
+      Deadlift: ['Barbell Hip Thrust', 'Bulgarian Split Squat', 'Chest-Supported Dumbbell Row'],
+      'Sumo Deadlift': ['Romanian Deadlift', 'Bulgarian Split Squat', 'Barbell Hip Thrust'],
+      'Competition Bench': ['Incline Dumbbell Press', 'Barbell Row', 'Triceps Pushdown'],
+      'Overhead Press': ['Pull-Up', 'Incline Dumbbell Press', 'Face Pull'],
+      'Barbell Row': ['Pull-Up', 'Chest-Supported Dumbbell Row', 'Face Pull'],
+      'Power Clean': ['Front Squat', 'Romanian Deadlift', 'Overhead Press'],
+    };
+    for (const [majorName, expectedNames] of Object.entries(expected)) {
+      const major = byName.get(majorName);
+      assert.ok(major, `${majorName} must remain supplementary-eligible as well as major-eligible`);
+      const ranked = rankRoutineSupplementaryRecommendations(major, recommendationRows);
+      assert.deepEqual(
+        ranked.map((row) => byName.get(expectedNames[row.rank - 1])?.movementId),
+        ranked.map((row) => row.movementId),
+        `${majorName} recommendation order drifted`,
+      );
+      assert.equal(ranked.length, 3);
+      assert.ok(ranked.every((row) => row.curated));
+    }
   });
 
   check('the routine picker derives its role sets from the database, not hardcoded names', () => {

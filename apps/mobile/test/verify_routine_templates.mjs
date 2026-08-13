@@ -325,6 +325,15 @@ check('freezeRoutineTemplateToPlannedSession sets archivedPreviousBlock ONLY whe
   assert.ok(returnsFlag, 'freezeRoutineTemplateToPlannedSession must return archivedPreviousBlock');
 });
 
+check('routine freeze resolves a major peak RPE to the active block week', () => {
+  assert.ok(storeSource.includes('routineMajorRpeForWeek(savedSlot.targetRpe, template.schemaType, weekIndex, profile.base_rpe_cap)'),
+    'major RPE must be projected from the saved peak and current block week');
+  assert.ok(storeSource.includes("savedSlot.role === 'major'"),
+    'only the major slot should receive block RPE projection');
+  assert.ok(storeSource.includes(': Math.min(savedSlot.targetRpe, profile.base_rpe_cap)'),
+    'supplementary and conditional targets must remain constant and capped');
+});
+
 check('the routine builder offers 3 conditional slots when conditional movements are ratified (12)', () => {
   const builderSource = readFileSync(
     join(ROOT, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8',

@@ -16,6 +16,189 @@ export interface ComposeRoutineInput {
 }
 export interface ComposedRoutine { readonly slots: readonly RoutinePrescription[]; readonly warnings: readonly string[]; }
 
+/** Minimal movement shape used by the routine builder's recommendation law.
+ * IDs and role/access eligibility stay database-owned; names only bind the
+ * deliberately curated relationship between the eight ratified major lifts
+ * and their preferred supplementary work. */
+export interface RoutineRecommendationMovement {
+  readonly movementId: number;
+  readonly name: string;
+  readonly pattern: string;
+  readonly targetMuscles: readonly string[];
+  readonly isCompound: boolean;
+}
+
+export interface RoutineSupplementaryRecommendation {
+  readonly movementId: number;
+  readonly rank: number;
+  readonly reason: string;
+  readonly curated: boolean;
+}
+
+export interface RoutineMajorRpeProjection {
+  /** Loading-week 1 target. */
+  readonly startRpe: number;
+  /** Highest target reached during the three loading weeks. */
+  readonly maxRpe: number;
+  /** Weeks 1-3 loading targets followed by the week-4 deload target. */
+  readonly weekTargets: readonly [number, number, number, number];
+}
+
+interface CuratedRecommendation {
+  readonly name: string;
+  readonly reason: string;
+}
+
+/** Owner-delegated, deterministic coaching curation. These are names rather
+ * than IDs because movement IDs remain database-owned. Callers must still
+ * supply only live, role-eligible, executable candidates; this table can
+ * rank a movement but can never grant access to it. */
+const CURATED_SUPPLEMENTARY_BY_MAJOR: Readonly<Record<string, readonly CuratedRecommendation[]>> = {
+  'Competition Squat': [
+    { name: 'Romanian Deadlift', reason: 'Posterior-chain support' },
+    { name: 'Bulgarian Split Squat', reason: 'Unilateral leg strength' },
+    { name: 'Barbell Hip Thrust', reason: 'Hip-extension strength' },
+  ],
+  'Front Squat': [
+    { name: 'Romanian Deadlift', reason: 'Posterior-chain balance' },
+    { name: 'Bulgarian Split Squat', reason: 'Unilateral leg strength' },
+    { name: 'Barbell Hip Thrust', reason: 'Hip-extension strength' },
+  ],
+  Deadlift: [
+    { name: 'Barbell Hip Thrust', reason: 'Hip-extension volume with less spinal loading' },
+    { name: 'Bulgarian Split Squat', reason: 'Unilateral leg strength' },
+    { name: 'Chest-Supported Dumbbell Row', reason: 'Upper-back support with less spinal loading' },
+  ],
+  'Sumo Deadlift': [
+    { name: 'Romanian Deadlift', reason: 'Hamstring and hinge support' },
+    { name: 'Bulgarian Split Squat', reason: 'Unilateral leg strength' },
+    { name: 'Barbell Hip Thrust', reason: 'Hip-extension strength' },
+  ],
+  'Competition Bench': [
+    { name: 'Incline Dumbbell Press', reason: 'Pressing volume through a different angle' },
+    { name: 'Barbell Row', reason: 'Upper-back support for pressing' },
+    { name: 'Triceps Pushdown', reason: 'Elbow-extension support' },
+  ],
+  'Overhead Press': [
+    { name: 'Pull-Up', reason: 'Vertical-pull balance' },
+    { name: 'Incline Dumbbell Press', reason: 'Additional shoulder and pressing volume' },
+    { name: 'Face Pull', reason: 'Scapular and rear-shoulder support' },
+  ],
+  'Barbell Row': [
+    { name: 'Pull-Up', reason: 'Vertical-pull balance' },
+    { name: 'Chest-Supported Dumbbell Row', reason: 'Upper-back volume with less spinal loading' },
+    { name: 'Face Pull', reason: 'Scapular and rear-shoulder support' },
+  ],
+  'Power Clean': [
+    { name: 'Front Squat', reason: 'Receiving-position and leg-strength support' },
+    { name: 'Romanian Deadlift', reason: 'Posterior-chain strength' },
+    { name: 'Overhead Press', reason: 'Upper-body force-transfer support' },
+  ],
+};
+
+const COMPLEMENTARY_PATTERNS: Readonly<Record<string, readonly string[]>> = {
+  squat: ['hinge', 'lunge', 'isolation', 'core'],
+  hinge: ['lunge', 'pull_h', 'squat', 'core'],
+  push_h: ['pull_h', 'push_h', 'pull_v', 'isolation'],
+  push_v: ['pull_v', 'pull_h', 'push_h', 'isolation'],
+  pull_h: ['pull_v', 'pull_h', 'push_h', 'isolation'],
+};
+
+const normalizedMuscles = (movement: RoutineRecommendationMovement): ReadonlySet<string> =>
+  new Set(movement.targetMuscles.map((muscle) => muscle.trim().toLocaleLowerCase()).filter(Boolean));
+
+/** Rank up to `limit` executable supplementary candidates for a selected
+ * major. Curated matches always lead. If equipment, safety, tier or capability
+ * removes one, a deterministic muscle/pattern score fills the gap without
+ * weakening those upstream gates. */
+export function rankRoutineSupplementaryRecommendations(
+  major: RoutineRecommendationMovement | null,
+  candidates: readonly RoutineRecommendationMovement[],
+  limit = 3,
+): readonly RoutineSupplementaryRecommendation[] {
+  if (major === null || !Number.isInteger(limit) || limit < 1) return [];
+  const curated = CURATED_SUPPLEMENTARY_BY_MAJOR[major.name] ?? [];
+  const majorMuscles = normalizedMuscles(major);
+  const complementary = COMPLEMENTARY_PATTERNS[major.pattern] ?? [];
+  const uniqueCandidates = [...new Map(
+    candidates
+      .filter((candidate) => candidate.movementId !== major.movementId)
+      .map((candidate) => [candidate.movementId, candidate] as const),
+  ).values()];
+
+  const fallbackScore = (candidate: RoutineRecommendationMovement): number => {
+    const overlap = [...normalizedMuscles(candidate)].filter((muscle) => majorMuscles.has(muscle)).length;
+    const patternIndex = complementary.indexOf(candidate.pattern);
+    const patternScore = patternIndex < 0 ? 0 : (complementary.length - patternIndex) * 3;
+    return overlap * 8 + patternScore + (candidate.isCompound ? 1 : 0);
+  };
+
+  uniqueCandidates.sort((a, b) => {
+    const aCurated = curated.findIndex((entry) => entry.name === a.name);
+    const bCurated = curated.findIndex((entry) => entry.name === b.name);
+    if (aCurated >= 0 || bCurated >= 0) {
+      if (aCurated < 0) return 1;
+      if (bCurated < 0) return -1;
+      return aCurated - bCurated;
+    }
+    return fallbackScore(b) - fallbackScore(a) || a.name.localeCompare(b.name);
+  });
+
+  return uniqueCandidates.slice(0, Math.min(limit, uniqueCandidates.length)).map((candidate, index) => {
+    const authored = curated.find((entry) => entry.name === candidate.name);
+    return {
+      movementId: candidate.movementId,
+      rank: index + 1,
+      reason: authored?.reason ?? (fallbackScore(candidate) > 0
+        ? 'Compatible supplementary support'
+        : 'Available supplementary option'),
+      curated: authored !== undefined,
+    };
+  });
+}
+
+const clampRpe = (value: number, cap: number): number => {
+  const safeCap = Math.min(10, Math.max(5, Number.isFinite(cap) ? cap : 5));
+  return Math.min(safeCap, Math.max(5, Math.round(value * 2) / 2));
+};
+
+/** Project a major lift's peak RPE across a four-week custom block. The
+ * template's persisted target remains the peak (backward compatible); the
+ * start and each frozen week are derived. The low point is 2.5 RPE below the
+ * peak where the athlete's cap allows, matching the intentionally conservative
+ * 6 -> 8.5 example. Each method then preserves its existing weekly shape. */
+export function projectRoutineMajorRpe(
+  peakTargetRpe: number,
+  schemaType: SchemaType,
+  baseRpeCap: number,
+): RoutineMajorRpeProjection {
+  const maxRpe = clampRpe(Number.isFinite(peakTargetRpe) ? peakTargetRpe : 5, baseRpeCap);
+  const lowRpe = clampRpe(maxRpe - 2.5, maxRpe);
+  const midpoint = clampRpe((lowRpe + maxRpe) / 2, maxRpe);
+  const deload = clampRpe(lowRpe - 1, maxRpe);
+  const loadingTargets: readonly [number, number, number] = schemaType === 'STEP'
+    ? [lowRpe, lowRpe, maxRpe]
+    : schemaType === 'WAVE'
+      ? [lowRpe, maxRpe, midpoint]
+      : schemaType === 'APRE'
+        ? [midpoint, midpoint, maxRpe]
+        : [lowRpe, midpoint, maxRpe];
+  const startRpe = loadingTargets[0];
+  return { startRpe, maxRpe, weekTargets: [...loadingTargets, deload] };
+}
+
+export function routineMajorRpeForWeek(
+  peakTargetRpe: number,
+  schemaType: SchemaType,
+  weekIndex: number,
+  baseRpeCap: number,
+): number {
+  if (!Number.isInteger(weekIndex) || weekIndex < 1 || weekIndex > 4) {
+    throw new Error('Routine block week must be an integer from 1 to 4.');
+  }
+  return projectRoutineMajorRpe(peakTargetRpe, schemaType, baseRpeCap).weekTargets[weekIndex - 1];
+}
+
 /** One authored slot with its position inside the template. */
 export interface RoutineTemplateSlotPlacement extends RoutineSelection {
   readonly dayIndex: number;
