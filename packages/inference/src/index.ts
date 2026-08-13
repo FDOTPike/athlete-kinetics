@@ -240,9 +240,14 @@ export {
 } from './historyImport';
 export {
   composeRoutine,
+  groupRoutineTemplateDays,
   isRoutineRoleSnapshotExecutable,
+  ROUTINE_DAY_ROLE_MAXIMA,
+  ROUTINE_TEMPLATE_MAX_DAYS,
+  ROUTINE_TEMPLATE_MAX_SLOTS,
   type ComposeRoutineInput,
   type ComposedRoutine,
+  type RoutineTemplateSlotPlacement,
   type RoutineRoleEligibility,
   type RoutineRoleSnapshotRow,
   type RoutinePrescription,

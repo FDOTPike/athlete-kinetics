@@ -16,6 +16,81 @@ export interface ComposeRoutineInput {
 }
 export interface ComposedRoutine { readonly slots: readonly RoutinePrescription[]; readonly warnings: readonly string[]; }
 
+/** One authored slot with its position inside the template. */
+export interface RoutineTemplateSlotPlacement extends RoutineSelection {
+  readonly dayIndex: number;
+  readonly slotIndex: number;
+}
+
+/** Role budget for ONE routine day. Every populated day is an independently
+ *  executable session, so these are never a template-wide allowance. */
+export const ROUTINE_DAY_ROLE_MAXIMA: Readonly<Record<RoutineRole, number>> = {
+  major: 1, supplementary: 2, conditional: 3,
+};
+
+/** Overall supported template size, unchanged by multi-day support. */
+export const ROUTINE_TEMPLATE_MAX_SLOTS = 6;
+export const ROUTINE_TEMPLATE_MAX_DAYS = 7;
+
+/**
+ * Group an authored template into its populated days and enforce the
+ * structural routine law, throwing the athlete-facing message for the first
+ * violation. Two scopes are deliberately different:
+ *
+ *   PER DAY   role maxima and exactly one major — a day is one session;
+ *   PER TEMPLATE  the slot ceiling, position uniqueness, and MOVEMENT
+ *                 IDENTITY. A movement may appear once in the whole template
+ *                 so the day-index-free planned-session snapshot stays
+ *                 decidable for isRoutineRoleSnapshotExecutable at start time.
+ *
+ * Role ratification, capability verdicts and dose bounds are the caller's
+ * (database-backed) half; this function is pure and knows no athlete.
+ */
+export function groupRoutineTemplateDays(
+  placements: readonly RoutineTemplateSlotPlacement[],
+): ReadonlyMap<number, readonly RoutineTemplateSlotPlacement[]> {
+  if (placements.length < 1 || placements.length > ROUTINE_TEMPLATE_MAX_SLOTS) {
+    throw new Error(`A routine template must contain between 1 and ${ROUTINE_TEMPLATE_MAX_SLOTS} movements.`);
+  }
+  const byDay = new Map<number, RoutineTemplateSlotPlacement[]>();
+  const countsByDay = new Map<number, Record<RoutineRole, number>>();
+  const seenMovements = new Set<number>();
+  const seenPositions = new Set<string>();
+
+  for (const placement of placements) {
+    const { dayIndex, slotIndex } = placement;
+    if (!Number.isInteger(dayIndex) || dayIndex < 1 || dayIndex > ROUTINE_TEMPLATE_MAX_DAYS
+      || !Number.isInteger(slotIndex) || slotIndex < 1 || slotIndex > ROUTINE_TEMPLATE_MAX_SLOTS) {
+      throw new Error('Routine day and slot positions must stay inside the supported 1-7 / 1-6 bounds.');
+    }
+    const positionKey = `${dayIndex}:${slotIndex}`;
+    if (seenPositions.has(positionKey)) throw new Error('Routine slot positions must be unique.');
+    seenPositions.add(positionKey);
+    if (seenMovements.has(placement.movementId)) {
+      throw new Error('A movement can appear only once in a routine template.');
+    }
+    seenMovements.add(placement.movementId);
+    const counts = countsByDay.get(dayIndex) ?? { major: 0, supplementary: 0, conditional: 0 };
+    countsByDay.set(dayIndex, counts);
+    counts[placement.role] += 1;
+    const maximum = ROUTINE_DAY_ROLE_MAXIMA[placement.role];
+    if (counts[placement.role] > maximum) {
+      throw new Error(`A routine day supports at most ${maximum} ${placement.role} movement${maximum === 1 ? '' : 's'}.`);
+    }
+    const day = byDay.get(dayIndex) ?? [];
+    day.push(placement);
+    byDay.set(dayIndex, day);
+  }
+
+  const ordered = [...byDay.keys()].sort((a, b) => a - b);
+  for (const dayIndex of ordered) {
+    if (countsByDay.get(dayIndex)!.major !== 1) {
+      throw new Error(`Routine day ${dayIndex} must contain exactly one major movement.`);
+    }
+  }
+  return new Map(ordered.map((dayIndex) => [dayIndex, byDay.get(dayIndex)!]));
+}
+
 const roleMinutes: Record<RoutineRole, number> = { major: 18, supplementary: 12, conditional: 8 };
 const baseDose: Record<RoutineRole, readonly [number, number, number]> = {
   major: [4, 5, 8], supplementary: [3, 8, 7.5], conditional: [2, 12, 7],
@@ -23,8 +98,14 @@ const baseDose: Record<RoutineRole, readonly [number, number, number]> = {
 const ageSetDelta: Record<TrainingAge, number> = { beginner: -1, intermediate: 0, advanced: 1, elite: 1 };
 
 /** Revalidate a frozen routine against its live, DB-derived role policy.
- * Missing and duplicated source rows are deliberately unverifiable because
- * the planned-session method snapshot does not carry a template day index. */
+ *
+ * `planMovementIds` is one executable day's frozen plan; `sourceRows` is the
+ * whole template, which is why the sole-major law is counted over the plan and
+ * never over the source. Missing and duplicated source rows are deliberately
+ * unverifiable: the planned-session method snapshot does not carry a template
+ * day index, so a movement that resolves to more than one role — or to none —
+ * cannot be attributed to the day being started. The store keeps movement
+ * identity unique template-wide precisely so this stays decidable. */
 export function isRoutineRoleSnapshotExecutable(
   planMovementIds: readonly number[],
   sourceRows: readonly RoutineRoleSnapshotRow[],

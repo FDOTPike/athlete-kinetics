@@ -1,7 +1,7 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, nextUp as nextRunnerWork } from '@ak/inference';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
@@ -493,8 +493,24 @@ export default function SessionScreen(): React.JSX.Element {
     );
   }
 
-  const tierPlanViolation = sessionPlan.some((slot) =>
-    availabilityMap.get(slot.movementId)?.state !== 'available');
+  // P1-1 (Opus audit): the session-wide early blocker is TIER ONLY. A full
+  // non-available verdict also carries equipment, safety, capability and
+  // attestation reasons — all of which can change mid-session (a niggle is the
+  // ordinary case) and none of which justify blanking an active session. Those
+  // restrictions stay enforced per slot below and inside the store's mutation
+  // guards (addPlanSlot / swapMovement / applyDaySwap).
+  // The predicate remains fail-closed: a missing frozen access context or a
+  // planned movement that is not in the library cannot be tier-checked at all.
+  const tierPlanViolation = sessionAccessContext === null || sessionPlan.some((slot) => {
+    const planned = byId.get(slot.movementId);
+    return planned === undefined || !isDifficultyAllowed(
+      profile.training_age,
+      planned.difficulty,
+      planned.beginnerOk,
+      sessionAccessContext,
+      planned.sportTracking,
+    );
+  });
 
   if (tierPlanViolation) {
     return (
@@ -504,8 +520,12 @@ export default function SessionScreen(): React.JSX.Element {
         </View>
         <Text style={styles.kicker}>SESSION CHECK</Text>
         <Text style={styles.idleTitle}>This plan needs Coach review.</Text>
+        {/* P2-1: the copy states exactly what the predicate above tests — a
+            movement above the athlete's difficulty tier, or a tier that cannot
+            be confirmed at all. It claims nothing about equipment, safety,
+            capability or attestation, which no longer reach this screen. */}
         <Text style={styles.idleBody}>
-          A movement outside this athlete’s tier was blocked before it could be shown.
+          A planned movement sits above this athlete’s difficulty tier, or its tier could not be confirmed, so the session was blocked before it could be shown.
         </Text>
         <SecondaryButton
           label="Finish session"
@@ -516,6 +536,18 @@ export default function SessionScreen(): React.JSX.Element {
       </View>
     );
   }
+
+  // Per-slot access guard. Equipment, safety (an active niggle), capability and
+  // attestation no longer blank the session — they stop THIS slot from being
+  // executed while the rest of the session, including the substitution sheet,
+  // stays reachable. Fail closed when no verdict exists for the movement.
+  const currentAvailability = currentMovement === null
+    ? undefined
+    : availabilityMap.get(currentMovement.movement_id);
+  const currentSlotExecutable = currentAvailability?.state === 'available';
+  const currentSlotBlockedReason = currentSlotExecutable
+    ? null
+    : formatTeachingOnlyReason(currentAvailability);
 
   const chooseSlot = (slot: PlanSlot): void => {
     if (mode === 'guided' || loggedCount(slot) >= slot.plannedSets) return;
@@ -530,6 +562,9 @@ export default function SessionScreen(): React.JSX.Element {
 
   const logCurrent = (): void => {
     if (currentSlot === null || currentMovement === null || target === null || resting) return;
+    // Equipment/safety/capability/attestation restrictions block execution of
+    // this slot even though they no longer block the whole session.
+    if (!currentSlotExecutable) return;
     const parsed = parseLoadDraft(loadText);
     // Logging an external-load set requires an explicit finite, non-negative
     // entry; blank is absent evidence and never coerced to zero.
@@ -775,6 +810,16 @@ export default function SessionScreen(): React.JSX.Element {
                         {!loadInvalid && !loadLoggable && (
                           <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
                         )}
+                        {currentSlotBlockedReason !== null && (
+                          <Text
+                            style={styles.loadEvidence}
+                            testID="session-slot-blocked"
+                            accessibilityRole="alert"
+                            accessibilityLabel={`This movement cannot be performed right now. ${currentSlotBlockedReason}`}
+                          >
+                            {currentSlotBlockedReason}
+                          </Text>
+                        )}
 
                         {/* Steppers using the shared primitive */}
                         <View testID="current-set-steppers" style={styles.stepperStack}>
@@ -908,10 +953,12 @@ export default function SessionScreen(): React.JSX.Element {
                           label="Log set"
                           onPress={logCurrent}
                           size="log"
-                          disabled={!loadLoggable}
-                          accessibilityLabel={loadLoggable
-                            ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
-                            : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
+                          disabled={!loadLoggable || !currentSlotExecutable}
+                          accessibilityLabel={!currentSlotExecutable
+                            ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — ${currentSlotBlockedReason}`
+                            : loadLoggable
+                              ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
+                              : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
 
                         {/* Shared Disclosure Primitive */}
@@ -1056,9 +1103,12 @@ export default function SessionScreen(): React.JSX.Element {
             <View style={{ marginTop: theme.space[3] }}>
               {substitution.result.layer1Regression.options.map((option) => {
                 const avail = availabilityMap.get(option.movement_id);
-                const isTeachingOnly = avail?.state === 'teaching_only';
+                // Fail closed: only an explicit 'available' verdict is selectable.
+                // The store refuses the swap anyway; the sheet must not offer it.
+                const selectable = avail?.state === 'available';
+                const isTeachingOnly = !selectable;
                 return (
-                  <Pressable key={option.movement_id} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
+                  <Pressable key={option.movement_id} disabled={!selectable} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityState={{ disabled: !selectable }} accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}>
                     <View style={styles.optionCopy}>
                       <Text style={styles.optionName}>{option.name}</Text>
                       <Text style={styles.optionReason}>{option.rationale}</Text>
@@ -1074,9 +1124,10 @@ export default function SessionScreen(): React.JSX.Element {
               })}
               {substitution.result.layer2DaySwap.options.map((option) => {
                 const avail = availabilityMap.get(option.movement_id);
-                const isTeachingOnly = avail?.state === 'teaching_only';
+                const selectable = avail?.state === 'available';
+                const isTeachingOnly = !selectable;
                 return (
-                  <Pressable key={`swap-${option.plannedSlotId}`} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
+                  <Pressable key={`swap-${option.plannedSlotId}`} disabled={!selectable} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityState={{ disabled: !selectable }} accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}>
                     <View style={styles.optionCopy}>
                       <Text style={styles.optionName}>{option.name}</Text>
                       <Text style={styles.optionReason}>{option.rationale}</Text>
@@ -1578,6 +1629,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: theme.color.line,
+  },
+  optionDisabled: {
+    opacity: 0.5,
   },
   optionCopy: {
     flex: 1,

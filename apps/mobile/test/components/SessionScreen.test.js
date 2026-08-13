@@ -3,6 +3,9 @@ import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
+import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
+import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
+import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
 import SessionScreen from '../../src/screens/SessionScreen';
 
 let mockState;
@@ -991,4 +994,173 @@ test('D1-A: bodyweight + valid APRE in auto mode derives (absolute prescription)
   render(<SessionScreen />);
   expect(screen.getByTestId('session-load-input').props.value).toBe('10.0');
   expect(screen.getByText('Prescribed 10.0 kg added load')).toBeOnTheScreen();
+});
+
+// --- P1-1: a mid-session niggle must not blank the whole active session ------
+// Counterexample from the movement-access audit. The session-wide early
+// blocker used to fire on ANY non-available verdict, so the moment an
+// intermediate athlete reported a knee niggle at their triage minimum the
+// squat slot went safety-excluded and the entire session was replaced by the
+// tier-review screen — destroying the substitution sheet that the same report
+// had just opened. The blocker is tier-only now; safety stays a per-slot gate.
+//
+// Fixtures are deliberately narrow so only the safety law can move: no
+// required equipment, no capability edges, no attestations, no prior
+// experience. Tier is satisfied for every movement at the intermediate ceiling.
+const realVerdictsFor = (context) => {
+  const { movements, profile, niggles } = mockState;
+  const triageMin = EXPERIENCE_SEVERITY[profile.training_age].triageMin;
+  const injured = new Set(
+    (niggles ?? [])
+      .filter((niggle) => niggle.severity >= triageMin)
+      .map((niggle) => niggle.region.trim().toLowerCase())
+      .filter((region) => ACTUAL_JOINTS.includes(region)),
+  );
+  const safetyExcludedMovementIds = new Set(
+    movements
+      .filter((item) => (PATTERN_JOINTS[item.pattern] ?? []).some((joint) => injured.has(joint)))
+      .map((item) => item.movement_id),
+  );
+  return actualResolveMovementAvailability({
+    movements: movements.map((item) => ({
+      movementId: item.movement_id,
+      difficulty: item.difficulty,
+      beginnerOk: item.beginnerOk,
+      sportTracking: item.sportTracking,
+      requiredEquipment: item.required,
+    })),
+    edges: [],
+    evidence: [],
+    attestedEdgeKeys: new Set(),
+    priorExperienceMovementIds: new Set(),
+    trainingAge: profile.training_age,
+    accessContext: context,
+    equipment: new Set(profile.equipment_inventory),
+    safetyExcludedMovementIds,
+  });
+};
+
+const niggleCounterexampleState = () => state({
+  profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  movements: [
+    movement(1, 'Front Squat', { pattern: 'squat', difficulty: 'Intermediate', beginnerOk: false }),
+    movement(2, 'Later movement'),
+    movement(3, 'Goblet Squat', { pattern: 'squat', difficulty: 'Beginner' }),
+    movement(4, 'Hip Thrust', { pattern: 'hinge', difficulty: 'Beginner' }),
+  ],
+  runner: runner({
+    slots: [
+      { sessionPlanSlotId: 1, movementId: 1, movementName: 'Front Squat', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+      { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+    ],
+  }),
+  getMovementAvailabilityVerdicts: realVerdictsFor,
+});
+
+test('a non-halting knee niggle keeps the session and opens substitution instead of blanking it', () => {
+  mockState = niggleCounterexampleState();
+  const view = render(<SessionScreen />);
+
+  // Baseline: nothing is blocked before the report.
+  expect(screen.getByText('Front Squat')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Log set 1 for Front Squat')).toBeOnTheScreen();
+
+  // Report knee discomfort at the intermediate triage minimum (default 4).
+  fireEvent.press(screen.getByLabelText('Report discomfort'));
+  fireEvent.press(screen.getByLabelText('knee'));
+  expect(EXPERIENCE_SEVERITY.intermediate.triageMin).toBe(4);
+  fireEvent.press(screen.getByLabelText('Save discomfort report'));
+  expect(mockState.reportNiggle).toHaveBeenCalledWith('knee', 4);
+
+  // What the store does next: records the niggle (below the intermediate halt
+  // minimum of 8) and opens the substitution sheet for the current movement.
+  mockState.niggles = [{ region: 'knee', severity: 4 }];
+  mockState.substitution = {
+    targetId: 1,
+    result: {
+      haltAdvised: false,
+      layer1Regression: {
+        options: [
+          { movement_id: 3, name: 'Goblet Squat', rationale: 'Same pattern, lighter load.' },
+          { movement_id: 4, name: 'Hip Thrust', rationale: 'Loads the hip without the knee.' },
+        ],
+      },
+      layer2DaySwap: { options: [] },
+    },
+  };
+  view.rerender(<SessionScreen />);
+
+  // The session is still there and the substitution sheet rendered.
+  expect(screen.queryByText('This plan needs Coach review.')).toBeNull();
+  expect(screen.queryByLabelText('Finish the blocked session')).toBeNull();
+  expect(screen.getByText('Front Squat')).toBeOnTheScreen();
+  expect(screen.getByText('0 of 2 exercises complete')).toBeOnTheScreen();
+  expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+
+  // The unsafe movement is still blocked from execution.
+  const logSetButton = screen.getByLabelText(/^Log set 1 for Front Squat, unavailable — Teaching only/);
+  expect(logSetButton.props.accessibilityState.disabled).toBe(true);
+  expect(screen.getByTestId('session-slot-blocked')).toBeOnTheScreen();
+  fireEvent.press(logSetButton);
+  expect(mockState.logSet).not.toHaveBeenCalled();
+
+  // ...and from substitution selection: the knee-loading alternative cannot be
+  // chosen, while the alternative that spares the knee can.
+  const unsafeOption = screen.getByLabelText('Use Goblet Squat instead');
+  expect(unsafeOption.props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(unsafeOption);
+  expect(mockState.applyRegression).not.toHaveBeenCalled();
+
+  const safeOption = screen.getByLabelText('Use Hip Thrust instead');
+  expect(safeOption.props.accessibilityState.disabled).toBe(false);
+  fireEvent.press(safeOption);
+  expect(mockState.applyRegression).toHaveBeenCalledWith(1, 4);
+});
+
+test('equipment, capability and attestation gaps also stay per-slot instead of blanking the session', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      // Barbell is absent from the inventory: equipment alone must not blank
+      // the session the way a tier violation does.
+      movement(1, 'First movement', { required: ['barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    getMovementAvailabilityVerdicts: realVerdictsFor,
+  });
+  render(<SessionScreen />);
+
+  expect(screen.queryByText('This plan needs Coach review.')).toBeNull();
+  expect(screen.getByText('First movement')).toBeOnTheScreen();
+  expect(screen.getByLabelText(/^Log set 1 for First movement, unavailable — Teaching only/)
+    .props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(screen.getByLabelText(/^Log set 1 for First movement, unavailable/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test('an above-tier movement still blanks the session, and the copy matches that predicate', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [movement(1, 'First movement'), movement(2, 'Advanced movement', { difficulty: 'Advanced', beginnerOk: false })],
+    getMovementAvailabilityVerdicts: realVerdictsFor,
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
+  expect(screen.getByText(
+    'A planned movement sits above this athlete’s difficulty tier, or its tier could not be confirmed, so the session was blocked before it could be shown.',
+  )).toBeOnTheScreen();
+  expect(screen.queryByText('Advanced movement')).toBeNull();
+});
+
+test('a planned movement missing from the library fails the tier check closed', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    sessionPlan: [slot(1, 1), slot(2, 999, 8)],
+    getMovementAvailabilityVerdicts: realVerdictsFor,
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
+  expect(screen.queryByText('First movement')).toBeNull();
 });

@@ -12,7 +12,27 @@
  *      upward, missing pattern slots are dropped with a warning;
  *   4. hybrid balance: every hybrid split contains bjj sessions and carries
  *      strictly less raw strength set volume than the pure strength block
- *      (concurrent-training interference damping).
+ *      (concurrent-training interference damping);
+ *   5. context-aware access: each scheduled day resolves its own executable
+ *      access context from its focus (see accessContextForBlockFocus), and
+ *      the pool is rebuilt per day from that context.
+ *
+ * Access law, stated once here because the per-day filters below are its only
+ * implementation:
+ *   - WEIGHT ROOM: the difficulty-tier ceiling is a HARD bound. A beginner is
+ *     never prescribed an Advanced movement, an intermediate never a
+ *     competition lift; an out-of-tier pattern is dropped with a warning and
+ *     never filled upward.
+ *   - CONDITIONING / BJJ: the difficulty-tier ceiling is INTENTIONALLY removed.
+ *     Sport and conditioning work is scored by performance context, not by a
+ *     weight-room progression rank, so isDifficultyAllowed admits every
+ *     difficulty in that context by design — this is ratified, not an
+ *     oversight.
+ *   - Equipment, active niggles (safety), capability evidence and separate
+ *     attestation are enforced INDEPENDENTLY of tier and of each other, in
+ *     both contexts. Removing the tier ceiling for sport work removes nothing
+ *     else: the capability verdict handed in per context still gates the pool,
+ *     and equipment/safety remain outer gates upstream in the resolver.
  */
 import type { DifficultyRating, MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
 import { EXPERIENCE_SEVERITY } from './types';
@@ -32,11 +52,17 @@ export interface GeneratorMovement {
    *  byte-identical — the store passes it from Phase 16 onward). */
   difficulty?: DifficultyRating;
   /** movement_beginner_whitelist membership: an Intermediate staple a
-   *  beginner may be prescribed (plan P16 S4). Absent = not whitelisted. */
+   *  beginner may be prescribed in the WEIGHT ROOM (plan P16 S4). It relaxes
+   *  one rung of the tier ceiling and nothing else — never equipment, niggle,
+   *  capability or attestation. False = not whitelisted. */
   beginner_ok: boolean;
-  /** Frozen movement_sport_tracking membership. */
+  /** Frozen movement_sport_tracking membership. A sport-tracking row is always
+   *  resolved in the sport/conditioning context, where the tier ceiling does
+   *  not apply; the other gates still do. */
   sportTracking: boolean;
-  /** Shared capability resolver verdict in each executable context. */
+  /** Shared capability-resolver verdict, one per executable context. The
+   *  verdict already folds in equipment, active niggles, capability evidence
+   *  and separate attestation, so a false here is independent of tier. */
   capability_available_weight_room: boolean;
   capability_available_sport_conditioning: boolean;
   /** movement_scope membership (049). Absent = not scoped; like the three
@@ -54,6 +80,11 @@ export interface GeneratorMovement {
 export type BlockFocus = 'lower' | 'upper' | 'full' | 'conditioning' | 'bjj';
 export type BlockPhase = 'accumulation' | 'intensification' | 'realization' | 'deload';
 
+/** The executable access context a scheduled day runs in. Conditioning and BJJ
+ *  are sport/performance work: that context intentionally carries NO
+ *  difficulty-tier ceiling. Every other focus is weight-room work, where the
+ *  tier ceiling is a hard bound. Neither answer touches equipment, niggle,
+ *  capability or attestation, which are enforced independently. */
 export const accessContextForBlockFocus = (
   focus: BlockFocus,
 ): ExecutableMovementAccessContext =>
@@ -550,6 +581,12 @@ export function generateBlock(input: BlockInput): BlockPlan {
     const wmod = SCHEMA_WEEKS[schemaType][progIdx as 0 | 1 | 2];
 
     for (const { focus, day_index: dayIndex, movement_preferences: preferences } of schedule) {
+      // Per-day access, rebuilt from THIS day's focus. A weight-room day keeps
+      // the difficulty-tier ceiling as a hard bound; a conditioning/BJJ day
+      // has that ceiling removed on purpose (performance context, not
+      // progression rank), so tierPool == equipPool there. Capability — which
+      // already carries equipment, niggle and attestation — is applied after
+      // it, in the same context, and is never waived by either branch.
       const accessContext = accessContextForBlockFocus(focus);
       const tierPool = equipPool.filter((movement) => isDifficultyAllowed(
         profile.training_age,
@@ -614,11 +651,17 @@ export function generateBlock(input: BlockInput): BlockPlan {
           warnings.add(`${focus}: preferred ${pattern} movement unavailable; slot dropped`);
         }
         if (m === null) {
-          // Strictness over substitution, tier included: a pattern the
-          // inventory cannot support — or that only exists above the
-          // athlete's tier cap — is dropped with a warning, never filled
-          // upward. (Audit F1: the previous ungated fallback could hand a
-          // beginner an Advanced movement.)
+          // Strictness over substitution across every gate: a pattern the
+          // inventory cannot support, one that only exists above the athlete's
+          // weight-room tier ceiling, or one whose remaining candidates are
+          // capability/niggle/attestation blocked, is dropped with a warning
+          // and never filled upward. (Audit F1: the previous ungated fallback
+          // could hand a beginner an Advanced movement.) The three warnings
+          // below are ordered narrowest-cause-last so the message names the
+          // gate that actually emptied the pool. On a conditioning/BJJ day the
+          // tier limb is unreachable by construction — the ceiling is removed
+          // there — so the message correctly attributes the drop to equipment
+          // or capability.
           const equipmentCandidate = pickForPattern(equipPool, pattern, usedIds);
           const tierCandidate = pickForPattern(tierPool, pattern, usedIds);
           warnings.add(equipmentCandidate === null

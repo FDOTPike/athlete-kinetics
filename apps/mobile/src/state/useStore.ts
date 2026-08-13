@@ -66,6 +66,7 @@ import {
   STANDARD_EQUIPMENT_ITEMS,
   EXPERIENCE_SEVERITY,
   generateBlock,
+  groupRoutineTemplateDays,
   accessContextForBlockFocus,
   historyContentFingerprint,
   parseHistoryImport,
@@ -92,6 +93,7 @@ import {
   triage,
   type CapabilityEdge,
   type CapabilityEvidence,
+  type ComposedRoutine,
   type DaySwapOption,
   type MovementAvailability,
   type MovementAccessContext,
@@ -3357,28 +3359,21 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const verdicts = get().getMovementAvailabilityVerdicts('weight_room');
     const availableSet = new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
     const roleEligibility = routineRoleEligibility(d);
-    const counts: Record<RoutineRole, number> = { major: 0, supplementary: 0, conditional: 0 };
-    const maxima: Record<RoutineRole, number> = { major: 1, supplementary: 2, conditional: 3 };
-    const seenMovements = new Set<number>();
-    const seenPositions = new Set<string>();
+    // P2-2 (movement-access audit): every POPULATED routine day is its own
+    // executable session, so role maxima and the sole-major law are accounted
+    // per day rather than across the template, while the overall template
+    // ceiling and movement identity stay template-wide. That structural law is
+    // the shared pure groupRoutineTemplateDays; this store adds only the
+    // database-backed half (ratification, capability verdicts, dose bounds).
+    const placements = input.slots.map((item, index) => ({
+      dayIndex: item.dayIndex ?? 1,
+      slotIndex: item.slotIndex ?? index + 1,
+      movementId: item.movementId,
+      role: item.role,
+    }));
+    const daysByIndex = groupRoutineTemplateDays(placements);
 
-    for (let index = 0; index < input.slots.length; index += 1) {
-      const item = input.slots[index];
-      const dayIndex = item.dayIndex ?? 1;
-      const slotIndex = item.slotIndex ?? index + 1;
-      if (!Number.isInteger(dayIndex) || dayIndex < 1 || dayIndex > 7 ||
-          !Number.isInteger(slotIndex) || slotIndex < 1 || slotIndex > 6) {
-        throw new Error('Routine day and slot positions must stay inside the supported 1-7 / 1-6 bounds.');
-      }
-      const positionKey = `${dayIndex}:${slotIndex}`;
-      if (seenPositions.has(positionKey)) throw new Error('Routine slot positions must be unique.');
-      seenPositions.add(positionKey);
-      if (seenMovements.has(item.movementId)) throw new Error('A movement can appear only once in a routine day.');
-      seenMovements.add(item.movementId);
-      counts[item.role] += 1;
-      if (counts[item.role] > maxima[item.role]) {
-        throw new Error(`A routine supports at most ${maxima[item.role]} ${item.role} movement${maxima[item.role] === 1 ? '' : 's'}.`);
-      }
+    for (const item of input.slots) {
       if (!roleEligibility[item.role].has(item.movementId)) {
         throw new Error(`Movement ${item.movementId} is not ratified for the ${item.role} role.`);
       }
@@ -3396,21 +3391,26 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         throw new Error(`Routine RPE must be between 5 and the athlete cap of ${profile.base_rpe_cap}.`);
       }
     }
-    if (counts.major !== 1) throw new Error('A routine must contain exactly one major movement.');
 
-    const composed = composeRoutine({
-      selections: input.slots.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
-      schemaType: input.schemaType,
-      objective: profile.objective,
-      trainingAge: profile.training_age,
-      // Persist defaults for the complete six-slot template. The athlete's live
-      // duration cap is applied later when a particular session is frozen.
-      durationCapMin: Math.max(profile.session_duration_cap_min, 66),
-      baseRpeCap: profile.base_rpe_cap,
-      availableMovementIds: availableSet,
-    });
-    if (composed.slots.length !== input.slots.length) {
-      throw new Error(composed.warnings[0] ?? 'The routine could not be composed safely.');
+    // Each populated day composes independently: one day's duration cap, role
+    // budget and warnings can never be paid for out of another day's slots.
+    const composedByDay = new Map<number, ComposedRoutine>();
+    for (const [dayIndex, daySlots] of daysByIndex) {
+      const composedDay = composeRoutine({
+        selections: daySlots.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
+        schemaType: input.schemaType,
+        objective: profile.objective,
+        trainingAge: profile.training_age,
+        // Persist defaults for the complete six-slot day. The athlete's live
+        // duration cap is applied later when a particular session is frozen.
+        durationCapMin: Math.max(profile.session_duration_cap_min, 66),
+        baseRpeCap: profile.base_rpe_cap,
+        availableMovementIds: availableSet,
+      });
+      if (composedDay.slots.length !== daySlots.length) {
+        throw new Error(composedDay.warnings[0] ?? 'The routine could not be composed safely.');
+      }
+      composedByDay.set(dayIndex, composedDay);
     }
 
     const now = Date.now();
@@ -3438,14 +3438,18 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
       for (let index = 0; index < input.slots.length; index += 1) {
         const item = input.slots[index];
-        const prescribed = composed.slots[index];
+        const placement = placements[index];
+        // Movement identity is unique template-wide, so the day's composition
+        // resolves to exactly one prescription for this slot.
+        const prescribed = composedByDay.get(placement.dayIndex)!.slots
+          .find((candidate) => candidate.movementId === item.movementId)!;
         const sets = item.sets ?? prescribed.sets;
         const reps = item.reps ?? prescribed.reps;
         const targetRpe = item.targetRpe ?? prescribed.targetRpe;
         d.executeSync(
           `INSERT INTO routine_template_slot (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [templateId, item.dayIndex ?? 1, item.slotIndex ?? index + 1, item.role, item.movementId, sets, reps, targetRpe],
+          [templateId, placement.dayIndex, placement.slotIndex, item.role, item.movementId, sets, reps, targetRpe],
         );
       }
       d.executeSync('COMMIT');
@@ -3493,8 +3497,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const verdicts = get().getMovementAvailabilityVerdicts('weight_room');
     const availableSet = new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId));
     const roleEligibility = routineRoleEligibility(d);
+    // P2-2: freezing executes ONE routine day. Only that day's movements are
+    // validated and composed — another day's drifted role or teaching-only
+    // movement neither blocks nor licenses this session.
     const daySlots = template.slots.filter((slot) => slot.dayIndex === routineDayIndex);
     if (daySlots.length === 0) throw new Error(`Routine template ${routineTemplateId} has no movements for day ${routineDayIndex}.`);
+    if (daySlots.filter((slot) => slot.role === 'major').length !== 1) {
+      throw new Error(`Routine day ${routineDayIndex} must contain exactly one major movement.`);
+    }
     for (const slot of daySlots) {
       if (!roleEligibility[slot.role].has(slot.movementId)) {
         throw new Error(`${slot.movementName} is no longer ratified for the ${slot.role} role.`);

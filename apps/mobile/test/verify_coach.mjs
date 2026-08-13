@@ -165,7 +165,28 @@ check('IO shell reads/writes REGISTRY_FILE in the document dir', () => {
   assert.ok(!shell.match(/from 'react-native-blob-util'/), 'blob-util must be deferred-required, not imported');
 });
 
-check('verification Lab core is pure and the UI imports no athlete-data mutator', () => {
+/**
+ * The Coach Verification Lab's no-write boundary (P2-5).
+ *
+ * This used to be a DENYLIST of mutator names. A denylist can only refuse the
+ * mutators someone already thought of: adding `saveRoutineTemplate` — or any
+ * future write action — to the Lab screen would have passed silently. It is
+ * now a CLOSED ALLOWLIST. Every store access in the screen must be a single
+ * read selector, and the complete sorted selector set must equal the approved
+ * set below. A new selector fails this gate until it is reviewed and listed.
+ */
+const APPROVED_LAB_SELECTORS = [
+  'getMovementAvailabilityVerdicts',
+  'loadCoachDiagnosticContext',
+  'loadCoachMovementAccessContext',
+  'loadMeasuredHistory',
+  'movements',
+  'profile',
+  'today',
+  'vector',
+];
+
+check('verification Lab core is pure and the UI is a CLOSED read-only selector allowlist', () => {
   const labCore = readFileSync(
     join(ROOT, 'apps', 'mobile', 'src', 'diagnostics', 'coachVerificationLab.ts'), 'utf-8');
   const labScreen = readFileSync(
@@ -173,16 +194,54 @@ check('verification Lab core is pure and the UI imports no athlete-data mutator'
   for (const forbidden of ['useStore', 'executeSync', 'Date.now', 'saveRegistry', "from 'react-native'"]) {
     assert.ok(!labCore.includes(forbidden), `pure Lab core must not contain ${forbidden}`);
   }
-  for (const forbidden of [
-    'saveProfile', 'generateNewBlock', 'createTrainingProgram', 'startSession',
-    'logSet', 'endSession', 'saveBodyweight', 'importHistory', 'resetTrainingData',
-  ]) {
-    assert.ok(!labScreen.includes(forbidden), `Lab UI must not select ${forbidden}`);
+
+  // Structural extraction: every line touching the store must be either the
+  // import or one canonical `const x = useStore((s) => s.name);` binding.
+  // Destructuring, nested property reads, getState/setState and inline
+  // selector expressions are all rejected before the name comparison runs.
+  const importLine = /^import \{ useStore \} from '\.\.\/state\/useStore';$/;
+  const selectorLine = /^\s*const \w+ = useStore\(\((\w+)\) => \1\.(\w+)\);$/;
+  const selectors = [];
+  for (const raw of labScreen.split(/\r?\n/)) {
+    if (!/\buseStore\b/.test(raw)) continue;
+    const line = raw.trimEnd();
+    if (importLine.test(line.trim())) continue;
+    const match = selectorLine.exec(line);
+    assert.ok(match, `Lab store access must be one read selector per line, got: ${line.trim()}`);
+    selectors.push(match[2]);
   }
-  assert.ok(labScreen.includes('loadMeasuredHistory'));
-  assert.ok(labScreen.includes('loadCoachDiagnosticContext'));
-  assert.ok(labScreen.includes('loadCoachMovementAccessContext'));
-  assert.ok(labScreen.includes('getMovementAvailabilityVerdicts'));
+  assert.ok(!/useStore\s*\.\s*(getState|setState)/.test(labScreen),
+    'the Lab must never reach the store outside a subscribed read selector');
+  assert.equal(selectors.length, new Set(selectors).size, 'each Lab selector must be bound once');
+  assert.deepEqual(
+    [...selectors].sort(),
+    APPROVED_LAB_SELECTORS,
+    'the Lab screen selector set changed. Review the new selector for write access, '
+      + 'then add it to APPROVED_LAB_SELECTORS in this file.',
+  );
+
+  // The Lab shares only through the redacting serializer, never the raw report.
+  assert.ok(labScreen.includes('serializeRedactedCoachReport(report)'),
+    'the share sheet must carry the redacted serialization');
+  assert.ok(!/JSON\.stringify\(\s*report/.test(labScreen),
+    'the Lab must never share a raw report object');
+});
+
+check('loadCoachMovementAccessContext is a read-only projection of the access sidecars', () => {
+  const storeSource = readFileSync(
+    join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
+  const start = storeSource.indexOf('  loadCoachMovementAccessContext: () => {');
+  assert.ok(start >= 0, 'loadCoachMovementAccessContext not found in useStore.ts');
+  const end = storeSource.indexOf('\n  },', start);
+  assert.ok(end > start, 'could not bound loadCoachMovementAccessContext');
+  const body = storeSource.slice(start, end);
+  for (const forbidden of ['INSERT', 'UPDATE', 'DELETE', 'BEGIN', 'COMMIT', 'ROLLBACK', 'DROP', 'set(']) {
+    assert.ok(!body.includes(forbidden), `the Lab access-context reader must not contain ${forbidden}`);
+  }
+  assert.ok(body.includes('loadCapabilityFacts(getDb())'),
+    'the reader must project the compact access sidecars');
+  assert.ok(body.includes('safetyExcludedMovementIdsFor('),
+    'the reader must reuse the shared niggle-to-safety projection');
 });
 
 if (process.exitCode !== 1) console.log(`verify:coach — all ${n} checks green`);

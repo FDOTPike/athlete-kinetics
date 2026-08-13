@@ -959,8 +959,18 @@ check('thin-data severe-niggle headroom never raises squat in the block',
     && capabilitySrc.includes('isDifficultyAllowed(')
     && storeSrc.includes('isDifficultyAllowed(')
     && storeSrc.includes('permittedForProfile(')
-    && screenSrc.includes("availabilityMap.get(slot.movementId)?.state !== 'available'")
+    && screenSrc.includes('isDifficultyAllowed(')
     && screenSrc.includes('tierPlanViolation'));
+  // P1-1: the SESSION-WIDE blocker is tier only. This check previously pinned
+  // the defect itself — `state !== 'available'` — which let an ordinary
+  // mid-session niggle blank the whole active session. Equipment, safety,
+  // capability and attestation now gate the current slot instead.
+  check('production: the renderer session blocker is the shared tier law, never the full verdict',
+    !screenSrc.includes("availabilityMap.get(slot.movementId)?.state !== 'available'")
+    && /const tierPlanViolation = sessionAccessContext === null \|\| sessionPlan\.some/.test(screenSrc)
+    && screenSrc.includes("const currentSlotExecutable = currentAvailability?.state === 'available';")
+    && screenSrc.includes('if (!currentSlotExecutable) return;')
+    && screenSrc.includes('disabled={!loadLoggable || !currentSlotExecutable}'));
 }
 
 // --- [16b] day-local sport/weight access context -----------------------------
