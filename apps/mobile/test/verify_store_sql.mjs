@@ -1383,6 +1383,38 @@ if (resetTables.length >= 15) {
       && src.includes("? accessContextForBlockFocus(restoredOrigin.focus as BlockFocus)")
       && src.includes(": 'weight_room'"));
 
+  // --- [T7] logSet access boundary: ORDERING pin -----------------------------
+  // The behaviour is proved executably against the real store, the real
+  // migration chain and the real capability law in
+  // apps/mobile/test/components/SessionAccessBoundary.test.js. What a
+  // behavioural test can only show indirectly is WHERE the guard sits, so pin
+  // the ordering here: after the identity/halt checks, before the runner
+  // advance, and before the write transaction opens.
+  console.log('[logSet store-boundary access revalidation]');
+  const logSetAccessBody = src.slice(src.indexOf('  logSet: (movementId, reps, loadKg, rpe,'), src.indexOf('  deleteSet: (setId)'));
+  const atGuard = logSetAccessBody.indexOf('const logAccessContext = executionContextForState(state);');
+  const atVerdict = logSetAccessBody.indexOf('const logAvailability = capabilityMovementAvailability(');
+  const atIdentity = logSetAccessBody.indexOf("set({ error: 'This set is not the current session step.' });");
+  const atHalt = logSetAccessBody.indexOf("set({ error: 'Training is halted. Finish the session before logging more work.' });");
+  const atAdvance = logSetAccessBody.indexOf('advanceSessionRunner(state.runner, {');
+  const atBegin = logSetAccessBody.indexOf("d.executeSync('BEGIN');");
+  a('logSet resolves the frozen access context and one shared capability verdict',
+    atGuard >= 0 && atVerdict >= 0);
+  a('logSet revalidates AFTER the slot-identity and halt guards',
+    atHalt >= 0 && atIdentity >= 0 && atGuard > atIdentity && atGuard > atHalt);
+  a('logSet revalidates BEFORE the runner advance and before the write transaction',
+    atAdvance > atVerdict && atBegin > atVerdict);
+  a('logSet fails closed on a missing verdict and never infers a fallback context',
+    logSetAccessBody.includes("if (logAvailability?.state !== 'available') {")
+      && logSetAccessBody.includes('set({ error: formatTeachingOnlyReason(logAvailability) });')
+      && logSetAccessBody.includes('The active session access context cannot be verified. Reopen the session before logging more work.')
+      && !/logAccessContext\s*(\?\?|\|\|)\s*'weight_room'/.test(logSetAccessBody));
+  a('logSet feeds the shared law the live profile, niggles and prior-experience declarations',
+    logSetAccessBody.includes('state.movements,')
+      && logSetAccessBody.includes('state.profile,')
+      && logSetAccessBody.includes('new Set(state.activePriorExperienceMovementIds),')
+      && logSetAccessBody.includes('safetyExcludedMovementIdsFor(state.movements, state.profile, state.niggles),'));
+
   // --- [F3] Gate count & documentation drift assertion ---
   console.log('[documentation & CI gate count drift check]');
   const pkgJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));

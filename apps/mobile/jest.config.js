@@ -17,6 +17,14 @@ module.exports = {
   testMatch: [`${testComponentsDir}/**/*.test.js`],
   transform: {
     '^.+\\\\.(js|ts|tsx)$': ['babel-jest', { babelrc: false, configFile: false, presets: ['module:@react-native/babel-preset'] }],
+    // Raw loader for schema files. The app gets this from
+    // babel-plugin-inline-import, which the transform above deliberately
+    // excludes (babelrc/configFile off), so without this entry any module that
+    // reaches packages/core-db's migration list is a parse error under jest.
+    // With it, a component test can boot the REAL store against the REAL
+    // 001-051 chain. Separator-agnostic on purpose: an anchored pattern using
+    // `\\\\` does not match a POSIX-normalized path.
+    '\\.sql$': path.join(__dirname, 'test', 'sqlRawTransformer.js'),
   },
   moduleNameMapper: {
     '^@ak/inference$': '<rootDir>/../../packages/inference/src/index.ts',

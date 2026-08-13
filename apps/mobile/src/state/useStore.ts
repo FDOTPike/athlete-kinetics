@@ -4875,6 +4875,38 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
     }
 
+    // Store-boundary access revalidation. SessionScreen disables an
+    // unavailable slot, but logSet is a public store action: a direct call
+    // must not be able to persist work the shared capability law refuses.
+    // This runs AFTER the identity and halt checks and BEFORE the runner
+    // advance and the write transaction, so a refusal leaves the database,
+    // the durable checkpoint and the in-memory runner all untouched.
+    //
+    // The frozen active-session context is the ONLY authority here — there is
+    // no weight-room (or any other) fallback to infer for a live session, so
+    // an unverifiable context is a refusal, not a default.
+    const logAccessContext = executionContextForState(state);
+    if (logAccessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before logging more work.' });
+      return;
+    }
+    // One shared law, one verdict: tier, equipment, active niggles, capability
+    // evidence, prior-experience declarations and separate attestation are all
+    // resolved together against the live profile and the frozen context.
+    const logAvailability = capabilityMovementAvailability(
+      getDb(),
+      state.movements,
+      state.profile,
+      logAccessContext,
+      new Set(state.activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(state.movements, state.profile, state.niggles),
+    ).find((verdict) => verdict.movementId === movementId);
+    // Fail closed: a missing verdict is unverifiable, not permission.
+    if (logAvailability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(logAvailability) });
+      return;
+    }
+
     const prescribedDose = planSlot?.target ?? null;
     const timeMode = prescribedDose?.kind === 'time' || (prescribedDose === null && movement.loggingMode === 'time');
     if (timeMode && (metrics?.timeS === undefined || metrics.timeS <= 0)) {
