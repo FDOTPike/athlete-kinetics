@@ -13,6 +13,7 @@
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { offlineTransformersLoad } from '../../../scripts/embedder-integrity.mjs';
 
 const require = createRequire(import.meta.url);
 const cosine = require('./.build/semantic/cosine.js');
@@ -66,7 +67,14 @@ check('loadCodebase rejects misaligned vectors', (() => {
 // --- 3. live routing with the production embedding model ------------------------
 console.log('[3] live routing (embedding real queries with MiniLM)');
 const { pipeline } = await import('@xenova/transformers');
-const embed = await pipeline('feature-extraction', codebase.embeddingModel, { quantized: true });
+const transformerLoad = offlineTransformersLoad(
+  codebase.embeddingModel,
+  process.env.AK_EMBEDDER_CACHE,
+);
+const embed = await pipeline('feature-extraction', transformerLoad.modelId, {
+  quantized: true,
+  ...transformerLoad.options,
+});
 const embedOne = async (text) => {
   const o = await embed(text, { pooling: 'mean', normalize: true });
   return Float32Array.from(o.data);

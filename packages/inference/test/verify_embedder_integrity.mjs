@@ -1,234 +1,342 @@
 /**
- * verify_embedder_integrity.mjs — deterministic, offline adversarial gate for
- * the embedder supply-chain pin (see scripts/embedder-integrity.mjs).
- *
- * Proves, without any network access:
- *   1. the full immutable revision is pinned and mutable revisions are rejected;
- *   2. both required remote artifacts have ratified hashes declared;
- *   3. correct (pin-matching) files pass verification, including existing outputs;
- *   4. a one-byte-corrupted ONNX file fails;
- *   5. a one-byte-corrupted tokenizer file fails;
- *   6. cache and download paths exercise the SAME verifier/install seam;
- *   7. an already-present output file cannot bypass verification;
- *   8. a failed verification can never replace a previously trusted destination;
- *   9. regenerated tokenizer.min.json retains the ratified byte hash;
- *  10. CI cache keys are bound to the pin-bearing source and have no broad
- *      restore-keys fallback.
- *
- * Runs:  node packages/inference/test/verify_embedder_integrity.mjs
- * (wired into npm run verify:embedder; may also be run standalone.)
+ * Deterministic, offline adversarial gate for the embedder supply chain.
+ * Normal contract: run fetch:embedder first. Missing artifacts are failures,
+ * never passing skips.
  */
 import {
+  existsSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import {
+  DEFAULT_TRANSFORMERS_CACHE_ROOT,
   KNOWN_SHA256,
   MODEL_ID,
   PINNED_REVISION,
+  REMOTE_ARTIFACTS,
   TOKENIZER_MIN_SHA256,
+  assertExpectedModelId,
   assertPinnedRevision,
   buildTokenizerMin,
   expectedSha256,
   installVerified,
+  installVerifiedAgainst,
+  offlineTransformersLoad,
   sha256Bytes,
   sha256File,
+  transformersModelCachePath,
+  transformersRevisionArtifactPath,
+  transformersRevisionCachePath,
   verifyAgainst,
   verifyExistingOutput,
   verifyIntegrity,
 } from '../../../scripts/embedder-integrity.mjs';
 
-const INTEGRITY_JS = join(import.meta.dirname, '..', '..', '..', 'scripts', 'embedder-integrity.mjs');
-const FETCH_JS = join(import.meta.dirname, '..', '..', '..', 'scripts', 'fetch-embedder.mjs');
-const CI_YML = join(import.meta.dirname, '..', '..', '..', '.github', 'workflows', 'ci.yml');
+const ROOT = join(import.meta.dirname, '..', '..', '..');
 const ASSETS = join(import.meta.dirname, '..', 'assets');
+const CI_YML = join(ROOT, '.github', 'workflows', 'ci.yml');
+const MIN_DIR = join(ASSETS, 'minilm');
+const MODEL_OUTPUT = join(MIN_DIR, 'model_quantized.onnx');
+const FULL_TOKENIZER_OUTPUT = join(MIN_DIR, 'tokenizer.full.json');
+const MIN_TOKENIZER_OUTPUT = join(MIN_DIR, 'tokenizer.min.json');
 
-const RATIFIED_SHA256 = {
-  'onnx/model_quantized.onnx':
-    'afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1',
-  'tokenizer.json':
-    'da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0',
-};
+const RATIFIED_SHA256 = Object.freeze({
+  'config.json': '7135149f7cffa1a573466c6e4d8423ed73b62fd2332c575bf738a0d033f70df7',
+  'onnx/model_quantized.onnx': 'afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1',
+  'tokenizer.json': 'da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0',
+  'tokenizer_config.json': '9261e7d79b44c8195c1cada2b453e55b00aeb81e907a6664974b4d7776172ab3',
+});
 
-let fail = 0;
-let skipped = 0;
+let failures = 0;
 const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  [${detail}]` : ''}`);
-  if (!ok) fail += 1;
+  if (!ok) failures += 1;
 };
-const skip = (label, why) => {
-  skipped += 1;
-  console.log(`  PASS  ${label}  [SKIPPED: ${why}]`);
+
+const throws = (fn) => {
+  try {
+    fn();
+    return false;
+  } catch {
+    return true;
+  }
 };
-const onnxAsset = join(ASSETS, 'minilm', 'model_quantized.onnx');
-const tokFullAsset = join(ASSETS, 'minilm', 'tokenizer.full.json');
-const minAsset = join(ASSETS, 'minilm', 'tokenizer.min.json');
-let haveRealModel = false;
-try { haveRealModel = readFileSync(onnxAsset).length > 0 && readFileSync(tokFullAsset).length > 0; } catch { haveRealModel = false; }
 
-console.log('[1] pinned revision + mutable-revision rejection');
-check('PINNED_REVISION is the full 40-char immutable SHA',
-  /^[0-9a-f]{40}$/.test(PINNED_REVISION) && PINNED_REVISION.length === 40, PINNED_REVISION);
-check('assertPinnedRevision accepts the pinned SHA', assertPinnedRevision(PINNED_REVISION) === PINNED_REVISION);
-let mutableRejected = 0;
-for (const rev of ['main', 'feature-branch', 'v2.17.2', 'release-candidate', '751bff3', '751bff37182d3f1213fa05d7196b954e230abad9zz']) {
-  try { assertPinnedRevision(rev); } catch { mutableRejected += 1; }
+const ignoredSourceDirs = new Set(['node_modules', '.build', 'build', 'dist', '.gradle']);
+const listFiles = (dir) => {
+  if (!existsSync(dir)) return [];
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!ignoredSourceDirs.has(entry.name)) files.push(...listFiles(path));
+    }
+    else files.push(path);
+  }
+  return files;
+};
+
+console.log('[1] immutable revision and model identity');
+check('PINNED_REVISION is a full immutable commit SHA',
+  /^[0-9a-f]{40}$/.test(PINNED_REVISION), PINNED_REVISION);
+check('pinned revision is accepted', assertPinnedRevision(PINNED_REVISION) === PINNED_REVISION);
+const mutable = ['main', 'feature', 'v2.17.2', '751bff3', '', null];
+check('mutable/short/non-string revisions are rejected',
+  mutable.every((revision) => throws(() => assertPinnedRevision(revision))), `${mutable.length}/${mutable.length}`);
+check('ratified model id is accepted', assertExpectedModelId(MODEL_ID) === MODEL_ID);
+check('model-id drift is rejected', throws(() => assertExpectedModelId('Xenova/other-model')));
+
+console.log('[2] all remote pipeline artifacts have independent ratified hashes');
+const expectedArtifacts = Object.keys(RATIFIED_SHA256).sort();
+check('declared artifact set is exactly config/model/tokenizer/tokenizer-config',
+  [...REMOTE_ARTIFACTS].sort().join('|') === expectedArtifacts.join('|'));
+check('KNOWN_SHA256 has no undeclared or missing entries',
+  Object.keys(KNOWN_SHA256).sort().join('|') === expectedArtifacts.join('|'));
+for (const rel of expectedArtifacts) {
+  check(`${rel} pin matches the independently ratified hash`,
+    expectedSha256(rel) === RATIFIED_SHA256[rel], RATIFIED_SHA256[rel]);
 }
-check('mutable revisions (main, branches, tags, short SHAs) are rejected',
-  mutableRejected === 6, `${mutableRejected}/6`);
+check('undeclared remote artifact fails closed', throws(() => expectedSha256('special_tokens_map.json')));
 
-console.log('[2] both remote artifacts carry ratified pinned hashes');
-check('KNOWN_SHA256 declares exactly the two required artifacts',
-  [...Object.keys(KNOWN_SHA256)].sort().join(',')
-    === ['onnx/model_quantized.onnx', 'tokenizer.json'].sort().join(','));
-const allPinned = Object.entries(KNOWN_SHA256).every(([rel, h]) => /^[0-9a-f]{64}$/.test(h));
-check('every declared hash is a full 64-char lowercase sha256', allPinned);
-check("onnx/model_quantized.onnx pin matches the ratified hash",
-  expectedSha256('onnx/model_quantized.onnx') === RATIFIED_SHA256['onnx/model_quantized.onnx']);
-check('tokenizer.json pin matches the ratified hash',
-  expectedSha256('tokenizer.json') === RATIFIED_SHA256['tokenizer.json']);
-let undeclaredRejected = false;
-try { expectedSha256('tokenizer.json.unratified'); } catch { undeclaredRejected = true; }
-check('an artifact without a declared hash is refused (fail closed)', undeclaredRejected);
+console.log('[3] exact revision-scoped Transformers cache contract');
+const revisionDir = transformersRevisionCachePath();
+check('revision cache is nested under cache-root/model/full-revision',
+  revisionDir === join(DEFAULT_TRANSFORMERS_CACHE_ROOT, ...MODEL_ID.split('/'), PINNED_REVISION), revisionDir);
+check('legacy unrevisioned cache is not the revision cache',
+  transformersModelCachePath() !== revisionDir);
+let allRevisionArtifactsPresent = true;
+for (const rel of expectedArtifacts) {
+  const path = transformersRevisionArtifactPath(rel);
+  const exact = path === join(revisionDir, ...rel.split('/'));
+  const present = existsSync(path) && statSync(path).isFile();
+  let verified = false;
+  if (present) {
+    try {
+      verified = verifyExistingOutput(rel, path) === RATIFIED_SHA256[rel];
+    } catch {
+      verified = false;
+    }
+  }
+  allRevisionArtifactsPresent &&= present && verified;
+  check(`${rel} exists at its exact revision key and verifies`, exact && present && verified, path);
+}
+check('normal post-fetch contract has all four required artifacts (no skips)', allRevisionArtifactsPresent);
 
-console.log('[3] correct files pass verification (including existing outputs)');
-const fixture = Buffer.from('athlete-kinetics-supply-chain-fixture');
-const fixtureHash = sha256Bytes(fixture);
-check('verifier accepts bytes that match their declared hash',
-  verifyAgainst(fixtureHash, fixture, 'fixture/artifact.bin', 'fixture') === fixtureHash);
-if (haveRealModel) {
-  check('existing onnx output verifies against the ratified pin',
-    verifyExistingOutput('onnx/model_quantized.onnx', onnxAsset) === RATIFIED_SHA256['onnx/model_quantized.onnx']);
-  check('existing tokenizer.full.json verifies against the ratified pin',
-    verifyExistingOutput('tokenizer.json', tokFullAsset) === RATIFIED_SHA256['tokenizer.json']);
-} else {
-  skip('real-model existing-output pin verification', 'model_quantized.onnx / tokenizer.full.json not present (run fetch:embedder first)');
+console.log('[4] shared Transformers load contract is pinned and offline');
+const sharedLoad = offlineTransformersLoad(MODEL_ID);
+check('shared loader fixes the ratified model id', sharedLoad.modelId === MODEL_ID);
+check('shared loader fixes the immutable revision', sharedLoad.options.revision === PINNED_REVISION);
+check('shared loader fixes the exact cache root',
+  sharedLoad.options.cache_dir === DEFAULT_TRANSFORMERS_CACHE_ROOT);
+check('shared loader explicitly prohibits remote fallback',
+  sharedLoad.options.local_files_only === true);
+
+const transformerCallers = [
+  ...listFiles(join(ROOT, 'apps')),
+  ...listFiles(join(ROOT, 'packages')),
+  ...listFiles(join(ROOT, 'scripts')),
+]
+  .filter((path) => {
+    return /\.(?:[cm]?js|tsx?)$/.test(path);
+  })
+  .filter((path) => {
+    const source = readFileSync(path, 'utf-8');
+    return /import\s*\(\s*['"]@xenova\/transformers['"]\s*\)/.test(source)
+      || /from\s*['"]@xenova\/transformers['"]/.test(source)
+      || /require\s*\(\s*['"]@xenova\/transformers['"]\s*\)/.test(source);
+  })
+  .map((path) => relative(ROOT, path).replaceAll('\\', '/'))
+  .sort();
+const productionTransformersCallers = [
+  'packages/inference/test/verify_embedder.mjs',
+  'packages/inference/test/verify_semantic.mjs',
+  'scripts/embed-codebase.mjs',
+];
+const expectedCallers = [
+  ...productionTransformersCallers,
+  'packages/inference/test/verify_embedder_integrity.mjs',
+].sort();
+check('every direct Transformers caller is known and audited',
+  transformerCallers.join('|') === expectedCallers.join('|'), transformerCallers.join(', '));
+for (const rel of productionTransformersCallers) {
+  const source = readFileSync(join(ROOT, ...rel.split('/')), 'utf-8');
+  check(`${rel} uses the shared model/pin/cache/offline seam`,
+    source.includes('offlineTransformersLoad(') && source.includes('transformerLoad.options'));
 }
 
-console.log('[4] one-byte-corrupted ONNX fails');
-const assertCorruptFails = (rel, name) => {
-  const bytes = haveRealModel
-    ? readFileSync(rel === 'onnx/model_quantized.onnx' ? onnxAsset : tokFullAsset)
-    : Buffer.from(`corrupt-${rel}`);
+// Behavioral proof: an empty cache fails locally and the populated cache loads
+// successfully while global fetch is blocked. This exercises the shared seam,
+// not a source-string approximation of local_files_only.
+const emptyCache = mkdtempSync(join(tmpdir(), 'ak-empty-transformers-cache-'));
+const originalFetch = globalThis.fetch;
+let fetchCalls = 0;
+globalThis.fetch = async () => {
+  fetchCalls += 1;
+  throw new Error('NETWORK FORBIDDEN BY INTEGRITY GATE');
+};
+try {
+  const { pipeline } = await import('@xenova/transformers');
+  let emptyFailedLocally = false;
+  try {
+    const emptyLoad = offlineTransformersLoad(MODEL_ID, emptyCache);
+    await pipeline('feature-extraction', emptyLoad.modelId, {
+      quantized: true,
+      ...emptyLoad.options,
+    });
+  } catch {
+    emptyFailedLocally = true;
+  }
+  check('empty cache fails locally when offline', emptyFailedLocally);
+  check('empty-cache failure attempts zero fetches', fetchCalls === 0, `${fetchCalls} fetch calls`);
+
+  let populatedLoaded = false;
+  let populatedPipeline;
+  try {
+    populatedPipeline = await pipeline('feature-extraction', sharedLoad.modelId, {
+      quantized: true,
+      ...sharedLoad.options,
+    });
+    const result = await populatedPipeline('supply chain proof', {
+      pooling: 'mean',
+      normalize: true,
+    });
+    populatedLoaded = result?.data?.length === 384;
+  } catch {
+    populatedLoaded = false;
+  } finally {
+    if (typeof populatedPipeline?.dispose === 'function') {
+      await populatedPipeline.dispose();
+    }
+  }
+  check('populated revision cache runs feature extraction offline', populatedLoaded);
+  check('populated-cache execution attempts zero fetches', fetchCalls === 0, `${fetchCalls} fetch calls`);
+} finally {
+  globalThis.fetch = originalFetch;
+  rmSync(emptyCache, { recursive: true, force: true });
+}
+
+console.log('[5] all installed bytes verify and corruption is rejected');
+const outputMap = new Map([
+  ['onnx/model_quantized.onnx', MODEL_OUTPUT],
+  ['tokenizer.json', FULL_TOKENIZER_OUTPUT],
+]);
+for (const [rel, path] of outputMap) {
+  let verified = false;
+  if (existsSync(path)) {
+    try {
+      verified = verifyExistingOutput(rel, path) === RATIFIED_SHA256[rel];
+    } catch {
+      verified = false;
+    }
+  }
+  check(`${rel} device output exists and verifies`, verified, path);
+}
+for (const rel of expectedArtifacts) {
+  const bytes = readFileSync(transformersRevisionArtifactPath(rel));
   const corrupt = Buffer.from(bytes);
   corrupt[corrupt.length - 1] ^= 0x01;
-  try {
-    verifyIntegrity(rel, corrupt, 'corrupt-fixture');
-    return { ok: false, detail: 'accepted corrupt bytes' };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return {
-      ok: msg.includes(rel) && msg.includes(RATIFIED_SHA256[rel]) && /got [0-9a-f]{64}/.test(msg),
-      detail: msg.slice(0, 120),
-    };
-  }
-};
-const onnxCorrupt = assertCorruptFails('onnx/model_quantized.onnx', 'model_quantized.onnx');
-check('one-byte-corrupted ONNX is refused with artifact + actual + expected hash',
-  onnxCorrupt.ok, onnxCorrupt.detail);
-
-console.log('[5] one-byte-corrupted tokenizer fails');
-const tokCorrupt = assertCorruptFails('tokenizer.json', 'tokenizer.json');
-check('one-byte-corrupted tokenizer is refused with artifact + actual + expected hash',
-  tokCorrupt.ok, tokCorrupt.detail);
-
-console.log('[6] cache and download share the same verifier/install path');
-const fetchSrc = readFileSync(FETCH_JS, 'utf-8');
-const integritySrc = readFileSync(INTEGRITY_JS, 'utf-8');
-check("fetch script installs cache artifacts through installVerified('…', staged, dest, 'cache')",
-  fetchSrc.includes("installVerified(rel, staged, dest, 'cache')"));
-check("fetch script installs downloads through installVerified('…', staged, dest, 'download')",
-  fetchSrc.includes("installVerified(rel, staged, dest, 'download')"));
-check('installVerified is a single shared seam that verifies before installing',
-  (integritySrc.match(/verifyFileIntegrity/g) ?? []).length >= 1
-    && integritySrc.includes('verifyFileIntegrity(rel, stagedPath, source); // throws; dest untouched')
-    && integritySrc.indexOf('verifyFileIntegrity(rel, stagedPath, source); // throws; dest untouched')
-      < integritySrc.indexOf('rmSync(dest, { force: true })')
-    && integritySrc.indexOf('verifyFileIntegrity(rel, stagedPath, source); // throws; dest untouched')
-      < integritySrc.indexOf('renameSync(stagedPath, dest)'));
-// Behavioral: the SAME seam rejects a corrupt staged artifact for either label.
-const dirtyStaged = join(tmpdir(), `ak-dirty-${process.pid}`);
-writeFileSync(dirtyStaged, Buffer.from('not-a-valid-pinned-artifact'));
-for (const source of ['cache', 'download']) {
-  try {
-    installVerified('tokenizer.json', dirtyStaged, join(tmpdir(), `ak-trust-${process.pid}-${source}`), source);
-    check(`corrupt staged bytes rejected from ${source} source via shared seam`, false);
-  } catch {
-    check(`corrupt staged bytes rejected from ${source} source via shared seam`, true);
-  }
-}
-rmSync(dirtyStaged, { force: true });
-
-console.log('[7] an existing output file cannot bypass verification');
-if (haveRealModel) {
-  check('an unverified existing output that matches its pin passes (already covered in [3])', true);
-}
-const decoy = join(tmpdir(), `ak-decoy-${process.pid}.onnx`);
-writeFileSync(decoy, fixture);
-let decoyRejected = false;
-try { verifyExistingOutput('onnx/model_quantized.onnx', decoy); } catch { decoyRejected = true; }
-check('an existing output with the wrong bytes is refused, never accepted unseen', decoyRejected);
-check('fetch-embedder verifies the existing output instead of skipping it',
-  fetchSrc.includes("verifyExistingOutput('onnx/model_quantized.onnx', onnxDest)")
-    && fetchSrc.includes('already present and verified'));
-rmSync(decoy, { force: true });
-
-console.log('[8] failed verification cannot replace a previously trusted destination');
-const sandbox = mkdtempSync(join(tmpdir(), 'ak-stage-'));
-const trustedDest = join(sandbox, 'model_quantized.onnx');
-const corruptStaged = join(sandbox, '.model_quantized.onnx.stage-corrupt');
-writeFileSync(trustedDest, Buffer.from('previously-trusted-pinned-bytes') );
-writeFileSync(corruptStaged, Buffer.from('failed-staged-replacement-bytes'));
-let installThrew = false;
-try { installVerified('onnx/model_quantized.onnx', corruptStaged, trustedDest, 'download'); } catch { installThrew = true; }
-check('mismatched staged artifact aborts before touching the destination', installThrew);
-check('previously trusted destination is byte-for-byte untouched after the failed install',
-  readFileSync(trustedDest, 'utf-8') === 'previously-trusted-pinned-bytes');
-// Positive control when real bytes are available: correct staged file replaces dest.
-if (haveRealModel) {
-  const goodStaged = join(sandbox, '.tokenizer.json.stage-good');
-  writeFileSync(goodStaged, readFileSync(tokFullAsset));
-  const tokDest = join(sandbox, 'tokenizer.full.json');
-  installVerified('tokenizer.json', goodStaged, tokDest, 'cache');
-  check('a verified staged file installs and yields the ratified hash',
-    sha256File(tokDest) === RATIFIED_SHA256['tokenizer.json']);
-} else {
-  skip('positive install control', 'real tokenizer.full.json not present');
-}
-rmSync(sandbox, { recursive: true, force: true });
-
-console.log('[9] regenerated tokenizer.min.json retains the ratified hash');
-let minCommitted = true;
-try { minCommitted = sha256File(minAsset) === TOKENIZER_MIN_SHA256; } catch { minCommitted = false; }
-check('committed tokenizer.min.json carries the ratified regeneration hash',
-  minCommitted, TOKENIZER_MIN_SHA256);
-if (haveRealModel) {
-  const regenSandbox = mkdtempSync(join(tmpdir(), 'ak-regen-'));
-  try {
-    const full = JSON.parse(readFileSync(tokFullAsset, 'utf-8'));
-    const regen = buildTokenizerMin(full, MODEL_ID);
-    const regenPath = join(regenSandbox, 'tokenizer.min.regen.json');
-    writeFileSync(regenPath, JSON.stringify(regen));
-    check('offline regeneration of tokenizer.min.json is byte-identical to the ratified hash',
-      sha256File(regenPath) === TOKENIZER_MIN_SHA256, sha256File(regenPath));
-  } finally {
-    rmSync(regenSandbox, { recursive: true, force: true });
-  }
-} else {
-  skip('offline regeneration check', 'tokenizer.full.json not present (run fetch:embedder first)');
+  check(`one-byte corruption is rejected for ${rel}`,
+    throws(() => verifyIntegrity(rel, corrupt, 'one-byte-corruption')));
 }
 
-console.log('[10] CI cache provenance is bound to the pin-bearing source');
+console.log('[6] one verifier covers cache/download/output candidates');
+const fixture = Buffer.from('athlete-kinetics-integrity-fixture');
+const fixtureHash = sha256Bytes(fixture);
+check('explicit-hash verifier accepts matching bytes',
+  verifyAgainst(fixtureHash, fixture, 'fixture.bin', 'fixture') === fixtureHash);
+for (const source of ['revision cache', 'legacy cache', 'existing output', 'download']) {
+  check(`${source} label cannot bypass the byte verifier`,
+    throws(() => verifyIntegrity('tokenizer_config.json', fixture, source)));
+}
+
+console.log('[7] verification and replacement failures preserve destinations');
+const installSandbox = mkdtempSync(join(tmpdir(), 'ak-install-integrity-'));
+try {
+  const trustedBytes = readFileSync(transformersRevisionArtifactPath('tokenizer_config.json'));
+  const trustedDest = join(installSandbox, 'tokenizer_config.json');
+  writeFileSync(trustedDest, trustedBytes);
+
+  const corruptStage = join(installSandbox, '.tokenizer_config.stage-corrupt');
+  writeFileSync(corruptStage, Buffer.from('corrupt'));
+  check('staged checksum mismatch aborts',
+    throws(() => installVerified('tokenizer_config.json', corruptStage, trustedDest, 'download')));
+  check('checksum mismatch leaves trusted destination byte-identical',
+    sha256File(trustedDest) === RATIFIED_SHA256['tokenizer_config.json']);
+
+  const goodStage = join(installSandbox, '.tokenizer_config.stage-good');
+  writeFileSync(goodStage, trustedBytes);
+  const injectedFailure = () => { throw new Error('injected replacement failure'); };
+  check('injected replacement failure propagates',
+    throws(() => installVerified(
+      'tokenizer_config.json',
+      goodStage,
+      trustedDest,
+      'download',
+      injectedFailure,
+    )));
+  check('replacement failure preserves prior destination byte-identical',
+    sha256File(trustedDest) === RATIFIED_SHA256['tokenizer_config.json']);
+
+  writeFileSync(goodStage, trustedBytes);
+  check('verified same-directory rename-over-file succeeds without pre-delete',
+    installVerified('tokenizer_config.json', goodStage, trustedDest, 'cache')
+      === RATIFIED_SHA256['tokenizer_config.json']);
+} finally {
+  rmSync(installSandbox, { recursive: true, force: true });
+}
+
+console.log('[8] tokenizer.min regeneration is staged and fail-closed');
+let minOutputVerified = false;
+if (existsSync(MIN_TOKENIZER_OUTPUT)) {
+  minOutputVerified = sha256File(MIN_TOKENIZER_OUTPUT) === TOKENIZER_MIN_SHA256;
+}
+check('installed tokenizer.min.json has the ratified hash',
+  minOutputVerified, TOKENIZER_MIN_SHA256);
+const minSandbox = mkdtempSync(join(tmpdir(), 'ak-min-integrity-'));
+try {
+  const full = JSON.parse(readFileSync(FULL_TOKENIZER_OUTPUT, 'utf-8'));
+  const regenerated = Buffer.from(JSON.stringify(buildTokenizerMin(full, MODEL_ID)));
+  check('regenerated tokenizer.min bytes match the ratified hash',
+    sha256Bytes(regenerated) === TOKENIZER_MIN_SHA256);
+
+  const minDest = join(minSandbox, 'tokenizer.min.json');
+  writeFileSync(minDest, readFileSync(MIN_TOKENIZER_OUTPUT));
+  const badMinStage = join(minSandbox, '.tokenizer.min.stage-bad');
+  writeFileSync(badMinStage, Buffer.concat([regenerated, Buffer.from('\n')]));
+  check('tokenizer.min regeneration mismatch aborts',
+    throws(() => installVerifiedAgainst(
+      TOKENIZER_MIN_SHA256,
+      badMinStage,
+      minDest,
+      'tokenizer.min.json',
+      'regenerated',
+    )));
+  check('tokenizer.min mismatch preserves the trusted destination',
+    sha256File(minDest) === TOKENIZER_MIN_SHA256);
+} finally {
+  rmSync(minSandbox, { recursive: true, force: true });
+}
+
+console.log('[9] materializer cleanup and CI provenance/order');
+const stageRemnants = [
+  ...listFiles(revisionDir),
+  ...listFiles(MIN_DIR),
+].filter((path) => /\.stage-|\.backup-/.test(path));
+check('normal fetch leaves no stage or backup remnants',
+  stageRemnants.length === 0, stageRemnants.join(', '));
 const ciYml = readFileSync(CI_YML, 'utf-8');
 const keyUses = (ciYml.match(/hashFiles\('scripts\/embedder-integrity\.mjs'\)/g) ?? []).length;
-check('both CI cache keys hash the pin-bearing integrity module',
-  keyUses >= 2, `${Math.max(0, keyUses)} references`);
-check('no broad restore-keys fallback can restore unrelated mutable model state',
-  !ciYml.includes('restore-keys: minilm-') && !/restore-keys:[\s]*minilm/i.test(ciYml));
+check('both CI model-cache keys are bound to the pin-bearing module', keyUses >= 2, `${keyUses} references`);
+check('CI has no broad model-cache restore key', !ciYml.includes('restore-keys:'));
+check('CI materializes before running the offline verification suite',
+  ciYml.indexOf('npm run fetch:embedder') >= 0
+    && ciYml.indexOf('npm run fetch:embedder') < ciYml.indexOf('npm run verify:all'));
 
-console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}${skipped > 0 ? `  (${skipped} skipped)` : ''}`);
-process.exit(fail ? 1 : 0);
+console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`} (0 skipped)`);
+process.exit(failures ? 1 : 0);

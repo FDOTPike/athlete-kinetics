@@ -1,5 +1,15 @@
 # Embedder supply-chain pin — checkpoint handover
 
+> **SUPERSEDED BY AUDIT CORRECTION (2026-08-13).** Audit of checkpoint
+> `2f4e72e6915275f301d31365233a2fb629c43566` proved that its cold fetch did
+> not populate the revision-scoped Transformers cache, two consumers still
+> defaulted to mutable `main`, verification could reach the network, and two
+> replacement paths could overwrite/remove trusted output before successful
+> completion. The original report is retained below as historical evidence;
+> its “fully pinned”, “no network in verify:all”, and final-green claims do not
+> describe the corrected tree. See
+> `HANDOVER_2026-08-13_EMBEDDER_SUPPLY_CHAIN_PIN_AUDIT_CORRECTION.md`.
+
 Date: 2026-08-13
 Baseline: `291183ef42a0c5f0932ed0d318ec9d0b48f16b0d`
 Status: implementation + all gates green; one unsigned local commit; no push/release action
