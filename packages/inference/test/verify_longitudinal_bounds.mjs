@@ -18,8 +18,9 @@
  *             Elite five-times-weekly bench-family routine, real DB-seeded
  *             contracts; one binding segment proves support yields before
  *             major dose reduction; segments 1,2,4 are byte-reproductions.
- * Family B — METAMORPHIC: one input dimension changed per variant, monotone
- *             consequences, round-trip reproducibility.
+ * Family B — METAMORPHIC: five variants, one input dimension changed per
+ *             variant, each run as a real 4-week repetition; monotone
+ *             consequences; round-trip reproducibility.
  * Family C — MIXED-CONTEXT-16: four consecutive generateBlock blocks with an
  *             explicit schedule of weight-room + conditioning + BJJ days over
  *             month/year/Sydney-DST-adjacent date-only boundaries.
@@ -28,15 +29,24 @@
  *             readiness (not representable in this pure seam).
  *
  * Determinism discipline: fixed ISO dates, fixed fixtures, no Date.now(), no
- * RNG, no network, no clock reads; every scenario runs twice from freshly
- * constructed deeply frozen inputs; equality asserted; no input mutation.
+ * RNG, no network, no clock reads. Every scenario runs twice from freshly
+ * constructed (deep-cloned), deeply frozen inputs; deep equality asserted;
+ * no input mutation. Freezing stubs Set/Map mutators so availability and
+ * role-eligibility Sets are genuinely protected, and cloning precedes
+ * freezing so module-level defaults are never mutated process-wide.
  * Informational process.memoryUsage() only — never a pass/fail threshold and
  * never Android private-dirty evidence.
+ *
+ * Audit remediation 2026-08-14 (12da513 review): counterexample checks X1-X7
+ * now invoke the SAME named predicates the family checks use (they can and
+ * must fail on a locally mutated fixture/result); deepFreeze protects Sets;
+ * Family B carries real 4-week structure (20 simulated weeks; 68 total).
  *
  * Run: npm run verify:autopilot (appended after the Autopilot checks)
  */
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -50,7 +60,6 @@ const {
   generateBlock,
   addDaysIso,
   accessContextForBlockFocus,
-  OVERREACH_ACWR,
 } = require('./.build/blockGenerator.js');
 const {
   DEFAULT_PROFILE,
@@ -73,22 +82,47 @@ const check = (label, fn) => {
     fail += 1;
   }
 };
-const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/** Deep equality that distinguishes undefined-keyed from absent and treats
+ *  NaN/±Infinity exactly — stronger than JSON.stringify byte comparison. */
+const eq = (a, b) => isDeepStrictEqual(a, b);
 
-/** Deep-freeze inputs so any engine mutation throws in strict mode. */
+/** Freeze stub: mutation of a frozen input throws in strict mode. */
+const FREEZE_MUTATION = 'frozen input mutation';
+const freezeGuard = () => {
+  throw new TypeError(FREEZE_MUTATION);
+};
+/** Deep-freeze inputs. Set/Map mutators are stubbed out (Object.freeze alone
+ *  does not block Set.add). Content is recursed so nested values are frozen. */
 const deepFreeze = (o) => {
   if (o && typeof o === 'object') {
-    if (o instanceof Set || o instanceof Map) Object.freeze(o);
-    else {
-      for (const value of Object.values(o)) deepFreeze(value);
+    if (o instanceof Set) {
+      for (const value of o) deepFreeze(value);
+      o.add = freezeGuard;
+      o.delete = freezeGuard;
+      o.clear = freezeGuard;
       Object.freeze(o);
+      return o;
     }
+    if (o instanceof Map) {
+      for (const [key, value] of o) {
+        deepFreeze(key);
+        deepFreeze(value);
+      }
+      o.set = freezeGuard;
+      o.delete = freezeGuard;
+      o.clear = freezeGuard;
+      Object.freeze(o);
+      return o;
+    }
+    for (const value of Object.values(o)) deepFreeze(value);
+    Object.freeze(o);
   }
   return o;
 };
-/** Fresh clone (Set-aware) so every run starts from a brand-new input. */
+/** Fresh clone (Set/Map-aware) so every run starts from brand-new values. */
 const cloneInput = (o) => {
   if (o instanceof Set) return new Set([...o].map(cloneInput));
+  if (o instanceof Map) return new Map([...o].map(([k, v]) => [cloneInput(k), cloneInput(v)]));
   if (o && typeof o === 'object') {
     const out = Array.isArray(o)
       ? o.map(cloneInput)
@@ -97,26 +131,40 @@ const cloneInput = (o) => {
   }
   return o;
 };
+/** Clone first, then freeze — freezing must never leak into production module
+ *  objects shared by reference (e.g. DEFAULT_PROFILE.injury_flags). */
+const freezeFresh = (makeInput) => deepFreeze(cloneInput(makeInput()));
 /** Run fn twice on freshly constructed, deeply frozen inputs; assert the two
- *  outputs are deep-equal and the frozen input was not mutated. */
+ *  outputs are deep-equal and the frozen input was not mutated. A thrown error
+ *  is reported with its real message and classified as mutation only when it
+ *  is a freeze-guard mutation. */
 const runTwice = (label, makeInput, fn) => {
+  const first = fn(freezeFresh(makeInput));
+  const second = fn(freezeFresh(makeInput));
   check(`${label}: deterministic double-run is deep-equal`, () => {
-    const first = fn(deepFreeze(makeInput()));
-    const second = fn(deepFreeze(makeInput()));
     assert.equal(eq(first, second), true);
   });
   check(`${label}: frozen inputs are never mutated`, () => {
-    const frozen = deepFreeze(makeInput());
-    let threw = false;
+    const frozen = freezeFresh(makeInput);
+    let error = null;
     try {
       fn(frozen);
-    } catch {
-      threw = true;
+    } catch (caught) {
+      error = caught;
     }
-    assert.equal(threw, false, 'engine mutated its frozen input');
+    assert.equal(error, null, error !== null
+      ? (error.message === FREEZE_MUTATION
+        ? 'engine mutated its frozen input'
+        : `unexpected error on frozen inputs: ${error.message}`)
+      : '');
   });
 };
-/** Exact finite/domain law for a routine prescription row. */
+
+// ===========================================================================
+// Named detectors — the SAME predicates the family checks use are re-used by
+// the counterexample checks, so a local fixture/result mutation can and must
+// make them fail. There is no second, hand-shaped implementation.
+// ===========================================================================
 const prescriptionDomainViolation = (row, rpeCap) => {
   const finite = (v) => Number.isFinite(v);
   if (!finite(row.sets) || !finite(row.reps) || !finite(row.targetRpe)
@@ -141,6 +189,10 @@ const prescriptionDomainViolation = (row, rpeCap) => {
   }
   return null;
 };
+const doseViolations = (result, rpeCap) =>
+  result.prescriptions
+    .map((row) => prescriptionDomainViolation(row, rpeCap))
+    .filter((text) => text !== null);
 const planSlotDomainViolation = (slot, rpeCap) => {
   if (!Number.isInteger(slot.sets) || slot.sets < 1 || slot.sets > 10) {
     return `slot ${slot.movement_id} sets ${slot.sets} outside 1..10`;
@@ -154,6 +206,49 @@ const planSlotDomainViolation = (slot, rpeCap) => {
   }
   return null;
 };
+/** Support-yield-before-major law, binding-fixture form: while the binding
+ *  fixture demonstrably reduces a selected major, NO support row may remain
+ *  included ahead of it. */
+const supportFullyOmittedViolations = (result) =>
+  result.prescriptions
+    .filter((row) => row.role !== 'major')
+    .filter((row) => row.included)
+    .map((row) => `${row.movementId} support still included while a major is under binding pressure`);
+/** Sport-tier-leak law: an Advanced movement never appears on a weight-room
+ *  (full/lower/upper) session in a composed block trace. */
+const leakViolations = (blocks, byId) => {
+  const weightFocuses = new Set(['full', 'lower', 'upper']);
+  const out = [];
+  for (const block of blocks) {
+    for (const session of block.sessions) {
+      if (!weightFocuses.has(session.focus)) continue;
+      for (const slot of session.slots) {
+        const movement = byId.get(slot.movement_id);
+        if (movement !== undefined && movement.difficulty === 'Advanced') {
+          out.push(`Advanced ${slot.movement_id} on weight-room ${session.focus} day ${session.session_date}`);
+        }
+      }
+    }
+  }
+  return out;
+};
+/** Date law: across a composed block trace every session date is unique and
+ *  strictly increasing. */
+const dateOrderViolations = (blocks) => {
+  const dates = blocks.flatMap((block) => block.sessions.map((s) => s.session_date));
+  const out = [];
+  for (let i = 1; i < dates.length; i += 1) {
+    if (dates[i] <= dates[i - 1]) {
+      out.push(`${dates[i - 1]} -> ${dates[i]}`);
+    }
+  }
+  return out;
+};
+/** Fail-closed law: a blocker may never coexist with therapeutic output. */
+const failClosedViolation = (result) => (
+  result.blockers.length > 0 && result.prescriptions.length > 0
+    ? `${result.prescriptions.length} prescriptions present beside ${result.blockers.length} blocker(s)`
+    : null);
 
 // ===========================================================================
 // Real library contracts (001-054 chain), exactly as verify_pipeline.mjs
@@ -256,7 +351,7 @@ function assertGeneratorFixtureComplete(movements) {
   }
   return movements;
 }
-const composeReal = (data, input) => composeRoutineMicrocycle(
+const composeReal = (input) => composeRoutineMicrocycle(
   assertRoutineInputComplete(cloneInput(input)),
 );
 
@@ -294,7 +389,7 @@ function familyA(contracts) {
   };
   const boundInput = { ...baseInput, selections: boundSelections };
 
-  const weekOutputs = (input) => [1, 2, 3, 4].map(() => composeReal(contracts, input));
+  const weekOutputs = (input) => [1, 2, 3, 4].map(() => composeReal(input));
   const segments = {
     s1: weekOutputs(baseInput),
     s2: weekOutputs(baseInput),
@@ -329,10 +424,7 @@ function familyA(contracts) {
       && row.targetRpe <= row.authoredTargetRpe), true);
   });
   check('[A-seg1] all numeric outputs finite, dose inside production domains, family stress bounded', () => {
-    for (const row of s1.prescriptions) {
-      const violation = prescriptionDomainViolation(row, 9);
-      assert.equal(violation, null, violation);
-    }
+    assert.deepEqual(doseViolations(s1, 9), []);
     for (const decision of s1.familyDecisions) {
       assert.equal(Number.isFinite(decision.initialStress) && Number.isFinite(decision.finalStress), true);
       assert.ok(decision.finalStress <= decision.weeklyBudget);
@@ -341,14 +433,14 @@ function familyA(contracts) {
     }
     assert.equal(s1.blockers.length, 0);
   });
+  const s3 = segments.s3[0];
   check('[A-seg3 binding] support is reduced/omitted before major dose reduction', () => {
-    const s3 = segments.s3[0];
     assert.deepEqual(s3.blockers, []);
     assert.equal(s3.familyDecisions[0].family, 'bench_press');
     const support = s3.prescriptions.filter((row) => row.role !== 'major');
     const majors = s3.prescriptions.filter((row) => row.role === 'major');
     assert.equal(support.length, 2);
-    assert.equal(support.every((row) => row.included === false), true,
+    assert.deepEqual(supportFullyOmittedViolations(s3), [],
       'binding pressure must strip the authored support first');
     assert.equal(support.every((row) => row.adaptations.some((text) =>
       text.includes('before changing bench_press major exposure'))), true,
@@ -368,21 +460,19 @@ function familyA(contracts) {
     assert.equal(eq(segments.s4[0], segments.s1[0]), true);
     assert.equal(eq(segments.s2[0], segments.s1[0]), true);
   });
-  check('[A] double-run determinism and frozen-input purity over the composed 16-week trace', () => {
-    for (const [name, input] of [['s1', baseInput], ['s3', boundInput]]) {
-      runTwice(`[A-${name}]`, () => input, (frozen) => composeRoutineMicrocycle(frozen));
-    }
-  });
-  return { segments, benchId, boundSelections };
+  // No outer wrapper: runTwice already registers its own checks (M4).
+  runTwice('[A-s1]', () => baseInput, (frozen) => composeRoutineMicrocycle(frozen));
+  runTwice('[A-s3]', () => boundInput, (frozen) => composeRoutineMicrocycle(frozen));
+  return { segments, benchId };
 }
 
 // ===========================================================================
-// FAMILY B — metamorphic routine bounds. One input dimension changes per
-// variant; each consequence is monotone; returning to the original input
-// reproduces the original output exactly.
+// FAMILY B — metamorphic routine bounds. Five variants, one input dimension
+// changed per variant, each with a genuine 4-week repetition; consequences
+// are monotone; returning to the original input reproduces it exactly.
 // ===========================================================================
 function familyB(contracts) {
-  console.log('[B] METAMORPHIC (one input dimension at a time)');
+  console.log('[B] METAMORPHIC (one input dimension at a time, 4 weeks per variant)');
   const {
     idOf, routineMovements, roleEligibility, liftFamilies, assistance, allAvailable,
   } = contracts;
@@ -400,59 +490,71 @@ function familyB(contracts) {
     durationCapMin: 120, baseRpeCap: 9, availableMovementIds: allAvailable,
     ...over,
   });
+  const variants = {
+    base: make(),
+    addSupport: make({
+      selections: [...baseSelections,
+        { dayIndex: 1, slotIndex: 3, movementId: hammerId, role: 'accessory', sets: 2, reps: 12, targetRpe: 6.5 }],
+    }),
+    tightenDuration: make({ durationCapMin: 15 }),
+    lowerRpeCap: make({ baseRpeCap: 7.5, rpeCapBehavior: 'clamp' }),
+    availabilityLoss: make({
+      availableMovementIds: new Set([...allAvailable].filter((id) => id !== benchId)),
+    }),
+  };
+  const result = {};
+  for (const [name, input] of Object.entries(variants)) {
+    result[name] = composeReal(input);
+    const weeks = [1, 2, 3, 4].map(() => composeReal(input));
+    for (let w = 1; w < 4; w += 1) {
+      check(`[B-${name}] week ${w + 1} byte-reproduces week 1 (pure seam)`, () =>
+        assert.equal(eq(weeks[0], weeks[w]), true));
+    }
+    runTwice(`[B-${name}]`, () => input, (frozen) => composeRoutineMicrocycle(frozen));
+  }
+  const { base: baseResult, addSupport: addResult, tightenDuration: tightResult,
+    lowerRpeCap: clampResult, availabilityLoss: lostResult } = result;
+
   check('[B-BASE] routine fixture completeness gate names every required field', () => {
-    assertRoutineInputComplete(make());
+    assertRoutineInputComplete(variants.base);
   });
-  const benchDose = (result) => result.prescriptions
+  const benchDose = (res) => res.prescriptions
     .filter((row) => row.movementId === benchId && row.role === 'major')
     .map((row) => [row.sets, row.reps, row.targetRpe])[0];
-
-  runTwice('[B-BASE]', () => make(), (frozen) => composeRoutineMicrocycle(frozen));
-  const baseResult = composeReal(contracts, make());
   check('[B-BASE] exact cardinality and bounded domains', () => {
     assert.equal(baseResult.prescriptions.length, 2);
     assert.equal(baseResult.blockers.length, 0);
-    for (const row of baseResult.prescriptions) {
-      const violation = prescriptionDomainViolation(row, 9);
-      assert.equal(violation, null, violation);
-    }
+    assert.deepEqual(doseViolations(baseResult, 9), []);
     const decision = baseResult.familyDecisions[0];
     assert.equal(decision.family, 'bench_press');
     assert.equal(Number.isFinite(decision.initialStress) && Number.isFinite(decision.finalStress), true);
     assert.ok(decision.finalStress <= decision.weeklyBudget);
   });
 
-  // B1 — add low-priority accessory work.
-  const withAccessory = make({
-    selections: [...baseSelections,
-      { dayIndex: 1, slotIndex: 3, movementId: hammerId, role: 'accessory', sets: 2, reps: 12, targetRpe: 6.5 }],
-  });
-  const addResult = composeReal(contracts, withAccessory);
-  runTwice('[B-ADD-SUPPORT]', () => withAccessory, (frozen) => composeRoutineMicrocycle(frozen));
   check('[B-ADD-SUPPORT] adding support cannot increase any selected major\'s final sets, reps or RPE', () => {
     const added = benchDose(addResult);
     const original = benchDose(baseResult);
     assert.ok(added !== undefined && original !== undefined);
     assert.ok(added[0] <= original[0] && added[1] <= original[1] && added[2] <= original[2],
       `major dose rose from ${original.join('/')} to ${added.join('/')}`);
-    const triceps = (result) => result.prescriptions.find((row) => row.movementId === tricepsId);
+    const triceps = (res) => res.prescriptions.find((row) => row.movementId === tricepsId);
     assert.ok(triceps(addResult).sets <= triceps(baseResult).sets);
     assert.ok(triceps(addResult).reps <= triceps(baseResult).reps);
     assert.ok(triceps(addResult).targetRpe <= triceps(baseResult).targetRpe);
-    // The added accessory is present in the analysis (included or explicitly
-    // omitted with provenance) — never silently discarded.
-    assert.ok(addResult.prescriptions.some((row) => row.movementId === hammerId));
+    // Non-vacuity: the added accessory reached the engine (output differs) and
+    // is present in the analysis (included or explicitly omitted, never gone).
+    assert.equal(eq(addResult, baseResult), false,
+      'adding the accessory changed nothing — metamorphic law not exercised');
+    assert.ok(addResult.prescriptions.some((row) => row.movementId === hammerId),
+      'the added accessory was silently discarded from the analysis');
   });
 
-  // B2 — tighten the duration cap (120 -> 15 binds the same-day support).
-  const tightened = make({ durationCapMin: 15 });
-  const tightResult = composeReal(contracts, tightened);
-  runTwice('[B-TIGHTEN-DURATION]', () => tightened, (frozen) => composeRoutineMicrocycle(frozen));
   check('[B-TIGHTEN-DURATION] tightening a cap cannot increase included work or final family stress', () => {
     assert.equal(tightResult.blockers.length, 0, JSON.stringify(tightResult.blockers));
-    const includedCount = (result) => result.prescriptions.filter((row) => row.included).length;
-    assert.ok(includedCount(tightResult) <= includedCount(baseResult));
-    const stress = (result) => result.familyDecisions[0].finalStress;
+    const includedCount = (res) => res.prescriptions.filter((row) => row.included).length;
+    assert.ok(includedCount(tightResult) < includedCount(baseResult),
+      `included work did not strictly drop (${includedCount(baseResult)} -> ${includedCount(tightResult)}) — law not exercised`);
+    const stress = (res) => res.familyDecisions[0].finalStress;
     assert.ok(stress(tightResult) <= stress(baseResult) + 1e-9,
       `family stress rose from ${stress(baseResult)} to ${stress(tightResult)} after tightening`);
     const support = tightResult.prescriptions.filter((row) => row.role !== 'major');
@@ -463,10 +565,6 @@ function familyB(contracts) {
     assert.ok(bench !== undefined && bench[0] <= 3 && bench[1] <= 5 && bench[2] <= 8);
   });
 
-  // B3 — lower the live RPE cap through the already-supported clamp path.
-  const clamped = make({ baseRpeCap: 7.5, rpeCapBehavior: 'clamp' });
-  const clampResult = composeReal(contracts, clamped);
-  runTwice('[B-LOWER-RPE-CAP]', () => clamped, (frozen) => composeRoutineMicrocycle(frozen));
   check('[B-LOWER-RPE-CAP] lowering the RPE cap cannot raise any final RPE', () => {
     assert.equal(clampResult.blockers.length, 0, JSON.stringify(clampResult.blockers));
     assert.ok(clampResult.prescriptions.every((row) => row.targetRpe <= 7.5));
@@ -476,17 +574,9 @@ function familyB(contracts) {
     assert.equal(bench[2], 7.5);
     assert.ok(clampResult.prescriptions.some((row) => row.adaptations.some((text) =>
       text.includes('Target RPE capped'))));
-    for (const row of clampResult.prescriptions) {
-      const violation = prescriptionDomainViolation(row, 7.5);
-      assert.equal(violation, null, violation);
-    }
+    assert.deepEqual(doseViolations(clampResult, 7.5), []);
   });
 
-  // B4 — availability loss fails closed with provenance, never substitutes.
-  const availableWithoutBench = new Set([...allAvailable].filter((id) => id !== benchId));
-  const lost = make({ availableMovementIds: availableWithoutBench });
-  const lostResult = composeReal(contracts, lost);
-  runTwice('[B-AVAILABILITY-LOSS]', () => lost, (frozen) => composeRoutineMicrocycle(frozen));
   check('[B-AVAILABILITY-LOSS] availability loss fails closed and cannot silently substitute or discard provenance', () => {
     assert.ok(lostResult.blockers.length > 0, 'availability loss must block');
     assert.ok(lostResult.blockers.some((text) => text.includes('Competition Bench')
@@ -494,14 +584,15 @@ function familyB(contracts) {
     assert.equal(lostResult.prescriptions.length, 0,
       'an availability loss must not silently substitute another movement');
     assert.equal(lostResult.familyDecisions.length, 0);
+    assert.equal(failClosedViolation(lostResult), null);
   });
 
   // B5 — returning to the original input reproduces the original output exactly.
   check('[B] returning to the original input reproduces the original output exactly', () => {
-    const replay = composeReal(contracts, make());
+    const replay = composeReal(variants.base);
     assert.equal(eq(replay, baseResult), true);
   });
-  return { baseResult };
+  return { baseResult, clampResult, lostResult };
 }
 
 // ===========================================================================
@@ -532,14 +623,14 @@ function generatorFixture() {
     mv(9, 'Kettlebell Carry', 'carry', { difficulty: 'Intermediate', required: ['kettlebell'] }),
     mv(10, 'Farmer Carry', 'carry', { difficulty: 'Intermediate' }),
     mv(11, 'Run', 'locomotion', { difficulty: 'Advanced' }),
-    // Capability probe: Advanced rotation with sport capability closed; the
-    // sport tier relief must never resurrect it.
+    // Capability probe: Advanced rotation closed in BOTH contexts; even with
+    // the tier ceiling open the sport tier relief must never resurrect it.
     mv(12, 'Advanced Rotation', 'rotation', {
       difficulty: 'Advanced', capability_available_sport_conditioning: false,
     }),
     mv(13, 'Cable Rotation', 'rotation', { difficulty: 'Intermediate' }),
     // Sport-only capability probe: Advanced isolation available only in
-    // sport/conditioning context.
+    // sport/conditioning context (weight-room capability closed).
     mv(14, 'Advanced Isolation', 'isolation', {
       difficulty: 'Advanced', capability_available_weight_room: false,
     }),
@@ -549,6 +640,7 @@ function generatorFixture() {
 function familyC() {
   console.log('[C] MIXED-CONTEXT-16 (weight-room + conditioning + BJJ across boundaries)');
   const movements = generatorFixture();
+  const movementById = new Map(movements.map((m) => [m.movement_id, m]));
   const schedule = [
     { day_index: 2, focus: 'full' },          // weight-room context
     { day_index: 4, focus: 'conditioning' },  // sport/conditioning context
@@ -562,6 +654,8 @@ function familyC() {
     session_duration_cap_min: 110,
     base_rpe_cap: 9,
     equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS],
+    injury_flags: [...DEFAULT_PROFILE.injury_flags],
+    mobility_limits: [...DEFAULT_PROFILE.mobility_limits],
   };
   const startDates = ['2025-10-04', '2025-11-01', '2025-11-29', '2025-12-27'];
   // Advance each next block start with the production UTC date helper.
@@ -570,23 +664,18 @@ function familyC() {
   check('[C] block starts advance with the production UTC date helper (28 days)', () => {
     assert.deepEqual(verifiedStarts, startDates);
   });
-  const composeC = (profile) => {
-    const blocks = verifiedStarts.map((startDate) =>
-      generateBlock({ profile, movements, startDate, programDays: schedule }));
-    return { blocks, movements };
-  };
-  const { blocks } = composeC(profileBase);
+  const composeC = (profile) => verifiedStarts.map((startDate) =>
+    generateBlock({ profile, movements, startDate, programDays: schedule }));
+  const blocks = composeC(profileBase);
   check('[C] exact trace cardinality: 4 blocks x 4 weeks x 3 schedule days = 48 sessions', () => {
     assert.equal(blocks.length, 4);
     assert.equal(blocks.reduce((sum, block) => sum + block.sessions.length, 0), 48);
     for (const block of blocks) assert.equal(block.sessions.length, 12);
   });
   check('[C] all 48 session dates are unique and strictly ordered across month, year and Sydney-DST-adjacent boundaries', () => {
+    assert.deepEqual(dateOrderViolations(blocks), []);
     const dates = blocks.flatMap((block) => block.sessions.map((s) => s.session_date));
     assert.equal(dates.length, 48);
-    for (let i = 1; i < dates.length; i += 1) {
-      assert.ok(dates[i] > dates[i - 1], `session dates not strictly ordered at index ${i}: ${dates[i - 1]} -> ${dates[i]}`);
-    }
     // The trace actually crosses a year boundary inside a block and touches the
     // Sydney DST-start weekend (DST began 2025-10-05) via date-only arithmetic.
     assert.ok(dates.some((date) => date.startsWith('2025-')));
@@ -607,13 +696,12 @@ function familyC() {
     }
   });
   check('[C] each day uses the access context derived from its own focus', () => {
-    const byId = new Map(movements.map((m) => [m.movement_id, m]));
     for (const block of blocks) {
       for (const session of block.sessions) {
         const context = accessContextForBlockFocus(session.focus);
         assert.equal(typeof context, 'string');
         for (const slot of session.slots) {
-          const movement = byId.get(slot.movement_id);
+          const movement = movementById.get(slot.movement_id);
           assert.ok(movement !== undefined);
           const available = context === 'sport_conditioning'
             ? movement.capability_available_sport_conditioning
@@ -629,59 +717,56 @@ function familyC() {
     }
   });
   check('[C] sport tier relief never carries an Advanced movement onto a weight-room day (leak law)', () => {
-    const weightFocuses = new Set(['full', 'lower', 'upper']);
-    const difficultyOf = new Map(movements.map((m) => [m.movement_id, m.difficulty]));
-    for (const block of blocks) {
-      for (const session of block.sessions) {
-        if (!weightFocuses.has(session.focus)) continue;
-        for (const slot of session.slots) {
-          assert.notEqual(difficultyOf.get(slot.movement_id), 'Advanced',
-            `Advanced "${slot.movement_id}" leaked onto a weight-room (${session.focus}) day ${session.session_date}`);
-        }
-      }
-    }
+    assert.deepEqual(leakViolations(blocks, movementById), []);
   });
-  check('[C] the sport-only Advanced probe appears on conditioning days and never on weight-room days', () => {
+  check('[C] the sport-tier-relief probe appears on sport-context days and never on weight-room days', () => {
     const probe = 8;
-    let onConditioning = 0;
+    let onSport = 0;
     let onWeight = 0;
     for (const block of blocks) {
       for (const session of block.sessions) {
+        const context = accessContextForBlockFocus(session.focus);
         const containsProbe = session.slots.some((slot) => slot.movement_id === probe);
-        if (session.focus === 'conditioning') {
-          if (containsProbe) onConditioning += 1;
+        if (context === 'sport_conditioning') {
+          if (containsProbe) onSport += 1;
         } else if (containsProbe) {
           onWeight += 1;
         }
       }
     }
-    assert.ok(onConditioning > 0, 'probe must actually be drafted under sport tier relief (non-vacuous)');
+    assert.ok(onSport > 0, 'probe must actually be drafted under sport tier relief (non-vacuous)');
     assert.equal(onWeight, 0, 'probe leaked onto a weight-room day');
   });
-  check('[C] capability and equipment exclusions remain independent of tier behavior', () => {
-    const byId = new Map(movements.map((m) => [m.movement_id, m]));
-    for (const block of blocks) {
+  check('[C] capability and equipment exclusions remain independent of tier (Advanced profile opens tier everywhere)', () => {
+    const advancedProfile = { ...profileBase, training_age: 'advanced' };
+    const advBlocks = composeC(advancedProfile);
+    // With the tier ceiling open in BOTH contexts, only capability decides:
+    // m12 (closed in both) must never appear; m14 (weight-closed, sport-open)
+    // may appear only on sport-context days (bjj).
+    for (const block of advBlocks) {
       for (const session of block.sessions) {
         for (const slot of session.slots) {
-          const movement = byId.get(slot.movement_id);
-          // m12 is sport-capability-closed; m9 needs specialist-style equipment.
-          assert.notEqual(movement.movement_id, 12,
-            'a sport-capability-closed movement must never be resurrected by tier relief');
-          const context = accessContextForBlockFocus(session.focus);
-          const open = context === 'sport_conditioning'
-            ? movement.capability_available_sport_conditioning
-            : movement.capability_available_weight_room;
-          assert.equal(open, true);
+          assert.notEqual(slot.movement_id, 12,
+            'a capability-closed movement must not appear even with the tier ceiling open');
+          if (slot.movement_id === 14) {
+            assert.equal(accessContextForBlockFocus(session.focus), 'sport_conditioning',
+              'm14 (weight-closed capability) drafted on a weight-room day despite tier being open');
+          }
         }
       }
     }
+    const m14OnBjj = advBlocks.flatMap((block) => block.sessions
+      .filter((s) => s.focus === 'bjj'))
+      .flatMap((s) => s.slots)
+      .some((slot) => slot.movement_id === 14);
+    assert.ok(m14OnBjj, 'sport-open capability must actually draft m14 on a bjj day (non-vacuous)');
   });
   check('[C] equipment loss (no kettlebell) removes only the equipment-bound movement, never the tier leak', () => {
     const noKbProfile = {
       ...profileBase,
       equipment_inventory: STANDARD_EQUIPMENT_ITEMS.filter((item) => item !== 'kettlebell'),
     };
-    const { blocks: noKbBlocks } = composeC(noKbProfile);
+    const noKbBlocks = composeC(noKbProfile);
     for (const block of noKbBlocks) {
       for (const session of block.sessions) {
         for (const slot of session.slots) {
@@ -694,15 +779,19 @@ function familyC() {
     const fullCarryIds = noKbBlocks.flatMap((block) => block.sessions
       .filter((s) => s.focus === 'full')
       .flatMap((s) => s.slots.filter((slot) => {
-        const m = movements.find((candidate) => candidate.movement_id === slot.movement_id);
-        return m !== undefined && m.pattern === 'carry';
+        const movement = movementById.get(slot.movement_id);
+        return movement !== undefined && movement.pattern === 'carry';
       }).map((slot) => slot.movement_id)));
     assert.ok(fullCarryIds.length > 0 && fullCarryIds.every((id) => id !== 8),
       'equipment loss must not reintroduce the Advanced probe on weight-room days');
   });
-  runTwice('[C] composed trace', () => ({ profile: profileBase }),
-    ({ profile }) => generateBlock(
-      { profile, movements, startDate: verifiedStarts[0], programDays: schedule }));
+  // M5: the composed-trace determinism run freezes the WHOLE closure and
+  // composes all four blocks (mirrors family D).
+  runTwice('[C] composed four-block trace', () => ({
+    profile: profileBase, movements, starts: verifiedStarts, programDays: schedule,
+  }), (frozen) => frozen.starts.map((startDate) => generateBlock({
+    profile: frozen.profile, movements: frozen.movements, startDate, programDays: frozen.programDays,
+  })));
   check('[C] per-day slot domains hold across the composed trace', () => {
     for (const block of blocks) {
       for (const session of block.sessions) {
@@ -733,6 +822,8 @@ function familyD(movements) {
     session_duration_cap_min: 90,
     base_rpe_cap: 9,
     equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS],
+    injury_flags: [...DEFAULT_PROFILE.injury_flags],
+    mobility_limits: [...DEFAULT_PROFILE.mobility_limits],
   };
   const startDates = ['2026-01-05', '2026-02-02', '2026-03-02', '2026-03-30'];
   const verifiedStarts = startDates.map((_, i) =>
@@ -746,10 +837,7 @@ function familyD(movements) {
     assert.equal(blocks.reduce((sum, block) => sum + block.sessions.length, 0), 48);
   });
   check('[D] all session dates unique and strictly ordered across the composed trace', () => {
-    const dates = blocks.flatMap((block) => block.sessions.map((s) => s.session_date));
-    for (let i = 1; i < dates.length; i += 1) {
-      assert.ok(dates[i] > dates[i - 1], `dates not ordered at ${i}: ${dates[i - 1]} -> ${dates[i]}`);
-    }
+    assert.deepEqual(dateOrderViolations(blocks), []);
   });
   check('[D] recentAcwr null never triggers the peak shift, even after a shifted neighbour', () => {
     assert.equal(blocks[0].peakShifted, false);
@@ -817,98 +905,86 @@ function familyD(movements) {
 }
 
 // ===========================================================================
-// Mutation / counterexample checks — every major invariant can be shown to
-// fail for its intended reason using local fixture/result mutation, never
-// production-source mutation.
+// Counterexample / mutation checks — every major invariant is demonstrated to
+// fail for its intended reason on a LOCAL fixture/result mutation. Each check
+// invokes the SAME named predicate the family checks use, first proving it is
+// clean on the real output, then proving the mutated output triggers it.
 // ===========================================================================
-function counterexamples(aData, bData, cData, contracts) {
+function counterexamples(aData, bData, cData) {
   console.log('[X] counterexample / mutation checks (invariants can fail for their intended reason)');
-  const { benchId } = aData;
 
-  // X1: dose-bound detector catches a hand-inflated prescription.
   check('[X1] dose-bound detector fires on an expanded authored dose', () => {
     const plan = cloneInput(aData.segments.s1[0]);
+    assert.deepEqual(doseViolations(plan, 9), [], 'clean plan must be violation-free first');
     plan.prescriptions[0].sets = plan.prescriptions[0].authoredSets + 5;
-    const violations = plan.prescriptions
-      .map((row) => prescriptionDomainViolation(row, 9))
-      .filter((text) => text !== null);
+    const violations = doseViolations(plan, 9);
     assert.ok(violations.some((text) => text.includes('expanded authored')),
       `expected a dose-expansion violation, got ${JSON.stringify(violations)}`);
   });
 
-  // X2: RPE-cap detector fires on an over-cap target.
   check('[X2] RPE-cap detector fires on an out-of-cap target', () => {
-    const plan = cloneInput(bData.baseResult);
+    const plan = cloneInput(bData.clampResult);
+    assert.deepEqual(doseViolations(plan, 7.5), [], 'clamped plan must be violation-free first');
     plan.prescriptions[0].targetRpe = 8.5;
-    const violations = plan.prescriptions
-      .map((row) => prescriptionDomainViolation(row, 7.5))
-      .filter((text) => text !== null);
-    assert.ok(violations.length > 0);
+    const violations = doseViolations(plan, 7.5);
+    assert.ok(violations.some((text) => text.includes('outside 5..')),
+      `expected a cap violation, got ${JSON.stringify(violations)}`);
   });
 
-  // X3: support-yield-before-major detector fires when a surviving support
-  // row remains at full dose while a major was already cut.
   check('[X3] support-before-major detector fires when a major is cut while support survives fully', () => {
     const plan = cloneInput(aData.segments.s3[0]);
-    const support = plan.prescriptions.filter((row) => row.role !== 'major');
+    assert.deepEqual(supportFullyOmittedViolations(plan), [], 'binding plan must be clean first');
+    const support = plan.prescriptions.find((row) => row.role !== 'major');
     const major = plan.prescriptions.find((row) => row.role === 'major');
-    assert.ok(support.length > 0 && major !== undefined);
+    assert.ok(support !== undefined && major !== undefined);
     // Reintroduce the previously omitted support at a full dose behind a cut major.
-    support[0].included = true;
-    support[0].sets = support[0].authoredSets;
-    support[0].reps = support[0].authoredReps;
-    support[0].targetRpe = support[0].authoredTargetRpe;
+    support.included = true;
+    support.sets = support.authoredSets;
+    support.reps = support.authoredReps;
+    support.targetRpe = support.authoredTargetRpe;
     major.sets = 1;
     major.reps = 1;
     major.targetRpe = 5;
-    const leak = plan.prescriptions.some((row) => row.role !== 'major' && row.included
-      && row.sets > 1 && major.sets < major.authoredSets);
-    assert.equal(leak, true, 'mutant support surviving ahead of a reduced major must be flagged');
+    const violations = supportFullyOmittedViolations(plan);
+    assert.ok(violations.some((text) => text.includes('support still included')),
+      `mutant support surviving ahead of a reduced major must be flagged, got ${JSON.stringify(violations)}`);
   });
 
-  // X4: leak detector fires when the sport probe appears on a weight-room day.
   check('[X4] sport-tier-leak detector fires on a probe in a weight-room session', () => {
-    const mutated = cloneInput({ blocks: cData.blocks });
+    const byId = new Map(cData.movements.map((m) => [m.movement_id, m]));
+    const real = cData.blocks;
+    assert.deepEqual(leakViolations(real, byId), [], 'real composed trace must be leak-free first');
+    const mutated = cloneInput({ blocks: real });
     const fullDay = mutated.blocks[0].sessions.find((s) => s.focus === 'full');
     assert.ok(fullDay !== undefined);
-    fullDay.slots[fullDay.slots.length - 1].movement_id = 8; // Advanced carry
-    let leaked = 0;
-    for (const block of mutated.blocks) {
-      for (const session of block.sessions) {
-        if (session.focus === 'full' && session.slots.some((slot) => slot.movement_id === 8)) {
-          leaked += 1;
-        }
-      }
-    }
-    assert.ok(leaked > 0, 'leak detector must observe a probe on a weight-room day');
+    fullDay.slots[fullDay.slots.length - 1].movement_id = 8; // Advanced carry probe
+    const violations = leakViolations(mutated.blocks, byId);
+    assert.ok(violations.some((text) => text.startsWith('Advanced 8 on weight-room')),
+      `leak detector must observe the probe on a weight-room day, got ${JSON.stringify(violations)}`);
   });
 
-  // X5: date detector fires on a duplicated/out-of-order session date.
   check('[X5] date detector fires on an out-of-order session date', () => {
+    assert.deepEqual(dateOrderViolations(cData.blocks), [], 'real composed trace must be ordered first');
     const mutated = cloneInput({ blocks: cData.blocks });
-    const dates = mutated.blocks.flatMap((block) => block.sessions.map((s) => ({
-      session_date: s.session_date, key: `${block.start_date}|${s.week_index}|${s.day_index}`,
-    })));
+    const dates = mutated.blocks.flatMap((block) => block.sessions);
     dates[5].session_date = addDaysIso(dates[5].session_date, -28); // duplicate an earlier date
-    let unordered = false;
-    for (let i = 1; i < dates.length; i += 1) {
-      if (dates[i].session_date <= dates[i - 1].session_date) unordered = true;
-    }
-    assert.equal(unordered, true, 'date detector must see the injected disorder');
+    const violations = dateOrderViolations(mutated.blocks);
+    assert.ok(violations.length > 0,
+      `date detector must see the injected disorder, got ${JSON.stringify(violations)}`);
   });
 
-  // X6: availability-loss detector fires on a partial result (therapy alongside blockers).
-  check('[X6] fail-closed detector fires on a partial result beside a blocker', () => {
-    const partial = {
-      blockers: ['Competition Bench is unavailable under equipment, safety, tier, capability, or attestation gates.'],
-      prescriptions: [{ movementId: benchId, role: 'major', sets: 3 }],
-      familyDecisions: [],
-    };
-    assert.ok(partial.blockers.length > 0 && partial.prescriptions.length > 0,
-      'a partial result alongside a blocker must be flagged as a silent substitution');
+  check('[X6] fail-closed detector fires when a prescription appears beside a blocker', () => {
+    const real = bData.lostResult;
+    assert.equal(failClosedViolation(real), null, 'real availability-loss result must be clean first');
+    assert.equal(real.prescriptions.length, 0, 'real result must carry zero prescriptions to mutate from');
+    const mutated = cloneInput(real);
+    mutated.prescriptions.push({ dayIndex: 1, movementId: 999, role: 'major' });
+    const violation = failClosedViolation(mutated);
+    assert.ok(violation !== null && violation.includes('prescriptions present beside'),
+      `fail-closed detector must flag the injected partial output, got ${String(violation)}`);
   });
 
-  // X7: fixture completeness fails clearly when a required capability field is omitted.
+  // X7 / X7b: fixture completeness fails clearly when a required field is omitted.
   check('[X7] generator fixture completeness fails clearly on an omitted capability field', () => {
     const movements = cloneInput(cData.movements);
     delete movements[7].capability_available_sport_conditioning;
@@ -923,14 +999,14 @@ function counterexamples(aData, bData, cData, contracts) {
   });
   check('[X7b] routine fixture completeness fails clearly on an omitted role-eligibility field', () => {
     const input = {
-      selections: [{ dayIndex: 1, slotIndex: 1, movementId: benchId, role: 'major', sets: 2, reps: 3, targetRpe: 6 }],
-      movements: contracts.routineMovements,
-      liftFamilies: contracts.liftFamilies,
-      assistance: contracts.assistance,
-      roleEligibility: contracts.roleEligibility,
+      selections: [{ dayIndex: 1, slotIndex: 1, movementId: aData.benchId, role: 'major', sets: 2, reps: 3, targetRpe: 6 }],
+      movements: cData.movements,
+      liftFamilies: [],
+      assistance: [],
+      roleEligibility: { major: new Set([aData.benchId]), supplementary: new Set(), accessory: new Set(), conditional: new Set() },
       schemaType: 'LINEAR', objective: 'strength', trainingAge: 'elite',
       durationCapMin: 120, baseRpeCap: 9,
-      availableMovementIds: new Set([benchId]),
+      availableMovementIds: new Set([aData.benchId]),
     };
     const broken = cloneInput(input);
     delete broken.roleEligibility;
@@ -967,6 +1043,7 @@ function summary(aData, cData, dData) {
   const trace = {
     scenarios: {
       'A-ELITE-BENCH-16': { segments: 4, weeksPerSegment: 4, totalWeeks: 16, ...summarizeSegments(aData.segments) },
+      'B-METAMORPHIC': { variants: 5, weeksPerVariant: 4, totalWeeks: 20 },
       'C-MIXED-CONTEXT-16': {
         blocks: cData.blocks.length, weeksPerBlock: 4, totalWeeks: cData.blocks.length * 4,
         sessions: cData.blocks.reduce((sum, block) => sum + block.sessions.length, 0),
@@ -991,7 +1068,7 @@ const aData = familyA(contracts);
 const bData = familyB(contracts);
 const cData = familyC();
 const dData = familyD(cData.movements);
-counterexamples(aData, bData, cData, contracts);
+counterexamples(aData, bData, cData);
 summary(aData, cData, dData);
 
 console.log(`\nlongitudinal bounds verification: ${pass} checks passed, ${fail} failed`);
