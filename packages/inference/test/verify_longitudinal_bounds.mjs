@@ -956,7 +956,8 @@ function counterexamples(aData, bData, cData) {
     assert.deepEqual(leakViolations(real, byId), [], 'real composed trace must be leak-free first');
     const mutated = cloneInput({ blocks: real });
     const fullDay = mutated.blocks[0].sessions.find((s) => s.focus === 'full');
-    assert.ok(fullDay !== undefined);
+    assert.ok(fullDay !== undefined, 'full session must exist in block 0');
+    assert.ok(fullDay.slots.length > 0, 'full session must have at least one slot');
     fullDay.slots[fullDay.slots.length - 1].movement_id = 8; // Advanced carry probe
     const violations = leakViolations(mutated.blocks, byId);
     assert.ok(violations.some((text) => text.startsWith('Advanced 8 on weight-room')),
@@ -1031,7 +1032,8 @@ function summary(aData, cData, dData) {
   const summarizeSegments = (segments) => Object.fromEntries(Object.entries(segments).map(([name, weeks]) => {
     const first = weeks[0];
     return [name, {
-      weeks: weeks.length,
+      weeklyEvaluations: weeks.length,
+      calendarAdvancing: false,
       prescriptions: first.prescriptions.length,
       included: first.prescriptions.filter((row) => row.included).length,
       blockers: first.blockers.length,
@@ -1041,15 +1043,20 @@ function summary(aData, cData, dData) {
     }];
   }));
   const trace = {
+    totalWeeklyEvaluations: 68,
+    calendarAdvancingWeeks: 32,
+    timeInvariantWeeklyEvaluations: 36,
     scenarios: {
-      'A-ELITE-BENCH-16': { segments: 4, weeksPerSegment: 4, totalWeeks: 16, ...summarizeSegments(aData.segments) },
-      'B-METAMORPHIC': { variants: 5, weeksPerVariant: 4, totalWeeks: 20 },
+      'A-ELITE-BENCH-16': { segments: 4, weeksPerSegment: 4, weeklyEvaluations: 16, calendarAdvancing: false, ...summarizeSegments(aData.segments) },
+      'B-METAMORPHIC': { variants: 5, weeksPerVariant: 4, weeklyEvaluations: 20, calendarAdvancing: false },
       'C-MIXED-CONTEXT-16': {
-        blocks: cData.blocks.length, weeksPerBlock: 4, totalWeeks: cData.blocks.length * 4,
+        blocks: cData.blocks.length, weeksPerBlock: 4, weeklyEvaluations: cData.blocks.length * 4,
+        calendarAdvancing: true, dateAdvancingWeeks: cData.blocks.length * 4,
         sessions: cData.blocks.reduce((sum, block) => sum + block.sessions.length, 0),
       },
       'D-TELEMETRY-CONSERVATIVE': {
-        blocks: dData.blocks.length, weeksPerBlock: 4, totalWeeks: dData.blocks.length * 4,
+        blocks: dData.blocks.length, weeksPerBlock: 4, weeklyEvaluations: dData.blocks.length * 4,
+        calendarAdvancing: true, dateAdvancingWeeks: dData.blocks.length * 4,
         sessions: dData.blocks.reduce((sum, block) => sum + block.sessions.length, 0),
         peakShifted: dData.blocks.map((block) => block.peakShifted),
       },
