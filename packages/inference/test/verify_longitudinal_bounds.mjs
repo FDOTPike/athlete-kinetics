@@ -14,19 +14,28 @@
  * weight-room days, date duplication/ordering across month/year/DST-adjacent
  * boundaries, stale state silently replacing a missing-input seam).
  *
- * Family A — ELITE-BENCH-16: 16 weeks (four 4-week segments) of the real
- *             Elite five-times-weekly bench-family routine, real DB-seeded
- *             contracts; one binding segment proves support yields before
- *             major dose reduction; segments 1,2,4 are byte-reproductions.
+ * Family A — ELITE-BENCH-16: 16 weekly evaluations (four 4-week segments)
+ *             of the real Elite five-times-weekly bench-family routine, real
+ *             DB-seeded contracts; one binding segment proves support yields
+ *             before major dose reduction; segments 1,2,4 are byte-reproductions.
+ *             Time-invariant pure seam (no calendar advancement).
  * Family B — METAMORPHIC: five variants, one input dimension changed per
- *             variant, each run as a real 4-week repetition; monotone
- *             consequences; round-trip reproducibility.
- * Family C — MIXED-CONTEXT-16: four consecutive generateBlock blocks with an
- *             explicit schedule of weight-room + conditioning + BJJ days over
- *             month/year/Sydney-DST-adjacent date-only boundaries.
+ *             variant, each evaluated across 4 identical weeks (20 weekly
+ *             evaluations total); monotone consequences; round-trip
+ *             reproducibility. Time-invariant pure seam (no calendar advancement).
+ * Family C — MIXED-CONTEXT-16: four consecutive generateBlock blocks (16
+ *             date-advancing weeks, 48 unique sessions) with an explicit
+ *             schedule of weight-room + conditioning + BJJ days over
+ *             month/year/calendar boundaries (UTC date-only arithmetic,
+ *             timezone-independent).
  * Family D — TELEMETRY-CONSERVATIVE: recentAcwr null / hot / cool over four
- *             peak blocks; per-block isolation; store gate cited for stale
- *             readiness (not representable in this pure seam).
+ *             peak blocks (16 date-advancing weeks, 48 unique sessions);
+ *             per-block isolation; store gate cited for stale readiness
+ *             (not representable in this pure seam).
+ *
+ * Total evaluations: 68 weekly evaluations across all 4 families (32
+ * calendar-advancing generated weeks in C & D; 36 time-invariant routine
+ * evaluations in A & B).
  *
  * Determinism discipline: fixed ISO dates, fixed fixtures, no Date.now(), no
  * RNG, no network, no clock reads. Every scenario runs twice from freshly
@@ -37,10 +46,15 @@
  * Informational process.memoryUsage() only — never a pass/fail threshold and
  * never Android private-dirty evidence.
  *
- * Audit remediation 2026-08-14 (12da513 review): counterexample checks X1-X7
- * now invoke the SAME named predicates the family checks use (they can and
- * must fail on a locally mutated fixture/result); deepFreeze protects Sets;
- * Family B carries real 4-week structure (20 simulated weeks; 68 total).
+ * Audit remediation 2026-08-14:
+ * - Counterexample checks X1-X7b (8 checks) invoke the SAME named predicates
+ *   the family checks use (they demonstrably fail on locally mutated fixtures/results).
+ * - Fixture completeness exercises every required field's failure path.
+ * - Non-empty guards ensure slot loops never pass vacuously.
+ * - B duration-cap proof positively verifies major inclusion, support omission,
+ *   exact provenance text ("duration cap" and "before changing a major"), and
+ *   dose domain validity.
+ * - Date arithmetic verification uses UTC date-only arithmetic (timezone-independent).
  *
  * Run: npm run verify:autopilot (appended after the Autopilot checks)
  */
@@ -503,9 +517,11 @@ function familyB(contracts) {
     }),
   };
   const result = {};
+  let weeklyEvaluations = 0;
   for (const [name, input] of Object.entries(variants)) {
     result[name] = composeReal(input);
     const weeks = [1, 2, 3, 4].map(() => composeReal(input));
+    weeklyEvaluations += weeks.length;
     for (let w = 1; w < 4; w += 1) {
       check(`[B-${name}] week ${w + 1} byte-reproduces week 1 (pure seam)`, () =>
         assert.equal(eq(weeks[0], weeks[w]), true));
@@ -517,6 +533,18 @@ function familyB(contracts) {
 
   check('[B-BASE] routine fixture completeness gate names every required field', () => {
     assertRoutineInputComplete(variants.base);
+    for (const [key, label] of ROUTINE_INPUT_REQUIRED) {
+      const broken = cloneInput(variants.base);
+      delete broken[key];
+      let threw = null;
+      try {
+        assertRoutineInputComplete(broken);
+      } catch (error) {
+        threw = error.message;
+      }
+      assert.ok(threw !== null && threw.includes(label),
+        `expected missing "${label}" failure, got ${String(threw)}`);
+    }
   });
   const benchDose = (res) => res.prescriptions
     .filter((row) => row.movementId === benchId && row.role === 'major')
@@ -557,12 +585,23 @@ function familyB(contracts) {
     const stress = (res) => res.familyDecisions[0].finalStress;
     assert.ok(stress(tightResult) <= stress(baseResult) + 1e-9,
       `family stress rose from ${stress(baseResult)} to ${stress(tightResult)} after tightening`);
+    const majors = tightResult.prescriptions.filter((row) => row.role === 'major');
+    assert.ok(majors.length > 0, 'at least one selected major row must exist');
+    assert.ok(majors.every((row) => row.included === true),
+      'every selected major must remain included under duration cap');
     const support = tightResult.prescriptions.filter((row) => row.role !== 'major');
-    assert.ok(support.every((row) => !row.included
-      || row.adaptations.some((text) => text.includes('duration cap'))),
-      'support must yield to the duration cap before a major');
+    assert.ok(support.length > 0, 'at least one support row must exist');
+    assert.ok(support.every((row) => row.included === false),
+      'every support row must be omitted in this binding duration fixture');
+    assert.ok(support.every((row) => row.adaptations.some((text) =>
+      text.includes('duration cap') && text.includes('before changing a major'))),
+      'every omitted support row must carry production duration-cap provenance with "duration cap" and "before changing a major"');
     const bench = benchDose(tightResult);
     assert.ok(bench !== undefined && bench[0] <= 3 && bench[1] <= 5 && bench[2] <= 8);
+    for (const row of majors) {
+      const violation = prescriptionDomainViolation(row, 9);
+      assert.equal(violation, null, violation);
+    }
   });
 
   check('[B-LOWER-RPE-CAP] lowering the RPE cap cannot raise any final RPE', () => {
@@ -592,12 +631,12 @@ function familyB(contracts) {
     const replay = composeReal(variants.base);
     assert.equal(eq(replay, baseResult), true);
   });
-  return { baseResult, clampResult, lostResult };
+  return { baseResult, clampResult, lostResult, variants, weeklyEvaluations };
 }
 
 // ===========================================================================
 // FAMILY C — mixed focus / access-context generation across four consecutive
-// blocks over month / year / Sydney-DST-adjacent date-only boundaries.
+// blocks over month / year / calendar boundaries (UTC date-only arithmetic).
 // ===========================================================================
 function generatorFixture() {
   const mv = (movement_id, name, pattern, over = {}) => ({
@@ -638,7 +677,7 @@ function generatorFixture() {
   ]);
 }
 function familyC() {
-  console.log('[C] MIXED-CONTEXT-16 (weight-room + conditioning + BJJ across boundaries)');
+  console.log('[C] MIXED-CONTEXT-16 (weight-room + conditioning + BJJ across month/year/calendar boundaries)');
   const movements = generatorFixture();
   const movementById = new Map(movements.map((m) => [m.movement_id, m]));
   const schedule = [
@@ -672,19 +711,21 @@ function familyC() {
     assert.equal(blocks.reduce((sum, block) => sum + block.sessions.length, 0), 48);
     for (const block of blocks) assert.equal(block.sessions.length, 12);
   });
-  check('[C] all 48 session dates are unique and strictly ordered across month, year and Sydney-DST-adjacent boundaries', () => {
+  check('[C] all 48 session dates are unique and strictly ordered across month, year and DST-adjacent calendar boundaries', () => {
     assert.deepEqual(dateOrderViolations(blocks), []);
     const dates = blocks.flatMap((block) => block.sessions.map((s) => s.session_date));
     assert.equal(dates.length, 48);
-    // The trace actually crosses a year boundary inside a block and touches the
-    // Sydney DST-start weekend (DST began 2025-10-05) via date-only arithmetic.
+    // addDaysIso uses UTC date-only arithmetic and does not consume an IANA
+    // timezone. The proof is UTC/date-only stability across month/year and
+    // DST-adjacent calendar dates (e.g. Australian spring/autumn DST dates),
+    // not a test of local-clock or timezone conversion.
     assert.ok(dates.some((date) => date.startsWith('2025-')));
     assert.ok(dates.some((date) => date.startsWith('2026-')));
-    assert.equal(addDaysIso('2025-10-04', 1), '2025-10-05', 'DST-start adjacent date');
-    assert.equal(addDaysIso('2025-11-30', 1), '2025-12-01', 'month boundary date');
-    assert.equal(addDaysIso('2025-12-31', 1), '2026-01-01', 'year boundary date');
-    assert.equal(addDaysIso('2026-04-04', 1), '2026-04-05', 'Sydney DST-end adjacent date');
-    assert.equal(addDaysIso('2026-04-05', 1), '2026-04-06', 'day after Sydney DST end');
+    assert.equal(addDaysIso('2025-10-04', 1), '2025-10-05', 'DST-start adjacent calendar date');
+    assert.equal(addDaysIso('2025-11-30', 1), '2025-12-01', 'month boundary calendar date');
+    assert.equal(addDaysIso('2025-12-31', 1), '2026-01-01', 'year boundary calendar date');
+    assert.equal(addDaysIso('2026-04-04', 1), '2026-04-05', 'DST-end adjacent calendar date');
+    assert.equal(addDaysIso('2026-04-05', 1), '2026-04-06', 'day after DST-end calendar date');
   });
   check('[C] every session date matches the production start + (week-1)*7 + (day_index-1) formula', () => {
     for (let b = 0; b < blocks.length; b += 1) {
@@ -696,11 +737,13 @@ function familyC() {
     }
   });
   check('[C] each day uses the access context derived from its own focus', () => {
+    let inspectedSlots = 0;
     for (const block of blocks) {
       for (const session of block.sessions) {
         const context = accessContextForBlockFocus(session.focus);
         assert.equal(typeof context, 'string');
         for (const slot of session.slots) {
+          inspectedSlots += 1;
           const movement = movementById.get(slot.movement_id);
           assert.ok(movement !== undefined);
           const available = context === 'sport_conditioning'
@@ -715,6 +758,7 @@ function familyC() {
         }
       }
     }
+    assert.ok(inspectedSlots > 0, 'must inspect at least one slot across Family C blocks');
   });
   check('[C] sport tier relief never carries an Advanced movement onto a weight-room day (leak law)', () => {
     assert.deepEqual(leakViolations(blocks, movementById), []);
@@ -793,14 +837,17 @@ function familyC() {
     profile: frozen.profile, movements: frozen.movements, startDate, programDays: frozen.programDays,
   })));
   check('[C] per-day slot domains hold across the composed trace', () => {
+    let inspectedSlots = 0;
     for (const block of blocks) {
       for (const session of block.sessions) {
         for (const slot of session.slots) {
+          inspectedSlots += 1;
           const violation = planSlotDomainViolation(slot, 9);
           assert.equal(violation, null, violation);
         }
       }
     }
+    assert.ok(inspectedSlots > 0, 'must inspect at least one slot across Family C blocks');
   });
   return { blocks, movements };
 }
@@ -1028,7 +1075,7 @@ function counterexamples(aData, bData, cData) {
 // Deterministic in-memory summary + informational memory diagnostic.
 // No timestamps, paths, machine names or timings in the summary.
 // ===========================================================================
-function summary(aData, cData, dData) {
+function summary(aData, bData, cData, dData) {
   const summarizeSegments = (segments) => Object.fromEntries(Object.entries(segments).map(([name, weeks]) => {
     const first = weeks[0];
     return [name, {
@@ -1042,21 +1089,29 @@ function summary(aData, cData, dData) {
       finalStress: first.familyDecisions.map((decision) => decision.finalStress),
     }];
   }));
+  const aEvals = Object.values(aData.segments).reduce((sum, weeks) => sum + weeks.length, 0);
+  const bEvals = bData.weeklyEvaluations;
+  const cWeeks = cData.blocks.length * 4;
+  const dWeeks = dData.blocks.length * 4;
+  const timeInvariant = aEvals + bEvals;
+  const calendarAdvancing = cWeeks + dWeeks;
+  const total = timeInvariant + calendarAdvancing;
+
   const trace = {
-    totalWeeklyEvaluations: 68,
-    calendarAdvancingWeeks: 32,
-    timeInvariantWeeklyEvaluations: 36,
+    totalWeeklyEvaluations: total,
+    calendarAdvancingWeeks: calendarAdvancing,
+    timeInvariantWeeklyEvaluations: timeInvariant,
     scenarios: {
-      'A-ELITE-BENCH-16': { segments: 4, weeksPerSegment: 4, weeklyEvaluations: 16, calendarAdvancing: false, ...summarizeSegments(aData.segments) },
-      'B-METAMORPHIC': { variants: 5, weeksPerVariant: 4, weeklyEvaluations: 20, calendarAdvancing: false },
+      'A-ELITE-BENCH-16': { segments: Object.keys(aData.segments).length, weeksPerSegment: 4, weeklyEvaluations: aEvals, calendarAdvancing: false, ...summarizeSegments(aData.segments) },
+      'B-METAMORPHIC': { variants: Object.keys(bData.variants).length, weeksPerVariant: 4, weeklyEvaluations: bEvals, calendarAdvancing: false },
       'C-MIXED-CONTEXT-16': {
-        blocks: cData.blocks.length, weeksPerBlock: 4, weeklyEvaluations: cData.blocks.length * 4,
-        calendarAdvancing: true, dateAdvancingWeeks: cData.blocks.length * 4,
+        blocks: cData.blocks.length, weeksPerBlock: 4, weeklyEvaluations: cWeeks,
+        calendarAdvancing: true, dateAdvancingWeeks: cWeeks,
         sessions: cData.blocks.reduce((sum, block) => sum + block.sessions.length, 0),
       },
       'D-TELEMETRY-CONSERVATIVE': {
-        blocks: dData.blocks.length, weeksPerBlock: 4, weeklyEvaluations: dData.blocks.length * 4,
-        calendarAdvancing: true, dateAdvancingWeeks: dData.blocks.length * 4,
+        blocks: dData.blocks.length, weeksPerBlock: 4, weeklyEvaluations: dWeeks,
+        calendarAdvancing: true, dateAdvancingWeeks: dWeeks,
         sessions: dData.blocks.reduce((sum, block) => sum + block.sessions.length, 0),
         peakShifted: dData.blocks.map((block) => block.peakShifted),
       },
@@ -1076,7 +1131,7 @@ const bData = familyB(contracts);
 const cData = familyC();
 const dData = familyD(cData.movements);
 counterexamples(aData, bData, cData);
-summary(aData, cData, dData);
+summary(aData, bData, cData, dData);
 
 console.log(`\nlongitudinal bounds verification: ${pass} checks passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
