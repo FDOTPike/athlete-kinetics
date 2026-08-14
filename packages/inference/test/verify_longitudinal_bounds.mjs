@@ -517,10 +517,12 @@ function familyB(contracts) {
     }),
   };
   const result = {};
+  const weeklyEvaluationsByVariant = {};
   let weeklyEvaluations = 0;
   for (const [name, input] of Object.entries(variants)) {
     result[name] = composeReal(input);
     const weeks = [1, 2, 3, 4].map(() => composeReal(input));
+    weeklyEvaluationsByVariant[name] = weeks.length;
     weeklyEvaluations += weeks.length;
     for (let w = 1; w < 4; w += 1) {
       check(`[B-${name}] week ${w + 1} byte-reproduces week 1 (pure seam)`, () =>
@@ -631,7 +633,10 @@ function familyB(contracts) {
     const replay = composeReal(variants.base);
     assert.equal(eq(replay, baseResult), true);
   });
-  return { baseResult, clampResult, lostResult, variants, weeklyEvaluations };
+  return {
+    baseResult, clampResult, lostResult, variants,
+    weeklyEvaluations, weeklyEvaluationsByVariant,
+  };
 }
 
 // ===========================================================================
@@ -1033,17 +1038,20 @@ function counterexamples(aData, bData, cData) {
   });
 
   // X7 / X7b: fixture completeness fails clearly when a required field is omitted.
-  check('[X7] generator fixture completeness fails clearly on an omitted capability field', () => {
-    const movements = cloneInput(cData.movements);
-    delete movements[7].capability_available_sport_conditioning;
-    let threw = null;
-    try {
-      assertGeneratorFixtureComplete(movements);
-    } catch (error) {
-      threw = error.message;
+  check('[X7] generator fixture completeness names every required field failure', () => {
+    assertGeneratorFixtureComplete(cloneInput(cData.movements));
+    for (const [key, label] of GENERATOR_MOVEMENT_REQUIRED) {
+      const movements = cloneInput(cData.movements);
+      delete movements[0][key];
+      let threw = null;
+      try {
+        assertGeneratorFixtureComplete(movements);
+      } catch (error) {
+        threw = error.message;
+      }
+      assert.ok(threw !== null && threw.includes(label),
+        `expected missing "${label}" failure, got ${String(threw)}`);
     }
-    assert.ok(threw !== null && threw.includes('capability_available_sport_conditioning'),
-      `expected a named completeness failure, got ${String(threw)}`);
   });
   check('[X7b] routine fixture completeness fails clearly on an omitted role-eligibility field', () => {
     const input = {
@@ -1089,10 +1097,17 @@ function summary(aData, bData, cData, dData) {
       finalStress: first.familyDecisions.map((decision) => decision.finalStress),
     }];
   }));
+  const generatedWeekCounts = (blocks) => blocks.map((block) =>
+    new Set(block.sessions.map((session) => session.week_index)).size);
+  const sum = (values) => values.reduce((total, value) => total + value, 0);
+  const aEvaluationsBySegment = Object.fromEntries(Object.entries(aData.segments)
+    .map(([name, weeks]) => [name, weeks.length]));
   const aEvals = Object.values(aData.segments).reduce((sum, weeks) => sum + weeks.length, 0);
   const bEvals = bData.weeklyEvaluations;
-  const cWeeks = cData.blocks.length * 4;
-  const dWeeks = dData.blocks.length * 4;
+  const cWeeksByBlock = generatedWeekCounts(cData.blocks);
+  const dWeeksByBlock = generatedWeekCounts(dData.blocks);
+  const cWeeks = sum(cWeeksByBlock);
+  const dWeeks = sum(dWeeksByBlock);
   const timeInvariant = aEvals + bEvals;
   const calendarAdvancing = cWeeks + dWeeks;
   const total = timeInvariant + calendarAdvancing;
@@ -1102,15 +1117,26 @@ function summary(aData, bData, cData, dData) {
     calendarAdvancingWeeks: calendarAdvancing,
     timeInvariantWeeklyEvaluations: timeInvariant,
     scenarios: {
-      'A-ELITE-BENCH-16': { segments: Object.keys(aData.segments).length, weeksPerSegment: 4, weeklyEvaluations: aEvals, calendarAdvancing: false, ...summarizeSegments(aData.segments) },
-      'B-METAMORPHIC': { variants: Object.keys(bData.variants).length, weeksPerVariant: 4, weeklyEvaluations: bEvals, calendarAdvancing: false },
+      'A-ELITE-BENCH-16': {
+        segments: Object.keys(aData.segments).length,
+        weeklyEvaluationsBySegment: aEvaluationsBySegment,
+        weeklyEvaluations: aEvals,
+        calendarAdvancing: false,
+        ...summarizeSegments(aData.segments),
+      },
+      'B-METAMORPHIC': {
+        variants: Object.keys(bData.variants).length,
+        weeklyEvaluationsByVariant: bData.weeklyEvaluationsByVariant,
+        weeklyEvaluations: bEvals,
+        calendarAdvancing: false,
+      },
       'C-MIXED-CONTEXT-16': {
-        blocks: cData.blocks.length, weeksPerBlock: 4, weeklyEvaluations: cWeeks,
+        blocks: cData.blocks.length, generatedWeeksByBlock: cWeeksByBlock, weeklyEvaluations: cWeeks,
         calendarAdvancing: true, dateAdvancingWeeks: cWeeks,
         sessions: cData.blocks.reduce((sum, block) => sum + block.sessions.length, 0),
       },
       'D-TELEMETRY-CONSERVATIVE': {
-        blocks: dData.blocks.length, weeksPerBlock: 4, weeklyEvaluations: dWeeks,
+        blocks: dData.blocks.length, generatedWeeksByBlock: dWeeksByBlock, weeklyEvaluations: dWeeks,
         calendarAdvancing: true, dateAdvancingWeeks: dWeeks,
         sessions: dData.blocks.reduce((sum, block) => sum + block.sessions.length, 0),
         peakShifted: dData.blocks.map((block) => block.peakShifted),
