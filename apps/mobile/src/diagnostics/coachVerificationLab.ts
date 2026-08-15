@@ -170,7 +170,6 @@ function schemaScenario(input: CoachVerificationInput): LabModuleResult {
       startDate: input.today,
       schemaType,
       macroBlockIndex: 1,
-      recentAcwr: input.vector?.acwr ?? null,
     }));
     const valid = plans.every((plan) => plan.weeks === 4 && plan.sessions.length > 0);
     return result(

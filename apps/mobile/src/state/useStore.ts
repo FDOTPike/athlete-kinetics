@@ -64,6 +64,8 @@ import {
   derivePrescription,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
+  evaluateReturn,
+  RETURN_OPTIONS,
   STANDARD_EQUIPMENT_ITEMS,
   EXPERIENCE_SEVERITY,
   generateBlock,
@@ -108,6 +110,7 @@ import {
   type RoutineStressPurpose,
   type DifficultyRating,
   type Embedder,
+  type ReturnAction,
   type BlockPlan,
   type BlockFocus,
   type ProgramDayPreference,
@@ -552,10 +555,19 @@ export interface CoachDiagnosticContext {
   readonly sessionsToday: number;
   readonly trainedDaysLast7: number;
 }
+export interface ReturnCheckinState {
+  /** The qualifying session date the detected gap is measured from — also the
+   *  acknowledgement key, so one gap prompts at most once. */
+  readonly lastQualifyingDate: string;
+  readonly daysSinceLastTrained: number;
+  readonly options: readonly ReturnAction[];
+  readonly isDismissed: boolean;
+}
 interface KineticsStore {
   status: BootStatus;
   error: string | null;
   today: string;
+  returnCheckin: ReturnCheckinState | null;
   vector: StateVectorRow | null; // null = no state_vector row for today
   trend: TrendPoint[];           // trailing 14 days, ascending
   movements: Movement[];
@@ -639,6 +651,9 @@ interface KineticsStore {
    *  SQLite transaction). Deterministic: profile + equipment + schema +
    *  macro position + today. Continues the 32-week macro-cycle. */
   generateNewBlock: (schemaType?: SchemaType) => void;
+  refreshReturnCheckin: () => void;
+  confirmReturnCheckin: (action: ReturnAction) => void;
+  dismissReturnCheckin: () => void;
   previewTrainingProgram: (input: TrainingProgramInput) => TrainingProgramPreview;
   createTrainingProgram: (input: TrainingProgramInput) => boolean;
   updateProgramPreferences: (input: TrainingProgramInput) => boolean;
@@ -1921,7 +1936,7 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
  *  target file). `onboarded: true` here is the no-flash default; boot() then
  *  reads the real value from the new file. */
 const PER_ATHLETE_RESET: Partial<KineticsStore> = {
-  vector: null, trend: [], session: null, prescription: null,
+  vector: null, trend: [], session: null, prescription: null, returnCheckin: null,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
   activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
@@ -1936,6 +1951,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   status: 'booting',
   error: null,
   today: localToday(),
+  returnCheckin: null,
   vector: null,
   trend: [],
   movements: [],
@@ -1997,10 +2013,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       });
       db = openKineticsDb(entry.dbName);
       migrate(db);
-      // Catch-up materialization: idempotent upsert over the trailing week so
-      // today's state_vector row exists whenever any base data does (a no-op
-      // on days with no data at all).
-      for (const date of demoDates(localToday(), 7)) {
+      // Catch-up materialization: idempotent upsert over the trailing 14 days so
+      // today's state_vector row and the 14-day trend exist under one policy revision
+      // (a no-op on days with no data at all).
+      for (const date of demoDates(localToday(), 14)) {
         db.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
       }
       const movements = rowsOf<MovementRow>(
@@ -2060,6 +2076,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().refreshBlock();
       get().refreshProgram();
       get().loadRoutineTemplates();
+      get().refreshReturnCheckin();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
       // duration (endSession stamps duration or deletes empty shells).
@@ -2840,7 +2857,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
       schemaType: input.schemaType, macroBlockIndex,
-      recentAcwr: vector?.acwr ?? null, programDays: shape.programDays,
+      programDays: shape.programDays,
     });
     return {
       objective: planningProfile.objective, startDate, requestedReviewDate: shape.requestedReviewDate,
@@ -2888,6 +2905,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshNiggles();  // yesterday's niggles drop out of the active set
     get().refreshBlock();
     get().refreshProgram();
+    get().refreshReturnCheckin();
     get().computePrescription([]);
   },
 
@@ -3022,7 +3040,6 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       startDate: today,
       schemaType,
       macroBlockIndex,
-      recentAcwr: vector !== null ? vector.acwr : null,
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
       flawReport,
     });
@@ -3114,6 +3131,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     if (pendingFrequency !== undefined) set({ profile });
     get().refreshBlock();
     get().refreshProgram();
+    get().refreshReturnCheckin();
   },
 
   refreshBlock: () => {
@@ -5815,6 +5833,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM subjective_report');
       d.executeSync('DELETE FROM niggle');
       d.executeSync('DELETE FROM one_rep_max');
+      d.executeSync('DELETE FROM return_checkin_ack');
       d.executeSync('DELETE FROM hrv_daily');
       d.executeSync('DELETE FROM sleep_daily');
       d.executeSync('DELETE FROM spo2_daily');
@@ -5838,6 +5857,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       activeSessionAccessContext: null, activePriorExperienceMovementIds: [],
       movementAvailabilityRevision: get().movementAvailabilityRevision + 1,
       prescription: null, substitution: null, lastTriage: null, niggles: [],
+      returnCheckin: null,
       block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
       lastEndedSessionId: null,
     });
@@ -5845,6 +5865,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshBlock();
     get().refreshProgram();
     get().refreshNiggles();
+    get().refreshReturnCheckin();
     return (had?.c ?? 0) > 0;
   },
 
@@ -5921,5 +5942,83 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       console.error('Failed to load recent session outcomes:', e);
       return [];
     }
+  },
+
+  // Calibration Policy v1 section 4. Qualifying evidence is a session carrying at
+  // least ONE logged set — an empty shell is not training evidence, and an athlete
+  // with no qualifying history is never prompted. Acknowledgement is keyed on that
+  // qualifying date, so one detected gap prompts at most once.
+  refreshReturnCheckin: () => {
+    const d = getDb();
+    if (!d) return;
+    const lastQualifyingRow = rowsOf<{ max_date: string | null }>(
+      d.executeSync(
+        `SELECT MAX(qualifying_date) AS max_date FROM (
+          SELECT s.session_date AS qualifying_date FROM session s
+            WHERE EXISTS (SELECT 1 FROM set_record r WHERE r.session_id = s.session_id)
+          UNION ALL
+          SELECT his.session_date AS qualifying_date FROM history_import_session his
+            JOIN history_import hi USING (history_import_id)
+            WHERE hi.verified = 1
+              AND EXISTS (SELECT 1 FROM history_import_set hiset WHERE hiset.history_import_session_id = his.history_import_session_id)
+        )`,
+      ),
+    )[0];
+    const lastQualifyingDate = lastQualifyingRow?.max_date ?? null;
+    if (lastQualifyingDate === null) {
+      set({ returnCheckin: null });
+      return;
+    }
+    const daysSinceLastTrained = Math.max(
+      0,
+      Math.floor((isoUtcMs(localToday()) - isoUtcMs(lastQualifyingDate)) / 86400000),
+    );
+    if (!evaluateReturn(daysSinceLastTrained).isLayoff) {
+      set({ returnCheckin: null });
+      return;
+    }
+    const acked = rowsOf<{ c: number }>(
+      d.executeSync('SELECT COUNT(*) AS c FROM return_checkin_ack WHERE last_qualifying_date = ?',
+        [lastQualifyingDate]),
+    )[0];
+    if ((acked?.c ?? 0) > 0) {
+      set({ returnCheckin: null });
+      return;
+    }
+    // A dismissal holds for the rest of the session; the acknowledgement ledger
+    // is what suppresses the prompt across boots.
+    const current = get().returnCheckin;
+    if (current?.isDismissed && current.lastQualifyingDate === lastQualifyingDate) return;
+    set({
+      returnCheckin: {
+        lastQualifyingDate,
+        daysSinceLastTrained,
+        options: RETURN_OPTIONS,
+        isDismissed: false,
+      },
+    });
+  },
+
+  // Records the acknowledgement and NOTHING else. Numerical return modifiers are
+  // deferred under Calibration Policy v1, so neither action rewrites a planned
+  // dose: 'review_first_session' only routes the athlete to the existing plan
+  // review controls (BlockScreen owns that navigation).
+  confirmReturnCheckin: (action) => {
+    const d = getDb();
+    const checkin = get().returnCheckin;
+    if (d && checkin !== null) {
+      d.executeSync(
+        `INSERT OR IGNORE INTO return_checkin_ack
+           (last_qualifying_date, acknowledged_action, acknowledged_at_ms) VALUES (?, ?, ?)`,
+        [checkin.lastQualifyingDate, action, Date.now()],
+      );
+    }
+    set({ returnCheckin: null });
+  },
+
+  dismissReturnCheckin: () => {
+    const current = get().returnCheckin;
+    if (current === null) return;
+    set({ returnCheckin: { ...current, isDismissed: true } });
   },
 }));

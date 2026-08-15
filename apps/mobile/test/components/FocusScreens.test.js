@@ -101,6 +101,9 @@ const baseState = (overrides = {}) => ({
   loadSessionSlots: jest.fn(() => [todaySlot]),
   reportSubjective: jest.fn(() => Promise.resolve()),
   startSession: jest.fn(),
+  returnCheckin: null,
+  confirmReturnCheckin: jest.fn(),
+  dismissReturnCheckin: jest.fn(),
   ...overrides,
 });
 
@@ -112,6 +115,7 @@ test('READY keeps one direct action and hides raw metrics until the relevant dis
 
   expect(screen.getByText('Ready to train')).toBeOnTheScreen();
   expect(screen.getByText("Follow today's plan at the effort it prescribes.")).toBeOnTheScreen();
+  expect(screen.getByText('Lower session planned today.')).toBeOnTheScreen();
   expect(screen.getByLabelText("Review today's plan")).toBeOnTheScreen();
   expect(screen.queryByText('Your recent training load and recovery signals support the planned work.')).toBeNull();
   expect(screen.queryByText('Acute to chronic load')).toBeNull();
@@ -413,4 +417,74 @@ test('COACH displays SUBSTITUTED badge element when slot load is overridden', ()
   fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
 
   expect(screen.getByText('SUBSTITUTED')).toBeOnTheScreen();
+});
+
+test('READY renders return check-in card when layoff is detected, with truthful non-dose copy', () => {
+  mockState = baseState({
+    returnCheckin: {
+      lastQualifyingDate: '2026-06-01',
+      daysSinceLastTrained: 44,
+      options: ['continue_plan', 'review_first_session'],
+      isDismissed: false,
+    },
+  });
+  render(<ReadinessScreen />);
+
+  expect(screen.getByTestId('return-checkin-banner')).toBeOnTheScreen();
+  expect(screen.getByText('RETURN CHECK-IN')).toBeOnTheScreen();
+  expect(screen.getByText('Welcome back')).toBeOnTheScreen();
+  expect(screen.getByText(/It's been 44 days since your last logged session/)).toBeOnTheScreen();
+  expect(screen.getByText(/Your plan is unchanged/)).toBeOnTheScreen();
+
+  // Confirm NO claims of automatic dose reduction
+  expect(screen.queryByText(/reduced/i)).toBeNull();
+  expect(screen.queryByText(/scaled/i)).toBeNull();
+  expect(screen.queryByText(/85%/)).toBeNull();
+  expect(screen.queryByText(/deload/i)).toBeNull();
+});
+
+test('READY return check-in card actions confirm and dismiss correctly', () => {
+  const openCoach = jest.fn();
+  const confirmReturnCheckin = jest.fn();
+  const dismissReturnCheckin = jest.fn();
+
+  mockState = baseState({
+    returnCheckin: {
+      lastQualifyingDate: '2026-06-01',
+      daysSinceLastTrained: 44,
+      options: ['continue_plan', 'review_first_session'],
+      isDismissed: false,
+    },
+    confirmReturnCheckin,
+    dismissReturnCheckin,
+  });
+
+  const { rerender } = render(<ReadinessScreen onOpenCoach={openCoach} />);
+
+  // 1. Continue plan
+  fireEvent.press(screen.getByText('Continue current plan'));
+  expect(confirmReturnCheckin).toHaveBeenCalledWith('continue_plan');
+
+  // 2. Review first session
+  fireEvent.press(screen.getByText('Review first session'));
+  expect(confirmReturnCheckin).toHaveBeenCalledWith('review_first_session');
+  expect(openCoach).toHaveBeenCalled();
+
+  // 3. Dismiss
+  fireEvent.press(screen.getByText('Dismiss'));
+  expect(dismissReturnCheckin).toHaveBeenCalled();
+});
+
+test('READY hides return check-in card when dismissed or absent', () => {
+  mockState = baseState({
+    returnCheckin: {
+      lastQualifyingDate: '2026-06-01',
+      daysSinceLastTrained: 44,
+      options: ['continue_plan', 'review_first_session'],
+      isDismissed: true,
+    },
+  });
+  render(<ReadinessScreen />);
+
+  expect(screen.queryByTestId('return-checkin-banner')).toBeNull();
 });

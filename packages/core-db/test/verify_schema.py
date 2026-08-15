@@ -110,9 +110,9 @@ check("ACWR ~ 1.0 on steady loading", sv["acwr"] is not None and 0.85 <= sv["acw
 check("load_component = 100 in sweet spot", sv["load_component"] == 100.0)
 check("hrv_z computed from 28d ln-baseline", sv["hrv_z"] is not None, f"z={round(sv['hrv_z'],3)}")
 check("sleep efficiency generated col (85-89%)", 80 <= sv["sleep_efficiency_pct"] <= 95, f"{sv['sleep_efficiency_pct']}")
-expected = round((0.35 * sv["hrv_component"] + 0.30 * sv["load_component"]
-                  + 0.25 * sv["sleep_component"]) / 0.90, 1)
-check("available-input weights renormalize without SpO2", abs(sv["readiness_score"] - expected) < 0.05, f"{sv['readiness_score']} vs {expected}")
+expected = round((0.35 * sv["hrv_component"]
+                  + 0.25 * sv["sleep_component"]) / 0.60, 1)
+check("available-input weights renormalize without SpO2 and load", abs(sv["readiness_score"] - expected) < 0.05, f"{sv['readiness_score']} vs {expected}")
 n = con.execute(sql_004, (target,))  # idempotent re-run (upsert)
 check("re-run is idempotent upsert",
       con.execute("SELECT count(*) c FROM state_vector WHERE date=?", (target,)).fetchone()["c"] == 1)
@@ -812,5 +812,40 @@ children = p17.execute("""
 """).fetchone()["c"]
 check("parent set/session deletion cascades both immutable Phase 18 side-cars",
       children == 0, str(children))
+
+# --- [20] Calibration Policy v1: return_checkin_ack (055) ---------------------
+# An acknowledgement ledger, not a dose record. Numerical return modifiers are
+# deferred, so the table must carry no applied-dose column at all.
+print("\n[20] return_checkin_ack (055)")
+sql_055 = (SCHEMA_DIR / "055_return_checkin_ack.sql").read_text(encoding="utf-8")
+p17.executescript(sql_055)
+p17.execute("INSERT INTO return_checkin_ack VALUES ('2026-07-01', 'continue_plan', 1000)")
+rc = p17.execute("SELECT * FROM return_checkin_ack WHERE last_qualifying_date='2026-07-01'").fetchone()
+check("return_checkin_ack row persists", rc is not None and rc["acknowledged_action"] == "continue_plan")
+
+cols = {r["name"] for r in p17.execute("PRAGMA table_info(return_checkin_ack)")}
+check("055 carries ONLY the acknowledgement columns (no applied-dose column)",
+      cols == {"last_qualifying_date", "acknowledged_action", "acknowledged_at_ms"}, str(sorted(cols)))
+check("055 SQL mentions no dose modifier",
+      not re.search(r"multiplier|rpe_cap|applied_modifier", sql_055, re.I))
+
+# One row per DETECTED GAP: a repeat acknowledgement of the same qualifying date
+# is ignored, which is what suppresses a duplicate prompt.
+p17.execute("INSERT OR IGNORE INTO return_checkin_ack VALUES ('2026-07-01', 'review_first_session', 2000)")
+again = p17.execute("SELECT acknowledged_action, COUNT(*) c FROM return_checkin_ack WHERE last_qualifying_date='2026-07-01'").fetchone()
+check("repeat acknowledgement for the same gap is ignored", again["c"] == 1 and again["acknowledged_action"] == "continue_plan")
+
+try:
+    p17.execute("INSERT INTO return_checkin_ack VALUES ('2026-07-02', 'fresh_block', 1000)")
+    check("055 CHECK rejects an unratified action", False)
+except sqlite3.IntegrityError:
+    check("055 CHECK rejects an unratified action", True)
+
+try:
+    p17.execute("INSERT INTO return_checkin_ack VALUES ('01-07-2026', 'continue_plan', 1000)")
+    check("055 CHECK rejects a malformed qualifying date", False)
+except sqlite3.IntegrityError:
+    check("055 CHECK rejects a malformed qualifying date", True)
+
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

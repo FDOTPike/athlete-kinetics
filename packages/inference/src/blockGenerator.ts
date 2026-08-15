@@ -170,9 +170,6 @@ export interface BlockInput {
   schemaType?: SchemaType;
   /** Position in the 32-week macro-cycle (1..8); defaults to 1. */
   macroBlockIndex?: number;
-  /** Rolling fatigue at generation time (state_vector.acwr) — drives the
-   *  deadlift auto-regulation gate in the peak phase. */
-  recentAcwr?: number | null;
   /** Explicit repeating weekly schedule for a goal program. */
   programDays?: readonly ProgramDayPreference[];
 
@@ -398,11 +395,6 @@ export const HYBRID_TAX_THRESHOLD = 1.3;
 /** Accessory/secondary work = slots after the first two compounds. */
 const ACCESSORY_SLOT_FROM = 3;
 
-/** ACWR above this at peak-block generation time = overreaching: insert a
- *  deload week and shift the peak back (the deadlift auto-regulation rule —
- *  the hinge peak must never land on an overreached athlete). */
-export const OVERREACH_ACWR = 1.5;
-
 // --- RPE/rep -> %1RM translation (Epley): pct = 1 / (1 + totalReps/30) ------
 /** Fraction of 1RM implied by `reps` at `rpe` (RIR = 10 - rpe). */
 export const targetPct = (reps: number, rpe: number): number => {
@@ -482,7 +474,6 @@ export function generateBlock(input: BlockInput): BlockPlan {
   const schemaType: SchemaType = input.schemaType ?? 'LINEAR';
   const macroBlockIndex = clamp(Math.round(input.macroBlockIndex ?? 1), 1, MACRO_BLOCKS);
   const macroPhase = macroPhaseOf(macroBlockIndex);
-  const recentAcwr = input.recentAcwr ?? null;
 
   // Phase 13 Step 4 — autopilot intercept. Halt supremacy: a recorded halt snaps
   // the block to a RECOVERY template (every week deloaded, no progressive
@@ -549,14 +540,11 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // rest), bounded to the planned_session shape the UI is built around.
   const slotBudget = clamp(Math.round(profile.session_duration_cap_min / 22), 2, 5);
 
-  // Deadlift auto-regulation: if rolling fatigue is in the overreaching band
-  // while a PEAK block is being generated, insert a deload week 1 and shift
-  // the whole peaking progression back one week.
-  const peakShifted =
-    macroPhase === 'peak' && recentAcwr !== null && recentAcwr > OVERREACH_ACWR;
-  const phaseByWeek: readonly BlockPhase[] = peakShifted
-    ? ['deload', 'accumulation', 'intensification', 'realization']
-    : PHASE_BY_WEEK;
+  // Under Calibration Policy v1, rolling load is descriptive only and does not alter
+  // block generation schedules. Peaking blocks always follow PHASE_BY_WEEK.
+  // peakShifted is preserved as false in the returned plan shape for backwards compatibility.
+  const peakShifted = false;
+  const phaseByWeek: readonly BlockPhase[] = PHASE_BY_WEEK;
 
   // The Hybrid Tax: high-fatigue schemas (cost matrix) are paid for by
   // stripping 1-2 working sets from accessory/secondary slots — concurrent

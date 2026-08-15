@@ -8,7 +8,8 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
@@ -38,7 +39,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '049_movement_content_correction_v1.sql', '050_movement_role_convergence.sql',
   '051_routine_access_context.sql', '052_bounded_microcycle_roles.sql',
   '053_routine_role_compatibility.sql',
-  '054_contract_cutoff_provenance.sql'];
+  '054_contract_cutoff_provenance.sql',
+  '055_return_checkin_ack.sql'];
 
 const db = new DatabaseSync(':memory:');
 try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
@@ -547,6 +549,11 @@ a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
 a('bounded: the set-aggregate carries a session_date window predicate', /WHERE s\.session_date >= \? AND s\.session_date <= \?/.test(hyd));
 a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for\s*\(|\.forEach\s*\(|\.map\s*\()[^;{]*executeSync/.test(hyd));
+
+// --- Calibration Policy v1 store invariants -------------------------------------
+console.log('[Calibration Policy v1 store invariants]');
+a('source tripwire: "recentAcwr" does not appear in useStore.ts', !src.includes('recentAcwr'));
+a('boot rematerialization loop window is exactly 14 days', /demoDates\(localToday\(\),\s*14\)/.test(src));
 
 // --- resetTrainingData: EXECUTE the store's wipe on seeded data -----------------
 // Proves the reset clears ALL history (so the demo can re-load) while KEEPING the
@@ -1679,5 +1686,178 @@ console.log('[O3 fail-closed equipment inventory parsing]');
     Number(db.prepare('SELECT COUNT(*) AS c FROM movement_equipment WHERE movement_id = ? AND item = ?')
       .get(boardPress.movement_id, 'boards').c) === 1);
 }
+
+// --- [Calibration Policy v1: 21-Day Return Check-in] -------------------------
+// The check-in is an ACKNOWLEDGEMENT prompt. Numerical return modifiers are
+// deferred under the ratification, so the decisive assertions here are the
+// negative ones: no modifier value, no dose write, no plan regeneration.
+{
+  console.log('[Calibration Policy v1: 21-Day Return Check-in]');
+  check('useStore imports evaluateReturn from @ak/inference',
+    /import \{[^}]*evaluateReturn[^}]*\} from '@ak\/inference'/.test(src));
+  check('useStore defines returnCheckin state and the two ratified actions',
+    /returnCheckin: ReturnCheckinState \| null/.test(src) &&
+    /refreshReturnCheckin: \(\) => void/.test(src) &&
+    /confirmReturnCheckin: \(action: ReturnAction\) => void/.test(src) &&
+    /dismissReturnCheckin: \(\) => void/.test(src));
+  check('useStore persists acknowledgements with INSERT OR IGNORE (one row per detected gap)',
+    /INSERT OR IGNORE INTO return_checkin_ack\s*\n?\s*\(last_qualifying_date, acknowledged_action, acknowledged_at_ms\)/.test(src));
+  check('useStore wipes return_checkin_ack in resetTrainingData',
+    /DELETE FROM return_checkin_ack/.test(src));
+
+  // Qualifying evidence = a session carrying at least one logged set OR eligible
+  // imported history with sets. A bare session shell is not training evidence.
+  check('the layoff gap is measured from local sessions WITH sets and verified imported history WITH sets',
+    /SELECT MAX\(qualifying_date\) AS max_date FROM \(\s*SELECT s\.session_date AS qualifying_date FROM session s\s*WHERE EXISTS \(SELECT 1 FROM set_record r WHERE r\.session_id = s\.session_id\)\s*UNION ALL\s*SELECT his\.session_date AS qualifying_date FROM history_import_session his\s*JOIN history_import hi USING \(history_import_id\)\s*WHERE hi\.verified = 1\s*AND EXISTS \(SELECT 1 FROM history_import_set hiset WHERE hiset\.history_import_session_id = his\.history_import_session_id\)\s*\)/.test(src.replace(/\s+/g, ' ')));
+
+  // Behavioral test: imported-only athlete within 21 days vs beyond 21 days, newer wins
+  const testDb = new DatabaseSync(':memory:');
+  for (const f of SCHEMA_FILES) {
+    testDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+  const qualQuery = `SELECT MAX(qualifying_date) AS max_date FROM (
+    SELECT s.session_date AS qualifying_date FROM session s
+      WHERE EXISTS (SELECT 1 FROM set_record r WHERE r.session_id = s.session_id)
+    UNION ALL
+    SELECT his.session_date AS qualifying_date FROM history_import_session his
+      JOIN history_import hi USING (history_import_id)
+      WHERE hi.verified = 1
+        AND EXISTS (SELECT 1 FROM history_import_set hiset WHERE hiset.history_import_session_id = his.history_import_session_id)
+  )`;
+
+  // 1. Unverified import -> null
+  testDb.prepare("INSERT INTO history_import (history_import_id, content_fingerprint, format_version, verified, readiness_eligible, created_at_ms) VALUES (1, '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'AK_HISTORY_V1', 0, 0, 1000)").run();
+  testDb.prepare("INSERT INTO history_import_session (history_import_session_id, history_import_id, source_ordinal, session_date, source_line) VALUES (1, 1, 1, '2026-07-10', 1)").run();
+  testDb.prepare("INSERT INTO history_import_set (history_import_set_id, history_import_session_id, movement_id, set_index, reps, load_kg, source_line) VALUES (1, 1, 1, 1, 5, 100, 1)").run();
+  check('unverified import is not qualifying evidence', testDb.prepare(qualQuery).get().max_date === null);
+
+  // 2. Verified import -> qualifying date recognized
+  testDb.prepare("UPDATE history_import SET verified = 1 WHERE history_import_id = 1").run();
+  check('verified imported history is recognized as qualifying evidence',
+    testDb.prepare(qualQuery).get().max_date === '2026-07-10');
+
+  // 3. Local session older than imported -> imported (newer) wins
+  testDb.prepare("INSERT INTO session (session_id, session_date) VALUES (101, '2026-06-01')").run();
+  testDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, logged_at_ms) VALUES (201, 101, 1, 1, 5, 80, 1000)").run();
+  check('imported history newer than local session wins',
+    testDb.prepare(qualQuery).get().max_date === '2026-07-10');
+
+  // 4. Local session newer than imported -> local wins
+  testDb.prepare("INSERT INTO session (session_id, session_date) VALUES (102, '2026-07-14')").run();
+  testDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, logged_at_ms) VALUES (202, 102, 1, 1, 5, 85, 2000)").run();
+  check('local session newer than imported history wins',
+    testDb.prepare(qualQuery).get().max_date === '2026-07-14');
+
+  // NEGATIVE INVARIANTS — the ratification forbids an automatic dose change.
+  const confirmFn = stripComments((() => {
+    const i = src.indexOf('confirmReturnCheckin: (action)');
+    const j = src.indexOf('dismissReturnCheckin: () => {', i);
+    return i >= 0 && j > i ? src.slice(i, j) : '';
+  })());
+  check('confirmReturnCheckin body was located for the negative invariants', confirmFn.length > 0);
+  check('NO return modifier constant exists anywhere in the store',
+    !/week1LoadMultiplier|week1RpeCap|FRESH_BLOCK_MODIFIER/.test(src));
+  check('acknowledging NEVER regenerates the block', !/generateNewBlock\(/.test(confirmFn));
+  check('acknowledging writes ONLY the ack ledger (no dose or plan table)',
+    [...confirmFn.matchAll(/(?:INSERT(?:\s+OR\s+IGNORE)?\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi)]
+      .every((m) => m[1] === 'return_checkin_ack'));
+  check('generateNewBlock takes no dose-modifier parameter',
+    /generateNewBlock: \(schemaType\?: SchemaType\) => void/.test(src)
+    && /generateNewBlock: \(schemaType = 'LINEAR'\) => \{/.test(src));
+
+  db.prepare(`
+    INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-07-01', 'review_first_session', ?)
+  `).run(Date.now());
+  const ackRow = db.prepare(
+    "SELECT * FROM return_checkin_ack WHERE last_qualifying_date = '2026-07-01'").get();
+  check('return_checkin_ack inserts and selects correctly',
+    ackRow !== undefined && ackRow.acknowledged_action === 'review_first_session');
+
+  // INSERT OR IGNORE keyed on the qualifying date is what suppresses a re-prompt
+  // for the SAME detected gap.
+  db.prepare(`
+    INSERT OR IGNORE INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-07-01', 'continue_plan', ?)
+  `).run(Date.now());
+  const ackCount = db.prepare(
+    "SELECT COUNT(*) AS c FROM return_checkin_ack WHERE last_qualifying_date = '2026-07-01'").get().c;
+  check('a second acknowledgement for the same gap is ignored, not duplicated',
+    Number(ackCount) === 1, `${ackCount} rows`);
+
+  // --- Step 4b: Athlete Isolation Test with Per-Athlete DB Files ------------
+  const isoDir = mkdtempSync(join(tmpdir(), 'ak-athlete-isolation-'));
+  const fileA = join(isoDir, 'athlete_a.db');
+  const fileB = join(isoDir, 'athlete_b.db');
+  const dbAthleteA = new DatabaseSync(fileA);
+  const dbAthleteB = new DatabaseSync(fileB);
+  for (const f of SCHEMA_FILES) {
+    const sql = readFileSync(join(SCHEMA_DIR, f), 'utf-8');
+    dbAthleteA.exec(sql);
+    dbAthleteB.exec(sql);
+  }
+  dbAthleteA.prepare(`
+    INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-06-01', 'continue_plan', 12345)
+  `).run();
+  dbAthleteB.prepare(`
+    INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-05-15', 'review_first_session', 99999)
+  `).run();
+
+  const ackA = dbAthleteA.prepare("SELECT COUNT(*) AS c FROM return_checkin_ack").get().c;
+  const ackB = dbAthleteB.prepare("SELECT COUNT(*) AS c FROM return_checkin_ack").get().c;
+  check('athlete isolation: separate database files hold independent acknowledgements',
+    Number(ackA) === 1 && Number(ackB) === 1);
+
+  // Execute resetTrainingData on Athlete A only
+  for (const t of resetTables) {
+    dbAthleteA.prepare(`DELETE FROM ${t}`).run();
+  }
+  const ackAAfterReset = dbAthleteA.prepare("SELECT COUNT(*) AS c FROM return_checkin_ack").get().c;
+  const ackBAfterReset = dbAthleteB.prepare("SELECT COUNT(*) AS c FROM return_checkin_ack").get().c;
+  check('athlete isolation: resetTrainingData on Athlete A wipes A and does NOT touch Athlete B',
+    Number(ackAAfterReset) === 0 && Number(ackBAfterReset) === 1);
+
+  dbAthleteA.close();
+  dbAthleteB.close();
+  rmSync(isoDir, { recursive: true, force: true });
+
+  // --- Step 1: Retrospective SQL Signals & Trigger Threshold Invariants -----
+  console.log('[Calibration Policy v1: Retrospective SQL Signals]');
+  const retroDb = new DatabaseSync(':memory:');
+  for (const f of SCHEMA_FILES) {
+    retroDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+  retroDb.prepare("INSERT INTO session (session_id, session_date) VALUES (1, '2026-07-15')").run();
+  const sessRowBefore = retroDb.prepare("SELECT session_rpe FROM session WHERE session_id = 1").get();
+  check('session.session_rpe is NULL on creation (never 0, never imputed)',
+    sessRowBefore.session_rpe === null);
+
+  // Set with NULL RPE
+  retroDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (1, 1, 1, 1, 10, 50, NULL, 1000)").run();
+  const mechNull = retroDb.prepare("SELECT hard_sets, reps_with_rpe, rpe_x_reps FROM mech_daily WHERE date = '2026-07-15'").get();
+  check('set with NULL RPE yields hard_sets = 0, reps_with_rpe = 0',
+    mechNull.hard_sets === 0 && mechNull.reps_with_rpe === 0 && mechNull.rpe_x_reps === 0);
+
+  // Set with RPE 7.5 (< 8 threshold)
+  retroDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (2, 1, 1, 2, 10, 50, 7.5, 2000)").run();
+  const mech75 = retroDb.prepare("SELECT hard_sets, reps_with_rpe FROM mech_daily WHERE date = '2026-07-15'").get();
+  check('set with RPE 7.5 (< 8) does NOT increment hard_sets',
+    mech75.hard_sets === 0 && mech75.reps_with_rpe === 10);
+
+  // Set with RPE 8.0 (>= 8 threshold)
+  retroDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (3, 1, 1, 3, 10, 50, 8.0, 3000)").run();
+  const mech80 = retroDb.prepare("SELECT hard_sets, reps_with_rpe FROM mech_daily WHERE date = '2026-07-15'").get();
+  check('set with RPE 8.0 (>= 8) increments hard_sets to 1',
+    mech80.hard_sets === 1 && mech80.reps_with_rpe === 20);
+
+  // Set with RPE 9.5 (>= 8 threshold)
+  retroDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (4, 1, 1, 4, 5, 60, 9.5, 4000)").run();
+  const mech95 = retroDb.prepare("SELECT hard_sets, reps_with_rpe FROM mech_daily WHERE date = '2026-07-15'").get();
+  check('set with RPE 9.5 increments hard_sets to 2',
+    mech95.hard_sets === 2 && mech95.reps_with_rpe === 25);
+}
+
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);
 process.exit(fail ? 1 : 0);

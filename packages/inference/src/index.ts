@@ -89,7 +89,6 @@ export {
   programFocuses,
   programMacroIndex,
   macroPhaseOf,
-  OVERREACH_ACWR,
   SCHEMA_FATIGUE_COST,
   targetLoadKg,
   targetPct,
@@ -323,3 +322,10 @@ export {
   type CapabilityEdgeInput,
   type ProjectedChainRow,
 } from './chainProjection';
+export {
+  evaluateReturn,
+  LAYOFF_GAP_DAYS,
+  RETURN_OPTIONS,
+  type ReturnAction,
+  type ReturnEvaluation,
+} from './returnFromLayoff';

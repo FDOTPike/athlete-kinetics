@@ -880,9 +880,8 @@ function familyD(movements) {
   const startDates = ['2026-01-05', '2026-02-02', '2026-03-02', '2026-03-30'];
   const verifiedStarts = startDates.map((_, i) =>
     (i === 0 ? startDates[0] : addDaysIso(startDates[i - 1], 28)));
-  const acwrSequence = [null, 1.7, null, 1.2];
   const blocks = verifiedStarts.map((startDate, i) => generateBlock({
-    profile, movements, startDate, macroBlockIndex: 7 + (i % 2), recentAcwr: acwrSequence[i],
+    profile, movements, startDate, macroBlockIndex: 7 + (i % 2),
   }));
   check('[D] exact trace cardinality: 4 peak blocks x 12 sessions = 48 sessions', () => {
     assert.equal(blocks.length, 4);
@@ -891,23 +890,20 @@ function familyD(movements) {
   check('[D] all session dates unique and strictly ordered across the composed trace', () => {
     assert.deepEqual(dateOrderViolations(blocks), []);
   });
-  check('[D] recentAcwr null never triggers the peak shift, even after a shifted neighbour', () => {
-    assert.equal(blocks[0].peakShifted, false);
-    assert.equal(blocks[2].peakShifted, false, 'hot neighbour must not leak into a later null block');
-    assert.equal(blocks[3].peakShifted, false, 'cool (below OVERREACH_ACWR) ACWR must not shift');
+  check('[D] peak blocks keep the standard schedule (deload week 4) with peakShifted=false across all blocks', () => {
+    for (const block of blocks) {
+      assert.equal(block.peakShifted, false);
+      assert.ok(block.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
+    }
   });
-  check('[D] the existing hot peak input keeps the ratified peak-shift shape, scoped to its own block', () => {
-    const hot = blocks[1];
-    assert.equal(hot.peakShifted, true);
+  check('[D] identical output regardless of any ACWR state (Calibration Policy v1)', () => {
     const phaseOn = (block, week) => new Set(block.sessions
       .filter((s) => s.week_index === week).map((s) => s.phase));
-    assert.deepEqual([...phaseOn(hot, 1)], ['deload']);
-    assert.deepEqual([...phaseOn(hot, 2)], ['accumulation']);
-    assert.deepEqual([...phaseOn(hot, 3)], ['intensification']);
-    assert.deepEqual([...phaseOn(hot, 4)], ['realization']);
-    // No spill-over into the following cool block's week-4 deload.
-    assert.ok(blocks[2].sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
-    for (const block of [hot, blocks[2]]) {
+    for (const block of blocks) {
+      assert.deepEqual([...phaseOn(block, 1)], ['accumulation']);
+      assert.deepEqual([...phaseOn(block, 2)], ['intensification']);
+      assert.deepEqual([...phaseOn(block, 3)], ['realization']);
+      assert.deepEqual([...phaseOn(block, 4)], ['deload']);
       for (const session of block.sessions) {
         for (const slot of session.slots) {
           const violation = planSlotDomainViolation(slot, 9);
@@ -932,26 +928,26 @@ function familyD(movements) {
     for (let i = 0; i < blocks.length; i += 1) {
       const isolated = generateBlock({
         profile, movements, startDate: verifiedStarts[i],
-        macroBlockIndex: 7 + (i % 2), recentAcwr: acwrSequence[i],
+        macroBlockIndex: 7 + (i % 2),
       });
       assert.equal(eq(isolated, blocks[i]), true, `block ${i} differs from isolated recomputation`);
     }
   });
-  check('[D] omitted recentAcwr is identical to an explicit null (missing input seam)', () => {
+  check('[D] omitted recentAcwr is identical to standard block generation (peakShifted=false)', () => {
     const omitted = generateBlock({
       profile, movements, startDate: '2026-05-25', macroBlockIndex: 7,
     });
-    const explicitNull = generateBlock({
-      profile, movements, startDate: '2026-05-25', macroBlockIndex: 7, recentAcwr: null,
+    const explicitBlock = generateBlock({
+      profile, movements, startDate: '2026-05-25', macroBlockIndex: 7,
     });
-    assert.equal(eq(omitted, explicitNull), true);
+    assert.equal(eq(omitted, explicitBlock), true);
     assert.equal(omitted.peakShifted, false);
   });
   runTwice('[D] composed telemetry trace',
-    () => ({ profile, movements, starts: verifiedStarts, acwr: acwrSequence }),
+    () => ({ profile, movements, starts: verifiedStarts }),
     (frozen) => frozen.starts.map((startDate, i) => generateBlock({
       profile: frozen.profile, movements: frozen.movements, startDate,
-      macroBlockIndex: 7 + (i % 2), recentAcwr: frozen.acwr[i],
+      macroBlockIndex: 7 + (i % 2),
     })));
   return { blocks };
 }

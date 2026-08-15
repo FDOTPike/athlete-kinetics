@@ -406,34 +406,60 @@ check('cost matrix: APRE outweighs LINEAR in every macro phase',
 check('hybrid APRE accessories never fall below one working set',
   hybridApre.sessions.every((s) => s.slots.every((sl) => sl.sets >= 1)));
 
-// --- [10] deadlift auto-regulation (peak shift) -----------------------------------
-console.log('[10] deadlift auto-regulation (ACWR gate on the peak block)');
-const peakCalm = generateBlock({
+// --- [10] Calibration Policy v1: ACWR descriptive only in block generation -------
+console.log('[10] Calibration Policy v1: ACWR descriptive only (no peak shifting)');
+const bgSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'blockGenerator.ts'), 'utf-8');
+check('source tripwire: "acwr" does not appear in blockGenerator.ts', !/acwr/i.test(bgSrc));
+
+const peakPlan = generateBlock({
   profile: prof({ objective: 'strength' }), movements, startDate: START,
-  schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: 1.0 });
-const peakHot = generateBlock({
+  schemaType: 'LINEAR', macroBlockIndex: 7 });
+const gppPlan = generateBlock({
   profile: prof({ objective: 'strength' }), movements, startDate: START,
-  schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: 1.7 });
-const gppHot = generateBlock({
-  profile: prof({ objective: 'strength' }), movements, startDate: START,
-  schemaType: 'LINEAR', macroBlockIndex: 1, recentAcwr: 1.7 });
-check('calm ACWR: peak block keeps the normal shape (deload week 4)',
-  !peakCalm.peakShifted &&
-  peakCalm.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
-check('overreached ACWR: deload inserted week 1, peak shifted to week 4',
-  peakHot.peakShifted &&
-  peakHot.sessions.filter((s) => s.week_index === 1).every((s) => s.phase === 'deload') &&
-  peakHot.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'realization'));
-const wkSets = (plan, w) => plan.sessions.filter((s) => s.week_index === w)
-  .reduce((a, s) => a + s.slots.reduce((b, sl) => b + sl.sets, 0), 0);
-check('shifted block: week 1 (deload) volume strictly below week 2',
-  wkSets(peakHot, 1) < wkSets(peakHot, 2), `${wkSets(peakHot, 1)} < ${wkSets(peakHot, 2)}`);
-check('the gate only guards the peak phase (gpp ignores hot ACWR)',
-  !gppHot.peakShifted &&
-  gppHot.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
-check('null ACWR (no telemetry) never shifts the peak',
-  !generateBlock({ profile: prof({ objective: 'strength' }), movements, startDate: START,
-    schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: null }).peakShifted);
+  schemaType: 'LINEAR', macroBlockIndex: 1 });
+
+check('peak block keeps the ordinary schedule (deload week 4, realization week 3)',
+  !peakPlan.peakShifted &&
+  peakPlan.sessions.filter((s) => s.week_index === 3).every((s) => s.phase === 'realization') &&
+  peakPlan.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
+check('gpp block keeps the ordinary schedule (deload week 4)',
+  !gppPlan.peakShifted &&
+  gppPlan.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
+check('peakShifted is false in returned plan shape for backwards compatibility',
+  peakPlan.peakShifted === false && gppPlan.peakShifted === false);
+
+// --- [10b] Calibration Policy v1: Hybrid planned-dose & retrospective invariants ---
+console.log('[10b] Calibration Policy v1: Hybrid planned-dose & retrospective signal invariants');
+const hybridSeedProfile = prof({ objective: 'hybrid', training_age: 'intermediate' });
+const hybridBlock1 = generateBlock({ profile: hybridSeedProfile, movements, startDate: START, schemaType: 'LINEAR', macroBlockIndex: 1 });
+const hybridBlock2 = generateBlock({ profile: hybridSeedProfile, movements, startDate: START, schemaType: 'LINEAR', macroBlockIndex: 1 });
+check('planned-dose model stays active and deterministic across multiple runs',
+  JSON.stringify(hybridBlock1) === JSON.stringify(hybridBlock2));
+check('hybrid block preserves 4-week structure and planned slot definitions',
+  hybridBlock1.weeks === 4 && hybridBlock1.sessions.length > 0 &&
+  hybridBlock1.sessions.every((s) => s.slots.every((sl) => sl.sets > 0 && sl.reps > 0 && sl.target_rpe >= 5)));
+
+const blockPlannerFiles = ['blockGenerator.ts', 'routineComposer.ts', 'routineMicrocycle.ts'];
+let blockRetroLeak = null;
+for (const bf of blockPlannerFiles) {
+  const code = readFileSync(join(import.meta.dirname, '..', 'src', bf), 'utf-8');
+  if (/\bhard_sets\b/.test(code) || /\bsession_rpe\b/.test(code)) {
+    blockRetroLeak = bf;
+  }
+}
+check('source tripwire: block planners contain no retrospective signal references',
+  blockRetroLeak === null, blockRetroLeak ? `leaked in ${blockRetroLeak}` : '3 block planner files clean');
+
+const cleanGen = generateBlock({ profile: hybridSeedProfile, movements, startDate: START, schemaType: 'LINEAR', macroBlockIndex: 1 });
+const poisonedGen = generateBlock({
+  profile: { ...hybridSeedProfile, hard_sets: 9999, session_rpe: 10.0 },
+  movements,
+  startDate: START,
+  schemaType: 'LINEAR',
+  macroBlockIndex: 1,
+});
+check('forward block generation is byte-identical when retrospective signals are poisoned',
+  JSON.stringify(cleanGen) === JSON.stringify(poisonedGen));
 
 // --- [11] 010 movement library contract (types.ts <-> 010 SQL/seed) --------------
 console.log('[11] 010 movement library contract (Phase 12)');

@@ -2,6 +2,17 @@
 
 Architectural deviations from product mandates, with rationale. Newest first.
 
+## 2026-08-14 - Calibration Policy v1 (readiness_score load term removal)
+
+1. **Readiness score no longer contains a load term (`load_component`).**
+   Under owner-ratified Calibration Policy v1 (`CALIBRATION_POLICY_V1_RATIFICATION.md`),
+   ACWR is descriptive only and has no authority over daily prescription or
+   readiness classification. `packages/core-db/src/schema/004_state_vector_materialize.sql`
+   removes the `0.30 * load_component` term from both numerator and denominator of
+   `readiness_score`. All-missing inputs continue to evaluate to neutral `50.0`.
+   Raw acute/chronic tonnage, ACWR, and `load_component` continue to be calculated
+   and persisted for descriptive/historical presentation only.
+
 ## 2026-08-12 - Pre-release hardening audit follow-up
 
 1. **RESOLVED by additive migration 050: poisoned-database self-heal formerly

@@ -55,6 +55,7 @@ const schemaFiles = [
   '052_bounded_microcycle_roles.sql',
   '053_routine_role_compatibility.sql',
   '054_contract_cutoff_provenance.sql',
+  '055_return_checkin_ack.sql',
 ];
 
 for (const f of schemaFiles) {
@@ -644,7 +645,7 @@ if (fail > 0) {
     }
   };
 
-  console.log('\n[multi-day routine templates — real 001-054 chain + shared production law]');
+  console.log('\n[multi-day routine templates — real 001-055 chain + shared production law]');
 
   const idOf = (name) => {
     const row = mdb.prepare('SELECT movement_id FROM movement WHERE name = ?').get(name);

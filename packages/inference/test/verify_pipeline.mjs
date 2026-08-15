@@ -489,7 +489,7 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
 // P2-4: named acceptance coverage against the REAL migration chain.
 //
 // Every check above runs on synthetic fixtures. This block builds the shipped
-// library from migrations 001-054 and pins the ratified records BY NAME, so a
+// library from migrations 001-055 and pins the ratified records BY NAME, so a
 // future content batch that re-tiers a competition lift, moves a role row, or
 // re-parents a capability edge fails here instead of in an athlete's hands.
 //
@@ -511,10 +511,10 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
   }
   for (const file of fullChain) db.exec(readFileSync(join(schemaDir, file), 'utf-8'));
 
-  check('the acceptance database is the real 001-054 chain, not a trimmed subset', () => {
+  check('the acceptance database is the real 001-055 chain, not a trimmed subset', () => {
     assert.equal(fullChain[0], '001_mechanical_input.sql');
-    assert.equal(fullChain[fullChain.length - 1], '054_contract_cutoff_provenance.sql');
-    assert.equal(fullChain.length, 53, `applied ${fullChain.length} migrations`);
+    assert.equal(fullChain[fullChain.length - 1], '055_return_checkin_ack.sql');
+    assert.equal(fullChain.length, 54, `applied ${fullChain.length} migrations`);
     assert.equal(Number(db.prepare('SELECT COUNT(*) AS c FROM movement').get().c), 300);
   });
 

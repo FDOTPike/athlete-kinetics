@@ -28,22 +28,20 @@ const cue = (text: string): string => {
  */
 export function evaluatePolicy(row: StateVectorRow): AdjustmentVector {
   const r = row.readiness_score;
-  const acwr = row.acwr;
   const hrvz = row.hrv_z;
   const slp = row.sleep_efficiency_pct;
 
   // load_modifier (first match wins)
   let load: number;
-  if (acwr !== null && acwr > 1.5) load = 0.85;
-  else if (r < 40) load = 0.85;
+  if (r < 40) load = 0.85;
   else if (r < 55) load = 0.9;
   else if (r < 70) load = 0.95;
-  else if (r >= 85 && acwr !== null && acwr <= 1.3 && hrvz !== null && hrvz >= 0) load = 1.05;
+  else if (r >= 85 && hrvz !== null && hrvz >= 0) load = 1.05;
   else load = 1.0;
 
   // set_modifier
   let sets: number;
-  if ((acwr !== null && acwr > 1.5) || r < 40) sets = -2;
+  if (r < 40) sets = -2;
   else if (r < 55) sets = -1;
   else if (r >= 85 && slp !== null && slp >= 85) sets = 1;
   else sets = 0;
@@ -58,18 +56,16 @@ export function evaluatePolicy(row: StateVectorRow): AdjustmentVector {
 
   // coaching_cue — blunt mechanical rationale citing the decisive numbers
   let text: string;
-  if (acwr !== null && acwr > 1.5) {
-    text = `ACWR ${fmt(acwr, 2)} spike: cut load 15% and drop 2 sets to re-enter the 0.8-1.30 band.`;
-  } else if (r < 40) {
+  if (r < 40) {
     text = `Readiness ${fmt(r, 0)} with HRV z ${fmt(hrvz, 1)}: pull load 15% and cap effort at RPE ${fmt(rpe, 1)}.`;
   } else if (r < 55) {
     text = `Readiness ${fmt(r, 0)}: reduce load 10%, one set down, RPE cap ${fmt(rpe, 1)}.`;
   } else if (r < 70) {
     text = `Readiness ${fmt(r, 0)}: shave load 5% and stop sets at RPE ${fmt(rpe, 1)}.`;
   } else if (load === 1.05) {
-    text = `Readiness ${fmt(r, 0)}, ACWR ${fmt(acwr, 2)} in band: add 5% load${sets === 1 ? ' and one set' : ''}, cap RPE ${fmt(rpe, 1)}.`;
+    text = `Readiness ${fmt(r, 0)}: add 5% load${sets === 1 ? ' and one set' : ''}, cap RPE ${fmt(rpe, 1)}.`;
   } else {
-    text = `Readiness ${fmt(r, 0)}, ACWR ${fmt(acwr, 2)}: hold planned loads, RPE cap ${fmt(rpe, 1)}.`;
+    text = `Readiness ${fmt(r, 0)}: hold planned loads, RPE cap ${fmt(rpe, 1)}.`;
   }
 
   return { load_modifier: load, set_modifier: sets, rpe_cap: rpe, coaching_cue: cue(text) };

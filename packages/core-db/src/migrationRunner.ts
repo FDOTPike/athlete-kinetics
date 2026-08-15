@@ -141,6 +141,7 @@ export const SENTINELS: readonly MigrationSentinel[] = [
     name: 'trg_routine_template_contract_cutoff_bd',                 // 054
     failClosedRepairSql: ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL,
   },
+  { type: 'table', name: 'return_checkin_ack' },                      // 055
 ];
 
 function userVersion(db: MigrationDb): number {

@@ -21,13 +21,8 @@ export type AthleteState = 'OPTIMAL' | 'OVERREACHED' | 'RECOVERY';
 
 /** Mirrors the LOADCTL policy bands without making this screen an engine. */
 export function classifyReadiness(v: StateVectorRow): AthleteState {
-  if ((v.acwr !== null && v.acwr > 1.5) || v.readiness_score < 40) return 'OVERREACHED';
-  if (
-    v.readiness_score >= 70 &&
-    (v.acwr === null || (v.acwr >= 0.8 && v.acwr <= 1.3))
-  ) {
-    return 'OPTIMAL';
-  }
+  if (v.readiness_score < 40) return 'OVERREACHED';
+  if (v.readiness_score >= 70) return 'OPTIMAL';
   return 'RECOVERY';
 }
 
@@ -55,7 +50,7 @@ const STATE_META: Record<AthleteState, ReadinessMeta> = {
     label: 'Recovery needed',
     title: 'Make recovery the work',
     recommendation: 'Reduce training stress today and follow the adjusted plan.',
-    explanation: 'Your recent load or readiness score indicates that extra recovery is the useful next step.',
+    explanation: 'Your readiness score indicates that extra recovery is the useful next step.',
   },
 };
 
@@ -72,12 +67,14 @@ const format = (value: number | null, digits: number, suffix = ''): string =>
 const formatSigned = (value: number | null, digits: number): string =>
   value === null ? 'Not available' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
+const formatFocus = (focus: string): string =>
+  focus ? focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase() : '';
+
 export const readinessCoverage = (vector: StateVectorRow): string => {
-  const available = [vector.acwr !== null, vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
+  const available = [vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
     .filter(Boolean).length;
   if (available === 0) return 'No current inputs';
-  if (available === 1 && vector.acwr !== null) return 'Load only · 1 of 3 inputs';
-  return `${available} of 3 inputs`;
+  return `${available} of 2 inputs`;
 };
 export interface ReadinessScreenProps {
   /** Supplied by the shell so the focused action can open a live session. */
@@ -107,6 +104,9 @@ export default function ReadinessScreen({
   const refreshVector = useStore((s) => s.refreshVector);
   const loadDemoAthlete = useStore((s) => s.loadDemoAthlete);
   const resetTrainingData = useStore((s) => s.resetTrainingData);
+  const returnCheckin = useStore((s) => s.returnCheckin);
+  const confirmReturnCheckin = useStore((s) => s.confirmReturnCheckin);
+  const dismissReturnCheckin = useStore((s) => s.dismissReturnCheckin);
   const [confirmReset, setConfirmReset] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -225,7 +225,11 @@ export default function ReadinessScreen({
           detail={`${Math.round(vector.readiness_score)} / 100`}
         />
         <ListRow label="Data coverage" detail={readinessCoverage(vector)} />
-        <ListRow label="Acute to chronic load" detail={format(vector.acwr, 2)} />
+        <ListRow label="Acute to chronic load" detail={format(vector.acwr, 2)}>
+          <Text style={styles.caption}>
+            Recent recorded external load compared with the preceding four-week average. Bodyweight, conditioning, grappling, and unlogged training may be incomplete.
+          </Text>
+        </ListRow>
         <ListRow label="HRV deviation" detail={formatSigned(vector.hrv_z, 1)} />
         <ListRow label="Sleep efficiency" detail={format(vector.sleep_efficiency_pct, 1, '%')} />
         <ListRow label="Acute load" detail={format(vector.acute_load_kg, 0, ' kg')} />
@@ -255,6 +259,42 @@ export default function ReadinessScreen({
     );
   };
 
+  const renderReturnCheckinCard = () => {
+    if (returnCheckin == null || returnCheckin.isDismissed) {
+      return null;
+    }
+    return (
+      <View style={styles.card} testID="return-checkin-banner">
+        <Text style={styles.wordmark}>RETURN CHECK-IN</Text>
+        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.body}>
+          It&apos;s been {returnCheckin.daysSinceLastTrained} days since your last logged
+          session. Training you did elsewhere may not be recorded here. Your plan is
+          unchanged — carry on with it, or look over the first session and adjust it
+          yourself.
+        </Text>
+        <SecondaryButton
+          label="Continue current plan"
+          onPress={() => confirmReturnCheckin('continue_plan')}
+          accessibilityLabel="Continue current plan unchanged"
+        />
+        <SecondaryButton
+          label="Review first session"
+          onPress={() => {
+            confirmReturnCheckin('review_first_session');
+            onOpenCoach?.();
+          }}
+          accessibilityLabel="Review the first session before training"
+        />
+        <SecondaryButton
+          label="Dismiss"
+          onPress={dismissReturnCheckin}
+          accessibilityLabel="Dismiss return check-in"
+        />
+      </View>
+    );
+  };
+
   if (isRestDay) {
     return (
       <ScrollView
@@ -267,6 +307,8 @@ export default function ReadinessScreen({
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
         </View>
+
+        {renderReturnCheckinCard()}
 
         {/* Display-type Rest day statement */}
         <Text style={styles.displayMain}>Rest day.</Text>
@@ -309,6 +351,8 @@ export default function ReadinessScreen({
         <Text style={styles.wordmark}>pikeMethods</Text>
       </View>
 
+      {renderReturnCheckinCard()}
+
       <View style={[styles.card, styles.cardActiveSpine]}>
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>{meta.label.toUpperCase()}</Text>
@@ -317,7 +361,7 @@ export default function ReadinessScreen({
         <Text style={styles.body}>{meta.recommendation}</Text>
         {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
         {!hasLiveSession && todayPlan !== null && (
-          <Text style={styles.caption}>{todayPlan.focus} is planned today.</Text>
+          <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
         )}
         {!hasLiveSession && todayPlan === null && !halted && (
           <Text style={styles.caption}>

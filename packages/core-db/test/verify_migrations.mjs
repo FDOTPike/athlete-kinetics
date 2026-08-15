@@ -54,7 +54,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '051_routine_access_context.sql',
   '052_bounded_microcycle_roles.sql',
   '053_routine_role_compatibility.sql',
-  '054_contract_cutoff_provenance.sql'];
+  '054_contract_cutoff_provenance.sql',
+  '055_return_checkin_ack.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -1558,6 +1559,54 @@ check('guard poison resets cutoff zero, restores both guards, and prunes fabrica
     && Number(cutoffPoison.raw.prepare(
       'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
     ).get(cutoffPoisonTemplateId).c) === 0);
+
+// --- 2q. 055 return_checkin_ack: poison heal, constraints, replay -------------
+console.log('[2q] 055 return_checkin_ack');
+{
+  const ackPoison = freshDb();
+  runMigrations(ackPoison, MIGRATIONS);
+  ackPoison.executeSync('DROP TABLE return_checkin_ack');
+  check('055 poison precondition: return_checkin_ack sentinel missing',
+    sentinelsMissing(ackPoison).includes('return_checkin_ack'));
+  runMigrations(ackPoison, MIGRATIONS);
+  check('055 poison self-heal restores return_checkin_ack sentinel',
+    sentinelsMissing(ackPoison).length === 0);
+
+  // Check valid insertion and primary key deduplication
+  ackPoison.raw.prepare(`
+    INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-07-01', 'continue_plan', 1000)
+  `).run();
+  ackPoison.raw.prepare(`
+    INSERT OR IGNORE INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-07-01', 'review_first_session', 2000)
+  `).run();
+  const row055 = ackPoison.raw.prepare("SELECT * FROM return_checkin_ack WHERE last_qualifying_date = '2026-07-01'").get();
+  check('055 persists acknowledged_action correctly', row055.acknowledged_action === 'continue_plan');
+
+  // Check CHECK constraints
+  let invalidActionThrew = false;
+  try {
+    ackPoison.raw.prepare(`
+      INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+      VALUES ('2026-07-02', 'unauthorized_dose_modifier', 3000)
+    `).run();
+  } catch {
+    invalidActionThrew = true;
+  }
+  check('055 schema rejects unauthorized action values', invalidActionThrew);
+
+  let invalidDateThrew = false;
+  try {
+    ackPoison.raw.prepare(`
+      INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+      VALUES ('2026/07/02', 'continue_plan', 3000)
+    `).run();
+  } catch {
+    invalidDateThrew = true;
+  }
+  check('055 schema rejects invalid date GLOB format', invalidDateThrew);
+}
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);
