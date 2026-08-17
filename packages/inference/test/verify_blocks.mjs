@@ -36,6 +36,14 @@ const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS,
   SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
   MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
   PATTERN_TO_CATEGORY } = require('./.build/types.js');
+const {
+  mapImplementToTier,
+  sortPickerMovements,
+  groupAndSortPickerMovements,
+  PICKER_TIER_NAMES,
+  TIER_3_CAPTION,
+} = require('./.build/pickerTiering.js');
+
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', '..', 'core-db', 'src', 'schema');
 const START = '2026-06-15';
@@ -1363,6 +1371,113 @@ console.log('[7] full-body scope routing and specialist equipment');
   check('SPECIALIST_EQUIPMENT_ITEMS is disjoint from every preset bundle',
     Object.values(EQUIPMENT_PRESETS).every((bundle) =>
       SPECIALIST_EQUIPMENT_ITEMS.every((i) => !bundle.includes(i))));
+}
+
+// --- [27] Custom Block Builder: implement tiering in picker (Phase 19) -------
+console.log('\n[27] custom block builder: picker implement tiering & sorting');
+{
+  // Total mapping: every implement lands in exactly one tier
+  check('barbell maps to Tier 1', mapImplementToTier('barbell') === 1);
+  check('dumbbell, kettlebell, bodyweight, band map to Tier 2',
+    ['dumbbell', 'kettlebell', 'bodyweight', 'band'].every((i) => mapImplementToTier(i) === 2));
+  check('cable, machine, other map to Tier 3',
+    ['cable', 'machine', 'other'].every((i) => mapImplementToTier(i) === 3));
+  check('unknown or null implement falls back to Tier 3',
+    mapImplementToTier(null) === 3 && mapImplementToTier('nonsense') === 3);
+  check('every taxonomy implement lands in exactly one tier [1, 2, 3]',
+    TAXONOMY_IMPLEMENTS.every((i) => [1, 2, 3].includes(mapImplementToTier(i))));
+
+
+  // Sort order Tier 1: usable first, difficulty DESCENDING (Adv > Int > Beg), name alphabetical
+  const t1Sample = [
+    { name: 'Back Squat', difficulty: 'Intermediate', implement: 'barbell', executable: true },
+    { name: 'Overhead Squat', difficulty: 'Advanced', implement: 'barbell', executable: true },
+    { name: 'Box Squat', difficulty: 'Intermediate', implement: 'barbell', executable: true },
+    { name: 'Locked Barbell Lift', difficulty: 'Advanced', implement: 'barbell', executable: false },
+    { name: 'Beginner Barbell Squat', difficulty: 'Beginner', implement: 'barbell', executable: true },
+  ];
+  const t1Sorted = sortPickerMovements(t1Sample, 1);
+  check('Tier 1 sorts usable first, then difficulty DESC, then name ASC',
+    JSON.stringify(t1Sorted.map((m) => m.name)) === JSON.stringify([
+      'Overhead Squat',        // Adv, usable
+      'Back Squat',            // Int, usable (B before B... wait 'Back' before 'Box')
+      'Box Squat',             // Int, usable
+      'Beginner Barbell Squat', // Beg, usable
+      'Locked Barbell Lift',   // Adv, locked (usable sorts above locked)
+    ]),
+    JSON.stringify(t1Sorted.map((m) => m.name)));
+
+  // Sort order Tiers 2 and 3: usable first, difficulty ASCENDING (Beg > Int > Adv), name alphabetical
+  const t2Sample = [
+    { name: 'Single-Leg RDL', difficulty: 'Advanced', implement: 'dumbbell', executable: true },
+    { name: 'Goblet Squat', difficulty: 'Beginner', implement: 'kettlebell', executable: true },
+    { name: 'DB Bench Press', difficulty: 'Intermediate', implement: 'dumbbell', executable: true },
+    { name: 'Locked DB Row', difficulty: 'Beginner', implement: 'dumbbell', executable: false },
+  ];
+  const t2Sorted = sortPickerMovements(t2Sample, 2);
+  check('Tier 2 sorts usable first, then difficulty ASC, then name ASC',
+    JSON.stringify(t2Sorted.map((m) => m.name)) === JSON.stringify([
+      'Goblet Squat',    // Beg, usable
+      'DB Bench Press',  // Int, usable
+      'Single-Leg RDL',  // Adv, usable
+      'Locked DB Row',   // Beg, locked (locked goes below usable)
+    ]),
+    JSON.stringify(t2Sorted.map((m) => m.name)));
+
+  // Tier 3 grouping and sorting
+  const fullSample = [...t1Sample, ...t2Sample,
+    { name: 'Cable Fly', difficulty: 'Intermediate', implement: 'cable', executable: true },
+    { name: 'Lat Pulldown', difficulty: 'Beginner', implement: 'cable', executable: true },
+  ];
+  const grouped = groupAndSortPickerMovements(fullSample);
+  check('grouped Tier 1 has 5 items sorted correctly', grouped[1].length === 5 && grouped[1][0].name === 'Overhead Squat');
+  check('grouped Tier 2 has 4 items sorted correctly', grouped[2].length === 4 && grouped[2][0].name === 'Goblet Squat');
+  check('grouped Tier 3 has 2 items sorted ASC (Lat Pulldown before Cable Fly)',
+    grouped[3].length === 2 && grouped[3][0].name === 'Lat Pulldown' && grouped[3][1].name === 'Cable Fly');
+
+  check('TIER_3_CAPTION is present and non-empty',
+    typeof TIER_3_CAPTION === 'string' && TIER_3_CAPTION.length > 0);
+}
+
+// ---------------------------------------------------------------------------
+// Work Order A: Split transparency and program focuses
+// ---------------------------------------------------------------------------
+console.log('\n[Work Order A: Split transparency and program focuses]');
+{
+  // Pin rehab profile behavior Francis hit: all full-body days across 1..7 frequency
+  for (let n = 1; n <= 7; n++) {
+    const focuses = programFocuses('rehab', n);
+    check(`programFocuses('rehab', ${n}) returns ${n} entries all equal to 'full'`,
+      focuses.length === n && focuses.every((f) => f === 'full'),
+      JSON.stringify(focuses));
+  }
+
+  // Pin strength 5-day split
+  const strength5 = programFocuses('strength', 5);
+  check("programFocuses('strength', 5) is ['lower','upper','lower','upper','full']",
+    JSON.stringify(strength5) === JSON.stringify(['lower', 'upper', 'lower', 'upper', 'full']),
+    JSON.stringify(strength5));
+
+  // Verify splitExplainer verbatim copy
+  const { splitExplainer, SPLIT_EXPLAINER_FOOTER } = require('./.build/blockGenerator.js');
+  check('splitExplainer for rehab matches approved copy',
+    splitExplainer('rehab', 5) === 'Every day is full-body and effort is capped at RPE 7. Rehab keeps volume low and frequency steady rather than loading any one pattern hard.');
+  check('splitExplainer for strength matches approved copy',
+    splitExplainer('strength', 5) === 'Alternating lower and upper days across 5 sessions, so each half recovers while the other works.');
+  check('splitExplainer for power matches approved copy',
+    splitExplainer('power', 4) === 'Alternating lower and upper days across 4 sessions, so each half recovers while the other works.');
+  check('splitExplainer for hypertrophy matches approved copy',
+    splitExplainer('hypertrophy', 3) === 'Alternating lower and upper days across 3 sessions, so each half recovers while the other works.');
+  check('splitExplainer for endurance matches approved copy',
+    splitExplainer('endurance', 3) === 'Full-body strength alternated with conditioning across 3 sessions.');
+  check('splitExplainer for weight_loss matches approved copy',
+    splitExplainer('weight_loss', 4) === 'Full-body strength alternated with conditioning across 4 sessions.');
+  check('splitExplainer for gpp matches approved copy',
+    splitExplainer('gpp', 4) === 'A mix of lower, upper, full-body and conditioning across 4 sessions — broad rather than specialised.');
+  check('splitExplainer for hybrid matches approved copy',
+    splitExplainer('hybrid', 4) === 'Strength days interleaved with mat time across 4 sessions, so grappling stays the priority.');
+  check('SPLIT_EXPLAINER_FOOTER matches approved copy',
+    SPLIT_EXPLAINER_FOOTER === 'You can change any day below.');
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

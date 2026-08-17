@@ -899,6 +899,7 @@ export default function SessionScreen(): React.JSX.Element {
                           <Stepper
                             testID="current-rpe-stepper"
                             label="Actual RPE"
+                            tip="RPE"
                             value={rpe.toFixed(1)}
                             onDecrement={() => {
                               setRpeTouched(true);

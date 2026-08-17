@@ -88,6 +88,7 @@ import {
   MACRO_BLOCKS,
   macroPhaseOf,
   programMacroIndex,
+  BLOCK_FOCI,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
   RED_FLAG_PAIN,
@@ -270,7 +271,10 @@ export interface Movement {
   scope: 'full_body' | null;
   /** movement_sport_tracking membership. */
   sportTracking: boolean;
+  /** movement_taxonomy.implement (008 / 056). */
+  implement: string | null;
 }
+
 
 export interface CoachMovementAccessContext {
   edges: CapabilityEdge[];
@@ -435,6 +439,15 @@ export interface TodaySlot {
   };
 }
 
+export interface PendingAutopilotAdjustment {
+  plannedSlotId: number;
+  movementId: number;
+  movementName: string;
+  rpeDelta: number;
+  setDelta: number;
+  reason: string;
+}
+
 /** The active block's periodization metadata (block_meta side-car). */
 export interface BlockMeta {
   schemaType: SchemaType;
@@ -500,6 +513,7 @@ export interface TrainingProgramInput {
   schemaType: SchemaType;
   dayIndices: number[];
   movementPreferences?: TrainingProgramMovementPreference[];
+  days?: TrainingProgramDay[];
 }
 
 export interface TrainingProgramPreview {
@@ -618,6 +632,7 @@ interface KineticsStore {
   hasArchivedBlock: boolean;
   program: TrainingProgram | null;
   routineTemplates: RoutineTemplate[];
+  pendingAutopilotAdjustments: PendingAutopilotAdjustment[];
   /** Absolute 1RMs by movement_id (one_rep_max rows). */
   oneRepMaxes: Record<number, number>;
   /** Evidence-backed last load by movement, hydrated from durable set history. */
@@ -661,6 +676,7 @@ interface KineticsStore {
   continueTrainingProgram: () => void;
   archiveTrainingProgram: () => void;
   refreshProgram: () => void;
+  getPendingAutopilotAdjustments: () => PendingAutopilotAdjustment[];
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
@@ -993,6 +1009,7 @@ interface MovementRow {
   progression_group: string | null; progression_rank: number | null;
   scope: string | null;
   sport_tracking: number | null;
+  implement: string | null;
 }
 const PREFIX_SET = new Set<string>(MOVEMENT_PREFIXES);
 const MEDIA_STATUS_SET = new Set<string>(['planned', 'external_fallback', 'ready']);
@@ -1065,6 +1082,7 @@ const movementFromRow = (r: MovementRow): Movement => {
     // (including a NULL LEFT JOIN) reads as "not scoped".
     scope: r.scope === 'full_body' ? 'full_body' : null,
     sportTracking: r.sport_tracking === 1,
+    implement: r.implement ?? null,
   };
 };
 
@@ -1074,8 +1092,10 @@ const MOVEMENT_LIBRARY_SQL = `SELECT m.movement_id, m.name, m.pattern, m.is_comp
   mm.asset_key AS media_asset_key, mm.status AS media_status, mm.revision AS media_revision,
   ci.coaching_intent, tp.default_sets AS time_default_sets, tp.target_seconds AS time_target_seconds, p.preference,
   (w.movement_id IS NOT NULL) AS beginner_ok, lm.mode AS logging_mode, mp.progression_group, mp.progression_rank,
-  ms.scope AS scope, (mst.movement_id IS NOT NULL) AS sport_tracking
-  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_media mm ON mm.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id LEFT JOIN movement_scope ms ON ms.movement_id = m.movement_id LEFT JOIN movement_sport_tracking mst ON mst.movement_id = m.movement_id ORDER BY m.movement_id`;
+  ms.scope AS scope, (mst.movement_id IS NOT NULL) AS sport_tracking,
+  t.implement AS implement
+  FROM movement m LEFT JOIN movement_detail d ON d.movement_id = m.movement_id LEFT JOIN movement_taxonomy t ON t.movement_id = m.movement_id LEFT JOIN movement_media mm ON mm.movement_id = m.movement_id LEFT JOIN movement_coaching_intent ci ON ci.movement_id = m.movement_id LEFT JOIN movement_time_policy tp ON tp.movement_id = m.movement_id LEFT JOIN movement_preference p ON p.movement_id = m.movement_id LEFT JOIN movement_beginner_whitelist w ON w.movement_id = m.movement_id LEFT JOIN movement_logging_mode lm ON lm.movement_id = m.movement_id LEFT JOIN movement_progression mp ON mp.movement_id = m.movement_id LEFT JOIN movement_scope ms ON ms.movement_id = m.movement_id LEFT JOIN movement_sport_tracking mst ON mst.movement_id = m.movement_id ORDER BY m.movement_id`;
+
 
 /** Map the 023 side-car (or a conservative legacy rep fallback) into one
  * target union. Historic sessions without the side-car stay readable. */
@@ -1903,7 +1923,14 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
     plannedBlockCount = Math.ceil(daysAway / 28);
   }
   const focuses = programFocuses(profile.objective, selected.length);
-  const days = selected.map((dayIndex, i) => ({ dayIndex, focus: focuses[i] }));
+  const inputDaysMap = new Map(input.days?.map((d) => [d.dayIndex, d.focus]));
+  const days: TrainingProgramDay[] = selected.map((dayIndex, i) => {
+    const focus = (inputDaysMap.get(dayIndex) ?? focuses[i]) as BlockFocus;
+    if (!BLOCK_FOCI.has(focus)) {
+      throw new Error('A program day contains an invalid focus.');
+    }
+    return { dayIndex, focus };
+  });
   const allowedDays = new Set(selected);
   const seenSlots = new Set<string>();
   const movementPreferences = [...(input.movementPreferences ?? [])].sort(
@@ -1940,7 +1967,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
   activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
-  block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [],
+  block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [], pendingAutopilotAdjustments: [],
   oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), loadPreference: 'auto', loadPreferenceExplicit: false, bandLadder: [], onboarded: true,
 };
 
@@ -1979,6 +2006,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   hasArchivedBlock: false,
   program: null,
   routineTemplates: [],
+  pendingAutopilotAdjustments: [],
   oneRepMaxes: {},
   lastLoggedLoads: {},
   lastEndedSessionId: null,
@@ -3146,7 +3174,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       "SELECT block_id, start_date, objective, created_at_ms FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
     ))[0];
     if (blockRow === undefined) {
-      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, hasArchivedBlock });
+      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, pendingAutopilotAdjustments: [], hasArchivedBlock });
       return;
     }
     const metaRow = rowsOf<{
@@ -3224,6 +3252,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
             adaptations: parseStringArray(routineStressRow.adaptations_json),
           },
         };
+    const pendingAutopilotAdjustments = get().getPendingAutopilotAdjustments();
     set({
       block: {
         blockId: blockRow.block_id,
@@ -3241,6 +3270,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         : null, // pre-009 blocks have no meta; UI treats them as LINEAR-era
       blockSessions,
       todayPlan,
+      pendingAutopilotAdjustments,
     });
   },
 
@@ -4223,6 +4253,41 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         stressDose: sl.stress_dose ?? 0,
         adaptations: parseStringArray(sl.routine_adaptations_json),
       },
+    }));
+  },
+
+  getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[] => {
+    if (db === null) return [];
+    const d = db;
+    const rows = rowsOf<{
+      planned_slot_id: number;
+      movement_id: number;
+      movement_name: string;
+      rpe_delta: number;
+      set_delta: number;
+      reason: string;
+    }>(d.executeSync(`
+      SELECT pa.planned_slot_id,
+             sl.movement_id,
+             m.name AS movement_name,
+             pa.rpe_delta,
+             pa.set_delta,
+             pa.reason
+      FROM planned_slot_autopilot pa
+      JOIN planned_slot sl ON sl.planned_slot_id = pa.planned_slot_id
+      JOIN movement m ON m.movement_id = sl.movement_id
+      JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+      JOIN training_block tb ON tb.block_id = ps.block_id
+      WHERE tb.status = 'active'
+      ORDER BY ps.session_date, sl.slot_index, pa.planned_slot_id
+    `));
+    return rows.map((r) => ({
+      plannedSlotId: r.planned_slot_id,
+      movementId: r.movement_id,
+      movementName: r.movement_name,
+      rpeDelta: r.rpe_delta,
+      setDelta: r.set_delta,
+      reason: r.reason,
     }));
   },
 

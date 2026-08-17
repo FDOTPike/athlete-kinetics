@@ -284,7 +284,34 @@ export const programFocuses = (objective: Objective, frequency: number): readonl
 export const defaultProgramDayIndices = (frequency: number): readonly number[] =>
   DAY_SPREAD[clamp(Math.round(frequency), 1, 7) - 1];
 
-const BLOCK_FOCI: ReadonlySet<BlockFocus> = new Set(['lower', 'upper', 'full', 'conditioning', 'bjj']);
+export const BLOCK_FOCUS_LIST: readonly BlockFocus[] = ['lower', 'upper', 'full', 'conditioning', 'bjj'] as const;
+export const BLOCK_FOCI: ReadonlySet<BlockFocus> = new Set(BLOCK_FOCUS_LIST);
+
+/**
+ * Split explainer copy approved by owner (Section 3 of 04_COPY_FOR_OWNER_APPROVAL.md).
+ * Rendered verbatim with {n} replaced by session count.
+ */
+export function splitExplainer(objective: Objective | string, n: number): string {
+  switch (objective) {
+    case 'strength':
+    case 'power':
+    case 'hypertrophy':
+      return `Alternating lower and upper days across ${n} sessions, so each half recovers while the other works.`;
+    case 'endurance':
+    case 'weight_loss':
+      return `Full-body strength alternated with conditioning across ${n} sessions.`;
+    case 'gpp':
+      return `A mix of lower, upper, full-body and conditioning across ${n} sessions — broad rather than specialised.`;
+    case 'hybrid':
+      return `Strength days interleaved with mat time across ${n} sessions, so grappling stays the priority.`;
+    case 'rehab':
+      return `Every day is full-body and effort is capped at RPE 7. Rehab keeps volume low and frequency steady rather than loading any one pattern hard.`;
+    default:
+      return '';
+  }
+}
+
+export const SPLIT_EXPLAINER_FOOTER = 'You can change any day below.';
 
 /** Rep/set/effort scheme per objective. rpeWave is weeks 1..3; week 4 is the
  *  deload transform (sets halved up, RPE = wave[0] - 1.0, floor 5.0). */

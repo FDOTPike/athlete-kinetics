@@ -847,5 +847,18 @@ try:
 except sqlite3.IntegrityError:
     check("055 CHECK rejects a malformed qualifying date", True)
 
+# --- [21] Custom Block Builder: movement_taxonomy_backfill (056) -------------
+print("\n[21] movement_taxonomy_backfill (056)")
+sql_056 = (SCHEMA_DIR / "056_movement_taxonomy_backfill.sql").read_text(encoding="utf-8")
+p17.executescript(sql_056)
+missing_count = p17.execute("""
+    SELECT COUNT(*) c
+    FROM movement m
+    LEFT JOIN movement_taxonomy t ON m.movement_id = t.movement_id
+    WHERE t.movement_id IS NULL
+""").fetchone()["c"]
+check("every row in movement has exactly one movement_taxonomy row (missing count is 0)",
+      missing_count == 0, f"{missing_count} missing")
+
 print(f"\n{'ALL CHECKS PASSED' if fail == 0 else f'{fail} CHECK(S) FAILED'}")
 sys.exit(1 if fail else 0)

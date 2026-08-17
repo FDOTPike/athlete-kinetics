@@ -6,7 +6,7 @@
  */
 import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SCHEMA_TYPES, addDaysIso, targetLoadKg, type BlockPlan, type SchemaType } from '@ak/inference';
+import { SCHEMA_TYPES, addDaysIso, targetLoadKg, splitExplainer, SPLIT_EXPLAINER_FOOTER, type BlockPlan, type SchemaType } from '@ak/inference';
 import {
   useStore,
   type BlockSessionSummary,
@@ -16,6 +16,8 @@ import {
 import { RoutineTemplateBuilder } from '../components/RoutineTemplateBuilder';
 import { useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
+import NewBlockChooserScreen from './NewBlockChooserScreen';
+import InfoTip from '../components/InfoTip';
 import { theme } from '../theme/theme';
 import {
   PrimaryButton,
@@ -44,6 +46,15 @@ const PHASE_LABEL: Record<string, string> = {
   intensification: 'Build strength',
   realization: 'Realise',
   deload: 'Deload',
+};
+
+const GLOSSARY_PHASE_TERM: Record<string, 'BUILD' | 'INTENSIFICATION' | 'REALISE' | 'DELOAD'> = {
+  accumulation: 'BUILD',
+  build: 'BUILD',
+  intensification: 'INTENSIFICATION',
+  realization: 'REALISE',
+  realise: 'REALISE',
+  deload: 'DELOAD',
 };
 
 interface BlockScreenProps {
@@ -168,6 +179,8 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const [editingProgram, setEditingProgram] = useState(false);
   const [nextProgramPreview, setNextProgramPreview] = useState<BlockPlan | null>(null);
   const startSession = useStore((s) => s.startSession);
+  const pendingAdjustments = useStore((s) => s.pendingAutopilotAdjustments) ?? [];
+  const blockEndDate = blockSessions.length > 0 ? blockSessions[blockSessions.length - 1].sessionDate : null;
 
   const routineTemplates = useStore((s) => s.routineTemplates) ?? [];
   const freezeRoutineTemplateToPlannedSession = useStore(
@@ -196,8 +209,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
+  const [showChooser, setShowChooser] = useState(false);
 
   const hasSubView =
+    showChooser ||
     editingProgram ||
     nextProgramPreview !== null ||
     detail !== null ||
@@ -208,7 +223,8 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     confirmRoutineAction !== null;
 
   useSubViewBack(hasSubView, () => {
-    if (editingProgram) setEditingProgram(false);
+    if (showChooser) setShowChooser(false);
+    else if (editingProgram) setEditingProgram(false);
     else if (nextProgramPreview !== null) setNextProgramPreview(null);
     else if (editingTemplate !== null) setEditingTemplate(null);
     else if (confirmRoutineAction !== null) setConfirmRoutineAction(null);
@@ -255,6 +271,22 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
       setConfirmRoutineAction(null);
     }
   };
+
+  if (showChooser) {
+    return (
+      <NewBlockChooserScreen
+        onSelectAuto={() => {
+          setShowChooser(false);
+          setEditingProgram(true);
+        }}
+        onSelectCustom={() => {
+          setShowChooser(false);
+          setEditingTemplate('new');
+        }}
+        onCancel={() => setShowChooser(false)}
+      />
+    );
+  }
 
   if (editingProgram) {
     return (
@@ -375,6 +407,26 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.bodyText}>
             A short four-week block gives Coach a clear trajectory to follow.
           </Text>
+          <PrimaryButton
+            label="Start a new block"
+            onPress={() => setShowChooser(true)}
+            accessibilityLabel="Start a new block"
+          />
+        </View>
+      )}
+
+      {block === null && !hasArchivedBlock && (
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>PERIODIZATION</Text>
+          <Text style={styles.cardTitle}>Build your first block</Text>
+          <Text style={styles.bodyText}>
+            A short four-week block gives Coach a clear trajectory to follow.
+          </Text>
+          <PrimaryButton
+            label="Start a new block"
+            onPress={() => setShowChooser(true)}
+            accessibilityLabel="Start a new block"
+          />
         </View>
       )}
 
@@ -462,11 +514,18 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             />
           )}
           {block !== null && (
-            <SecondaryButton
-              label={program == null ? 'Manage block' : 'Manage program'}
-              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
-              accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
-            />
+            <>
+              <SecondaryButton
+                label={program == null ? 'Manage block' : 'Manage program'}
+                onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+                accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
+              />
+              <SecondaryButton
+                label="Plan a new block"
+                onPress={() => setShowChooser(true)}
+                accessibilityLabel="Plan a new block"
+              />
+            </>
           )}
         </View>
       </View>
@@ -497,7 +556,14 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         style={styles.section}
         onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
       >
-        <Text style={styles.sectionTitle}>Four-week trajectory</Text>
+        <View style={styles.trajectoryHeaderRow}>
+          <Text style={styles.sectionTitle}>Four-week trajectory</Text>
+          {block !== null && blockEndDate !== null && (
+            <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
+              <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
+            </View>
+          )}
+        </View>
         {blockMeta !== null && blockMeta.macroBlockIndex >= 6 && (
           <View style={styles.blockAttribution}>
             <Pressable
@@ -518,14 +584,24 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           </View>
         ) : (
           <>
-            {rows.map((row) => (
-              <View key={row.week} style={styles.weekContainer}>
-                <View style={styles.weekRow}>
-                  <View style={styles.weekMeta}>
-                    <Text style={styles.weekTitle}>Week {row.week}</Text>
-                    <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
-                  </View>
-                  <View style={styles.dayRail}>
+            {(() => {
+              const seenPhaseTerms = new Set<string>();
+              return rows.map((row) => {
+                const phaseTerm = GLOSSARY_PHASE_TERM[row.phase.toLowerCase()];
+                const showPhaseTip = phaseTerm !== undefined && !seenPhaseTerms.has(phaseTerm);
+                if (phaseTerm) seenPhaseTerms.add(phaseTerm);
+
+                return (
+                  <View key={row.week} style={styles.weekContainer}>
+                    <View style={styles.weekRow}>
+                      <View style={styles.weekMeta}>
+                        <Text style={styles.weekTitle}>Week {row.week}</Text>
+                        <View style={styles.weekPhaseRow}>
+                          <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
+                          {showPhaseTip && <InfoTip term={phaseTerm} />}
+                        </View>
+                      </View>
+                      <View style={styles.dayRail}>
                     {row.cells.map((cell, dayIndex) => {
                       if (cell === null) {
                         return (
@@ -614,11 +690,40 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   </View>
                 )}
               </View>
-            ))}
+            );
+          });
+        })()}
             <Text style={styles.trajectoryHint}>Tap a planned day to see its movements.</Text>
           </>
         )}
       </View>
+
+      {/* What changes next block panel */}
+      {block !== null && (
+        <View style={styles.section}>
+          <View style={styles.nextBlockPanel} testID="next-block-adjustments-panel">
+            <Text style={styles.nextBlockHeading}>What changes next block</Text>
+            <Text style={styles.nextBlockIntro}>
+              Your current block is fixed. These adjustments apply when the next one is built.
+            </Text>
+            {pendingAdjustments.length === 0 ? (
+              <Text style={styles.nextBlockEmpty}>
+                Nothing queued. Your next block will follow the plan as written.
+              </Text>
+            ) : (
+              <View style={styles.adjustmentsList}>
+                {pendingAdjustments.map((adj) => (
+                  <View key={adj.plannedSlotId} style={styles.adjustmentRow}>
+                    <Text style={styles.adjustmentText}>
+                      {adj.movementName}: {adj.reason}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Disclosures Section */}
       <View style={styles.section}>
@@ -838,16 +943,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
             {!confirmRegenerate ? (
               <PrimaryButton
-                label={block === null ? 'Create four-week block' : 'Generate next block'}
+                label={block === null ? 'Start a new block' : 'Generate next block'}
                 onPress={() => {
                   if (block === null) {
-                    generateNewBlock(schema);
-                    setManageOpen(false);
+                    setShowChooser(true);
                   } else {
                     setConfirmRegenerate(true);
                   }
                 }}
-                accessibilityLabel={block === null ? 'Create four-week block' : 'Generate next block'}
+                accessibilityLabel={block === null ? 'Start a new block' : 'Generate next block'}
               />
             ) : (
               <View style={styles.confirmation}>
@@ -1096,17 +1200,21 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   weekMeta: {
-    width: 78,
+    minWidth: 78,
     justifyContent: 'center',
   },
   weekTitle: {
     ...theme.font.label,
     color: theme.color.textHi,
   },
+  weekPhaseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.space[1],
+  },
   weekPhase: {
     ...theme.font.eyebrow,
     color: theme.color.textLow,
-    marginTop: theme.space[1],
   },
   dayRail: {
     flex: 1,
@@ -1348,5 +1456,63 @@ const styles = StyleSheet.create({
   substitutedBadgeText: {
     ...theme.font.eyebrow,
     color: theme.color.textMid,
+  },
+  trajectoryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  fixedBadge: {
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+    paddingHorizontal: theme.space[2],
+    paddingVertical: theme.space[1],
+    backgroundColor: theme.color.ink1,
+  },
+  fixedBadgeText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+    letterSpacing: 1.2,
+  },
+  nextBlockPanel: {
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.sheet,
+    padding: theme.space[4],
+    gap: theme.space[2],
+  },
+  nextBlockHeading: {
+    ...theme.font.cue,
+    color: theme.color.textHi,
+  },
+  nextBlockIntro: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    lineHeight: 20,
+  },
+  nextBlockEmpty: {
+    ...theme.font.body,
+    color: theme.color.textLow,
+    fontStyle: 'italic',
+    paddingTop: theme.space[1],
+  },
+  adjustmentsList: {
+    gap: theme.space[2],
+    paddingTop: theme.space[1],
+  },
+  adjustmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.space[1],
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.line,
+  },
+  adjustmentText: {
+    ...theme.font.body,
+    color: theme.color.textHi,
   },
 });

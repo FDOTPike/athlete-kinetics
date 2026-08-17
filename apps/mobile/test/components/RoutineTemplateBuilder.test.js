@@ -360,4 +360,117 @@ describe('RoutineTemplateBuilder', () => {
     expect(screen.getByLabelText('+ Major').props.accessibilityState?.disabled).not.toBe(true);
     expect(screen.getByLabelText('+ Supp').props.accessibilityState?.disabled).not.toBe(true);
   });
+
+  test('movement picker renders three implement tiers, exact caption, tier-specific difficulty ordering, usable-over-locked hierarchy, and major slot demotions', () => {
+    const tierMovements = [
+      // Tier 1 (barbell)
+      { movement_id: 101, name: 'Barbell Back Squat', baseName: 'Squat', pattern: 'squat', cues: 'Brace', targetMuscles: ['quadriceps'], difficulty: 'Intermediate', implement: 'barbell' },
+      { movement_id: 102, name: 'Barbell Overhead Squat', baseName: 'Squat', pattern: 'squat', cues: 'Overhead', targetMuscles: ['quadriceps'], difficulty: 'Advanced', implement: 'barbell' },
+      { movement_id: 103, name: 'Barbell Box Squat', baseName: 'Squat', pattern: 'squat', cues: 'Box', targetMuscles: ['quadriceps'], difficulty: 'Beginner', implement: 'barbell' },
+      { movement_id: 104, name: 'Locked Barbell Snatch', baseName: 'Snatch', pattern: 'squat', cues: 'Snatch', targetMuscles: ['full_body'], difficulty: 'Advanced', implement: 'barbell' },
+
+      // Tier 2 (dumbbell, kettlebell, bodyweight, band)
+      { movement_id: 201, name: 'Dumbbell Bench Press', baseName: 'Bench Press', pattern: 'push_h', cues: 'Press', targetMuscles: ['chest'], difficulty: 'Intermediate', implement: 'dumbbell' },
+      { movement_id: 202, name: 'Goblet Squat', baseName: 'Squat', pattern: 'squat', cues: 'Hold KB', targetMuscles: ['quadriceps'], difficulty: 'Beginner', implement: 'kettlebell' },
+      { movement_id: 203, name: 'Single-Leg RDL', baseName: 'Deadlift', pattern: 'hinge', cues: 'Balance', targetMuscles: ['hamstrings'], difficulty: 'Advanced', implement: 'dumbbell' },
+      { movement_id: 204, name: 'Locked DB Clean', baseName: 'Clean', pattern: 'hinge', cues: 'Clean', targetMuscles: ['full_body'], difficulty: 'Beginner', implement: 'dumbbell' },
+
+      // Tier 3 (cable, machine, other)
+      { movement_id: 301, name: 'Cable Lat Pulldown', baseName: 'Pulldown', pattern: 'pull_v', cues: 'Pull', targetMuscles: ['lats'], difficulty: 'Beginner', implement: 'cable' },
+      { movement_id: 302, name: 'Cable Fly', baseName: 'Fly', pattern: 'push_h', cues: 'Squeeze', targetMuscles: ['chest'], difficulty: 'Intermediate', implement: 'cable' },
+
+      // Demoted patterns (isolation, rotation, carry)
+      { movement_id: 401, name: 'Dumbbell Bicep Curl', baseName: 'Curl', pattern: 'isolation', cues: 'Curl', targetMuscles: ['biceps'], difficulty: 'Beginner', implement: 'dumbbell' },
+      { movement_id: 402, name: 'Cable Woodchopper', baseName: 'Chop', pattern: 'rotation', cues: 'Rotate', targetMuscles: ['core'], difficulty: 'Intermediate', implement: 'cable' },
+      { movement_id: 403, name: 'Farmer Carry', baseName: 'Carry', pattern: 'carry', cues: 'Walk', targetMuscles: ['traps', 'grip'], difficulty: 'Intermediate', implement: 'dumbbell' },
+    ];
+
+    mockState.movements = tierMovements;
+    mockState.getMovementAvailabilityVerdicts = () => [
+      available(101),
+      available(102),
+      available(103),
+      { ...available(104), state: 'teaching_only', reasons: ['capability'] },
+      available(201),
+      available(202),
+      available(203),
+      { ...available(204), state: 'teaching_only', reasons: ['capability'] },
+      available(301),
+      available(302),
+      available(401),
+      available(402),
+      available(403),
+    ];
+    mockState.getRoutineRoleEligibleMovementIds = () => ({
+      major: tierMovements.map((m) => m.movement_id),
+      supplementary: tierMovements.map((m) => m.movement_id),
+      accessory: [],
+      conditional: [],
+    });
+    mockState.getRoutinePlanningContract = () => planningContract(tierMovements);
+
+    render(<RoutineTemplateBuilder />);
+
+    // 1. Open picker for Day 1 Slot 1 (role: 'major')
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
+
+    // Verify all three tier headers render with their counts
+    expect(screen.getByTestId('picker-tier-1-header')).toHaveTextContent(/MAIN LIFTS \(3\)/);
+    expect(screen.getByTestId('picker-tier-2-header')).toHaveTextContent(/DUMBBELL, KETTLEBELL & BODYWEIGHT \(3\)/);
+    expect(screen.getByTestId('picker-tier-3-header')).toHaveTextContent(/CABLE & ASSISTED \(2\)/);
+
+
+    // Verify Tier 3 caption is present
+    expect(screen.getByText(
+      'Assisted and cable variations to maintain training stimulus when injury or equipment restricts free weight movement.',
+    )).toBeOnTheScreen();
+
+    // 2. Verify major slot demotions (isolation, rotation, carry are excluded)
+    expect(screen.queryByText('Dumbbell Bicep Curl')).toBeNull();
+    expect(screen.queryByText('Cable Woodchopper')).toBeNull();
+    expect(screen.queryByText('Farmer Carry')).toBeNull();
+
+    const majorRows = screen.getByTestId('movement-picker-list').props.data;
+    expect(majorRows.some((r) => ['isolation', 'rotation', 'carry'].includes(r.movement.pattern))).toBe(false);
+
+    // 3. Verify Tier 1 rendered order: barbell, difficulty DESC (Advanced > Intermediate > Beginner), name ASC
+    const t1Rendered = majorRows.filter((r) => r.tier === 1).map((r) => r.movement.name);
+    expect(t1Rendered).toEqual(['Barbell Overhead Squat', 'Barbell Back Squat', 'Barbell Box Squat']);
+
+    // 4. Verify Tier 2 rendered order: dumbbell/kettlebell/etc., difficulty ASC (Beginner > Intermediate > Advanced), name ASC
+    const t2Rendered = majorRows.filter((r) => r.tier === 2).map((r) => r.movement.name);
+    expect(t2Rendered).toEqual(['Goblet Squat', 'Dumbbell Bench Press', 'Single-Leg RDL']);
+
+    // 5. Verify Tier 3 rendered order: cable/machine/other, difficulty ASC (Beginner > Intermediate > Advanced), name ASC
+    const t3Rendered = majorRows.filter((r) => r.tier === 3).map((r) => r.movement.name);
+    expect(t3Rendered).toEqual(['Cable Lat Pulldown', 'Cable Fly']);
+
+    // 6. Switch to 'All / Learn' view and verify locked movements sort BELOW all usable ones within every tier
+    fireEvent.press(screen.getByText(/All \/ Learn/));
+    const allRows = screen.getByTestId('movement-picker-list').props.data;
+
+    // In Tier 1: Box Squat (Beginner, usable) must sort ABOVE Locked Snatch (Advanced, locked)
+    const t1All = allRows.filter((r) => r.tier === 1).map((r) => r.movement.name);
+    expect(t1All).toEqual(['Barbell Overhead Squat', 'Barbell Back Squat', 'Barbell Box Squat', 'Locked Barbell Snatch']);
+
+    // In Tier 2: Single-Leg RDL (Advanced, usable) must sort ABOVE Locked Clean (Beginner, locked)
+    const t2All = allRows.filter((r) => r.tier === 2).map((r) => r.movement.name);
+    expect(t2All).toEqual(['Goblet Squat', 'Dumbbell Bench Press', 'Single-Leg RDL', 'Locked DB Clean']);
+
+    // 7. Select a major for slot 1 so that contextual supplementary roles are active
+    fireEvent.press(screen.getByText('Barbell Back Squat'));
+
+    // 8. Open picker for Day 1 Slot 2 (role: 'supplementary')
+    fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 2'));
+
+    // Verify supplementary slot STILL renders isolation, rotation, and carry
+    expect(screen.getByText('Dumbbell Bicep Curl')).toBeOnTheScreen();
+    expect(screen.getByText('Cable Woodchopper')).toBeOnTheScreen();
+    expect(screen.getByText('Farmer Carry')).toBeOnTheScreen();
+
+    const suppRows = screen.getByTestId('movement-picker-list').props.data;
+    expect(suppRows.some((r) => r.movement.name === 'Dumbbell Bicep Curl')).toBe(true);
+    expect(suppRows.some((r) => r.movement.name === 'Cable Woodchopper')).toBe(true);
+    expect(suppRows.some((r) => r.movement.name === 'Farmer Carry')).toBe(true);
+  });
 });

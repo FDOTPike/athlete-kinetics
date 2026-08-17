@@ -19,13 +19,20 @@ import {
   View,
 } from 'react-native';
 import {
+
   composeRoutine,
   composeRoutineMicrocycle,
   contextualRoutineRoles,
+  mapImplementToTier,
   projectRoutineMajorRpe,
   rankRoutineAccessoryRecommendations,
   rankRoutineSupplementaryRecommendations,
+  sortPickerMovements,
+  PICKER_TIER_NAMES,
+  TIER_3_CAPTION,
+  DIFFICULTY_RANK,
   type MovementAvailability,
+  type PickerTier,
   type RoutineAccessoryRecommendation,
   type RoutineMicrocyclePrescription,
   type RoutineSupplementaryRecommendation,
@@ -34,11 +41,15 @@ import {
 } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type Movement, type RoutineTemplate } from '../state/useStore';
 import { theme } from '../theme/theme';
+import InfoTip from './InfoTip';
 import {
   PrimaryButton,
   SecondaryButton,
   Chip,
 } from './ui';
+
+const MAJOR_EXCLUDED_PATTERNS = new Set(['isolation', 'rotation', 'carry']);
+
 
 const SCHEMA_LABELS: Record<SchemaType, string> = {
   LINEAR: 'Linear',
@@ -66,6 +77,7 @@ interface PickerRow {
   selectedElsewhere: boolean;
   executable: boolean;
   recommendation: (RoutineSupplementaryRecommendation | RoutineAccessoryRecommendation) | undefined;
+  tier: PickerTier;
 }
 
 interface RoutineTemplateBuilderProps {
@@ -125,7 +137,14 @@ export function RoutineTemplateBuilder({
   const [pickerSlotIndex, setPickerSlotIndex] = useState<number | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerView, setPickerView] = useState<'available' | 'all'>('available');
+  const [expandedMovementDetailId, setExpandedMovementDetailId] = useState<number | null>(null);
+  const [collapsedTiers, setCollapsedTiers] = useState<Record<PickerTier, boolean>>({
+    1: false,
+    2: false,
+    3: false,
+  });
   const [errorText, setErrorText] = useState<string | null>(null);
+
   const normalizedRpeSlots = initialTemplate?.slots.filter(
     (slot) => slot.targetRpe > profile.base_rpe_cap,
   ).length ?? 0;
@@ -302,14 +321,16 @@ export function RoutineTemplateBuilder({
     planningContract, profile.base_rpe_cap, profile.objective, profile.session_duration_cap_min,
     profile.training_age, roleEligibleSets, schemaType, slots]);
 
-  const pickerRows = useMemo((): PickerRow[] => {
-    if (pickerSlotIndex === null) return [];
+  const pickerTierBuckets = useMemo((): Record<PickerTier, PickerRow[]> => {
+    if (pickerSlotIndex === null) return { 1: [], 2: [], 3: [] };
     const pickerRole = slots[pickerSlotIndex]?.role ?? 'supplementary';
     const query = pickerSearch.trim().toLocaleLowerCase();
     const rows = movements
       // Role eligibility is the first predicate: non-role rows never reach the
       // virtualized picker or its counts.
       .filter((movement) => contextualRolesFor(movement.movement_id).has(pickerRole))
+      // Major slots must not offer pattern isolation, rotation, or carry (Step 3).
+      .filter((movement) => pickerRole !== 'major' || !MAJOR_EXCLUDED_PATTERNS.has(movement.pattern))
       .filter((movement) => query.length === 0 || [
         movement.name,
         movement.baseName,
@@ -321,6 +342,7 @@ export function RoutineTemplateBuilder({
         const verdict = verdictMap.get(movement.movement_id);
         const selectedElsewhere = slots.some((slot, index) => slot.dayIndex === activeDay
           && index !== pickerSlotIndex && slot.movementId === movement.movement_id);
+        const tier = mapImplementToTier(movement.implement);
         return {
           movement,
           verdict,
@@ -329,16 +351,51 @@ export function RoutineTemplateBuilder({
           recommendation: pickerRole === 'accessory'
             ? accessoryRecommendationMap.get(movement.movement_id)
             : supplementaryRecommendationMap.get(movement.movement_id),
+          tier,
         };
-      })
-      .sort((a, b) => Number(b.executable) - Number(a.executable)
-        || (a.recommendation?.rank ?? Number.MAX_SAFE_INTEGER)
-          - (b.recommendation?.rank ?? Number.MAX_SAFE_INTEGER)
-        || a.movement.name.localeCompare(b.movement.name));
-    return pickerView === 'available' ? rows.filter((row) => row.executable) : rows;
+      });
+
+    const filteredRows = pickerView === 'available' ? rows.filter((row) => row.executable) : rows;
+
+    const sortTier = (tierItems: PickerRow[], tier: PickerTier): PickerRow[] => {
+      return [...tierItems].sort((a, b) => {
+        // 1. Usable first: movements the athlete can currently use sort ABOVE locked or unavailable
+        if (a.executable !== b.executable) {
+          return a.executable ? -1 : 1;
+        }
+        // 2. Recommendation rank (if any)
+        const recA = a.recommendation?.rank ?? Number.MAX_SAFE_INTEGER;
+        const recB = b.recommendation?.rank ?? Number.MAX_SAFE_INTEGER;
+        if (recA !== recB) {
+          return recA - recB;
+        }
+        // 3. Difficulty rating: Tier 1 DESC (Adv > Int > Beg), Tiers 2 & 3 ASC (Beg > Int > Adv)
+        const rankA = DIFFICULTY_RANK[a.movement.difficulty] ?? 1;
+        const rankB = DIFFICULTY_RANK[b.movement.difficulty] ?? 1;
+        if (rankA !== rankB) {
+          return tier === 1 ? rankB - rankA : rankA - rankB;
+        }
+        // 4. Ties break alphabetically by name so ordering is deterministic
+        return a.movement.name.localeCompare(b.movement.name, undefined, { sensitivity: 'base' });
+      });
+    };
+
+    return {
+      1: sortTier(filteredRows.filter((r) => r.tier === 1), 1),
+      2: sortTier(filteredRows.filter((r) => r.tier === 2), 2),
+      3: sortTier(filteredRows.filter((r) => r.tier === 3), 3),
+    };
   }, [accessoryRecommendationMap, activeDay, activeMajorIds, movements, pickerSearch,
     pickerSlotIndex, pickerView, planningContract, roleEligibleSets, slots,
     supplementaryRecommendationMap, verdictMap]);
+
+  const pickerRows = useMemo((): PickerRow[] => {
+    const list: PickerRow[] = [];
+    if (!collapsedTiers[1]) list.push(...pickerTierBuckets[1]);
+    if (!collapsedTiers[2]) list.push(...pickerTierBuckets[2]);
+    if (!collapsedTiers[3]) list.push(...pickerTierBuckets[3]);
+    return list;
+  }, [collapsedTiers, pickerTierBuckets]);
 
   const pickerCounts = useMemo(() => {
     if (pickerSlotIndex === null) return { available: 0, teaching: 0, total: 0 };
@@ -346,6 +403,7 @@ export function RoutineTemplateBuilder({
     const query = pickerSearch.trim().toLocaleLowerCase();
     const rows = movements
       .filter((movement) => contextualRolesFor(movement.movement_id).has(role))
+      .filter((movement) => role !== 'major' || !MAJOR_EXCLUDED_PATTERNS.has(movement.pattern))
       .filter((movement) => query.length === 0 || [movement.name, movement.baseName,
         movement.pattern, movement.cues, ...movement.targetMuscles]
         .some((value) => value.toLocaleLowerCase().includes(query)));
@@ -359,6 +417,7 @@ export function RoutineTemplateBuilder({
     return { available, teaching, total: rows.length };
   }, [activeDay, activeMajorIds, movements, pickerSearch, pickerSlotIndex,
     planningContract, roleEligibleSets, slots, verdictMap]);
+
 
   const validSelections = slots.filter(
     (slot): slot is SlotItem & { movementId: number } => slot.movementId !== null,
@@ -437,7 +496,38 @@ export function RoutineTemplateBuilder({
     }
   }
 
+  const toggleTier = (tier: PickerTier): void => {
+    setCollapsedTiers((prev) => ({ ...prev, [tier]: !prev[tier] }));
+  };
+
+  const renderTierHeader = (tier: PickerTier): React.JSX.Element => {
+    const isCollapsed = collapsedTiers[tier];
+    const count = pickerTierBuckets[tier].length;
+    return (
+      <View key={`tier-header-${tier}`} style={styles.tierHeaderContainer}>
+        <Pressable
+          testID={`picker-tier-${tier}-header`}
+          onPress={() => toggleTier(tier)}
+          accessibilityRole="button"
+          accessibilityLabel={`Toggle ${PICKER_TIER_NAMES[tier]} tier, ${count} movements, currently ${isCollapsed ? 'collapsed' : 'expanded'}`}
+          style={styles.tierHeaderButton}
+        >
+          <Text style={styles.tierHeaderTitle}>
+            {PICKER_TIER_NAMES[tier]} ({count})
+          </Text>
+          <Text style={styles.tierHeaderChevron}>{isCollapsed ? '▶' : '▼'}</Text>
+        </Pressable>
+        {tier === 3 && (
+          <Text style={styles.tier3CaptionText}>
+            {TIER_3_CAPTION}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
   const addSlot = (role: RoutineRole): void => {
+
     setSlots([
       ...slots,
       { id: `slot-${Date.now()}-${slots.length}`, dayIndex: activeDay, role, movementId: null },
@@ -503,17 +593,20 @@ export function RoutineTemplateBuilder({
     setPickerSlotIndex(null);
     setPickerSearch('');
     setPickerView('available');
+    setExpandedMovementDetailId(null);
   };
 
   const closePicker = (): void => {
     setPickerSlotIndex(null);
     setPickerSearch('');
     setPickerView('available');
+    setExpandedMovementDetailId(null);
   };
 
   const openPicker = (index: number): void => {
     setPickerSearch('');
     setPickerView('available');
+    setExpandedMovementDetailId(null);
     setPickerSlotIndex(index);
   };
 
@@ -646,31 +739,33 @@ export function RoutineTemplateBuilder({
           {SCHEMAS.map((st) => {
             const selected = st === schemaType;
             return (
-              <Pressable
-                key={st}
-                onPress={() => {
-                  setSchemaType(st);
-                  setSlots((current) => current.map((slot) => ({
-                    ...slot, sets: undefined, reps: undefined, targetRpe: undefined,
-                  })));
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityLabel={`${SCHEMA_LABELS[st]} loading method`}
-                style={[
-                  styles.schemaChip,
-                  selected && styles.schemaChipSelected,
-                ]}
-              >
-                <Text
+              <View key={st} style={styles.schemaChipContainer}>
+                <Pressable
+                  onPress={() => {
+                    setSchemaType(st);
+                    setSlots((current) => current.map((slot) => ({
+                      ...slot, sets: undefined, reps: undefined, targetRpe: undefined,
+                    })));
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${SCHEMA_LABELS[st]} loading method`}
                   style={[
-                    styles.schemaChipText,
-                    selected && styles.schemaChipTextSelected,
+                    styles.schemaChip,
+                    selected && styles.schemaChipSelected,
                   ]}
                 >
-                  {SCHEMA_LABELS[st]}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={[
+                      styles.schemaChipText,
+                      selected && styles.schemaChipTextSelected,
+                    ]}
+                  >
+                    {SCHEMA_LABELS[st]}
+                  </Text>
+                </Pressable>
+                <InfoTip term={st} />
+              </View>
             );
           })}
         </View>
@@ -808,7 +903,10 @@ export function RoutineTemplateBuilder({
                       </View>
                       {majorProjection !== undefined && (
                         <View style={styles.doseField}>
-                          <Text style={styles.captionText}>RPE START</Text>
+                          <View style={styles.doseFieldLabelRow}>
+                            <Text style={styles.captionText}>RPE START</Text>
+                            <InfoTip term="RPE START" />
+                          </View>
                           <View
                             style={[styles.doseInput, styles.projectedDose]}
                             accessible
@@ -820,7 +918,10 @@ export function RoutineTemplateBuilder({
                         </View>
                       )}
                       <View style={styles.doseField}>
-                        <Text style={styles.captionText}>{majorProjection === undefined ? 'RPE' : 'RPE MAX'}</Text>
+                        <View style={styles.doseFieldLabelRow}>
+                          <Text style={styles.captionText}>{majorProjection === undefined ? 'RPE' : 'RPE MAX'}</Text>
+                          <InfoTip term={majorProjection === undefined ? 'RPE' : 'RPE MAX'} />
+                        </View>
                         <TextInput
                           style={styles.doseInput}
                           value={String(peakRpe ?? '')}
@@ -847,10 +948,22 @@ export function RoutineTemplateBuilder({
         {/* Add Slot Actions: accessory remains last because it depends on all chosen work. */}
         <View style={styles.addSlotRow}>
           <Text style={styles.captionText}>Add slot:</Text>
-          <Chip label="+ Major" selected={false} onPress={() => addSlot('major')} />
-          <Chip label="+ Supp" selected={false} onPress={() => addSlot('supplementary')} />
-          <Chip label="+ Cond" selected={false} disabled={roleEligibleSets.conditional.size === 0} onPress={() => addSlot('conditional')} />
-          <Chip label="+ Accessory last" selected={false} disabled={activeMajorIds.length === 0} onPress={() => addSlot('accessory')} />
+          <View style={styles.addSlotChipWrapper}>
+            <Chip label="+ Major" selected={false} onPress={() => addSlot('major')} />
+            <InfoTip term="MAJOR" />
+          </View>
+          <View style={styles.addSlotChipWrapper}>
+            <Chip label="+ Supp" selected={false} onPress={() => addSlot('supplementary')} />
+            <InfoTip term="SUPPLEMENTARY" />
+          </View>
+          <View style={styles.addSlotChipWrapper}>
+            <Chip label="+ Cond" selected={false} disabled={roleEligibleSets.conditional.size === 0} onPress={() => addSlot('conditional')} />
+            <InfoTip term="CONDITIONAL" />
+          </View>
+          <View style={styles.addSlotChipWrapper}>
+            <Chip label="+ Accessory last" selected={false} disabled={activeMajorIds.length === 0} onPress={() => addSlot('accessory')} />
+            <InfoTip term="ACCESSORY" />
+          </View>
         </View>
       </View>
 
@@ -977,14 +1090,29 @@ export function RoutineTemplateBuilder({
               windowSize={7}
               keyboardShouldPersistTaps="handled"
               ListEmptyComponent={(
-                <Text style={styles.emptyPickerText} accessibilityRole="text">
-                  {pickerView === 'available'
-                    ? 'No currently available movements match this role and search.'
-                    : 'No movements match this role and search.'}
-                </Text>
+                <View>
+                  {(collapsedTiers[1] || pickerTierBuckets[1].length === 0) && renderTierHeader(1)}
+                  {(collapsedTiers[2] || pickerTierBuckets[2].length === 0) && renderTierHeader(2)}
+                  {(collapsedTiers[3] || pickerTierBuckets[3].length === 0) && renderTierHeader(3)}
+                  <Text style={styles.emptyPickerText} accessibilityRole="text">
+                    {pickerView === 'available'
+                      ? 'No currently available movements match this role and search.'
+                      : 'No movements match this role and search.'}
+                  </Text>
+                </View>
               )}
-              renderItem={({ item: row }) => {
-                const { movement, verdict, selectedElsewhere, executable, recommendation } = row;
+              ListFooterComponent={(() => {
+                if (pickerRows.length === 0) return null;
+                const lastTier = pickerRows[pickerRows.length - 1]?.tier;
+                return (
+                  <View>
+                    {lastTier === 1 && (collapsedTiers[2] || pickerTierBuckets[2].length === 0) && renderTierHeader(2)}
+                    {lastTier !== 3 && (collapsedTiers[3] || pickerTierBuckets[3].length === 0) && renderTierHeader(3)}
+                  </View>
+                );
+              })()}
+              renderItem={({ item: row, index }) => {
+                const { movement, verdict, selectedElsewhere, executable, recommendation, tier } = row;
                 const canConfirm = !selectedElsewhere
                   && verdict?.state === 'teaching_only'
                   && verdict.confirmationWouldClear
@@ -995,57 +1123,126 @@ export function RoutineTemplateBuilder({
                 const reason = selectedElsewhere
                   ? 'Already selected in another slot.'
                   : formatTeachingOnlyReason(verdict);
+
+                const isFirstOfTier = index === 0 || pickerRows[index - 1]?.tier !== tier;
+                const showTier1BeforeTier2 = isFirstOfTier && tier === 2 && index === 0 && (collapsedTiers[1] || pickerTierBuckets[1].length === 0);
+                const showTier1BeforeTier3 = isFirstOfTier && tier === 3 && index === 0 && (collapsedTiers[1] || pickerTierBuckets[1].length === 0);
+                const showTier2BeforeTier3 = isFirstOfTier && tier === 3 && (
+                  (index === 0 && (collapsedTiers[2] || pickerTierBuckets[2].length === 0)) ||
+                  (index > 0 && pickerRows[index - 1]?.tier === 1 && (collapsedTiers[2] || pickerTierBuckets[2].length === 0))
+                );
+
                 return (
-                  <View
-                    testID={`movement-picker-row-${movement.movement_id}`}
-                    style={[styles.pickerItem, !executable && styles.pickerItemDisabled]}
-                  >
-                    <Pressable
-                      disabled={!executable}
-                      onPress={() => selectMovementForSlot(movement.movement_id)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Choose ${movement.name}`}
-                      accessibilityHint={executable ? `Available ${movement.difficulty} movement` : reason}
-                      accessibilityState={{ disabled: !executable }}
-                      style={styles.pickerItemMain}
+                  <View key={`row-wrap-${movement.movement_id}`}>
+                    {showTier1BeforeTier2 && renderTierHeader(1)}
+                    {showTier1BeforeTier3 && renderTierHeader(1)}
+                    {showTier2BeforeTier3 && renderTierHeader(2)}
+                    {isFirstOfTier && renderTierHeader(tier)}
+                    <View
+                      testID={`movement-picker-row-${movement.movement_id}`}
+                      style={[styles.pickerItem, !executable && styles.pickerItemDisabled]}
                     >
-                      <Text style={[styles.pickerItemName, !executable && styles.pickerItemNameDisabled]}>
-                        {movement.name}
-                      </Text>
-                      {recommendation !== undefined && (
-                        <Text
-                          style={styles.suggestionBadgeText}
-                          accessibilityLabel={`Suggested ${slots[pickerSlotIndex ?? 0]?.role ?? 'movement'} rank ${recommendation.rank}: ${recommendation.reason}`}
+                      <View style={styles.pickerItemRow}>
+                        <Pressable
+                          disabled={!executable}
+                          onPress={() => selectMovementForSlot(movement.movement_id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Choose ${movement.name}`}
+                          accessibilityHint={executable ? `Available ${movement.difficulty} movement` : reason}
+                          accessibilityState={{ disabled: !executable }}
+                          style={styles.pickerItemMain}
                         >
-                          #{recommendation.rank} SUGGESTED · {recommendation.reason}
-                        </Text>
+                          <Text style={[styles.pickerItemName, !executable && styles.pickerItemNameDisabled]}>
+                            {movement.name}
+                          </Text>
+                          {recommendation !== undefined && (
+                            <Text
+                              style={styles.suggestionBadgeText}
+                              accessibilityLabel={`Suggested ${slots[pickerSlotIndex ?? 0]?.role ?? 'movement'} rank ${recommendation.rank}: ${recommendation.reason}`}
+                            >
+                              #{recommendation.rank} SUGGESTED · {recommendation.reason}
+                            </Text>
+                          )}
+                          <Text style={styles.reasonText}>
+                            {executable ? `${movement.difficulty} · Available` : reason}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          testID={`toggle-movement-detail-${movement.movement_id}`}
+                          onPress={() => setExpandedMovementDetailId((current) => current === movement.movement_id ? null : movement.movement_id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={expandedMovementDetailId === movement.movement_id ? `Hide details for ${movement.name}` : `View details for ${movement.name}`}
+                          accessibilityState={{ expanded: expandedMovementDetailId === movement.movement_id }}
+                          style={styles.detailToggleButton}
+                        >
+                          <Text style={styles.detailToggleText}>
+                            {expandedMovementDetailId === movement.movement_id ? 'Hide details ▴' : 'Details ▾'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      {expandedMovementDetailId === movement.movement_id && (
+                        <View style={styles.movementDetailCard} testID={`movement-detail-card-${movement.movement_id}`}>
+                          {Boolean(movement.cues && movement.cues.trim().length > 0) && (
+                            <View style={styles.movementDetailSection}>
+                              <Text style={styles.movementDetailSectionTitle}>Coaching cues</Text>
+                              <Text style={styles.movementDetailBody}>{movement.cues}</Text>
+                            </View>
+                          )}
+                          {Boolean(movement.instructions && movement.instructions.trim().length > 0) && (
+                            <View style={styles.movementDetailSection}>
+                              <Text style={styles.movementDetailSectionTitle}>How to do it</Text>
+                              <Text style={styles.movementDetailBody}>{movement.instructions}</Text>
+                            </View>
+                          )}
+                          {Boolean(movement.targetMuscles && movement.targetMuscles.length > 0) && (
+                            <View style={styles.movementDetailSection}>
+                              <Text style={styles.movementDetailSectionTitle}>Works</Text>
+                              <Text style={styles.movementDetailBody}>{movement.targetMuscles.join(', ')}</Text>
+                            </View>
+                          )}
+                          <View style={styles.movementDetailSection}>
+                            <Text style={styles.movementDetailSectionTitle}>Difficulty</Text>
+                            <Text style={styles.movementDetailBody}>{movement.difficulty}</Text>
+                          </View>
+                          {!movement.cues && !movement.instructions && (!movement.targetMuscles || movement.targetMuscles.length === 0) && (
+                            <Text style={styles.movementDetailEmpty}>No notes for this movement yet.</Text>
+                          )}
+                          {executable && (
+                            <Pressable
+                              testID={`select-from-detail-${movement.movement_id}`}
+                              onPress={() => selectMovementForSlot(movement.movement_id)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Select ${movement.name}`}
+                              style={styles.selectFromDetailButton}
+                            >
+                              <Text style={styles.selectFromDetailButtonText}>Select movement</Text>
+                            </Pressable>
+                          )}
+                        </View>
                       )}
-                      <Text style={styles.reasonText}>
-                        {executable ? `${movement.difficulty} · Available` : reason}
-                      </Text>
-                    </Pressable>
-                    {canConfirm && (
-                      <Pressable
-                        testID={`confirm-prior-experience-${movement.movement_id}`}
-                        onPress={() => requestPriorExperienceConfirmation(movement)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Confirm prior experience for ${movement.name}`}
-                        style={styles.declarationButton}
-                      >
-                        <Text style={styles.declarationButtonText}>CONFIRM PRIOR EXPERIENCE</Text>
-                      </Pressable>
-                    )}
-                    {pickerView === 'all' && confirmed && (
-                      <Pressable
-                        testID={`revoke-prior-experience-${movement.movement_id}`}
-                        onPress={() => requestPriorExperienceRevocation(movement)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Revoke prior experience for ${movement.name}`}
-                        style={styles.declarationButton}
-                      >
-                        <Text style={styles.declarationButtonText}>REVOKE EXPERIENCE</Text>
-                      </Pressable>
-                    )}
+                      {canConfirm && (
+                        <Pressable
+                          testID={`confirm-prior-experience-${movement.movement_id}`}
+                          onPress={() => requestPriorExperienceConfirmation(movement)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Confirm prior experience for ${movement.name}`}
+                          style={styles.declarationButton}
+                        >
+                          <Text style={styles.declarationButtonText}>CONFIRM PRIOR EXPERIENCE</Text>
+                        </Pressable>
+                      )}
+                      {pickerView === 'all' && confirmed && (
+                        <Pressable
+                          testID={`revoke-prior-experience-${movement.movement_id}`}
+                          onPress={() => requestPriorExperienceRevocation(movement)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Revoke prior experience for ${movement.name}`}
+                          style={styles.declarationButton}
+                        >
+                          <Text style={styles.declarationButtonText}>REVOKE EXPERIENCE</Text>
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
                 );
               }}
@@ -1360,13 +1557,66 @@ const styles = StyleSheet.create({
   pickerList: {
     flex: 1,
   },
-  pickerItem: {
+  tierHeaderContainer: {
+    marginTop: theme.space[3],
+    marginBottom: theme.space[1],
+  },
+  tierHeaderButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: theme.space[2],
+    paddingHorizontal: theme.space[3],
+    backgroundColor: theme.color.ink0,
+    borderRadius: theme.radius.chip,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+  },
+  tierHeaderTitle: {
+    ...theme.font.eyebrow,
+    color: theme.color.textHi,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  tierHeaderChevron: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    fontSize: 12,
+  },
+  tier3CaptionText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: theme.space[1],
+    paddingHorizontal: theme.space[1],
+  },
+  schemaChipContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addSlotChipWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  doseFieldLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pickerItem: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    paddingVertical: theme.space[2],
     borderBottomWidth: 1,
     borderBottomColor: theme.color.line,
+    gap: theme.space[2],
+  },
+  pickerItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
     gap: theme.space[2],
   },
   pickerItemDisabled: {
@@ -1384,6 +1634,59 @@ const styles = StyleSheet.create({
   },
   pickerItemNameDisabled: {
     color: theme.color.textLow,
+  },
+  detailToggleButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailToggleText: {
+    ...theme.font.label,
+    color: theme.color.chalk,
+    fontSize: 12,
+  },
+  movementDetailCard: {
+    width: '100%',
+    marginTop: theme.space[1],
+    padding: theme.space[3],
+    backgroundColor: theme.color.ink1,
+    borderRadius: theme.radius.control,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    gap: theme.space[2],
+  },
+  movementDetailSection: {
+    gap: 2,
+  },
+  movementDetailSectionTitle: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+  },
+  movementDetailBody: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  movementDetailEmpty: {
+    ...theme.font.body,
+    color: theme.color.textLow,
+    fontStyle: 'italic',
+    fontSize: 13,
+  },
+  selectFromDetailButton: {
+    marginTop: theme.space[2],
+    backgroundColor: theme.color.chalk,
+    paddingVertical: theme.space[2],
+    paddingHorizontal: theme.space[3],
+    borderRadius: theme.radius.control,
+    alignItems: 'center',
+  },
+  selectFromDetailButtonText: {
+    ...theme.font.label,
+    color: theme.color.onChalk,
+    fontWeight: '700',
   },
   reasonText: {
     ...theme.font.label,

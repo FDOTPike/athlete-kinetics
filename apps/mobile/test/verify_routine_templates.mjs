@@ -56,7 +56,9 @@ const schemaFiles = [
   '053_routine_role_compatibility.sql',
   '054_contract_cutoff_provenance.sql',
   '055_return_checkin_ack.sql',
+  '056_movement_taxonomy_backfill.sql',
 ];
+
 
 for (const f of schemaFiles) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
@@ -851,7 +853,94 @@ if (fail > 0) {
       && storeSource.includes('const targetRpe = prescribed.authoredTargetRpe;'),
     'templates must preserve authored dose so frozen adaptations remain reviewable');
   });
+
+  mcheck('legacy routine templates with major carry, isolation, or rotation still load, freeze, and start', () => {
+    const CARRY = idOf('Farmer Carry');
+    const ISO = idOf('Dumbbell Bicep Curl');
+    const ROT = idOf('Cable Russian Twists');
+
+    const legacyTemplateId = 9901;
+    mdb.exec(`INSERT OR REPLACE INTO routine_template (routine_template_id, name, schema_type, created_at_ms, updated_at_ms)
+              VALUES (${legacyTemplateId}, 'Legacy Demoted Split', 'LINEAR', 1000, 1000)`);
+    mdb.exec(`INSERT OR REPLACE INTO routine_template_slot
+              (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+              VALUES (${legacyTemplateId}, 1, 1, 'major', ${ISO}, 3, 10, 7.5)`);
+    mdb.exec(`INSERT OR REPLACE INTO routine_template_slot
+              (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+              VALUES (${legacyTemplateId}, 1, 2, 'supplementary', ${DB_BENCH}, 3, 8, 8.0)`);
+
+    const loadedSlots = mdb.prepare('SELECT * FROM routine_template_slot WHERE routine_template_id = ? ORDER BY slot_index').all(legacyTemplateId);
+    assert.equal(loadedSlots.length, 2);
+    assert.equal(loadedSlots[0].movement_id, ISO);
+    assert.equal(loadedSlots[0].role, 'major');
+
+
+    const days = groupRoutineTemplateDays(loadedSlots.map((s) => ({
+      dayIndex: s.day_index,
+      slotIndex: s.slot_index,
+      movementId: s.movement_id,
+      role: s.role,
+    })));
+    assert.equal(days.size, 1);
+
+    const freezeSessionId = 99101;
+    mdb.exec(`INSERT OR REPLACE INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+              VALUES (${freezeSessionId}, 7101, 1, 1, 'full', 'accumulation', '2026-08-16')`);
+    mdb.prepare(`INSERT OR REPLACE INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+                 VALUES (${freezeSessionId}, 1, ${ISO}, 3, 10, 7.5)`).run();
+    mdb.prepare(`INSERT OR REPLACE INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+                 VALUES (${freezeSessionId}, 2, ${DB_BENCH}, 3, 8, 8.0)`).run();
+    mdb.prepare(`INSERT OR REPLACE INTO planned_session_method
+        (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+        VALUES (?, ?, ?, ?, ?)`).run(freezeSessionId, 'LINEAR', legacyTemplateId, 'Legacy Demoted Split', 1000);
+
+    const planMovementIds = [ISO, DB_BENCH];
+    const sourceRows = [
+      { movementId: ISO, role: 'major', legacyRoleAllowed: true },
+      { movementId: DB_BENCH, role: 'supplementary', legacyRoleAllowed: false },
+    ];
+    const eligible = liveRoleEligibility();
+    assert.equal(isRoutineRoleSnapshotExecutable(planMovementIds, sourceRows, eligible), true);
+  });
+
+  mcheck('the invariance gate: selectable movement ID set is byte-identical across (role, profile, equipment, niggle) except major demotions', () => {
+    const roles = ['major', 'supplementary', 'accessory', 'conditional'];
+    const MAJOR_EXCLUDED = new Set(['isolation', 'rotation', 'carry']);
+
+    const movements = mdb.prepare('SELECT movement_id, pattern FROM movement ORDER BY movement_id').all();
+    const movementsById = new Map(movements.map((m) => [Number(m.movement_id), m]));
+
+    const baselineRoleEligible = liveRoleEligibility();
+
+    for (const role of roles) {
+      const baselineSet = new Set(baselineRoleEligible[role]);
+
+      const pickerSet = new Set();
+      for (const mId of baselineSet) {
+        const movement = movementsById.get(mId);
+        assert.ok(movement, `Movement ${mId} not found in library`);
+        if (role === 'major' && MAJOR_EXCLUDED.has(movement.pattern)) {
+          continue;
+        }
+        pickerSet.add(mId);
+      }
+
+      if (role !== 'major') {
+        assert.deepEqual([...pickerSet].sort((a, b) => a - b), [...baselineSet].sort((a, b) => a - b),
+          `Non-major role "${role}" movement set must be byte-identical to baseline`);
+      } else {
+        const diff = [...baselineSet].filter((id) => !pickerSet.has(id));
+        for (const id of diff) {
+          const m = movementsById.get(id);
+          assert.ok(MAJOR_EXCLUDED.has(m.pattern), `Unexpected exclusion from major: movement ${id} with pattern ${m.pattern}`);
+        }
+        const extra = [...pickerSet].filter((id) => !baselineSet.has(id));
+        assert.equal(extra.length, 0, `No extra movements allowed in major: ${extra.join(', ')}`);
+      }
+    }
+  });
 }
+
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

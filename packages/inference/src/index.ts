@@ -90,6 +90,10 @@ export {
   programMacroIndex,
   macroPhaseOf,
   SCHEMA_FATIGUE_COST,
+  splitExplainer,
+  SPLIT_EXPLAINER_FOOTER,
+  BLOCK_FOCI,
+  BLOCK_FOCUS_LIST,
   targetLoadKg,
   targetPct,
   type BlockFocus,
@@ -329,3 +333,12 @@ export {
   type ReturnAction,
   type ReturnEvaluation,
 } from './returnFromLayoff';
+export {
+  mapImplementToTier,
+  sortPickerMovements,
+  groupAndSortPickerMovements,
+  PICKER_TIER_NAMES,
+  TIER_3_CAPTION,
+  type PickerTier,
+  type PickerSortableMovement,
+} from './pickerTiering';

@@ -511,12 +511,13 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
   }
   for (const file of fullChain) db.exec(readFileSync(join(schemaDir, file), 'utf-8'));
 
-  check('the acceptance database is the real 001-055 chain, not a trimmed subset', () => {
+  check('the acceptance database is the real 001-056 chain, not a trimmed subset', () => {
     assert.equal(fullChain[0], '001_mechanical_input.sql');
-    assert.equal(fullChain[fullChain.length - 1], '055_return_checkin_ack.sql');
-    assert.equal(fullChain.length, 54, `applied ${fullChain.length} migrations`);
+    assert.equal(fullChain[fullChain.length - 1], '056_movement_taxonomy_backfill.sql');
+    assert.equal(fullChain.length, 55, `applied ${fullChain.length} migrations`);
     assert.equal(Number(db.prepare('SELECT COUNT(*) AS c FROM movement').get().c), 300);
   });
+
 
   const idOf = (name) => {
     const row = db.prepare('SELECT movement_id FROM movement WHERE name = ?').get(name);

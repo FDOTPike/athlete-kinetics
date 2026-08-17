@@ -17,6 +17,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { theme } from '../../theme/theme';
+import InfoTip, { type GLOSSARY } from '../InfoTip';
 
 export interface StepperProps {
   label: string;
@@ -26,6 +27,7 @@ export interface StepperProps {
   style?: StyleProp<ViewStyle>;
   testID?: string;
   repeatOnHold?: boolean;
+  tip?: keyof typeof GLOSSARY & string;
 }
 
 export function Stepper({
@@ -36,6 +38,7 @@ export function Stepper({
   style,
   testID,
   repeatOnHold = false,
+  tip,
 }: StepperProps): React.JSX.Element {
   const holdTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -72,7 +75,10 @@ export function Stepper({
 
   return (
     <View style={[styles.container, style]} testID={testID}>
-      <Text style={styles.label}>{label.toUpperCase()}</Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>{label.toUpperCase()}</Text>
+        {tip !== undefined && <InfoTip term={tip} />}
+      </View>
       <View style={styles.row}>
         <Pressable
           onPress={() => finishPress(onDecrement)}
@@ -111,11 +117,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minWidth: 0,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.space[2], // 8
+  },
   label: {
     ...theme.font.eyebrow,
     fontFamily: theme.font.family,
     color: theme.color.textMid,
-    marginBottom: theme.space[2], // 8
   },
   row: {
     flexDirection: 'row',

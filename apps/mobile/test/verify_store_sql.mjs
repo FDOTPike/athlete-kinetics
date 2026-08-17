@@ -40,7 +40,9 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '051_routine_access_context.sql', '052_bounded_microcycle_roles.sql',
   '053_routine_role_compatibility.sql',
   '054_contract_cutoff_provenance.sql',
-  '055_return_checkin_ack.sql'];
+  '055_return_checkin_ack.sql',
+  '056_movement_taxonomy_backfill.sql'];
+
 
 const db = new DatabaseSync(':memory:');
 try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
@@ -549,6 +551,46 @@ a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
 a('bounded: the set-aggregate carries a session_date window predicate', /WHERE s\.session_date >= \? AND s\.session_date <= \?/.test(hyd));
 a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for\s*\(|\.forEach\s*\(|\.map\s*\()[^;{]*executeSync/.test(hyd));
+
+// --- [Work Order C] Next Block Panel read-only store invariants ----------------
+console.log('[Work Order C — Next Block Panel store invariants]');
+const getAdjustmentsRaw = (() => {
+  const i = src.indexOf('getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[]');
+  const j = src.indexOf('refreshVector:', i);
+  return i >= 0 && j > i ? src.slice(i, j) : '';
+})();
+const getAdjustmentsBody = stripComments(getAdjustmentsRaw);
+a('getPendingAutopilotAdjustments body located', getAdjustmentsBody.length > 0);
+a('NULL-DB GUARD: getPendingAutopilotAdjustments returns [] when database is null / unbooted',
+  /if\s*\(\s*db\s*===\s*null\s*\)\s*return\s*\[\s*\];/.test(getAdjustmentsBody));
+a('READ-ONLY: getPendingAutopilotAdjustments contains NO INSERT, UPDATE, or DELETE statements',
+  !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b/i.test(getAdjustmentsBody));
+
+const adjustmentsQuerySql = statements.find((sql) =>
+  sql.includes('FROM planned_slot_autopilot') && sql.includes('JOIN movement') && sql.includes("WHERE tb.status = 'active'"),
+);
+a('store exposes the next block autopilot adjustments query SQL', Boolean(adjustmentsQuerySql));
+a('refreshBlock stores pendingAutopilotAdjustments in store state',
+  /pendingAutopilotAdjustments\s*=\s*get\(\)\.getPendingAutopilotAdjustments\(\)/.test(src));
+if (adjustmentsQuerySql) {
+  db.exec('BEGIN');
+  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (940,'Overhead Barbell Press','push_v',1),(941,'Barbell Deadlift','hinge',1)");
+  db.exec("INSERT INTO training_block (block_id,start_date,objective,status,created_at_ms) VALUES (940, '2030-04-01','strength','active',0)");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (940,940,1,1,'upper','accumulation','2030-04-01'),(941,940,1,2,'lower','accumulation','2030-04-02')");
+  db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (940,940,1,940,3,5,7.5),(941,941,1,941,3,5,7.5)");
+  db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (940,-0.5,-1,'eased'),(941,0.5,1,'raised')");
+  const adjustmentsRows = db.prepare(adjustmentsQuerySql).all();
+  a('getPendingAutopilotAdjustments returns exactly the seeded rows with byte-identical reason',
+    adjustmentsRows.length === 2
+      && adjustmentsRows[0].planned_slot_id === 940
+      && adjustmentsRows[0].movement_name === 'Overhead Barbell Press'
+      && adjustmentsRows[0].reason === 'eased'
+      && adjustmentsRows[1].planned_slot_id === 941
+      && adjustmentsRows[1].movement_name === 'Barbell Deadlift'
+      && adjustmentsRows[1].reason === 'raised',
+    JSON.stringify(adjustmentsRows));
+  db.exec('ROLLBACK');
+}
 
 // --- Calibration Policy v1 store invariants -------------------------------------
 console.log('[Calibration Policy v1 store invariants]');
@@ -1857,6 +1899,107 @@ console.log('[O3 fail-closed equipment inventory parsing]');
   const mech95 = retroDb.prepare("SELECT hard_sets, reps_with_rpe FROM mech_daily WHERE date = '2026-07-15'").get();
   check('set with RPE 9.5 increments hard_sets to 2',
     mech95.hard_sets === 2 && mech95.reps_with_rpe === 25);
+
+  // --- Work Order A: Split Transparency and Day Focus Overrides -------------
+  console.log('[Work Order A: Split Transparency and Day Focus Overrides]');
+  const woaDb = new DatabaseSync(':memory:');
+  for (const f of SCHEMA_FILES) {
+    woaDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+  const woaProductionDb = {
+    executeSync(sql, params) {
+      if (/^\s*SELECT/i.test(sql)) {
+        return { rows: woaDb.prepare(sql).all(...(params ?? [])) };
+      }
+      if (params && params.length > 0) woaDb.prepare(sql).run(...params);
+      else woaDb.exec(sql);
+      return { rows: [] };
+    },
+  };
+
+  const req = createRequire(import.meta.url);
+  const { insertTrainingProgram } = req(join(ROOT, 'packages', 'core-db', 'test', '.build', 'programTx.js'));
+  const { generateBlock } = req(join(ROOT, 'packages', 'inference', 'test', '.build', 'blockGenerator.js'));
+  const { DEFAULT_PROFILE } = req(join(ROOT, 'packages', 'inference', 'test', '.build', 'types.js'));
+
+  // 1. A per-day focus override round-trips through training_program_day
+  const overriddenDays = [
+    { dayIndex: 1, focus: 'conditioning' },
+    { dayIndex: 2, focus: 'full' },
+    { dayIndex: 4, focus: 'bjj' },
+    { dayIndex: 5, focus: 'upper' },
+    { dayIndex: 6, focus: 'lower' },
+  ];
+  const programId = insertTrainingProgram(woaProductionDb, {
+    objective: 'strength',
+    startDate: '2026-08-01',
+    horizonKind: 'weeks',
+    requestedReviewDate: null,
+    plannedEndDate: '2026-08-28',
+    plannedBlockCount: 1,
+    startingMacroBlockIndex: 1,
+    schemaType: 'LINEAR',
+    days: overriddenDays,
+    movementPreferences: [],
+    weeklyFrequency: 5,
+    now: 1000,
+  });
+
+  const readBackDays = woaDb.prepare(
+    'SELECT day_index, focus FROM training_program_day WHERE program_id = ? ORDER BY day_index',
+  ).all(programId);
+
+  check('per-day focus override round-trips through training_program_day',
+    readBackDays.length === 5
+      && readBackDays[0].day_index === 1 && readBackDays[0].focus === 'conditioning'
+      && readBackDays[1].day_index === 2 && readBackDays[1].focus === 'full'
+      && readBackDays[2].day_index === 4 && readBackDays[2].focus === 'bjj'
+      && readBackDays[3].day_index === 5 && readBackDays[3].focus === 'upper'
+      && readBackDays[4].day_index === 6 && readBackDays[4].focus === 'lower',
+    JSON.stringify(readBackDays));
+
+  // 2. The generated planned_session rows carry the OVERRIDDEN focus, not the default from programFocuses
+  // Default strength 5-day split is ['lower', 'upper', 'lower', 'upper', 'full'] on days [1, 2, 4, 5, 6]
+  const movements = woaDb.prepare(`
+    SELECT m.movement_id, m.name, m.pattern, m.is_compound,
+           COALESCE(d.difficulty_rating, 'beginner') AS difficulty
+    FROM movement m
+    LEFT JOIN movement_detail d ON d.movement_id = m.movement_id
+  `).all().map((m) => ({
+    movement_id: m.movement_id,
+    name: m.name,
+    pattern: m.pattern,
+    is_compound: m.is_compound === 1,
+    difficulty: m.difficulty,
+    beginner_ok: true,
+    sportTracking: false,
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: true,
+    required: [],
+  }));
+
+  const plan = generateBlock({
+    profile: { ...DEFAULT_PROFILE, objective: 'strength', weekly_frequency: 5 },
+    movements,
+    startDate: '2026-08-01',
+    schemaType: 'LINEAR',
+    macroBlockIndex: 1,
+    programDays: overriddenDays.map((d) => ({
+      day_index: d.dayIndex,
+      focus: d.focus,
+    })),
+  });
+
+  const week1Sessions = plan.sessions.filter((s) => s.week_index === 1);
+  const week1Focuses = week1Sessions.map((s) => ({ day: s.day_index, focus: s.focus }));
+  check('generated planned_session rows carry the OVERRIDDEN focus, not default from programFocuses',
+    week1Focuses.length === 5
+      && week1Focuses[0].focus === 'conditioning'
+      && week1Focuses[1].focus === 'full'
+      && week1Focuses[2].focus === 'bjj'
+      && week1Focuses[3].focus === 'upper'
+      && week1Focuses[4].focus === 'lower',
+    JSON.stringify(week1Focuses));
 }
 
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);

@@ -7,15 +7,19 @@ import { theme } from '../../src/theme/theme';
 
 let mockState;
 
-jest.mock('@ak/inference', () => ({
-  SCHEMA_TYPES: ['LINEAR', 'WAVE', 'STEP', 'APRE'],
-  targetLoadKg: jest.fn(() => 42.5),
-  addDaysIso: jest.fn((iso, days) => {
-    const date = new Date(`${iso}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
-  }),
-}));
+jest.mock('@ak/inference', () => {
+  const actual = jest.requireActual('@ak/inference');
+  return {
+    ...actual,
+    SCHEMA_TYPES: ['LINEAR', 'WAVE', 'STEP', 'APRE'],
+    targetLoadKg: jest.fn(() => 42.5),
+    addDaysIso: jest.fn((iso, days) => {
+      const date = new Date(`${iso}T00:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + days);
+      return date.toISOString().slice(0, 10);
+    }),
+  };
+});
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
   useStore: (selector) => selector(mockState),
@@ -104,6 +108,10 @@ const baseState = (overrides = {}) => ({
   returnCheckin: null,
   confirmReturnCheckin: jest.fn(),
   dismissReturnCheckin: jest.fn(),
+  getMovementAvailabilityVerdicts: jest.fn(() => []),
+  previewTrainingProgram: jest.fn(() => ({ plan: { sessions: [] } })),
+  movements: [],
+  niggles: [],
   ...overrides,
 });
 
@@ -487,4 +495,70 @@ test('READY hides return check-in card when dismissed or absent', () => {
   render(<ReadinessScreen />);
 
   expect(screen.queryByTestId('return-checkin-banner')).toBeNull();
+});
+
+describe('BlockScreen - Chooser Entry (Work Order E)', () => {
+  test('renders Plan a new block action when a block IS active and opens chooser', () => {
+    mockState = baseState({
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
+      program: {
+        programId: 1,
+        status: 'active',
+        currentSequenceIndex: 1,
+        plannedBlockCount: 2,
+        plannedEndDate: '2026-08-26',
+      },
+    });
+
+    render(<BlockScreen />);
+
+    // Action must render when block is active
+    const planNewBlockButton = screen.getByText('Plan a new block');
+    expect(planNewBlockButton).toBeOnTheScreen();
+
+    // Tapping it opens the NewBlockChooserScreen
+    fireEvent.press(planNewBlockButton);
+
+    expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+    expect(screen.getByText('Auto')).toBeOnTheScreen();
+    expect(screen.getByText('Custom')).toBeOnTheScreen();
+    expect(screen.getByText('Guided')).toBeOnTheScreen();
+    expect(screen.getByText('Coming soon')).toBeOnTheScreen();
+  });
+
+  test('inter-block state with block === null and program !== null still opens chooser and routes to handlers', () => {
+    mockState = baseState({
+      block: null,
+      hasArchivedBlock: true,
+      program: {
+        programId: 1,
+        status: 'active',
+        currentSequenceIndex: 1,
+        plannedBlockCount: 2,
+        plannedEndDate: '2026-08-26',
+        days: [
+          { dayIndex: 1, focus: 'lower' },
+          { dayIndex: 2, focus: 'upper' },
+        ],
+        movementPreferences: [],
+      },
+    });
+
+    render(<BlockScreen />);
+
+    // Start a new block button on the inter-block card
+    const startNewBlockButton = screen.getByText('Start a new block');
+    expect(startNewBlockButton).toBeOnTheScreen();
+
+    // Tapping opens chooser
+    fireEvent.press(startNewBlockButton);
+
+    expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+    expect(screen.getByText('Auto')).toBeOnTheScreen();
+    expect(screen.getByText('Custom')).toBeOnTheScreen();
+
+    // Auto opens ProgramSetupScreen in editing mode
+    fireEvent.press(screen.getByText('Auto'));
+    expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+  });
 });

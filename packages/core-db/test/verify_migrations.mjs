@@ -55,8 +55,10 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '052_bounded_microcycle_roles.sql',
   '053_routine_role_compatibility.sql',
   '054_contract_cutoff_provenance.sql',
-  '055_return_checkin_ack.sql'];
+  '055_return_checkin_ack.sql',
+  '056_movement_taxonomy_backfill.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
 let fail = 0;
@@ -1606,6 +1608,21 @@ console.log('[2q] 055 return_checkin_ack');
     invalidDateThrew = true;
   }
   check('055 schema rejects invalid date GLOB format', invalidDateThrew);
+}
+
+// --- 2r. 056 movement_taxonomy_backfill: coverage assertion ----------------
+console.log('[2r] 056 movement_taxonomy_backfill');
+{
+  const db056 = freshDb();
+  runMigrations(db056, MIGRATIONS);
+  const missingTaxonomy = db056.raw.prepare(`
+    SELECT COUNT(*) AS c
+    FROM movement m
+    LEFT JOIN movement_taxonomy t ON m.movement_id = t.movement_id
+    WHERE t.movement_id IS NULL
+  `).get().c;
+  check('every row in movement has exactly one movement_taxonomy row (missing count is 0)',
+    Number(missingTaxonomy) === 0, `${missingTaxonomy} missing`);
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

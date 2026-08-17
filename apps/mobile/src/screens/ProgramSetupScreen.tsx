@@ -1,10 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { accessContextForBlockFocus, SCHEMA_TYPES, defaultProgramDayIndices, type BlockFocus, type SchemaType } from '@ak/inference';
+import {
+  accessContextForBlockFocus,
+  SCHEMA_TYPES,
+  defaultProgramDayIndices,
+  programFocuses,
+  splitExplainer,
+  SPLIT_EXPLAINER_FOOTER,
+  BLOCK_FOCUS_LIST,
+  type BlockFocus,
+  type SchemaType,
+} from '@ak/inference';
 import { Chip, PrimaryButton, SecondaryButton } from '../components/ui';
 import { theme } from '../theme/theme';
 import {
   useStore,
+  type TrainingProgramDay,
   type TrainingProgramInput,
   type TrainingProgramMovementPreference,
 } from '../state/useStore';
@@ -53,6 +64,21 @@ export default function ProgramSetupScreen({
   const [dayIndices, setDayIndices] = useState<number[]>(() =>
     program?.days.map((day) => day.dayIndex) ?? [...defaultProgramDayIndices(initialFrequency)],
   );
+  const [dayFocuses, setDayFocuses] = useState<Record<number, BlockFocus>>(() => {
+    const initial: Record<number, BlockFocus> = {};
+    if (program?.days && program.days.length > 0) {
+      for (const d of program.days) {
+        initial[d.dayIndex] = d.focus as BlockFocus;
+      }
+    } else {
+      const defaultFocuses = programFocuses(profile.objective, initialFrequency);
+      const defaults = defaultProgramDayIndices(initialFrequency);
+      defaults.forEach((day, idx) => {
+        initial[day] = defaultFocuses[idx] ?? 'full';
+      });
+    }
+    return initial;
+  });
   const [preferences, setPreferences] = useState<TrainingProgramMovementPreference[]>(() =>
     program?.movementPreferences ?? [],
   );
@@ -62,14 +88,21 @@ export default function ProgramSetupScreen({
     if (horizonKind === null || schemaType === null || buildMode === null) return null;
     if (horizonKind === 'weeks' && blockCount === null) return null;
     if (horizonKind === 'date' && reviewDate.trim() === '') return null;
+    const defaultFocuses = programFocuses(profile.objective, dayIndices.length);
+    const days: TrainingProgramDay[] = dayIndices.map((dayIndex, i) => ({
+      dayIndex,
+      focus: dayFocuses[dayIndex] ?? defaultFocuses[i] ?? 'full',
+    }));
     return {
       horizon: horizonKind === 'weeks'
         ? { kind: 'weeks', blockCount: blockCount! }
         : { kind: 'date', requestedReviewDate: reviewDate.trim() },
-      schemaType, dayIndices,
+      schemaType,
+      dayIndices,
+      days,
       movementPreferences: buildMode === 'custom' ? preferences : [],
     };
-  }, [horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices, preferences]);
+  }, [horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices, preferences, dayFocuses, profile.objective]);
 
   const previewResult = useMemo(() => {
     if (input === null) return { preview: null, error: null };
@@ -88,10 +121,28 @@ export default function ProgramSetupScreen({
   }), [getVerdicts, movementAvailabilityRevision, profile, movements, niggles]);
 
   const toggleDay = (day: number): void => {
-    setDayIndices((current) => current.includes(day)
-      ? current.length === 1 ? current : current.filter((value) => value !== day)
-      : [...current, day].sort((a, b) => a - b));
+    const nextDays = dayIndices.includes(day)
+      ? (dayIndices.length === 1 ? dayIndices : dayIndices.filter((value) => value !== day))
+      : [...dayIndices, day].sort((a, b) => a - b);
+    setDayIndices(nextDays);
     setPreferences((current) => current.filter((preference) => preference.dayIndex !== day));
+    setDayFocuses((current) => {
+      const updated = { ...current };
+      const defaultFocuses = programFocuses(profile.objective, nextDays.length);
+      nextDays.forEach((d, idx) => {
+        if (!updated[d]) {
+          updated[d] = defaultFocuses[idx] ?? 'full';
+        }
+      });
+      return updated;
+    });
+  };
+
+  const setDayFocus = (dayIndex: number, focus: BlockFocus): void => {
+    setDayFocuses((current) => ({
+      ...current,
+      [dayIndex]: focus,
+    }));
   };
 
   const chooseMovement = (dayIndex: number, slotIndex: number, pattern: TrainingProgramMovementPreference['pattern'], movementId: number): void => {
@@ -157,6 +208,36 @@ export default function ProgramSetupScreen({
           {[1, 2, 3, 4, 5, 6, 7].map((day) => (
             <Chip key={day} label={DAY_NAME[day - 1]} selected={dayIndices.includes(day)} onPress={() => toggleDay(day)} />
           ))}
+        </View>
+
+        {/* Split explainer */}
+        <View style={styles.explainerBox}>
+          <Text style={styles.explainerText}>
+            {splitExplainer(profile.objective, dayIndices.length)}
+          </Text>
+          <Text style={styles.explainerFooter}>{SPLIT_EXPLAINER_FOOTER}</Text>
+        </View>
+
+        {/* Day rows with focus chips */}
+        <View style={styles.dayRowsContainer}>
+          {dayIndices.map((dayIndex) => {
+            const currentFocus = dayFocuses[dayIndex] ?? programFocuses(profile.objective, dayIndices.length)[dayIndices.indexOf(dayIndex)] ?? 'full';
+            return (
+              <View key={dayIndex} style={styles.dayRow}>
+                <Text style={styles.dayRowTitle}>{DAY_NAME[dayIndex - 1]}</Text>
+                <View style={styles.focusChipRow}>
+                  {BLOCK_FOCUS_LIST.map((focus) => (
+                    <Chip
+                      key={focus}
+                      label={focus}
+                      selected={currentFocus === focus}
+                      onPress={() => setDayFocus(dayIndex, focus)}
+                    />
+                  ))}
+                </View>
+              </View>
+            );
+          })}
         </View>
       </View>
 
@@ -232,4 +313,43 @@ const styles = StyleSheet.create({
   slot: { gap: 6 },
   slotTitle: { color: theme.color.textMid, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   error: { color: theme.color.textHi, borderLeftWidth: 3, borderLeftColor: theme.color.textHi, paddingLeft: 10 },
+  explainerBox: {
+    marginTop: theme.space[2],
+    paddingTop: theme.space[3],
+    borderTopWidth: 1,
+    borderTopColor: theme.color.line,
+    gap: 4,
+  },
+  explainerText: {
+    color: theme.color.textHi,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  explainerFooter: {
+    color: theme.color.textLow,
+    fontSize: 13,
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  dayRowsContainer: {
+    marginTop: theme.space[2],
+    gap: theme.space[3],
+  },
+  dayRow: {
+    paddingTop: theme.space[2],
+    borderTopWidth: 1,
+    borderTopColor: theme.color.line,
+    gap: 6,
+  },
+  dayRowTitle: {
+    color: theme.color.textHi,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  focusChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
 });
