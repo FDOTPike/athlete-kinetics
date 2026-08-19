@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   accessContextForBlockFocus,
-  SCHEMA_TYPES,
+  SELECTABLE_SCHEMA_TYPES,
   defaultProgramDayIndices,
   programFocuses,
   splitExplainer,
@@ -247,7 +247,7 @@ export default function ProgramSetupScreen({
           <Text style={styles.notice}>Linear is recommended: one clear progression is easiest to learn and review. You can change it.</Text>
         )}
         <View style={styles.wrap}>
-          {SCHEMA_TYPES.map((method) => (
+          {SELECTABLE_SCHEMA_TYPES.map((method) => (
             <Chip key={method} label={SCHEMA_LABEL[method]} selected={schemaType === method} onPress={() => setSchemaType(method)} />
           ))}
         </View>

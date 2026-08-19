@@ -6,7 +6,7 @@
  */
 import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SCHEMA_TYPES, addDaysIso, targetLoadKg, splitExplainer, SPLIT_EXPLAINER_FOOTER, type BlockPlan, type SchemaType } from '@ak/inference';
+import { SELECTABLE_SCHEMA_TYPES, addDaysIso, targetLoadKg, splitExplainer, SPLIT_EXPLAINER_FOOTER, type BlockPlan, type SchemaType } from '@ak/inference';
 import {
   useStore,
   type BlockSessionSummary,
@@ -922,7 +922,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             )}
             <Text style={styles.schemaLabel}>Choose a loading structure</Text>
             <View style={styles.schemaRow}>
-              {SCHEMA_TYPES.map((type) => {
+              {SELECTABLE_SCHEMA_TYPES.map((type) => {
                 const selected = type === schema;
                 return (
                   <Pressable

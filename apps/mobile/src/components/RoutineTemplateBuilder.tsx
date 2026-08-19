@@ -29,6 +29,7 @@ import {
   rankRoutineSupplementaryRecommendations,
   sortPickerMovements,
   PICKER_TIER_NAMES,
+  SELECTABLE_SCHEMA_TYPES,
   TIER_3_CAPTION,
   DIFFICULTY_RANK,
   type MovementAvailability,
@@ -58,7 +59,10 @@ const SCHEMA_LABELS: Record<SchemaType, string> = {
   APRE: 'Autoregulated',
 };
 
-const SCHEMAS: SchemaType[] = ['LINEAR', 'WAVE', 'STEP', 'APRE'];
+// Selection offers the non-retired schemas only. SCHEMA_LABELS above stays keyed
+// by the full SchemaType so a template that already chose a retired schema still
+// renders its name.
+const SCHEMAS: readonly SchemaType[] = SELECTABLE_SCHEMA_TYPES;
 
 interface SlotItem {
   id: string;

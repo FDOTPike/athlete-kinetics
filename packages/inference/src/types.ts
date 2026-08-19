@@ -202,6 +202,25 @@ export const PATTERN_TO_CATEGORY: Record<MovementPattern, TaxonomyCategory> = {
 export const SCHEMA_TYPES = ['LINEAR', 'WAVE', 'STEP', 'APRE'] as const;
 export type SchemaType = (typeof SCHEMA_TYPES)[number];
 
+/** Schemas offered for NEW selection — a STRICT subset of SCHEMA_TYPES.
+ *  SCHEMA_TYPES itself must stay at four members: it mirrors the frozen
+ *  block_meta CHECK in 009_periodization.sql and persisted blocks reference
+ *  every one of them. Retirement is selection-only — a retired schema keeps
+ *  generating, loading and rendering for blocks that already chose it.
+ *
+ *  A schema governs ONE layer: how sets, reps and effort move WEEK TO WEEK
+ *  inside a 4-week block. It is texture within a fixed block dose. Long-term
+ *  progress is the job of the block-to-block layer above it, which today is a
+ *  fixed 8-block rotation (macroPhaseOf) with no athlete input. Do not judge a
+ *  schema by whether it drives long-term progress — that is not its layer.
+ *  See docs/decisions/TRAINING_PROGRESSION_LAYERS.md.
+ *
+ *    STEP — retired on product-simplification grounds. STEP adds a set in weeks
+ *           2-3 rather than redistributing a fixed dose, so unlike the others it
+ *           is not volume-equated; it was cut for simplicity, not for evidence. */
+export const SELECTABLE_SCHEMA_TYPES = ['LINEAR', 'WAVE', 'APRE'] as const;
+export type SelectableSchemaType = (typeof SELECTABLE_SCHEMA_TYPES)[number];
+
 /** The 32-week macro-cycle: 8 blocks x 4 weeks, two blocks per phase. */
 export const MACRO_PHASES = ['gpp', 'hypertrophy', 'volume', 'peak'] as const;
 export type MacroPhase = (typeof MACRO_PHASES)[number];

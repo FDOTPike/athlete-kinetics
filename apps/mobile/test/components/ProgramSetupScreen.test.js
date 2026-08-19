@@ -59,6 +59,9 @@ test('intermediate athlete cannot continue until a method is chosen', () => {
   fireEvent.press(screen.getByText('4 wk'));
   expect(screen.getByText('Create program')).toBeDisabled();
 
+  // STEP is retired from selection (product simplification).
+  expect(screen.queryByText('Step loading')).toBeNull();
+
   fireEvent.press(screen.getByText('Undulating'));
   expect(screen.getByText('Create program')).not.toBeDisabled();
 });

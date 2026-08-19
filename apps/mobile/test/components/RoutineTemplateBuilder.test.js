@@ -96,12 +96,14 @@ describe('RoutineTemplateBuilder', () => {
     };
   });
 
-  test('shows only the four implemented methods and three safe default slots', () => {
+  test('offers only the selectable methods and three safe default slots', () => {
     render(<RoutineTemplateBuilder />);
     expect(screen.getByText('Linear')).toBeOnTheScreen();
     expect(screen.getByText('Undulating')).toBeOnTheScreen();
-    expect(screen.getByText('Step Loading')).toBeOnTheScreen();
     expect(screen.getByText('Autoregulated')).toBeOnTheScreen();
+    // STEP is retired from selection (product simplification). It still
+    // generates for templates that already chose it.
+    expect(screen.queryByText('Step Loading')).toBeNull();
     expect(screen.queryByText(/Conjugate/i)).toBeNull();
     expect(screen.getByText('Day 1 Ordered Movements (3)')).toBeOnTheScreen();
   });
