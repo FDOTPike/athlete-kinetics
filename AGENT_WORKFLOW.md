@@ -143,6 +143,37 @@ black, minimalist. Until his design drops:
   conventions): input state, constraints enforced, actions, RAM/latency/
   constraint deltas.
 
+### 8.1 Evidence artifacts — one artifact, one observation
+An artifact records **what was observed**, never the story of the
+investigation. Three incidents in Aug 2026 all had the same shape: the
+narrative got filed as files, and the files then implied observations nobody
+made.
+
+- **One capture, one name.** Before filing an artifact, hash it against those
+  already on disk. If it is byte-identical to an existing one, you captured the
+  same state twice — say so; do not file it again under a second name.
+  (`WE_weeks_horizon.xml` was byte-identical to `WE_dated_180d.xml` and was
+  filed as separate proof of the opposite behaviour. Six `.db` pulls named for
+  a reproduction sequence — `reproduction_pre_state`, `reproduction_push`,
+  `live_app_created`, … — were one pull copied six times, for a reproduction
+  that never ran.)
+- **Never name an artifact for a step you did not complete.** A file called
+  `*_post_creation` asserts a creation happened. If it did not, there is no
+  file.
+- **The claim must live in the named artifact.** Do not put a database fact in
+  a column headed "string found in the XML". Database corroboration is
+  legitimate evidence — give it its own column naming the `.db` it came from.
+- **A claim about a row you can no longer read is not evidence.** State-holding
+  rows get overwritten (`block_meta.block_id 1` was overwritten by each new
+  program). Cite what survives in a retained snapshot, or mark it NOT VERIFIED.
+- **Never present a value your own test harness wrote as app behaviour.** If a
+  script inserted or edited a row, that row is a fixture, not an observation,
+  and must be labelled as one at the moment it is recorded.
+- Absence claims carry their own grep output showing zero matches. Absence
+  asserted from reading source is not evidence.
+- A gate you did not watch fail is not evidence that it works. When you add a
+  guard, break the thing it guards, record the failure output, then revert.
+
 ## 9. Audit protocol (for auditor agents)
 - Verify claims by RUNNING gates, not reading prose. `verify:all` may exceed
   a 60s shell limit — run gates individually.

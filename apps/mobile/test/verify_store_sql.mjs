@@ -405,6 +405,25 @@ check('continuation carries the program anchor, never re-reads the global cycle'
 check('standalone block generation still advances the athlete global cycle',
   src.includes('nextMacroPosition(d).macroBlockIndex'),
 );
+check('dated program creation calls datedProgramMacroAnchor and undated uses plan.macroBlockIndex',
+  src.includes("startingMacroBlockIndex: programDraft.input.horizon.kind === 'date'")
+    && src.includes('? datedProgramMacroAnchor(programDraft.preview.plannedBlockCount)')
+    && src.includes(': plan.macroBlockIndex'),
+);
+// The persisted anchor above is only ONE of three sites that derive a macro
+// position for a dated program. blockGenerator.ts:350-357 requires preview and
+// committed generation to use the IDENTICAL derivation "never silent" — a preview
+// that regressed to the global carousel would show the athlete phases they will
+// not receive, and the persist-site check alone does not catch that. Pin all three.
+const datedAnchorCallSites = [...src.matchAll(/datedProgramMacroAnchor\(/g)].length;
+check('ALL THREE dated-program macro sites call datedProgramMacroAnchor (preview, generation, persist)',
+  datedAnchorCallSites === 3, `${datedAnchorCallSites} call sites`);
+check('the PREVIEW path anchors a dated program to the competition date, not the global carousel',
+  src.includes('datedProgramMacroAnchor(shape.plannedBlockCount)'),
+);
+check('committed GENERATION anchors a dated program to the competition date',
+  src.includes('datedProgramMacroAnchor(pendingProgramCreation.preview.plannedBlockCount)'),
+);
 
 check(
   'planned completion is joined through exact session_origin provenance and immutable session_outcome',
@@ -556,7 +575,7 @@ a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for
 console.log('[Work Order C — Next Block Panel store invariants]');
 const getAdjustmentsRaw = (() => {
   const i = src.indexOf('getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[]');
-  const j = src.indexOf('refreshVector:', i);
+  const j = src.indexOf('\n  },', i);
   return i >= 0 && j > i ? src.slice(i, j) : '';
 })();
 const getAdjustmentsBody = stripComments(getAdjustmentsRaw);
@@ -596,6 +615,63 @@ if (adjustmentsQuerySql) {
 console.log('[Calibration Policy v1 store invariants]');
 a('source tripwire: "recentAcwr" does not appear in useStore.ts', !src.includes('recentAcwr'));
 a('boot rematerialization loop window is exactly 14 days', /demoDates\(localToday\(\),\s*14\)/.test(src));
+
+// --- e1RM series selector --------------------------------------------------------
+console.log('[e1RM series selector — read-only tripwires]');
+const e1rmBody = stripComments((() => {
+  const i = src.indexOf('getMovementE1rmSeries: (movementId: number): E1rmPoint[] => {');
+  if (i < 0) return '';
+  return src.slice(i, src.indexOf('\n  },', i));
+})());
+a('getMovementE1rmSeries exists in useStore.ts', e1rmBody.length > 0);
+a('getMovementE1rmSeries never writes',
+  !/\b(INSERT|UPDATE|DELETE)\b/i.test(e1rmBody));
+a('getMovementE1rmSeries never touches one_rep_max',
+  !/one_rep_max/.test(e1rmBody));
+a('getMovementE1rmSeries never unions imported history',
+  !/history_import/.test(e1rmBody));
+
+console.log('[e1RM series selector — executed against seeded rows]');
+const e1rmSql = statements.find((s) =>
+  s.includes('FROM set_record sr') && s.includes('JOIN session s') && s.includes('WHERE sr.movement_id = ?'),
+);
+a('store exposes the getMovementE1rmSeries SQL literal', Boolean(e1rmSql));
+if (e1rmSql) {
+  const req = createRequire(import.meta.url);
+  const { bestPerSession } = req(join(ROOT, 'packages', 'inference', 'test', '.build', 'e1rm.js'));
+  db.exec('BEGIN');
+  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (950,'E1RM Test Squat','squat',1)");
+  // Session 1 (2026-06-01): two rated sets
+  db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (951,'2026-06-01',0)");
+  db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (9501,951,950,1,5,100.0,8.0,0),(9502,951,950,2,5,105.0,8.5,0)");
+  // Session 2 (2026-06-03): one rated set
+  db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (952,'2026-06-03',0)");
+  db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (9503,952,950,1,3,110.0,9.0,0)");
+  // Session 3 (2026-06-05): sets with rpe IS NULL (unrated)
+  db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (953,'2026-06-05',0)");
+  db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (9504,953,950,1,5,100.0,NULL,0),(9505,953,950,2,5,105.0,NULL,0)");
+
+  const rows = db.prepare(e1rmSql).all(950);
+  const points = bestPerSession(rows);
+
+  a('two sessions in, two points out, date-ordered',
+    points.length === 2
+      && points[0].session_id === 951
+      && points[0].session_date === '2026-06-01'
+      && points[0].set_id === 9502
+      && points[1].session_id === 952
+      && points[1].session_date === '2026-06-03'
+      && points[1].set_id === 9503
+      && points[0].e1rm_kg > 0
+      && points[1].e1rm_kg > 0,
+    JSON.stringify(points));
+
+  a('a session whose sets all have rpe IS NULL produces no point',
+    !points.some((p) => p.session_id === 953),
+    JSON.stringify(points));
+
+  db.exec('ROLLBACK');
+}
 
 // --- resetTrainingData: EXECUTE the store's wipe on seeded data -----------------
 // Proves the reset clears ALL history (so the demo can re-load) while KEEPING the

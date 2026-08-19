@@ -88,6 +88,7 @@ import {
   MACRO_BLOCKS,
   macroPhaseOf,
   programMacroIndex,
+  datedProgramMacroAnchor,
   BLOCK_FOCI,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
@@ -162,6 +163,8 @@ import {
   transitionLoadPreference,
   type LoadPreference,
   type LoadSelection,
+  bestPerSession,
+  type E1rmPoint,
 } from '@ak/inference';
 
 export type { MovementAvailability };
@@ -677,6 +680,11 @@ interface KineticsStore {
   archiveTrainingProgram: () => void;
   refreshProgram: () => void;
   getPendingAutopilotAdjustments: () => PendingAutopilotAdjustment[];
+  /** Estimated-1RM series for one movement, derived from logged sets.
+   *  Read-only and observational — it never writes, and never feeds one_rep_max,
+   *  which stays the athlete-entered source of truth for load targeting.
+   *  Native sessions only: imported history carries no per-set RPE. */
+  getMovementE1rmSeries: (movementId: number) => E1rmPoint[];
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
@@ -2880,7 +2888,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // program (no program row yet) anchors to the athlete's global position.
     const macroBlockIndex = activeProgram !== null
       ? programMacroIndex(activeProgram.startingMacroBlockIndex, activeProgram.currentSequenceIndex + 1)
-      : nextMacroPosition(d).macroBlockIndex;
+      : (input.horizon.kind === 'date'
+          ? datedProgramMacroAnchor(shape.plannedBlockCount)
+          : nextMacroPosition(d).macroBlockIndex);
     const effectiveProfile = { ...planningProfile, weekly_frequency: shape.days.length };
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
@@ -2964,7 +2974,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // the preview used, never the global counter.
     const macroBlockIndex = pendingProgramContinuation !== null
       ? programMacroIndex(pendingProgramContinuation.startingMacroBlockIndex, pendingProgramContinuation.sequenceIndex)
-      : nextMacroPosition(d).macroBlockIndex;
+      : (pendingProgramCreation !== null && pendingProgramCreation.input.horizon.kind === 'date'
+          ? datedProgramMacroAnchor(pendingProgramCreation.preview.plannedBlockCount)
+          : nextMacroPosition(d).macroBlockIndex);
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
     const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
@@ -3085,7 +3097,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           requestedReviewDate: programDraft.preview.requestedReviewDate,
           plannedEndDate: programDraft.preview.plannedEndDate,
           plannedBlockCount: programDraft.preview.plannedBlockCount,
-          startingMacroBlockIndex: plan.macroBlockIndex,
+          startingMacroBlockIndex: programDraft.input.horizon.kind === 'date'
+            ? datedProgramMacroAnchor(programDraft.preview.plannedBlockCount)
+            : plan.macroBlockIndex,
           schemaType,
           days: programDraft.preview.days,
           movementPreferences: programDraft.input.movementPreferences ?? [],
@@ -4289,6 +4303,35 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       setDelta: r.set_delta,
       reason: r.reason,
     }));
+  },
+
+  getMovementE1rmSeries: (movementId: number): E1rmPoint[] => {
+    if (db === null) return [];
+    const d = db;
+    // set_record only — history_import_set is deliberately NOT unioned in.
+    // Imported sessions carry a whole-session RPE, not per-set RPE, so they
+    // cannot produce a comparable estimate. Mixing them would average two
+    // different constructs (see AUDIT_CORRECTIONS.md, Finding 0.2).
+    const rows = rowsOf<{
+      set_id: number;
+      session_id: number;
+      session_date: string;
+      reps: number;
+      load_kg: number;
+      rpe: number | null;
+    }>(d.executeSync(`
+      SELECT sr.set_id,
+             sr.session_id,
+             s.session_date,
+             sr.reps,
+             sr.load_kg,
+             sr.rpe
+      FROM set_record sr
+      JOIN session s ON s.session_id = sr.session_id
+      WHERE sr.movement_id = ?
+      ORDER BY s.session_date, sr.session_id, sr.set_id
+    `, [movementId]));
+    return bestPerSession(rows);
   },
 
   refreshVector: () => {

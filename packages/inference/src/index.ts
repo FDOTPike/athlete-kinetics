@@ -90,6 +90,7 @@ export {
   MACRO_TOTAL_WEEKS,
   programFocuses,
   programMacroIndex,
+  datedProgramMacroAnchor,
   macroPhaseOf,
   SCHEMA_FATIGUE_COST,
   splitExplainer,

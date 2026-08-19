@@ -26,14 +26,14 @@ import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
-  SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
-  programFocuses, programMacroIndex } = require('./.build/blockGenerator.js');
+  SCHEMA_FATIGUE_COST, MACRO_BLOCKS, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
+  programFocuses, programMacroIndex, datedProgramMacroAnchor } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
 const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
 const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS,
   STANDARD_EQUIPMENT_ITEMS, SPECIALIST_EQUIPMENT_ITEMS, OBJECTIVES,
-  SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
+  SCHEMA_TYPES, SELECTABLE_SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
   MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
   PATTERN_TO_CATEGORY } = require('./.build/types.js');
 const {
@@ -331,6 +331,36 @@ const orphans = Number(db.prepare(
           (SELECT count(*) FROM block_meta) AS c`).get().c);
 check('block delete cascades sessions + slots + meta (no orphans)', orphans === 0, String(orphans));
 
+// --- [6b] selectable schema subset (retirement is selection-only) ---------------
+// SCHEMA_TYPES mirrors the frozen block_meta CHECK in 009 and is the domain every
+// persisted block was written against, so it must never shrink. Retiring a schema
+// removes it from SELECTABLE_SCHEMA_TYPES only; the engine keeps generating it so
+// blocks that already chose it still load, run and render.
+console.log('[6b] selectable schema subset (retirement is selection-only)');
+check('SCHEMA_TYPES is exactly the frozen 009 domain (never shrinks)',
+  SCHEMA_TYPES.length === 4
+  && ['LINEAR', 'WAVE', 'STEP', 'APRE'].every((t, i) => SCHEMA_TYPES[i] === t),
+  SCHEMA_TYPES.join(','));
+check('SELECTABLE_SCHEMA_TYPES is non-empty and contains no unknown schema',
+  SELECTABLE_SCHEMA_TYPES.length > 0
+  && SELECTABLE_SCHEMA_TYPES.every((t) => SCHEMA_TYPES.includes(t)),
+  SELECTABLE_SCHEMA_TYPES.join(','));
+check('SELECTABLE_SCHEMA_TYPES is a STRICT subset (at least one schema is retired)',
+  SELECTABLE_SCHEMA_TYPES.length < SCHEMA_TYPES.length,
+  `${SELECTABLE_SCHEMA_TYPES.length} selectable of ${SCHEMA_TYPES.length}`);
+check('SELECTABLE_SCHEMA_TYPES has no duplicates',
+  new Set(SELECTABLE_SCHEMA_TYPES).size === SELECTABLE_SCHEMA_TYPES.length);
+// Retired schemas must still generate — persisted blocks depend on it.
+let retiredGenerates = true;
+const retiredSchemas = SCHEMA_TYPES.filter((t) => !SELECTABLE_SCHEMA_TYPES.includes(t));
+for (const schemaType of retiredSchemas) {
+  const p = generateBlock({
+    profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType });
+  if (p.sessions.length === 0 || p.schemaType !== schemaType) retiredGenerates = false;
+}
+check('every RETIRED schema still generates a valid block (persisted blocks keep running)',
+  retiredSchemas.length > 0 && retiredGenerates, retiredSchemas.join(','));
+
 // --- [7] multi-schema strategy bound --------------------------------------------
 console.log('[7] multi-schema strategies (LINEAR / WAVE / STEP / APRE)');
 // Weekly loading signature: (sets, reps, rpe) of the first strength slot for
@@ -389,6 +419,88 @@ check('60 kg 1RM, 12 reps @ RPE 6.5 -> 40.0 kg', targetLoadKg(60, 12, 6.5) === 4
 check('pct rises with RPE at fixed reps', targetPct(5, 9.0) > targetPct(5, 7.0));
 check('pct falls as reps rise at fixed RPE', targetPct(3, 8.0) > targetPct(10, 8.0));
 check('1 rep @ RPE 10 approaches the 1RM', targetPct(1, 10) > 0.95 && targetPct(1, 10) <= 1.0);
+
+// --- [8b] estimated 1RM from logged sets (the inverse of [8]) ---------------------
+// e1rm.ts must be the SAME translation read backwards, never a second formula.
+// The round-trip below is what proves that: anything with its own coefficient
+// would drift outside targetLoadKg's own 2.5 kg plate rounding.
+console.log('[8b] estimated 1RM derived from logged sets (inverse Epley)');
+const e1rmMod = require('./.build/e1rm.js');
+const { estimateOneRepMax, bestPerSession } = e1rmMod;
+
+let roundTrips = true, worstDrift = 0;
+for (const oneRm of [60, 100, 140, 227.5]) {
+  for (const reps of [1, 3, 5, 8, 12, 20]) {
+    for (const rpe of [6, 6.5, 7, 8, 8.5, 9, 10]) {
+      const load = targetLoadKg(oneRm, reps, rpe);
+      const back = estimateOneRepMax(load, reps, rpe);
+      // targetLoadKg rounds the LOAD to 2.5 kg, so the recovered 1RM can sit up
+      // to half an increment / pct away. Nothing wider than that is rounding.
+      const tolerance = 1.25 / targetPct(reps, rpe) + 1e-9;
+      const drift = Math.abs(back - oneRm);
+      if (drift > worstDrift) worstDrift = drift;
+      if (!(drift <= tolerance)) roundTrips = false;
+    }
+  }
+}
+check('estimateOneRepMax inverts targetLoadKg within plate-rounding tolerance',
+  roundTrips, `worst drift ${worstDrift.toFixed(3)} kg over 168 cases`);
+check('a set at RPE 10 for 1 rep recovers its own load as the estimate',
+  Math.abs(estimateOneRepMax(100, 1, 10) - 100 * (31 / 30)) < 1e-9,
+  String(estimateOneRepMax(100, 1, 10)));
+check('estimate rises with reps at fixed load and RPE',
+  estimateOneRepMax(100, 8, 8) > estimateOneRepMax(100, 3, 8));
+check('estimate rises as RPE falls at fixed load and reps',
+  estimateOneRepMax(100, 5, 6) > estimateOneRepMax(100, 5, 9));
+
+// Missingness stays missing — no fallback RPE, no default, no zero.
+check('a set logged without an RPE yields no estimate',
+  estimateOneRepMax(100, 5, null) === null);
+check('non-positive load, zero reps and non-finite inputs yield no estimate',
+  estimateOneRepMax(0, 5, 8) === null && estimateOneRepMax(-10, 5, 8) === null
+  && estimateOneRepMax(100, 0, 8) === null
+  && estimateOneRepMax(Number.NaN, 5, 8) === null
+  && estimateOneRepMax(100, Number.NaN, 8) === null
+  && estimateOneRepMax(100, 5, Number.NaN) === null);
+check('an RPE outside the set_record CHECK domain yields no estimate',
+  estimateOneRepMax(100, 5, -1) === null && estimateOneRepMax(100, 5, 11) === null);
+
+const mkSet = (set_id, session_id, session_date, reps, load_kg, rpe) => ({
+  set_id, session_id, session_date, reps, load_kg, rpe });
+const series = bestPerSession([
+  mkSet(3, 20, '2026-07-02', 5, 100, 8),
+  mkSet(1, 10, '2026-07-01', 5, 100, 8),
+  mkSet(2, 10, '2026-07-01', 3, 110, 8),   // higher estimate, same session
+  mkSet(4, 30, '2026-07-03', 5, 100, null), // unrated -> session drops out
+]);
+check('bestPerSession returns one point per session, date-ordered',
+  series.length === 2 && series[0].session_id === 10 && series[1].session_id === 20,
+  series.map((p) => `${p.session_date}:${p.session_id}`).join(','));
+check('bestPerSession keeps the highest estimate in a session',
+  series[0].set_id === 2, `set_id ${series[0]?.set_id}`);
+check('a session with no rated set produces NO point (never a zero or a gap-fill)',
+  !series.some((p) => p.session_id === 30));
+check('bestPerSession is order-independent and does not mutate its input',
+  JSON.stringify(bestPerSession([
+    mkSet(2, 10, '2026-07-01', 3, 110, 8),
+    mkSet(1, 10, '2026-07-01', 5, 100, 8),
+  ])) === JSON.stringify(bestPerSession([
+    mkSet(1, 10, '2026-07-01', 5, 100, 8),
+    mkSet(2, 10, '2026-07-01', 3, 110, 8),
+  ])));
+check('bestPerSession of no sets is an empty series', bestPerSession([]).length === 0);
+
+// Numerical calibration is DEFERRED (Calibration Policy v1 section 5). This module
+// must expose the two derivations and NOTHING else — no MDC, no noise floor, no
+// persistence window, no "stalled" verdict. A threshold added later turns this red.
+check('the e1RM module exports NO threshold, constant or detector',
+  Object.keys(e1rmMod).sort().join(',') === 'bestPerSession,estimateOneRepMax');
+const e1rmSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'e1rm.ts'), 'utf-8');
+check('source tripwire: no plateau/threshold vocabulary in e1rm.ts',
+  !/\bMDC\b|[Tt]hreshold\s*=|[Ss]talled\s*[=:]|[Pp]lateauDetect|[Nn]oiseFloor/.test(e1rmSrc));
+check('source tripwire: e1rm.ts imports the ratified targetPct rather than restating it',
+  /import\s*\{\s*targetPct\s*\}\s*from\s*'\.\/blockGenerator'/.test(e1rmSrc)
+  && !/1\s*\/\s*\(\s*1\s*\+/.test(e1rmSrc.replace(/^\s*\*.*$/gm, '')));
 
 // --- [9] the hybrid tax -----------------------------------------------------------
 console.log('[9] hybrid tax (schema fatigue cost matrix)');
@@ -1172,6 +1284,53 @@ console.log('[18] guided program macro-cycle ownership');
     macroPhaseOf(programMacroIndex(6, 4)) === 'gpp'
       && macroPhaseOf(programMacroIndex(6, 1)) === 'volume'
       && macroPhaseOf(programMacroIndex(6, 2)) === 'peak');
+
+  const table = [
+    { count: 1, anchor: 8, indices: [8], phases: ['peak'] },
+    { count: 2, anchor: 7, indices: [7, 8], phases: ['peak', 'peak'] },
+    { count: 3, anchor: 6, indices: [6, 7, 8], phases: ['volume', 'peak', 'peak'] },
+    { count: 4, anchor: 5, indices: [5, 6, 7, 8], phases: ['volume', 'volume', 'peak', 'peak'] },
+    { count: 5, anchor: 4, indices: [4, 5, 6, 7, 8], phases: ['hypertrophy', 'volume', 'volume', 'peak', 'peak'] },
+    { count: 6, anchor: 3, indices: [3, 4, 5, 6, 7, 8], phases: ['hypertrophy', 'hypertrophy', 'volume', 'volume', 'peak', 'peak'] },
+    { count: 7, anchor: 2, indices: [2, 3, 4, 5, 6, 7, 8], phases: ['gpp', 'hypertrophy', 'hypertrophy', 'volume', 'volume', 'peak', 'peak'] },
+    { count: 8, anchor: 1, indices: [1, 2, 3, 4, 5, 6, 7, 8], phases: ['gpp', 'gpp', 'hypertrophy', 'hypertrophy', 'volume', 'volume', 'peak', 'peak'] },
+  ];
+
+  check('dated program macro table: anchor and phases match specification in full with final block in peak',
+    table.every(({ count, anchor, indices, phases }) => {
+      const gotAnchor = datedProgramMacroAnchor(count);
+      if (gotAnchor !== anchor) return false;
+      const gotIndices = Array.from({ length: count }, (_, i) => programMacroIndex(gotAnchor, i + 1));
+      if (gotIndices.join(',') !== indices.join(',')) return false;
+      const gotPhases = gotIndices.map((idx) => macroPhaseOf(idx));
+      if (gotPhases.join(',') !== phases.join(',')) return false;
+      const finalIndex = programMacroIndex(gotAnchor, count);
+      return macroPhaseOf(finalIndex) === 'peak';
+    }));
+
+  check('dated program final block macro index is exactly MACRO_BLOCKS for every count 1-8',
+    [1, 2, 3, 4, 5, 6, 7, 8].every((count) => {
+      const anchor = datedProgramMacroAnchor(count);
+      return programMacroIndex(anchor, count) === MACRO_BLOCKS;
+    }));
+
+  check('dated program macro phases are contiguous, ascending, and never wrap past 8 mid-program',
+    [1, 2, 3, 4, 5, 6, 7, 8].every((count) => {
+      const anchor = datedProgramMacroAnchor(count);
+      const indices = Array.from({ length: count }, (_, i) => programMacroIndex(anchor, i + 1));
+      return indices.every((val, idx) => idx === 0 || val === indices[idx - 1] + 1)
+        && indices[indices.length - 1] === MACRO_BLOCKS;
+    }));
+
+  check('datedProgramMacroAnchor throws for 0, 9, -1, 1.5 and NaN',
+    [0, 9, -1, 1.5, NaN].every((badInput) => {
+      try {
+        datedProgramMacroAnchor(badInput);
+        return false;
+      } catch {
+        return true;
+      }
+    }));
 }
 
 // --- [7] full-body scope routing + specialist equipment (O3/O4, migration 049) --
