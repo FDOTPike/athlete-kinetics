@@ -336,6 +336,12 @@ export {
   type ReturnEvaluation,
 } from './returnFromLayoff';
 export {
+  bestPerSession,
+  estimateOneRepMax,
+  type E1rmPoint,
+  type E1rmSetInput,
+} from './e1rm';
+export {
   mapImplementToTier,
   sortPickerMovements,
   groupAndSortPickerMovements,
