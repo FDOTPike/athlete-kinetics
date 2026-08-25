@@ -47,13 +47,18 @@ import { fileURLToPath } from 'node:url';
 // --- contract constants --------------------------------------------------------
 const MODEL_SIZE = 22972370;
 const MODEL_SHA256 = 'afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1';
-const PACKAGE_ID = 'com.athletekinetics.qa';
+const PACKAGE_ID = 'com.pikemethods.training.qa';
 const MANIFEST_ASSET = 'assets/candidate_manifest.json';
 const MANIFEST_SCHEMA = 'ak.candidate-manifest/1';
 const MANIFEST_LABEL = 'NON_PRODUCTION_QA_DEBUG_SIGNED';
 const MIN_ELF_LOAD_ALIGN = 0x4000;
 const FINGERPRINT_METHOD = 'sha256(git diff --full-index --binary HEAD)';
 const SHA256_RE = /^[0-9a-f]{64}$/;
+// R8 §2.5/§2.7: the QA artifact must carry exactly this hash-pinned Archivo
+// entry and must NOT carry any production networking permission.
+export const ARCHIVO_ASSET = 'assets/fonts/Archivo.ttf';
+export const ARCHIVO_SHA256 =
+  'bc878c6e9e36b848bfa2fb9174acdf812ea6df640fd167f2c95b42674729f6b5';
 
 /** The Android debug keystore has shipped in TWO distinguished-name shapes:
  *    classic Studio/AGP : C=US, O=Android, CN=Android Debug
@@ -747,11 +752,20 @@ export async function verifyQaArtifact(apkPath, options = {}) {
       dump = String(e.message);
     }
     const pkgLine = dump.split('\n').find((l) => l.startsWith('package:')) ?? '';
-    check('binary AndroidManifest package id is com.athletekinetics.qa (aapt)',
+    check('binary AndroidManifest package id is com.pikemethods.training.qa (aapt)',
       aaptOk && pkgLine.includes(`name='${PACKAGE_ID}'`), pkgLine.slice(0, 90) || 'aapt failed');
     if (!aaptOk || !pkgLine.includes(`name='${PACKAGE_ID}'`)) {
       throw new QaRejectionError('binary AndroidManifest package identity is not the QA id');
     }
+    // R8 §2.7: the merged QA manifest must not carry INTERNET — the production
+    // runtime has no in-process network client and the debug-only Metro
+    // permission must never leak into a packaged artifact. Read from the same
+    // authoritative aapt dump, never from the source tree.
+    const usesPermissions = [...dump.matchAll(/uses-permission: name='([^']+)'/g)].map((m) => m[1]);
+    const internetPerms = usesPermissions.filter((p) => p === 'android.permission.INTERNET');
+    check('packaged QA manifest carries NO android.permission.INTERNET',
+      internetPerms.length === 0,
+      internetPerms.length > 0 ? internetPerms.join(',') : `${usesPermissions.length} permissions, none networking`);
     check('generated manifest agrees with the binary manifest',
       manifest.packageId === PACKAGE_ID && manifest.buildVariant === 'qa',
       `${manifest.packageId} / ${manifest.buildVariant}`);
@@ -779,6 +793,22 @@ export async function verifyQaArtifact(apkPath, options = {}) {
     if (requireModelHash) {
       check('model asset sha256 matches ratified pin', actualSha === MODEL_SHA256, actualSha);
     }
+  }
+
+  // 4b. Archivo — R8 §2.5: presence AND hash are mandatory in every packaged
+  // artifact (QA here; the release AAB gate reuses this module's constants).
+  const archivoEntry = zip.entries.get(ARCHIVO_ASSET);
+  if (!archivoEntry) {
+    check('assets/fonts/Archivo.ttf packaged', false, `${ARCHIVO_ASSET} missing`);
+    throw new QaRejectionError('Archivo font asset missing');
+  }
+  const archivoSha = createHash('sha256')
+    .update(extractEntryToBuffer(apkPath, archivoEntry)).digest('hex');
+  check('assets/fonts/Archivo.ttf sha256 matches the ratified pin',
+    archivoSha === ARCHIVO_SHA256,
+    archivoSha === ARCHIVO_SHA256 ? archivoSha : `got ${archivoSha}`);
+  if (archivoSha !== ARCHIVO_SHA256) {
+    throw new QaRejectionError('Archivo font asset hash mismatch');
   }
 
   // 5. ONNX base/JSI pairing per ABI — zero native libraries is a rejection.

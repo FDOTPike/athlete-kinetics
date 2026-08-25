@@ -603,14 +603,34 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                       </View>
                       <View style={styles.dayRail}>
                     {row.cells.map((cell, dayIndex) => {
+                      // Every trajectory position owns a calendar date derived
+                      // from the block start, week and day index (same formula
+                      // as the generator's session_date), so rest cells can be
+                      // today-aware too.
+                      const cellDate = addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex);
+                      const isToday = cellDate === today;
                       if (cell === null) {
+                        if (!isToday) {
+                          return (
+                            <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
+                              <Text style={styles.dayMarkRestText}>-</Text>
+                            </View>
+                          );
+                        }
+                        // Today on a recovery/rest day: exactly one today-marker,
+                        // chalk left spine, accessible label, 'Today' not '-'.
                         return (
-                          <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
-                            <Text style={styles.dayMarkRestText}>-</Text>
+                          <View
+                            key={`rest-${dayIndex}`}
+                            testID="today-marker"
+                            accessibilityRole="text"
+                            accessibilityLabel="Today — recovery day"
+                            style={[styles.dayMark, styles.dayMarkRest, styles.dayMarkToday]}
+                          >
+                            <Text style={[styles.dayMarkRestText, styles.dayMarkTextToday]}>Today</Text>
                           </View>
                         );
                       }
-                      const isToday = cell.sessionDate === today;
                       const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
                       return (
                         <Pressable

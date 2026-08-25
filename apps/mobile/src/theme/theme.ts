@@ -24,8 +24,8 @@ export const theme = {
     pressed: '#D9D8D3',// primary button pressed fill
   },
   font: {
-    // Archivo variable TTF is bundled via assets/fonts (see WO-UI-0).
-    // Until the asset lands, RN falls back to the system face; sizes hold.
+    // Archivo variable TTF ships as an app asset, packaged hash-pinned by the
+    // packageArchivoFont gradle task into assets/fonts/Archivo.ttf (R8 §2.5).
     family: 'Archivo',
     metric:  { fontSize: 64, lineHeight: 68, fontWeight: '700' as const },
     display: { fontSize: 40, lineHeight: 46, fontWeight: '800' as const },

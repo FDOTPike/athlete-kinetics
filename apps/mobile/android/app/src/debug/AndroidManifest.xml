@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- R8 §2.7: INTERNET exists for the Metro/dev-client workflow ONLY.
+         It merges into debug builds; qa and release stay fully offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

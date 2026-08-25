@@ -99,7 +99,7 @@ gradle.taskGraph.whenReady { taskGraph ->
 }
 
 def appVersionCode = project.findProperty('AK_VERSION_CODE') ?: System.getenv('AK_VERSION_CODE') ?: '1'
-def appVersionName = project.findProperty('AK_VERSION_NAME') ?: System.getenv('AK_VERSION_NAME') ?: '1.0'
+def appVersionName = project.findProperty('AK_VERSION_NAME') ?: System.getenv('AK_VERSION_NAME') ?: '1.0.0-beta.1'
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -116,10 +116,15 @@ android {
 
     namespace "com.athletekinetics"
     defaultConfig {
-        applicationId "com.athletekinetics"
+        // Permanent Play identity (R8 §2.6): com.pikemethods.training is the
+        // production id; the qa variant appends .qa below. Package names become
+        // permanent after the first Play upload — never change casually.
+        applicationId "com.pikemethods.training"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode Integer.parseInt(appVersionCode.toString())
+        // First closed-beta version (R8 §2.6): 1 / 1.0.0-beta.1 unless pinned
+        // explicitly through AK_VERSION_CODE / AK_VERSION_NAME.
         versionName appVersionName.toString()
         // NOTE: this app module has no own CMake build (no src/main/cpp), so
         // these arguments affect nothing in this module. The 16 KB alignment
@@ -174,7 +179,7 @@ android {
             // itself (offline QA artifact: cleartext stays disabled).
             manifestPlaceholders["usesCleartextTraffic"] = "false"
             // Clearly labeled non-production on the launcher.
-            resValue "string", "app_name", "AthleteKinetics QA"
+            resValue "string", "app_name", "pikeMethods QA"
         }
         release {
             if (hasReleaseSigning) {
@@ -183,6 +188,54 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+// --- R8 §2.5: reproducible Archivo packaging ----------------------------------
+// The variable-font source is pinned by hash; exactly one file is copied into
+// src/main/assets/fonts. No npx/react-native-asset dependency, no generated
+// Android res — the raw TTF ships as an app asset that RN resolves through the
+// theme's fontFamily: 'Archivo'. The copy FAILS CLOSED when the source bytes do
+// not match the ratified SHA-256. Self-contained on purpose: it must not depend
+// on helpers declared later in this script.
+def archivoSource = new File(projectDir, '../../assets/fonts/Archivo/Archivo-VariableFont_wdth,wght.ttf').canonicalFile
+def ARCHIVO_SHA256 = 'bc878c6e9e36b848bfa2fb9174acdf812ea6df640fd167f2c95b42674729f6b5'
+def archivoTarget = file("src/main/assets/fonts/Archivo.ttf")
+def archivoSha256 = { File f ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    f.withInputStream { ins ->
+        def buf = new byte[8192]
+        int read
+        while ((read = ins.read(buf)) > 0) { digest.update(buf, 0, read) }
+    }
+    return digest.digest().collect { String.format('%02x', it) }.join()
+}
+
+tasks.register("packageArchivoFont") {
+    group = "verification"
+    description = "Copies the hash-pinned Archivo variable font into main assets."
+    outputs.file(archivoTarget)
+    outputs.upToDateWhen { false }
+    doLast {
+        if (!archivoSource.isFile()) {
+            throw new GradleException("Archivo packaging: tracked source missing: ${archivoSource}")
+        }
+        def actual = archivoSha256(archivoSource)
+        if (actual != ARCHIVO_SHA256) {
+            throw new GradleException(
+                "Archivo packaging: source sha256 ${actual} != ratified pin ${ARCHIVO_SHA256}; refusing to package")
+        }
+        archivoTarget.parentFile.mkdirs()
+        java.nio.file.Files.copy(archivoSource.toPath(), archivoTarget.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        logger.lifecycle("[archivo] packaged ${archivoTarget.name} (${archivoSha256(archivoTarget)})")
+    }
+}
+
+tasks.configureEach { task ->
+    def n = task.name
+    if (n == 'mergeReleaseAssets' || n == 'mergeQaAssets' || n == 'mergeDebugAssets') {
+        task.dependsOn packageArchivoFont
     }
 }
 
@@ -324,7 +377,7 @@ def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
                 sha256       : modelSha,
                 sizeBytes    : 22972370,
             ],
-            packageId           : 'com.athletekinetics.qa',
+            packageId           : 'com.pikemethods.training.qa',
             versionCode         : android.defaultConfig.versionCode,
             versionName         : "${android.defaultConfig.versionName}-QA",
             buildVariant        : 'qa',

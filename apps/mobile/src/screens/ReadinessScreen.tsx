@@ -108,7 +108,15 @@ export default function ReadinessScreen({
   const confirmReturnCheckin = useStore((s) => s.confirmReturnCheckin);
   const dismissReturnCheckin = useStore((s) => s.dismissReturnCheckin);
   const [confirmReset, setConfirmReset] = useState(false);
+  // Set when a demo load came back 'blocked_existing_data' so the screen can
+  // say so instead of leaving the button looking dead.
+  const [demoBlocked, setDemoBlocked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const attemptDemoLoad = React.useCallback(() => {
+    const result = loadDemoAthlete();
+    setDemoBlocked(result === 'blocked_existing_data');
+  }, [loadDemoAthlete]);
 
   const handleRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -159,9 +167,14 @@ export default function ReadinessScreen({
           </Text>
           <PrimaryButton
             label="Load demo athlete"
-            onPress={loadDemoAthlete}
+            onPress={attemptDemoLoad}
             accessibilityLabel="Load the 180 day demo athlete"
           />
+          {demoBlocked && (
+            <Text style={styles.caption} accessibilityLiveRegion="polite">
+              Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
+            </Text>
+          )}
           <SecondaryButton label="Refresh" onPress={refreshVector} />
           <View style={{ marginTop: theme.space[3] }}>
             <Disclosure label="Reset and load demo">
@@ -184,7 +197,7 @@ export default function ReadinessScreen({
                     label="Reset training data and load demo"
                     onPress={() => {
                       resetTrainingData();
-                      loadDemoAthlete();
+                      attemptDemoLoad();
                       setConfirmReset(false);
                     }}
                     accessibilityLabel="Confirm reset training data and load demo athlete"

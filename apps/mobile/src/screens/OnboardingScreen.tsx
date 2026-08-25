@@ -115,6 +115,9 @@ export default function OnboardingScreen(): React.JSX.Element {
   // tier default is not explicit and re-derives on tier change.
   const [loadPreference, setLoadPreference] = useState<LoadPreference>(defaultLoadPreference(DEFAULT_PROFILE.training_age));
   const [loadPreferenceExplicit, setLoadPreferenceExplicit] = useState(false);
+  // Set when a demo load was refused because real history exists; explains the
+  // refusal and keeps the wizard on the current step.
+  const [demoNotice, setDemoNotice] = useState<string | null>(null);
 
   useSubViewBack(stepIdx > 0, () => setStepIdx((i) => Math.max(0, i - 1)));
 
@@ -164,7 +167,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   };
 
   const finishWithDemo = (): void => {
-    loadDemoAthlete();
+    const result = loadDemoAthlete();
+    if (result === 'blocked_existing_data') {
+      // Existing history was preserved — stay here and say so. Onboarding is
+      // NOT completed; normal setup remains available.
+      setDemoNotice('Your existing training history was preserved, so the demo was not loaded. You can complete the normal setup instead.');
+      return;
+    }
+    setDemoNotice(null);
     completeOnboarding({}, name.trim().length > 0 ? name : 'Demo Athlete');
   };
 
@@ -210,6 +220,11 @@ export default function OnboardingScreen(): React.JSX.Element {
               accessibilityLabel="Skip the questionnaire and load the demo athlete"
               style={styles.demoLink}
             />
+            {demoNotice !== null && (
+              <Text style={styles.p} accessibilityLiveRegion="polite">
+                {demoNotice}
+              </Text>
+            )}
           </View>
         )}
 

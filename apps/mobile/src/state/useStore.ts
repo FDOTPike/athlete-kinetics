@@ -326,6 +326,9 @@ export interface TrendPoint {
 }
 
 export type BootStatus = 'booting' | 'ready' | 'error';
+/** Outcome of a demo-athlete load: seeded fresh, or refused because real
+ *  training history already exists (which the load must never touch). */
+export type DemoLoadResult = 'loaded' | 'blocked_existing_data';
 
 export type TriageOutcome =
   | { kind: 'rejected' }
@@ -844,8 +847,11 @@ interface KineticsStore {
   endSession: () => void;
   computePrescription: (patterns: readonly MovementPattern[]) => void;
   /** First-run affordance: 180-day deterministic demo athlete. Refuses to run
-   *  unless the database is empty — it must never touch real training data. */
-  loadDemoAthlete: () => void;
+   *  unless the database is empty — it must never touch real training data.
+   *  Returns 'loaded' when the demo was seeded, or 'blocked_existing_data'
+   *  when real sessions exist (nothing was modified); unexpected database
+   *  errors keep failing honestly through the error channel. */
+  loadDemoAthlete: () => DemoLoadResult;
   /** DESTRUCTIVE: wipe ALL training history + telemetry + derived state
    *  (sessions, sets, blocks, cycles, telemetry, state_vector, niggles,
    *  reports, 1RMs) so the demo athlete can be loaded fresh. KEEPS the
@@ -5953,12 +5959,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     return (had?.c ?? 0) > 0;
   },
 
-  loadDemoAthlete: () => {
+  loadDemoAthlete: (): DemoLoadResult => {
     const d = getDb();
     const existing = rowsOf<{ c: number }>(
       d.executeSync('SELECT count(*) AS c FROM session'),
     )[0];
-    if (existing !== undefined && existing.c > 0) return; // never touch real data
+    if (existing !== undefined && existing.c > 0) return 'blocked_existing_data'; // never touch real data
     const adapter: DemoSql = {
       run: (sql, params = []) => {
         d.executeSync(sql, params as (string | number | null)[]);
@@ -5979,13 +5985,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     } catch (e) {
       d.executeSync('ROLLBACK');
       set({ error: e instanceof Error ? e.message : String(e) });
-      return;
+      throw e instanceof Error ? e : new Error(String(e));
     }
     const movements = rowsOf<MovementRow>(
       d.executeSync(MOVEMENT_LIBRARY_SQL),
     ).map(movementFromRow);
     set({ movements, lastLoggedLoads: latestLoadMap(d) });
     get().refreshVector();
+    return 'loaded';
   },
 
   dismissOutcome: () => {

@@ -384,13 +384,17 @@ test('COACH renders archived block card when block is null and hasArchivedBlock 
 });
 
 test('COACH enforces Law-2 assertion by marking only TODAY with chalk in the trajectory', () => {
+  // R8 §2.1: cellDate is DERIVED from block.startDate + week/dayIndex, so the
+  // fixture keeps sessionDate consistent with that formula: a block starting
+  // Mon 2026-07-13 puts today (2026-07-15) on week 1, dayIndex 3.
   const planned = baseState().blockSessions[0];
   mockState = baseState({
     today: TODAY,
+    block: { blockId: 1, startDate: '2026-07-13', objective: 'strength', createdAtMs: 1 },
     blockSessions: [
-      { ...planned, plannedSessionId: 1, dayIndex: 1, sessionDate: TODAY, focus: 'lower' },
-      { ...planned, plannedSessionId: 2, dayIndex: 3, sessionDate: '2026-07-17', focus: 'upper' },
-      { ...planned, plannedSessionId: 3, dayIndex: 5, sessionDate: '2026-07-19', focus: 'full' },
+      { ...planned, plannedSessionId: 1, dayIndex: 3, sessionDate: TODAY, focus: 'lower' },
+      { ...planned, plannedSessionId: 2, dayIndex: 5, sessionDate: '2026-07-17', focus: 'upper' },
+      { ...planned, plannedSessionId: 3, dayIndex: 7, sessionDate: '2026-07-19', focus: 'full' },
     ],
   });
   render(<BlockScreen />);

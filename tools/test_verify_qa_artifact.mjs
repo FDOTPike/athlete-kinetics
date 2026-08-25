@@ -67,9 +67,9 @@ const VALID_MANIFEST = {
     sha256: 'afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1',
     sizeBytes: 22972370,
   },
-  packageId: 'com.athletekinetics.qa',
+  packageId: 'com.pikemethods.training.qa',
   versionCode: 1,
-  versionName: '1.0-QA',
+  versionName: '1.0.0-beta.1-QA',
   buildVariant: 'qa',
   builtAtUtc: '2026-08-22T00:00:00.000Z',
 };
@@ -209,6 +209,19 @@ function makeSigningBlock(certDer) {
 
 const MODEL_BYTES = Buffer.alloc(22972370, 0x51);
 const BUNDLE_BYTES = Buffer.alloc(4096, 0x41);
+// Real pinned Archivo bytes for fixtures: the verifier hashes the entry, so a
+// fixture claiming to be valid must carry the genuine article. The altered
+// fixture below flips one byte to prove the hash gate can fire.
+const ARCHIVO_BYTES = readFileSync(new URL(
+  '../apps/mobile/assets/fonts/Archivo/Archivo-VariableFont_wdth,wght.ttf',
+  import.meta.url,
+));
+if (createHash('sha256').update(ARCHIVO_BYTES).digest('hex')
+  !== 'bc878c6e9e36b848bfa2fb9174acdf812ea6df640fd167f2c95b42674729f6b5') {
+  throw new Error('fixture Archivo source does not match the ratified pin');
+}
+const ARCHIVO_ALTERED = Buffer.from(ARCHIVO_BYTES);
+ARCHIVO_ALTERED[ARCHIVO_ALTERED.length - 1] ^= 0xff;
 const ELF_OK = (() => {
   // Minimal ELF64 with one PT_LOAD aligned 0x4000.
   const b = Buffer.alloc(0x100);
@@ -229,7 +242,8 @@ const ELF_BAD = (() => {
 })();
 
 const fixtureEntries = (overrides = {},
-  { includeBundle = true, includeModel = true, includeLibs = true, elf = ELF_OK, rawManifest = null } = {}) => {
+  { includeBundle = true, includeModel = true, includeLibs = true, includeArchivo = true,
+    archivoBytes = ARCHIVO_BYTES, elf = ELF_OK, rawManifest = null } = {}) => {
   const manifest = { ...VALID_MANIFEST, ...overrides };
   const entries = [{
     name: 'assets/candidate_manifest.json',
@@ -237,6 +251,9 @@ const fixtureEntries = (overrides = {},
   }];
   if (includeBundle) entries.push({ name: 'assets/index.android.bundle', data: BUNDLE_BYTES });
   if (includeModel) entries.push({ name: 'assets/minilm.onnx', data: MODEL_BYTES });
+  if (includeArchivo) {
+    entries.push({ name: 'assets/fonts/Archivo.ttf', data: archivoBytes });
+  }
   if (includeLibs) {
     entries.push({ name: 'lib/arm64-v8a/libonnxruntime.so', data: elf });
     entries.push({ name: 'lib/arm64-v8a/libonnxruntimejsi.so', data: elf });
@@ -318,6 +335,10 @@ async function main() {
     await expectRejected('mismatched manifest label rejected', fixtureApk({ label: 'SOMETHING_ELSE' }));
     await expectRejected('missing model rejected', fixtureApk({}, { includeModel: false }));
     await expectRejected('missing ONNX base/JSI pairing rejected', fixtureApk({}, { includeLibs: false }));
+    // R8 §2.5 rejection fixtures: absent and altered font files.
+    await expectRejected('missing Archivo asset rejected', fixtureApk({}, { includeArchivo: false }));
+    await expectRejected('ALTERED Archivo asset rejected (hash gate)',
+      fixtureApk({}, { archivoBytes: ARCHIVO_ALTERED }));
     await expectRejected('4 KB-aligned ELF64 input rejected', fixtureApk({}, { elf: ELF_BAD }));
     await expectRejected('corrupt archive rejected',
       Buffer.concat([Buffer.alloc(64, 0), Buffer.from('PK'), Buffer.alloc(128)]));

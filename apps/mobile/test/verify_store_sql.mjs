@@ -654,7 +654,9 @@ a('the unbounded e1RM store getter is not reintroduced without a ratified window
 console.log('[resetTrainingData — executed against seeded rows]');
 const resetBody = (() => {
   const i = src.indexOf('resetTrainingData: () => {');
-  const j = src.indexOf('loadDemoAthlete: () => {', i);
+  // R8 §2.2 gave loadDemoAthlete an explicit return type
+  // ((): DemoLoadResult => {...}); match it with or without the annotation.
+  const j = src.indexOf("loadDemoAthlete: (", i);
   return i >= 0 && j > i ? src.slice(i, j) : '';
 })();
 const resetTables = [...resetBody.matchAll(/DELETE FROM (\w+)'/g)].map((m) => m[1]);
@@ -2151,6 +2153,41 @@ console.log('[O3 fail-closed equipment inventory parsing]');
       && week1Focuses[3].focus === 'upper'
       && week1Focuses[4].focus === 'lower',
     JSON.stringify(week1Focuses));
+}
+
+// ---------------------------------------------------------------------------
+// [R8 §2.6/§2.7] Permanent Play identity + offline release posture — static
+// source checks. The PACKAGED artifact is proven by verify_qa_artifact.mjs
+// (aapt dump: package id, no INTERNET); these checks pin the SOURCE the
+// artifact must be built from, so a regression fails CI before any build.
+// ---------------------------------------------------------------------------
+console.log('[R8 identity + offline posture (static sources)]');
+{
+  const mainManifest = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf-8');
+  const debugManifestPath = join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'debug', 'AndroidManifest.xml');
+  const debugManifest = existsSync(debugManifestPath)
+    ? readFileSync(debugManifestPath, 'utf-8') : '';
+  const stringsXml = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml'), 'utf-8');
+  const appJson = JSON.parse(readFileSync(join(ROOT, 'apps', 'mobile', 'app.json'), 'utf-8'));
+  const gradleContent2 = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'build.gradle'), 'utf-8');
+
+  a('production manifest does NOT declare android.permission.INTERNET',
+    !/uses-permission\s+android:name="android\.permission\.INTERNET"/.test(mainManifest));
+  a('debug-only manifest grants INTERNET for Metro and nothing else declares it',
+    /uses-permission\s+android:name="android\.permission\.INTERNET"/.test(debugManifest)
+      && !/uses-permission\s+android:name="android\.permission\.INTERNET"/.test(mainManifest));
+  a('production applicationId is com.pikemethods.training',
+    /applicationId\s+"com\.pikemethods\.training"/.test(gradleContent2));
+  a('QA package identity is com.pikemethods.training.qa',
+    gradleContent2.includes("'com.pikemethods.training.qa'")
+      || gradleContent2.includes('"com.pikemethods.training.qa"'));
+  a('first closed-beta version code is 1 and version name 1.0.0-beta.1',
+    /def appVersionCode = project\.findProperty\('AK_VERSION_CODE'\) \?: System\.getenv\('AK_VERSION_CODE'\) \?: '1'/.test(gradleContent2)
+      && /def appVersionName = project\.findProperty\('AK_VERSION_NAME'\) \?: System\.getenv\('AK_VERSION_NAME'\) \?: '1\.0\.0-beta\.1'/.test(gradleContent2),
+    'gradle version defaults');
+  a('launcher label is pikeMethods in native resources and RN app config',
+    stringsXml.includes('>pikeMethods</string>')
+      && appJson?.name === 'pikeMethods' && appJson?.displayName === 'pikeMethods');
 }
 
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);

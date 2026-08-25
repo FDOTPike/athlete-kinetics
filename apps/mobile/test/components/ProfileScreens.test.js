@@ -347,4 +347,40 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByTestId('profile-load-pref-manual').props.accessibilityState.disabled).toBe(true);
     expect(screen.getByText('Finish the active session before changing load selection.')).toBeOnTheScreen();
   });
+
+  // R8 §2.4 — ChipRow is a permitted composition wrapper over the FROZEN Chip
+  // primitive. These assertions prove the wrapper forwards real Chip
+  // accessibility semantics for both a selected and an unselected option
+  // (the Stepper assertions in UIComponents cover NumberRow's other half).
+  test('ChipRow exposes shared Chip selected-state semantics for exactly one option', () => {
+    const { getByRole } = render(<ProfileScreen />);
+
+    // OBJECTIVES renders one chip per objective; 'hybrid' is baseProfile's value.
+    const objectives = ['strength', 'hypertrophy', 'power', 'endurance', 'gpp', 'hybrid', 'rehab', 'weight_loss'];
+    const selected = getByRole('button', { name: '1 · OBJECTIVE: hybrid' });
+    expect(selected.props.accessibilityState.selected).toBe(true);
+
+    const unselected = getByRole('button', { name: '1 · OBJECTIVE: strength' });
+    expect(unselected.props.accessibilityState.selected).toBe(false);
+    expect(unselected.props.accessibilityState.disabled).toBe(false);
+
+    // Exactly ONE of the row's chips claims the selected state.
+    const selectedCount = objectives.filter(
+      (o) => getByRole('button', {
+        name: `1 · OBJECTIVE: ${o.replace(/_/g, ' ')}`,
+      }).props.accessibilityState.selected,
+    ).length;
+    expect(selectedCount).toBe(1);
+  });
+
+  test('TRAINING AGE ChipRow keeps shared semantics and disables every chip during a session', () => {
+    mockState.session = { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] };
+    const { getByRole } = render(<ProfileScreen />);
+
+    for (const age of TRAINING_AGES) {
+      const chip = getByRole('button', { name: `2 · TRAINING AGE: ${age}` });
+      expect(chip.props.accessibilityState.disabled).toBe(true);
+      expect(chip.props.accessibilityState.selected).toBe(age === 'intermediate');
+    }
+  });
 });

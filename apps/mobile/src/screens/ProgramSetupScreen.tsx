@@ -164,6 +164,18 @@ export default function ProgramSetupScreen({
 
   const weekOne = previewResult.preview?.plan.sessions.filter((session) => session.week_index === 1) ?? [];
 
+  // First unmet requirement for enabling Create program, in the order the form
+  // asks for them. Rendered next to the disabled button so the rule is never
+  // enforced invisibly.
+  const missingRequirement = useMemo<string | null>(() => {
+    if (buildMode === null) return 'Choose who selects movements.';
+    if (horizonKind === null) return 'Choose when you want to review the program.';
+    if (horizonKind === 'weeks' && blockCount === null) return 'Choose a program duration.';
+    if (horizonKind === 'date' && reviewDate.trim() === '') return 'Enter a review date.';
+    if (schemaType === null) return 'Choose a progression method.';
+    return null;
+  }, [buildMode, horizonKind, blockCount, reviewDate, schemaType]);
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{editing ? 'MANAGE PROGRAM' : 'BUILD YOUR PROGRAM'}</Text>
@@ -277,7 +289,7 @@ export default function ProgramSetupScreen({
           <Text style={styles.sectionTitle}>5. Customize generated week</Text>
           {weekOne.map((session) => (
             <View key={session.day_index} style={styles.session}>
-              <Text style={styles.sessionTitle}>Day {session.day_index} ? {session.focus}</Text>
+              <Text style={styles.sessionTitle}>Day {session.day_index} · {session.focus}</Text>
               {session.slots.map((slot) => {
                 const movement = movements.find((item) => item.movement_id === slot.movement_id);
                 if (movement === undefined) return null;
@@ -305,6 +317,11 @@ export default function ProgramSetupScreen({
 
       {(localError ?? previewResult.error ?? storeError) !== null && (
         <Text style={styles.error}>{localError ?? previewResult.error ?? storeError}</Text>
+      )}
+      {missingRequirement !== null && (
+        <Text style={styles.caption} accessibilityLiveRegion="polite">
+          {missingRequirement}
+        </Text>
       )}
       <PrimaryButton label={editing ? 'Save future preferences' : 'Create program'} onPress={confirm}
         disabled={input === null || previewResult.preview === null} />

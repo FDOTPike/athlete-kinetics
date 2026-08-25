@@ -102,3 +102,113 @@ test('editing a day row changes the focus passed to block generation / program c
   expect(calledInput.days.find((d) => d.dayIndex === 1)?.focus).toBe('conditioning');
 });
 
+// ---------------------------------------------------------------------------
+// R8 §2.3 — disabled-state guidance, in the order the form asks for them.
+// The screen renders ONLY the first unmet requirement, directly explaining
+// why Create program is disabled (never an invisible rule).
+// ---------------------------------------------------------------------------
+
+const GUIDANCE_ORDER = [
+  'Choose who selects movements.',
+  'Choose when you want to review the program.',
+  'Choose a program duration.',
+  'Enter a review date.',
+  'Choose a progression method.',
+];
+
+const escapeForRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const GUIDANCE_RE = new RegExp(`^(${GUIDANCE_ORDER.map(escapeForRegExp).join('|')})$`);
+
+const guidanceText = () => {
+  const captions = screen.getAllByText(GUIDANCE_RE);
+  expect(captions).toHaveLength(1); // exactly ONE unmet requirement shown at a time
+  return captions[0].props.children;
+};
+
+test('guidance walks all five unmet requirements in form order, one at a time', () => {
+  mockState = stateFor('intermediate');
+  render(<ProgramSetupScreen />);
+
+  // 1. nothing chosen yet
+  expect(guidanceText()).toBe(GUIDANCE_ORDER[0]);
+  // The live region must announce changes politely, and the button is off.
+  expect(screen.getByText(GUIDANCE_ORDER[0]).props.accessibilityLiveRegion).toBe('polite');
+  expect(screen.getByText('Create program')).toBeDisabled();
+
+  fireEvent.press(screen.getByText('Coach build'));
+  expect(guidanceText()).toBe(GUIDANCE_ORDER[1]);
+
+  fireEvent.press(screen.getByText('Duration'));
+  expect(guidanceText()).toBe(GUIDANCE_ORDER[2]);
+
+  fireEvent.press(screen.getByText('4 wk'));
+  expect(guidanceText()).toBe(GUIDANCE_ORDER[4]); // beginner-independent: intermediate has no preset method
+
+  fireEvent.press(screen.getByText('Undulating'));
+  // Everything satisfied: no guidance remains and creation is available.
+  expect(screen.queryByText(GUIDANCE_RE)).toBeNull();
+  expect(screen.getByText('Create program')).not.toBeDisabled();
+});
+
+test('date horizon swaps the duration prompt for the review-date prompt', () => {
+  mockState = stateFor('intermediate');
+  render(<ProgramSetupScreen />);
+
+  fireEvent.press(screen.getByText('Coach build'));
+  fireEvent.press(screen.getByText('Date'));
+  expect(guidanceText()).toBe(GUIDANCE_ORDER[3]);
+
+  fireEvent.changeText(screen.getByPlaceholderText('YYYY-MM-DD'), '2026-12-01');
+  expect(guidanceText()).toBe(GUIDANCE_ORDER[4]);
+});
+
+test('review-boundary disclosure states rounding, the 27-day bound, and that it is not a competition date', () => {
+  mockState = stateFor('intermediate');
+  render(<ProgramSetupScreen />);
+
+  fireEvent.press(screen.getByText('Coach build'));
+  fireEvent.press(screen.getByText('Date'));
+  fireEvent.changeText(screen.getByPlaceholderText('YYYY-MM-DD'), '2026-12-01');
+  // The disclosure renders under the normalized-boundary notice, which needs
+  // a successful preview — i.e. a COMPLETE input (method included).
+  fireEvent.press(screen.getByText('Undulating'));
+
+  // R3 REVIEW_BOUNDARY contract verbatim — every ratified element present.
+  const disclosure = screen.getByText(
+    /Blocks are whole 4-week units, so this rounds up to the next full block and can fall\s+up to 27 days after the date you chose\. It is a review checkpoint, not a competition\s+date — your training phases are not scheduled around it\./,
+  );
+  expect(disclosure).toBeOnTheScreen();
+});
+
+test('custom week-one rows use the middle dot between day number and focus', () => {
+  mockState = stateFor('intermediate');
+  mockState.profile.objective = 'strength';
+  mockState.profile.weekly_frequency = 1;
+  // The shared preview fixture carries an empty session list; give THIS test
+  // one generated week-one session so section 5 renders its day rows.
+  const base = stateFor('intermediate');
+  mockState.previewTrainingProgram = jest.fn(() => ({
+    ...base.previewTrainingProgram(),
+    plan: {
+      ...preview.plan,
+      sessions: [{
+        week_index: 1,
+        day_index: 1,
+        focus: 'lower',
+        slots: [],
+      }],
+    },
+  }));
+  render(<ProgramSetupScreen />);
+
+  fireEvent.press(screen.getByText('Customize'));
+  // Week-one rows (and their Day N · focus headings) render only when the
+  // preview exists, so complete the form first.
+  fireEvent.press(screen.getByText('Duration'));
+  fireEvent.press(screen.getByText('4 wk'));
+  fireEvent.press(screen.getByText('Undulating'));
+
+  // The literal separator is U+00B7 MIDDLE DOT, never '?'.
+  expect(screen.getByText(/Day \d+ · /)).toBeOnTheScreen();
+  expect(screen.queryByText(/Day \d+ \? /)).toBeNull();
+});
