@@ -2192,6 +2192,22 @@ console.log('[R8 identity + offline posture (static sources)]');
   a('launcher label is pikeMethods in native resources and RN app config',
     stringsXml.includes('>pikeMethods</string>')
       && appJson?.name === 'pikeMethods' && appJson?.displayName === 'pikeMethods');
+
+  // Cold-launch parity (regression: 2026-08-25 device crash). The activity's
+  // getMainComponentName() MUST equal the AppRegistry component name that
+  // index.js registers from app.json. A mismatch builds cleanly and fails
+  // only at cold launch with 'Invariant Violation ... not registered'.
+  const mainActivityPath = join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'main', 'java', 'com', 'athletekinetics', 'MainActivity.kt');
+  if (existsSync(mainActivityPath)) {
+    const mainActivitySrc = readFileSync(mainActivityPath, 'utf-8');
+    const componentMatch = /getMainComponentName\(\): String = "([^"]+)"/.exec(mainActivitySrc);
+    a('MainActivity.getMainComponentName matches the JS-registered app.json name',
+      componentMatch !== null && componentMatch[1] === appJson?.name,
+      `native=${componentMatch?.[1] ?? 'unparsed'} js=${appJson?.name ?? 'missing'}`);
+  } else {
+    a('MainActivity.getMainComponentName matches the JS-registered app.json name',
+      false, 'MainActivity.kt not found');
+  }
 }
 
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);
