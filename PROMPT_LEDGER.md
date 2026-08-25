@@ -1146,3 +1146,47 @@ dashboard clutter with progressive disclosure and a vertical session timeline.
 - Deliver pure runner hardening, additive persistence, coaching/timed-set support,
   utility-first READY/COACH/SESSION surfaces, and verification coverage before the
   required physical-device visual checkpoint.
+
+---
+
+## Entry 0023 — 2026-08-26 · Commit the R8 mobile layout-fix phase
+
+### Input G(x)
+
+```
+Could we commit the last phase before making any new workorders?
+```
+
+### Output F(G(x))
+
+- Committed the previously uncommitted layout phase on `codex/pikemethods-closed-beta-r8`
+  (working tree had been held uncommitted under the "Do not commit" instruction recorded in
+  `HANDOFF_STATE.md`; the owner released that hold with this prompt):
+  - `apps/mobile/src/layout/statusBarPadding.ts` (new) — `statusBarPaddingTop` keeps a 24 px
+    minimum Android status-bar inset when an edge-to-edge runtime reports `StatusBar.currentHeight`
+    as 0, instead of padding by the reported zero.
+  - `apps/mobile/src/App.tsx` — root padding now calls that pure function.
+  - `apps/mobile/src/components/ui/Chip.tsx` — chip label held to one line (`numberOfLines={1}`),
+    no font shrinking, so an enlarged system font keeps its scaled size.
+  - `apps/mobile/src/screens/BlockScreen.tsx` — COACH trajectory week row restructured from
+    `row` to `column` with a full-width day rail; day tokens (`Done`, `Stopped`, `Today`, focus
+    abbreviations) get `numberOfLines={1}` + `adjustsFontSizeToFit` at `minimumFontScale={0.7}`,
+    eyebrow type and zero letter-spacing; `testID`s added for the week row and day rail.
+  - `apps/mobile/test/components/FocusScreens.test.js`,
+    `apps/mobile/test/components/UIComponents.test.js` — behavioural coverage pinning the
+    one-line/shrink-to-fit contract, the column layout, and the four `statusBarPaddingTop` cases.
+- Owner and audit artifacts deliberately left untracked and out of the commit, per the R8 work
+  order Phase 1 rule that no audit-only file enters a commit: `TASK.md`,
+  `STEVE_OX_ALPHA_PIKEMETHODS_R8_WORK_ORDER.md.txt`, `audit_task_b.mjs`.
+- Gates: `npm run typecheck` exit 0. `npm run verify:ci` green — 21 gates + typecheck, with
+  `verify:components` at 17 suites / 218 tests (up from the 14 / 197 recorded at the Work Order
+  E & F acceptance point).
+- `npm run verify:memory-contract` fails checks [A] and [D]. **Pre-existing and unrelated to this
+  diff** — `tools/memory-audit/audit.mjs` reads only `tools/memory-audit/budget.json`,
+  `packages/inference/assets/phrase-codebase.vectors.json` and the root `package.json`, none of
+  which this phase touches. The component envelope (471,936,000 B) sits in the REVIEW_BAND between
+  the 450,000,000 B target and the 536,870,912 B hard ceiling, which the 2026-08-24 ratification
+  permits only with a physical-device evidence packet; `AK_MEM_EVIDENCE_SESSION` was not supplied.
+  `.github/workflows/ci.yml` documents both checks as structurally excluded from CI and reserved
+  for the owner's pre-release run.
+- Not pushed. Push remains gated on the owner's on-device check.

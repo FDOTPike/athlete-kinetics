@@ -306,6 +306,40 @@ test('COACH shows only exact finalized plan outcomes as Done or Stopped', () => 
   expect(screen.getByLabelText('Week 1, lower session on 2026-07-02, stopped')).toBeOnTheScreen();
 });
 
+test('COACH keeps trajectory labels on one line across recovery and finalized states', () => {
+  const planned = baseState().blockSessions[0];
+  mockState = baseState({
+    todayPlan: null,
+    block: { blockId: 1, startDate: '2026-07-13', objective: 'strength', createdAtMs: 1 },
+    blockSessions: [
+      { ...planned, plannedSessionId: 1, dayIndex: 1, sessionDate: '2026-07-13', completionStatus: 'complete' },
+      { ...planned, plannedSessionId: 2, dayIndex: 2, sessionDate: '2026-07-14', completionStatus: 'halted' },
+      { ...planned, plannedSessionId: 3, dayIndex: 4, sessionDate: '2026-07-16', focus: 'upper', completionStatus: null },
+    ],
+  });
+  render(<BlockScreen />);
+
+  expect(StyleSheet.flatten(screen.getByTestId('trajectory-week-1').props.style)).toMatchObject({
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  });
+  expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.style)).toMatchObject({
+    width: '100%',
+  });
+
+  for (const label of ['Done', 'Stopped', 'Today', 'UPR']) {
+    const token = screen.getByText(label);
+    expect(token.props.numberOfLines).toBe(1);
+    expect(token.props.adjustsFontSizeToFit).toBe(true);
+    expect(token.props.minimumFontScale).toBe(0.7);
+    expect(StyleSheet.flatten(token.props.style)).toMatchObject({
+      fontSize: theme.font.eyebrow.fontSize,
+      letterSpacing: 0,
+    });
+  }
+  expect(screen.getByLabelText('Week 1, lower session on 2026-07-14, stopped')).toBeOnTheScreen();
+});
+
 test('COACH leaves the safety form behind its explicit action even during a halt', () => {
   mockState = baseState({
     lastTriage: {

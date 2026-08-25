@@ -26,6 +26,7 @@ import BlockScreen from './screens/BlockScreen';
 import LibraryScreen from './screens/LibraryScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
+import { statusBarPaddingTop } from './layout/statusBarPadding';
 
 const TABS: readonly { key: Tab; label: string }[] = [
   { key: 'readiness', label: 'READY' },
@@ -165,9 +166,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: palette.bg,
-    // RN's SafeAreaView only pads on iOS; on Android the status bar overlaps
-    // content (seen on hardware) — pad the real inset ourselves.
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0,
+    // RN's SafeAreaView only pads on iOS. Honor Android's reported inset, but
+    // keep the standard minimum when an edge-to-edge runtime reports zero.
+    paddingTop: statusBarPaddingTop(Platform.OS, StatusBar.currentHeight),
   },
   body: { flex: 1 },
   tabBar: {

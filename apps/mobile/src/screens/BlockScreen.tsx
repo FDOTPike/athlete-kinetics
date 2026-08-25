@@ -593,7 +593,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
                 return (
                   <View key={row.week} style={styles.weekContainer}>
-                    <View style={styles.weekRow}>
+                    <View testID={`trajectory-week-${row.week}`} style={styles.weekRow}>
                       <View style={styles.weekMeta}>
                         <Text style={styles.weekTitle}>Week {row.week}</Text>
                         <View style={styles.weekPhaseRow}>
@@ -601,7 +601,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                           {showPhaseTip && <InfoTip term={phaseTerm} />}
                         </View>
                       </View>
-                      <View style={styles.dayRail}>
+                      <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
                     {row.cells.map((cell, dayIndex) => {
                       // Every trajectory position owns a calendar date derived
                       // from the block start, week and day index (same formula
@@ -627,7 +627,14 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                             accessibilityLabel="Today — recovery day"
                             style={[styles.dayMark, styles.dayMarkRest, styles.dayMarkToday]}
                           >
-                            <Text style={[styles.dayMarkRestText, styles.dayMarkTextToday]}>Today</Text>
+                            <Text
+                              style={[styles.dayMarkRestText, styles.dayMarkTextToday]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                              minimumFontScale={0.7}
+                            >
+                              Today
+                            </Text>
                           </View>
                         );
                       }
@@ -660,6 +667,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                               cell.completionStatus !== null && styles.dayMarkTextFinalized,
                               isToday && styles.dayMarkTextToday,
                             ]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.7}
                           >
                             {cell.completionStatus === 'complete'
                               ? 'Done'
@@ -1215,13 +1225,15 @@ const styles = StyleSheet.create({
   },
   weekRow: {
     minHeight: theme.touch.min,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'stretch',
-    gap: theme.space[2],
+    gap: theme.space[1],
   },
   weekMeta: {
-    minWidth: 78,
-    justifyContent: 'center',
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   weekTitle: {
     ...theme.font.label,
@@ -1230,14 +1242,13 @@ const styles = StyleSheet.create({
   weekPhaseRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: theme.space[1],
   },
   weekPhase: {
     ...theme.font.eyebrow,
     color: theme.color.textLow,
   },
   dayRail: {
-    flex: 1,
+    width: '100%',
     flexDirection: 'row',
     gap: theme.space[1],
   },
@@ -1251,7 +1262,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.ink1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: theme.space[1],
+    paddingHorizontal: 0,
   },
   dayMarkPressed: {
     backgroundColor: theme.color.pressed,
@@ -1277,6 +1288,7 @@ const styles = StyleSheet.create({
     ...theme.font.eyebrow,
     color: theme.color.textMid,
     textAlign: 'center',
+    letterSpacing: 0,
   },
   dayMarkTextFinalized: {
     color: theme.color.textHi,
@@ -1285,8 +1297,10 @@ const styles = StyleSheet.create({
     color: theme.color.chalk,
   },
   dayMarkRestText: {
-    ...theme.font.body,
+    ...theme.font.eyebrow,
     color: theme.color.line,
+    textAlign: 'center',
+    letterSpacing: 0,
   },
   trajectoryHint: {
     ...theme.font.eyebrow,
