@@ -139,6 +139,26 @@ export type DirectLoadPreferenceSaveResult =
   | { ok: true }
   | { ok: false; error: string | null };
 
+/** R4: the ONE policy decision for "may this preference be written now?".
+ *  Returns a refusal reason, or null when the write is permitted.
+ *
+ *  It is a predicate rather than a writer because the two callers cannot share
+ *  a write path: the direct save owns its own persistence, while onboarding
+ *  must write the profile row and the preference row inside a SINGLE
+ *  transaction. Sharing the decision — not the write — keeps one fail-closed
+ *  boundary without forcing onboarding to split its transaction, and stops the
+ *  two guards drifting apart as they had. */
+export const loadPreferenceWriteRefusal = (input: {
+  sessionActive: boolean;
+  trainingAge: TrainingAge;
+  preference: LoadPreference;
+}): string | null => {
+  if (input.sessionActive) return ACTIVE_LOAD_PREFERENCE_ERROR;
+  if (input.preference !== 'auto' && input.preference !== 'manual') return '';
+  if (input.trainingAge === 'beginner' && input.preference !== 'auto') return '';
+  return null;
+};
+
 export const executeDirectLoadPreferenceSave = <TDb extends LoadPreferenceDb>(input: {
   getDb: () => TDb;
   sessionActive: boolean;
@@ -146,9 +166,10 @@ export const executeDirectLoadPreferenceSave = <TDb extends LoadPreferenceDb>(in
   preference: LoadPreference;
   commitState: () => void;
 }): DirectLoadPreferenceSaveResult => {
-  if (input.sessionActive) return { ok: false, error: ACTIVE_LOAD_PREFERENCE_ERROR };
-  if (input.preference !== 'auto' && input.preference !== 'manual') return { ok: false, error: null };
-  if (input.trainingAge === 'beginner' && input.preference !== 'auto') return { ok: false, error: null };
+  const refusal = loadPreferenceWriteRefusal(input);
+  // '' is a silent domain refusal (no user-facing error); the active-session
+  // refusal carries its message. Preserves the previous return contract exactly.
+  if (refusal !== null) return { ok: false, error: refusal === '' ? null : refusal };
   persistLoadPreferenceRow(input.getDb(), input.preference, true);
   input.commitState();
   return { ok: true };

@@ -14,7 +14,7 @@ env:
 
 jobs:
   verify:
-    name: Verification suite (20 gates + typecheck)
+    name: Verification suite (21 gates + typecheck)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -39,8 +39,15 @@ jobs:
       # Hugging Face download on a cold cache, always byte-verified).
       - name: Fetch embedder assets
         run: npm run fetch:embedder
-      - name: verify:all (20 gates + typecheck)
-        run: npm run verify:all
+      # verify:ci is the DETERMINISTIC host suite and must exit 0. It excludes
+      # the two checks CI structurally cannot make honestly:
+      #   [A] the memory contract, which is a ratified budget decision, and
+      #   [D] measured physical evidence, which requires an authorized device
+      #       packet (AK_MEM_EVIDENCE_SESSION) that no runner possesses.
+      # Both live in `npm run verify:release`, which is run by the owner before
+      # a release, NOT here. `verify:all` is an alias for `verify:release`.
+      - name: verify:ci (21 gates + typecheck)
+        run: npm run verify:ci
       - name: Seeder physiology — pinned alignment + today's alignment
         run: |
           node scripts/seed-db.ts --end=2026-06-10 --db=/tmp/pinned.db
@@ -55,8 +62,13 @@ jobs:
             --assets-dest build/assets
 
   android-apk:
-    name: Android debug APK (sideloadable, never for Play)
+    name: Android QA + debug APKs (sideloadable, never for Play)
     runs-on: ubuntu-latest
+    # `verify` runs verify:ci, which is required to be green. Before the
+    # ci/release split this job depended on a suite that failed on the memory
+    # contract, so it NEVER executed and the QA candidate was never built or
+    # gated in CI. The structure gate in apps/mobile/test/verify_store_sql.mjs
+    # asserts this dependency stays pointed at a green job.
     needs: verify
     steps:
       - uses: actions/checkout@v6
@@ -93,6 +105,24 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+      # The QA variant is the CANDIDATE artifact. verify:qa-artifact (in
+      # verify:ci) only exercises synthetic fixtures; the real candidate must
+      # also be gated, or a stale/incorrect APK can never be caught by CI.
+      # verify:qa-candidate recomputes provenance against this checkout, so a
+      # self-consistent but stale APK fails here.
+      - name: Build QA candidate APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleQa --no-daemon
+      - name: verify:qa-candidate (real artifact, fails closed)
+        run: npm run verify:qa-candidate
+      # The CANDIDATE artifact — the one verify:qa-candidate just gated.
+      - uses: actions/upload-artifact@v6
+        with:
+          name: athlete-kinetics-qa-candidate-apk
+          path: apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk
+          if-no-files-found: error
+      # The debug variant is a separate, UNGATED convenience build. It is named
+      # distinctly so it can never be mistaken for the gated candidate above.
       - uses: actions/upload-artifact@v6
         with:
           name: athlete-kinetics-debug-qa-apk

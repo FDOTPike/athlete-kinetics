@@ -47,6 +47,7 @@ import {
 } from './equipmentInventory';
 import {
   executeDirectLoadPreferenceSave,
+  loadPreferenceWriteRefusal,
   executeProfileLoadSave,
   persistLoadPreferenceRow,
   persistProfileFields,
@@ -88,7 +89,6 @@ import {
   MACRO_BLOCKS,
   macroPhaseOf,
   programMacroIndex,
-  datedProgramMacroAnchor,
   BLOCK_FOCI,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
@@ -163,8 +163,6 @@ import {
   transitionLoadPreference,
   type LoadPreference,
   type LoadSelection,
-  bestPerSession,
-  type E1rmPoint,
 } from '@ak/inference';
 
 export type { MovementAvailability };
@@ -680,11 +678,6 @@ interface KineticsStore {
   archiveTrainingProgram: () => void;
   refreshProgram: () => void;
   getPendingAutopilotAdjustments: () => PendingAutopilotAdjustment[];
-  /** Estimated-1RM series for one movement, derived from logged sets.
-   *  Read-only and observational — it never writes, and never feeds one_rep_max,
-   *  which stays the athlete-entered source of truth for load targeting.
-   *  Native sessions only: imported history carries no per-set RPE. */
-  getMovementE1rmSeries: (movementId: number) => E1rmPoint[];
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
@@ -2805,6 +2798,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const prefExplicit = merged.training_age !== 'beginner'
       && loadPreference !== undefined
       && (loadPreferenceExplicit ?? true);
+    // R4: onboarding is a public store action and previously wrote the
+    // preference row without the active-session guard that every other writer
+    // enforces. It shares the ONE policy decision here and fails closed BEFORE
+    // opening the transaction, so neither in-memory state nor SQLite changes.
+    const prefRefusal = loadPreferenceWriteRefusal({
+      sessionActive: get().session !== null,
+      trainingAge: merged.training_age,
+      preference: pref,
+    });
+    if (prefRefusal !== null) {
+      if (prefRefusal !== '') set({ error: prefRefusal });
+      return;
+    }
     const d = getDb();
     d.executeSync('BEGIN');
     try {
@@ -2888,9 +2894,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // program (no program row yet) anchors to the athlete's global position.
     const macroBlockIndex = activeProgram !== null
       ? programMacroIndex(activeProgram.startingMacroBlockIndex, activeProgram.currentSequenceIndex + 1)
-      : (input.horizon.kind === 'date'
-          ? datedProgramMacroAnchor(shape.plannedBlockCount)
-          : nextMacroPosition(d).macroBlockIndex);
+      // R3 (REVIEW_BOUNDARY, ratified 2026-08-22): the selected date sets the
+      // review horizon and block COUNT only. It confers no peak authority, so a
+      // dated program takes the athlete's rotation position exactly as an
+      // undated one does. Dedicated competition preparation is deferred.
+      : nextMacroPosition(d).macroBlockIndex;
     const effectiveProfile = { ...planningProfile, weekly_frequency: shape.days.length };
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
@@ -2974,9 +2982,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // the preview used, never the global counter.
     const macroBlockIndex = pendingProgramContinuation !== null
       ? programMacroIndex(pendingProgramContinuation.startingMacroBlockIndex, pendingProgramContinuation.sequenceIndex)
-      : (pendingProgramCreation !== null && pendingProgramCreation.input.horizon.kind === 'date'
-          ? datedProgramMacroAnchor(pendingProgramCreation.preview.plannedBlockCount)
-          : nextMacroPosition(d).macroBlockIndex);
+      : nextMacroPosition(d).macroBlockIndex; // R3: no date-derived peak anchor
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
     const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
@@ -3097,9 +3103,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           requestedReviewDate: programDraft.preview.requestedReviewDate,
           plannedEndDate: programDraft.preview.plannedEndDate,
           plannedBlockCount: programDraft.preview.plannedBlockCount,
-          startingMacroBlockIndex: programDraft.input.horizon.kind === 'date'
-            ? datedProgramMacroAnchor(programDraft.preview.plannedBlockCount)
-            : plan.macroBlockIndex,
+          startingMacroBlockIndex: plan.macroBlockIndex, // R3: rotation, not the date
           schemaType,
           days: programDraft.preview.days,
           movementPreferences: programDraft.input.movementPreferences ?? [],
@@ -4305,34 +4309,6 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }));
   },
 
-  getMovementE1rmSeries: (movementId: number): E1rmPoint[] => {
-    if (db === null) return [];
-    const d = db;
-    // set_record only — history_import_set is deliberately NOT unioned in.
-    // Imported sessions carry a whole-session RPE, not per-set RPE, so they
-    // cannot produce a comparable estimate. Mixing them would average two
-    // different constructs (see AUDIT_CORRECTIONS.md, Finding 0.2).
-    const rows = rowsOf<{
-      set_id: number;
-      session_id: number;
-      session_date: string;
-      reps: number;
-      load_kg: number;
-      rpe: number | null;
-    }>(d.executeSync(`
-      SELECT sr.set_id,
-             sr.session_id,
-             s.session_date,
-             sr.reps,
-             sr.load_kg,
-             sr.rpe
-      FROM set_record sr
-      JOIN session s ON s.session_id = sr.session_id
-      WHERE sr.movement_id = ?
-      ORDER BY s.session_date, sr.session_id, sr.set_id
-    `, [movementId]));
-    return bestPerSession(rows);
-  },
 
   refreshVector: () => {
     if (get().status !== 'ready') return;
@@ -6067,7 +6043,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           UNION ALL
           SELECT his.session_date AS qualifying_date FROM history_import_session his
             JOIN history_import hi USING (history_import_id)
+            -- R6: readiness eligibility is an EXPLICIT policy field and is required
+            -- here, not implied by integrity verification. 029's CHECK is
+            -- (readiness_eligible = 0 OR verified = 1): eligibility implies
+            -- verification, never the converse, so "verified = 1" alone admits
+            -- readiness-ineligible imports and lets them suppress the layoff
+            -- check-in. Scoped to the return check-in only — capability evidence
+            -- (see the verified-import read above) is a different policy domain
+            -- and deliberately still qualifies on verification alone.
             WHERE hi.verified = 1
+              AND hi.readiness_eligible = 1
               AND EXISTS (SELECT 1 FROM history_import_set hiset WHERE hiset.history_import_session_id = his.history_import_session_id)
         )`,
       ),

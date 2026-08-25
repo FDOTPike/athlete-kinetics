@@ -125,11 +125,16 @@ test('READY keeps one direct action and hides raw metrics until the relevant dis
   expect(screen.getByText("Follow today's plan at the effort it prescribes.")).toBeOnTheScreen();
   expect(screen.getByText('Lower session planned today.')).toBeOnTheScreen();
   expect(screen.getByLabelText("Review today's plan")).toBeOnTheScreen();
-  expect(screen.queryByText('Your recent training load and recovery signals support the planned work.')).toBeNull();
+  expect(screen.queryByText('Your recovery signals support the planned work.')).toBeNull();
   expect(screen.queryByText('Acute to chronic load')).toBeNull();
 
   fireEvent.press(screen.getByLabelText('Why this recommendation'));
-  expect(screen.getByText('Your recent training load and recovery signals support the planned work.')).toBeOnTheScreen();
+  // R7: the explanation attributes readiness to the RATIFIED inputs only. Load is
+  // excluded from the readiness score, so it must not be named as supporting the
+  // recommendation, and the normative ACWR-band score must not be rendered.
+  expect(screen.getByText('Your recovery signals support the planned work.')).toBeOnTheScreen();
+  expect(screen.queryByText(/recent training load/i)).toBeNull();
+  expect(screen.queryByText('Load component')).toBeNull();
   expect(screen.queryByText('Acute to chronic load')).toBeNull();
   fireEvent.press(screen.getByLabelText("Review today's plan"));
   expect(openCoach).toHaveBeenCalledTimes(1);

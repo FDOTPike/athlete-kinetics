@@ -502,6 +502,38 @@ check('source tripwire: e1rm.ts imports the ratified targetPct rather than resta
   /import\s*\{\s*targetPct\s*\}\s*from\s*'\.\/blockGenerator'/.test(e1rmSrc)
   && !/1\s*\/\s*\(\s*1\s*\+/.test(e1rmSrc.replace(/^\s*\*.*$/gm, '')));
 
+// --- [8c] R8: athlete-visible loading copy must match the generator --------------
+// The WAVE tip promised "rises ... then rises past where it was". Derived from
+// SCHEMA_WEEKS the block actually goes 80 -> 85 -> 80 kg: a rise and a fall, with
+// nothing exceeding the earlier high. Copy was corrected to the generator; the
+// generator was NOT changed to fit the copy (that needs separate ratification).
+console.log('[8c] R8 WAVE copy matches generated loading');
+{
+  const oneRm = 100;
+  const waveLoads = [1, 2, 3].map((week) => {
+    const s = generateBlock({
+      profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType: 'WAVE',
+    }).sessions.find((x) => x.week_index === week && x.focus !== 'bjj' && x.focus !== 'conditioning');
+    const sl = s.slots[0];
+    return targetLoadKg(oneRm, sl.reps, sl.target_rpe);
+  });
+  check('WAVE rises then falls: week 2 is the high and week 3 does NOT exceed it',
+    waveLoads[1] > waveLoads[0] && waveLoads[2] <= waveLoads[1],
+    waveLoads.join(' -> '));
+
+  const infoTipSrc = readFileSync(
+    join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'components', 'InfoTip.tsx'),
+    'utf-8',
+  );
+  const waveCopy = (infoTipSrc.match(/^\s*WAVE: '(.*)',$/m) ?? [])[1] ?? '';
+  check('WAVE tip exists and makes no "rises past" claim the block never delivers',
+    waveCopy.length > 0 && !/past where it was|past its former|rises past/i.test(waveCopy),
+    waveCopy.slice(0, 70));
+  check('LINEAR and WAVE both remain selectable; STEP stays retired but generable',
+    SELECTABLE_SCHEMA_TYPES.includes('LINEAR') && SELECTABLE_SCHEMA_TYPES.includes('WAVE')
+    && !SELECTABLE_SCHEMA_TYPES.includes('STEP') && SCHEMA_TYPES.includes('STEP'));
+}
+
 // --- [9] the hybrid tax -----------------------------------------------------------
 console.log('[9] hybrid tax (schema fatigue cost matrix)');
 const accessorySets = (plan) => plan.sessions
@@ -1285,52 +1317,15 @@ console.log('[18] guided program macro-cycle ownership');
       && macroPhaseOf(programMacroIndex(6, 1)) === 'volume'
       && macroPhaseOf(programMacroIndex(6, 2)) === 'peak');
 
-  const table = [
-    { count: 1, anchor: 8, indices: [8], phases: ['peak'] },
-    { count: 2, anchor: 7, indices: [7, 8], phases: ['peak', 'peak'] },
-    { count: 3, anchor: 6, indices: [6, 7, 8], phases: ['volume', 'peak', 'peak'] },
-    { count: 4, anchor: 5, indices: [5, 6, 7, 8], phases: ['volume', 'volume', 'peak', 'peak'] },
-    { count: 5, anchor: 4, indices: [4, 5, 6, 7, 8], phases: ['hypertrophy', 'volume', 'volume', 'peak', 'peak'] },
-    { count: 6, anchor: 3, indices: [3, 4, 5, 6, 7, 8], phases: ['hypertrophy', 'hypertrophy', 'volume', 'volume', 'peak', 'peak'] },
-    { count: 7, anchor: 2, indices: [2, 3, 4, 5, 6, 7, 8], phases: ['gpp', 'hypertrophy', 'hypertrophy', 'volume', 'volume', 'peak', 'peak'] },
-    { count: 8, anchor: 1, indices: [1, 2, 3, 4, 5, 6, 7, 8], phases: ['gpp', 'gpp', 'hypertrophy', 'hypertrophy', 'volume', 'volume', 'peak', 'peak'] },
-  ];
-
-  check('dated program macro table: anchor and phases match specification in full with final block in peak',
-    table.every(({ count, anchor, indices, phases }) => {
-      const gotAnchor = datedProgramMacroAnchor(count);
-      if (gotAnchor !== anchor) return false;
-      const gotIndices = Array.from({ length: count }, (_, i) => programMacroIndex(gotAnchor, i + 1));
-      if (gotIndices.join(',') !== indices.join(',')) return false;
-      const gotPhases = gotIndices.map((idx) => macroPhaseOf(idx));
-      if (gotPhases.join(',') !== phases.join(',')) return false;
-      const finalIndex = programMacroIndex(gotAnchor, count);
-      return macroPhaseOf(finalIndex) === 'peak';
-    }));
-
-  check('dated program final block macro index is exactly MACRO_BLOCKS for every count 1-8',
-    [1, 2, 3, 4, 5, 6, 7, 8].every((count) => {
-      const anchor = datedProgramMacroAnchor(count);
-      return programMacroIndex(anchor, count) === MACRO_BLOCKS;
-    }));
-
-  check('dated program macro phases are contiguous, ascending, and never wrap past 8 mid-program',
-    [1, 2, 3, 4, 5, 6, 7, 8].every((count) => {
-      const anchor = datedProgramMacroAnchor(count);
-      const indices = Array.from({ length: count }, (_, i) => programMacroIndex(anchor, i + 1));
-      return indices.every((val, idx) => idx === 0 || val === indices[idx - 1] + 1)
-        && indices[indices.length - 1] === MACRO_BLOCKS;
-    }));
-
-  check('datedProgramMacroAnchor throws for 0, 9, -1, 1.5 and NaN',
-    [0, 9, -1, 1.5, NaN].every((badInput) => {
-      try {
-        datedProgramMacroAnchor(badInput);
-        return false;
-      } catch {
-        return true;
-      }
-    }));
+  // R3 (REVIEW_BOUNDARY, ratified 2026-08-22): the review date sets the horizon
+  // and block count only. No macro anchor is derived from it, so the former
+  // dated-anchor table is withdrawn along with datedProgramMacroAnchor. Guard
+  // against a quiet reintroduction: competition preparation is deferred and
+  // needs its own ratification.
+  check('no date-derived macro anchor is exported from the engine (REVIEW_BOUNDARY)',
+    !Object.keys(require('./.build/blockGenerator.js')).includes('datedProgramMacroAnchor'));
+  check('programMacroIndex still owns program macro progression from a stored anchor',
+    programMacroIndex(6, 1) === 6 && programMacroIndex(6, 3) === 8 && programMacroIndex(8, 2) === 1);
 }
 
 // --- [7] full-body scope routing + specialist equipment (O3/O4, migration 049) --

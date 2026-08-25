@@ -48,8 +48,27 @@ const ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL = `
 /** Objects or durable rows whose absence proves the schema is incomplete
  *  regardless of what user_version claims. */
 export const SENTINELS: readonly MigrationSentinel[] = [
+  // R1: the original registry carried roughly ONE representative object per
+  // migration, which detects "a migration never applied" but NOT "one table was
+  // lost while user_version still reads latest". Under individual-table loss an
+  // unregistered table is invisible: sentinelsMissing returns empty, no replay
+  // runs, and the table stays gone. Every durable table is therefore registered
+  // below, and DURABLE_TABLE_EXEMPTIONS records the only deliberate omission.
   { type: 'table', name: 'set_record' },          // 001
+  { type: 'table', name: 'macro_cycle' },         // 001
+  { type: 'table', name: 'micro_cycle' },         // 001
+  { type: 'table', name: 'session' },             // 001
+  { type: 'table', name: 'mech_daily' },          // 001
+  { type: 'table', name: 'movement' },            // 001
   { type: 'table', name: 'hrv_daily' },           // 002
+  { type: 'table', name: 'sleep_daily' },         // 002
+  { type: 'table', name: 'spo2_daily' },          // 002
+  { type: 'table', name: 'spo2_sample' },         // 002
+  { type: 'table', name: 'movement_equipment' },  // 007
+  { type: 'table', name: 'planned_session' },     // 007
+  { type: 'table', name: 'planned_slot' },        // 007
+  { type: 'table', name: 'session_note' },        // 009
+  { type: 'table', name: 'slot_override' },       // 009
   { type: 'table', name: 'state_vector' },        // 003
   { type: 'view', name: 'v_readiness_inputs' },   // 003
   { type: 'table', name: 'subjective_report' },   // 005
@@ -95,8 +114,18 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'movement_role_eligibility' }, // 028
   { type: 'table', name: 'movement_capability_edge' },  // 028
   { type: 'table', name: 'capability_session_evidence' }, // 028
+  // R1: 028/029 registered their PARENT tables but not these children, so a
+  // dropped child was invisible to sentinelsMissing and never replayed. The
+  // durable-object drift guard in verify_migrations.mjs now fails when a
+  // durable table is added without recovery coverage.
+  { type: 'table', name: 'movement_capability_family' },      // 028
+  { type: 'table', name: 'movement_capability_attestation' }, // 028
   { type: 'table', name: 'routine_template' },          // 029
+  { type: 'table', name: 'routine_template_slot' },     // 029
   { type: 'table', name: 'history_import' },            // 029
+  { type: 'table', name: 'history_import_session' },    // 029
+  { type: 'table', name: 'history_import_set' },        // 029
+  { type: 'table', name: 'history_import_capability_evidence' }, // 029
   { type: 'table', name: 'bodyweight_daily' },          // 029
   { type: 'view', name: 'v_training_daily_all' },       // 029
   { type: 'table', name: 'import_readiness_daily' },     // 029
@@ -142,6 +171,24 @@ export const SENTINELS: readonly MigrationSentinel[] = [
     failClosedRepairSql: ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL,
   },
   { type: 'table', name: 'return_checkin_ack' },                      // 055
+  // 057 fail-closed phase/index invariant (DB-BLOCK-META-DRIFT): a dropped
+  // trigger would silently reopen block_meta to phase/index drift.
+  { type: 'trigger', name: 'trg_block_meta_phase_bi' },               // 057
+  { type: 'trigger', name: 'trg_block_meta_phase_bu' },               // 057
+];
+
+/** Durable tables deliberately absent from SENTINELS, each with the reason it
+ *  needs no recovery coverage. The drift guard in verify:migrations fails when
+ *  a table exists at latest user_version and appears in neither list, so a new
+ *  migration cannot introduce an unrecoverable table silently. Adding a name
+ *  here is a decision that must be justified in review, not a way to quiet the
+ *  gate. */
+export const DURABLE_TABLE_EXEMPTIONS: readonly { readonly name: string; readonly reason: string }[] = [
+  {
+    name: 'user_profile',
+    reason: '006 creates it; 007 copies it into athlete_profile and DROPs it. '
+      + 'It does not exist at latest user_version, so it can never be missing.',
+  },
 ];
 
 function userVersion(db: MigrationDb): number {

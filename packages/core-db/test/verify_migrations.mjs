@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
-const { runMigrations, sentinelsMissing, SENTINELS } = require('./.build/migrationRunner.js');
+const { runMigrations, sentinelsMissing, SENTINELS, DURABLE_TABLE_EXEMPTIONS } = require('./.build/migrationRunner.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', 'src', 'schema');
 const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
@@ -56,7 +56,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '053_routine_role_compatibility.sql',
   '054_contract_cutoff_provenance.sql',
   '055_return_checkin_ack.sql',
-  '056_movement_taxonomy_backfill.sql'];
+  '056_movement_taxonomy_backfill.sql',
+  '057_block_meta_phase_invariant.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1623,6 +1624,306 @@ console.log('[2r] 056 movement_taxonomy_backfill');
   `).get().c;
   check('every row in movement has exactly one movement_taxonomy row (missing count is 0)',
     Number(missingTaxonomy) === 0, `${missingTaxonomy} missing`);
+}
+
+// --- 2s. R1: durable-object drift guard + per-table self-heal matrix --------
+// The registry used to carry ~one representative object per migration, which
+// detects "a migration never applied" but NOT "one table was lost while
+// user_version still reads latest". This guard fails when a durable table is
+// introduced without recovery coverage, so the defect cannot recur at 057.
+console.log('[2s] R1 durable-object drift guard');
+{
+  const dbDrift = freshDb();
+  runMigrations(dbDrift, MIGRATIONS);
+  const registered = new Set(SENTINELS.map((s) => s.name));
+  const exempt = new Map(DURABLE_TABLE_EXEMPTIONS.map((e) => [e.name, e.reason]));
+  const durable = dbDrift.raw.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+  ).all().map((r) => r.name);
+  const uncovered = durable.filter((t) => !registered.has(t) && !exempt.has(t));
+  check('every durable table is a sentinel or a justified exemption',
+    uncovered.length === 0,
+    uncovered.length === 0 ? `${durable.length} tables covered` : `UNCOVERED: ${uncovered.join(', ')}`);
+  check('every exemption names a table that does NOT exist at latest user_version',
+    DURABLE_TABLE_EXEMPTIONS.every((e) => !durable.includes(e.name)),
+    DURABLE_TABLE_EXEMPTIONS.map((e) => e.name).join(', ') || 'none');
+  check('every exemption carries a reason',
+    DURABLE_TABLE_EXEMPTIONS.every((e) => typeof e.reason === 'string' && e.reason.length > 20));
+}
+
+// Per-table recovery matrix: drop each table at latest user_version, boot the
+// PRODUCTION runner, and prove detection + restoration + unrelated-data safety.
+console.log('[2t] R1 missing-table self-heal matrix (production runner)');
+for (const target of ['movement_capability_family', 'movement_capability_attestation',
+  'routine_template_slot', 'history_import_session', 'history_import_set',
+  'history_import_capability_evidence']) {
+  const db = freshDb();
+  runMigrations(db, MIGRATIONS);
+  const before = uv(db);
+  db.raw.exec(`INSERT INTO movement_taxonomy (movement_id, category, implement)
+    SELECT movement_id, 'squat', 'barbell' FROM movement LIMIT 0`);
+  const unrelatedBefore = db.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c;
+  db.raw.exec(`DROP TABLE ${target}`);
+  db.raw.exec(`PRAGMA user_version = ${before}`);
+  // sentinelsMissing already returns names, not sentinel objects.
+  const detected = sentinelsMissing(db).includes(target);
+  runMigrations(db, MIGRATIONS);
+  const restored = db.raw.prepare(
+    `SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name = ?`,
+  ).get(target).c === 1;
+  const unrelatedAfter = db.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c;
+  runMigrations(db, MIGRATIONS);
+  const idempotent = uv(db) === before && db.raw.prepare(
+    `SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name = ?`,
+  ).get(target).c === 1;
+  check(`${target}: loss detected, restored, unrelated data intact, replay idempotent`,
+    detected && restored && idempotent && unrelatedAfter === unrelatedBefore,
+    `detected=${detected} restored=${restored} idempotent=${idempotent} `
+    + `movement ${unrelatedBefore}->${unrelatedAfter} uv=${uv(db)}`);
+}
+
+// --- [2u] 057 block_meta phase/index invariant (DB-BLOCK-META-DRIFT) ---------
+// Field capture held (block_id=2, macro_block_index=3, macro_phase='volume');
+// the production mapping requires index 3 -> 'hypertrophy'. 057 repairs every
+// persisted mismatch from macro_block_index and installs fail-closed triggers
+// so the drift cannot be re-inserted at the database boundary.
+console.log('[2u] 057 block_meta phase/index repair + enforcement');
+{
+  // Canonical index->phase mapping mirrored from macroPhaseOf (verify:blocks
+  // machine-checks the TS side; this is the SQL side of the same contract).
+  const phaseOf = (i) =>
+    i <= 2 ? 'gpp' : i <= 4 ? 'hypertrophy' : i <= 6 ? 'volume' : 'peak';
+
+  // Seed a training_block + block_meta row. The UPDATE-of-phase helper keeps
+  // each scenario explicit about which mismatch it plants.
+  const seedBlock = (db, blockId, idx) => {
+    db.raw.prepare(
+      `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+       VALUES (?, '2026-01-05', 'strength', 4, 'archived', 1000)`,
+    ).run(blockId);
+    db.raw.prepare(
+      `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+       VALUES (?, ?, ?, 'WAVE', 0)`,
+    ).run(blockId, idx, phaseOf(idx));
+  };
+  const setPhase = (db, blockId, phase) => {
+    // Directly plant a drifted phase, bypassing nothing: before 057 there is
+    // no trigger, so this is exactly how the field row came to exist.
+    db.raw.prepare('UPDATE block_meta SET macro_phase = ? WHERE block_id = ?').run(phase, blockId);
+  };
+
+  // --- fresh install reaches user_version 57 with the invariant enforced ---
+  {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    // Slot 004 is the parameterized materialize script, never a migration:
+    // 57 files -> user_version 56.
+    check('fresh install reaches user_version 56 (57 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 56,
+      String(uv(db)));
+    const trig = db.raw.prepare(
+      `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
+       AND name IN ('trg_block_meta_phase_bi', 'trg_block_meta_phase_bu')`,
+    ).get().c;
+    check('fresh install carries both 057 enforcement triggers', trig === 2);
+    let insertRejected = false;
+    try {
+      db.raw.prepare(
+        `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+         VALUES (9001, '2026-01-05', 'strength', 4, 'active', 1)`,
+      ).run();
+      db.raw.prepare(
+        `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+         VALUES (9001, 3, 'volume', 'WAVE', 0)`,
+      ).run();
+    } catch (e) {
+      insertRejected = /macro_phase does not match/i.test(String(e.message));
+    }
+    check('invalid INSERT (3, volume) rejected at the boundary', insertRejected);
+    // Every valid pair must pass the same boundary.
+    let allValidAccepted = true;
+    for (let i = 1; i <= 8; i += 1) {
+      try {
+        db.raw.prepare(
+          `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+           VALUES (?, '2026-01-05', 'strength', 4, 'active', 1)`,
+        ).run(9100 + i);
+        db.raw.prepare(
+          `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+           VALUES (?, ?, ?, 'LINEAR', 0)`,
+        ).run(9100 + i, i, phaseOf(i));
+      } catch {
+        allValidAccepted = false;
+      }
+    }
+    check('every valid index/phase pair accepted (all 8)', allValidAccepted);
+  }
+
+  // --- version-56 DB containing EVERY possible mismatch is repaired ----------
+  {
+    const db = freshDb();
+    const v56 = FILES.indexOf('057_block_meta_phase_invariant.sql'); // = 56 migrations applied
+    for (let i = 0; i < v56; i += 1) db.executeSync(MIGRATIONS[i]);
+    db.executeSync(`PRAGMA user_version = ${v56};`);
+    check('precondition: version-56 database built', uv(db) === v56);
+    // One row per macro index; plant the WRONG phase for every index.
+    for (let i = 1; i <= 8; i += 1) {
+      seedBlock(db, i, i);
+      const wrong = phaseOf(i === 8 ? 7 : i + 1); // always a different VALID phase value
+      setPhase(db, i, wrong);
+    }
+    runMigrations(db, MIGRATIONS);
+    const rows = db.raw.prepare(
+      'SELECT block_id, macro_block_index, macro_phase, schema_type, peak_shifted FROM block_meta ORDER BY block_id',
+    ).all();
+    const allRepaired = rows.length === 8 && rows.every((r) => r.macro_phase === phaseOf(r.macro_block_index));
+    check('version-56 DB with all 8 indexes drifted: every phase repaired deterministically', allRepaired,
+      JSON.stringify(rows.map((r) => [r.macro_block_index, r.macro_phase])));
+    // Repair preserves everything except the derived phase.
+    const preserved = rows.every((r) => r.schema_type === 'WAVE' && r.peak_shifted === 0);
+    check('repair preserves schema_type/peak_shifted/block ids', preserved);
+  }
+
+  // --- the exact captured case: (3,'volume') -> (3,'hypertrophy') ------------
+  {
+    const db = freshDb();
+    const v56 = FILES.indexOf('057_block_meta_phase_invariant.sql');
+    for (let i = 0; i < v56; i += 1) db.executeSync(MIGRATIONS[i]);
+    db.executeSync(`PRAGMA user_version = ${v56};`);
+    seedBlock(db, 2, 3);
+    setPhase(db, 2, 'volume'); // the captured field row
+    runMigrations(db, MIGRATIONS);
+    const row = db.raw.prepare(
+      'SELECT macro_block_index, macro_phase FROM block_meta WHERE block_id = 2',
+    ).get();
+    check('captured field row (block_id=2, index=3, volume) becomes (3, hypertrophy)',
+      row && row.macro_block_index === 3 && row.macro_phase === 'hypertrophy',
+      JSON.stringify(row));
+  }
+
+  // --- valid rows survive replay byte/logically unchanged --------------------
+  {
+    const db = freshDb();
+    const v56 = FILES.indexOf('057_block_meta_phase_invariant.sql');
+    for (let i = 0; i < v56; i += 1) db.executeSync(MIGRATIONS[i]);
+    db.executeSync(`PRAGMA user_version = ${v56};`);
+    for (let i = 1; i <= 8; i += 1) seedBlock(db, i, i);
+    const before = JSON.stringify(db.raw.prepare(
+      'SELECT * FROM block_meta ORDER BY block_id',
+    ).all());
+    runMigrations(db, MIGRATIONS);
+    const after = JSON.stringify(db.raw.prepare(
+      'SELECT * FROM block_meta ORDER BY block_id',
+    ).all());
+    check('valid index/phase pairs survive migration logically unchanged', before === after);
+    runMigrations(db, MIGRATIONS); // full replay/self-heal path
+    const afterReplay = JSON.stringify(db.raw.prepare(
+      'SELECT * FROM block_meta ORDER BY block_id',
+    ).all());
+    check('replay/idempotency leaves correct rows unchanged', afterReplay === after);
+  }
+
+  // --- invalid UPDATE rejected; FK cascade intact; rollback atomicity --------
+  {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    seedBlock(db, 50, 3);
+    let updateRejected = false;
+    try { setPhase(db, 50, 'volume'); } catch (e) {
+      updateRejected = /macro_phase does not match/i.test(String(e.message));
+    }
+    const stillHypertrophy = db.raw.prepare(
+      "SELECT macro_phase FROM block_meta WHERE block_id = 50",
+    ).get().macro_phase;
+    check('invalid UPDATE of phase rejected at the boundary, row untouched',
+      updateRejected && stillHypertrophy === 'hypertrophy');
+
+    // Dependent planned_session data survives; parent delete still cascades.
+    db.raw.prepare(
+      `INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+       VALUES (5001, 50, 1, 1, 'lower', 'accumulation', '2026-01-06')`,
+    ).run();
+    const depBefore = db.raw.prepare(
+      'SELECT COUNT(*) AS c FROM planned_session WHERE block_id = 50',
+    ).get().c;
+    db.raw.prepare('DELETE FROM training_block WHERE block_id = 50').run();
+    const depAfter = db.raw.prepare(
+      'SELECT COUNT(*) AS c FROM planned_session WHERE block_id = 50',
+    ).get().c;
+    const metaAfter = db.raw.prepare(
+      'SELECT COUNT(*) AS c FROM block_meta WHERE block_id = 50',
+    ).get().c;
+    check('dependent planned data present pre-delete, FK cascade intact post-delete',
+      depBefore === 1 && depAfter === 0 && metaAfter === 0);
+
+    // Transactional atomicity: an aborted statement leaves no partial repair.
+    // Plant a multi-row "repair" where one row violates the invariant inside a
+    // transaction; the violating statement aborts and the earlier one rolls back.
+    seedBlock(db, 60, 5);   // volume
+    seedBlock(db, 61, 6);   // volume
+    let txAborted = false;
+    try {
+      db.raw.exec('BEGIN');
+      db.raw.prepare("UPDATE block_meta SET macro_phase = 'gpp' WHERE block_id = 60").run(); // valid
+      db.raw.prepare("UPDATE block_meta SET macro_phase = 'bogus' WHERE block_id = 61").run(); // CHECK rejects
+      db.raw.exec('COMMIT');
+    } catch {
+      txAborted = true;
+      try { db.raw.exec('ROLLBACK'); } catch { /* already rolled back */ }
+    }
+    const r60 = db.raw.prepare('SELECT macro_phase FROM block_meta WHERE block_id = 60').get().macro_phase;
+    const r61 = db.raw.prepare('SELECT macro_phase FROM block_meta WHERE block_id = 61').get().macro_phase;
+    check('transaction failure rolls back without partial repair',
+      txAborted && r60 === 'volume' && r61 === 'volume',
+      `r60=${r60} r61=${r61}`);
+  }
+
+  // --- both production block-creation paths keep passing ---------------------
+  {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    // Path 1: continuation via nextMacroPosition semantics — next index wraps 8->1.
+    db.raw.prepare(
+      `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+       VALUES (70, '2026-01-05', 'strength', 4, 'archived', 1000),
+              (71, '2026-02-02', 'hypertrophy', 4, 'active', 2000)`,
+    ).run();
+    db.raw.prepare(
+      `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+       VALUES (70, 8, 'peak', 'WAVE', 0), (71, 1, 'gpp', 'LINEAR', 0)`,
+    ).run();
+    // Path 2: goal-program minting at a mid-cycle anchor (programMacroIndex), e.g. 6,7,8,1.
+    db.raw.prepare(
+      `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+       VALUES (72, '2026-03-02', 'power', 4, 'active', 3000),
+              (73, '2026-03-30', 'power', 4, 'active', 4000),
+              (74, '2026-04-27', 'strength', 4, 'active', 5000),
+              (75, '2026-05-25', 'strength', 4, 'active', 6000)`,
+    ).run();
+    for (const [bid, idx] of [[72, 6], [73, 7], [74, 8], [75, 1]]) {
+      db.raw.prepare(
+        `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+         VALUES (?, ?, ?, 'APRE', 0)`,
+      ).run(bid, idx, phaseOf(idx));
+    }
+    const count = db.raw.prepare('SELECT COUNT(*) AS c FROM block_meta').get().c;
+    check('both block-creation paths (continuation + program anchor) accept mapped phases', count === 6,
+      String(count));
+  }
+
+  // --- self-heal coverage: dropped 057 trigger is detected and restored ------
+  {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    db.raw.exec('DROP TRIGGER trg_block_meta_phase_bi');
+    check('dropped 057 trigger is detected as missing sentinel',
+      sentinelsMissing(db).includes('trg_block_meta_phase_bi'));
+    runMigrations(db, MIGRATIONS);
+    const restoredTrig = db.raw.prepare(
+      `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_block_meta_phase_bi'`,
+    ).get().c;
+    check('self-heal restores dropped 057 trigger', restoredTrig === 1);
+  }
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

@@ -148,6 +148,34 @@ android {
         debug {
             signingConfig signingConfigs.debug
         }
+        // QA acceptance variant (WO remediation B1): production source/runtime,
+        // NON-debuggable (so the React Native plugin bundles the JS/Hermes
+        // application), debug-key signed, .qa application-id suffix so it
+        // coexists with developer installs. Never a Play artifact; never
+        // described as a Metro-dependent dev shell. Runtime needs no dev
+        // server, Metro, adb reverse, or host connection.
+        qa {
+            initWith buildTypes.release
+            applicationIdSuffix ".qa"
+            versionNameSuffix "-QA"
+            debuggable false
+            jniDebuggable false
+            // Explicitly non-shrinking so the QA binary matches the release
+            // runtime configuration (enableProguardInReleaseBuilds is false).
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // Debug-key signed, clearly labeled non-production (see B1 comment).
+            signingConfig signingConfigs.debug
+            // Dependency-resolution fallback so libraries that only publish a
+            // release variant resolve for this non-debuggable build type.
+            matchingFallbacks += "release"
+            // The RN gradle plugin injects the usesCleartextTraffic placeholder
+            // for its debug/release types only; the QA variant must supply it
+            // itself (offline QA artifact: cleartext stays disabled).
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            // Clearly labeled non-production on the launcher.
+            resValue "string", "app_name", "AthleteKinetics QA"
+        }
         release {
             if (hasReleaseSigning) {
                 signingConfig signingConfigs.release
@@ -155,6 +183,182 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+// --- QA candidate identity manifest (WO remediation B2) ----------------------
+// Generated at build time into build/generated (never a maintained source
+// asset) and packaged ONLY into the qa variant. Carries enough correlation to
+// audit the dirty candidate WITHOUT absolute local paths, usernames, .git
+// data, credentials, or report text. Fails closed when any required identity
+// input is absent, malformed, or inconsistent.
+def repoRoot = rootDir.getParentFile().getParentFile().getParentFile() // android -> mobile -> apps -> repo
+
+def gitCapture = { List<String> args ->
+    def stdout = new ByteArrayOutputStream()
+    def stderr = new ByteArrayOutputStream()
+    def proc = new ProcessBuilder(["git"] + args)
+        .directory(repoRoot)
+        .redirectErrorStream(false)
+        .start()
+    proc.inputStream.withCloseable { stdout << it }
+    proc.errorStream.withCloseable { stderr << it }
+    if (proc.waitFor() != 0) {
+        throw new GradleException(
+            "git ${args.join(' ')} failed (${proc.exitValue()}): ${stderr.toString().trim()}") as Object
+    }
+    return stdout.toByteArray()
+}
+
+def gitText = { List<String> args -> new String(gitCapture(args), 'UTF-8').trim() }
+
+def sha256Hex = { byte[] bytes ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    return digest.digest(bytes).collect { String.format('%02x', it) }.join()
+}
+
+def sha256OfFile = { File f -> sha256Hex(f.bytes) }
+
+/** Tracked-diff fingerprint method: SHA-256 over the exact bytes of
+ *  `git diff --full-index --binary HEAD` (byte-preserving, no newline or
+ *  encoding translation anywhere in the pipeline). */
+def EMPTY_DIFF_SHA256 = sha256Hex(new byte[0])
+
+def requirePin = { String label, String value, java.util.regex.Pattern pattern ->
+    if (value == null || !(value ==~ pattern)) {
+        throw new GradleException("QA candidate manifest: malformed ${label}: '${value}'")
+    }
+    return value
+}
+
+def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
+    group = "verification"
+    description = "Generates the non-secret QA candidate identity manifest."
+    def outDir = layout.buildDirectory.dir("generated/candidate_manifest")
+    outputs.dir(outDir)
+    outputs.upToDateWhen { false }
+    doLast {
+        def branch = requirePin('branch name', gitText(['rev-parse', '--abbrev-ref', 'HEAD']), ~/[^\x00]+/)
+        def head = requirePin('HEAD commit', gitText(['rev-parse', 'HEAD']), ~/[0-9a-f]{40}/)
+        def diffBytes = gitCapture(['diff', '--full-index', '--binary', 'HEAD'])
+        def diffSha = sha256Hex(diffBytes)
+        boolean dirty = diffSha != EMPTY_DIFF_SHA256
+
+        // Intended staged/new-file material (WO staging permission): untracked
+        // files except the two pre-existing owner/process artifacts, which are
+        // explicitly NOT candidate inputs. Also includes files STAGED as new
+        // (index-added, absent from HEAD) — once staged they leave ls-files
+        // --others, but they remain new candidate material and must be pinned.
+        def OWNER_ARTIFACTS = ['TASK.md', 'audit_task_b.mjs'] as Set
+        def newFiles = []
+        def addedPaths = gitText(['diff', '--cached', '--name-only', '--diff-filter=A'])
+            .split('\n').findAll { it.trim() }
+            .findAll { !OWNER_ARTIFACTS.contains(it.trim()) }
+        addedPaths.each { rel ->
+            def f = new File(repoRoot, rel.trim())
+            if (!f.isFile()) {
+                throw new GradleException("QA candidate manifest: staged-new path is not a regular file: ${rel}")
+            }
+            newFiles.add([path: rel.trim().replace('\\', '/'), sha256: sha256OfFile(f)])
+        }
+        gitText(['ls-files', '--others', '--exclude-standard']).split('\n')
+            .findAll { it.trim() }
+            .findAll { !OWNER_ARTIFACTS.contains(it.trim()) }
+            .findAll { !addedPaths.contains(it.trim()) }
+            .sort()
+            .each { rel ->
+                def f = new File(repoRoot, rel.trim())
+                if (!f.isFile()) {
+                    throw new GradleException("QA candidate manifest: untracked path is not a regular file: ${rel}")
+                }
+                newFiles.add([path: rel.trim().replace('\\', '/'), sha256: sha256OfFile(f)])
+            }
+
+        // Embedder supply-chain pin — single source of truth remains
+        // scripts/embedder-integrity.mjs; parsed here, never duplicated.
+        def integrityFile = new File(repoRoot, 'scripts/embedder-integrity.mjs')
+        def integritySrc = integrityFile.text
+        def pinMatcher = integritySrc =~ /PINNED_REVISION\s*=\s*'([0-9a-f]{40})'/
+        if (!pinMatcher.find()) {
+            throw new GradleException("QA candidate manifest: cannot parse PINNED_REVISION from embedder-integrity.mjs")
+        }
+        def modelRevision = pinMatcher.group(1)
+        def modelMatcher = integritySrc =~ /'onnx\/model_quantized\.onnx':\s*\n\s*'([0-9a-f]{64})'/
+        if (!modelMatcher.find()) {
+            throw new GradleException("QA candidate manifest: cannot parse pinned model SHA-256 from embedder-integrity.mjs")
+        }
+        def modelSha = modelMatcher.group(1)
+
+        def stagedModel = new File(repoRoot, 'packages/inference/assets/minilm/model_quantized.onnx')
+        if (!stagedModel.isFile()) {
+            throw new GradleException(
+                "QA candidate manifest: ${stagedModel} missing - run 'npm run fetch:embedder' before building the QA artifact")
+        }
+        def stagedModelSha = sha256OfFile(stagedModel)
+        if (stagedModelSha != modelSha) {
+            throw new GradleException(
+                "QA candidate manifest: staged model sha256 ${stagedModelSha} != ratified pin ${modelSha}; refusing to build")
+        }
+
+        def rnPkg = new groovy.json.JsonSlurper()
+            .parse(new File(repoRoot, 'node_modules/react-native/package.json'))
+        def ortRnPkg = new groovy.json.JsonSlurper()
+            .parse(new File(repoRoot, 'node_modules/onnxruntime-react-native/package.json'))
+
+        def manifest = [
+            schema              : 'ak.candidate-manifest/1',
+            label               : 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+            branch              : branch,
+            head                : head,
+            sourceDirty         : dirty,
+            trackedDiffFingerprint: [
+                method: "sha256(git diff --full-index --binary HEAD)",
+                value : diffSha,
+            ],
+            newFiles            : newFiles,
+            qaLifecycleTelemetry: true,
+            model               : [
+                id           : 'Xenova/all-MiniLM-L6-v2',
+                revision     : modelRevision,
+                assetPath    : 'assets/minilm.onnx',
+                sha256       : modelSha,
+                sizeBytes    : 22972370,
+            ],
+            packageId           : 'com.athletekinetics.qa',
+            versionCode         : android.defaultConfig.versionCode,
+            versionName         : "${android.defaultConfig.versionName}-QA",
+            buildVariant        : 'qa',
+            reactNativeVersion  : rnPkg.version,
+            onnxRuntimeReactNativeVersion: ortRnPkg.version,
+            onnxRuntimeAndroidVersion: rootProject.ext.onnxruntimeAndroidVersion,
+            builtAtUtc          : java.time.Instant.now().toString(),
+        ]
+
+        def dir = outDir.get().asFile
+        dir.mkdirs()
+        def out = new File(dir, 'candidate_manifest.json')
+        out.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(manifest)) + "\n"
+        logger.lifecycle("[qa-manifest] wrote ${out} (head=${head.take(12)} dirty=${dirty})")
+    }
+}
+
+android {
+    sourceSets {
+        qa {
+            // Packaged from build/generated only; source dirs stay clean.
+            assets.srcDir layout.buildDirectory.dir("generated/candidate_manifest")
+        }
+    }
+}
+
+// Every qa-variant task that reads sources/assets/lint inputs must run after
+// the manifest exists (Gradle implicit-dependency validation fails otherwise,
+// since lint scans build/generated).
+tasks.configureEach { task ->
+    def n = task.name
+    if (n == 'mergeQaAssets'
+            || (n.contains('Qa') && (n.contains('Lint') || n.contains('lint')))) {
+        task.dependsOn qaCandidateManifestTask
     }
 }
 
@@ -298,6 +502,7 @@ def onnxPackagingContract = tasks.register("verifyOnnxRuntimePackagingContract")
 // never be reused solely because Gradle considered the task up to date.
 def onnxArtifactTasks = [
     packageDebug: ["outputs/apk/debug/app-debug.apk", "lib/"],
+    packageQa: ["outputs/apk/qa/app-qa.apk", "lib/"],
     packageRelease: ["outputs/apk/release/app-release.apk", "lib/"],
     signDebugBundle: ["outputs/bundle/debug/app-debug.aab", "base/lib/"],
     signReleaseBundle: ["outputs/bundle/release/app-release.aab", "base/lib/"],

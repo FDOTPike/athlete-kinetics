@@ -119,33 +119,62 @@ echo "  mixed:   $(seg_aligns libmixed.so)"
 
 # Assemble isolated APKs. Plain jar zips are not 16 KB page aligned; each APK
 # used for an ELF assertion is zipaligned before the auditor sees it.
+MODEL_SRC="$ROOT/packages/inference/assets/minilm/model_quantized.onnx"
+[ -f "$MODEL_SRC" ] || { echo "ERROR: missing model source at $MODEL_SRC" >&2; exit 2; }
+
 zap() { # $1=in.apk $2=out.apk (Windows paths)
   "$ZIPALIGN" -P 16 -f 4 "$1" "$2" >/dev/null 2>&1
 }
 
 # aligned-only APK (must PASS)
-mkdir -p "$WORK/apkA/lib/arm64-v8a"
+mkdir -p "$WORK/apkA/lib/arm64-v8a" "$WORK/apkA/assets"
 cp "$WORK/libaligned.so" "$WORK/apkA/lib/arm64-v8a/"
-(cd "$WORK/apkA" && "$JAR" cf0 "$WIN_WORK\\A_raw.apk" lib >/dev/null 2>&1)
+cp "$MODEL_SRC" "$WORK/apkA/assets/minilm.onnx"
+(cd "$WORK/apkA" && "$JAR" cf0 "$WIN_WORK\\A_raw.apk" lib assets >/dev/null 2>&1)
 zap "$WIN_WORK\\A_raw.apk" "$WIN_WORK\\A.apk"
 
 # strong-only APK (must PASS)
-mkdir -p "$WORK/apkS/lib/arm64-v8a"
+mkdir -p "$WORK/apkS/lib/arm64-v8a" "$WORK/apkS/assets"
 cp "$WORK/libstrong.so" "$WORK/apkS/lib/arm64-v8a/"
-(cd "$WORK/apkS" && "$JAR" cf0 "$WIN_WORK\\S_raw.apk" lib >/dev/null 2>&1)
+cp "$MODEL_SRC" "$WORK/apkS/assets/minilm.onnx"
+(cd "$WORK/apkS" && "$JAR" cf0 "$WIN_WORK\\S_raw.apk" lib assets >/dev/null 2>&1)
 zap "$WIN_WORK\\S_raw.apk" "$WIN_WORK\\S.apk"
 
-# ordinary 0x1000-only APK (must FAIL independently)
-mkdir -p "$WORK/apkB/lib/arm64-v8a"
+# ordinary 0x1000-only APK (must FAIL independently on ELF alignment)
+mkdir -p "$WORK/apkB/lib/arm64-v8a" "$WORK/apkB/assets"
 cp "$WORK/libbad.so" "$WORK/apkB/lib/arm64-v8a/"
-(cd "$WORK/apkB" && "$JAR" cf0 "$WIN_WORK\\B_raw.apk" lib >/dev/null 2>&1)
+cp "$MODEL_SRC" "$WORK/apkB/assets/minilm.onnx"
+(cd "$WORK/apkB" && "$JAR" cf0 "$WIN_WORK\\B_raw.apk" lib assets >/dev/null 2>&1)
 zap "$WIN_WORK\\B_raw.apk" "$WIN_WORK\\B.apk"
 
-# mixed 0x1000/0x4000-only APK (must FAIL independently)
-mkdir -p "$WORK/apkM/lib/arm64-v8a"
+# mixed 0x1000/0x4000-only APK (must FAIL independently on ELF alignment)
+mkdir -p "$WORK/apkM/lib/arm64-v8a" "$WORK/apkM/assets"
 cp "$WORK/libmixed.so" "$WORK/apkM/lib/arm64-v8a/"
-(cd "$WORK/apkM" && "$JAR" cf0 "$WIN_WORK\\M_raw.apk" lib >/dev/null 2>&1)
+cp "$MODEL_SRC" "$WORK/apkM/assets/minilm.onnx"
+(cd "$WORK/apkM" && "$JAR" cf0 "$WIN_WORK\\M_raw.apk" lib assets >/dev/null 2>&1)
 zap "$WIN_WORK\\M_raw.apk" "$WIN_WORK\\M.apk"
+
+# aligned APK with MISSING minilm.onnx (must FAIL model gate, exit 1)
+mkdir -p "$WORK/apkNoModel/lib/arm64-v8a"
+cp "$WORK/libaligned.so" "$WORK/apkNoModel/lib/arm64-v8a/"
+(cd "$WORK/apkNoModel" && "$JAR" cf0 "$WIN_WORK\\NoModel_raw.apk" lib >/dev/null 2>&1)
+zap "$WIN_WORK\\NoModel_raw.apk" "$WIN_WORK\\NoModel.apk"
+
+# aligned APK with TRUNCATED minilm.onnx (must FAIL model gate, exit 1)
+mkdir -p "$WORK/apkTruncModel/lib/arm64-v8a" "$WORK/apkTruncModel/assets"
+cp "$WORK/libaligned.so" "$WORK/apkTruncModel/lib/arm64-v8a/"
+head -c 1024 "$MODEL_SRC" > "$WORK/apkTruncModel/assets/minilm.onnx"
+(cd "$WORK/apkTruncModel" && "$JAR" cf0 "$WIN_WORK\\TruncModel_raw.apk" lib assets >/dev/null 2>&1)
+zap "$WIN_WORK\\TruncModel_raw.apk" "$WIN_WORK\\TruncModel.apk"
+
+# aligned APK with CORRUPT SHA minilm.onnx (must FAIL model gate, exit 1)
+mkdir -p "$WORK/apkCorruptModel/lib/arm64-v8a" "$WORK/apkCorruptModel/assets"
+cp "$WORK/libaligned.so" "$WORK/apkCorruptModel/lib/arm64-v8a/"
+cp "$MODEL_SRC" "$WORK/apkCorruptModel/assets/minilm.onnx"
+# Corrupt 1 byte in place while preserving exact length
+printf 'X' | dd of="$WORK/apkCorruptModel/assets/minilm.onnx" bs=1 seek=100 count=1 conv=notrunc >/dev/null 2>&1
+(cd "$WORK/apkCorruptModel" && "$JAR" cf0 "$WIN_WORK\\CorruptModel_raw.apk" lib assets >/dev/null 2>&1)
+zap "$WIN_WORK\\CorruptModel_raw.apk" "$WIN_WORK\\CorruptModel.apk"
 
 # empty APK (zero native libraries -> exit 2) — from a genuinely empty dir
 mkdir -p "$WORK/emptyDir"
@@ -157,13 +186,13 @@ cp "$WORK/libaligned.so" "$WORK/apkD/assets/not-a-native-library.so"
 (cd "$WORK/apkD" && "$JAR" cf0 "$WIN_WORK\\D_raw.apk" assets >/dev/null 2>&1)
 zap "$WIN_WORK\\D_raw.apk" "$WIN_WORK\\D.apk"
 
-
 # one valid ELF64 plus garbage .so: proves readelf failure itself fails closed,
 # rather than relying on the zero-inspected-library gate
-mkdir -p "$WORK/apkG/lib/arm64-v8a"
+mkdir -p "$WORK/apkG/lib/arm64-v8a" "$WORK/apkG/assets"
 cp "$WORK/libaligned.so" "$WORK/apkG/lib/arm64-v8a/"
+cp "$MODEL_SRC" "$WORK/apkG/assets/minilm.onnx"
 echo "this is not an ELF file" > "$WORK/apkG/lib/arm64-v8a/libgarbage.so"
-(cd "$WORK/apkG" && "$JAR" cf0 "$WIN_WORK\\G_raw.apk" lib >/dev/null 2>&1)
+(cd "$WORK/apkG" && "$JAR" cf0 "$WIN_WORK\\G_raw.apk" lib assets >/dev/null 2>&1)
 zap "$WIN_WORK\\G_raw.apk" "$WIN_WORK\\G.apk"
 
 # existing but corrupt APK: reaches and must fail jar extraction (exit 2)
@@ -172,23 +201,29 @@ printf 'this is not a zip archive\n' > "$WORK/corrupt.apk"
 echo
 echo "[running auditor on fixtures]"
 set +e
-bash "$AUDITOR" "$WORK/A.apk"           >/dev/null 2>&1; a_rc=$?
-bash "$AUDITOR" "$WORK/S.apk"           >/dev/null 2>&1; s_rc=$?
-bash "$AUDITOR" "$WORK/B.apk"           >/dev/null 2>&1; b_rc=$?
-bash "$AUDITOR" "$WORK/M.apk"           >/dev/null 2>&1; m_rc=$?
-bash "$AUDITOR" "$WORK/A_raw.apk"       >/dev/null 2>&1; raw_rc=$?
-bash "$AUDITOR" "$WORK/empty.apk"       >/dev/null 2>&1; e_rc=$?
-bash "$AUDITOR" "$WORK/D.apk"           >/dev/null 2>&1; d_rc=$?
-bash "$AUDITOR" "$WORK/G.apk"           >/dev/null 2>&1; g_rc=$?
-bash "$AUDITOR" "$WORK/corrupt.apk"     >"$WORK/corrupt.out" 2>&1; c_rc=$?
+bash "$AUDITOR" "$WORK/A.apk"               >/dev/null 2>&1; a_rc=$?
+bash "$AUDITOR" "$WORK/S.apk"               >/dev/null 2>&1; s_rc=$?
+bash "$AUDITOR" "$WORK/B.apk"               >/dev/null 2>&1; b_rc=$?
+bash "$AUDITOR" "$WORK/M.apk"               >/dev/null 2>&1; m_rc=$?
+bash "$AUDITOR" "$WORK/NoModel.apk"         >/dev/null 2>&1; nomodel_rc=$?
+bash "$AUDITOR" "$WORK/TruncModel.apk"      >/dev/null 2>&1; trunc_rc=$?
+bash "$AUDITOR" "$WORK/CorruptModel.apk"    >/dev/null 2>&1; corruptmodel_rc=$?
+bash "$AUDITOR" "$WORK/A_raw.apk"           >/dev/null 2>&1; raw_rc=$?
+bash "$AUDITOR" "$WORK/empty.apk"           >/dev/null 2>&1; e_rc=$?
+bash "$AUDITOR" "$WORK/D.apk"               >/dev/null 2>&1; d_rc=$?
+bash "$AUDITOR" "$WORK/G.apk"               >/dev/null 2>&1; g_rc=$?
+bash "$AUDITOR" "$WORK/corrupt.apk"         >"$WORK/corrupt.out" 2>&1; c_rc=$?
 corrupt_output="$(<"$WORK/corrupt.out")"
-bash "$AUDITOR" /nonexistent.apk         >/dev/null 2>&1; n_rc=$?
+bash "$AUDITOR" /nonexistent.apk             >/dev/null 2>&1; n_rc=$?
 set -e
 
-t "aligned-only APK (0x4000) passes"                      0 "$a_rc"
-t "stronger-than-required APK (0x8000) passes"            0 "$s_rc"
-t "0x1000-only APK fails independently"                   1 "$b_rc"
+t "aligned-only APK with model (0x4000) passes"           0 "$a_rc"
+t "stronger-than-required APK with model (0x8000) passes"  0 "$s_rc"
+t "0x1000-only APK fails independently on ELF alignment"  1 "$b_rc"
 t "mixed-only 0x1000/0x4000 APK fails independently"      1 "$m_rc"
+t "missing model asset fails closed"                      1 "$nomodel_rc"
+t "truncated model asset fails closed"                    1 "$trunc_rc"
+t "corrupt-SHA model asset fails closed"                  1 "$corruptmodel_rc"
 t "raw jar zip fails zipalign -P 16 check"                1 "$raw_rc"
 t "APK with zero native libraries fails closed"           2 "$e_rc"
 t "assets-only ELF64 decoy is not a native library"        2 "$d_rc"

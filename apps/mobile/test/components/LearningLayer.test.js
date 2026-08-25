@@ -74,6 +74,14 @@ describe('LearningLayer (Work Order B)', () => {
     }
   });
 
+  test('GLOSSARY.WAVE carries the bounded non-equality copy and rejects matches Linear', () => {
+    expect(GLOSSARY.WAVE).toBe(
+      'Reps and effort trade off across the block, with a shorter, harder middle week between two longer, easier ones.'
+    );
+    expect(GLOSSARY.WAVE).not.toContain('matches Linear');
+    expect(GLOSSARY.WAVE).not.toContain('Total work');
+  });
+
   test('every term rendered with an InfoTip in apps/mobile/src has a matching GLOSSARY key', () => {
     const srcDir = path.resolve(__dirname, '../../src');
     const termRegex = /<InfoTip\s+term=(?:["']([^"']+)["']|\{["']([^"']+)["']\})/g;

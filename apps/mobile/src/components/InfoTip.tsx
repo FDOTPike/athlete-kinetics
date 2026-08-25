@@ -56,7 +56,7 @@ export const GLOSSARY: Record<string, string> = {
 
   // Loading methods
   LINEAR: 'Load climbs steadily week to week. The simplest progression and the best starting point.',
-  WAVE: 'Load rises for two or three weeks, drops back, then rises past where it was.',
+  WAVE: 'Reps and effort trade off across the block, with a shorter, harder middle week between two longer, easier ones.',
   STEP: 'The same load for a stretch of weeks, then a single jump up. Good when technique needs time.',
   APRE: 'Autoregulated. The set you actually perform decides the next set\'s load, so a bad day costs less.',
 

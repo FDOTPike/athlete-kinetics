@@ -7,8 +7,10 @@
  * Run:  node apps/mobile/test/verify_store_sql.mjs
  */
 import { DatabaseSync } from 'node:sqlite';
+import { checkWorkflowStructure } from '../../../tools/verify_ci_structure.mjs';
+import { checkInstallScriptPolicy } from '../../../tools/verify_install_scripts.mjs';
 import { createRequire } from 'node:module';
-import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -405,25 +407,17 @@ check('continuation carries the program anchor, never re-reads the global cycle'
 check('standalone block generation still advances the athlete global cycle',
   src.includes('nextMacroPosition(d).macroBlockIndex'),
 );
-check('dated program creation calls datedProgramMacroAnchor and undated uses plan.macroBlockIndex',
-  src.includes("startingMacroBlockIndex: programDraft.input.horizon.kind === 'date'")
-    && src.includes('? datedProgramMacroAnchor(programDraft.preview.plannedBlockCount)')
-    && src.includes(': plan.macroBlockIndex'),
-);
-// The persisted anchor above is only ONE of three sites that derive a macro
-// position for a dated program. blockGenerator.ts:350-357 requires preview and
-// committed generation to use the IDENTICAL derivation "never silent" — a preview
-// that regressed to the global carousel would show the athlete phases they will
-// not receive, and the persist-site check alone does not catch that. Pin all three.
-const datedAnchorCallSites = [...src.matchAll(/datedProgramMacroAnchor\(/g)].length;
-check('ALL THREE dated-program macro sites call datedProgramMacroAnchor (preview, generation, persist)',
-  datedAnchorCallSites === 3, `${datedAnchorCallSites} call sites`);
-check('the PREVIEW path anchors a dated program to the competition date, not the global carousel',
-  src.includes('datedProgramMacroAnchor(shape.plannedBlockCount)'),
-);
-check('committed GENERATION anchors a dated program to the competition date',
-  src.includes('datedProgramMacroAnchor(pendingProgramCreation.preview.plannedBlockCount)'),
-);
+// R3 (REVIEW_BOUNDARY, ratified 2026-08-22): the selected date sets the review
+// horizon and block COUNT. It confers NO peak authority, so no macro position may
+// be derived from it. Dedicated competition preparation is deferred; a future
+// implementation needs its own ratification, not a quiet reintroduction here.
+check('no macro position is derived from the selected date (REVIEW_BOUNDARY)',
+  !src.includes('datedProgramMacroAnchor'));
+check('dated and undated programs both take the athlete rotation position',
+  [...src.matchAll(/nextMacroPosition\(d\)\.macroBlockIndex/g)].length >= 2,
+  `${[...src.matchAll(/nextMacroPosition\(d\)\.macroBlockIndex/g)].length} rotation sites`);
+check('the persisted program anchor comes from the generated plan, not the date',
+  src.includes('startingMacroBlockIndex: plan.macroBlockIndex'));
 
 check(
   'planned completion is joined through exact session_origin provenance and immutable session_outcome',
@@ -616,62 +610,43 @@ console.log('[Calibration Policy v1 store invariants]');
 a('source tripwire: "recentAcwr" does not appear in useStore.ts', !src.includes('recentAcwr'));
 a('boot rematerialization loop window is exactly 14 days', /demoDates\(localToday\(\),\s*14\)/.test(src));
 
-// --- e1RM series selector --------------------------------------------------------
-console.log('[e1RM series selector — read-only tripwires]');
-const e1rmBody = stripComments((() => {
-  const i = src.indexOf('getMovementE1rmSeries: (movementId: number): E1rmPoint[] => {');
-  if (i < 0) return '';
-  return src.slice(i, src.indexOf('\n  },', i));
-})());
-a('getMovementE1rmSeries exists in useStore.ts', e1rmBody.length > 0);
-a('getMovementE1rmSeries never writes',
-  !/\b(INSERT|UPDATE|DELETE)\b/i.test(e1rmBody));
-a('getMovementE1rmSeries never touches one_rep_max',
-  !/one_rep_max/.test(e1rmBody));
-a('getMovementE1rmSeries never unions imported history',
-  !/history_import/.test(e1rmBody));
-
-console.log('[e1RM series selector — executed against seeded rows]');
-const e1rmSql = statements.find((s) =>
-  s.includes('FROM set_record sr') && s.includes('JOIN session s') && s.includes('WHERE sr.movement_id = ?'),
-);
-a('store exposes the getMovementE1rmSeries SQL literal', Boolean(e1rmSql));
-if (e1rmSql) {
-  const req = createRequire(import.meta.url);
-  const { bestPerSession } = req(join(ROOT, 'packages', 'inference', 'test', '.build', 'e1rm.js'));
-  db.exec('BEGIN');
-  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (950,'E1RM Test Squat','squat',1)");
-  // Session 1 (2026-06-01): two rated sets
-  db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (951,'2026-06-01',0)");
-  db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (9501,951,950,1,5,100.0,8.0,0),(9502,951,950,2,5,105.0,8.5,0)");
-  // Session 2 (2026-06-03): one rated set
-  db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (952,'2026-06-03',0)");
-  db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (9503,952,950,1,3,110.0,9.0,0)");
-  // Session 3 (2026-06-05): sets with rpe IS NULL (unrated)
-  db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (953,'2026-06-05',0)");
-  db.exec("INSERT INTO set_record (set_id,session_id,movement_id,set_index,reps,load_kg,rpe,logged_at_ms) VALUES (9504,953,950,1,5,100.0,NULL,0),(9505,953,950,2,5,105.0,NULL,0)");
-
-  const rows = db.prepare(e1rmSql).all(950);
-  const points = bestPerSession(rows);
-
-  a('two sessions in, two points out, date-ordered',
-    points.length === 2
-      && points[0].session_id === 951
-      && points[0].session_date === '2026-06-01'
-      && points[0].set_id === 9502
-      && points[1].session_id === 952
-      && points[1].session_date === '2026-06-03'
-      && points[1].set_id === 9503
-      && points[0].e1rm_kg > 0
-      && points[1].e1rm_kg > 0,
-    JSON.stringify(points));
-
-  a('a session whose sets all have rpe IS NULL produces no point',
-    !points.some((p) => p.session_id === 953),
-    JSON.stringify(points));
-
-  db.exec('ROLLBACK');
+// --- R4: every load-preference writer shares ONE fail-closed policy -------------
+console.log('[R4 load-preference write policy]');
+{
+  // Anchor on the IMPLEMENTATION (it has destructured params) — not the
+  // interface declaration, which appears first in the file.
+  const onboardingBody = stripComments((() => {
+    const i = src.indexOf('completeOnboarding: (patch, athleteName, loadPreference');
+    return i < 0 ? '' : src.slice(i, src.indexOf('\n  },', i));
+  })());
+  a('completeOnboarding body located', onboardingBody.length > 0);
+  a('completeOnboarding consults the shared refusal policy before writing',
+    onboardingBody.includes('loadPreferenceWriteRefusal('));
+  a('completeOnboarding refuses BEFORE opening its transaction (no partial write)',
+    onboardingBody.indexOf('loadPreferenceWriteRefusal(') <
+      onboardingBody.indexOf("d.executeSync('BEGIN')"));
+  a('the refusal is keyed on an active session',
+    /loadPreferenceWriteRefusal\(\{\s*sessionActive: get\(\)\.session !== null/.test(onboardingBody));
+  // Both writers must resolve the SAME policy; a second inline guard would drift.
+  a('exactly the two known writers reach persistLoadPreferenceRow',
+    [...src.matchAll(/persistLoadPreferenceRow\(/g)].length === 1,
+    `${[...src.matchAll(/persistLoadPreferenceRow\(/g)].length} direct call(s) in useStore`);
 }
+
+// --- e1RM store surface: REMOVED (R10 + R5) --------------------------------------
+// getMovementE1rmSeries loaded every historical set for a movement with no LIMIT and
+// no date predicate, then allocated a Map, an array and a sort over that result —
+// an allocation scaling with history, which the ratified memory ceiling forbids (512 MiB
+// hard, 450,000,000 B preferred target — see tools/memory-audit/budget.json). It had no
+// runtime consumer, so the surface was withdrawn rather than bounded with an
+// unratified window. The pure derivation in packages/inference/src/e1rm.ts remains
+// and is still gated in verify_blocks.mjs [8b].
+// DEFERRED with it (not fixed): R5's imported-set inclusion and missing/partial
+// coverage metadata. Re-landing this surface requires a ratified history window,
+// source-scoped session/set keys (native and imported ids can collide) and explicit
+// provenance — see docs/decisions/TRAINING_PROGRESSION_LAYERS.md.
+a('the unbounded e1RM store getter is not reintroduced without a ratified window',
+  !src.includes('getMovementE1rmSeries'));
 
 // --- resetTrainingData: EXECUTE the store's wipe on seeded data -----------------
 // Proves the reset clears ALL history (so the demo can re-load) while KEEPING the
@@ -1554,21 +1529,80 @@ if (resetTables.length >= 15) {
   // --- [F3] Gate count & documentation drift assertion ---
   console.log('[documentation & CI gate count drift check]');
   const pkgJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
-  const verifyAllScript = pkgJson.scripts['verify:all'] ?? '';
-  const verifyInvocations = (verifyAllScript.match(/npm run verify:(?!all\b)[a-z0-9-]+/g) ?? []).length;
+  const verifyCiScript = pkgJson.scripts['verify:ci'] ?? '';
+  const verifyInvocations = (verifyCiScript
+    .match(/npm run verify:(?!all\b|ci\b|release\b)[a-z0-9-]+/g) ?? []).length;
 
   const agentWorkflowContent = readFileSync(join(ROOT, 'AGENT_WORKFLOW.md'), 'utf-8');
   const ciYmlContent = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf-8');
 
-  const workflowMatch = agentWorkflowContent.match(/npm run verify:all\s+#\s+(\d+)\s+gates/);
+  const workflowMatch = agentWorkflowContent.match(/npm run verify:ci\s+#\s+(\d+)\s+gates/);
   const workflowGateCount = workflowMatch ? Number(workflowMatch[1]) : null;
 
   const ciMatches = Array.from(ciYmlContent.matchAll(/\((\d+)\s+gates/g));
   const ciGateCounts = ciMatches.map((m) => Number(m[1]));
 
-  a('verify:all script invokes exactly 20 verify:* targets', verifyInvocations === 20, `got ${verifyInvocations}`);
-  a('AGENT_WORKFLOW.md documents exact verify:all gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
-  a('ci.yml documents exact verify:all gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
+  a('verify:ci script invokes exactly 21 verify:* targets', verifyInvocations === 21, `got ${verifyInvocations}`);
+  a('AGENT_WORKFLOW.md documents exact verify:ci gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
+  a('ci.yml documents exact verify:ci gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
+
+  // --- [F3b] merge-vs-release separation (ratified 2026-08-24) --------------
+  // verify:ci is the DETERMINISTIC host suite and must be green to merge.
+  // verify:release adds the two checks CI structurally cannot make honestly:
+  // the ratified memory contract [A] and measured device evidence [D], which
+  // needs an authorized packet no runner possesses. Keeping them in separate
+  // scripts is the whole point; silently folding either back into verify:ci,
+  // or quietly dropping one from verify:release, is the drift this gate exists
+  // to catch.
+  const releaseScript = pkgJson.scripts['verify:release'] ?? '';
+  const ciScript = pkgJson.scripts['verify:ci'] ?? '';
+  a('verify:release builds on verify:ci rather than restating it',
+    releaseScript.includes('npm run verify:ci'), releaseScript);
+  a('verify:release adds the memory contract [A]/[D] gate',
+    releaseScript.includes('npm run verify:memory-contract'), releaseScript);
+  a('verify:release adds the REAL candidate APK gate',
+    releaseScript.includes('npm run verify:qa-candidate'), releaseScript);
+  a('verify:ci does NOT contain the memory contract or the real-APK gate',
+    !ciScript.includes('verify:memory-contract') && !ciScript.includes('verify:qa-candidate'),
+    ciScript.slice(0, 80));
+  a('verify:ci DOES contain the deterministic memory + QA fixtures',
+    ciScript.includes('npm run verify:memory-fixtures') && ciScript.includes('npm run verify:qa-artifact'));
+  a('verify:all remains a strict alias for verify:release, never a weaker set',
+    (pkgJson.scripts['verify:all'] ?? '').trim() === 'npm run verify:release',
+    pkgJson.scripts['verify:all'] ?? '(absent)');
+
+  // --- [F3c] CI workflow STRUCTURE, not just its labels --------------------
+  // Delegated to tools/verify_ci_structure.mjs, which is PURE and has its own
+  // falsifiers (tools/test_verify_ci_structure.mjs). The inline version of this
+  // gate proved the gate command APPEARED and RAN, but not that its failure
+  // stopped anything: `continue-on-error:` and a job-level `if:` each removed
+  // its effect while leaving every asserted string in place (Hermes r5 H-2).
+  // A gate with no fixtures is a gate nobody has tried to break, so the checks
+  // now live somewhere they can be attacked directly.
+  const ciStructure = checkWorkflowStructure(ciYmlContent, { gateCount: verifyInvocations });
+  a('CI workflow structure: candidate is built, GATED and published, and the gate can fail',
+    ciStructure.ok, ciStructure.problems.join(' | ').slice(0, 200));
+  a('CI structure gate identified the prerequisite job',
+    ciStructure.observed.prereq !== null, String(ciStructure.observed.prereq));
+
+  // --- [F3d] npm install-script policy -------------------------------------
+  // A package with an install script runs arbitrary code on `npm install`,
+  // before any test does. npm >= 11.6 refuses to run one that is not reviewed
+  // in `allowScripts`. That refusal is only real if the map is pinned, agrees
+  // with the lockfile IN BOTH DIRECTIONS, and `.npmrc` makes it strict.
+  //
+  // This gate was DELETED by a text splice during the round-6 CI-structure
+  // extraction (Hermes r6, R6-1). Nothing went red; only the total check count
+  // moved, 618 -> 600. It is restored here against the real manifests, and its
+  // logic now lives in a module with its own falsifiers
+  // (tools/test_verify_install_scripts.mjs) so that removing it again fails a
+  // test instead of quietly subtracting nine checks.
+  const installPolicy = checkInstallScriptPolicy({
+    pkgJson,
+    lockJson: JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf-8')),
+    npmrc: existsSync(join(ROOT, '.npmrc')) ? readFileSync(join(ROOT, '.npmrc'), 'utf-8') : '',
+  });
+  for (const { label, ok: passed, detail } of installPolicy.checks) a(label, passed, detail);
 
   const androidBuildContent = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'build.gradle'), 'utf-8');
   const releaseBuildBlock = androidBuildContent.slice(androidBuildContent.lastIndexOf('release {'));
@@ -1582,9 +1616,10 @@ if (resetTables.length >= 15) {
     signingNames.every((name) => androidBuildContent.includes(name))
       && androidBuildContent.includes('Release signing is not configured.')
       && androidBuildContent.includes('gradle.taskGraph.whenReady'));
-  a('CI artifact is explicitly debug-only and never invokes assembleRelease',
+  a('CI artifacts are debug-signed only and never invoke assembleRelease',
     ciYmlContent.includes('assembleDebug')
       && ciYmlContent.includes('athlete-kinetics-debug-qa-apk')
+      && ciYmlContent.includes('athlete-kinetics-qa-candidate-apk')
       && !ciYmlContent.includes('assembleRelease'));
 
   const gitignoreContent = readFileSync(join(ROOT, '.gitignore'), 'utf-8');
@@ -1825,23 +1860,36 @@ console.log('[O3 fail-closed equipment inventory parsing]');
 
   // Qualifying evidence = a session carrying at least one logged set OR eligible
   // imported history with sets. A bare session shell is not training evidence.
-  check('the layoff gap is measured from local sessions WITH sets and verified imported history WITH sets',
-    /SELECT MAX\(qualifying_date\) AS max_date FROM \(\s*SELECT s\.session_date AS qualifying_date FROM session s\s*WHERE EXISTS \(SELECT 1 FROM set_record r WHERE r\.session_id = s\.session_id\)\s*UNION ALL\s*SELECT his\.session_date AS qualifying_date FROM history_import_session his\s*JOIN history_import hi USING \(history_import_id\)\s*WHERE hi\.verified = 1\s*AND EXISTS \(SELECT 1 FROM history_import_set hiset WHERE hiset\.history_import_session_id = his\.history_import_session_id\)\s*\)/.test(src.replace(/\s+/g, ' ')));
+  // R6: the imported branch requires BOTH integrity verification and the explicit
+  // readiness_eligible policy flag. 029's CHECK is (readiness_eligible = 0 OR
+  // verified = 1), so eligibility implies verification but never the converse —
+  // "verified = 1" alone admitted readiness-ineligible imports.
+  const qualifyingSql = (() => {
+    const i = src.indexOf('SELECT MAX(qualifying_date) AS max_date FROM (');
+    return i < 0 ? '' : stripComments(src.slice(i, src.indexOf(')`', i) + 1)).replace(/\s+/g, ' ');
+  })();
+  check('the layoff gap is measured from local sessions WITH sets and READINESS-ELIGIBLE verified imports WITH sets',
+    qualifyingSql.includes('FROM session s WHERE EXISTS (SELECT 1 FROM set_record r WHERE r.session_id = s.session_id)')
+    && qualifyingSql.includes('UNION ALL')
+    && qualifyingSql.includes('FROM history_import_session his')
+    && qualifyingSql.includes('WHERE hi.verified = 1 AND hi.readiness_eligible = 1')
+    && qualifyingSql.includes('EXISTS (SELECT 1 FROM history_import_set hiset'),
+    qualifyingSql.slice(0, 80));
 
   // Behavioral test: imported-only athlete within 21 days vs beyond 21 days, newer wins
   const testDb = new DatabaseSync(':memory:');
   for (const f of SCHEMA_FILES) {
     testDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
   }
-  const qualQuery = `SELECT MAX(qualifying_date) AS max_date FROM (
-    SELECT s.session_date AS qualifying_date FROM session s
-      WHERE EXISTS (SELECT 1 FROM set_record r WHERE r.session_id = s.session_id)
-    UNION ALL
-    SELECT his.session_date AS qualifying_date FROM history_import_session his
-      JOIN history_import hi USING (history_import_id)
-      WHERE hi.verified = 1
-        AND EXISTS (SELECT 1 FROM history_import_set hiset WHERE hiset.history_import_session_id = his.history_import_session_id)
-  )`;
+  // Execute the PRODUCTION literal, not a copy. The previous hand-maintained
+  // duplicate silently went stale when the production predicate changed, so the
+  // behavioural cases below were exercising SQL the app no longer runs.
+  const qualQuery = (() => {
+    const i = src.indexOf('SELECT MAX(qualifying_date) AS max_date FROM (');
+    return src.slice(i, src.indexOf(')`', i) + 1); // +1 keeps the closing paren
+  })();
+  check('behavioural cases execute the production qualifying SQL, not a copy',
+    qualQuery.includes('hi.readiness_eligible = 1'), `${qualQuery.length} chars extracted`);
 
   // 1. Unverified import -> null
   testDb.prepare("INSERT INTO history_import (history_import_id, content_fingerprint, format_version, verified, readiness_eligible, created_at_ms) VALUES (1, '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'AK_HISTORY_V1', 0, 0, 1000)").run();
@@ -1849,10 +1897,37 @@ console.log('[O3 fail-closed equipment inventory parsing]');
   testDb.prepare("INSERT INTO history_import_set (history_import_set_id, history_import_session_id, movement_id, set_index, reps, load_kg, source_line) VALUES (1, 1, 1, 1, 5, 100, 1)").run();
   check('unverified import is not qualifying evidence', testDb.prepare(qualQuery).get().max_date === null);
 
-  // 2. Verified import -> qualifying date recognized
-  testDb.prepare("UPDATE history_import SET verified = 1 WHERE history_import_id = 1").run();
-  check('verified imported history is recognized as qualifying evidence',
-    testDb.prepare(qualQuery).get().max_date === '2026-07-10');
+  // 2. R6 truth table. 029's CHECK is (readiness_eligible = 0 OR verified = 1),
+  // so the (0,1) row is unreachable by construction and fail-closed by the
+  // schema itself; the decisive new row is (1,0) — verified but NOT readiness
+  // eligible — which previously qualified and must not.
+  const setFlags = (v, e) => testDb.prepare(
+    'UPDATE history_import SET verified = ?, readiness_eligible = ? WHERE history_import_id = 1',
+  ).run(v, e);
+  const qualifies = () => testDb.prepare(qualQuery).get().max_date === '2026-07-10';
+
+  setFlags(0, 0);
+  check('R6 truth table (verified=0, eligible=0): does NOT qualify', !qualifies());
+  setFlags(1, 0);
+  check('R6 truth table (verified=1, eligible=0): does NOT qualify — the regression', !qualifies());
+  setFlags(1, 1);
+  check('R6 truth table (verified=1, eligible=1): qualifies', qualifies());
+  check('R6 (verified=0, eligible=1) is unreachable — 029 CHECK fails closed', (() => {
+    try { setFlags(0, 1); return false; } catch { setFlags(1, 1); return true; }
+  })());
+
+  // A readiness-INELIGIBLE verified import must still be able to support
+  // capability evidence: that is a different policy domain and is deliberately
+  // unchanged. Proven against the production capability read.
+  const capQuery = (() => {
+    const i = src.indexOf('SELECT ice.history_import_session_id');
+    return src.slice(i, src.indexOf('`)', i));
+  })();
+  setFlags(1, 0);
+  check('a verified but readiness-INELIGIBLE import still qualifies for capability evidence',
+    capQuery.includes('hi.verified = 1') && !capQuery.includes('readiness_eligible')
+    && !qualifies());
+  setFlags(1, 1);
 
   // 3. Local session older than imported -> imported (newer) wins
   testDb.prepare("INSERT INTO session (session_id, session_date) VALUES (101, '2026-06-01')").run();

@@ -38,7 +38,7 @@ const STATE_META: Record<AthleteState, ReadinessMeta> = {
     label: 'Ready',
     title: 'Ready to train',
     recommendation: 'Follow today\'s plan at the effort it prescribes.',
-    explanation: 'Your recent training load and recovery signals support the planned work.',
+    explanation: 'Your recovery signals support the planned work.',
   },
   RECOVERY: {
     label: 'Recovery focus',
@@ -227,15 +227,19 @@ export default function ReadinessScreen({
         <ListRow label="Data coverage" detail={readinessCoverage(vector)} />
         <ListRow label="Acute to chronic load" detail={format(vector.acwr, 2)}>
           <Text style={styles.caption}>
-            Recent recorded external load compared with the preceding four-week average. Bodyweight, conditioning, grappling, and unlogged training may be incomplete.
+            Recent recorded external load compared with the preceding four-week average. Bodyweight, conditioning, grappling, and unlogged training may be incomplete. Shown as history only: it does not affect the readiness estimate or today&apos;s plan, and there is no target range.
           </Text>
         </ListRow>
         <ListRow label="HRV deviation" detail={formatSigned(vector.hrv_z, 1)} />
         <ListRow label="Sleep efficiency" detail={format(vector.sleep_efficiency_pct, 1, '%')} />
         <ListRow label="Acute load" detail={format(vector.acute_load_kg, 0, ' kg')} />
         <ListRow label="Chronic load" detail={format(vector.chronic_load_kg, 0, ' kg')} />
+        {/* R7: load_component is materialised in 004 as a normative ACWR band
+            (100 inside 0.8-1.3, penalties outside) but is EXCLUDED from the
+            readiness score under Calibration Policy v1. Rendering it beside the
+            two contributing components implied a safe range and an authority it
+            does not have. The descriptive ACWR history above remains. */}
         <ListRow label="HRV component" detail={vector.hrv_component.toFixed(1)} />
-        <ListRow label="Load component" detail={vector.load_component.toFixed(1)} />
         <ListRow label="Sleep component" detail={vector.sleep_component.toFixed(1)} />
 
         <View style={{ marginTop: theme.space[3] }}>

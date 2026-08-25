@@ -359,19 +359,6 @@ export const programMacroIndex = (
   sequenceIndex: number,
 ): number => (((startingMacroBlockIndex - 1) + (sequenceIndex - 1)) % MACRO_BLOCKS) + 1;
 
-/** Anchor for a goal program with a COMPETITION DATE: the starting macro index
- *  such that the program's final block lands on the last block of the macro
- *  cycle (index MACRO_BLOCKS, a `peak` block). Pure arithmetic over the existing
- *  sequence — it introduces no phase duration and no new value; it only chooses
- *  where the athlete enters the cycle so its end coincides with the date.
- *  Undated (weeks-horizon) programs do not use this and keep inheriting the
- *  athlete's global rotation position. */
-export const datedProgramMacroAnchor = (plannedBlockCount: number): number => {
-  if (!Number.isInteger(plannedBlockCount) || plannedBlockCount < 1 || plannedBlockCount > MACRO_BLOCKS) {
-    throw new Error('Planned block count must be an integer from 1 to 8.');
-  }
-  return ((MACRO_BLOCKS - plannedBlockCount) % MACRO_BLOCKS) + 1;
-};
 
 /** Macro-phase modulation applied on top of the objective scheme. */
 const PHASE_MODS: Record<MacroPhase, { reps: number; rpe: number; sets: number }> = {

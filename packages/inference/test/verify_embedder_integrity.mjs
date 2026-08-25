@@ -336,7 +336,8 @@ check('both CI model-cache keys are bound to the pin-bearing module', keyUses >=
 check('CI has no broad model-cache restore key', !ciYml.includes('restore-keys:'));
 check('CI materializes before running the offline verification suite',
   ciYml.indexOf('npm run fetch:embedder') >= 0
-    && ciYml.indexOf('npm run fetch:embedder') < ciYml.indexOf('npm run verify:all'));
+    && ciYml.indexOf('npm run verify:ci') >= 0
+    && ciYml.indexOf('npm run fetch:embedder') < ciYml.indexOf('npm run verify:ci'));
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`} (0 skipped)`);
 process.exit(failures ? 1 : 0);

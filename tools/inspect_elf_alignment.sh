@@ -112,6 +112,36 @@ else
 fi
 echo
 
+# --- verified model asset (fail closed) ---------------------------------------
+EXPECTED_MODEL_SIZE=22972370
+EXPECTED_MODEL_SHA256="afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1"
+
+MODEL_FILE=""
+if [ -f "$WORK/assets/minilm.onnx" ]; then
+  MODEL_FILE="$WORK/assets/minilm.onnx"
+elif [ -f "$WORK/base/assets/minilm.onnx" ]; then
+  MODEL_FILE="$WORK/base/assets/minilm.onnx"
+fi
+
+if [ -z "$MODEL_FILE" ]; then
+  echo "ERROR: packaged minilm.onnx model asset is MISSING from APK/AAB" >&2
+  exit 1
+fi
+
+MODEL_SIZE=$(wc -c < "$MODEL_FILE" | tr -d '[:space:]')
+if [ "$MODEL_SIZE" -ne "$EXPECTED_MODEL_SIZE" ]; then
+  echo "ERROR: packaged minilm.onnx size $MODEL_SIZE != expected $EXPECTED_MODEL_SIZE" >&2
+  exit 1
+fi
+
+MODEL_SHA256=$(sha256sum "$MODEL_FILE" | awk '{print $1}')
+if [ "$MODEL_SHA256" != "$EXPECTED_MODEL_SHA256" ]; then
+  echo "ERROR: packaged minilm.onnx SHA-256 $MODEL_SHA256 != expected $EXPECTED_MODEL_SHA256" >&2
+  exit 1
+fi
+echo "Model asset (minilm.onnx): PASS (size $MODEL_SIZE, sha256 $MODEL_SHA256)"
+echo
+
 # --- per-library ELF64 PT_LOAD alignment ---------------------------------------
 echo "=== per-library PT_LOAD alignment (ELF64 requires every segment >= 0x4000) ==="
 printf '%-55s %-10s %-6s %s\n' "LIBRARY" "WORST" "OK?" "CLASS/MACHINE"

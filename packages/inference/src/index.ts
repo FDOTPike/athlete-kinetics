@@ -90,7 +90,6 @@ export {
   MACRO_TOTAL_WEEKS,
   programFocuses,
   programMacroIndex,
-  datedProgramMacroAnchor,
   macroPhaseOf,
   SCHEMA_FATIGUE_COST,
   splitExplainer,
@@ -196,9 +195,19 @@ export {
 export { type Embedder } from './semantic/embedder';
 export { WordPieceTokenizer, type TokenizerSpec } from './semantic/wordpiece';
 export {
+  createLazySingleFlightEmbedder,
   createMiniLmEmbedder,
+  disposeOrtSession,
+  runMiniLmInference,
+  type EmbedderLifecycleEvent,
+  type EmbedderLifecyclePhase,
+  type EmbedderLifecycleSink,
+  type LazyEmbedderOptions,
   type MiniLmEmbedderOptions,
+  type OrtHandlerWithDispose,
+  type OrtOutputTensor,
   type OrtSessionLike,
+  type OrtSessionWithHandler,
   type OrtTensorCtor,
 } from './semantic/onnxEmbedder';
 export {

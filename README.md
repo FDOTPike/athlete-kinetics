@@ -51,8 +51,8 @@ more conservative**; halts (sharp pain, dizziness, chest symptoms) end it.
 ## Quickstart (no device needed)
 
 ```powershell
-npm install
-npm run verify:all     # 20 gates + typecheck; semantic/embedder need network
+npm ci                 # requires npm >= 11.6 (install-script policy is enforced)
+npm run verify:ci      # 21 gates + typecheck; semantic/embedder need network
 npm run seed           # deterministic 180-day athlete -> athlete_kinetics.seed.db
 ```
 
@@ -93,6 +93,8 @@ Every layer ships with a runnable verifier; all must pass before a change lands.
 | `npm run verify:store` | every store SQL statement prepares against the live schema          |
 | `npm run verify:coach` | Coach Mode athlete registry invariants (per-athlete DB isolation)   |
 | `npm run verify:memory`| RAM footprint vs jetsam limits; gates the generative stack out      |
+| `npm run verify:ci`    | MERGE gate — every deterministic host gate; must exit 0             |
+| `npm run verify:release`| RELEASE gate — verify:ci + memory contract [A]/[D] + real QA APK   |
 | `npm run bench:cosine` | the Path A (JS cosine) vs sqlite-vec decision data                  |
 
 ## Why there is no LLM in this app

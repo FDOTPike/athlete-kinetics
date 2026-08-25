@@ -16,7 +16,8 @@
  * only. It NEVER touches the backward-looking `mech_daily` / ACWR pipeline —
  * the raw-vs-effective tonnage bifurcation is preserved by construction
  * (invariant 6). No clock, no randomness, no external libs: O(window) time,
- * O(1)-beyond-window space, safe under the 450 MB Hermes ceiling.
+ * O(1)-beyond-window space, safe under the ratified Hermes memory ceiling
+ * (512 MiB hard / 450,000,000 B preferred target, ratified 2026-08-24).
  *
  * The six machine-checkable invariants (§ "Invariant List") are exercised in
  * test/verify_autopilot.mjs.

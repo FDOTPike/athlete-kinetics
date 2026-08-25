@@ -197,7 +197,26 @@ export default function ProgramSetupScreen({
             placeholderTextColor={theme.color.textLow} style={styles.input} autoCapitalize="none" />
         )}
         {previewResult.preview !== null && (
-          <Text style={styles.notice}>Normalized review boundary: {previewResult.preview.plannedEndDate}</Text>
+          <>
+            <Text style={styles.notice}>
+              Normalized review boundary: {previewResult.preview.plannedEndDate}
+              {' '}({previewResult.preview.plannedBlockCount} × 4-week block
+              {previewResult.preview.plannedBlockCount === 1 ? '' : 's'})
+            </Text>
+            {/* R3 (REVIEW_BOUNDARY, ratified 2026-08-22): blocks are whole
+                4-week units, so the boundary rounds UP to the next whole block
+                and can sit up to 27 days after the date entered. The date is a
+                planning checkpoint only — it does not schedule a peak or a
+                competition, and nothing about the training phases is derived
+                from it. Disclosing both is required by the ratified contract. */}
+            {horizonKind === 'date' && (
+              <Text style={styles.caption}>
+                Blocks are whole 4-week units, so this rounds up to the next full block and can fall
+                up to 27 days after the date you chose. It is a review checkpoint, not a competition
+                date — your training phases are not scheduled around it.
+              </Text>
+            )}
+          </>
         )}
       </View>
 

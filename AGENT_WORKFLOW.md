@@ -33,7 +33,10 @@ migration.
    embedded web views. Video links are inert text opened via the OS handler.
 2. **Determinism**: prescriptions, blocks, progression, substitution = pure
    TS functions. No RNG, no clock reads inside engines, no LLMs at runtime.
-3. **Memory**: 450 MB peak dirty RAM ceiling (4 GB Jetsam devices). GC-friendly
+3. **Memory**: hard ceiling 536,870,912 B (512 MiB), preferred operating target
+   450,000,000 B — ratified 2026-08-24, one ceiling for every supported Android
+   and iOS device. Between target and ceiling requires physical-device evidence
+   and an explicit review record; above the ceiling blocks release. GC-friendly
    code; reference data loads once.
 4. **Strict typing**: TS `--strict`, no `any`. SQLite tables STRICT.
 5. **Append-only migration chain**: shipped migrations are FROZEN. New work =
@@ -57,21 +60,32 @@ session. Therefore:
   git process is live).
 
 ## 3. The verification loop (nothing ships around it)
+Clean-checkout contract: `npm ci` -> `npm run fetch:embedder` -> `npm run verify:ci`.
+MERGE gate = `verify:ci` (must be green). RELEASE gate = `verify:release`, which
+adds the ratified memory contract [A] and measured device evidence [D]; CI cannot
+run it because no runner has an authorized device packet. `verify:all` is an alias
+for `verify:release`.
 ```
 npm run typecheck        # first, always
-npm run verify:all       # 20 gates + typecheck; semantic+embedder need network
+npm run verify:ci        # 21 gates + preflight + typecheck; semantic+embedder need bootstrap
+npm run verify:release   # verify:ci + memory contract [A]/[D] + REAL candidate APK (owner-run)
 ```
-Gates: db, demo, migrations, policy, blocks, autopilot,
-autopilot-counterexamples, biometrics, semantic, embedder, store, coach, memory,
-progression, pipeline, runner, outcomes, library,
+verify:ci gates: db, demo, migrations, policy, blocks, autopilot,
+autopilot-counterexamples, biometrics, semantic, embedder, qa-artifact, store,
+coach, memory-fixtures, progression, pipeline, runner, outcomes, library,
 coaching-content-generator, components (+ typecheck).
+verify:release adds: memory-contract ([A] ratified envelope, [D] measured device
+evidence, [G] evidence provenance — the packet must be re-derivable from its own
+sealed raw logcat/meminfo bytes, closing the fabricated-packet hole Hermes
+found in audit r3) and qa-candidate (provenance of the REAL app-qa.apk).
 - A new invariant is not real until a gate asserts it. Prefer extending the
   owning gate over prose promises. Behavior contracts (source-grep checks in
   verify_store/verify_blocks) are acceptable until RN component tests exist.
 - Sandbox quirks: verify:db can fail on libsqlite < 3.41 (STRICT/REAL) —
   environmental, expect green on CI/modern machines. semantic/embedder are
   CI/network-only.
-- Every gate you add: wire it into `verify:all` and the CI expectations.
+- Every gate you add: wire it into `verify:ci` (or `verify:release` if it needs a
+  device or a ratified budget) and the CI expectations.
 
 ## 4. Migration protocol
 - Next slot = `max(seeded_manifest slots, files on disk in src/schema) + 1`.

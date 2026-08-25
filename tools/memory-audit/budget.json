@@ -6,7 +6,7 @@
     "comment": "300 MB Hermes/RN/UI + 50 MB SQLite ceiling (unchanged, audited)"
   },
   "embedderTransientBytes": 104857600,
-  "embedderComment": "onnxruntime-react-native + int8 MiniLM (~23 MB weights) during a SINGLE short-string embed call, session released after: 100 MB ceiling.",
+  "embedderComment": "onnxruntime-react-native + int8 MiniLM (~23 MB weights) during a SINGLE short-string embed call, session released after: 100 MB ceiling. RESTORED per WO E1: the prior reduction to 50 MiB was an unmeasured modeled allowance; RATIFIED 2026-08-23 at the E4 pause. Owner decision, option 1, verbatim: '1 - Retain 100 MB, fix the gate honestly (Recommended)'. The value is RETAINED at 104857600 and the 450,000,000-byte decimal ceiling is RETAINED exactly. The authorized-device packet could not bound the embedder's transient share (per-request increments were unmeasurable: a ~871 ms median sampling interval against a ~147 ms inference left 7 of 11 requests with no sample inside their window and the rest showing negative noise), so no evidence-backed reduction was available and none was invented. The static gate was instead redesigned to separate the conservative component envelope from measured physical evidence: see tools/memory-audit/memory_gate.mjs and tools/memory-audit/test_memory_gate.mjs.",
   "deviceTiers": [
     {
       "name": "3GB-android",
@@ -23,5 +23,33 @@
       "maxDirtyBytes": 2621440000,
       "comment": "iPhone 15/16 class and mid/flagship Android"
     }
-  ]
+  ],
+  "ceilingRatification": {
+    "ratifiedAtUtc": "2026-08-24",
+    "ratifiedBy": "owner, verbatim in the Claude Code conversation",
+    "verbatim": "I ratify 536,870,912 bytes (512 MiB) as the hard mobile memory ceiling for all supported Android and iOS devices. The preferred operating target remains 450,000,000 bytes. Results between those values require physical-device evidence and explicit review; exceeding 536,870,912 bytes blocks release. No higher allowance applies to better-equipped devices.",
+    "hardCeilingBytes": 536870912,
+    "hardCeilingNote": "512 MiB exactly. Exceeding this BLOCKS RELEASE and no review or device evidence can rescue it.",
+    "preferredTargetBytes": 450000000,
+    "preferredTargetNote": "The previous single ceiling, retained as the preferred operating target. At or below this, the gate passes cleanly.",
+    "appliesToAllTiers": true,
+    "appliesToAllTiersNote": "No higher allowance applies to better-equipped devices. deviceTiers describe what a HANDSET survives (lmkd/jetsam); they never grant this product a larger allowance. Check [F] rejects any per-tier ceiling override.",
+    "supersedes": {
+      "ceilingBytes": 450000000,
+      "ratifiedAtUtc": "2026-08-22",
+      "note": "A single hard 450,000,000-byte ceiling with no review band. The component envelope of 471,936,000 B exceeded it by 21,936,000 B, so the gate was honestly RED and could not be made green without either lowering an estimate (blocked by [E]) or an owner ratification. This record IS that ratification."
+    },
+    "reviewBandApproval": {
+      "reviewedEnvelopeBytes": 471936000,
+      "reviewedComposition": {
+        "hermesAndUi": 314572800,
+        "sqliteLayer": 52428800,
+        "matrixBytes": 76800,
+        "embedderTransientBytes": 104857600
+      },
+      "evidenceRequired": true,
+      "note": "This approval covers ONE exact envelope value. If any component estimate changes the envelope by even a single byte, the approval no longer describes reality, check [A] fails as STALE, and the owner must review again. It is deliberately not a standing permission for the whole band."
+    },
+    "sourceAnalysis": "Gemini research packet, sealed in the evidence directory as gemini-research-packet-512MiB-ceiling.md (untracked working copy: research_packet.md at the worktree root): 512 MiB accommodates the 471,936,000 B modelled transient envelope with ~64.9 MB headroom while staying below the ~640 MiB (50%) pressure threshold of a 3 GB Android device. The packet also proposed a 768 MiB mid-tier allowance; the owner ratification explicitly REJECTS per-tier allowances, so that row was not adopted."
+  }
 }

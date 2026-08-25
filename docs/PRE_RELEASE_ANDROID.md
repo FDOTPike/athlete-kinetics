@@ -39,7 +39,7 @@ From the repository root:
 ```powershell
 npm.cmd ci
 npm.cmd run fetch:embedder
-npm.cmd run verify:all
+npm.cmd run verify:ci
 New-Item -ItemType Directory -Force apps\mobile\android\app\src\main\assets | Out-Null
 Copy-Item packages\inference\assets\minilm\model_quantized.onnx apps\mobile\android\app\src\main\assets\minilm.onnx
 ```
@@ -57,7 +57,7 @@ mutable `main`:
 - distilled `tokenizer.min.json` sha256 `ed2e443c24f234f62dd05a039ca0c489d8d1a7039f1f42fc876aaae9cb32cff6`
 
 `fetch:embedder` is the only network-enabled model materializer. Run it before
-`verify:all`: it stages all four remote artifacts, verifies their pinned byte
+`verify:ci`: it stages all four remote artifacts, verifies their pinned byte
 hashes, and populates the exact revision-scoped Transformers cache plus the
 device output directory. All verification and codebase-embedding consumers use
 that cache with the immutable revision and `local_files_only=true`; a missing
@@ -67,6 +67,68 @@ also staged and hash-checked before replacement, so any mismatch preserves the
 previous trusted file. The single source of truth is
 `scripts/embedder-integrity.mjs`; `npm run verify:embedder` includes the
 deterministic offline integrity gate.
+
+## 3. Verification and build sequence (one unambiguous clean checkout path)
+
+```powershell
+npm.cmd ci                      # npm >= 11.6; enforces the install-script policy
+npm.cmd run fetch:embedder
+npm.cmd run verify:ci           # MERGE gate: must exit 0
+npm.cmd run verify:release      # RELEASE gate: adds [A], [D] and the real QA APK
+```
+
+`npm ci` enforces a pinned install-script policy. `package.json` carries an
+`allowScripts` map naming the exact `name@version` of every dependency allowed
+to run a lifecycle script at install time, and `.npmrc` sets
+`strict-allow-scripts=true`, so a dependency that GAINS an install script — or
+whose approved version drifts — fails `npm ci` with `ESTRICTALLOWSCRIPTS`
+instead of executing unreviewed code. `engine-strict=true` plus the `engines`
+floor stops an npm older than 11.6 (which ignores the policy entirely) from
+producing a silent false green. Approve a genuinely required new script with
+`npm install-scripts approve`; never with `--dangerously-allow-all-scripts`.
+
+`verify:ci` is the MERGE gate and is required to be green. `verify:release`
+adds the checks that cannot be made honestly on a CI runner: the ratified
+memory contract `[A]`, measured physical device evidence `[D]`, and evidence
+provenance `[G]`. Point it at the evidence packet:
+
+```powershell
+$env:AK_MEM_EVIDENCE_SESSION = "C:\evidence-root\run-r4-A\session.json"
+```
+
+That is the only variable you need. `[G]` locates the sealed manifest itself by
+looking beside the packet (`EVIDENCE_MANIFEST.json` at the evidence root);
+`AK_MEM_EVIDENCE_MANIFEST` exists only to override that when the manifest lives
+somewhere else.
+
+`[G]` re-derives every scalar the gate relies on (correlated request count,
+disposal integrity, sampled maximum, cadence) from the packet's OWN raw bytes —
+the raw `logcat-epoch.txt` and `sample-NNN-*.txt` dumps — and rejects any packet
+whose claims are not reproducible from them. It ALSO requires, mandatorily, that
+the packet and its raw inputs be members of the two-layer-sealed evidence
+manifest, and that the manifest match its detached `.sha256`. A packet that is
+internally perfect but UNSEALED fails: internal consistency proves arithmetic,
+not provenance, and a consistent corpus can simply be authored.
+
+Two findings are burned into this design. Without `[G]`, a hand-written
+`session.json` satisfied `[D]` and — because the review band makes `[A]` depend
+on `[D]` — turned the whole memory gate green with no device data (Hermes r3,
+B-1). Then, with `[G]` present but its seal check OPT-IN behind an environment
+variable that nothing set, a fabricated corpus reached the same review band
+through this very command (Hermes r4, R4-1). An opt-in control that the shipping
+path never opts into is not a control, which is why the seal check is now
+mandatory and self-locating.
+
+`verify:all` is an alias for `verify:release`.
+
+`verify:ci` begins with a deterministic prerequisites preflight
+(`scripts/verify-preflight.mjs`) that fails within seconds — with the exact
+remediation command — when the checkout is not prepared: missing
+`node_modules`, a broken native `sharp` binding, absent or hash-mismatched
+pinned revision-cache artifacts, missing device outputs, or a distilled
+tokenizer off its pin. It never downloads; `fetch:embedder` remains the only
+network-capable materializer. An unprepared checkout is an operator error, not
+a candidate failure.
 
 The copied ONNX file and all Android build output are ignored and must not be
 staged.
