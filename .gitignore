@@ -12,6 +12,7 @@ packages/inference/assets/minilm/tokenizer.full.json
 apps/mobile/android/app/src/main/assets/minilm.onnx
 apps/mobile/ios/Pods/
 apps/mobile/android/.gradle/
+apps/mobile/android/.kotlin/
 apps/mobile/android/app/build/
 apps/mobile/android/local.properties
 .DS_Store
