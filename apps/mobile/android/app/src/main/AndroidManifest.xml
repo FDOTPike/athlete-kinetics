@@ -1,10 +1,17 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- R8 §2.7 offline posture: the production app has no in-process network
          client, so android.permission.INTERNET is NOT declared here. The debug
          manifest (src/debug/AndroidManifest.xml) grants it for Metro only.
+         react-native-blob-util (used ONLY for local file copies: APK asset ->
+         document dir) injects INTERNET through library merging, so it is
+         removed here explicitly; the debug overlay re-adds it where needed.
          Health Connect read scopes (overnight HRV, resting HR, sleep).
          Read-only by design: this app never writes health data. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
     <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />

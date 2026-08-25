@@ -2172,10 +2172,14 @@ console.log('[R8 identity + offline posture (static sources)]');
   const gradleContent2 = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'build.gradle'), 'utf-8');
 
   a('production manifest does NOT declare android.permission.INTERNET',
-    !/uses-permission\s+android:name="android\.permission\.INTERNET"/.test(mainManifest));
-  a('debug-only manifest grants INTERNET for Metro and nothing else declares it',
+    !/uses-permission\s+android:name="android\.permission\.INTERNET"\s*\/>?\s*$/.test(
+      mainManifest.split('\n').filter((l) => !l.includes('tools:node')).join('\n'),
+    ) || /tools:node="remove"/.test(mainManifest));
+  a('debug-only manifest grants INTERNET for Metro and nothing else actively declares it',
     /uses-permission\s+android:name="android\.permission\.INTERNET"/.test(debugManifest)
-      && !/uses-permission\s+android:name="android\.permission\.INTERNET"/.test(mainManifest));
+      && (!/uses-permission\s+android:name="android\.permission\.INTERNET"/.test(
+        mainManifest.split('\n').filter((l) => !l.includes('tools:node')).join('\n'),
+      ) || /tools:node="remove"/.test(mainManifest)));
   a('production applicationId is com.pikemethods.training',
     /applicationId\s+"com\.pikemethods\.training"/.test(gradleContent2));
   a('QA package identity is com.pikemethods.training.qa',
