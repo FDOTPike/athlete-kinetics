@@ -352,6 +352,21 @@ async function main() {
       entries.push({ name: 'assets/minilm.onnx', data: corrupt.subarray(0, MODEL_BYTES.length - 1) });
       await expectRejected('wrong-size model rejected', buildZip(entries));
     }
+    {
+      // R8 Phase 4: same wrong-size fixture but with the manifest's declared
+      // model.sizeBytes adjusted to MATCH the short bytes — the size check
+      // must fail against the DECLARED size, not merely detect a mismatch
+      // with the ratified constant baked into the verifier.
+      const corrupt = Buffer.from(MODEL_BYTES);
+      corrupt[1000] ^= 0xff;
+      const entries = fixtureEntries(
+        { model: { ...VALID_MANIFEST.model, sizeBytes: MODEL_BYTES.length - 1 } },
+        { includeModel: false },
+      );
+      entries.push({ name: 'assets/minilm.onnx', data: corrupt.subarray(0, MODEL_BYTES.length - 1) });
+      await expectRejected('wrong-size model rejected even when the manifest declares the short size',
+        buildZip(entries));
+    }
     check('ELF parser: 4 KB fixture reports min alignment 0x1000',
       minElfLoadAlignment(ELF_BAD) === 0x1000);
     check('ELF parser: 16 KB fixture reports min alignment 0x4000',
@@ -394,7 +409,10 @@ async function main() {
       !validateNewFiles([{ path: '../outside.mjs', sha256: 'a'.repeat(64) }]).ok);
     check('malformed sha256 rejected',
       !validateNewFiles([{ path: 'ok.mjs', sha256: 'short' }]).ok);
-    check('empty newFiles rejected', !validateNewFiles([]).ok);
+    // R8 Phase 4: an EMPTY newFiles array is the legitimate clean-candidate
+    // shape — provenance then rides on trackedDiffFingerprint/head/sourceDirty.
+    check('empty newFiles accepted (clean candidate has no staged files)',
+      validateNewFiles([]).ok && validateNewFiles([]).uniqueCount === 0);
     check('non-array newFiles rejected', !validateNewFiles(null).ok);
     await expectRejected('APK with duplicate staged paths is rejected',
       fixtureApk({ newFiles: [okFiles[0], { ...okFiles[0] }] }));

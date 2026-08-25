@@ -574,7 +574,12 @@ export function verifyProvenance(manifest, { repoRoot, gitBin = 'git' } = {}) {
 export function validateNewFiles(newFiles) {
   const problems = [];
   if (!Array.isArray(newFiles)) return { ok: false, problems: ['newFiles is not an array'] };
-  if (newFiles.length === 0) problems.push('newFiles is empty');
+  // R8 Phase 4: a genuinely CLEAN candidate has zero untracked/staged-new
+  // files — an empty array is the expected shape for the release candidate,
+  // not a defect. (The empty-array rejection predated the clean-checkout
+  // build flow and rejected exactly the artifact the work order demands.)
+  // Provenance for a clean tree is carried by trackedDiffFingerprint +
+  // head + sourceDirty:false, all verified against the live worktree.
   const seen = new Set();
   for (const [i, f] of newFiles.entries()) {
     const where = `newFiles[${i}]`;
@@ -789,7 +794,15 @@ export async function verifyQaArtifact(apkPath, options = {}) {
   } else {
     const modelBytes = extractEntryToBuffer(apkPath, modelEntry);
     const actualSha = createHash('sha256').update(modelBytes).digest('hex');
-    check('model asset exact size', modelBytes.length === MODEL_SIZE, `${modelBytes.length} B`);
+    // R8 Phase 4: the size gate is the RATIFIED constant — a manifest that
+    // declares a different (e.g. truncated) size cannot legitimize short
+    // bytes. Declared-vs-actual consistency is separately enforced when the
+    // generated manifest is compared against its binary copy.
+    const declaredSize = manifest?.model?.sizeBytes;
+    check('model asset exact ratified size',
+      modelBytes.length === MODEL_SIZE
+        && (declaredSize === undefined || declaredSize === MODEL_SIZE),
+      `${modelBytes.length} B${declaredSize !== undefined ? ` (declared ${declaredSize})` : ''}`);
     if (requireModelHash) {
       check('model asset sha256 matches ratified pin', actualSha === MODEL_SHA256, actualSha);
     }
