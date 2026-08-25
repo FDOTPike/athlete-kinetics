@@ -237,6 +237,12 @@ tasks.configureEach { task ->
     if (n == 'mergeReleaseAssets' || n == 'mergeQaAssets' || n == 'mergeDebugAssets') {
         task.dependsOn packageArchivoFont
     }
+    // Lint tasks (lintVital report models / analyze) also read src/main/assets
+    // as an input directory; without this edge Gradle's implicit-dependency
+    // validation fails the build (observed on :app:generateQaLintVitalReportModel).
+    if (n.contains('Lint') || n.contains('lint')) {
+        task.dependsOn packageArchivoFont
+    }
 }
 
 // --- QA candidate identity manifest (WO remediation B2) ----------------------
