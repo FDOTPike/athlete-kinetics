@@ -87,6 +87,8 @@ import {
   PATTERN_JOINTS,
   loadCodebase,
   MACRO_BLOCKS,
+  type SuspensionEpisode,
+  type SuspensionReason,
   macroPhaseOf,
   programMacroIndex,
   BLOCK_FOCI,
@@ -758,6 +760,17 @@ interface KineticsStore {
    *  group has no chain rows. */
   resolveGoalRung: (progressionGroup: string, today: string) => RungResolution | null;
   /** Capability attestation: manual coach/athlete override for attestation-gated edges. */
+  /** RR-02 suspension (058). Athlete-owned: the app may prompt after a halt or
+   *  a persistent niggle, but it NEVER infers an episode. Returns the frozen
+   *  macro position. Throws if an episode is already open. */
+  beginSuspension: (reason: SuspensionReason, atMs: number) => number;
+  /** Close the open episode. No-op when none is open. Athlete-owned: there is
+   *  no auto-expiry and no maximum duration, because the app has no ratified
+   *  return-to-training modifier and a timeout would be a new coefficient. */
+  endSuspension: (atMs: number) => void;
+  /** The open episode, or null. Drives the suspended banner and the resume
+   *  affordance; `isSuspended` is this being non-null. */
+  activeSuspension: () => SuspensionEpisode | null;
   attestEdge: (prerequisiteMovementId: number, movementId: number) => void;
   revokeAttestation: (prerequisiteMovementId: number, movementId: number) => void;
   confirmMovementPriorExperience: (
@@ -1799,7 +1812,24 @@ const persistSessionOutcome = (
  *  index 1 / 'gpp', so using a template after a block expired rewound an
  *  athlete mid-macrocycle back to the start (audit 6ff5449 s2). Deterministic:
  *  reads persisted state only, no clock, no RNG. */
+/** The open suspension episode, or null. `is_suspended` is DERIVED here and
+ *  never stored (058), so a flag and a history cannot drift apart. */
+const openSuspension = (d: DB): { episode_id: number; frozen_macro_index: number } | null =>
+  rowsOf<{ episode_id: number; frozen_macro_index: number }>(d.executeSync(
+    'SELECT episode_id, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL LIMIT 1',
+  ))[0] ?? null;
+
 const nextMacroPosition = (d: DB): { macroBlockIndex: number; macroPhase: MacroPhase } => {
+  // RR-02 (ratified 2026-08-27): rehab is a SUSPENDING STATE, not an L3 phase.
+  // While an episode is open the macro position is frozen, so an athlete who
+  // was in `volume` before an injury returns to `volume` rather than having
+  // positions consumed while hurt. Training itself is NOT suspended — the
+  // substitution, RPE-cap, autopilot-clamp and halt machinery all keep running.
+  const suspended = openSuspension(d);
+  if (suspended !== null) {
+    const frozen = Math.min(Math.max(suspended.frozen_macro_index, 1), MACRO_BLOCKS);
+    return { macroBlockIndex: frozen, macroPhase: macroPhaseOf(frozen) };
+  }
   const lastMeta = rowsOf<{ macro_block_index: number }>(d.executeSync(
     'SELECT macro_block_index FROM block_meta ORDER BY block_id DESC LIMIT 1',
   ))[0];
@@ -2568,6 +2598,38 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return resolveActiveRung(chain, [...bySession.values()], { requiredSets: pol.required_sets, requiredReps: pol.required_value });
     }
     return resolveActiveRung(chain, [...bySession.values()]);
+  },
+
+  beginSuspension: (reason, atMs) => {
+    const d = getDb();
+    if (openSuspension(d) !== null) {
+      throw new Error('A suspension is already open. Resume it before starting another.');
+    }
+    // Freeze the position the athlete would next have occupied, so resuming
+    // returns them to it exactly.
+    const frozen = nextMacroPosition(d).macroBlockIndex;
+    d.executeSync(
+      'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, NULL, ?, ?)',
+      [atMs, reason, frozen],
+    );
+    return frozen;
+  },
+
+  endSuspension: (atMs) => {
+    const d = getDb();
+    const open = openSuspension(d);
+    if (open === null) return;
+    d.executeSync(
+      'UPDATE suspension_episode SET ended_at_ms = ? WHERE episode_id = ?',
+      [atMs, open.episode_id],
+    );
+  },
+
+  activeSuspension: () => {
+    const d = getDb();
+    return rowsOf<SuspensionEpisode>(d.executeSync(
+      'SELECT episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL LIMIT 1',
+    ))[0] ?? null;
   },
 
   attestEdge: (prerequisiteMovementId, movementId) => {

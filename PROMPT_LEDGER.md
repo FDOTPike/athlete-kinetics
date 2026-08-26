@@ -2299,3 +2299,77 @@ Also note that taper weeks should be accompanied by a peak 1-2 week prior and us
   autopilot-counterexamples, progression, db, demo, migrations, runner, outcomes, pipeline, coach,
   library. `verify:ci` still cannot complete in this worktree for the known preflight reason.
 - Not pushed.
+
+---
+
+## Entry 0051 — 2026-08-27 · RR-02: Migration 058, suspension episodes
+
+### Input G(x)
+
+```
+yes go ahead with RR-02 Migration 058, taking note that this apps purpose is to serve as an athletes coach in their pocket, injuries happen , i want the app to be able to account for this but still allow the app to function to progress the athlete safetely, this might be out of scope but a simple injury protocol can be implemented surely for a short period until the severity of the injury goes down
+```
+
+### Output F(G(x))
+
+- **Migration 058 built and wired.** `058_suspension_episode.sql`: an EPISODE table, not a boolean —
+  the ratified requirement is that the athlete returns to where they were, which needs the frozen
+  position recorded at entry, and a bare flag has nowhere to put it. `is_suspended` is **derived**
+  (`ended_at_ms IS NULL`) and never stored, so a flag and a history cannot drift apart.
+- Invariants enforced in SQL: closed reason domain `injury | illness | life`; `frozen_macro_index`
+  constrained 1..8 mirroring the 009 `block_meta` domain; `ended_at_ms >= started_at_ms`; a partial
+  unique index over a constant-valued expression allowing **at most one open episode**; a fail-closed
+  trigger making that violation legible; and a second trigger refusing to **reopen** a closed episode,
+  because reopening would destroy the audit trail the episode model exists to keep.
+- **Chain plumbing, all four places:** `migrations.ts` import and array, `migrationRunner.ts`
+  SENTINELS (the table plus both triggers, registered as DB-SUSPENSION-DRIFT fail-closed objects so
+  self-heal restores them), `verify_migrations.mjs` FILES, and the pinned migration count. Two
+  pinned-count tripwires fired and were updated deliberately rather than loosened —
+  `verify_migrations.mjs` (`MIGRATIONS.length === 56 -> 57`, and its stale "57 files" comment
+  corrected) and `verify_pipeline.mjs` (chain tail `057 -> 058`, length `56 -> 57`). Those pins exist
+  so adding a migration is a conscious act; both were re-pinned, not removed.
+- **Engine wiring.** `nextMacroPosition` now consults `openSuspension(d)` **before** advancing and
+  returns the frozen index while an episode is open. Store actions `beginSuspension(reason, atMs)`,
+  `endSuspension(atMs)` and `activeSuspension()` added, with `SuspensionReason` / `SuspensionEpisode`
+  in `types.ts` and exported through the barrel. `beginSuspension` freezes the position the athlete
+  would next have occupied and refuses a second open episode in the store as well as in SQL.
+- **The owner's framing is honoured explicitly, and recorded in the migration header: suspension
+  freezes PROGRESSION, never TRAINING.** The app is a coach in the athlete's pocket, so an injury is
+  something to train around, not a reason to go dark. Every existing safety mechanism keeps running
+  untouched during an episode — substitution away from injured joints
+  (`substitution.ts` injuredJoints/computeSubstitutions on the niggle region domain), the rehab RPE
+  ceiling of 7.0, the autopilot's monotone-conservative override which may only pull dose DOWN while
+  a loaded joint is injured, and halt supremacy. **Suspension adds no modifier of its own to any of
+  them**, and a source tripwire now asserts that the suspension path contains no dose vocabulary.
+- **No numeric value entered the engine.** No maximum duration, no auto-expiry, no detraining decay,
+  no return-to-training modifier — Calibration Policy v1 forbids the last outright and the others
+  would each be a new unratified coefficient. An episode ends when the athlete ends it. Tripwires
+  assert both the absence of auto-expiry and that the timestamp is supplied by the caller rather than
+  read from a clock.
+- Entry and exit are athlete-owned. The app may PROMPT after a halt or a persistent niggle, matching
+  the ratified "a halt prompts rather than auto-suspends" rule, but it never infers — an automatic
+  injury detector would be a diagnostic claim this project has no ratified authority to make.
+- **Guards: 18 new executed assertions** in `verify_migrations.mjs` section `[058]` covering table,
+  both triggers and the partial index on fresh install; open/close/reopen behaviour; single-open
+  rejection; closed-historical coexistence; all three CHECK domains; and **sentinel self-heal for
+  both a dropped trigger and a dropped table**. Plus **8 source tripwires** in `verify_store_sql.mjs`
+  pinning that `nextMacroPosition` consults suspension before advancing, that `is_suspended` is never
+  a column, that a second episode is refused in the store, that the suspension path carries no dose
+  modifier, and that nothing auto-expires.
+- **Three of my own checks were wrong and were fixed rather than the code.** The `is_suspended` check
+  matched the identifier in its own explanatory comment and now inspects only SQL-bearing lines; the
+  auto-expiry check matched the unrelated word "expired" in prose about block expiry elsewhere in
+  `useStore.ts` and is now scoped to the suspension slice; and a shell-escaping error wrote a literal
+  newline into the gate, caught by `node --check`.
+- **Observation, not fixed:** `verify_store_sql.mjs`'s `SCHEMA_FILES` list stopped at **056** and was
+  already missing 057 before this change. 058 does not depend on 057, so 058 was added on its own and
+  the gap is recorded in a comment beside it; closing it has its own blast radius and is not this
+  change's business.
+- **Gates: 15 of 15 runnable exited 0**, including `verify:store` and `verify:pipeline`. All six
+  source tripwires PASS. `verify:ci` still cannot complete in this worktree for the known preflight
+  reason.
+- **Not built, and named so absence is not mistaken for oversight:** there is no UI surface yet. The
+  store actions exist and are gate-covered, but until a screen calls them the athlete cannot declare
+  an episode. That is the next step, and it is the difference between a working feature and a
+  correctly-built mechanism.
+- Not pushed.

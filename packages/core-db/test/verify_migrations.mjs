@@ -57,7 +57,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '054_contract_cutoff_provenance.sql',
   '055_return_checkin_ack.sql',
   '056_movement_taxonomy_backfill.sql',
-  '057_block_meta_phase_invariant.sql'];
+  '057_block_meta_phase_invariant.sql',
+  '058_suspension_episode.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1717,9 +1718,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 57 files -> user_version 56.
-    check('fresh install reaches user_version 56 (57 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 56,
+    // 57 files (slots 001-058, no 004) -> user_version 57. This count is
+    // pinned deliberately so adding a migration is a conscious act, not a
+    // silent one.
+    check('fresh install reaches user_version 57 (57 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 57,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -1924,6 +1927,70 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     ).get().c;
     check('self-heal restores dropped 057 trigger', restoredTrig === 1);
   }
+}
+
+// --- [058] suspension episodes (RR-02) ---------------------------------------
+console.log('\n[058] suspension episode invariants');
+{
+  const db = freshDb();
+  runMigrations(db, MIGRATIONS);
+  const open = () => db.raw.prepare(
+    'SELECT episode_id, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL').all();
+  const INS = 'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, ?, ?, ?)';
+  const begin = (startedAt, reason, frozen) => db.raw.prepare(INS).run(startedAt, null, reason, frozen);
+  const rejects = (args) => { try { db.raw.prepare(INS).run(...args); return false; } catch { return true; } };
+
+  check('fresh install carries the suspension_episode table',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name='suspension_episode'").get().c === 1);
+  check('fresh install carries both 058 enforcement triggers',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='trigger' AND name IN ('trg_suspension_episode_single_open_bi','trg_suspension_episode_no_reopen_bu')").get().c === 2);
+  check('fresh install carries the single-open partial unique index',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='index' AND name='ux_suspension_episode_single_open'").get().c === 1);
+  check('no episode is open on a fresh install (never suspended by default)', open().length === 0);
+
+  begin(1000, 'injury', 5);
+  check('an episode opens and freezes the macro position',
+    open().length === 1 && open()[0].frozen_macro_index === 5);
+
+  let secondRejected = false;
+  try { begin(2000, 'illness', 3); } catch (e) { secondRejected = /already open/i.test(String(e.message)); }
+  check('a SECOND open episode is rejected (single-open invariant)', secondRejected);
+
+  let closedAccepted = true;
+  try { db.raw.prepare(INS).run(400, 900, 'life', 2); } catch { closedAccepted = false; }
+  check('a closed historical episode coexists with an open one', closedAccepted);
+
+  db.raw.prepare('UPDATE suspension_episode SET ended_at_ms = ? WHERE ended_at_ms IS NULL').run(3000);
+  check('closing the open episode leaves none open', open().length === 0);
+
+  let reopenRejected = false;
+  try { db.raw.prepare('UPDATE suspension_episode SET ended_at_ms = NULL WHERE episode_id = 1').run(); }
+  catch (e) { reopenRejected = /cannot be reopened/i.test(String(e.message)); }
+  check('a closed episode cannot be reopened (the audit trail is durable)', reopenRejected);
+
+  let reBegun = true;
+  try { begin(5000, 'injury', 7); } catch { reBegun = false; }
+  check('a NEW episode may open after the previous one closed', reBegun && open().length === 1);
+
+  check('reason outside injury|illness|life is rejected', rejects([6000, 6100, 'sprain', 3]));
+  check('frozen_macro_index outside 1..8 is rejected', rejects([6000, 6100, 'injury', 9]));
+  check('ended_at_ms before started_at_ms is rejected', rejects([6000, 5000, 'injury', 3]));
+  check('every valid reason is accepted', ['injury', 'illness', 'life'].every((r, i) =>
+    !rejects([7000 + i, 7100 + i, r, (i % 8) + 1])));
+
+  db.raw.exec('DROP TRIGGER trg_suspension_episode_single_open_bi');
+  check('dropped 058 trigger is detected as a missing sentinel',
+    sentinelsMissing(db).includes('trg_suspension_episode_single_open_bi'));
+  runMigrations(db, MIGRATIONS);
+  check('self-heal restores the dropped 058 trigger',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='trigger' AND name='trg_suspension_episode_single_open_bi'").get().c === 1);
+
+  db.raw.exec('DROP TABLE suspension_episode');
+  check('a dropped suspension_episode TABLE is detected as a missing sentinel',
+    sentinelsMissing(db).includes('suspension_episode'));
+  runMigrations(db, MIGRATIONS);
+  check('self-heal restores the dropped suspension_episode table',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name='suspension_episode'").get().c === 1);
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

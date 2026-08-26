@@ -43,7 +43,12 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '053_routine_role_compatibility.sql',
   '054_contract_cutoff_provenance.sql',
   '055_return_checkin_ack.sql',
-  '056_movement_taxonomy_backfill.sql'];
+  '056_movement_taxonomy_backfill.sql',
+  // NOTE: 057_block_meta_phase_invariant.sql is deliberately absent here and
+  // was already absent before 058 — this list predates it. 058 does not
+  // depend on 057, so it is added on its own; closing the 057 gap is a
+  // separate change with its own blast radius.
+  '058_suspension_episode.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -418,6 +423,41 @@ check('dated and undated programs both take the athlete rotation position',
   `${[...src.matchAll(/nextMacroPosition\(d\)\.macroBlockIndex/g)].length} rotation sites`);
 check('the persisted program anchor comes from the generated plan, not the date',
   src.includes('startingMacroBlockIndex: plan.macroBlockIndex'));
+
+// --- RR-02 (058): the suspending state, ratified 2026-08-27 ------------------
+// TRAINING_PROGRESSION_LAYERS.md 4.1 ratified that rehab SUSPENDS rather than
+// consuming an L3 position. These are source tripwires, not behaviour tests:
+// they pin the shape that makes the freeze impossible to lose silently.
+check('nextMacroPosition consults the open suspension BEFORE advancing',
+  /const nextMacroPosition[\s\S]{0,900}?openSuspension\(d\)[\s\S]{0,600}?ORDER BY block_id DESC/.test(src));
+// Scoped to SQL-bearing lines: the identifier legitimately appears in prose
+// explaining that it is DERIVED. What must never exist is a COLUMN by that name.
+const sqlBearingLines = src.split('\n').filter((l) => /SELECT|INSERT|UPDATE|CREATE/i.test(l));
+check('is_suspended is DERIVED from an open episode, never stored as a column',
+  src.includes('WHERE ended_at_ms IS NULL')
+  && !sqlBearingLines.some((l) => l.includes('is_suspended')));
+check('the frozen macro index is what a suspended athlete resumes at',
+  src.includes('frozen_macro_index'));
+check('an episode is opened only with an explicit reason and timestamp',
+  src.includes('beginSuspension: (reason, atMs)')
+  && src.includes('endSuspension: (atMs)'));
+check('opening a second episode is refused in the store, not only in SQL',
+  /beginSuspension[\s\S]{0,400}?openSuspension\(d\) !== null[\s\S]{0,200}?throw new Error/.test(src));
+// The app is a coach in the athlete's pocket: suspension freezes PROGRESSION,
+// never training. Nothing in the suspension path may reach dose.
+check('suspension carries no dose modifier of its own',
+  !/suspension[\s\S]{0,600}?(dLoad|dRpe|dSet|multiplier|deload)/i.test(
+    src.slice(src.indexOf('beginSuspension: (reason, atMs)'),
+              src.indexOf('beginSuspension: (reason, atMs)') + 1400)));
+// Scoped to the suspension implementation: 'expired' appears in unrelated prose
+// about block expiry elsewhere in this file, and a whole-file match is noise.
+const SUSP_ANCHOR = 'beginSuspension: (reason, atMs)';
+const suspensionSlice = src.slice(src.indexOf(SUSP_ANCHOR), src.indexOf(SUSP_ANCHOR) + 1400);
+check('no auto-expiry: nothing closes an episode on elapsed time',
+  suspensionSlice.length > 0
+  && !/autoResume|expire|setTimeout|setInterval/i.test(suspensionSlice));
+check('the episode timestamp is supplied by the caller, never read from a clock',
+  !/Date\.now|new Date/.test(suspensionSlice));
 
 check(
   'planned completion is joined through exact session_origin provenance and immutable session_outcome',

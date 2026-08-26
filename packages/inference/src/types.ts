@@ -37,6 +37,26 @@ export const OBJECTIVES = [
 ] as const;
 export type Objective = (typeof OBJECTIVES)[number];
 
+/** Why a macro position is frozen (058, RR-02 ratified 2026-08-27). A closed
+ *  domain: free text cannot be reasoned about and will not stay clean.
+ *  `life` is deliberate — travel, work, bereavement. Restricting suspension to
+ *  injury would leave the commonest cause of a training gap still consuming the
+ *  athlete's progression track, which is the bug the state exists to fix. */
+export const SUSPENSION_REASONS = ['injury', 'illness', 'life'] as const;
+export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
+
+/** One suspension episode. `ended_at_ms === null` means currently suspended —
+ *  `is_suspended` is derived from this and is never stored. */
+export interface SuspensionEpisode {
+  episode_id: number;
+  started_at_ms: number;
+  /** null = open. */
+  ended_at_ms: number | null;
+  reason: SuspensionReason;
+  /** The macro position frozen at entry; the athlete resumes here. */
+  frozen_macro_index: number;
+}
+
 export const TRAINING_AGES = ['beginner', 'intermediate', 'advanced', 'elite'] as const;
 export type TrainingAge = (typeof TRAINING_AGES)[number];
 

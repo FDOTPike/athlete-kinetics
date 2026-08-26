@@ -175,6 +175,13 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   // trigger would silently reopen block_meta to phase/index drift.
   { type: 'trigger', name: 'trg_block_meta_phase_bi' },               // 057
   { type: 'trigger', name: 'trg_block_meta_phase_bu' },               // 057
+  // 058 suspension episodes. The table is durable athlete state, and the two
+  // triggers are fail-closed invariants (DB-SUSPENSION-DRIFT): losing them
+  // silently reopens double-suspension and episode reopening, either of which
+  // corrupts the frozen macro position the athlete resumes from.
+  { type: 'table', name: 'suspension_episode' },                      // 058
+  { type: 'trigger', name: 'trg_suspension_episode_single_open_bi' }, // 058
+  { type: 'trigger', name: 'trg_suspension_episode_no_reopen_bu' },   // 058
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
