@@ -2011,3 +2011,49 @@ You maybe start but allow 4)B to be done as plan only, and currently deferred un
 - Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes in the commit
   message. Documentation only; nothing under `packages/` or `apps/` changed.
 - Not pushed.
+
+---
+
+## Entry 0047 — 2026-08-27 · LINEAR scheme fix — scoped, demonstrated, held for ratification
+
+### Input G(x)
+
+```
+lets do the linear scheme fix
+```
+
+### Output F(G(x))
+
+- **No engine file was modified.** The change was scoped, the defect was reproduced empirically, and
+  the work was held for owner ratification. Finding recorded in
+  `docs/ANALYSIS_linear_scheme_progression_defect.md`.
+- **The scoping in the previous turn was wrong on two counts and is corrected here.** It was
+  described as bounded and needing no ratification. It is neither, and the defect is larger than
+  bodyweight.
+- Reproduced the reported complaint through the built engine rather than by reading code: a
+  bodyweight athlete on `LINEAR` receives Push-up 7 reps × 4 sets in all three working weeks, with
+  only the RPE label moving 7.0 → 7.5 → 8.0.
+- **Discovered a wider defect while doing so.** `LINEAR`'s only progression channel is effort, which
+  reaches the athlete solely through `targetPct` → `targetLoadKg` → 2.5 kg plate rounding. The RPE
+  wave spans a 2.6 % intensity range at 7 reps, which rounds to a single plate loading below roughly
+  60 kg of 1RM. Measured across thirteen 1RMs: **five receive no load progression at all**, and no
+  1RM below 200 kg receives three distinct weekly loads. At 100 kg, weeks 1 and 2 are identical.
+  Accessory work, lighter athletes' pressing, and beginners sit almost entirely inside that dead
+  zone.
+- **Three couplings make this a ratification matter, not an edit**, all recorded in the analysis:
+  any progression rule is a new engine value; a volume progression would invalidate
+  `SCHEMA_FATIGUE_COST.LINEAR` (`1.0/1.1/1.2/1.2`, the pricing of a schema that adds no volume)
+  which feeds the hybrid CNS tax at `HYBRID_TAX_THRESHOLD = 1.3`; and bodyweight is not visible where
+  the decision would be made — dose is fixed at `blockGenerator.ts:620-637` before the movement is
+  picked at `:662`, the generator's `Movement` type carries no implement, and `required` is not a
+  bodyweight test because Feet-Elevated Push-Up requires a bench yet is bodyweight-loaded.
+- Five options recorded with tradeoffs and none preselected. The analysis recommends option (a) —
+  reuse `STEP`'s already-ratified `setsDelta` rows so no new constant is invented — **with
+  `SCHEMA_FATIGUE_COST.LINEAR` re-ratified in the same change**. No fatigue figure was proposed;
+  naming one is a ratification act.
+- The demonstration script was run from a temporary file inside `packages/inference/test` and
+  deleted immediately; it is not committed and is not a gate. The analysis records that its
+  assertions belong in `verify_blocks.mjs` as a regression guard if a fix is authorized.
+- Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes in the commit
+  message. Documentation only; nothing under `packages/` or `apps/` changed.
+- Not pushed.
