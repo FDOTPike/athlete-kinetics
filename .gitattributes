@@ -16,3 +16,9 @@
 *.db binary
 *.keystore binary
 *.jar binary
+
+# Frozen evidence archives: byte-for-byte preservation, no EOL conversion.
+# These artifacts are identified by SHA-256 in docs/research/ and in commit
+# messages. Normalising their line endings would silently break every recorded
+# hash, so all conversion is disabled here. Do not remove this rule.
+docs/research/audits/** -text

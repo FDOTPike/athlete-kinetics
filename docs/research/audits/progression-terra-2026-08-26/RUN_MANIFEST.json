@@ -1,0 +1,94 @@
+{
+  "audit_id": "progression-terra-2026-08-26-full-audit",
+  "created_at_utc": "2026-08-26T03:40:42.056321+00:00",
+  "agent_model": "gpt-5.6-terra via Hermes",
+  "reasoning": "high",
+  "subagents_used": false,
+  "scope": "independent claim-level audit only; no product modification, ratification, work order, or implementation proposal",
+  "input_snapshot": [
+    {
+      "original_path": "C:\\Users\\fpike\\AppData\\Local\\hermes\\profiles\\prometheus\\attachments\\HERMES_RESEARCH_BRIEF_progression_measurement.md",
+      "snapshot_path": "C:\\Users\\fpike\\Documents\\pikeMethods\\audits\\progression-terra-2026-08-26-full-audit\\inputs\\HERMES_RESEARCH_BRIEF_progression_measurement.md",
+      "sha256_original": "d2be5ffff60140c177d1253289272c45e50be1fde1d5d5b6fc4e5ad584a54a57",
+      "sha256_snapshot": "d2be5ffff60140c177d1253289272c45e50be1fde1d5d5b6fc4e5ad584a54a57",
+      "byte_identical": true,
+      "available": true
+    },
+    {
+      "original_path": "C:\\Users\\fpike\\Downloads\\HANDOVER_20260826_RESEARCH_AGENT.txt",
+      "snapshot_path": "C:\\Users\\fpike\\Documents\\pikeMethods\\audits\\progression-terra-2026-08-26-full-audit\\inputs\\HANDOVER_20260826_RESEARCH_AGENT.txt",
+      "sha256_original": "76b50db1b253ed2d8bf812bd3da241caafbf70f7d8372a261a3b9e477e34ae56",
+      "sha256_snapshot": "76b50db1b253ed2d8bf812bd3da241caafbf70f7d8372a261a3b9e477e34ae56",
+      "byte_identical": true,
+      "available": true
+    },
+    {
+      "original_path": "C:\\Users\\fpike\\Documents\\pikeMethods\\drafts\\evidence_review_strength_progression.md",
+      "snapshot_path": "C:\\Users\\fpike\\Documents\\pikeMethods\\audits\\progression-terra-2026-08-26-full-audit\\inputs\\evidence_review_strength_progression.md",
+      "sha256_original": "ba371600e7e83986b7fb1f17c9b47de13c1c381ce066320fa4de6f4c9b3affed",
+      "sha256_snapshot": "ba371600e7e83986b7fb1f17c9b47de13c1c381ce066320fa4de6f4c9b3affed",
+      "byte_identical": true,
+      "available": true
+    },
+    {
+      "original_path": "C:\\Users\\fpike\\Documents\\Claude Coding\\Athlete App\\.worktrees\\research-task\\progression_measurement_evidence_review.md",
+      "snapshot_path": "C:\\Users\\fpike\\Documents\\pikeMethods\\audits\\progression-terra-2026-08-26-full-audit\\inputs\\progression_measurement_evidence_review.md",
+      "sha256_original": "19a93435fb0d5c15c7e23ae06c1a32c4fbd5c7af89a1e8ffcd9cc49a80d21035",
+      "sha256_snapshot": "19a93435fb0d5c15c7e23ae06c1a32c4fbd5c7af89a1e8ffcd9cc49a80d21035",
+      "byte_identical": true,
+      "available": true
+    }
+  ],
+  "source_access": [
+    {
+      "method": "PubMed EFetch",
+      "count": 30,
+      "depth": "abstract",
+      "artifact": "source_metadata.json"
+    },
+    {
+      "method": "Crossref Works API",
+      "count": 10,
+      "depth": "metadata",
+      "artifact": "source_metadata.json"
+    },
+    {
+      "method": "pinned code baseline git grep/read-only",
+      "commit": "368e82d508be30956afbd1f6166d68bcf04ae432",
+      "after_verdict_lock": true
+    }
+  ],
+  "search_log": [
+    {
+      "date": "2026-08-26",
+      "queries": "high-risk source DOI/PMID retrieval; direct PubMed/Crossref records",
+      "outcome": "30 PubMed abstracts and 10 Crossref records retrieved; no full-text claims inferred"
+    },
+    {
+      "date": "2026-08-26",
+      "queries": "pinned baseline hard_sets/e1rm/stagnation/calibration strings",
+      "outcome": "baseline matched required commit; code facts separated from research evidence"
+    }
+  ],
+  "pinned_code_baseline": {
+    "path": "C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/antigravity-pre-release-acceptance",
+    "commit": "368e82d508be30956afbd1f6166d68bcf04ae432",
+    "inspection_status": "deferred until report verdicts locked"
+  },
+  "forbidden_until_lock": [
+    "C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/research-task/antigravity_review_audit.md",
+    "C:/Users/fpike/Downloads/RESEARCH_FINDINGS_for_Sol.md",
+    "C:/Users/fpike/.codex/attachments/52b326df-67bd-4b7b-b2d8-b3e338688f8e/pasted-text.txt",
+    "C:/Users/fpike/Documents/pikeMethods/drafts/.agents/"
+  ],
+  "verdict_lock": {
+    "locked_at_utc": "2026-08-26T03:45:00Z",
+    "scope": "Independent verdicts on the two original reports only; reconciliation materials and code baseline not yet read.",
+    "antigravity_verdict": "NOT SAFE AS EVIDENCE OR DECISION INPUT. It contains unsupported/incorrect source characterisations, invalid source-to-claim upgrades, and auditor-derived MDC/persistence values presented as recommendations.",
+    "hermes_verdict": "CONDITIONALLY USABLE ONLY AFTER CLAIM-LEVEL REWRITE. Its central no-MDC/no-persistence conclusion is directionally defensible, but several positive/negative claims are only partially verified or rely on inadequate searches/secondary access.",
+    "independent_sources_read": "PubMed abstracts and Crossref metadata captured in source_metadata.json; no reconciliation document, Opus output, prior audit, or code baseline read before this lock."
+  },
+  "completed_at_utc": "2026-08-26T03:52:04.274968+00:00",
+  "claim_ledger_terminal_rows": 735,
+  "claim_scope_note": "Material atomic external, derived, gap, system and design claims. Exact full text is required for rows marked UNVERIFIED."
+}

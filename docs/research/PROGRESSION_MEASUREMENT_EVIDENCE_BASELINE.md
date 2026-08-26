@@ -15,9 +15,17 @@ It authorizes no implementation, threshold, display, score, persistence window, 
 change. Product choices remain in
 [`PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md`](../decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md).
 
-The binding audit artifacts are archived at:
+The binding audit artifacts are archived **in this repository** at
+[`docs/research/audits/progression-terra-2026-08-26/`](audits/progression-terra-2026-08-26/), by
+owner decision 6 ratified 2026-08-26. The archived copy is byte-identical to the audit's output and
+the hashes below verify against it directly; run
+`sha256sum -c docs/research/audits/progression-terra-2026-08-26.sha256` to check the complete
+25-file run. Retention is indefinite and immutable — see
+[`audits/README.md`](audits/README.md).
 
-`C:\Users\fpike\Documents\pikeMethods\audits\progression-terra-2026-08-26-full-audit`
+The originating copy remains at
+`C:\Users\fpike\Documents\pikeMethods\audits\progression-terra-2026-08-26-full-audit`, which is now
+a secondary location and no longer the record of reference.
 
 | Artifact | SHA-256 |
 |---|---|

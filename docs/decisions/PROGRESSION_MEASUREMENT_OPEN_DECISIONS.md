@@ -118,6 +118,33 @@ a hash cannot make a missing artifact independently inspectable.
 location and retention rule should be authoritative. No copy or relocation is authorized by this
 documentation phase.
 
+**Owner ruling — ratified 2026-08-26: option (b), preserve an immutable copy, with this
+repository as the authoritative location.**
+
+- **Unit preserved:** the complete 25-file audit run, not the six binding artifacts alone. The six
+  are conclusions; `checkpoints/`, `calculations/`, `inputs/`, `VERDICT_LOCK.json`,
+  `source_metadata.json` and `workorder.md` are the derivation trail that makes the run
+  re-checkable rather than merely re-readable.
+- **Location:** `docs/research/audits/progression-terra-2026-08-26/`. Copied **unscrubbed**, so the
+  archived bytes hash-match what the audit produced. The owner accepted that the run's sixteen
+  author-local absolute paths become public when this branch is pushed; a scan found no credential
+  or personal data.
+- **Retention:** indefinite and immutable. Never edited in place, never deleted. A later audit of
+  the same claims is added as a new dated run directory **alongside**, never replacing this one.
+- **Byte preservation is enforced, not assumed.** Seventeen of the twenty-five files contain CRLF,
+  including all six binding artifacts. The repository's default `* text=auto eol=lf` rule would
+  have rewritten them on commit and checkout and broken every recorded hash. `.gitattributes` now
+  carries `docs/research/audits/** -text` to disable conversion; removing that rule silently
+  invalidates the archive.
+- **Verification recorded at ratification:** all 25 files byte-identical to the originating copy by
+  `diff -r`; all 25 staged git blobs hash-equal to their source files; all six binding hashes match
+  the table in the canonical evidence baseline; `sha256sum -c` over the 25-file manifest reports 25
+  `OK` and 0 failures.
+- **What this ruling does not do:** it preserves an evidence record. It ratifies no conclusion the
+  audit reached, and confers no authority on any number inside the archive. The quarantine list
+  stands unchanged.
+- The originating copy at the author-local path was left in place. Nothing was moved or deleted.
+
 ## 8. Investigation backlog — not authorized in this phase
 
 The following work remains available for later, separately approved tasks:
@@ -143,4 +170,4 @@ The following work remains available for later, separately approved tasks:
 | Own-data repeatability protocol | Pending | — | A-Q2-04; H-Q5-03; A-Q5-03/04 |
 | Descriptive/prescriptive boundary | Pending | — | H-Q8-01; A-Q8-01/02/03 |
 | Push-up full-text verification | **Ratified — (a) do not pursue** | 2026-08-26 | A-Q4-01/02/03 |
-| Evidence archive location and retention | Pending | — | Canonical artifact hash table |
+| Evidence archive location and retention | **Ratified — (b) preserve in-repo, indefinite** | 2026-08-26 | Canonical artifact hash table |

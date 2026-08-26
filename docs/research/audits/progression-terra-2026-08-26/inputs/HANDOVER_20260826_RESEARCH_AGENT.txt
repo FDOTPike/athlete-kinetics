@@ -1,0 +1,180 @@
+# Handover — Research Agent
+
+Date: 2026-08-26
+For: Hermes research agents working the Progression Measurement Evidence Review
+Companion documents: `HERMES_RESEARCH_BRIEF_progression_measurement.md` (the brief),
+`HERMES_PROMPT_progression_measurement.txt` (the cover prompt)
+
+---
+
+## 0. What this document is, and what it deliberately omits
+
+This is a **state-of-the-question** handover, not a state-of-the-code handover.
+
+It tells you which questions are already closed, which were already answered by an earlier
+review, which are open and waiting on evidence, and what happens to your report when it lands.
+
+**It contains no file paths, no line numbers, and no code.** That is deliberate. The brief you
+are working from instructs you to ignore the repository, because the code available to you is a
+different revision and does not match. Handing you a code map alongside that instruction would
+invite exactly the confusion the instruction exists to prevent. If you find yourself wanting to
+check something in code, the answer is that the brief is the specification — and if the brief is
+silent on something, that silence is itself an answer worth reporting.
+
+---
+
+## 1. The one governance rule that shapes everything
+
+The project operates under a ratified **Calibration Policy** (owner-ratified 2026-08-14).
+
+Its core provision: **no numerical value enters the engine without the owner's explicit
+ratification, recorded against a source.** There is a frozen registry of every coefficient
+currently in the system. No coefficient may be inferred from a movement's name, its equipment
+label, its movement pattern, or its similarity to another movement. Values that have not been
+ratified are deliberately absent from the code rather than filled with a plausible default.
+
+Three consequences for your report:
+
+1. **Your findings inform a ratification decision. They do not authorise anything.** Nothing you
+   write becomes a value in the product without a separate, explicit human ruling.
+2. **A number stated confidently in a research report is the primary vector by which unsourced
+   values get into systems like this one.** The owner is aware of that and is reading for it. A
+   value you cannot source is worse than no value, not better.
+3. **"The evidence does not support a specific value" is a fully useful result.** The engine
+   already has several deliberately empty slots that are waiting for exactly that verdict, and
+   an honest blank lets the owner stop looking. A plausible fill makes him stop looking for the
+   wrong reason.
+
+---
+
+## 2. Already decided — do not re-open these
+
+These are settled rulings. If your evidence contradicts one, **say so explicitly and clearly** —
+that is valuable. But do not treat any of them as an open question to be answered.
+
+| Decided | Ruling |
+|---|---|
+| 2026-08-14 | **Acute:chronic workload ratio is descriptive only.** It is computed, stored, displayed and graphed, and has no authority — direct or indirect — over any prescription, readiness classification, phase, deload, movement availability or safety decision. Poisoning it changes nothing downstream. |
+| 2026-08-14 | **Readiness is computed from two inputs only** — heart-rate variability (weight 0.35) and sleep efficiency (weight 0.25), renormalised over whatever is available, neutral fallback when neither is. Workload and blood-oxygen contribute zero. |
+| 2026-08-14 | **No return-to-training dose modifier exists.** A 21-day gap triggers an optional, dismissible check-in that records an acknowledgement and changes no dose. The 21 days is a detection threshold, not a prescription value. |
+| 2026-08-19 | **Rehab is not a training phase.** It is a suspending state that holds the athlete's position in the sequence rather than consuming one. |
+| 2026-08-20 | **Hypertrophy and volume phases are not merged.** Hypertrophy is generic tissue accumulation; volume is sport- and skill-specific loading. |
+| 2026-08-20 | **Taper is a derived property, not a fifth phase value.** When a taper occurs is derivable from a dated horizon; what it does is not yet decided. |
+| 2026-08-20 | **A competition date drives phase selection**, counting back from the date, falling back to a fixed rotation when no date exists. |
+| 2026-08-20 | **A safety halt prompts the athlete rather than silently suspending** their progression. |
+| 2026-08-20 | **The three selectable loading schemes are linear, undulating and autoregulated.** Step loading was retired from selection on product-simplification grounds, explicitly **not** because evidence ruled against it. |
+| — | **Undulating carries no evidential claim of superiority** over linear. It is retained as legitimate week-to-week texture and athlete preference. The pooled meta-analytic advantage for undulating periodisation rests on *daily* undulation; this app's is weekly. |
+| — | **Cross-movement volume equating is limited to four barbell anchor lifts**, each at coefficient 1.0. No coefficient for any alternative movement has been approved. Accessory, rowing, carry, core and grappling work are outside the metric entirely. |
+
+---
+
+## 3. Already answered — a companion review covered these
+
+An earlier evidence review answered eight questions. **Do not re-answer them.** Where your work
+touches one, note the overlap in a single line and move on.
+
+1. Whether acute:chronic workload ratio should drive a readiness score.
+2. What telemetry would actually change prescription for combat-sport athletes.
+3. Whether per-muscle weekly volume landmarks (minimum effective / maximum adaptive / maximum
+   recoverable volume) are supportable.
+4. How competition peaking and tapering should work.
+5. Whether linear / undulating / autoregulated is a sufficient set of loading schemes.
+6. What should determine which loading scheme an athlete receives.
+7. Whether step loading is a distinct method.
+8. Whether conjugate is a block-organisation model rather than a loading curve.
+
+Question 3 above is the closest neighbour to your Q3. The distinction: theirs asked whether
+per-muscle volume *landmarks* are supportable. Yours asks whether volume-load *equates across
+load and repetition configurations*. Those are different questions and yours is not answered by
+theirs.
+
+---
+
+## 4. Deliberately absent numbers — these are what you are actually for
+
+The following values do not exist anywhere in the system, by policy, because no cited source
+supplies them for this population. Each is blocking a decision:
+
+- **How large a change in estimated strength is real rather than measurement noise.** This is the
+  single most load-bearing gap. Without it, no trend can be called progress or stagnation, and a
+  whole class of features cannot be built. Your Q2 and Q5 bear directly on it.
+- **How long a non-improving trend must persist before it means anything.**
+- **What a taper does** — its duration, and its volume reduction. When a taper should happen is
+  now derivable; how much it changes is not.
+- **How far out from a competition date preparation should begin.**
+- **How many blocks a training phase should last.**
+- **Any load or effort modifier for entering or leaving a rehabilitation state.**
+
+If the literature does not support one of these, saying so plainly closes the question. That is a
+successful outcome, not a failed one.
+
+---
+
+## 5. Facts about the system that are easy to get wrong
+
+These have caused confusion before. Each is stated in the brief; they are repeated here because
+they are the ones most likely to be assumed away.
+
+- **The field the app calls "session RPE" is not Foster's session-RPE.** It is the arithmetic
+  mean of the logged per-set ratings, rounded to the nearest half point. It is never a single
+  whole-session rating and is never multiplied by duration. If your answer discusses session-RPE
+  as the literature uses the term, say explicitly that the app's field of that name is a
+  different quantity.
+- **A bodyweight set contributes exactly zero to the app's volume figure**, because that figure
+  is repetitions multiplied by external load. This is a known and accepted limitation, not an
+  oversight, and the app is forbidden from claiming the figure represents total mechanical work.
+- **The app receives no data at all from grappling or conditioning sessions.** It schedules them
+  and hears nothing back — no duration, no rounds, no intensity. Any load or progression figure
+  it computes is therefore built on systematically incomplete data.
+- **The estimated-1RM calculation exists but nothing consumes it.** It is not stored, not
+  displayed, and does not influence any prescription. It carries no noise floor and no definition
+  of a stall, deliberately, because those are unratified numbers.
+- **There is no measurement of repetition velocity.** A field for it exists and nothing writes to
+  it. Treat velocity-based methods as requiring hardware the app does not have.
+- **There is no per-muscle volume tracking of any kind.**
+- **There is no coach.** Nobody verifies an RPE rating, notices technique breakdown, or
+  intervenes on a bad day. This is the constraint most likely to break the transfer of a protocol
+  validated on supervised trained subjects, and it should be addressed explicitly wherever it
+  matters rather than noted once.
+
+---
+
+## 6. No audience data exists
+
+No product has launched. There is **no age range, no training-age distribution, no confirmed
+sport mix, and no usage data.** Do not assume any.
+
+What the design implies, and no more: training ages from beginner through elite; one to seven
+sessions per week; grappling represented as a first-class training day. Grappling is the only
+combat sport modelled — there is no striking, wrestling or mixed-martial-arts handling. Where
+evidence exists for striking or mixed martial arts but not grappling, say which population you
+actually found.
+
+---
+
+## 7. Where your report lands
+
+The product is in a pre-release closed-beta pipeline. It is feature-complete enough to test and
+is being prepared for closed testing on Android.
+
+Your report does not gate that release. It feeds the decision about **what the app measures and
+reports as progress**, which is currently one-dimensional and which the owner believes is wrong.
+That work has not started and will not start until the evidence is in — which is why an honest
+blank is genuinely actionable here and a plausible fill is genuinely damaging.
+
+The report will be read against the evidence standard in Part 2 of the brief: every factual claim
+tiered inline, every claim carrying a digital object identifier or PubMed identifier, population
+transfer stated, effect size and uncertainty given, and commercial systems separated from the
+science they borrow.
+
+Two structural requirements from Part 4 that are easy to miss on a first read:
+
+- Each question section ends with a short block separating findings solid enough to decide on
+  from things that are convention or practitioner consensus.
+- The report closes with an explicit list of **every number a reader might mistake for a
+  ratified recommendation**, each with its tier and its population.
+
+And the one prohibition: **do not design a progression score.** No formula, no weighting, no
+composite index, no thresholds. If the evidence supports a multi-dimensional model, name the
+dimensions and say what measures each — and stop. Composition is the owner's ratification
+decision, and a plausible-looking formula in your report would pre-empt it.

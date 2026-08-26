@@ -1835,3 +1835,64 @@ first lets start with decisions 5)a and 6b)
 - Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes recorded in the
   commit message. Documentation only; nothing under `packages/` or `apps/` changed.
 - Not pushed. Push remains gated on the owner's on-device check.
+
+---
+
+## Entry 0044 — 2026-08-26 · Owner ratification, decision 6 — evidence archive
+
+### Input G(x)
+
+The owner's ruling on decision 6 was given as three selections in response to a structured
+question, not as free text. Recorded verbatim as selected, with the question each answers:
+
+```
+Q: Decision 6 asks you to name what gets preserved. Which unit is authoritative?
+A: All 25 files
+
+Q: Which location is authoritative? (athlete-kinetics is a public repo, so in-repo storage
+   becomes public on push.)
+A: In-repo, unscrubbed
+
+Q: What retention rule governs the preserved copy?
+A: Indefinite, immutable
+```
+
+Prior turn's instruction, under which these answers were sought: `first lets start with
+decisions 5)a and 6b)` — recorded verbatim in entry 0043.
+
+### Output F(G(x))
+
+- **Decision 6 (evidence archive) ratified: option (b), preserve an immutable copy, with this
+  repository as the authoritative location.** Recorded in
+  `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md` §7, and the §9 row moved from `Pending`
+  to ratified against 2026-08-26. All six rows are now ruled except decisions 1 to 4.
+- Copied the complete 25-file run to `docs/research/audits/progression-terra-2026-08-26/`,
+  unscrubbed, by ruling. Added `docs/research/audits/README.md` (provenance, retention rule,
+  verification instructions) and `docs/research/audits/progression-terra-2026-08-26.sha256` (a
+  25-line manifest). Both sit in the parent directory so the run directory remains byte-for-byte
+  the audit's own output.
+- **Defect caught before it landed.** Seventeen of the twenty-five files contain CRLF, including
+  all six binding artifacts. The repository's `.gitattributes` carries `* text=auto eol=lf`, which
+  would have rewritten those bytes on commit and checkout and caused every recorded SHA-256 to
+  fail against the in-repository copy — an archive that looks preserved and is silently wrong.
+  Added `docs/research/audits/** -text` to `.gitattributes` to disable conversion, and documented
+  in the archive README that removing the rule invalidates the archive.
+- Verification performed at ratification, all four independent of each other: `diff -r` against the
+  originating copy reported no difference across 25 files; each staged git blob was hashed through
+  `git cat-file -p` and matched its source file, 25 match / 0 mismatch, which tests what git will
+  actually store rather than what is on disk; the six binding hashes recomputed from the committed
+  copy matched the canonical baseline table with zero unmatched; `sha256sum -c` over the manifest
+  reported 25 `OK` and 0 `FAILED`.
+- Updated the canonical evidence baseline's archive pointer, which named only the author-local
+  path and was made stale by this ruling. It now names the in-repository location as the record of
+  reference and the author-local path as secondary. Nothing was moved or deleted; the originating
+  copy is untouched.
+- Scanned the archive before copying: 25 files, 777 KB, all plain text, no binaries. No credential,
+  key, token, or account identifier found. Sixteen author-local absolute paths are present and were
+  preserved deliberately — scrubbing them would change the bytes and destroy the hash identity that
+  this ruling exists to provide. The owner accepted publication of those paths on push.
+- **Nothing in the archive is ratified by its presence there.** The copy preserves an evidence
+  record; it confers no authority on any number inside it, and the quarantine list is unchanged.
+- Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes in the commit message.
+- Not pushed. Push remains gated on the owner's on-device check, and this ruling makes the push the
+  moment the author-local paths become public.
