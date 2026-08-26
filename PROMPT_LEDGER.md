@@ -2133,3 +2133,79 @@ Execute this work order and return the `git diff --stat` and tripwire results.
   `targetPct` rather than restating it; `"acwr"` does not appear in `blockGenerator.ts`; block
   planners contain no retrospective signal references [3 block planner files clean].
 - Not pushed.
+
+---
+
+## Entry 0049 — 2026-08-27 · Audit of the external architecture review (RR-01..RR-04, WO-01..WO-12)
+
+### Input G(x)
+
+```
+@"C:\Users\fpike\Documents\pikeMethods\drafts\architecture-review-8b4e75b/"
+Could you please audit these options and help me decide which options actually relevant to the app
+Currently working through new work orders
+```
+Accompanied by an advisor transcript recording RR-01 signed as Option A, and presenting RR-02
+(suspended state / Migration 059), RR-03 (competition taper parameters) and RR-04 (sport-specific
+volume allocation) for ruling.
+
+### Output F(G(x))
+
+- Audit written to `docs/AUDIT_architecture_review_8b4e75b.md`. **No engine, schema or test file was
+  modified, and no ruling was signed on the owner's behalf.**
+- Overall: the review's factual base is better than average and most of it holds. Three corrections
+  are needed before work orders are handed out, and one architectural defect larger than most of the
+  register was missed entirely.
+- **RR-01 (already signed A):** the arithmetic checks out — LINEAR is ≤ 1.2 in every phase so
+  `accessoryCut` is 0. Option A is defensible. Two claims around it are not: its stated rationale
+  (calisthenics "inherently produce lower systemic CNS fatigue") carries **no source locator**, which
+  is the pattern the progression audit quarantined 17 claims for; and it is not a cycle-saving no-op
+  — it ratifies a permanent, door-closing policy. Cancelling WO-07 is nonetheless correct.
+- **RR-02: take Option A, but the docket is wrong on three counts.** The migration slot is **058**,
+  not 059 (chain head is `057_block_meta_phase_invariant.sql`; `TRAINING_PROGRESSION_LAYERS.md` §8
+  item 1 still says 057 and is now stale). It is **not a bug fix** — no suspension state exists
+  anywhere in any migration or in `packages/inference/`, so `nextMacroPosition` has nothing to check;
+  this is a feature build. And Option B is **non-viable, not a band-aid**: there is no Zustand
+  persist middleware in this app, every `persist*` symbol writes to SQLite, so that state would not
+  survive an app restart. Also unresolved and absent from the docket: what actually sets and clears
+  `is_suspended`, given rehab is an athlete-chosen objective and niggles are a rolling complaint
+  channel with no lifecycle.
+- **RR-03: recommend ruling neither option.** `taper` appears **zero times** in
+  `packages/inference/src/` and `apps/mobile/src/` — the feature does not exist, and WO-09 concedes
+  the app currently ships a second `peak` block instead. The parameters cite "Bosquet et al. (2007)"
+  and "Mujika (2010)" with **no DOI and no PMID**, and the figures drift across the package's own
+  documents (41-60 % in the queue, 40-60 % in WO-09, 50 % in Option A, 30 %/60 % in Option B).
+  Recommended sequence is to build the derivation with no ratified magnitude and let WO-12 return
+  sources with resolvable locators first.
+- **RR-04: Option A, the best-value item in the package.** Verified `PHASE_MODS.volume` is
+  `{ reps: 0, rpe: 0, sets: 1 }` at `blockGenerator.ts:383`, applied uniformly; it matches the
+  owner's own standing docket item 4, so it is independently recorded rather than panel-invented. It
+  introduces **no new number** — the `+1` already exists and is already ratified; only its
+  placement changes. One correction before execution: the stated mechanism inspects `day.focus` for
+  "Primary Lifts", but `BlockFocus` has no such value; the primary/accessory split is slot-index
+  based (`ACCESSORY_SLOT_FROM = 3`). It also changes shipped `volume` blocks for live athletes.
+- **Finding the review missed, and the largest one:** the capability ladder and the block generator
+  disagree about reps. `resolveActiveRung` **is** wired (`useStore.ts:138, :2568, :2570`) against 180
+  days of set history, and advancement needs `{ requiredSets: 3, requiredReps: 8 }` with no seeded
+  `progression_policy` override for the push-up chain. Measured across all eight macro blocks for a
+  bodyweight strength athlete on LINEAR, the prescription reaches 8 reps in **two of eight** (both
+  hypertrophy); gpp prescribes 7, volume 5, and peak **3**. So an athlete following the plan as
+  written advances a rung during 25 % of the macro cycle. Not fatal — the ladder reads logged reps
+  and Option C deliberately invites exceeding the prescription — but rung advancement then depends
+  on athletes routinely out-performing their own plan, an undocumented load-bearing assumption
+  joining two independently designed subsystems. It also means the headline push-up progression story
+  is still gated after Option C.
+- **Two work orders should not ship as written.** **WO-04** proposes persisting e1RM to a new SQLite
+  table and cites Decision 1 as its authority — but Decision 1 was ratified (a) dormant on
+  2026-08-26, explicitly forbidding persistence, and a live removal guard at
+  `verify_store_sql.mjs:649` asserts the surface stays absent. It should be withdrawn or re-scoped as
+  a proposal to revisit Decision 1, which is the owner's call. **WO-02** states at HIGH confidence
+  that the progression engine "is not wired into useStore.ts"; it **is** wired at the three lines
+  above. A narrower session-completion UI gap may survive, but the priority should drop.
+- WO-05, WO-06 and WO-11 were not audited in depth — the first two concern the offline verification
+  gaps already known in this worktree, and WO-11 restates decision 3, already ratified as future work.
+- The macro-block measurements were generated through the built engine from a temporary script that
+  was deleted; the audit records how to reproduce them.
+- Gates re-run after writing (documentation only): `typecheck`, `verify:policy`, `verify:blocks` —
+  exit codes in the commit message.
+- Not pushed.
