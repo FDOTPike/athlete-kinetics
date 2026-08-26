@@ -92,6 +92,18 @@ work [A-Q4-01].
 verification. Until then, preserve ordinal relationships without adding evidence claims or
 coefficients.
 
+**Owner ruling — ratified 2026-08-26: option (a), do not pursue.** The exact values are not
+product-critical. Push-up variations remain ordered by `movement_progression.progression_rank`
+(`packages/core-db/src/schema/016_movement_library_seed.sql`), an integer ordinal that carries
+sequence and no magnitude. No force coefficient, percentage of bodyweight, continuous
+interpolation, or common scale with barbell work is authorized. The `41/49/64/74%` figures remain
+quarantined and must not appear as a default, example, fixture, comment, or candidate constant.
+
+**What this ruling does not assert:** it is a decision not to spend verification effort. It is not
+a finding that the published values are wrong, and it does not convert “not located” into a
+literature conclusion. Option (b) remains available unchanged if exact values later become
+product-critical.
+
 **Further investigation if requested:** inspect the relevant full-text tables and record exact
 conditions, apparatus, population, uncertainty, and transfer limits. This phase does not perform
 that investigation.
@@ -119,7 +131,8 @@ The following work remains available for later, separately approved tasks:
 5. **Control-system safety review:** required before any progression signal gains prescription
    authority.
 6. **Push-up biomechanics verification:** needed only if exact force values or coefficients are
-   product-critical.
+   product-critical. Not authorized: decision 5 was ratified (a) on
+   2026-08-26. Reopening requires the product-critical condition to arise first.
 
 ## 9. Ratification record
 
@@ -129,5 +142,5 @@ The following work remains available for later, separately approved tasks:
 | Hard-set count | Pending | — | H-Q3-02; A-Q3-01/03/04; A-Q7-02 |
 | Own-data repeatability protocol | Pending | — | A-Q2-04; H-Q5-03; A-Q5-03/04 |
 | Descriptive/prescriptive boundary | Pending | — | H-Q8-01; A-Q8-01/02/03 |
-| Push-up full-text verification | Pending | — | A-Q4-01/02/03 |
+| Push-up full-text verification | **Ratified — (a) do not pursue** | 2026-08-26 | A-Q4-01/02/03 |
 | Evidence archive location and retention | Pending | — | Canonical artifact hash table |

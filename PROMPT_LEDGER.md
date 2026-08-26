@@ -1796,3 +1796,42 @@ Freeze the four files with a local commit, and present the six Pending rows for 
 - Deferred and not performed: the P3-1 ledger capture-at-issue-time convention, which belongs in
   `AGENT_WORKFLOW.md` and therefore outside this delta's audited scope. Drafted for the next work
   order rather than applied here.
+
+---
+
+## Entry 0043 — 2026-08-26 · Owner ratification, decisions 5 and 6
+
+### Input G(x)
+
+```
+first lets start with decisions 5)a and 6b)
+```
+
+### Output F(G(x))
+
+- **Decision 5 (push-up full-text verification) ratified: option (a), do not pursue.** Recorded in
+  `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md` §6, with the backlog item in §8 marked
+  not authorized and the §9 row moved from `Pending` to ratified against 2026-08-26.
+- The ruling is recorded with an explicit **“what this ruling does not assert”** clause: it is a
+  decision not to spend verification effort, not a finding that the published values are wrong, and
+  it does not convert “not located” into a literature conclusion. Option (b) stays available if the
+  values later become product-critical.
+- Verified before recording that the ruling is already the state of the source: the push-up ladder
+  is ordinal only — `movement_progression(progression_group, progression_rank)` at
+  `packages/core-db/src/schema/016_movement_library_seed.sql:271`, integer rank, no magnitude — and
+  no push-up force coefficient or percentage-of-bodyweight constant exists anywhere under
+  `packages/` or `apps/`. The ratification changes no code and authorizes none.
+- **Decision 6 (evidence archive) NOT ratified in this entry.** The owner indicated option (b),
+  preserve an immutable copy. §7 requires two things of that ruling — whether to preserve, *and*
+  which location and retention rule is authoritative — and the second is unanswered. Recording a
+  half-ruling in a decision record was declined; the row stays `Pending` until the location and
+  retention rule are named. **No copy, relocation, or deletion of any artifact was performed.**
+- Answer-independent groundwork for decision 6 was done and reported to the owner rather than
+  acted on: the archive holds **25 files, 777 KB, all plain text**, with no credential or personal
+  data found on scan. Only **6 of the 25** are the binding artifacts already hashed in-repository;
+  the other 19 — `VERDICT_LOCK.json`, `checkpoints/` (8), `calculations/` (4, including three
+  Python scripts), `inputs/` (4), `source_metadata.json`, `workorder.md` — carry the derivation
+  trail. Which of those two units is preserved is part of the outstanding ruling.
+- Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes recorded in the
+  commit message. Documentation only; nothing under `packages/` or `apps/` changed.
+- Not pushed. Push remains gated on the owner's on-device check.
