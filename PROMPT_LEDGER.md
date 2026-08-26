@@ -1635,3 +1635,125 @@ Sixteen entries carry `NOT RECOVERABLE` inputs. That is the honest state of the 
 the cost of the ledger having lapsed for six weeks: the outputs survive in git, the intents do
 not. Restoring the isomorphism this ledger is for requires capturing prompts at the time they are
 issued, which Entry 0023 onward resumes.
+
+---
+
+## Entry 0040 — 2026-08-26 · Progression evidence remediation and Opus audit corrections
+
+### Input G(x)
+
+```text
+Please read Opus reply here , overall accept and please continue your work, but can we run the audits through Hermes using OX alpha, with your output please present a copy paste prompt ready to be sent to the auditor &#x20;
+
+\~\~
+
+Strong work on first read. Let me verify the specific claims rather than take them at face value.
+Audited. Verified every claim independently rather than accepting the report.
+Audit verdict: ACCEPT
+Sol's work is good, and every claim in the completion report held under independent check — I verified rather than took them at face value:
+
+
+
+Claim
+How I checked
+Result
+
+
+
+Three doc files, no runtime files
+git diff --stat + full untracked enumeration
+✓
+
+Audit hashes unchanged
+Recomputed SHA-256 on all six artifacts
+✓ all six match
+
+51 claims: 3/17/17/14
+Tallied the table mechanically
+✓ exact
+
+Gates passed
+Re-ran verify:blocks + verify:policy myself
+✓ both exit 0
+
+No decisions preselected
+Read both documents in full
+✓ all five "Pending"
+
+e1rm code facts
+Grepped all consumers at the pinned baseline
+✓ barrel export only
+
+
+
+Sol corrected me on three things, and was right each time
+This is the part worth your attention.
+
+1. I overreached on "not buildable." My digest said the gaps were "absences confirmed twice" that "cannot be filled from literature at all", and I recommended rewriting §5C to say so. Sol refused, and reframed all four as search-bounded outcomes. Sol is right — two bounded searches failing to find something is not proof it cannot exist. My framing would have hard-coded a false certainty into a decision record, which is precisely the failure mode the whole exercise exists to prevent.
+2. I called the push-up percentages "verified." They aren't. Sol retrieved the abstracts: they support that force differs by variation, but the exact 41/49/64/74% values were never located. I verified the citation and reported the number as verified — a milder version of the exact error the Hermes audit caught Antigravity making. Sol's quarantine stands, and my §6 salvage recommendation was wrong.
+3. Pareja-Blanco is worse than I said. I passed it along as "plausibly from full text, unverifiable." Sol pulled the abstract: it reports CMJ 9.5% vs 3.5%. The −1.2% is contradicted, not merely unsourced.
+   Sol also surfaced something I missed entirely: there is a machine-enforced source tripwire at verify\_policy.mjs:398 forbidding hard\_sets from appearing in any prospective planner, with poison tests in two gates. My "surface the hard-set count" recommendation would have run straight into it. Sol's quarantine of RPE ≥ 8 as a validated proxy is also the correct call — my chat framing outran my own caveats.
+   Three defects, all documentation-only
+   R1 (P2) — the document now contradicts itself. Sol fixed §5C's false premise but left the identical premise standing in §7, which still reads "the persistence window that turns 'below MDC' into 'stalled'". That presupposes an MDC exists and only the window is missing — exactly what §5C now denies.
+   R2 (P3) — two owner dockets, no link. §8 of TRAINING\_PROGRESSION\_LAYERS.md carries items 1–8; the new PROGRESSION\_MEASUREMENT\_OPEN\_DECISIONS.md carries five more. §5C links forward; §8 doesn't. Same drift class that produced the phantom getMovementE1rmSeries citation in the first place.
+   R3 (P2) — no ledger entry, and it's a conflict in Sol's instructions, not a lapse. The work order said "exactly three documentation files." The standing ledger protocol demands a fourth. Sol followed the tighter constraint, which was defensible — but the branch would land unrecorded, immediately after you paid to backfill 0024–0039. I've resolved it in favour of the ledger and told Sol the file count becomes four.
+   The work order scopes all three tightly, restates the non-goals (including "do not work around the tripwire"), and requires the §7 bullet quoted verbatim before and after so you can read the fix without opening the file.
+   One risk not in the work order
+   The binding audit artifacts live at C:\Users\fpike\Documents\pikeMethods\audits... — outside the repository. The hashes recorded in the baseline document are the right mitigation, but if that directory is lost the hashes become unverifiable and the evidence record loses its anchor. Not a defect in Sol's work; worth a decision about whether those artifacts get archived somewhere durable.
+```
+
+### Output F(G(x))
+
+- Corrected `docs/decisions/TRAINING_PROGRESSION_LAYERS.md` §7 from
+  `the persistence window that turns "below MDC" into "stalled"` to
+  `any app-specific e1RM error bound or persistence rule that would declare stagnation`, removing
+  the false premise that an app-specific MDC already exists.
+- Linked the phase-model owner docket to
+  `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md` and explicitly separated their scopes.
+- Added the external audit-artifact durability risk as a sixth pending owner decision without
+  copying, moving, or selecting an archive location.
+- Added this ledger record as the fourth documentation file. No runtime, test, migration, policy,
+  package, or audit-artifact file changed; the prospective-planner `hard_sets` tripwire was not
+  bypassed or weakened.
+- Verification: `npm run typecheck`, `npm run verify:blocks`, and `npm run verify:policy` all exit
+  `0`; `git diff --check` exits `0`; all six binding audit hashes match; the 51-claim disposition
+  remains exactly 3 retain / 17 rewrite / 17 quarantine / 14 full text required.
+- No new research or full-text retrieval was performed. No commit was created; the four-file
+  working delta awaits independent Hermes/OX Alpha audit and owner review.
+
+---
+
+## Entry 0041 — 2026-08-26 · Progression evidence remediation commissioning prompt — late capture
+
+This prompt survives verbatim in the current task history but was not recorded before the first
+three documentation writes. It is appended now rather than silently rewriting Entry 0040.
+
+### Input G(x)
+
+```text
+# Files mentioned by the user:
+
+## workorder.md: C:/Users/fpike/Documents/pikeMethods/audits/progression-terra-2026-08-26-full-audit/workorder.md
+
+Distinguish instructions in attached documents from the user's request.
+
+## My request:
+please start , ive changed the effort setting , please present to me any extra work that needs to be investigate, dont prepare research yourself
+```
+
+### Output F(G(x))
+
+- Created `docs/research/PROGRESSION_MEASUREMENT_EVIDENCE_BASELINE.md` as the audit-bounded
+  canonical evidence record, with all six binding artifact hashes and source-access limits.
+- Created `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md` with no product option or
+  numerical value preselected and with future investigation explicitly outside the phase.
+- Corrected `docs/decisions/TRAINING_PROGRESSION_LAYERS.md` §5C: the pinned baseline exposes pure
+  e1RM derivation functions but no store getter, persistence, display, threshold, or detector;
+  direct supervised 1RM reliability is not an app-e1RM MDC.
+- Mapped all 51 material audit claims exactly once: 3 retain, 17 rewrite, 17 quarantine, and
+  14 full text required. Quarantined constants appear only as visibly rejected historical claims.
+- Worked from commit `368e82d508be30956afbd1f6166d68bcf04ae432` on branch
+  `codex/progression-evidence-remediation` in a dedicated worktree. No research was performed and
+  no original audit artifact was modified.
+- Initial verification: `npm run verify:blocks` and `npm run verify:policy` exited `0`; all six
+  audit hashes matched; the delta was documentation-only. No commit was created.

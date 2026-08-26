@@ -203,12 +203,17 @@ advances.
 not do is suspend the macro sequence — the athlete still consumes a macro position while
 recovering. A halt is the natural engine-side signal for entering the suspended state.
 
-**C — Engine-observed, soft.** Stagnation. This is the one that needs the e1RM series
-(`packages/inference/src/e1rm.ts`, `getMovementE1rmSeries` at `useStore.ts:4301`) and it is
-**not buildable yet**: the published MDC values are real but the persistence window — how many
-weeks of non-progression constitute a stall — is supplied by no cited source. Until that is
-ratified, stagnation should be a *confirmatory* signal behind an athlete declaration, not a
-trigger in its own right.
+**C — Engine-observed, soft.** Stagnation. At the pinned R8 baseline,
+`packages/inference/src/e1rm.ts` exposes pure derivation functions, but there is no store getter,
+persistence, display, threshold or detector. Direct supervised 1RM reliability cannot be
+transferred into an MDC for the app's RPE-adjusted e1RM series. The documented audit searches did
+not locate qualifying direct validation for an app-specific MDC or persistence window, and no
+such value is ratified. Stagnation therefore remains non-authoritative and unimplemented; any
+future use requires a separate owner ruling after source-located evidence or an approved own-data
+protocol. See
+[`PROGRESSION_MEASUREMENT_EVIDENCE_BASELINE.md`](../research/PROGRESSION_MEASUREMENT_EVIDENCE_BASELINE.md)
+and
+[`PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md`](PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md).
 
 **Recommendation: build A first.** It requires no unratified number, and it covers the two
 cases the carousel handles worst — injury and a real competition date.
@@ -248,7 +253,7 @@ population and Calibration Policy v1 §5 forbids inventing them:
 
 - how many blocks a phase should last;
 - taper duration, or its volume-reduction percentage;
-- the persistence window that turns "below MDC" into "stalled";
+- any app-specific e1RM error bound or persistence rule that would declare stagnation;
 - any load or effort modifier for entering or leaving rehab;
 - how far out from a competition date preparation should begin.
 
@@ -258,6 +263,11 @@ by making transitions athlete-declared (§5A).
 ---
 
 ## 8. Open decisions for the owner
+
+This section tracks phase-model decisions. Progression-measurement decisions are maintained in
+the separate
+[`PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md`](PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md)
+docket; both records must be checked before authorizing work that crosses the two scopes.
 
 ### Settled
 
