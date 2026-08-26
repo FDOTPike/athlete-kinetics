@@ -1190,3 +1190,448 @@ Could we commit the last phase before making any new workorders?
   `.github/workflows/ci.yml` documents both checks as structurally excluded from CI and reserved
   for the owner's pre-release run.
 - Not pushed. Push remains gated on the owner's on-device check.
+
+---
+
+# Retrospective Backfill — Entries 0024–0039
+
+Appended 2026-08-26. Covers the 92 commits between Entry 0022 (2026-07-15) and
+Entry 0023 (2026-08-26), a period during which the ledger was not maintained.
+
+**Read this before using these entries as ledger data.** This ledger's contract is that
+`Input G(x)` is the exact verbatim prompt. **None of the prompts for this period survive.**
+The work ran through Codex/Sol, Antigravity, Gemini and Steve sessions whose transcripts are
+not in this repository, and no prompt text was captured at the time. Paraphrasing a prompt into
+the input slot would corrupt the intent→output correspondence the ledger exists to record, so
+every entry below marks its input `NOT RECOVERABLE` and names whichever tracked mandate document
+survives in its place.
+
+`Output F(G(x))` in this section is reconstructed from commit metadata, commit bodies, and the
+tracked handover / work-order / run-log documents. All of it is repository evidence; none of it
+is inferred beyond what those sources state.
+
+Entry numbers reflect the order these records were **written** (the ledger is append-only), not
+the order the work happened. Each entry carries the true date of its commits.
+
+---
+
+## Entry 0024 — 2026-07-15/16 · Phase 17 guided-session runner, UI primitives, migration 023
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandate: none tracked. Closest record: HANDOVER_2026-07-14_OVERNIGHT.md.
+```
+
+### Output F(G(x))
+
+- `98434e2` — session target provenance snapshot: migration 022 tables for frozen session, slot
+  and set-target provenance; store/screen wired to slot-aware logging and substitution; autopilot
+  confidence adjusted so target-less days do not count toward observations.
+- `29e8e21` — Phase 17 runtime and UI surface: deterministic session runner (serialization,
+  replay, checkpointing, validation), persistence hooks and runner-checkpoint wiring, migration
+  023 (session targets, runner checkpoint, UI prefs, time policy, coaching intent),
+  `FocusPrimitives`, Readiness/Coach/Session/Profile refactors for session modes, band ladder,
+  rest timer and subject reports; coaching-content generator plus tests; verify gate count raised.
+- `8e93041` — ledger updated with the audit P1–P2 fixes. **This is the last ledger maintenance
+  before the present backfill.**
+
+---
+
+## Entry 0025 — 2026-07-17 · Phase 17 content and migration safeguards (024, 025)
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandate: none tracked.
+```
+
+### Output F(G(x))
+
+- `ae17922` — migration 024 enforcing the ratified equipment-prefix fixes (DB bench / shoulder
+  press, banded Pallof), wired into migration and store SQL verification. Coaching-content
+  generation tightened with full-coverage checks, generic-intent rejection, and staging↔manifest
+  fingerprint validation; cross-platform Python launcher added for verify scripts; runner
+  regression tests for recovery, rest-day, runner-state and substitution behaviour.
+- `8d18af4` — migration 025 seeding reviewed movement coaching intent plus movement-detail
+  instructions, cues and video URLs, including the approved Feet-Elevated Push-Up video
+  replacement. Attested content hashes recorded in the manifest; completeness asserted at
+  124 records with idempotent re-application coverage.
+
+---
+
+## Entry 0026 — 2026-07-21 · pikeMethods UI skin system and Phase 18 session outcomes (026)
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandate: WO_UI_SKIN.md, DESIGN_BRIEF_pikeMethods.md (both tracked).
+```
+
+### Output F(G(x))
+
+- `d69d8ef` — pikeMethods visual foundation: Archivo font assets, canonical theme tokens, shared
+  UI primitives, a new Library screen and tab, broad screen refactors and test coverage. Landed
+  Phase 18 training-decision recording end to end: migration 026 (immutable set dose and session
+  outcome tables plus triggers), the pure outcome classifier in `packages/inference`, store
+  finalization wiring, and new outcome/migration verification gates.
+- `03c6938` — ProfileScreen bug fix.
+
+---
+
+## Entry 0027 — 2026-07-27 · Capability pipeline and routine template builder checkpoints
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandate: none tracked.
+```
+
+### Output F(G(x))
+
+- `4a471e7` — capability resolution, progression-aware selection, deterministic history import,
+  routine foundations, readiness safeguards, measured analytics, and the mobile navigation
+  baseline.
+- `6ff5449` — durable routine template builder.
+- `8935f60` — audit remediation against `6ff5449`: macro-cycle continuity, template delete
+  transaction, conditional role gate.
+
+---
+
+## Entry 0028 — 2026-07-27/28 · Phase 19B overnight run (T1–T14, F1–F3)
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — the per-task mandates (T0–T14, F1–F3) were issued in an
+overnight run and were not captured verbatim.
+Surviving record: PHASE19_RUN_LOG.md (tracked) — per-task commit, files,
+anchors, gates, negative test, decisions, and items flagged for Francis.
+That log is an OUTPUT record, not the input prompts.
+```
+
+### Output F(G(x))
+
+- Baseline `8935f60`; every task self-verified against `verify:all` with a named negative test.
+- `ec48d31` T1 — stray CR removed from BlockScreen.
+- `d07c537` T2 — `latestLoadMap` reworked to a per-movement index seek bound by library size
+  rather than by history length.
+- `25be55f` T3 — `resolveGoalRung` bounded by a 180-day capability evidence window;
+  `CAPABILITY_EVIDENCE_WINDOW_DAYS` added and the signature changed to take a reference date.
+  **Flagged at the time as an athlete-visible behaviour change awaiting ratification.**
+- `26ff2fd` T4 — `chainProjection.ts`: pure derivation of progression chains from the capability
+  graph, throwing on cycles, branching and disconnected components.
+- `51b6eb9` T5 — store writer and gate for capability edge attestation.
+- `f4d7183` T6 — capability verdicts and human-readable reasons surfaced in LibraryScreen,
+  SessionScreen and store errors.
+- `56091b1` T7 — `AK_HISTORY_V1` documentation, sample template, automated gate.
+- `efc1284` T8 — archived training block state surfaced in BlockScreen, with component test;
+  corrected by `3483c9f` to use a verbatim archived block copy.
+- `b6a527b` T9 — gate count reconciled across verification scripts; corrected by `0c46898` to
+  19 gates + typecheck in `AGENT_WORKFLOW.md` and `ci.yml`.
+- `6baf2fc` T10 — iOS Apple Health technical design analysis; superseded by `004408e`
+  (`ANALYSIS_ios_biometrics_gap.md`) and folded together by `a17c8b3`.
+- `13669c3` F1 — false "block started" message suppressed when no active block exists.
+- `ff5835a` F2 — history-import example and AI prompt made selectable on screen.
+- `c32fd22` F3 — duplicate CI step removed; documentation gate drift check added to
+  `verify:store`.
+- `ed2c7d0` T11 — `_chain_projection.sql.tpl` added and SQL/TS equivalence proven in
+  `verify:pipeline` and `verify:store`.
+- `03e2fe4` T12 — capability content ingestion generator and test suite.
+- `3128700` T13 — behavioural coverage for the template builder and freeze-refusal paths.
+- `9f7279a` T14 — technical analysis of history-file input options and memory footprint.
+- `5fcb11f`, `cd46b8a` — `PHASE19_RUN_LOG.md` finalized.
+
+---
+
+## Entry 0029 — 2026-07-28 · Phase 19B closeout: capability content (032), release readiness
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandate: none tracked.
+```
+
+### Output F(G(x))
+
+- `a117772` — capability migration generator CLI wired (`T-A`).
+- `3612c23` — migration 032: capability content — 8 chains, 4 major and 12 conditional roles.
+- `62b5d32` — `RELEASE_READINESS.md` added.
+- `5bf11ba` — agent scaffolding and local scratch gitignored.
+- `84f3e7e` — Antigravity SDK project agent harness added.
+
+---
+
+## Entry 0030 — 2026-07-31 · Autopilot stability remediation and the completion observer
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandates (all tracked): docs/WORKORDER_Sol_autopilot_stability.md,
+docs/WORKORDER_autopilot_stability_remediation.md,
+docs/WORKORDER_Sol_completion_vs_prescription_observer.md,
+docs/PROMPT_Sol_autopilot_stability.md, docs/SWEEP_completion_action_2026-07-31.md.
+These are the work-order documents the phase was executed against; they are not
+the chat prompt that commissioned them.
+```
+
+### Output F(G(x))
+
+- `2a21ded` — kinematic autopilot control loop stabilized.
+- `1ec16e0` — explicit actual-RPE evidence now required, so a missing rating cannot be read as
+  agreement with the target.
+- `af4546d` — dormant completion-action path added: `completionAction.ts`, an independently
+  bounded, never-upward control action kept separate from the RPE observer, with no default
+  numeric policy.
+- `32a457b` — mobile session and coach UI defects fixed.
+- `8744c80` — athlete blocks and session controls preloaded.
+
+---
+
+## Entry 0031 — 2026-08-03 · Guided goal programs
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandate: none tracked.
+```
+
+### Output F(G(x))
+
+- `4c5056f` — planned completion derived from outcomes rather than tracked separately.
+- `ff72694` — guided goal programs added (migration 033, `training_program` with
+  `horizon_kind` / `requested_review_date`).
+
+---
+
+## Entry 0032 — 2026-08-06/07 · Guided-program merge readiness, alignment, WO-UI-3/4 closeout
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandate: WO_UI_3_4_punchlist.md (tracked),
+HANDOVER_WO-UI-2_to_4_for_Fable.md (tracked).
+```
+
+### Output F(G(x))
+
+- `0d97f50` — guided programs own their macro progression
+  (`starting_macro_block_index + sequence - 1 mod 8`), with preview and committed generation
+  sharing one derivation and boundary tests at starts 6/7/8 plus wrap; shared program
+  transaction; jest path fix; 16 KB alignment.
+- `0068a5b` — Android ELF alignment audit now fails closed.
+- `4f064ac` — WO-UI-3/4 punchlist closeout.
+- `ab42b0e` — autopilot target attribution persisted (migration 034).
+
+---
+
+## Entry 0033 — 2026-08-07/08 · Four-mode load selection
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandates (tracked): docs/WO_FOUR_MODE_LOAD.md,
+docs/SPEC_FOUR_MODE_LOAD_KIMI.md, docs/PROPOSAL_experience_tiered_load_selection.md.
+```
+
+### Output F(G(x))
+
+- `004d1ce` — four-mode load selection ratified in documentation before implementation.
+- `617039f` — implemented (`loadSelection.ts`, migration 035 profile load preference).
+- `5116ff7` — audit findings closed: production persistence seam used for durable SQLite
+  evidence, resolver inputs passed through unchanged, direct-entry boundaries covered,
+  active-session authority preserved, canonical Kimi provenance and scenario matrix reconciled.
+
+---
+
+## Entry 0034 — 2026-08-09 · Phase 2A movement library (batches 037–048) and Android boundary
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandate: HANDOVER_2026-08-09_PHASE_2A_MOVEMENT_LIBRARY.md (tracked),
+AGENT_WORKFLOW.md section 5 curation contract and section 11 WO-1/WO-3 batch pattern.
+```
+
+### Output F(G(x))
+
+- `578b0cd` — Android pre-release boundary hardened.
+- `fc020b5`, `a342563`, `90858e0`, `4a9d323`, `ea3d1db`, `332e356` — movement library v2
+  batches, migrations 037 through 048, two slots per commit via the batch generator.
+- `1fcac30` — Phase 2A movement library completed.
+
+---
+
+## Entry 0035 — 2026-08-12 · Movement corrections, ONNX packaging, coach verification lab
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandates (tracked): docs/audits/phase-2a-movement-library/OPUS_AUDIT_PROMPT.md,
+docs/audits/pre-release-coach-verification-lab/CLAUDE_CODE_AUDIT_HANDOVER.md,
+docs/decisions/coach-verification-lab.md.
+```
+
+### Output F(G(x))
+
+- `2e223fe` — pre-release movement corrections finalized (migration 049).
+- `1854a8a` — ONNX APK and AAB packaging verified in the Gradle build.
+- `2f67d56` — ONNX release hardening gaps closed.
+- `37a06b8` — supplementary role eligibility converged (migration 050).
+- `ebaf784` — hidden coach verification lab added.
+- `ef825a7` — coach lab verification handed over.
+
+---
+
+## Entry 0036 — 2026-08-13 · Routine access control, bounded microcycle, embedder supply chain
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandates (all tracked): HANDOVER_2026-08-13_ROUTINE_CONTRACT_CUTOFF.md,
+HANDOVER_2026-08-13_BOUNDED_MICROCYCLE.md,
+HANDOVER_2026-08-13_BOUNDED_MICROCYCLE_AUDIT_REMEDIATION.md,
+HANDOVER_2026-08-13_EMBEDDER_SUPPLY_CHAIN_PIN.md,
+HANDOVER_2026-08-13_EMBEDDER_SUPPLY_CHAIN_PIN_AUDIT_CORRECTION.md,
+docs/decisions/ROUTINE_MAJOR_SUPPORT_POLICY.md,
+docs/decisions/ROUTINE_BOUNDED_MICROCYCLE_POLICY.md.
+```
+
+### Output F(G(x))
+
+- `3870825` — context-aware movement access enforced in routines.
+- `046a165` — audit findings closed: SessionScreen's session-wide early blocker was firing on
+  any non-available verdict, so an ordinary mid-session niggle blanked the entire active session.
+- `6b233b6` — access enforced at the log boundary: `useStore.logSet` is a public action and a
+  direct call could write a `set_record` without revalidating the movement.
+- `6cfb990` — major RPE projected and support work ranked.
+- `f41712d` — uncapped microcycle stress bounded; `d3cab60` closed its audit findings.
+- `291183e` — routine legacy-role provenance sealed in migrations.
+- `2f4e72e` — embedder model supply chain pinned; `4a95679` closed its audit findings.
+
+---
+
+## Entry 0037 — 2026-08-14/15 · Longitudinal bounds verification and Calibration Policy v1
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandates (tracked): HANDOVER_2026-08-14_FINAL_AUDIT_RPE_CORRECTION.md,
+tools/autopilot-sim/HANDOVER_2026-08-14_LONGITUDINAL_BOUNDS.md,
+docs/decisions/CALIBRATION_POLICY_V1.md,
+docs/decisions/FOUR_LIFT_EQUIVALENT_VOLUME.md.
+```
+
+### Output F(G(x))
+
+- `a38ab10` — authored projected RPE ceiling preserved.
+- `12da513` — longitudinal bounds verification added; hardened per audit in `7002c24`;
+  findings closed in `f6dce82`; P2 closeout and repair summary in `2ed9531`; final audit debt
+  cleared in `d726a01`.
+- `6727cba` — pre-release calibration acceptance, migration 055, and device evidence. This is
+  the commit that lands **Calibration Policy v1**: ACWR made descriptive only and stripped from
+  the readiness numerator; the frozen coefficient registry; the optional 21-day return check-in
+  with no dose authority; and the ruling that no numeric value enters the engine without owner
+  ratification against a source.
+
+---
+
+## Entry 0038 — 2026-08-17/20 · Three-mode builder, schema selection, e1RM series, dated anchor
+
+### Input G(x)
+
+```
+NOT RECOVERABLE — no captured prompt.
+Surviving mandates (untracked, present in .worktrees/three-mode-workorders/):
+00_START_HERE.txt, 01_WORKORDER_A_CHOOSER_AND_SPLIT.txt,
+02_WORKORDER_B_LEARNING_LAYER.txt, 03_WORKORDER_C_NEXT_BLOCK_PANEL.txt.
+Related tracked decisions: docs/decisions/TRAINING_STRUCTURE_CONVENTIONS.md,
+docs/decisions/TRAINING_PROGRESSION_LAYERS.md.
+```
+
+### Output F(G(x))
+
+- `a6be1a2` — tiered movement picker (migration 056 + `pickerTiering.ts`), three-mode entry, and
+  the learning layer. Backfilled the 21 movements missing a `movement_taxonomy` row so tier
+  assignment is total.
+- `4b8d8e5` — `SELECTABLE_SCHEMA_TYPES` added and `STEP` retired from selection on
+  product-simplification grounds. Recorded reasoning: a loading schema governs one layer only —
+  how sets, reps and effort move week to week inside a block — and judging it by long-term
+  adaptation is a category error. `WAVE` was subsequently reinstated carrying no evidential claim
+  of superiority.
+- `a812cee` — `e1rm.ts`: estimated 1RM derived from logged sets by reading the ratified
+  `targetPct` translation backwards. No second formula, no new coefficient, so Calibration Policy
+  v1 §5 is not engaged. Deliberately observational — no minimal detectable change, no persistence
+  window, no notion of a stall, and a set logged without an RPE yields null rather than a
+  fallback. **It writes nothing and, as of this entry, is consumed by nothing.**
+- `dc1d89a` — a dated goal program now anchors so its peak lands on the date. Previously the
+  competition date decided only how many blocks the athlete received.
+
+### Flagged during backfill
+
+`docs/decisions/TRAINING_PROGRESSION_LAYERS.md` §5C cites `getMovementE1rmSeries` at
+`useStore.ts:4301`. No such function exists on this branch — `e1rm.ts` has no store wiring and no
+UI. The document reads as though an e1RM series is available to the app; it is not.
+
+---
+
+## Entry 0039 — 2026-08-25 · pikeMethods revision-8 closed-test release candidate
+
+### Input G(x)
+
+```
+NOT RECOVERABLE as a chat prompt.
+Surviving mandate: STEVE_OX_ALPHA_PIKEMETHODS_R8_WORK_ORDER.md.txt — present in
+the worktree as an UNTRACKED owner artifact, deliberately kept out of commits per
+its own Phase 1 rule that no audit-only file enters a commit. It is the closest
+thing to a verbatim input for this phase and is not preserved by git.
+```
+
+### Output F(G(x))
+
+- `a276bf1` — audited revision 7 preserved byte-for-byte as an immutable checkpoint against the
+  required tracked-diff fingerprint, on branch `codex/pikemethods-closed-beta-r8`.
+- `75ef8ba` — revision-8 remediation, R8 sections 2.1–2.7: today-spine calendar derivation with
+  recovery-day markers, the `DemoLoadResult` contract, Program Setup guidance messages, the
+  Archivo packaging gate, permanent Play identity (`com.pikemethods.training`), and the offline
+  manifest posture, with the full Phase 3 test matrix.
+- `1edf390` — Gradle lint tasks given an explicit dependency on the Archivo packaging task, which
+  Gradle 8.14 implicit-dependency validation was rejecting.
+- `125fcf4` — candidate verification accepts an empty `newFiles` array, which is the expected
+  shape for a genuinely clean candidate; model size gate hardened.
+- `bff0a38` — `android.permission.INTERNET`, injected into production merges by
+  `react-native-blob-util`, stripped explicitly.
+- `62af2e5` — `MainActivity.getMainComponentName()` returned `AthleteKinetics` while JS registered
+  `pikeMethods`, crashing the packaged QA artifact at cold launch. Registered natively.
+- `ff6f137` — Kotlin daemon session markers gitignored; they were leaking into the candidate
+  manifest's `newFiles` list.
+- Phase ends at **HUMAN CHECKPOINT A**: ten owner decisions outstanding (launcher and Play icon
+  assets, launch-screen decision, support contact email, privacy-policy and medical-disclaimer
+  approval, Play Console account, fee and identity verification, upload-key permission,
+  screenshot bundle approval, further QA data-reset permission, and personal on-device
+  confirmation). Nothing merged, pushed, uploaded, or credentialed while it is open.
+
+---
+
+## Backfill coverage note
+
+Entries 0024–0039 account for all 92 commits between `98434e2` (2026-07-15) and `ff6f137`
+(2026-08-25). Entry 0023 covers `f686d7e` (2026-08-26). No commit in that range is unrecorded.
+
+Sixteen entries carry `NOT RECOVERABLE` inputs. That is the honest state of the record and it is
+the cost of the ledger having lapsed for six weeks: the outputs survive in git, the intents do
+not. Restoring the isomorphism this ledger is for requires capturing prompts at the time they are
+issued, which Entry 0023 onward resumes.
