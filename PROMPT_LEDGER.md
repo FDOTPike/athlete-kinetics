@@ -2209,3 +2209,93 @@ volume allocation) for ruling.
 - Gates re-run after writing (documentation only): `typecheck`, `verify:policy`, `verify:blocks` —
   exit codes in the commit message.
 - Not pushed.
+
+---
+
+## Entry 0050 — 2026-08-27 · RR-04, ladder reconciliation, injury-trigger proposal, RR-03 parked
+
+### Input G(x)
+
+```
+Please see the following corrections
+
+1.  **"Execute RR-04:** Bias the `+1 set` volume modifier strictly to the primary slots using `ACCESSORY_SLOT_FROM`, leaving accessories flat."
+2.  **"Fix the Ladder Bug:** Reconcile the `resolveActiveRung` requirement (3x8) with the `LINEAR` phase prescriptions so athletes can actually level up to harder variations."
+3.  **"Draft the Injury Trigger:** Before you build RR-02 (Migration 058), output a quick proposal for how the athlete explicitly enters and exits the rehab state so we aren't writing a database column to a ghost trigger."
+4.  **"Park RR-03:** Discard the hallucinated taper math. Acknowledge that the engine currently lacks Taper and Non-7-Day Micro-Cycle architecture, and docket this as a massive future build phase."
+
+As for 4, please defer this to Sol, titled : Non-7-Day Micro-Cycle architecture implementation (9day, 12, 14 day mirco cycles implemented into block generated / coaching engine / app in general
+Also note that taper weeks should be accompanied by a peak 1-2 week prior and usually an intensity block 4 weeks , that usually focused on higher intensity and sets, lower volume to maximize skill / super compensation effect during peak/ taper weeks , this will need to be implemented in the future
+```
+
+### Output F(G(x))
+
+- **(1) RR-04 executed.** `workingSetsFor` now takes `phaseSets` as a parameter instead of reading
+  `phaseMod.sets` internally, and the slot loop passes `primarySlot ? phaseMod.sets : 0` where
+  `primarySlot = slotIndex < ACCESSORY_SLOT_FROM`. `volume` is the only phase with a non-zero delta,
+  so this is precisely where `volume` stops being `hypertrophy`. **No new number** — only the
+  placement of an existing ratified `+1` changed. Measured in a volume block: loaded primaries 5
+  sets, loaded accessories 4.
+- **(2) Ladder bug fixed.** Added a bodyweight rep floor at
+  `DEFAULT_ADVANCEMENT_POLICY.requiredReps`, **imported from `progressionEngine.ts`, never restated**
+  — the same single-source discipline the `e1rm.ts`/`targetPct` tripwire enforces, so the
+  prescription and the criterion it must satisfy cannot drift apart. Rationale recorded in code:
+  `PHASE_MODS`' rep deltas encode a load/rep trade a movement with no load channel cannot make, so
+  bodyweight slots were prescribed below the level at which their own capability is measured.
+  **Result: the ladder is now reachable in 8 of 8 macro blocks, up from 2 of 8.** Bodyweight reps
+  move gpp 7→8, volume 5→8, peak 3→8; hypertrophy was already 8. Loaded prescriptions and every
+  deload are untouched — both machine-asserted.
+- **Disclosed dose change requiring the owner's eye:** the floor applies to *all* strictly bodyweight
+  movements, not only those on a ladder chain, because chain membership is not available in the
+  generator's input. A bodyweight accessory therefore also rises to 8 reps. Defensible — a bodyweight
+  movement below 8 reps is a weak stimulus for most athletes — but it is a real increase and is
+  flagged rather than buried.
+- **Regression guards.** New `[9c]` (5 assertions) and `[9d]` (7 assertions) in `verify_blocks.mjs`.
+  `[9c]` proves the volume delta reaches primaries and not accessories, with a gpp contrast block
+  proving the effect comes from the delta rather than slot ordering. `[9d]` reads the ladder policy
+  constant rather than restating `8`, proves 8/8 blocks clear the bar, proves loaded prescriptions
+  are NOT floored (min loaded reps 3 across blocks, so the phase rep shape survives), and proves the
+  deload is exempt while peak working weeks are not.
+- **Two of my own assertions were wrong and were corrected rather than the code.** `[9c]`'s first
+  version compared every primary against every accessory and failed — a bodyweight accessory
+  legitimately gains a set in weeks 2-3 from Option C, an independent mechanism; the check now
+  compares within the loaded class. `[9b]`'s "non-LINEAR schemas: bodyweight routing changes nothing"
+  then failed for WAVE/STEP/APRE, correctly: the ladder floor is deliberately schema-independent
+  because an athlete on WAVE must also be able to level up. That assertion was split into two — sets
+  and RPE identical (the setsDelta table mirrors), reps floored in every schema — so a regression in
+  one cannot hide behind the other.
+- **(3) Injury trigger proposed, not built.** `docs/PROPOSAL_suspended_state_trigger.md`. Establishes
+  that no existing signal can serve as the trigger and says why for each: `objective = 'rehab'` is a
+  goal with no start or end, `niggle` is a rolling complaint channel with no resolved flag (so
+  suspension would silently expire by timeout), and an autopilot halt is a dose event, not an injury
+  record. Proposes an athlete-declared **suspension episode row** with `ended_at_ms IS NULL` meaning
+  active and `is_suspended` **derived rather than stored**, since a stored boolean has nowhere to put
+  the frozen macro position the ratified requirement needs. Reason domain `injury | illness | life` —
+  `life` argued for deliberately, since restricting suspension to injury leaves the commonest cause
+  of a training gap still burning the progression track. Entry and exit are athlete-owned; the app
+  may prompt but never infers, matching the ratified halt-prompts-rather-than-suspends posture. No
+  auto-expiry and no maximum duration, because the app has no ratified return-to-training modifier
+  and inventing a decay curve would be a new coefficient. Suspension freezes macro position and
+  nothing else, keeping it orthogonal to the rehab objective. Four open questions named for the work
+  order. **No migration, column, or code written**; records that the free slot is 058, not 059.
+- **(4) RR-03 parked.** `docs/PARKED_RR03_taper_and_microcycle_architecture.md`. Neither option ruled;
+  50%, 30%, 60%, 40-60%, 41-60% and the Bosquet/Mujika attributions are quarantined from any work
+  order. Records the two real absences: no taper primitive (a deload cuts volume *and* intensity, a
+  taper holds intensity — `PHASE_MODS` cannot express that) and no non-7-day micro-cycle architecture
+  (`BLOCK_WEEKS = 4` and week-indexed schema rows are the periodization primitive), and notes that an
+  8-14 day taper cannot be expressed in a 7-day grid at all — which is what forced RR-03's false
+  choice. **The owner's periodization intent is recorded**: intensity block (~4 wk, higher intensity
+  and sets, lower volume) → peak (1-2 wk) → taper → competition, with the consequences drawn out —
+  the unit of periodization becomes the multi-block sequence rather than the block, and "higher sets,
+  lower volume" is not currently expressible because volume is emergent from sets x reps rather than
+  modelled. Those durations are recorded as design intent, **not ratified coefficients**. Deferred to
+  Sol under the owner's title: *Non-7-Day Micro-Cycle architecture implementation — 9-day, 12-day and
+  14-day micro-cycles into the block generator, coaching engine and app*, scoped as an architecture
+  phase with the blast radius listed from source.
+- Standing docket updated: `TRAINING_PROGRESSION_LAYERS.md` §8 gains two Settled rows (RR-04 and the
+  ladder floor), item 4 struck as settled, item 2 marked PARKED with a pointer, and item 1's stale
+  "migration 057" corrected to 058 with a pointer to the trigger proposal.
+- **Gates: all 14 runnable exited 0** — typecheck, policy, blocks, autopilot,
+  autopilot-counterexamples, progression, db, demo, migrations, runner, outcomes, pipeline, coach,
+  library. `verify:ci` still cannot complete in this worktree for the known preflight reason.
+- Not pushed.

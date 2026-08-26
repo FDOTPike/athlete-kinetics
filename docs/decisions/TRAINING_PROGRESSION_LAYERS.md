@@ -277,6 +277,8 @@ docket; both records must be checked before authorizing work that crosses the tw
 | 2026-08-20 | **`hypertrophy` and `volume` are not merged.** `volume` is skill-specific loading, not generic accumulation — merging would delete the only phase expressing sport specificity (§4). |
 | 2026-08-20 | **Taper is derived, not a fifth phase value** (§4.2), following the `recovery` precedent. |
 | 2026-08-20 | **A competition date drives phase selection.** Count back from a dated horizon; fall back to the rotation when no date exists (§5A). |
+| 2026-08-27 | **The macro phase's set delta biases to primary slots (RR-04).** `PHASE_MODS.volume`'s `+1` lands only on slots below `ACCESSORY_SLOT_FROM`; accessories stay flat. This is what makes `volume` differ from `hypertrophy`. No new number — only the placement of an existing ratified delta changed. |
+| 2026-08-27 | **Bodyweight rep prescriptions are floored at the capability ladder's advancement bar.** `PHASE_MODS`' rep deltas encode a load↔rep trade a bodyweight movement cannot make, so bodyweight slots were prescribed below the level at which their own capability is measured (7 in gpp, 5 in volume, 3 in peak, against 8). The floor is IMPORTED from `DEFAULT_ADVANCEMENT_POLICY`, never restated, so prescription and criterion cannot drift. Loaded movements and every deload are untouched. |
 | 2026-08-20 | **An autopilot halt prompts rather than auto-suspends.** The halt already deloads the whole block, so the athlete is protected either way; suspension changes weeks of future plan and should not happen silently. |
 
 **Net effect: `MACRO_PHASES` stays at its four frozen values and no migration is required for
@@ -288,13 +290,22 @@ any of the above.** The one exception is the suspended-state flag — see open q
    persistent injury state to infer from. Niggles are queried on a rolling recency window
    (`WHERE reported_at_ms >= ?`, `useStore.ts:3048`, `:5117`) with no resolved flag and no
    lifecycle — a daily complaint channel, not an injury record. So suspension needs its own
-   explicit state, which is the **only** item here that would require migration 057. Whatever
+   explicit state, which is the **only** item here that would require a migration — slot **058**, since
+   `057_block_meta_phase_invariant.sql` now occupies 057. **How the athlete enters and exits that state
+   is proposed in [`PROPOSAL_suspended_state_trigger.md`](../PROPOSAL_suspended_state_trigger.md);
+   the column must not be built before that trigger is ruled.** Whatever
    is chosen, `nextMacroPosition` (`useStore.ts:1802-1810`) must not advance while suspended.
 2. **What does a taper actually do?** Duration and volume reduction are unratified (§7).
    *When* it happens is now derivable for free; *how much* it changes is not.
+   **PARKED 2026-08-27** — the engine has no taper primitive and no non-7-day micro-cycle
+   architecture, so the question cannot be answered inside the current week model. See
+   [`PARKED_RR03_taper_and_microcycle_architecture.md`](../PARKED_RR03_taper_and_microcycle_architecture.md),
+   which also records the owner's intensity-block → peak → taper sequence intent and the deferred
+   architecture phase.
 3. **How far out from the competition date does preparation begin?** Also unratified. Counting
    back requires knowing how many blocks to reserve.
-4. **Should `volume` bias its added set toward skill/sport days** to match its stated purpose?
+4. ~~**Should `volume` bias its added set toward skill/sport days** to match its stated purpose?~~
+   **SETTLED 2026-08-27 (RR-04)** — biased to primary slots via `ACCESSORY_SLOT_FROM`. See Settled.
 5. **What is the fatigue price of a strictly bodyweight working set?** *(raised 2026-08-27 by the
    Option C implementation.)* Option C gives bodyweight slots a `setsDelta` of `0 → 1 → 1` in
    LINEAR, so a bodyweight block now carries real added volume in weeks 2 and 3.

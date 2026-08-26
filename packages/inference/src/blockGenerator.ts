@@ -42,6 +42,10 @@ import { isDifficultyAllowed, type ExecutableMovementAccessContext } from './tie
 // autopilot controller and applies its forward-looking corrections to the next
 // block (a recorded halt snaps the whole block to a recovery template).
 import { deriveControlAction, type ControlAction, type FlawReport } from './kinematicAutopilot';
+// Ladder reconciliation: the bodyweight rep floor is IMPORTED from the
+// capability ladder's own advancement policy, never restated here, so the
+// prescription and the criterion it must satisfy cannot drift apart.
+import { DEFAULT_ADVANCEMENT_POLICY } from './progressionEngine';
 
 // ---------------------------------------------------------------------------
 // Inputs / outputs (mirror the 007 block tables 1:1)
@@ -697,24 +701,39 @@ export function generateBlock(input: BlockInput): BlockPlan {
       // Factored so the loaded and bodyweight classes run through IDENTICAL
       // logic and differ only in which setsDelta row they carry. The deload
       // zeroes the delta for both — week 4 is a strict volume deload.
-      const workingSetsFor = (setsDelta: number): number => {
-        let baseSets = scheme.sets + phaseMod.sets + (deload ? 0 : setsDelta);
+      // `phaseSets` is passed in rather than read from phaseMod because RR-04
+      // (owner-ratified 2026-08-27) restricts the macro phase's set delta to
+      // PRIMARY slots. Accessories stay flat.
+      const workingSetsFor = (setsDelta: number, phaseSets: number): number => {
+        let baseSets = scheme.sets + phaseSets + (deload ? 0 : setsDelta);
         if (profile.objective === 'hybrid' && STRENGTH_FOCI.has(focus)) baseSets -= 1;
         if (profile.training_age === 'beginner') baseSets -= 1;
         if (profile.training_age === 'elite') baseSets += 1;
         baseSets = clamp(baseSets, 2, 6);
         return deload ? Math.max(1, Math.ceil(baseSets / 2)) : baseSets;
       };
-      /** External load (and weighted calisthenics): unchanged behaviour. */
-      const workingSets = workingSetsFor(wmod.setsDelta);
-      /** Strictly bodyweight slots only (Option C). Identical outside LINEAR. */
-      const workingSetsBodyweight =
-        workingSetsFor(SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA[schemaType][progIdx as 0 | 1 | 2]);
 
       // Reps: scheme reps through the schema's scale, then the phase delta.
       const reps = deload
         ? clamp(scheme.reps + phaseMod.reps, 1, 30)
         : clamp(Math.round(scheme.reps * wmod.repsScale) + phaseMod.reps, 1, 30);
+      // Ladder reconciliation (owner-ratified 2026-08-27). The capability
+      // ladder advances a rung only on `requiredReps` (progressionEngine's
+      // DEFAULT_ADVANCEMENT_POLICY, or a per-chain progression_policy row).
+      // PHASE_MODS' rep deltas encode a load<->rep trade — gpp +2, peak -2 —
+      // which a movement with NO load channel cannot make, so a bodyweight
+      // slot was being prescribed below the level at which its own capability
+      // is measured: 7 in gpp, 5 in volume, 3 in peak against a bar of 8. An
+      // athlete following the plan literally could not level up outside the
+      // hypertrophy phases.
+      //
+      // The floor is IMPORTED, never restated, so the prescription and the
+      // advancement criterion cannot drift apart — the same single-source rule
+      // the e1rm.ts/targetPct tripwire enforces. Loaded movements are
+      // untouched: they progress by load, and their rep deltas are meaningful.
+      const bodyweightReps = deload
+        ? reps
+        : Math.max(reps, DEFAULT_ADVANCEMENT_POLICY.requiredReps);
 
       // Effort: schema row picks the wave position; deload pulls below week
       // 1 and ignores phase/schema heat. Every cap below stays monotone
@@ -790,10 +809,22 @@ export function generateBlock(input: BlockInput): BlockPlan {
         // Reps are untouched for both classes. The hybrid accessory tax still
         // applies to whichever row is chosen.
         const bodyweightSlot = isPurelyBodyweight(m);
-        const slotWorkingSets = bodyweightSlot ? workingSetsBodyweight : workingSets;
+        // RR-04 (owner-ratified 2026-08-27): the macro phase's set delta is
+        // sport/primary-specific loading, not generic accumulation, so it
+        // lands ONLY on primary slots. `volume` is the only phase with a
+        // non-zero delta today, so this is where hypertrophy and volume stop
+        // being the same block. Accessories keep base sets.
+        const primarySlot = slotIndex < ACCESSORY_SLOT_FROM;
+        const slotWorkingSets = workingSetsFor(
+          bodyweightSlot
+            ? SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA[schemaType][progIdx as 0 | 1 | 2]
+            : wmod.setsDelta,
+          primarySlot ? phaseMod.sets : 0,
+        );
         let slotSets = locomotion
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
           : Math.max(1, slotWorkingSets - (taxed ? accessoryCut : 0));
+        const slotReps = bodyweightSlot ? bodyweightReps : reps;
         let slotRpe = rpe;
         const preAutopilotSets = slotSets;
         const preAutopilotRpe = slotRpe;
@@ -851,7 +882,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
           slot_index: slotIndex,
           movement_id: m.movement_id,
           sets: slotSets,
-          reps: locomotion ? LOCOMOTION_REPS : reps,
+          reps: locomotion ? LOCOMOTION_REPS : slotReps,
           target_rpe: slotRpe,
           ...(autopilotDelta === undefined ? {} : { autopilotDelta }),
         });

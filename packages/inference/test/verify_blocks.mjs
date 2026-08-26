@@ -36,6 +36,7 @@ const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS,
   SCHEMA_TYPES, SELECTABLE_SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
   MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
   PATTERN_TO_CATEGORY } = require('./.build/types.js');
+const { DEFAULT_ADVANCEMENT_POLICY } = require('./.build/progressionEngine.js');
 const {
   mapImplementToTier,
   sortPickerMovements,
@@ -673,12 +674,135 @@ check('legacy omission never yields the bodyweight progression',
   (() => { const l = pushSlots(legacyPool);
     return l[0].sets === l[1].sets && l[1].sets === l[2].sets; })());
 
-// --- non-LINEAR schemas are untouched by the bodyweight table ------------------
+// --- non-LINEAR schemas: the SETS table is untouched --------------------------
+// The Option C setsDelta table mirrors each non-LINEAR schema's own row, so set
+// counts must be identical under bodyweight routing. Reps are a SEPARATE
+// mechanism: the ladder floor is deliberately schema-independent, because an
+// athlete on WAVE must be able to level up too. Asserted separately below so a
+// regression in one cannot hide behind the other.
 for (const st of SCHEMA_TYPES.filter((x) => x !== 'LINEAR')) {
   const withBw = generateBlock({ profile: prof(bwProfile), movements, startDate: START, schemaType: st });
   const asLoaded = generateBlock({ profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: st });
-  check(`${st}: bodyweight routing changes nothing (mirrors its own setsDelta)`,
-    JSON.stringify(withBw) === JSON.stringify(asLoaded));
+  const setsOf = (plan) => plan.sessions.map((sess) =>
+    sess.slots.map((sl) => `${sl.slot_index}:${sl.movement_id}:${sl.sets}:${sl.target_rpe}`).join(','));
+  check(`${st}: bodyweight routing leaves sets and RPE identical (setsDelta mirrors)`,
+    JSON.stringify(setsOf(withBw)) === JSON.stringify(setsOf(asLoaded)));
+  const bwReps = withBw.sessions.filter((x) => x.phase !== 'deload').flatMap((x) => x.slots).map((sl) => sl.reps);
+  check(`${st}: the ladder rep floor still applies (schema-independent by design)`,
+    bwReps.length > 0 && Math.min(...bwReps) >= DEFAULT_ADVANCEMENT_POLICY.requiredReps,
+    `min reps ${Math.min(...bwReps)}`);
+}
+
+// --- [9c] RR-04: macro-phase set delta biases to PRIMARY slots ---------------
+// Owner-ratified 2026-08-27. PHASE_MODS.volume carries the only non-zero sets
+// delta (+1). It is sport/primary-specific loading, not generic accumulation,
+// so it lands only on slots below ACCESSORY_SLOT_FROM. This is what stops
+// `volume` and `hypertrophy` being the same block.
+console.log('[9c] RR-04 — phase set delta lands on primary slots only');
+{
+  const volumeBlock = generateBlock({
+    profile: prof({ objective: 'strength' }), movements, startDate: START,
+    schemaType: 'LINEAR', macroBlockIndex: 5 });
+  check('macroBlockIndex 5 resolves to the volume phase', volumeBlock.macroPhase === 'volume',
+    volumeBlock.macroPhase);
+  const work = volumeBlock.sessions.filter((x) => x.phase !== 'deload' && x.slots.length >= 3);
+  check('volume phase emits sessions with both primary and accessory slots', work.length > 0);
+  // Compared WITHIN the loaded class. A bodyweight accessory legitimately gains
+  // a set in weeks 2-3 from the Option C progression, which is an independent
+  // mechanism — mixing the classes would test both at once and prove neither.
+  const isLoaded = (sl) => {
+    const mv = movements.find((x) => x.movement_id === sl.movement_id);
+    return mv !== undefined && mv.pattern !== 'locomotion' && mv.primaryImplement !== 'Bodyweight';
+  };
+  let biased = true; let compared = 0;
+  for (const sess of work) {
+    const primary = sess.slots.filter((sl) => sl.slot_index < 3 && isLoaded(sl));
+    const accessory = sess.slots.filter((sl) => sl.slot_index >= 3 && isLoaded(sl));
+    if (primary.length === 0 || accessory.length === 0) continue;
+    compared += 1;
+    if (!(Math.min(...primary.map((sl) => sl.sets)) > Math.max(...accessory.map((sl) => sl.sets)))) {
+      biased = false;
+    }
+  }
+  check('volume: every LOADED primary carries strictly more sets than every loaded accessory',
+    compared > 0 && biased, `${compared} sessions compared`);
+
+  // The contrast that proves the delta, not just an ordering artefact: a phase
+  // with sets delta 0 must show NO primary/accessory set difference.
+  const gppBlock = generateBlock({
+    profile: prof({ objective: 'strength' }), movements, startDate: START,
+    schemaType: 'LINEAR', macroBlockIndex: 1 });
+  check('macroBlockIndex 1 resolves to gpp (sets delta 0)', gppBlock.macroPhase === 'gpp');
+  let flat = true;
+  for (const sess of gppBlock.sessions.filter((x) => x.phase !== 'deload')) {
+    const loaded = sess.slots.filter((sl) => {
+      const mv = movements.find((x) => x.movement_id === sl.movement_id);
+      return mv !== undefined && mv.pattern !== 'locomotion' && mv.primaryImplement !== 'Bodyweight';
+    });
+    if (loaded.length < 2) continue;
+    if (new Set(loaded.map((sl) => sl.sets)).size !== 1) flat = false;
+  }
+  check('gpp: loaded primary and accessory sets are equal (no delta to bias)', flat);
+}
+
+// --- [9d] ladder reconciliation ----------------------------------------------
+// Owner-ratified 2026-08-27. The capability ladder advances a rung only at
+// DEFAULT_ADVANCEMENT_POLICY.requiredReps. PHASE_MODS' rep deltas encode a
+// load<->rep trade a bodyweight movement cannot make, so bodyweight slots were
+// prescribed BELOW the level at which their own capability is measured (7 in
+// gpp, 5 in volume, 3 in peak, against a bar of 8). An athlete following the
+// plan could only level up during hypertrophy.
+console.log('[9d] ladder reconciliation — bodyweight reps reach the advancement bar');
+{
+  const floor = DEFAULT_ADVANCEMENT_POLICY.requiredReps;
+  check('the gate reads the ladder policy rather than restating a literal',
+    typeof floor === 'number' && floor > 0, `requiredReps=${floor}`);
+
+  let reachableBlocks = 0; let totalBlocks = 0; let loadedUnchanged = true;
+  const loadedRepsByBlock = [];
+  for (let i = 1; i <= MACRO_BLOCKS; i += 1) {
+    const bwPlan = generateBlock({
+      profile: prof({ objective: 'strength', equipment_inventory: [] }), movements,
+      startDate: START, schemaType: 'LINEAR', macroBlockIndex: i });
+    const bwWork = bwPlan.sessions.filter((x) => x.phase !== 'deload');
+    const bwSlots = bwWork.flatMap((x) => x.slots);
+    if (bwSlots.length === 0) continue;
+    totalBlocks += 1;
+    if (bwSlots.every((sl) => sl.reps >= floor)) reachableBlocks += 1;
+
+    // A block with full equipment must keep its LOADED rep prescription, which
+    // is phase-shaped and must NOT be floored.
+    const loadedPlan = generateBlock({
+      profile: prof({ objective: 'strength' }),
+      movements: movements.map((m) => ({ ...m, primaryImplement: undefined })),
+      startDate: START, schemaType: 'LINEAR', macroBlockIndex: i });
+    const loadedSlots = loadedPlan.sessions
+      .filter((x) => x.phase !== 'deload')
+      .flatMap((x) => x.slots)
+      .filter((sl) => {
+        const mv = movements.find((x) => x.movement_id === sl.movement_id);
+        return mv !== undefined && mv.pattern !== 'locomotion';
+      });
+    loadedRepsByBlock.push(Math.min(...loadedSlots.map((sl) => sl.reps)));
+  }
+  check('EVERY macro block now prescribes bodyweight work at or above the ladder bar',
+    totalBlocks > 0 && reachableBlocks === totalBlocks, `${reachableBlocks}/${totalBlocks}`);
+  check('loaded prescriptions are NOT floored — the phase rep shape survives',
+    new Set(loadedRepsByBlock).size > 1 && Math.min(...loadedRepsByBlock) < floor,
+    `min loaded reps across blocks = ${Math.min(...loadedRepsByBlock)}`);
+
+  // The deload is exempt: it must stay a strict cut, never floored upward.
+  const peakPlan = generateBlock({
+    profile: prof({ objective: 'strength', equipment_inventory: [] }), movements,
+    startDate: START, schemaType: 'LINEAR', macroBlockIndex: 7 });
+  check('macroBlockIndex 7 resolves to peak', peakPlan.macroPhase === 'peak');
+  const peakDeload = peakPlan.sessions.filter((x) => x.phase === 'deload').flatMap((x) => x.slots);
+  const peakWork = peakPlan.sessions.filter((x) => x.phase !== 'deload').flatMap((x) => x.slots);
+  check('peak deload reps are NOT floored (the deload stays a real cut)',
+    peakDeload.length > 0 && Math.min(...peakDeload.map((sl) => sl.reps)) < floor,
+    `deload min reps = ${Math.min(...peakDeload.map((sl) => sl.reps))}`);
+  check('peak working weeks ARE floored (bodyweight peak is no longer 3 reps)',
+    Math.min(...peakWork.map((sl) => sl.reps)) >= floor);
 }
 
 // --- [10] Calibration Policy v1: ACWR descriptive only in block generation -------
