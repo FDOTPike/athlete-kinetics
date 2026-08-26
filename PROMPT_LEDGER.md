@@ -1757,3 +1757,42 @@ please start , ive changed the effort setting , please present to me any extra w
   no original audit artifact was modified.
 - Initial verification: `npm run verify:blocks` and `npm run verify:policy` exited `0`; all six
   audit hashes matched; the delta was documentation-only. No commit was created.
+
+---
+
+## Entry 0042 — 2026-08-26 · Freeze the audited evidence remediation
+
+### Input G(x)
+
+```
+Freeze the four files with a local commit, and present the six Pending rows for my ratification.
+```
+
+### Output F(G(x))
+
+- Froze the audited delta as commit `bedf1d3b26e4785358c4eb68936c19f8fac826cd` on
+  `codex/progression-evidence-remediation`: 4 files, 492 insertions, 7 deletions, documentation
+  only. Working tree clean afterwards.
+- **The freeze commit contains the four files byte-identical to what both independent audits
+  verified.** This ledger entry is committed separately, so that appending it could not alter the
+  audited bytes. The protocol sanctions a standalone ledger commit for docs-only work.
+- Recorded the four files' SHA-256 in the freeze commit message. Neither audit produced content
+  hashes, so both verdicts referred to a mutable working tree; the freeze gives them an immutable
+  referent:
+  - `2ed45c9a…` `PROMPT_LEDGER.md`
+  - `a41400af…` `docs/decisions/TRAINING_PROGRESSION_LAYERS.md`
+  - `e58998d1…` `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md`
+  - `ee69e8a2…` `docs/research/PROGRESSION_MEASUREMENT_EVIDENCE_BASELINE.md`
+- Independent re-verification performed before the freeze, from source rather than from the audit
+  report: 51 material claim IDs matched `CLAIM_LEDGER.csv` exactly in both directions with zero
+  duplicates; the 14 fine-grained CSV verdicts cross-tabulated onto the 3/17/17/14 dispositions
+  with zero residue; the six external artifact hashes matched on recompute; `npm run typecheck`,
+  `npm run verify:blocks` and `npm run verify:policy` each exited `0`, including the source
+  tripwire proving `hard_sets` and `session_rpe` reach no prospective planner.
+- Not pushed. Push remains gated on the owner's on-device check.
+- **Nothing ratified.** All six rows in the `PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md`
+  ratification record remain `Pending`; they were presented to the owner for ruling in the same
+  turn, with options stated neutrally and no numeric value proposed.
+- Deferred and not performed: the P3-1 ledger capture-at-issue-time convention, which belongs in
+  `AGENT_WORKFLOW.md` and therefore outside this delta's audited scope. Drafted for the next work
+  order rather than applied here.
