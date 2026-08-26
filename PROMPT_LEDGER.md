@@ -1956,3 +1956,58 @@ for decision 4 ) I thought the app already included both options for the rest 1)
 - Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes in the commit message.
   Documentation only; nothing under `packages/` or `apps/` changed.
 - Not pushed.
+
+---
+
+## Entry 0046 — 2026-08-27 · Owner ratification, decision 4 — plan only, deferred
+
+### Input G(x)
+
+```
+You maybe start but allow 4)B to be done as plan only, and currently deferred until further notice
+```
+
+### Output F(G(x))
+
+- **Decision 4 ratified: option (b), PLAN ONLY, deferred until further notice.** Recorded in
+  `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md` §5 and the §9 row. All six rows are now
+  ruled. The record states explicitly that the ruling authorizes the brief and nothing else: no
+  control design, code, schema, migration, threshold, coefficient, detector, display, or work order
+  follows from it, the authorization is dormant until a new owner instruction names a next step, and
+  decision 3 still gates execution regardless of what the brief concludes.
+- Wrote `docs/BRIEF_progression_control_safety.md` — the system-safety brief §5 required, covering
+  signal missingness, bias, failure modes, authority limits, and prospective validation, plus a scope
+  check and a recommendation. Every factual claim about the app carries a file and line; all fifteen
+  citations were verified by reading the cited line before commit.
+- **Two errors in the preceding chat analysis were found and corrected in the brief, both of which
+  had made option (b) look harder than it is.**
+  1. I stated the engine "can currently only ever reduce" and that no input can raise dose. **That
+     is wrong.** `LOAD_MODIFIER_LITERALS` includes `1.05` (`outputSchema.ts:16`) and two live paths
+     emit a raise: `kinematicAutopilot.ts:425` on strong negative flaw score, and
+     `policyReference.ts:39` at readiness ≥ 85 with non-negative HRV z. A progression signal asking
+     for more work would not be architecturally novel; readiness already does it. What is novel is
+     the input class, not the direction.
+  2. I implied the guard layer would need designing. It exists and is mature: a monotone-conservative
+     override with three independent triggers (`kinematicAutopilot.ts:437-442`), `Math.min`
+     arbitration across actions (`completionAction.ts:243-246`), an anti-windup volume budget
+     (`kinematicAutopilot.ts:452-455`), and halt supremacy (`blockGenerator.ts:506-511`). Option (b)
+     is adding one input to a guarded loop, not building a loop.
+- Findings the brief records that were not previously stated: `e1rm.ts:77` returns null for
+  `loadKg <= 0`, so **bodyweight movements produce no e1RM at all** — an e1RM-driven controller would
+  be blind exactly where the originating push-up complaint lives; and the push-up defect itself is a
+  layer-2 scheme issue (`SCHEMA_WEEKS.LINEAR` holds `repsScale: 1` across all three weeks at
+  `blockGenerator.ts:384-387` while `WAVE` and `STEP` vary reps and sets), addressable with no
+  measurement authority at all.
+- The brief's recommendation is **not to execute option (b) yet and not to commission literature
+  research for it**: it is gated on decision 3, the autoregulation literature was already asked and
+  returned nothing that settles the boundary (H-Q8-01), and re-commissioning invites re-importing
+  quarantined material. One narrow question is identified as literature-suitable if authority ever
+  moves beyond reduction-only — safety frameworks for closed-loop systems driven by self-reported,
+  biased measurement, a corpus the audit never searched.
+- The brief contains no threshold, coefficient, window length, smoother, or detector, and §10 names
+  what it deliberately omits so absence is not mistaken for oversight. It proposes no estimate of RPE
+  presence frequency, because that needs closed-beta data and inventing it would repeat the exact
+  failure the evidence audit corrected.
+- Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes in the commit
+  message. Documentation only; nothing under `packages/` or `apps/` changed.
+- Not pushed.

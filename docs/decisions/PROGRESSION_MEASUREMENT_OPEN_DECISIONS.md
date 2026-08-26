@@ -153,6 +153,22 @@ automatic deload, automatic niggle insertion). That is the same *class* of quest
 measurand and a different safety profile, and it is not covered by this ruling. It requires its own
 boundary decision and its own system-safety brief.
 
+**Owner ruling — ratified 2026-08-27: option (b), authorized as PLAN ONLY and deferred until
+further notice.**
+
+- **What is authorized:** the system-safety brief named below, at
+  [`docs/BRIEF_progression_control_safety.md`](../BRIEF_progression_control_safety.md). Analysis and
+  design reasoning only.
+- **What is not authorized:** any implementation whatsoever. No control design, code, schema,
+  migration, threshold, coefficient, smoother, detector, display, or work order follows from this
+  ruling. The brief may recommend; it ratifies nothing.
+- **Deferred until further notice.** The authorization does not lapse, but it is dormant. Producing
+  the brief does not advance the phase, and no further step may be taken without a new explicit
+  owner instruction naming that step.
+- **Decision 3 still gates execution.** No progression measurement yet has an established
+  repeatability or minimal detectable change, so any control proposal in the brief remains
+  unvalidatable until that protocol lands, whatever the brief concludes.
+
 **Further investigation if requested:** establish a separate system-safety brief covering signal
 missingness, bias, failure modes, authority limits, and prospective validation before any control
 proposal is drafted.
@@ -254,6 +270,6 @@ The following work remains available for later, separately approved tasks:
 | Dormant e1RM series | **Ratified — (a) dormant; gated-disclosure rider unratified** | 2026-08-26 | H-Q2-03/04/05/07; H-Q5-01 |
 | Hard-set count | **Ratified — (b) descriptive display, later work order** | 2026-08-26 | H-Q3-02; A-Q3-01/03/04; A-Q7-02 |
 | Own-data repeatability protocol | **Ratified — (b) future phase designs protocol** | 2026-08-26 | A-Q2-04; H-Q5-03; A-Q5-03/04 |
-| Descriptive/prescriptive boundary | Pending — re-scoped 2026-08-26, see section 5 | — | H-Q8-01; A-Q8-01/02/03 |
+| Descriptive/prescriptive boundary | **Ratified — (b) plan only, deferred until further notice** | 2026-08-27 | H-Q8-01; A-Q8-01/02/03 |
 | Push-up full-text verification | **Ratified — (a) do not pursue** | 2026-08-26 | A-Q4-01/02/03 |
 | Evidence archive location and retention | **Ratified — (b) preserve in-repo, indefinite** | 2026-08-26 | Canonical artifact hash table |
