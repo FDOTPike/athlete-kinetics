@@ -71,7 +71,9 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
 const movements = db.prepare(
   `SELECT m.movement_id, m.name, m.pattern, m.is_compound,
           (SELECT json_group_array(me.item) FROM movement_equipment me
-           WHERE me.movement_id = m.movement_id) AS required_json
+           WHERE me.movement_id = m.movement_id) AS required_json,
+          (SELECT d.supported_prefixes FROM movement_detail d
+           WHERE d.movement_id = m.movement_id) AS prefixes_json
    FROM movement m ORDER BY m.movement_id`,
 ).all().map((r) => ({
   movement_id: Number(r.movement_id),
@@ -79,6 +81,9 @@ const movements = db.prepare(
   pattern: r.pattern,
   is_compound: Number(r.is_compound) === 1,
   required: JSON.parse(r.required_json ?? '[]'),
+  // Option C: the canonical primary implement, exactly as the store threads it.
+  // Absent/empty is undefined, which the generator reads as external load.
+  primaryImplement: JSON.parse(r.prefixes_json ?? '[]')[0] ?? undefined,
   difficulty: 'Beginner',
   beginner_ok: false,
   sportTracking: false,
@@ -539,17 +544,24 @@ console.log('[9] hybrid tax (schema fatigue cost matrix)');
 const accessorySets = (plan) => plan.sessions
   .filter((s) => ['lower', 'upper', 'full'].includes(s.focus))
   .reduce((a, s) => a + s.slots.filter((sl) => sl.slot_index >= 3).reduce((b, sl) => b + sl.sets, 0), 0);
+// Option C: strictly bodyweight slots now carry their own volume progression,
+// so a LINEAR total is no longer comparable with an APRE total on a mixed pool.
+// The fatigue tax is a statement about LOADED accessory work, so this whole
+// section asserts against a pool routed entirely as external load — which is
+// exactly the pool these checks ran against before implements were threaded.
+// The bodyweight behaviour is asserted separately in [9b].
+const loadedMovements = movements.map((m) => ({ ...m, primaryImplement: undefined }));
 const hybridApre = generateBlock({
-  profile: prof({ objective: 'hybrid' }), movements, startDate: START, schemaType: 'APRE' });
+  profile: prof({ objective: 'hybrid' }), movements: loadedMovements, startDate: START, schemaType: 'APRE' });
 const hybridLinear = generateBlock({
-  profile: prof({ objective: 'hybrid' }), movements, startDate: START, schemaType: 'LINEAR' });
+  profile: prof({ objective: 'hybrid' }), movements: loadedMovements, startDate: START, schemaType: 'LINEAR' });
 check('hybrid APRE block has strictly fewer accessory sets than hybrid LINEAR',
   accessorySets(hybridApre) < accessorySets(hybridLinear),
   `${accessorySets(hybridApre)} < ${accessorySets(hybridLinear)}`);
 const strengthApre = generateBlock({
-  profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType: 'APRE' });
+  profile: prof({ objective: 'strength' }), movements: loadedMovements, startDate: START, schemaType: 'APRE' });
 const strengthLinear = generateBlock({
-  profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType: 'LINEAR' });
+  profile: prof({ objective: 'strength' }), movements: loadedMovements, startDate: START, schemaType: 'LINEAR' });
 check('the tax fires ONLY for hybrid (strength APRE keeps its accessory sets)',
   accessorySets(strengthApre) === accessorySets(strengthLinear),
   `${accessorySets(strengthApre)} == ${accessorySets(strengthLinear)}`);
@@ -557,6 +569,117 @@ check('cost matrix: APRE outweighs LINEAR in every macro phase',
   MACRO_PHASES.every((p) => SCHEMA_FATIGUE_COST.APRE[p] > SCHEMA_FATIGUE_COST.LINEAR[p]));
 check('hybrid APRE accessories never fall below one working set',
   hybridApre.sessions.every((s) => s.slots.every((sl) => sl.sets >= 1)));
+
+// --- [9b] Option C: implement-routed bodyweight progression -------------------
+// Owner ruling 2026-08-27. LINEAR's only progression channel is effort, and
+// effort reaches the athlete solely through targetPct -> targetLoadKg -> 2.5 kg
+// rounding. A strictly bodyweight movement has no load channel, so its three
+// working weeks were identical apart from the RPE label. Bodyweight slots now
+// progress by VOLUME instead; loaded slots are untouched.
+//
+// The two pools below differ in ONE field on ONE movement: Push-up's
+// primaryImplement. Same movement_id, same name, same required equipment. If
+// the two blocks differ, the routing is provably by IMPLEMENT and not by name.
+console.log('[9b] Option C — bodyweight progression routes on implement');
+
+const pushUp = movements.find((m) => m.name === 'Push-up');
+check('fixture: Push-up seeds primaryImplement Bodyweight',
+  pushUp !== undefined && pushUp.primaryImplement === 'Bodyweight',
+  String(pushUp?.primaryImplement));
+
+// Identical pool, Push-up re-routed as plate-loaded. Nothing else changes.
+const plateLoadedPool = movements.map((m) =>
+  (m.movement_id === pushUp.movement_id ? { ...m, primaryImplement: 'BB' } : m));
+
+const patternById = new Map(movements.map((m) => [m.movement_id, m.pattern]));
+// Empty inventory: every emitted movement is equipment-free, so Push-up fills
+// push_h in BOTH pools and the only difference is how it is routed.
+const bwProfile = { objective: 'strength', equipment_inventory: [] };
+const pushSlots = (pool) => {
+  const plan = generateBlock({
+    profile: prof(bwProfile), movements: pool, startDate: START, schemaType: 'LINEAR' });
+  const out = new Map();
+  for (const sess of plan.sessions) {
+    for (const sl of sess.slots) {
+      if (patternById.get(sl.movement_id) !== 'push_h') continue;
+      if (!out.has(sess.week_index)) out.set(sess.week_index, { ...sl, phase: sess.phase });
+    }
+  }
+  return [1, 2, 3, 4].map((w) => out.get(w)).filter((x) => x !== undefined);
+};
+
+const bw = pushSlots(movements);
+const loaded = pushSlots(plateLoadedPool);
+
+check('both pools emit a push_h slot in all four weeks',
+  bw.length === 4 && loaded.length === 4, `bw=${bw.length} loaded=${loaded.length}`);
+check('both pools select the SAME movement (routing is not selection)',
+  bw.every((sl, i) => sl.movement_id === loaded[i].movement_id));
+
+// --- pure bodyweight: volume progresses, reps do not -------------------------
+check('bodyweight Push-up ADDS sets across weeks 1-3 (0 -> 1 -> 1)',
+  bw[1].sets === bw[0].sets + 1 && bw[2].sets === bw[1].sets,
+  `${bw[0].sets} -> ${bw[1].sets} -> ${bw[2].sets}`);
+check('bodyweight Push-up holds reps flat across weeks 1-3',
+  bw[0].reps === bw[1].reps && bw[1].reps === bw[2].reps,
+  `${bw[0].reps} / ${bw[1].reps} / ${bw[2].reps}`);
+check('bodyweight Push-up still ramps effort across weeks 1-3',
+  bw[0].target_rpe < bw[1].target_rpe && bw[1].target_rpe < bw[2].target_rpe,
+  `${bw[0].target_rpe} < ${bw[1].target_rpe} < ${bw[2].target_rpe}`);
+check('week 4 stays a strict volume deload — the added set is NOT carried in',
+  bw[3].phase === 'deload' && bw[3].sets < bw[0].sets,
+  `deload=${bw[3].sets} vs week1=${bw[0].sets}`);
+
+// --- plate-loaded: effort ramps, volume does not ------------------------------
+check('plate-loaded Push-up holds sets FLAT across weeks 1-3',
+  loaded[0].sets === loaded[1].sets && loaded[1].sets === loaded[2].sets,
+  `${loaded[0].sets} / ${loaded[1].sets} / ${loaded[2].sets}`);
+check('plate-loaded Push-up holds reps flat across weeks 1-3',
+  loaded[0].reps === loaded[1].reps && loaded[1].reps === loaded[2].reps);
+check('plate-loaded Push-up progresses by RPE/load instead',
+  loaded[0].target_rpe < loaded[1].target_rpe && loaded[1].target_rpe < loaded[2].target_rpe,
+  `${loaded[0].target_rpe} < ${loaded[1].target_rpe} < ${loaded[2].target_rpe}`);
+check('the RPE ramp is IDENTICAL for both classes (only volume differs)',
+  bw.every((sl, i) => sl.target_rpe === loaded[i].target_rpe));
+check('the two classes actually diverge in set count (the fix is observable)',
+  bw[1].sets !== loaded[1].sets && bw[2].sets !== loaded[2].sets,
+  `bw ${bw[1].sets}/${bw[2].sets} vs loaded ${loaded[1].sets}/${loaded[2].sets}`);
+
+// --- fail-toward-external-load (P2-2) ----------------------------------------
+const noPrefixPool = movements.map((m) => ({ ...m, primaryImplement: undefined }));
+const emptyPrefixSlots = pushSlots(noPrefixPool);
+check('absent primaryImplement is NOT bodyweight evidence — sets stay flat',
+  emptyPrefixSlots[0].sets === emptyPrefixSlots[1].sets
+  && emptyPrefixSlots[1].sets === emptyPrefixSlots[2].sets,
+  `${emptyPrefixSlots.map((x) => x.sets).join('/')}`);
+check('a non-canonical implement is NOT bodyweight evidence either',
+  (() => {
+    const junk = movements.map((m) => ({ ...m, primaryImplement: 'Bodyweight ' }));
+    const j = pushSlots(junk);
+    return j[0].sets === j[1].sets && j[1].sets === j[2].sets;
+  })());
+
+// --- legacy callers stay byte-identical --------------------------------------
+// The field is optional precisely so callers predating it do not change
+// behaviour. Omitting the key entirely must equal passing it as undefined,
+// and both must equal external-load routing.
+const legacyPool = movements.map(({ primaryImplement: _drop, ...rest }) => rest);
+check('a pool that OMITS primaryImplement is byte-identical to explicit external load',
+  JSON.stringify(generateBlock({
+    profile: prof(bwProfile), movements: legacyPool, startDate: START, schemaType: 'LINEAR' }))
+  === JSON.stringify(generateBlock({
+    profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: 'LINEAR' })));
+check('legacy omission never yields the bodyweight progression',
+  (() => { const l = pushSlots(legacyPool);
+    return l[0].sets === l[1].sets && l[1].sets === l[2].sets; })());
+
+// --- non-LINEAR schemas are untouched by the bodyweight table ------------------
+for (const st of SCHEMA_TYPES.filter((x) => x !== 'LINEAR')) {
+  const withBw = generateBlock({ profile: prof(bwProfile), movements, startDate: START, schemaType: st });
+  const asLoaded = generateBlock({ profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: st });
+  check(`${st}: bodyweight routing changes nothing (mirrors its own setsDelta)`,
+    JSON.stringify(withBw) === JSON.stringify(asLoaded));
+}
 
 // --- [10] Calibration Policy v1: ACWR descriptive only in block generation -------
 console.log('[10] Calibration Policy v1: ACWR descriptive only (no peak shifting)');

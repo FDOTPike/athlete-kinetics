@@ -295,6 +295,17 @@ any of the above.** The one exception is the suspended-state flag — see open q
 3. **How far out from the competition date does preparation begin?** Also unratified. Counting
    back requires knowing how many blocks to reserve.
 4. **Should `volume` bias its added set toward skill/sport days** to match its stated purpose?
+5. **What is the fatigue price of a strictly bodyweight working set?** *(raised 2026-08-27 by the
+   Option C implementation.)* Option C gives bodyweight slots a `setsDelta` of `0 → 1 → 1` in
+   LINEAR, so a bodyweight block now carries real added volume in weeks 2 and 3.
+   `SCHEMA_FATIGUE_COST` is a ratified table and **no bodyweight row has been ratified for it**, so
+   `SCHEMA_FATIGUE_COST_BODYWEIGHT` in `blockGenerator.ts` is deliberately an alias of the loaded
+   table — a no-op branch that injects no unratified number.
+   **Disclosed consequence while it stays an alias:** the hybrid CNS tax prices LINEAR as a schema
+   that adds no volume, so a hybrid athlete on bodyweight LINEAR receives the week 2-3 set with no
+   corresponding accessory-tax adjustment. The exposure is bounded to hybrid athletes, bodyweight
+   slots, weeks 2-3, one set. Ratifying a coefficient is a table edit at that alias, not a
+   refactor.
    Currently it adds a set uniformly (§4). This is a behaviour change to a shipped engine.
 5. **`progression_methodology`**: redefine as a system selector, or record as dead? Blocked on
    question 6.

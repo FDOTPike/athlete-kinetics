@@ -2893,6 +2893,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // Store-side null <-> generator-side "absent": GeneratorMovement's optional
       // fields all use undefined as their absent signal (see blockGenerator).
       scope: m.scope ?? undefined,
+      // Option C (ratified 2026-08-27): the canonical primary implement, the
+      // same signal SessionScreen resolves bodyweightMode from. An absent or
+      // empty prefix list is NOT bodyweight evidence and stays undefined, so
+      // the generator fails toward external-load behaviour (P2-2).
+      primaryImplement: m.supportedPrefixes[0] ?? undefined,
     }));
     // Program-owned macro position (AUD-GP-2): when a program exists, the
     // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
@@ -3013,6 +3018,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       capability_available_sport_conditioning: capabilityAvailableSport.has(m.movement_id),
       // Store-side null <-> generator-side "absent" (see blockGenerator).
       scope: m.scope ?? undefined,
+      // Option C (ratified 2026-08-27): the canonical primary implement, the
+      // same signal SessionScreen resolves bodyweightMode from. An absent or
+      // empty prefix list is NOT bodyweight evidence and stays undefined, so
+      // the generator fails toward external-load behaviour (P2-2).
+      primaryImplement: m.supportedPrefixes[0] ?? undefined,
     }));
     // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
     // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate

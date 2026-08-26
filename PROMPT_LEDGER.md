@@ -2057,3 +2057,79 @@ lets do the linear scheme fix
 - Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes in the commit
   message. Documentation only; nothing under `packages/` or `apps/` changed.
 - Not pushed.
+
+---
+
+## Entry 0048 — 2026-08-27 · Option C — implement-aware LINEAR bodyweight progression
+
+### Input G(x)
+
+```
+The Project Lead has officially ratified **Option C** from the LINEAR scheme progression analysis. We want the precise architectural fix based on the implement, not the movement name.
+
+**Execution Directive:**
+1. **The Plumbing (§4.3):** Refactor the engine's dose generation pipeline (`packages/inference/src/blockGenerator.ts`). Thread the `primaryImplement` upstream into the generator's `Movement` input type. The generator MUST route logic based on whether the implement is strictly `'Bodyweight'` versus an external load (e.g., a Weighted Vest or Plate).
+2. **The Branching Logic (LINEAR):**
+   - **If external load (including weighted calisthenics):** Strictly retain the current `rpeIdx` ramp. Sets and reps remain completely flat; progression is driven by load/RPE.
+   - **If purely 'Bodyweight':** Progress the volume week-over-week by holding prescribed reps steady and increasing sets. Implement a `setsDelta` of `0 -> 1 -> 1` for Weeks 1, 2, and 3. Do NOT add sets to Week 4, as it must remain a strict volume deload. (This allows the athlete to push reps to the RPE target organically).
+3. **Fatigue Isolation:** Do NOT alter the global `SCHEMA_FATIGUE_COST.LINEAR` table for loaded blocks. If the bodyweight volume jump requires a fatigue cost adjustment, branch the cost logic and flag the specific bodyweight coefficient for ratification.
+4. **Regression Guards (§7):** Add assertions into `verify_blocks.mjs`. We need a test that explicitly proves a pure bodyweight Push-Up progresses in sets, while a plate-loaded Push-Up progresses in RPE/Load without adding sets.
+
+Execute this work order and return the `git diff --stat` and tripwire results.
+```
+
+### Output F(G(x))
+
+- **Option C implemented.** Five files, no migration, no new SQL.
+- **Plumbing (§1).** Added optional `primaryImplement?: MovementPrefix` to `GeneratorMovement`
+  (`blockGenerator.ts`), threaded from `m.supportedPrefixes[0] ?? undefined` at both `generateBlock`
+  call sites in `useStore.ts`. Routing predicate `isPurelyBodyweight` matches **exactly**
+  `'Bodyweight'`; absent, empty or non-canonical fails toward external load, mirroring the P2-2 rule
+  the session screen already uses. Corrected the now-false comment on `required` — empty means
+  "needs no equipment", not "bodyweight", since Feet-Elevated Push-Up requires a bench and is still
+  bodyweight loaded.
+- **Branching (§2).** New table `SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA` with `LINEAR: [0, 1, 1]`.
+  Every other schema mirrors its own `SCHEMA_WEEKS` `setsDelta` (`WAVE [0,0,0]`, `STEP [0,1,1]`,
+  `APRE [0,0,0]`), so nothing outside LINEAR changes — machine-asserted. The working-set pipeline was
+  factored into `workingSetsFor(setsDelta)` so both classes run identical logic and differ only in
+  which row they carry; the loaded value is computed exactly as before. Week 4 is untouched because
+  the existing `deload ? 0 : setsDelta` guard zeroes the delta — verified by assertion, not assumed.
+  Reps are not modified for either class.
+- **Fatigue isolation (§3).** `SCHEMA_FATIGUE_COST` is unchanged. Added
+  `SCHEMA_FATIGUE_COST_BODYWEIGHT` as a deliberate **alias** of the loaded table plus a routed
+  accessor `schemaFatigueCost(schema, phase, bodyweightDominant)`; both branches resolve identically
+  today, so **no unratified number entered the engine**. The pending coefficient is flagged in code
+  and docketed as open item 5 of `TRAINING_PROGRESSION_LAYERS.md` §8, with the consequence disclosed:
+  the hybrid CNS tax still prices LINEAR as a schema that adds no volume, so a hybrid athlete on
+  bodyweight LINEAR receives the week 2-3 set with no accessory-tax adjustment — bounded to hybrid
+  athletes, bodyweight slots, weeks 2-3, one set.
+- **Regression guards (§4).** New section `[9b]` in `verify_blocks.mjs`, 19 assertions. The two pools
+  differ in ONE field on ONE movement — Push-up's `primaryImplement` — with identical id, name and
+  required equipment, so a divergence proves routing is by **implement, not name**. Measured:
+  bodyweight `4 → 5 → 5` sets with reps flat `7/7/7` and RPE `7 → 7.5 → 8`; plate-loaded `4/4/4` sets
+  with the identical RPE ramp; deload 2 sets, below week 1. Also asserted: both classes share the
+  same RPE ramp, the classes actually diverge, absent and non-canonical implements stay flat, a pool
+  OMITTING the key is byte-identical to explicit external load, and all three non-LINEAR schemas are
+  unchanged under bodyweight routing.
+- **A pre-existing gate caught the change and was repaired rather than weakened.** `[9]`'s "the tax
+  fires ONLY for hybrid" asserted `accessorySets(strengthApre) === accessorySets(strengthLinear)`,
+  an equality that held only because LINEAR added no volume (it broke `112 == 124`). The invariant
+  is about LOADED accessory work, so section `[9]` is now pinned to a pool routed entirely as
+  external load — the exact pool it tested before implements existed. The assertion is unchanged and
+  still passes.
+- One `[9b]` assertion was written, found tautological on review (both sides reduced to the same
+  pool, so it proved only determinism despite its label) and replaced with the invariant that
+  matters: a pool omitting `primaryImplement` entirely is byte-identical to explicit external load.
+- **Gates.** `npm run verify:ci` cannot complete in this worktree — it aborts in
+  `scripts/verify-preflight.mjs` on the known `node_modules` / embedder-asset gap, **before**
+  typecheck and before any gate executes. That is an environment condition, not a code failure. The
+  fourteen runnable gates were therefore run individually and **all exited 0**: typecheck,
+  verify:policy, verify:blocks, verify:autopilot, verify:autopilot-counterexamples,
+  verify:progression, verify:db, verify:demo, verify:migrations, verify:runner, verify:outcomes,
+  verify:pipeline, verify:coach, verify:library.
+- **Tripwires, all PASS**, including both that guard this file: `hard_sets` and `session_rpe` appear
+  in NO prospective planner [6 files clean]; no multiplier/cap/dose vocabulary in
+  `returnFromLayoff.ts`; no plateau/threshold vocabulary in `e1rm.ts`; `e1rm.ts` imports the ratified
+  `targetPct` rather than restating it; `"acwr"` does not appear in `blockGenerator.ts`; block
+  planners contain no retrospective signal references [3 block planner files clean].
+- Not pushed.

@@ -73,9 +73,28 @@ export interface GeneratorMovement {
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
-  /** movement_equipment rows; empty = bodyweight. */
+  /** movement_equipment rows; empty = needs no equipment. NOT a bodyweight
+   *  test — Feet-Elevated Push-Up requires a bench and is still bodyweight
+   *  loaded. Use `primaryImplement` for the loading question. */
   required: readonly string[];
+  /** movement_detail.supported_prefixes[0] — the canonical primary implement,
+   *  the same signal SessionScreen resolves bodyweightMode from. Absent,
+   *  empty or non-canonical is NOT bodyweight evidence: it fails toward
+   *  external-load behaviour (P2-2). Omitting it keeps legacy callers
+   *  byte-identical, exactly like the optional fields above. */
+  primaryImplement?: MovementPrefix;
 }
+
+/** Strictly bodyweight: the canonical primary implement is exactly
+ *  'Bodyweight'. Weighted calisthenics, plate-loaded variants and every
+ *  external implement resolve false, as does an absent or non-canonical
+ *  prefix — the same fail-toward-external-load rule the session screen uses.
+ *
+ *  This is the routing predicate for the Option C bodyweight progression
+ *  (owner-ratified 2026-08-27): a purely bodyweight movement has no load
+ *  channel, so an effort ramp alone is unobservable to the athlete. */
+export const isPurelyBodyweight = (m: GeneratorMovement): boolean =>
+  m.primaryImplement === 'Bodyweight';
 
 export type BlockFocus = 'lower' | 'upper' | 'full' | 'conditioning' | 'bjj';
 export type BlockPhase = 'accumulation' | 'intensification' | 'realization' | 'deload';
@@ -407,6 +426,29 @@ const SCHEMA_WEEKS: Record<SchemaType, readonly [SchemaWeekMod, SchemaWeekMod, S
   ],
 };
 
+/** Per-schema working-set delta applied to STRICTLY BODYWEIGHT slots only
+ *  (owner ruling, Option C, ratified 2026-08-27).
+ *
+ *  Rationale: LINEAR's only progression channel is effort, and effort reaches
+ *  the athlete solely through targetPct -> targetLoadKg -> 2.5 kg rounding. A
+ *  bodyweight movement has no load channel at all, so its three working weeks
+ *  were byte-identical apart from the RPE label. These rows give bodyweight
+ *  slots a volume channel instead, which is never quantised away. Reps stay
+ *  flat by ruling, so the athlete pushes reps toward the RPE target
+ *  organically rather than being told a different number.
+ *
+ *  Every non-LINEAR row MIRRORS that schema's own SCHEMA_WEEKS setsDelta, so
+ *  this table changes nothing outside LINEAR. Loaded slots never read it.
+ *  The deload week is excluded at the call site, not here — week 4 stays a
+ *  strict volume deload. */
+const SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA:
+  Record<SchemaType, readonly [number, number, number]> = {
+  LINEAR: [0, 1, 1],
+  WAVE: [0, 0, 0],
+  STEP: [0, 1, 1],
+  APRE: [0, 0, 0],
+};
+
 /** The Schema Cost Matrix: fatigue weight per (schema, macro phase). Pure
  *  data — the hybrid tax below is its only in-engine consumer today; the
  *  store/UI may surface it later. */
@@ -416,6 +458,38 @@ export const SCHEMA_FATIGUE_COST: Record<SchemaType, Record<MacroPhase, number>>
   STEP: { gpp: 1.1, hypertrophy: 1.2, volume: 1.4, peak: 1.3 },
   APRE: { gpp: 1.3, hypertrophy: 1.4, volume: 1.5, peak: 1.6 },
 };
+/** Fatigue price for a strictly bodyweight slot.
+ *
+ *  PENDING OWNER RATIFICATION — deliberately an alias, not a literal table.
+ *
+ *  The Option C progression adds a working set to bodyweight slots in weeks 2
+ *  and 3. Whether that changes the schema's fatigue price is a SEPARATE
+ *  ratification: SCHEMA_FATIGUE_COST is a ratified table and no bodyweight row
+ *  has been ratified for it. Inventing one here would put an unratified number
+ *  into the engine, so bodyweight is priced at the existing loaded row — the
+ *  status quo, and a strictly no-op branch today.
+ *
+ *  DISCLOSED CONSEQUENCE while this remains an alias: the hybrid CNS tax
+ *  (HYBRID_TAX_THRESHOLD below) prices LINEAR as a schema that adds no volume.
+ *  A hybrid athlete on bodyweight LINEAR therefore receives the week 2-3 set
+ *  without any corresponding accessory tax adjustment. The exposure is bounded
+ *  to hybrid athletes, bodyweight slots, weeks 2-3, one set.
+ *
+ *  Ratifying a coefficient means replacing this alias with its own literal
+ *  rows — a table edit, not a refactor. The branch point exists so the absence
+ *  is visible rather than implicit. */
+const SCHEMA_FATIGUE_COST_BODYWEIGHT = SCHEMA_FATIGUE_COST;
+
+/** Fatigue price for (schema, phase), routed by loading class. Both branches
+ *  resolve to the same table until a bodyweight coefficient is ratified. */
+export const schemaFatigueCost = (
+  schemaType: SchemaType,
+  macroPhase: MacroPhase,
+  bodyweightDominant: boolean,
+): number => (bodyweightDominant
+  ? SCHEMA_FATIGUE_COST_BODYWEIGHT
+  : SCHEMA_FATIGUE_COST)[schemaType][macroPhase];
+
 /** Hybrid athletes pay for high-fatigue schemas (>= threshold strips one
  *  accessory set, >= 1.5 strips two) — CNS budget protection. */
 export const HYBRID_TAX_THRESHOLD = 1.3;
@@ -577,7 +651,10 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // The Hybrid Tax: high-fatigue schemas (cost matrix) are paid for by
   // stripping 1-2 working sets from accessory/secondary slots — concurrent
   // grappling load leaves no CNS budget for both.
-  const fatigueCost = SCHEMA_FATIGUE_COST[schemaType][macroPhase];
+  // Routed through the loading-class accessor so a ratified bodyweight
+  // coefficient becomes a table edit. Both branches resolve identically
+  // today; `false` preserves the existing loaded price exactly.
+  const fatigueCost = schemaFatigueCost(schemaType, macroPhase, false);
   const accessoryCut =
     profile.objective === 'hybrid'
       ? fatigueCost >= 1.5 ? 2 : fatigueCost >= HYBRID_TAX_THRESHOLD ? 1 : 0
@@ -617,12 +694,22 @@ export function generateBlock(input: BlockInput): BlockPlan {
 
       // Working sets: objective scheme + macro phase + schema row, damped for
       // hybrid strength days (interference) and beginners, +1 for elites.
-      let baseSets = scheme.sets + phaseMod.sets + (deload ? 0 : wmod.setsDelta);
-      if (profile.objective === 'hybrid' && STRENGTH_FOCI.has(focus)) baseSets -= 1;
-      if (profile.training_age === 'beginner') baseSets -= 1;
-      if (profile.training_age === 'elite') baseSets += 1;
-      baseSets = clamp(baseSets, 2, 6);
-      const workingSets = deload ? Math.max(1, Math.ceil(baseSets / 2)) : baseSets;
+      // Factored so the loaded and bodyweight classes run through IDENTICAL
+      // logic and differ only in which setsDelta row they carry. The deload
+      // zeroes the delta for both — week 4 is a strict volume deload.
+      const workingSetsFor = (setsDelta: number): number => {
+        let baseSets = scheme.sets + phaseMod.sets + (deload ? 0 : setsDelta);
+        if (profile.objective === 'hybrid' && STRENGTH_FOCI.has(focus)) baseSets -= 1;
+        if (profile.training_age === 'beginner') baseSets -= 1;
+        if (profile.training_age === 'elite') baseSets += 1;
+        baseSets = clamp(baseSets, 2, 6);
+        return deload ? Math.max(1, Math.ceil(baseSets / 2)) : baseSets;
+      };
+      /** External load (and weighted calisthenics): unchanged behaviour. */
+      const workingSets = workingSetsFor(wmod.setsDelta);
+      /** Strictly bodyweight slots only (Option C). Identical outside LINEAR. */
+      const workingSetsBodyweight =
+        workingSetsFor(SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA[schemaType][progIdx as 0 | 1 | 2]);
 
       // Reps: scheme reps through the schema's scale, then the phase delta.
       const reps = deload
@@ -695,9 +782,18 @@ export function generateBlock(input: BlockInput): BlockPlan {
         const taxed =
           !deload && accessoryCut > 0 && STRENGTH_FOCI.has(focus) &&
           slotIndex >= ACCESSORY_SLOT_FROM && !locomotion;
+        // Option C routing (owner-ratified 2026-08-27): the dose is fixed per
+        // session BEFORE the movement is known, so the loading class can only
+        // be applied here, once `m` exists. A strictly bodyweight movement
+        // takes the volume-progressing row; everything with an external load,
+        // weighted calisthenics included, keeps the effort ramp on flat sets.
+        // Reps are untouched for both classes. The hybrid accessory tax still
+        // applies to whichever row is chosen.
+        const bodyweightSlot = isPurelyBodyweight(m);
+        const slotWorkingSets = bodyweightSlot ? workingSetsBodyweight : workingSets;
         let slotSets = locomotion
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
-          : Math.max(1, workingSets - (taxed ? accessoryCut : 0));
+          : Math.max(1, slotWorkingSets - (taxed ? accessoryCut : 0));
         let slotRpe = rpe;
         const preAutopilotSets = slotSets;
         const preAutopilotRpe = slotRpe;
