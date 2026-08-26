@@ -1896,3 +1896,63 @@ decisions 5)a and 6b)` — recorded verbatim in entry 0043.
 - Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes in the commit message.
 - Not pushed. Push remains gated on the owner's on-device check, and this ruling makes the push the
   moment the author-local paths become public.
+
+---
+
+## Entry 0045 — 2026-08-26 · Owner ratification, decisions 1-3; decision 4 re-scoped
+
+### Input G(x)
+
+```
+@"C:\Users\fpike\Documents\Claude Coding\Athlete App\KINESTRIKE_MECHATRONIC_SYSTEM_AUDIT_REPORT.md"
+for decision 4 ) I thought the app already included both options for the rest 1)a with option for advance athletes only to uncover extra data , for 2)B  and 3)b i wish to include this as future work potentially to concurrently with the attached file (electronic device development via university project with piezoelectrical polymers )
+```
+
+### Output F(G(x))
+
+- **Decision 1 ratified: option (a), remains dormant**, with an owner-directed rider that a
+  disclosure path gated to `training_age IN ('advanced', 'elite')` be scoped as future work.
+  Recorded in section 2. **The rider is explicitly not ratified by that ruling.** Gating changes who
+  sees the number, not how precise it is; an advanced athlete reading an e1RM series with no error
+  bound is chasing possible noise exactly as a beginner would. The rider is option (b) behind an
+  eligibility check and needs its own ratification against the section 4 measurement work.
+- **Decision 2 ratified: option (b), descriptive display in a later work order.** Recorded in
+  section 3 with two binding constraints: a display is not a planner and so does not breach the
+  tripwire at `apps/mobile/test/verify_policy.mjs:398`, and `RPE ≥ 8` remains an unvalidated proxy
+  that must be presented as a count of sets at a chosen effort mark, never as a validated measure of
+  effective volume or hypertrophic dose.
+- **Decision 3 ratified: option (b), a future phase designs an own-data measurement protocol.**
+  Recorded in section 4, with the owner's direction that it may run concurrently with the KineStrike
+  instrumentation project. The record states the linkage is **method, not data**: both need a
+  measurand's repeatability and minimal detectable change established before any threshold from it
+  carries authority, but e1RM and gait kinetics are different measurands and no figure transfers.
+- **Decision 4 remains Pending and its framing was corrected after an owner challenge.** The owner
+  observed that the app already does both descriptive and prescriptive work, and was right. The
+  docket's one-line "current state" was accurate but invited a broader reading, and the presentation
+  built on it was misleading. Section 5 now records the boundary precisely, verified from source:
+  the app **is** prescriptive — `completionAction.ts` emits `dLoad_p`/`dSet_p`/`dRpe_p` and
+  `kinematicAutopilot.ts` declares `u` produces prescription corrections, reaching the athlete via
+  `blockGenerator.ts:707-731`. What it prescribes **from** is readiness (`StateVectorRow`,
+  `types.ts:7`), completion shortfall, and niggle tolerance. No progression measurement reaches any
+  prescriptive path: `e1rm.ts` is consumed only by the barrel re-export at `index.ts:349-353`, and
+  `hard_sets` is held out by the tripwire. The decision governs only whether a measurement of
+  progression may acquire that authority.
+- Added a sequencing note to section 5: decision 3's ruling means no progression measurement yet has
+  an established precision, so option (b) there cannot be exercised responsibly until the protocol
+  lands, whichever way decision 4 is ruled.
+- Added backlog item 7: the KineStrike host-integration section would give a **gait** measurement
+  prescription authority (automatic halt, automatic deload, automatic niggle insertion). Same class
+  of question, different measurand and safety profile; explicitly **not** covered by decision 4 and
+  requiring its own boundary decision and system-safety brief.
+- Verification performed against source before recording, not taken from the attached document:
+  `TRAINING_AGES` confirmed at `types.ts:40`; the prescriptive emitters and their inputs read
+  directly; e1RM and `hard_sets` consumer searches re-run.
+- **Defects found in the attached KineStrike report and reported to the owner, not acted on.** Its
+  Milestone 2 plan commits `035_gait_telemetry.sql`, but slot 035 is occupied by
+  `035_profile_load_preference.sql` and the append-only chain head is **057**; the next free slot is
+  058. Its integration section also introduces five numeric thresholds with no ratified source,
+  which Calibration Policy v1 forbids from entering the engine. No KineStrike file, migration, or
+  work order was created — none was requested.
+- Gates at this tree: `typecheck`, `verify:blocks`, `verify:policy` — exit codes in the commit message.
+  Documentation only; nothing under `packages/` or `apps/` changed.
+- Not pushed.

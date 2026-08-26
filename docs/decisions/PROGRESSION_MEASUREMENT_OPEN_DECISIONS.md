@@ -27,6 +27,21 @@ or an app-specific e1RM MDC [H-Q2-03; H-Q2-07].
 **Owner ruling needed:** whether e1RM remains dormant, becomes a descriptive display in a later
 work order, or waits for an app-specific measurement protocol.
 
+**Owner ruling — ratified 2026-08-26: option (a), remains dormant, with a disclosure rider.**
+The series stays dormant by default: no store getter, persistence, display, threshold, detector, or
+prescription consumer. The owner additionally directs that a **disclosure path gated to advanced
+athletes** be scoped as future work, so that athletes at `training_age IN ('advanced', 'elite')`
+(`TRAINING_AGES` in `packages/inference/src/types.ts:40`) may opt to uncover the derived series as
+extra data.
+
+**The rider is not ratified by this ruling and must not be built on it.** Gating changes *who sees*
+the number; it does not change *how precise* the number is. An advanced athlete reading an e1RM
+series with no established error bound is chasing a value whose movement may be noise, exactly as a
+beginner would be. A gated disclosure is therefore option (b) behind an eligibility check, and
+requires its own ratification against the measurement work in section 4 — specifically, an honest
+statement of precision shown alongside the number, or an explicit ruling that the series may be
+shown without one.
+
 **Further investigation if requested:** full-text verification of H-Q2-02, A-Q2-01, and related
 equation-error claims; or a separately designed closed-beta repeatability protocol. This phase
 does not perform either investigation.
@@ -42,6 +57,21 @@ documented search did not locate a qualifying direct proxy comparison [H-Q3-02].
 
 **Owner ruling needed:** whether the count remains internal, is considered for descriptive
 display in a later work order, or is excluded from progression reporting.
+
+**Owner ruling — ratified 2026-08-26: option (b), considered for descriptive display in a later
+work order.** The count stays internal until that work order exists; this ruling authorizes no
+display, surface, or schema change now.
+
+Binding constraints on any such work order:
+
+- Descriptive use does not breach the machine tripwire at `apps/mobile/test/verify_policy.mjs:398`,
+  which forbids `hard_sets` and `session_rpe` reaching a prospective planner. A display is not a
+  planner. A prescriptive use would breach it and is not authorized.
+- `RPE ≥ 8` remains an **unvalidated** proxy. The audit did not establish it as superior to any
+  alternative, the claimed correlation has no accessible source locator, and no qualifying direct
+  proxy comparison was located. Any display must therefore present it as a count of sets logged at
+  or above a chosen effort mark — not as a validated measure of effective volume, stimulus, or
+  hypertrophic dose.
 
 **Further investigation if requested:** obtain and inspect the Baz-Valle full text for the exact
 R² attribution, then separately determine whether any result transfers to the app's optional,
@@ -59,13 +89,48 @@ reliability cannot supply the missing app-e1RM quantities.
 **Owner ruling needed:** whether stagnation detection remains out of scope or whether a future
 phase should design an own-data measurement protocol for later ratification.
 
+**Owner ruling — ratified 2026-08-26: option (b), a future phase designs an own-data measurement
+protocol for later ratification.** Stagnation detection stays out of scope until that protocol is
+designed, run, and separately ratified. No MDC, noise floor, persistence window, smoother, or
+plateau detector is authorized by this ruling.
+
+The owner directs that this phase may run **concurrently with the KineStrike instrumentation
+project** (`KINESTRIKE_MECHATRONIC_SYSTEM_AUDIT_REPORT.md`, ENG233, piezoelectric polymer insole).
+What the two share is **method, not data**: both require establishing what an own-device
+measurement's repeatability, noise floor, and minimal detectable change actually are before any
+threshold derived from it can carry authority. Strength-progression e1RM and gait kinetics are
+different measurands; no coefficient, threshold, or reliability figure transfers between them, and
+concurrency must not become substitution.
+
 **Further investigation if requested:** protocol design must specify repeated-measure conditions,
 missing RPE handling, exercise stratification, training status, bias, reliability, uncertainty,
 and a predeclared analysis. Designing or running that research is outside this phase.
 
 ## 5. Descriptive versus prescriptive authority
 
-**Current state:** progression measurements have no authority over prescription.
+**Current state — clarified 2026-08-26 after an owner challenge.** The earlier one-line statement
+was accurate but invited a broader reading, and the owner correctly observed that the app already
+does both. Stated precisely:
+
+**The app is already prescriptive.** `packages/inference/src/completionAction.ts` emits
+`dLoad_p`/`dSet_p`/`dRpe_p` corrections, and `kinematicAutopilot.ts` states in its own header that
+its control action `u` "produces forward-looking PRESCRIPTION corrections only." Those corrections
+reach the athlete through `blockGenerator.ts:707-731`.
+
+**What it prescribes from is execution and tolerance, not progression.** The autopilot's input
+`StateVectorRow` (`types.ts:7`) carries readiness, HRV, sleep, SpO2, ACWR and load — physiological
+state. `completionAction.ts` reads shortfall against prescribed sets — execution. Niggle severity
+carries joint tolerance. Every one of these answers *how did the athlete cope with what was
+prescribed*.
+
+**No progression measurement reaches any prescriptive path.** `e1rm.ts` is consumed only by a
+barrel re-export at `index.ts:349-353` and by nothing else; `hard_sets` is held out of every
+prospective planner by the tripwire at `apps/mobile/test/verify_policy.mjs:398`. Nothing in the
+engine answers *is the athlete getting stronger* and then changes the prescription because of it.
+
+This decision governs **only that second class**: whether a measurement of progression may acquire
+prescription authority. It does not reopen the readiness, completion, or tolerance paths, which are
+already ratified and in service.
 
 **Evidence boundary:** reviewed autoregulation studies are supervised, heterogeneous, and
 terminologically inconsistent [H-Q8-01]. The audit found no paper establishing a mandatory
@@ -74,6 +139,19 @@ and safety decision, not a research result.
 
 **Owner ruling needed:** retain the current separation indefinitely, or authorize a later
 evidence-and-control-design phase. No feedback-loop design is authorized here.
+
+**Sequencing note added 2026-08-26.** Decision 3 was ratified (b): the own-data measurement protocol
+is future work and no repeatability, noise floor, or minimal detectable change yet exists for any
+progression measurement. Until that protocol lands, a progression measurement has no established
+precision, so option (b) here cannot be exercised responsibly even if ratified — there would be
+nothing to state a confidence bound against. This decision is therefore gated behind decision 3 in
+practice, whichever way it is ruled.
+
+**Out of scope for this decision: new measurement domains.** The KineStrike instrumentation project
+proposes giving a gait-kinetics measurement direct prescription authority (automatic session halt,
+automatic deload, automatic niggle insertion). That is the same *class* of question but a different
+measurand and a different safety profile, and it is not covered by this ruling. It requires its own
+boundary decision and its own system-safety brief.
 
 **Further investigation if requested:** establish a separate system-safety brief covering signal
 missingness, bias, failure modes, authority limits, and prospective validation before any control
@@ -153,6 +231,8 @@ The following work remains available for later, separately approved tasks:
 2. **Systematic negative-claim searches:** required before strengthening “not located” into a
    broader literature conclusion.
 3. **Closed-beta repeatability protocol:** required before app-specific MDC or stagnation work.
+   **Authorized as future work by decision 3, ratified 2026-08-26**, and may run concurrently with
+   the KineStrike instrumentation project. Shared method only; see section 4.
 4. **Metric-display behavioural review:** direct evidence would be needed before claiming that a
    strength metric will improve adherence or cause gaming.
 5. **Control-system safety review:** required before any progression signal gains prescription
@@ -161,13 +241,19 @@ The following work remains available for later, separately approved tasks:
    product-critical. Not authorized: decision 5 was ratified (a) on
    2026-08-26. Reopening requires the product-critical condition to arise first.
 
+7. **KineStrike boundary decision:** if the instrumentation project's host-integration section is
+   pursued, it needs a decision of its own on whether a gait measurement may halt a session, insert
+   a niggle, or trigger a deload. Not covered by decision 4, which governs progression measurement
+   only.
+
+
 ## 9. Ratification record
 
 | Decision | Owner ruling | Date | Evidence/protocol reference |
 |---|---|---|---|
-| Dormant e1RM series | Pending | — | H-Q2-03/04/05/07; H-Q5-01 |
-| Hard-set count | Pending | — | H-Q3-02; A-Q3-01/03/04; A-Q7-02 |
-| Own-data repeatability protocol | Pending | — | A-Q2-04; H-Q5-03; A-Q5-03/04 |
-| Descriptive/prescriptive boundary | Pending | — | H-Q8-01; A-Q8-01/02/03 |
+| Dormant e1RM series | **Ratified — (a) dormant; gated-disclosure rider unratified** | 2026-08-26 | H-Q2-03/04/05/07; H-Q5-01 |
+| Hard-set count | **Ratified — (b) descriptive display, later work order** | 2026-08-26 | H-Q3-02; A-Q3-01/03/04; A-Q7-02 |
+| Own-data repeatability protocol | **Ratified — (b) future phase designs protocol** | 2026-08-26 | A-Q2-04; H-Q5-03; A-Q5-03/04 |
+| Descriptive/prescriptive boundary | Pending — re-scoped 2026-08-26, see section 5 | — | H-Q8-01; A-Q8-01/02/03 |
 | Push-up full-text verification | **Ratified — (a) do not pursue** | 2026-08-26 | A-Q4-01/02/03 |
 | Evidence archive location and retention | **Ratified — (b) preserve in-repo, indefinite** | 2026-08-26 | Canonical artifact hash table |
