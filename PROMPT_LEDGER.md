@@ -2373,3 +2373,38 @@ yes go ahead with RR-02 Migration 058, taking note that this apps purpose is to 
   an episode. That is the next step, and it is the difference between a working feature and a
   correctly-built mechanism.
 - Not pushed.
+
+---
+
+## Entry 0052 — 2026-08-27 · Handover brief for Sol
+
+### Input G(x)
+
+```
+Are you able to give me prompt for Sol to take over, please provide a brief on the work done and the tasks outstanding,  also could you explain why you choose to bulid the app in c++ instead of node.js
+```
+
+### Output F(G(x))
+
+- Wrote `HANDOVER_2026-08-27_SOL.md` at the repository root, matching the existing `HANDOVER_*`
+  convention: state, what landed, gate status, outstanding work in priority order, the standing
+  constraints Sol must honour, and the traps that cost time this session.
+- Verified before asserting it that **none of this session's eleven commits touched build
+  configuration**. Scoped the diff to `368e82d~1..HEAD` rather than `master..HEAD` (the latter spans
+  all 62 branch commits and would have wrongly implicated this session). No `.gradle`,
+  `gradle.properties`, `babel.config.js`, `metro.config.js`, or native project file appears in the
+  session's file list. The native projects and their toolchain were scaffolded on 2026-06-11 in
+  `e303181`, "Phase 6 step 2: scaffold native projects (RN 0.81.6), monorepo-adapted".
+- Answered the owner's build question by correcting its premise rather than the choice: **no
+  language was selected.** Node.js ran the desktop toolchain this session — all 15 verification
+  gates, `tsc`, and the block-generation demonstrations. It is not a phone runtime and never was a
+  candidate. The app's JavaScript runs on **Hermes** on-device, set by `hermesEnabled=true`. The C++
+  compilation Gradle performed is React Native's New Architecture native layer
+  (`newArchEnabled=true`), plus op-sqlite's SQLite bindings and the ONNX runtime — all pre-existing
+  dependencies whose own implementations are C++. Building an Android React Native app compiles
+  them; that is not a decision an agent makes at build time.
+- Recorded for the handover that `verify:ci` may now be runnable in this worktree for the first
+  time, since the device build resolved both preflight blockers (`node_modules` via `npm ci`, and
+  the embedder assets copied from the main checkout). Re-running it is listed as the first act of
+  the handover rather than claimed as done.
+- Not pushed.
