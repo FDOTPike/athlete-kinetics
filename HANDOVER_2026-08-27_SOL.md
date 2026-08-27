@@ -12,15 +12,17 @@ Written for your role: you orchestrate, you do not write the code. Everything be
 
 ## 1. Read this before you dispatch anything
 
-**`tools/hermes_executor.py` does not exist.** Not in this worktree, not in `master`, not anywhere
-in the repository. Your Conjugation Loop step 3 has no script behind it.
-`tools/antigravity/run_project_agent.py` **is** present and takes `argparse` flags.
-`tools/temp_hermes_output.ts` and `docs/CURRENT_AUDIT.md` are absent, but those are outputs — they
-appear on first use, which is expected. The missing executor is the real blocker. See §9 Q1.
+**Your precision coder is Claude Code via VS Code.** An earlier draft of your role named
+`tools/hermes_executor.py`; that was stale naming carried over from when the execution
+engineer was Hermes, and the owner has confirmed it. No such script exists in this
+repository, and none is needed. `tools/antigravity/run_project_agent.py` **is** present and
+argparse-driven. `tools/temp_hermes_output.ts` and `docs/CURRENT_AUDIT.md` are absent, but
+those are outputs — they appear on first use.
 
-**Naming hazard:** "Hermes" means two different things here. It is your precision-coding agent, and
-it is also React Native's JavaScript engine (`hermesEnabled=true`, and hundreds of
-`hermes-engine*.cmake` build artifacts). A grep for "hermes" will drown you in the second kind.
+**Naming hazard:** in this repository "Hermes" now means only one live thing — React Native's
+**JavaScript engine** (`hermesEnabled=true`, and hundreds of `hermes-engine*.cmake` build
+artifacts). Historical documents also use it for the retired execution engineer and research
+agent. Neither is your coder. A grep for "hermes" returns build artifacts, not work.
 
 ---
 
@@ -52,8 +54,10 @@ specific and are likely to recur:
 - tier inflation — a medRxiv preprint tiered as A;
 - a paper mischaracterised (Baumel: *Mental* Health Apps, cited as *Mobile* Health Apps).
 
-The audit's own verdict: *"Antigravity is not safe as an evidence basis or decision input."* Hermes
-was judged *"not adoption-ready either, but materially more disciplined."*
+The audit's own verdict: *"Antigravity is not safe as an evidence basis or decision input."* The
+Hermes research agent that produced the parallel review was judged *"not adoption-ready either, but
+materially more disciplined."* That agent is retired; the comparison is kept because it shows the
+audit discriminated between agents rather than condemning both.
 
 **What this means for your loop:** Antigravity is fine for what it is good at — large log analysis,
 sprint decomposition, reading things too big for one context. But **any number it derives is a
@@ -95,13 +99,13 @@ result transfers — report what it actually says.
 npm run verify:ci
 ```
 
-### U3 — Suspension UI · **Hermes (precision coder)** · depends on U1
+### U3 — Suspension UI · **Claude Code (precision coder)** · depends on U1
 
 Migration 058, the store actions (`beginSuspension`, `endSuspension`, `activeSuspension`) and 26
 gate assertions all exist. **Nothing calls them**, so the athlete cannot declare an episode. This is
 the gap between a correct mechanism and a working feature.
 
-Brief for Hermes: `docs/PROPOSAL_suspended_state_trigger.md`. **Answer its §3 open questions first** —
+Brief for the coder: `docs/PROPOSAL_suspended_state_trigger.md`. **Answer its §3 open questions first** —
 four of them, and they are design rulings, not code:
 
 1. Does an in-flight block survive suspension — archive, resume mid-block, or regenerate?
@@ -130,7 +134,7 @@ WO-02 states at HIGH confidence that the progression engine "is not wired into `
 wired — imported at `:138`, called at `:2568` and `:2570`. A narrower session-completion UI gap may
 survive; the priority should drop accordingly.
 
-### U6 — WO-01, the dead `progression_methodology` column · **Hermes** · small, self-contained
+### U6 — WO-01, the dead `progression_methodology` column · **Claude Code** · small, self-contained
 
 Stored in `006_user_profile.sql`, typed, validated, hydrated — and read by **no planner**. It is a
 second vocabulary competing with `schemaType`. One of the two should go. Genuine finding, cheap fix.
@@ -153,12 +157,12 @@ Natural decomposition for your loop:
   good at: `BLOCK_WEEKS = 4`, week-indexed `SCHEMA_WEEKS`, `week_index` CHECK domains, the autopilot's
   21-day window, session runner, calendar, and the gate asserting "exactly 4 weeks ending in deload"
   all move together.
-- **Hermes** — the implementation, once the plan is ratified.
+- **Claude Code** — the implementation, once the plan is ratified.
 - **Owner** — every duration and percentage. None is ratified.
 
 **Prerequisite for any taper work.** RR-03 stays parked; its figures stay quarantined (§7).
 
-### U8 — Deferred maintenance · **Hermes**, low priority
+### U8 — Deferred maintenance · **Claude Code**, low priority
 
 - `verify_store_sql.mjs` `SCHEMA_FILES` was missing **057** before this session and still is. I added
   058 alone because it does not depend on 057; closing that gap has its own blast radius.
@@ -231,16 +235,17 @@ unlocatable Bosquet/Mujika attributions.
 
 ## 9. Questions I need answered
 
-1. **Where is `tools/hermes_executor.py`?** It is absent from this worktree and from `master`. Your
-   loop's step 3 cannot run without it. Does it live outside the repository, is it yet to be written,
-   or has the invocation changed?
+1. ~~Where is `tools/hermes_executor.py`?~~ **Resolved by the owner 2026-08-27:** stale
+   naming. The precision coder is Claude Code via VS Code; no such script is needed.
 2. **Which tree do you work in?** I am on `codex/progression-evidence-remediation` with 12 unpushed
    commits; `master` is 62 behind. Do you continue in this worktree, or is the branch merged first?
    If a sub-agent runs in the wrong tree, §8's first trap applies at full force.
-3. **Does the ledger protocol bind your sub-agents?** I have assumed yes — that a Hermes-authored
-   change still needs its `PROMPT_LEDGER.md` entry with the verbatim prompt. If the executor writes
-   into `tools/temp_hermes_output.ts` and you overwrite the main file, **who owns the ledger entry:
-   you as dispatcher, or the executor?** The protocol is silent on delegated work.
+3. **Does the ledger protocol bind your sub-agents?** I have assumed yes — that a delegated change
+   still needs its `PROMPT_LEDGER.md` entry with the verbatim prompt. If the coder writes into a
+   staging file and you overwrite the main file after auditing, **who owns the ledger entry: you as
+   dispatcher, or the coder?** The protocol is silent on delegated work. My proposed answer, now
+   written into the orchestrator mandate: **you own it**, because you are the one who accepted the
+   change into the repository.
 4. **Antigravity's numeric output — do you want it firewalled by default?** Given §3, my
    recommendation is that any figure it derives lands in a docket for ratification and never in a
    diff. Confirm that is your posture, or tell me the rule you would rather apply.

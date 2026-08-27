@@ -2462,3 +2462,52 @@ via `tools/antigravity/run_project_agent.py`, and a Claude-code precision coder 
   grounds that an orchestrator inheriting the work needs to know what was corrected, not a tidied
   narrative.
 - Not pushed.
+
+---
+
+## Entry 0054 — 2026-08-27 · Rewrite Sol's role as Chief Orchestrator
+
+### Input G(x)
+
+```
+Sorry i made a mistake but leaving hermes in there, it was supposed to be hermes instead i replaced it with you, could you rewrite Sols orc role, please optimize it
+```
+
+Clarifies that `tools/hermes_executor.py` in the draft role prompt was stale naming: the precision
+coder is no longer Hermes but Claude Code via VS Code.
+
+### Output F(G(x))
+
+- Wrote `CHIEF_ORCHESTRATOR_MANDATE_SOL.md`, superseding the untracked
+  `CHIEF_AUDITOR_MANDATE_SOL.md` in the main checkout. The audit posture is **folded in rather than
+  dropped** — it is now what Sol applies to sub-agent output before adopting it, which is the natural
+  home for it once Sol stops reviewing a peer and starts accepting work into the repository.
+- Corrected the sub-agent roster: Antigravity (Gemini Ultra) for macro-analysis via the argparse
+  runner that exists; **Claude Code via VS Code** as precision coder. `tools/hermes_executor.py` is
+  gone from the mandate entirely — the owner confirmed it was stale naming from when the execution
+  engineer was Hermes.
+- Added a **naming disambiguation** at the top: "Hermes" in this repository now means only React
+  Native's JavaScript engine. Historical documents use it for the retired execution engineer and
+  research agent; neither is the coder. Without this an orchestrator greps "hermes" and drowns in
+  `hermes-engine*.cmake`.
+- Carried forward from the auditor mandate what is still load-bearing: the five non-negotiable
+  invariants, the standing lenses, the output and verdict discipline, and the line about treating
+  "it's fine, tests pass" as a hypothesis rather than a conclusion.
+- Added what the auditor mandate had no reason to contain, all of it learned the hard way this
+  session: a **ratification firewall** section naming what may never be delegated or invented, with
+  the `SCHEMA_FATIGUE_COST_BODYWEIGHT` alias cited as the worked precedent for shipping a docket
+  entry instead of a value; **ledger-first as step 1 of the loop**, explicitly binding delegated
+  work; a **gate discipline** section whose first rule is that a gate failing after a change is more
+  often correct than wrong, with pinned counts called out as deliberate; the **environment traps**,
+  the `node_modules` junction wrong-source hazard first; and **stop-and-ask conditions**.
+- Gave Antigravity's audited failure record its own block inside the mandate rather than leaving it
+  in the handover only, since dispatch decisions are made from the mandate.
+- Corrected `HANDOVER_2026-08-27_SOL.md` for the same naming error: §1's blocker is now recorded as
+  resolved rather than outstanding, question 1 is struck with the owner's answer, and the U3/U6/U7/U8
+  agent assignments now read Claude Code. The §3 reference to the Hermes research agent is kept but
+  clarified as retired, because the comparison shows the audit discriminated between agents rather
+  than condemning both.
+- Answered my own question 3 in the handover rather than leaving it open: the orchestrator mandate
+  now states that **Sol owns the ledger entry for delegated work**, on the grounds that Sol is the
+  party who accepts the change into the repository. Flagged as a proposal the owner can overrule.
+- Not pushed.
