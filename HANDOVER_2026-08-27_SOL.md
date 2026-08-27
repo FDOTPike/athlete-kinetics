@@ -1,165 +1,263 @@
-# Handover — 2026-08-27 — Opus → Sol
+# Handover — 2026-08-27 — Opus → Sol (orchestrator)
 
-**Branch:** `codex/progression-evidence-remediation`
-**Worktree:** `.worktrees/progression-evidence-remediation`
-**HEAD:** `5c727f6` — 11 commits this session, **none pushed**
-**Base:** `368e82d` (ledger backfill), itself 51 commits ahead of `master`
+**Branch:** `codex/progression-evidence-remediation` · **Worktree:**
+`.worktrees/progression-evidence-remediation` · **HEAD:** `0c6d164`
+**12 commits this session, none pushed.** Base `368e82d`, itself 51 commits ahead of `master`.
 
----
-
-## 1. State in one paragraph
-
-All six progression-measurement owner decisions are now ratified and recorded, the LINEAR
-bodyweight-progression defect is fixed and machine-guarded, RR-04 is implemented, the capability
-ladder has been reconciled with what blocks actually prescribe, and Migration 058 gives the app a
-real suspending state. **15 of 15 runnable gates exit 0** and all six source tripwires pass. A QA
-build (`1.0.0-beta.1-QA`, `com.pikemethods.training.qa`) is installed on the owner's Pixel 9 Pro from
-`5c727f6`. Push remains gated on the owner's on-device verification.
+Written for your role: you orchestrate, you do not write the code. Everything below is shaped as
+**assignable units** — who to give it to, why that agent, what verifies it, and what it depends on.
+§9 carries the questions I need answered before you can dispatch cleanly.
 
 ---
 
-## 2. What landed
+## 1. Read this before you dispatch anything
 
-### 2.1 Ratifications — all six decisions closed
+**`tools/hermes_executor.py` does not exist.** Not in this worktree, not in `master`, not anywhere
+in the repository. Your Conjugation Loop step 3 has no script behind it.
+`tools/antigravity/run_project_agent.py` **is** present and takes `argparse` flags.
+`tools/temp_hermes_output.ts` and `docs/CURRENT_AUDIT.md` are absent, but those are outputs — they
+appear on first use, which is expected. The missing executor is the real blocker. See §9 Q1.
 
-| # | Decision | Ruling |
-|---|---|---|
-| 1 | Dormant e1RM series | **(a) dormant**, with an advanced-athlete disclosure rider recorded as **NOT ratified** by that ruling |
-| 2 | Hard-set count | **(b)** descriptive display in a later work order; `RPE >= 8` stays an unvalidated proxy |
-| 3 | Own-data repeatability protocol | **(b)** future phase, may run concurrently with KineStrike — **method, not data** |
-| 4 | Descriptive/prescriptive boundary | **(b) PLAN ONLY, deferred until further notice**; brief written, implementation unauthorized |
-| 5 | Push-up force values | **(a)** do not pursue; ordinal ladder preserved; `41/49/64/74%` quarantined |
-| 6 | Evidence archive | **(b)** preserved in-repo, unscrubbed, indefinite and immutable |
-
-Decision 4's framing was **corrected after an owner challenge**: the app *is* prescriptive
-(`completionAction.ts`, `kinematicAutopilot.ts`), but it prescribes from readiness, completion and
-tolerance — never from progression measurement. That distinction is now written into §5 of the
-docket from source.
-
-### 2.2 Engine changes
-
-**Option C — implement-routed bodyweight progression** (`8b4e75b`). `GeneratorMovement` gains
-optional `primaryImplement`, threaded from `supportedPrefixes[0]` at both `generateBlock` call sites.
-`isPurelyBodyweight` matches exactly `'Bodyweight'`; absent or non-canonical fails toward
-external-load behaviour (P2-2). Bodyweight LINEAR slots take `SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA`
-`[0,1,1]`; every other schema mirrors its own row. Week 4 is untouched by the pre-existing
-`deload ? 0 : setsDelta` guard.
-
-**RR-04 + ladder reconciliation** (`1f934bb`). `workingSetsFor` now takes `phaseSets`, and the slot
-loop passes `primarySlot ? phaseMod.sets : 0` — the volume phase's `+1` reaches primaries only.
-Separately, bodyweight reps are floored at `DEFAULT_ADVANCEMENT_POLICY.requiredReps`, **imported from
-`progressionEngine.ts` and never restated**, so the prescription and the criterion cannot drift.
-
-**Migration 058 — suspension episodes** (`5c727f6`). An episode table, not a boolean; `is_suspended`
-is derived (`ended_at_ms IS NULL`) and never stored. Closed reason domain `injury|illness|life`,
-`frozen_macro_index` 1..8, a partial unique index enforcing one open episode, and two fail-closed
-triggers (single-open, no-reopen) registered as SENTINELS with self-heal coverage.
-`nextMacroPosition` consults the open episode before advancing.
-
-### 2.3 The finding that mattered most
-
-The capability ladder and the block generator disagreed about reps. `resolveActiveRung` **is** wired
-(`useStore.ts:2568`) and needs `3x8`; the prescription reached 8 reps in **two of eight** macro
-blocks — gpp 7, volume 5, peak **3**. An athlete following the plan literally could not level up
-outside hypertrophy. Now **8 of 8**. This was missed by the external architecture review and is the
-single largest defect closed this session.
-
-### 2.4 Documents
-
-`docs/BRIEF_progression_control_safety.md`, `docs/ANALYSIS_linear_scheme_progression_defect.md`,
-`docs/AUDIT_architecture_review_8b4e75b.md`, `docs/PROPOSAL_suspended_state_trigger.md`,
-`docs/PARKED_RR03_taper_and_microcycle_architecture.md`, plus the 25-file audit archive under
-`docs/research/audits/` with a SHA-256 manifest.
+**Naming hazard:** "Hermes" means two different things here. It is your precision-coding agent, and
+it is also React Native's JavaScript engine (`hermesEnabled=true`, and hundreds of
+`hermes-engine*.cmake` build artifacts). A grep for "hermes" will drown you in the second kind.
 
 ---
 
-## 3. Gate status
+## 2. State, compressed
 
-**15/15 runnable exit 0:** typecheck, policy, blocks, autopilot, autopilot-counterexamples,
-progression, db, demo, migrations, runner, outcomes, pipeline, coach, library, store.
+All six progression-measurement owner decisions are ratified. The LINEAR bodyweight-progression
+defect is fixed and machine-guarded. RR-04 is implemented. The capability ladder now agrees with what
+blocks prescribe. Migration 058 gives the app a real suspending state.
 
-**All six source tripwires PASS**, including both that guard `blockGenerator.ts`.
+**15 of 15 runnable gates exit 0. All six source tripwires pass.** A QA build
+(`1.0.0-beta.1-QA`, `com.pikemethods.training.qa`) from `5c727f6` is installed on the owner's Pixel 9
+Pro. **Nothing pushes until the owner verifies on-device.**
 
-**`verify:ci` cannot complete in this worktree.** It aborts in `scripts/verify-preflight.mjs` on the
-missing `node_modules` / embedder assets, *before* typecheck and before any gate runs. That is an
-environment condition, not a code failure. Both were resolved for the device build (see §6), so
-`verify:ci` may now be runnable — **worth re-running once as the first act of the handover.**
-
----
-
-## 4. Outstanding work, in priority order
-
-1. **Owner's on-device verification.** Nothing pushes until this happens. Check: bodyweight push-ups
-   at 8 reps and 4→5→5 sets; loaded blocks flat at 4 sets with RPE 7→7.5→8 and reps NOT forced to 8;
-   volume-phase primaries carrying more sets than accessories.
-2. **Suspension has no UI.** Migration 058, the store actions (`beginSuspension`, `endSuspension`,
-   `activeSuspension`) and the gates all exist, but nothing calls them, so the athlete cannot declare
-   an episode. This is the gap between a correct mechanism and a working feature. The app should
-   *prompt* after a halt or a persistent niggle and never infer — see
-   `docs/PROPOSAL_suspended_state_trigger.md` §2.2, and the four open questions in its §3.
-3. **Non-7-Day Micro-Cycle architecture — owner-assigned to Sol.** Title as specified:
-   *Non-7-Day Micro-Cycle architecture implementation — 9-day, 12-day and 14-day micro-cycles into
-   the block generator, coaching engine and app.* Prerequisite for any taper work. Blast radius and
-   the owner's intensity-block → peak → taper intent are in
-   `docs/PARKED_RR03_taper_and_microcycle_architecture.md`.
-4. **WO-04 should be withdrawn.** It proposes e1RM persistence while citing Decision 1 as authority;
-   Decision 1 ratified (a) dormant, explicitly forbidding persistence, and
-   `verify_store_sql.mjs:649` is a live removal guard.
-5. **WO-02 should be re-scoped and downgraded.** It claims the progression engine is unwired; it is
-   wired at `useStore.ts:138, :2568, :2570`.
-6. **WO-01 is genuine and cheap.** `athlete_profile.progression_methodology` is stored, validated and
-   hydrated but read by no planner — a second vocabulary competing with `schemaType`. One should go.
-7. **RR-01 rationale.** Option A was signed on the basis that calisthenics "inherently produce lower
-   systemic CNS fatigue" — **no source locator**. The ruling stands; the reason should not be carried
-   into a decision record as evidence.
-8. **`verify_store_sql.mjs` SCHEMA_FILES was missing 057** before this session and still is. 058 was
-   added alone because it does not depend on 057. Closing that gap has its own blast radius.
-9. **P3-1 ledger capture-at-issue-time convention** — drafted, belongs in `AGENT_WORKFLOW.md`, still
-   not applied.
+Detail on any ruling lives in `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md` and
+`docs/decisions/TRAINING_PROGRESSION_LAYERS.md` §8. Ledger entries 0042–0053 carry verbatim prompts
+and full outputs.
 
 ---
 
-## 5. Standing constraints — non-negotiable
+## 3. The single most important thing to know about your sub-agents
 
-- **Calibration Policy v1.** No numeric value enters the engine without explicit owner ratification
-  recorded against a source. Every change this session honoured it: Option C reused `STEP`'s ratified
-  row, RR-04 only moved an existing `+1`, and the ladder floor imports an existing constant. The one
-  pending coefficient (`SCHEMA_FATIGUE_COST_BODYWEIGHT`) is a deliberate **alias**, docketed as open
-  item 5 of `TRAINING_PROGRESSION_LAYERS.md` §8.
+**Antigravity's prior output on this exact domain was materially unreliable, and it is on record.**
+An independent audit of its progression-measurement review dispositioned 51 material claims:
+**3 retained, 17 rewritten, 17 quarantined, 14 requiring full text.** The failure modes were
+specific and are likely to recur:
+
+- auditor-derived values presented as published findings (MDC tables, persistence windows);
+- exact statistics with no source locator;
+- tier inflation — a medRxiv preprint tiered as A;
+- a paper mischaracterised (Baumel: *Mental* Health Apps, cited as *Mobile* Health Apps).
+
+The audit's own verdict: *"Antigravity is not safe as an evidence basis or decision input."* Hermes
+was judged *"not adoption-ready either, but materially more disciplined."*
+
+**What this means for your loop:** Antigravity is fine for what it is good at — large log analysis,
+sprint decomposition, reading things too big for one context. But **any number it derives is a
+candidate, never a finding.** If you route a kinematic derivation to it, the output must land in a
+docket for owner ratification, not into code. The whole quarantine list in §7 exists because that
+boundary was crossed once already.
+
+The audit itself is preserved in-repo at `docs/research/audits/progression-terra-2026-08-26/` —
+25 files, SHA-256 manifest alongside. Read `AUDIT_REPORT.md` before assigning Antigravity anything
+evidential.
+
+---
+
+## 4. Work decomposed into assignable units
+
+Ordered by dependency. "Owner only" means no agent may decide it.
+
+### U1 — Owner's on-device verification · **owner only** · blocks everything
+
+Nothing pushes until this is done. What to check on the installed QA build:
+
+| Case | Expected |
+|---|---|
+| Bodyweight push-up block | 8 reps; sets **4 → 5 → 5** across weeks 1-3; week 4 drops to 2 |
+| Loaded block | sets flat at 4; RPE **7 → 7.5 → 8**; reps **not** forced to 8 |
+| Volume-phase block | primaries carry strictly more sets than accessories |
+| Weighted calisthenics | behaves as **loaded**, not bodyweight |
+
+The last one is the sharpest test that routing keys on implement rather than movement name.
+
+### U2 — Re-run `verify:ci` · **you, directly** · 5 minutes
+
+It never completed during my session: it aborts in `scripts/verify-preflight.mjs` on missing
+`node_modules` and embedder assets, **before typecheck and before any gate**. Both were resolved for
+the device build, so it may now run for the first time. Do not assume the 15/15 individual-gate
+result transfers — report what it actually says.
+
+```
+npm run verify:ci
+```
+
+### U3 — Suspension UI · **Hermes (precision coder)** · depends on U1
+
+Migration 058, the store actions (`beginSuspension`, `endSuspension`, `activeSuspension`) and 26
+gate assertions all exist. **Nothing calls them**, so the athlete cannot declare an episode. This is
+the gap between a correct mechanism and a working feature.
+
+Brief for Hermes: `docs/PROPOSAL_suspended_state_trigger.md`. **Answer its §3 open questions first** —
+four of them, and they are design rulings, not code:
+
+1. Does an in-flight block survive suspension — archive, resume mid-block, or regenerate?
+2. What does `nextMacroPosition` return if suspension began before any block existed?
+3. How does suspension interact with a dated competition horizon?
+4. Is `frozen_macro_index` fixed at entry or recomputed at exit? (The proposal freezes at entry.)
+
+Hard constraints for whoever codes it: entry and exit are **athlete-owned**; the app may *prompt*
+after a halt or persistent niggle but must **never infer** — an automatic injury detector is a
+diagnostic claim this project has no ratified authority to make. No auto-expiry, no maximum duration,
+no severity threshold. Those are all new coefficients.
+
+**Verify:** `npm run verify:store && npm run verify:migrations && npm run typecheck`
+
+### U4 — Withdraw WO-04 · **you, directly** · 10 minutes
+
+WO-04 proposes persisting e1RM to a new SQLite table and cites *Decision 1* as its authority.
+Decision 1 was ratified **(a) dormant**, explicitly forbidding persistence, and
+`apps/mobile/test/verify_store_sql.mjs:649` is a live removal guard asserting the surface stays
+absent. Withdraw it, or re-scope it as a proposal to revisit Decision 1 — which is the owner's call,
+not a work order's.
+
+### U5 — Re-scope WO-02 · **you, directly** · 10 minutes
+
+WO-02 states at HIGH confidence that the progression engine "is not wired into `useStore.ts`". It is
+wired — imported at `:138`, called at `:2568` and `:2570`. A narrower session-completion UI gap may
+survive; the priority should drop accordingly.
+
+### U6 — WO-01, the dead `progression_methodology` column · **Hermes** · small, self-contained
+
+Stored in `006_user_profile.sql`, typed, validated, hydrated — and read by **no planner**. It is a
+second vocabulary competing with `schemaType`. One of the two should go. Genuine finding, cheap fix.
+
+**Verify:** `npm run verify:store && npm run typecheck`
+
+### U7 — Non-7-Day Micro-Cycle architecture · **owner-assigned to YOU** · the large one
+
+Owner's title, verbatim:
+
+> *Non-7-Day Micro-Cycle architecture implementation — 9-day, 12-day and 14-day micro-cycles
+> implemented into the block generator, coaching engine and app.*
+
+Scope as a **phase**, not a work order. `docs/PARKED_RR03_taper_and_microcycle_architecture.md`
+carries the blast radius from source and the owner's periodization intent
+(intensity block ~4 wk → peak 1-2 wk → taper → competition).
+
+Natural decomposition for your loop:
+- **Antigravity** — sprint planning and the cross-cutting impact map. This is genuinely what it is
+  good at: `BLOCK_WEEKS = 4`, week-indexed `SCHEMA_WEEKS`, `week_index` CHECK domains, the autopilot's
+  21-day window, session runner, calendar, and the gate asserting "exactly 4 weeks ending in deload"
+  all move together.
+- **Hermes** — the implementation, once the plan is ratified.
+- **Owner** — every duration and percentage. None is ratified.
+
+**Prerequisite for any taper work.** RR-03 stays parked; its figures stay quarantined (§7).
+
+### U8 — Deferred maintenance · **Hermes**, low priority
+
+- `verify_store_sql.mjs` `SCHEMA_FILES` was missing **057** before this session and still is. I added
+  058 alone because it does not depend on 057; closing that gap has its own blast radius.
+- The **P3-1 ledger capture-at-issue-time convention** is drafted and belongs in `AGENT_WORKFLOW.md`.
+  Never applied.
+- **RR-01's rationale** — Option A was signed on the basis that calisthenics "inherently produce
+  lower systemic CNS fatigue", with **no source locator**. The ruling stands; the reason should not
+  sit in a decision record as though it were evidence.
+
+---
+
+## 5. What must never be delegated
+
+- **Any numeric value entering the engine.** Calibration Policy v1: owner ratification recorded
+  against a source, every time. No agent may propose a number into code.
+- **Any of the six ratified decisions**, or reopening one.
+- **The push.** Not you, not a sub-agent. See §6.
+- **Anything on the quarantine list** (§7).
+
+---
+
+## 6. Standing constraints
+
+- **Push gate.** Never push until the owner has verified on-device. "Proceed" is not "push."
+  Ruling 6(b) added a second edge: pushing publishes the audit archive's sixteen author-local paths
+  to a **public** repository. The owner accepted that knowingly — but it makes the push irreversible
+  in a way it was not before.
 - **Prompt ledger protocol.** Every execution prompt's FIRST file operation appends a
-  `PROMPT_LEDGER.md` entry with the verbatim input. Currently at entry **0052**, strictly append-only.
-- **Push gate.** Never push until the owner has verified on-device. "Proceed" is not "push". Ruling
-  6(b) added a second edge: pushing publishes the archive's sixteen author-local paths to a public
-  repository.
-- **Append-only migrations.** Shipped migrations are frozen; new work is a new slot. Head is **058**.
-- **The quarantine list.** Nothing on it may enter code or a work order: e1RM MDC 11.1–33%, persistence
-  windows, hard-set R² .68/.09, Hackett 3.5±1.2, Pareja-Blanco −1.2%, push-up 41/49/64/74%, and the
-  RR-03 taper figures (50%, 30%, 60%, 40–60%, 41–60%) with their unlocatable Bosquet/Mujika
-  attributions.
+  `PROMPT_LEDGER.md` entry carrying the **verbatim** input. Currently at **0053**, strictly
+  append-only. This applies to your sub-agents' work too — the executor does not get to skip it.
+- **Append-only migrations.** Shipped migrations are frozen. Head is **058**; next free slot is
+  **059**.
+- **The one pending coefficient.** `SCHEMA_FATIGUE_COST_BODYWEIGHT` is a deliberate **alias** of the
+  loaded table, not a real table, because no bodyweight fatigue row is ratified. Docketed as open
+  item 5 of `TRAINING_PROGRESSION_LAYERS.md` §8, with the exposure disclosed: a hybrid athlete on
+  bodyweight LINEAR receives the week 2-3 set with no accessory-tax adjustment.
 
 ---
 
-## 6. Traps that cost time here
+## 7. Quarantine list — may not enter code or any work order
 
-- **Worktree `node_modules` must be a real install, never a junction to the main checkout.** Main's
-  `node_modules/@ak/*` symlink back to *master's* source, so a junction silently builds master's code
-  and reports success. `npm ci` in the worktree links `@ak/*` correctly; `babel.config.js` already
-  anchors its aliases to `__dirname` for the same class of reason, and says so in a comment.
-- **Embedder assets** are gitignored and absent from a fresh worktree. Copy
-  `model_quantized.onnx` and `tokenizer.full.json` from the main checkout rather than re-fetching.
-- **Two pinned migration counts** fire whenever a migration is added — `verify_migrations.mjs` and
-  `verify_pipeline.mjs`. They exist so adding one is a conscious act. Re-pin, never loosen.
-- **Gradle needs JDK 21**, not the system Java 26. `JAVA_HOME="C:/Program Files/Android/openjdk/jdk-21.0.8"`.
-- **Build recipe that works:** `cd apps/mobile/android && JAVA_HOME=<jdk21> ./gradlew installQa`.
-  6m15s warm. The QA variant is non-debuggable with the JS bundled — no Metro, no adb tunnel.
+e1RM MDC 11.1–33%; persistence windows 3-5 / 6-9 / 15-30 sessions; hard-set vs tonnage R² .68/.09;
+Hackett 3.5±1.2; Pareja-Blanco −1.2% (contradicted: the abstract reports CMJ 9.5% vs 3.5%);
+push-up 41/49/64/74%; Silva MDC values; Baumel mislabelled as "Mobile Health Apps"; the Davidson &
+Barillas preprint tiered A; and the RR-03 taper figures — 50%, 30%, 60%, 40–60%, 41–60% — with their
+unlocatable Bosquet/Mujika attributions.
 
 ---
 
-## 7. Where the judgement calls are recorded
+## 8. Traps that will bite your sub-agents
 
-Every ruling, its reasoning, and what it deliberately does **not** assert is in
-`docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md` and
-`docs/decisions/TRAINING_PROGRESSION_LAYERS.md` §8. Ledger entries 0042–0052 carry the verbatim
-prompts and full outputs, including the corrections made along the way — three of my own test
-assertions were wrong and were fixed rather than the code, and my initial scoping of the LINEAR fix
-was wrong on two counts. Those are recorded rather than tidied away, deliberately.
+- **Never junction a worktree's `node_modules` to the main checkout.** Main's `node_modules/@ak/*`
+  symlink back to **master's** source, so a junction silently builds master's code and **reports
+  success**. `npm ci` inside the worktree links `@ak/*` correctly. `babel.config.js` already anchors
+  its aliases to `__dirname` for exactly this class of reason and says so in a comment — someone hit
+  this before, at the Babel layer. The `node_modules` layer can still bite.
+- **Embedder assets** are gitignored and absent from a fresh worktree. Copy `model_quantized.onnx`
+  and `tokenizer.full.json` from the main checkout rather than re-fetching.
+- **Two pinned migration counts** fire on every new migration — `verify_migrations.mjs` and
+  `verify_pipeline.mjs`. They exist so adding one is a conscious act. **Re-pin, never loosen.**
+- **Gradle needs JDK 21**, not the system Java 26:
+  `JAVA_HOME="C:/Program Files/Android/openjdk/jdk-21.0.8"`.
+- **Device build that works:** `cd apps/mobile/android && JAVA_HOME=<jdk21> ./gradlew installQa`.
+  6m15s warm. The QA variant is non-debuggable with JS bundled — no Metro, no adb tunnel, no cable.
+- **A gate failing after a change is not automatically a gate to fix.** Three times this session a
+  pre-existing gate correctly caught my change, and twice my own new assertion was the thing that was
+  wrong. Default to fixing the assertion or the code — not to loosening the gate.
+
+---
+
+## 9. Questions I need answered
+
+1. **Where is `tools/hermes_executor.py`?** It is absent from this worktree and from `master`. Your
+   loop's step 3 cannot run without it. Does it live outside the repository, is it yet to be written,
+   or has the invocation changed?
+2. **Which tree do you work in?** I am on `codex/progression-evidence-remediation` with 12 unpushed
+   commits; `master` is 62 behind. Do you continue in this worktree, or is the branch merged first?
+   If a sub-agent runs in the wrong tree, §8's first trap applies at full force.
+3. **Does the ledger protocol bind your sub-agents?** I have assumed yes — that a Hermes-authored
+   change still needs its `PROMPT_LEDGER.md` entry with the verbatim prompt. If the executor writes
+   into `tools/temp_hermes_output.ts` and you overwrite the main file, **who owns the ledger entry:
+   you as dispatcher, or the executor?** The protocol is silent on delegated work.
+4. **Antigravity's numeric output — do you want it firewalled by default?** Given §3, my
+   recommendation is that any figure it derives lands in a docket for ratification and never in a
+   diff. Confirm that is your posture, or tell me the rule you would rather apply.
+5. **Can you run the device build, or is that owner-only?** I built and installed with the owner
+   present and asking. If verification builds are yours to run, U1 becomes a much shorter loop.
+6. **U3's four open questions (§4) — who answers them?** They are design rulings, not code. If they
+   go to the owner, that is a blocking dependency for the suspension UI and should be raised before
+   you dispatch it.
+
+---
+
+## 10. Where my judgement is recorded
+
+Every ruling, its reasoning, and what it deliberately does **not** assert is in the two decision
+documents. Ledger entries 0042–0053 carry the verbatim prompts and full outputs, including the
+corrections — three of my own test assertions were wrong and were fixed rather than the code, my
+initial scoping of the LINEAR fix was wrong on two counts, and my "the engine can only reduce" claim
+was wrong and is corrected in `docs/BRIEF_progression_control_safety.md` §2.1. Those are recorded
+rather than tidied away, deliberately: an orchestrator inheriting this needs to know which of my
+conclusions were revised and why.

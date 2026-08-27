@@ -2408,3 +2408,57 @@ Are you able to give me prompt for Sol to take over, please provide a brief on t
   the embedder assets copied from the main checkout). Re-running it is listed as the first act of
   the handover rather than claimed as done.
 - Not pushed.
+
+---
+
+## Entry 0053 — 2026-08-27 · Handover rewritten for Sol as orchestrator
+
+### Input G(x)
+
+```
+sorry i shouldve been clearer, Sol primary role will be to orchestrate
+Please see his role prompt i gave it<Could you write your handover according to your role and can you ask it any questions you need help with>
+```
+
+Followed by Sol's role definition: Sol 5.6 Max, Chief Orchestrator, who does not write complex code
+or process massive logs but manages two sub-agents — Antigravity (Gemini Ultra) for macro-analysis
+via `tools/antigravity/run_project_agent.py`, and a Claude-code precision coder via
+`tools/hermes_executor.py` — through a five-step Conjugation Loop ending in local verification.
+
+### Output F(G(x))
+
+- Rewrote `HANDOVER_2026-08-27_SOL.md` for an orchestrator rather than an executor. The previous
+  version told Sol how to run builds and gates; this one decomposes the outstanding work into eight
+  assignable units (U1-U8), each naming who it goes to, why that agent, the verification command,
+  and its dependencies — the shape a Conjugation Loop actually consumes.
+- **Blocker surfaced at the top: `tools/hermes_executor.py` does not exist** — not in this worktree,
+  not in `master`, nowhere in the repository. Sol's loop step 3 has no script behind it. Verified by
+  a repository-wide search; the only `*hermes*` hits are React Native's JavaScript engine build
+  artifacts and old work-order documents in another worktree.
+  `tools/antigravity/run_project_agent.py` **is** present and argparse-driven.
+  `tools/temp_hermes_output.ts` and `docs/CURRENT_AUDIT.md` are absent but are outputs, so their
+  absence is expected rather than blocking.
+- Flagged the naming collision: "Hermes" is both Sol's precision-coding agent and React Native's JS
+  engine, so grepping it returns hundreds of `hermes-engine*.cmake` artifacts.
+- **Gave Antigravity's track record its own section**, because it changes how Sol should dispatch.
+  The preserved in-repo audit dispositioned 51 of its material claims 3 retain / 17 rewrite /
+  17 quarantine / 14 full-text-required, with named failure modes — auditor-derived values presented
+  as published, exact statistics with no locator, tier inflation, a paper mischaracterised. The
+  audit's verdict that it "is not safe as an evidence basis or decision input" is quoted. The
+  operating rule proposed: Antigravity is sound for log analysis and sprint decomposition, but any
+  number it derives is a candidate that must land in a docket, never in a diff.
+- Recorded what may never be delegated (numeric values, ratified decisions, the push, the quarantine
+  list), the standing constraints, and the traps that will bite a sub-agent — the `node_modules`
+  junction wrong-source hazard first among them, plus the note that a gate failing after a change is
+  not automatically a gate to fix, since three times this session a pre-existing gate correctly
+  caught the change and twice a new assertion of mine was the thing that was wrong.
+- **Asked six questions** rather than assuming: where the Hermes executor lives; which tree Sol
+  works in given 12 unpushed commits and a 62-behind `master`; whether the ledger protocol binds
+  sub-agents and who owns the entry for delegated work (the protocol is genuinely silent on this);
+  whether Antigravity's numeric output should be firewalled by default; whether Sol may run device
+  builds or that stays owner-only; and who answers the four design questions blocking the suspension
+  UI.
+- Closed by naming which of my own conclusions were revised during the session and where, on the
+  grounds that an orchestrator inheriting the work needs to know what was corrected, not a tidied
+  narrative.
+- Not pushed.
