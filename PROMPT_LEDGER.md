@@ -2511,3 +2511,564 @@ coder is no longer Hermes but Claude Code via VS Code.
   now states that **Sol owns the ledger entry for delegated work**, on the grounds that Sol is the
   party who accepts the change into the repository. Flagged as a proposal the owner can overrule.
 - Not pushed.
+
+---
+
+## Entry 0055 — 2026-08-29 · Release-candidate completion after the worktree audit
+
+### Input G(x)
+
+`````
+# Work order — Claude Code: release-candidate completion after the worktree audit
+
+**Date:** 2026-08-29  
+**Status:** **DRAFT FOR OWNER RATIFICATION — implementation stops at C1 until the owner answers §4**  
+**Assignee:** Claude Code via VS Code; one implementation executor  
+**Audited integration base:** `codex/progression-evidence-remediation` at
+`48719b07988ad30d255b0fed37f45ed5db49c935`  
+**Release surface:** Android QA release candidate and repository release gates. This does not
+authorize a push, use of release-signing credentials, public store submission, or an iOS release
+claim.
+
+This work order converts the 2026-08-28 worktree audit into an executable release path. The audit's
+verdict is **NO-GO**. Do not treat green targeted gates or the existing APK as evidence that the
+defects below are absent.
+
+---
+
+## 1. Outcome
+
+Produce one clean, locally committed candidate descended from the audited base for which all of the
+following are true:
+
+1. Suspension freezes the owner-ratified progression state across standalone and guided-program
+   paths, including preview, generation, restart, entry, exit, and training performed while an
+   episode is open.
+2. Bodyweight-specific prescription logic uses an authoritative *actual planned implement/load
+   class*, not movement name and not the first element of a UI dropdown.
+3. Capability-ladder prescriptions follow the owner-ratified scope and any per-chain progression
+   policy that can differ from the default.
+4. No clock, randomness, cloud call, historical rewrite, unratified coefficient, or unbounded
+   history allocation enters the runtime.
+5. Verification uses dependencies installed inside the candidate worktree and tests production
+   behavior rather than source-text patterns or a reduced movement fixture.
+6. `npm run verify:release` exits `0` against a newly built QA APK whose manifest identifies the
+   candidate commit and whose memory evidence is real, sealed, and owner-reviewed.
+7. The owner completes the device acceptance checkpoint before any push.
+
+The public release remains **NO-GO** if any item is incomplete. A partial GO is a NO-GO.
+
+---
+
+## 2. Binding authority and evidence
+
+Read these before touching product files:
+
+1. `CHIEF_ORCHESTRATOR_MANDATE_SOL.md` — invariants, ratification firewall, ledger, environment,
+   gate, and stop rules.
+2. `HANDOVER_2026-08-27_SOL.md` §§4–8 — current branch, owner-only push gate, migration head,
+   quarantine list, and worktree traps.
+3. `docs/PROPOSAL_suspended_state_trigger.md`, especially §3 — unresolved suspension rulings.
+4. `docs/decisions/TRAINING_PROGRESSION_LAYERS.md` and
+   `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md` — ratified versus open progression
+   policy.
+5. `docs/PRE_RELEASE_ANDROID.md` — build, artifact, memory, and device procedures. Where it suggests
+   fetching embedder files, the orchestrator mandate's newer worktree rule governs: copy already
+   pinned assets/cache from the trusted main checkout and let preflight verify them; do not
+   re-fetch merely because a fresh worktree lacks ignored files.
+6. Root `PROMPT_LEDGER.md`, Entry 0024 — the worktree audit, gate results, and counterexamples.
+
+The frozen progression-research archive is evidence, not calibration authority. Nothing from the
+quarantine list in `HANDOVER_2026-08-27_SOL.md` §7 may enter code, fixtures, examples, or this task's
+decision docket.
+
+---
+
+## 3. Falsifier declared before implementation
+
+The release claim is disproved by any one of these observations:
+
+- a guided-program preview or generated block advances its program-owned position while suspended;
+- standalone training during suspension causes resume to skip the frozen position;
+- a loaded or weighted-calisthenics selection receives the pure-bodyweight dose because
+  `supportedPrefixes[0]` is `Bodyweight`;
+- a supported custom `progression_policy` and the generated ladder prescription disagree;
+- the same persisted inputs produce different state or output because of wall clock, timezone,
+  locale, randomness, or iteration order;
+- a test remains green after reintroducing one of those defects;
+- a worktree resolves `@ak/*` to another checkout;
+- a release gate is red, the QA artifact identifies another HEAD or dirty fingerprint, or the
+  memory packet is absent, unsealed, unreproducible, or not from the authorized 4 GB device;
+- a new engine number appears without an owner-ratified source; or
+- existing block/session history is rewritten to make the new behavior appear consistent.
+
+If a falsifier is observed, report **NO-GO** and fix the cause. Do not weaken the gate.
+
+---
+
+## 4. C1 — mandatory owner rulings before product implementation
+
+Claude Code may inspect source and produce the decision docket, but must not modify runtime, schema,
+or tests until every blocking row below has an owner answer recorded in a decision document and in
+the prompt ledger. Present options neutrally; do not recommend or preselect a value.
+
+| ID | Owner ruling required | Why code cannot choose it |
+|---|---|---|
+| S1 | Archive, retain/resume, or regenerate an in-flight block when suspension begins | Each choice changes athlete-visible history or prescription continuity |
+| S2 | Exact macro position when suspension begins before any block exists | A fallback would silently invent the initial position |
+| S3 | Competition-horizon behavior when suspension crosses or outlives the dated horizon | The taper/non-7-day architecture is parked and its figures are quarantined |
+| S4 | Freeze position at entry or recompute it at exit | This defines the persisted episode contract |
+| S5 | What guided-program state is frozen: global macro index, program sequence index, or another explicitly named state | Current code bypasses the episode through `programMacroIndex(...)` |
+| S6 | Whether a new block may be generated while suspended and, if allowed, whether repeated blocks reuse the frozen position | The existing proposal says suspension changes position only, but does not settle consumption semantics |
+| L1 | The authoritative source and selection time for the planned implement/load class used by block generation | `supported_prefixes` is a dropdown domain, not an actual selection |
+| L2 | Retain the broad bodyweight repetition floor, restrict it to movements in a capability chain, or roll it back | The current broad floor changes dose for non-ladder bodyweight movements |
+| M1 | Authorize Migration 059 to enforce suspension-history immutability, or defer that P2 explicitly | Migration 058 has reached an installed QA build and must not be edited |
+| A1 | Which, if any, dirty-worktree features are part of this release: blocked-control UI, demo-loader extraction, and movement-video factory | None is safely mergeable wholesale and none is on the audited integration head |
+
+For L1, the docket must trace the current data flow from movement selection through block generation
+and later session load selection. It must distinguish:
+
+- the set of implements a movement supports;
+- the implement selected for the planned slot;
+- equipment availability;
+- the actual load source used during a session; and
+- external load for weighted calisthenics.
+
+Do not call any of those fields equivalent without a source-backed contract.
+
+**C1 handback:** a concise decision docket with `file:line` anchors, no code diff, no numerical
+proposal, and an explicit list of which later tasks each ruling unlocks. Wait for owner responses.
+
+---
+
+## 5. C0 — isolated execution environment
+
+This preparation may be done before C1 because it changes no product behavior.
+
+1. Work in a new isolated worktree or clean branch starting exactly at
+   `48719b07988ad30d255b0fed37f45ed5db49c935`. Never implement in dirty `master`, detached `8890`,
+   blissful, wonderful, or four-mode.
+2. Before any other file operation, append the **verbatim execution prompt** to that worktree's
+   `PROMPT_LEDGER.md`. Leave its Output section open until handback. Never rewrite an earlier entry.
+3. Record:
+
+   ```powershell
+   git rev-parse HEAD
+   git status --short
+   node --version
+   npm --version
+   ```
+
+   HEAD must match the audited base and status must be empty. Node must satisfy `package.json`; npm
+   must enforce the repository's lifecycle-script policy.
+4. Run `npm ci` in this worktree. `node_modules` itself must not be a junction, and every `@ak/*`
+   workspace link must resolve inside this same worktree. Paste the resolved targets in the handback.
+5. Copy the ignored pinned embedder/device assets and exact revision cache from the trusted main
+   checkout. Do not junction dependencies and do not use a network download as a shortcut. Run:
+
+   ```powershell
+   node scripts/verify-preflight.mjs
+   ```
+
+   It must exit `0`; its hashes, not filenames alone, establish that the copied assets are correct.
+6. Run the untouched baseline:
+
+   ```powershell
+   npm run verify:ci
+   ```
+
+   Record the exit code and full per-gate summary. If red, attribute the failure before proceeding.
+
+---
+
+## 6. C2 — regression tests first
+
+After C1 is ratified, add tests that fail against the audited base before changing production code.
+The test must exercise production functions and the real 001–058 migration chain. Source regexes,
+manually reconstructed algorithms, and the 001–015/30-movement fixture are insufficient.
+
+### 6.1 Suspension lifecycle
+
+Cover at least:
+
+- standalone entry, preview, generation while open, exit, and next generation;
+- active guided-program continuation through the same lifecycle;
+- process/store rehydration between entry and exit;
+- entry before any prior block, per S2;
+- in-flight block handling, per S1;
+- competition horizon, per S3;
+- repeated begin, repeated end, and two attempted open episodes;
+- transaction failure at entry and exit;
+- sentinel/self-heal restoration; and
+- preservation of all pre-existing block/session/history rows.
+
+One assertion must reproduce the audited standalone counterexample shape: the position frozen at
+entry is used according to S6 and the first post-resume position is exactly the owner-ratified one,
+not silently advanced from an intervening `block_meta` row.
+
+### 6.2 Implement-aware prescription
+
+Build the fixture from the full live movement corpus and prove:
+
+- an explicitly unloaded bodyweight selection follows the pure-bodyweight path;
+- DB/BB/plate/vest or another explicit external load follows the loaded path;
+- weighted calisthenics follows the loaded path even if its movement supports bodyweight;
+- Bulgarian Split Squat and Walking Lunge do not become bodyweight merely because the dropdown's
+  first token is `Bodyweight`;
+- missing or unknown planned implement cannot silently earn the bodyweight dose;
+- changing dropdown order alone cannot change the prescription; and
+- loaded prescriptions and previously persisted block/session history remain unchanged.
+
+### 6.3 Ladder and fatigue seams
+
+- Exercise at least one custom per-chain `progression_policy` whose requirement differs from the
+  default, using an owner-authorized fixture value already supported by the schema rather than a new
+  engine constant.
+- Prove the prescription follows L2 and the chain policy without applying a global default to an
+  unrelated movement.
+- Make the `bodyweightDominant` fatigue route reachable from real block inputs. The bodyweight table
+  remains an exact alias of the loaded table until a separate owner ratification supplies a sourced
+  coefficient; therefore this plumbing change must produce no numerical dose difference today.
+
+### 6.4 Test integrity
+
+For each P1, demonstrate a mutant or deliberate one-line reversion that makes the new test fail,
+then restore the correction. Record the mutation and failure; do not commit the mutant.
+
+**C2 handback:** failing test names and outputs against `48719b0`, plus an explanation of why each
+test reaches shipped behavior.
+
+---
+
+## 7. C3 — minimal implementation
+
+Implement only after C2 is accepted.
+
+### 7.1 Suspension
+
+- Use one authoritative progression resolver for preview and committed generation. A guided-program
+  continuation may not bypass the active episode through a parallel calculation.
+- Persist exactly the owner-ratified frozen state. Do not infer injury, rehabilitation, or exit from
+  objective, niggle recency, guardrails, inactivity, or elapsed time.
+- Entry and exit remain athlete-owned. No automatic suspension, auto-expiry, duration limit,
+  severity threshold, or return-to-training decay may be introduced.
+- Keep episode creation/closure and any required sidecar state atomic and crash-safe.
+- Never rewrite a generated block, completed session, set record, target, or historical progression
+  row.
+- Add the smallest UI needed to begin, inspect, and end an episode only after S1–S6 are ratified.
+  Refusal/error state must be action-scoped and accessible.
+
+If M1 authorizes immutability, add **Migration 059**. Do not edit 058. Permit only the exact lifecycle
+transition required to close an episode; reject changes to its recorded start, reason, frozen state,
+or a second alteration after closure. Add idempotency, pinned-count updates, and sentinel/self-heal
+coverage. If M1 is deferred, record the mutable-audit-history exposure as an explicit release
+exception; do not silently call the trail immutable.
+
+### 7.2 Actual implement/load routing
+
+- Remove every use of `supportedPrefixes[0]` as a proxy for actual or primary implement.
+- Thread the L1 source of truth through the planning boundary with strict types. Keep the pure
+  inference engine free of database, store, clock, and UI reads.
+- Route pure bodyweight only when the authoritative plan says there is no external load. Weighted
+  calisthenics is loaded. Ambiguous or missing state must fail closed without granting the
+  bodyweight-specific dose.
+- Do not reconstruct actual session loading later and use it to rewrite the frozen prescription.
+  Prospective plan and retrospective history remain separate.
+
+### 7.3 Ladder and fatigue reconciliation
+
+- Implement L2 exactly. If the floor is chain-scoped, supply chain membership and the applicable
+  policy through a typed planning input rather than querying the database inside the engine.
+- Do not restate a policy value in `blockGenerator.ts`; preserve a single source of truth.
+- Replace the hardcoded `false` passed to the fatigue accessor with the real, typed classification.
+  Keep `SCHEMA_FATIGUE_COST_BODYWEIGHT` an exact alias. No new fatigue value is authorized.
+
+### 7.4 Optional dirty-worktree adoption
+
+Only items expressly selected in A1 may be reimplemented. Do not merge or copy a dirty worktree
+wholesale.
+
+- **Demo loader:** all temporal behavior must derive from the supplied `today`; no `Date.now()`.
+  Demo refusal/result state must not reuse the global store error channel.
+- **Blocked-control UI:** a control expected to explain a refusal must remain semantically enabled
+  with an accessibility hint; do not advertise it as disabled while expecting activation.
+- **Movement-video factory:** preserve `verify:all -> verify:release`. Add any factory gate to the
+  current `verify:ci` topology rather than restoring the obsolete monolithic chain. No network or
+  render command belongs in the verification test.
+
+If an optional item is not selected, leave its dirty worktree untouched and exclude it from this
+candidate explicitly.
+
+---
+
+## 8. Preliminary write boundary
+
+Expected product/test files are limited to the smallest necessary subset of:
+
+- `PROMPT_LEDGER.md`;
+- `apps/mobile/src/state/useStore.ts`;
+- the minimum existing screen/component files required by the ratified suspension UI;
+- `packages/inference/src/blockGenerator.ts` and an existing shared type/policy module if needed;
+- `apps/mobile/test/verify_store_sql.mjs` or a new behavioral store test wired into `verify:store`;
+- `packages/inference/test/verify_blocks.mjs` and existing progression tests;
+- `packages/core-db/src/schema/059_*.sql` and migration tests **only if M1 authorizes it**;
+- one decision record carrying the owner's C1 rulings; and
+- `package.json` only if a real new gate needs wiring, while preserving `verify:all` as the release
+  alias.
+
+Do not modify frozen research/audit artifacts, migration 058, controller constants, fatigue tables,
+memory budget values, Android identity/signing configuration, historical data, or unrelated UI.
+If the minimal correct fix needs another file, stop at a checkpoint, name it, and explain why.
+
+---
+
+## 9. C4 — verification after implementation
+
+Run targeted gates first:
+
+```powershell
+npm run typecheck
+npm run verify:blocks
+npm run verify:progression
+npm run verify:store
+npm run verify:migrations
+npm run verify:pipeline
+npm run verify:components
+```
+
+If the demo loader is adopted, also run `npm run verify:demo`. If a migration is added, consciously
+re-pin the exact migration count in both migration and pipeline gates; never loosen a count.
+
+Then run:
+
+```powershell
+npm run verify:ci
+git diff --check
+git status --short
+```
+
+Every command must exit `0`. Review every changed assertion to ensure it fails on the defect it
+claims to guard. Commit the accepted code and tests locally in coherent commits. Do not push.
+
+**C4 handback:** GO/NO-GO, commit list, `git diff --stat` from the audited base, per-command exit
+codes, test mutation evidence, and any remaining open item.
+
+---
+
+## 10. C5 — rebuild and verify the QA artifact
+
+Build only from the clean committed candidate. The candidate manifest must identify the current
+HEAD and a clean fingerprint; reusing the APK built from `5c727f6` is prohibited.
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Android\openjdk\jdk-21.0.8'
+Push-Location apps\mobile\android
+.\gradlew.bat clean assembleQa --no-daemon
+Pop-Location
+npm run verify:qa-candidate
+Get-FileHash apps\mobile\android\app\build\outputs\apk\qa\app-qa.apk -Algorithm SHA256
+```
+
+The verifier, not a visual inspection, must establish bundle presence, package/variant identity,
+model pin, ONNX pairing, signing class, 16 KB zip/ELF alignment, and candidate provenance. Record
+the APK byte size and SHA-256.
+
+---
+
+## 11. C6 — physical-device and memory checkpoint
+
+This checkpoint is owner-assisted. Claude Code may operate the harness and record evidence, but may
+not fabricate, edit, self-seal, or self-approve a packet.
+
+1. Install the newly verified QA APK on the authorized device using the repository's JDK/ADB path.
+2. Follow `docs/PRE_RELEASE_ANDROID.md` and
+   `tools/memory-audit/meminfo_harness.mjs` exactly. Capture continuous epoch logcat in a separate
+   terminal, run `start`, sample/watch the production inference path, and run `finish`.
+3. Evidence must live outside the repository and include its raw logcat, raw meminfo samples,
+   `session.json`, `EVIDENCE_MANIFEST.json`, and detached manifest SHA-256.
+4. The device must be the owner-authorized 4 GB release target. A Pixel 9 Pro result does not prove
+   the 4 GB criterion.
+5. If there is no established authority/procedure for producing the detached sealed manifest, stop
+   and report that operational gap. Do not invent a signing or sealing process.
+6. Set only the packet path required by the gate:
+
+   ```powershell
+   $env:AK_MEM_EVIDENCE_SESSION = 'C:\evidence-root\run-current\session.json'
+   npm run verify:memory-contract
+   ```
+
+   The current conservative envelope is in the review band. A green result also requires an
+   owner-approved review record naming the exact envelope reported by this candidate; Claude Code
+   may draft the record but may not sign the owner's acceptance.
+7. With the owner, execute the full device checklist in `docs/PRE_RELEASE_ANDROID.md` plus these
+   regressions:
+   - pure bodyweight versus explicitly loaded/weighted-calisthenics routing;
+   - suspension entry, restart, preview, generation, exit, and exact resume behavior for standalone
+     and guided programs;
+   - in-flight block behavior per S1;
+   - no-history entry per S2; and
+   - screen-reader behavior for any adopted refusal control.
+
+The owner records pass/fail for every row. Claude Code does not infer a pass from an installed app.
+
+---
+
+## 12. C7 — final release gate and handback
+
+After C6 evidence and owner review exist:
+
+```powershell
+npm run verify:release
+git status --short
+git rev-parse HEAD
+git log --oneline 48719b07988ad30d255b0fed37f45ed5db49c935..HEAD
+```
+
+`verify:release` and status must be green/empty. Complete the ledger Output section with exact
+commands, exit codes, artifact hash, evidence packet hash/path, decision-record locator, and owner
+device verdict.
+
+Return:
+
+1. one-line **GO** or **NO-GO**;
+2. P1/P2 findings with `file:line` anchors;
+3. verified correct, retracted/conceded, and open sections;
+4. commits and `git diff --stat` from the audited base;
+5. a gate table that states what each command did and did not cover;
+6. QA APK path, byte size, SHA-256, embedded candidate HEAD, and dirty fingerprint;
+7. memory packet path/hash, manifest/seal verification, measured maximum, and owner review locator;
+8. device checklist result; and
+9. the standardized `### MASTER LEDGER ENTRY: PHASE XX` block.
+
+**Do not push.** The owner alone authorizes the irreversible push after inspecting the device result.
+
+---
+
+## 13. Stop conditions
+
+Stop and ask rather than assume if:
+
+- any C1 ruling is absent or conflicts with a ratified decision;
+- a fix would change dose for an athlete already mid-block beyond the owner's explicit ruling;
+- a new numerical constant, threshold, duration, percentage, or default appears necessary;
+- migration 058 would need editing, or Migration 059 lacks owner authorization;
+- the correct fix requires rewriting history or broadening the preliminary write boundary;
+- dependency links resolve outside the worktree;
+- a gate is red for a reason that cannot be attributed;
+- a required device, signing/sealing authority, credential, or owner witness is unavailable; or
+- any irreversible action, including push, signing-key use, or store submission, is requested.
+
+An honestly attributed NO-GO is an acceptable result. A stale artifact, false-green test, invented
+policy, or fabricated evidence packet is not.
+
+---
+
+## 14. Explicitly outside this work order
+
+- Push, merge into `master`, branch deletion, or worktree cleanup.
+- Play/App Store submission, developer-account operations, signing secrets, privacy/legal approval,
+  and final store metadata.
+- Claiming iOS release readiness without a separately audited iOS build and device pass.
+- Non-7-day micro-cycles, taper architecture, e1RM persistence, new fatigue coefficients, or any
+  quarantined research value.
+- Wholesale adoption of any dirty worktree.
+`````
+
+### Output F(G(x))
+
+**OPEN.** C0 and C1 only. Implementation is barred until the owner answers S1–S6, L1, L2, M1, A1.
+This section is completed at handback per §12.
+
+---
+
+## Entry 0056 — 2026-08-29 · Owner ratification of the C1 package; docket revision 2
+
+### Input G(x)
+
+```
+please see the audit at
+[Request interrupted by user]
+Path to push readiness
+
+1. Correct the docket’s L1, L2 and accessibility framing.
+2. Record the owner’s S1–S6, L1, L2, M1 and A1 rulings.
+3. Have Claude complete C2–C5: behavioral tests, implementation, clean commits and a current-head QA APK.
+4. Complete owner-assisted memory/device evidence.
+5. Run `verify:release` successfully.
+6. Finish the ledger and obtain separate owner authorization to push.
+
+The full audit is recorded at [PROMPT_LEDGER.md:1496](C:\\Users\\fpike\\Documents\\Claude Coding\\Athlete App\\PROMPT_LEDGER.md). I did not modify Opus’s worktree.
+
+And please follow Sols recommendations 
+I ratify the recommended C1 package: S1a S2a S3a S4a S5c S6b L1a(constrained) L2b M1a A1a.
+```
+
+### Output F(G(x))
+
+**PROTOCOL NOTE — ordering slip, disclosed.** This entry was appended *after* the first file
+operations of this prompt (the revision-2 edits to
+`docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md`), not before them. The standing protocol requires
+the ledger append to be the FIRST file operation of every execution prompt, ratifications included.
+The input above is verbatim and the entry is append-only; only the ordering was wrong, and it is
+recorded rather than concealed.
+
+**Owner rulings ratified:** `S1a S2a S3a S4a S5c S6b L1a(constrained) L2b M1a A1a`, adopting the
+package recommended at root-ledger Entry 0027. Recorded in
+`docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md` §6 with the binding content of each ruling and the
+consequences that follow.
+
+**Root-ledger Entry 0026 audit — dispositions.**
+
+- **P1-5 UPHELD, and my revision-1 claim is retracted.** The docket had declared the broad
+  bodyweight repetition floor an owner-ratified *Settled* decision and labelled L2(b)/(c) re-rulings
+  requiring a §13 stop. Verified against this branch's own ledger: the owner's instruction at
+  `PROMPT_LEDGER.md:2223` authorized reconciling the ladder so athletes "can actually level up to
+  harder variations"; the implementer's handback at `:2248-2252` recorded a **"Disclosed dose change
+  requiring the owner's eye"** because the floor reached *all* bodyweight movements rather than only
+  chain members. The `TRAINING_PROGRESSION_LAYERS.md` §8 *Settled* row was written by that same
+  implementer and recorded as settled the broadening its own handback had flagged as unratified.
+  L2 was always an open owner ruling. Docket §5.6 carries the retraction; the §8 row is flagged for
+  correction as a checkpoint item, being outside the work order §8 write boundary.
+- **P2-1 ACCEPTED.** L1 option (a) no longer reads "the only option that answers the actual
+  question". It is rephrased as preserving Option C while recording a prospective per-slot choice,
+  with no schema shape preselected, and option (d) rollback is now described as release-safe rather
+  than as reopening a ratified decision.
+- **P2-2 ACCEPTED.** The accessibility finding is restored to a correctness finding. The docket now
+  states that deliberate is not the same as accessible — a control announced disabled but expected
+  to be activated denies the screen-reader user the reason — and that adoption needs either the
+  §7.4 correction or an explicit owner exception plus screen-reader evidence.
+- **P2-3 ACCEPTED.** The `git diff --check` trailing-whitespace conflict is recorded as a genuine
+  ledger-vs-gate protocol conflict rather than a transient. Revision 1 claimed committing removes
+  it; that holds only for the working-tree form in work-order §9 and not for a base-to-HEAD check.
+  Held verbatim pending an owner ruling between a standing ledger exception and normalization.
+- **P1-1..P1-4 ACKNOWLEDGED, not defects to fix.** They restate the C1 stop state: no commits, empty
+  ruling cells, and red release-only gates. The rulings above clear P1-3; P1-1, P1-2 and P1-4 are
+  the C2–C6 work this entry authorizes.
+- **Concessions received:** the dependency environment is admissible, the wrong-source finding does
+  not apply to this worktree, and `user_version = 57` is correct because slot 004 is a parameterized
+  materializer rather than a migration.
+
+**Next:** C2 — behavioural regression tests that fail against `48719b0` before any production change.
+
+Output section remains OPEN pending C7.
+
+---
+
+## Entry 0057 — 2026-08-29 · Execute C1–C5 locally; produce the final QA APK
+
+### Input G(x)
+
+```
+Proceed with C1–C5 locally and produce the final QA APK.
+Local commits are fine.
+Functional testing on another device is useful but does not satisfy C6.
+Do not push or approve the release until the exact final APK passes C6 on a physical, owner-authorized 4 GB device.
+```
+
+### Output F(G(x))
+
+**OPEN.** Authorizes C2–C5 execution and local commits on `claude/rc-48719b0`. Push, release
+approval, and C6 sign-off remain owner-only and are explicitly gated on the exact final APK passing
+on a physical owner-authorized 4 GB device; a pass on any other device does not substitute.
+
+Completed at handback per work order §12.
