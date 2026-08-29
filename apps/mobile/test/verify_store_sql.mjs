@@ -48,7 +48,11 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // was already absent before 058 — this list predates it. 058 does not
   // depend on 057, so it is added on its own; closing the 057 gap is a
   // separate change with its own blast radius.
-  '058_suspension_episode.sql'];
+  '058_suspension_episode.sql',
+  // 059 adds suspension_episode_program, block_suspension_origin and
+  // planned_slot_load_intent, which the store now reads and writes. 057 stays
+  // deliberately absent (see the note above); 059 does not depend on it.
+  '059_suspension_state_and_load_intent.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -429,7 +433,12 @@ check('the persisted program anchor comes from the generated plan, not the date'
 // consuming an L3 position. These are source tripwires, not behaviour tests:
 // they pin the shape that makes the freeze impossible to lose silently.
 check('nextMacroPosition consults the open suspension BEFORE advancing',
-  /const nextMacroPosition[\s\S]{0,900}?openSuspension\(d\)[\s\S]{0,600}?ORDER BY block_id DESC/.test(src));
+  /const nextMacroPosition[\s\S]{0,900}?openSuspension\(d\)[\s\S]{0,1200}?ORDER BY bm\.block_id DESC/.test(src));
+// S6(b) 2026-08-29: the fall-through read must EXCLUDE blocks generated during
+// an episode, or a suspension block consumes the very position the athlete is
+// meant to resume at. Pinned because losing this clause is silent.
+check('the macro fall-through excludes blocks attributed to a suspension episode',
+  /FROM block_meta bm[\s\S]{0,300}?NOT EXISTS[\s\S]{0,200}?block_suspension_origin/.test(src));
 // Scoped to SQL-bearing lines: the identifier legitimately appears in prose
 // explaining that it is DERIVED. What must never exist is a COLUMN by that name.
 const sqlBearingLines = src.split('\n').filter((l) => /SELECT|INSERT|UPDATE|CREATE/i.test(l));
@@ -598,7 +607,10 @@ a('the ONLY write targets are forward plan/program tables plus weekly frequency'
   [...gnb.matchAll(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi)]
     .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot', 'planned_slot_target',
       'training_program', 'training_program_day', 'training_program_movement_preference',
-      'training_block_program', 'planned_slot_autopilot', 'athlete_profile'].includes(m[1])));
+      'training_block_program', 'planned_slot_autopilot', 'athlete_profile',
+      // 059, both forward-plan side-cars: the suspension attribution for the
+      // block being minted, and this plan's prospective per-slot load intent.
+      'block_suspension_origin', 'planned_slot_load_intent'].includes(m[1])));
 const hyd = stripComments((() => { const i = gnbRaw.indexOf('autopilot hydration'); const j = gnbRaw.indexOf('generateBlock({'); return i >= 0 && j > i ? gnbRaw.slice(i, j) : ''; })());
 a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match(/GROUP BY s\.session_date, m\.pattern/g) || []).length === 1);
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());

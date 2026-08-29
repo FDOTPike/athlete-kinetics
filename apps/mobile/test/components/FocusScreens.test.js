@@ -227,6 +227,7 @@ test('COACH opens the Manage program editor and saves future preferences', () =>
       objective: 'strength', training_age: 'beginner', weekly_frequency: 1,
       equipment_inventory: [], base_rpe_cap: 9, session_duration_cap_min: 60,
     },
+    suspension: null,
     program: activeProgram,
     movements: [],
     previewTrainingProgram: jest.fn(() => editorPreview),

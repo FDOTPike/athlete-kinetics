@@ -20,7 +20,7 @@
  * Run:  npm run verify:blocks
  */
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -82,9 +82,22 @@ const movements = db.prepare(
   pattern: r.pattern,
   is_compound: Number(r.is_compound) === 1,
   required: JSON.parse(r.required_json ?? '[]'),
-  // Option C: the canonical primary implement, exactly as the store threads it.
-  // Absent/empty is undefined, which the generator reads as external load.
-  primaryImplement: JSON.parse(r.prefixes_json ?? '[]')[0] ?? undefined,
+  // L1(a): the implement PLANNED for the slot, exactly as the store threads it.
+  // The store's rule, applied here: an explicit athlete selection wins; failing
+  // that, a movement whose supported set has exactly ONE member has no choice to
+  // make, so that member IS the selection; anything else stays undeclared and
+  // fails closed to the loaded path. Element zero of a MULTI-member list is
+  // never used — that is dropdown ordering, not intent.
+  plannedImplement: (() => {
+    const p = JSON.parse(r.prefixes_json ?? '[]');
+    return p.length === 1 ? p[0] : undefined;
+  })(),
+  // L2(b): this 001-015 fixture predates movement_progression, so it cannot
+  // resolve real chain membership. It declares every movement a chain member so
+  // the sections below keep exercising FLOOR MECHANICS. Chain SCOPING — that an
+  // off-chain movement is not floored — is tested in [28] against the real
+  // 001-059 corpus, where membership is genuine.
+  progressionGroup: 'fixture-chain',
   difficulty: 'Beginner',
   beginner_ok: false,
   sportTracking: false,
@@ -96,6 +109,18 @@ check('generator fixture explicitly carries both contexts and sport status', mov
   && typeof movement.capability_available_weight_room === 'boolean'
   && typeof movement.capability_available_sport_conditioning === 'boolean'));
 const requiredById = new Map(movements.map((m) => [m.movement_id, m.required]));
+/** An athlete who explicitly planned BODYWEIGHT wherever the movement supports
+ *  it. Under L1(a) the bodyweight route requires a declaration, so the sections
+ *  that assert bodyweight behaviour must declare it rather than relying on the
+ *  fixture having inferred it from dropdown order. */
+const prefixesById = new Map(db.prepare(
+  `SELECT m.movement_id, d.supported_prefixes AS p FROM movement m
+   JOIN movement_detail d USING (movement_id)`,
+).all().map((r) => [Number(r.movement_id), JSON.parse(r.p ?? '[]')]));
+const declaredBodyweightPool = movements.map((m) => (
+  (prefixesById.get(m.movement_id) ?? []).includes('Bodyweight')
+    ? { ...m, plannedImplement: 'Bodyweight' }
+    : m));
 const prof = (over = {}) => ({ ...DEFAULT_PROFILE, ...over });
 const gen = (over = {}) => generateBlock({ profile: prof(over), movements, startDate: START });
 
@@ -551,7 +576,7 @@ const accessorySets = (plan) => plan.sessions
 // section asserts against a pool routed entirely as external load — which is
 // exactly the pool these checks ran against before implements were threaded.
 // The bodyweight behaviour is asserted separately in [9b].
-const loadedMovements = movements.map((m) => ({ ...m, primaryImplement: undefined }));
+const loadedMovements = movements.map((m) => ({ ...m, plannedImplement: undefined }));
 const hybridApre = generateBlock({
   profile: prof({ objective: 'hybrid' }), movements: loadedMovements, startDate: START, schemaType: 'APRE' });
 const hybridLinear = generateBlock({
@@ -579,18 +604,25 @@ check('hybrid APRE accessories never fall below one working set',
 // progress by VOLUME instead; loaded slots are untouched.
 //
 // The two pools below differ in ONE field on ONE movement: Push-up's
-// primaryImplement. Same movement_id, same name, same required equipment. If
+// plannedImplement. Same movement_id, same name, same required equipment. If
 // the two blocks differ, the routing is provably by IMPLEMENT and not by name.
 console.log('[9b] Option C — bodyweight progression routes on implement');
 
 const pushUp = movements.find((m) => m.name === 'Push-up');
-check('fixture: Push-up seeds primaryImplement Bodyweight',
-  pushUp !== undefined && pushUp.primaryImplement === 'Bodyweight',
-  String(pushUp?.primaryImplement));
+// L1(a): Push-up supports ["Bodyweight","Banded"], so the fixture leaves it
+// UNDECLARED — a multi-implement movement has a choice to make and the plan
+// must record which way it went. The pools below declare it explicitly, which
+// is the whole point: the two differ in that one declaration and nothing else.
+check('fixture: multi-implement Push-up is undeclared until a slot declares it',
+  pushUp !== undefined && pushUp.plannedImplement === undefined,
+  String(pushUp?.plannedImplement));
 
-// Identical pool, Push-up re-routed as plate-loaded. Nothing else changes.
+// Two pools differing in ONE declaration on ONE movement: the implement the
+// athlete planned for Push-up. Same movement_id, same name, same equipment.
+const bodyweightPool = movements.map((m) =>
+  (m.movement_id === pushUp.movement_id ? { ...m, plannedImplement: 'Bodyweight' } : m));
 const plateLoadedPool = movements.map((m) =>
-  (m.movement_id === pushUp.movement_id ? { ...m, primaryImplement: 'BB' } : m));
+  (m.movement_id === pushUp.movement_id ? { ...m, plannedImplement: 'BB' } : m));
 
 const patternById = new Map(movements.map((m) => [m.movement_id, m.pattern]));
 // Empty inventory: every emitted movement is equipment-free, so Push-up fills
@@ -609,7 +641,7 @@ const pushSlots = (pool) => {
   return [1, 2, 3, 4].map((w) => out.get(w)).filter((x) => x !== undefined);
 };
 
-const bw = pushSlots(movements);
+const bw = pushSlots(bodyweightPool);
 const loaded = pushSlots(plateLoadedPool);
 
 check('both pools emit a push_h slot in all four weeks',
@@ -647,15 +679,15 @@ check('the two classes actually diverge in set count (the fix is observable)',
   `bw ${bw[1].sets}/${bw[2].sets} vs loaded ${loaded[1].sets}/${loaded[2].sets}`);
 
 // --- fail-toward-external-load (P2-2) ----------------------------------------
-const noPrefixPool = movements.map((m) => ({ ...m, primaryImplement: undefined }));
+const noPrefixPool = movements.map((m) => ({ ...m, plannedImplement: undefined }));
 const emptyPrefixSlots = pushSlots(noPrefixPool);
-check('absent primaryImplement is NOT bodyweight evidence — sets stay flat',
+check('absent plannedImplement is NOT bodyweight evidence — sets stay flat',
   emptyPrefixSlots[0].sets === emptyPrefixSlots[1].sets
   && emptyPrefixSlots[1].sets === emptyPrefixSlots[2].sets,
   `${emptyPrefixSlots.map((x) => x.sets).join('/')}`);
 check('a non-canonical implement is NOT bodyweight evidence either',
   (() => {
-    const junk = movements.map((m) => ({ ...m, primaryImplement: 'Bodyweight ' }));
+    const junk = bodyweightPool.map((m) => ({ ...m, plannedImplement: 'Bodyweight ' }));
     const j = pushSlots(junk);
     return j[0].sets === j[1].sets && j[1].sets === j[2].sets;
   })());
@@ -664,8 +696,8 @@ check('a non-canonical implement is NOT bodyweight evidence either',
 // The field is optional precisely so callers predating it do not change
 // behaviour. Omitting the key entirely must equal passing it as undefined,
 // and both must equal external-load routing.
-const legacyPool = movements.map(({ primaryImplement: _drop, ...rest }) => rest);
-check('a pool that OMITS primaryImplement is byte-identical to explicit external load',
+const legacyPool = movements.map(({ plannedImplement: _drop, ...rest }) => rest);
+check('a pool that OMITS plannedImplement is byte-identical to explicit external load',
   JSON.stringify(generateBlock({
     profile: prof(bwProfile), movements: legacyPool, startDate: START, schemaType: 'LINEAR' }))
   === JSON.stringify(generateBlock({
@@ -681,7 +713,7 @@ check('legacy omission never yields the bodyweight progression',
 // athlete on WAVE must be able to level up too. Asserted separately below so a
 // regression in one cannot hide behind the other.
 for (const st of SCHEMA_TYPES.filter((x) => x !== 'LINEAR')) {
-  const withBw = generateBlock({ profile: prof(bwProfile), movements, startDate: START, schemaType: st });
+  const withBw = generateBlock({ profile: prof(bwProfile), movements: declaredBodyweightPool, startDate: START, schemaType: st });
   const asLoaded = generateBlock({ profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: st });
   const setsOf = (plan) => plan.sessions.map((sess) =>
     sess.slots.map((sl) => `${sl.slot_index}:${sl.movement_id}:${sl.sets}:${sl.target_rpe}`).join(','));
@@ -712,7 +744,7 @@ console.log('[9c] RR-04 — phase set delta lands on primary slots only');
   // mechanism — mixing the classes would test both at once and prove neither.
   const isLoaded = (sl) => {
     const mv = movements.find((x) => x.movement_id === sl.movement_id);
-    return mv !== undefined && mv.pattern !== 'locomotion' && mv.primaryImplement !== 'Bodyweight';
+    return mv !== undefined && mv.pattern !== 'locomotion' && mv.plannedImplement !== 'Bodyweight';
   };
   let biased = true; let compared = 0;
   for (const sess of work) {
@@ -737,7 +769,7 @@ console.log('[9c] RR-04 — phase set delta lands on primary slots only');
   for (const sess of gppBlock.sessions.filter((x) => x.phase !== 'deload')) {
     const loaded = sess.slots.filter((sl) => {
       const mv = movements.find((x) => x.movement_id === sl.movement_id);
-      return mv !== undefined && mv.pattern !== 'locomotion' && mv.primaryImplement !== 'Bodyweight';
+      return mv !== undefined && mv.pattern !== 'locomotion' && mv.plannedImplement !== 'Bodyweight';
     });
     if (loaded.length < 2) continue;
     if (new Set(loaded.map((sl) => sl.sets)).size !== 1) flat = false;
@@ -762,7 +794,8 @@ console.log('[9d] ladder reconciliation — bodyweight reps reach the advancemen
   const loadedRepsByBlock = [];
   for (let i = 1; i <= MACRO_BLOCKS; i += 1) {
     const bwPlan = generateBlock({
-      profile: prof({ objective: 'strength', equipment_inventory: [] }), movements,
+      profile: prof({ objective: 'strength', equipment_inventory: [] }),
+      movements: declaredBodyweightPool,
       startDate: START, schemaType: 'LINEAR', macroBlockIndex: i });
     const bwWork = bwPlan.sessions.filter((x) => x.phase !== 'deload');
     const bwSlots = bwWork.flatMap((x) => x.slots);
@@ -774,7 +807,7 @@ console.log('[9d] ladder reconciliation — bodyweight reps reach the advancemen
     // is phase-shaped and must NOT be floored.
     const loadedPlan = generateBlock({
       profile: prof({ objective: 'strength' }),
-      movements: movements.map((m) => ({ ...m, primaryImplement: undefined })),
+      movements: movements.map((m) => ({ ...m, plannedImplement: undefined })),
       startDate: START, schemaType: 'LINEAR', macroBlockIndex: i });
     const loadedSlots = loadedPlan.sessions
       .filter((x) => x.phase !== 'deload')
@@ -793,7 +826,8 @@ console.log('[9d] ladder reconciliation — bodyweight reps reach the advancemen
 
   // The deload is exempt: it must stay a strict cut, never floored upward.
   const peakPlan = generateBlock({
-    profile: prof({ objective: 'strength', equipment_inventory: [] }), movements,
+    profile: prof({ objective: 'strength', equipment_inventory: [] }),
+    movements: declaredBodyweightPool,
     startDate: START, schemaType: 'LINEAR', macroBlockIndex: 7 });
   check('macroBlockIndex 7 resolves to peak', peakPlan.macroPhase === 'peak');
   const peakDeload = peakPlan.sessions.filter((x) => x.phase === 'deload').flatMap((x) => x.slots);
@@ -1879,6 +1913,234 @@ console.log('\n[Work Order A: Split transparency and program focuses]');
     splitExplainer('hybrid', 4) === 'Strength days interleaved with mat time across 4 sessions, so grappling stays the priority.');
   check('SPLIT_EXPLAINER_FOOTER matches approved copy',
     SPLIT_EXPLAINER_FOOTER === 'You can change any day below.');
+}
+
+// --- [28] L1(a)/L2(b): prospective load intent + chain-scoped ladder floor ----
+//
+// Ratified 2026-08-29 (docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md §6):
+//   L1(a) constrained — the bodyweight route is taken only on an EXPLICIT
+//         prospective per-slot load intent. Intent may not be derived from
+//         dropdown order, taxonomy, equipment ownership, or retrospective set
+//         data; missing state fails closed toward the loaded path.
+//   L2(b) — the ladder rep floor applies to capability-chain movements only,
+//         honouring an applicable per-chain progression_policy. Unrelated
+//         bodyweight movements keep their phase prescription.
+//
+// The fixture above applies migrations 001-015 (30 movements) and derives
+// `plannedImplement` from `supported_prefixes[0]` — i.e. it reproduces the
+// defect under test. This section builds a SECOND fixture from the FULL live
+// 001-058 corpus (300 movements) so dropdown ordering is real.
+console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor (L2b)');
+{
+  const fullDb = new DatabaseSync(':memory:');
+  fullDb.exec('PRAGMA foreign_keys = ON;');
+  try { fullDb.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
+    fullDb.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+    fullDb.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+  }
+  for (const f of readdirSync(SCHEMA_DIR)
+    .filter((f) => /^\d{3}_.*\.sql$/.test(f) && !f.startsWith('004_'))
+    .sort()) {
+    fullDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+
+  const corpus = fullDb.prepare(
+    `SELECT m.movement_id, m.name, m.pattern, m.is_compound,
+            (SELECT json_group_array(me.item) FROM movement_equipment me
+             WHERE me.movement_id = m.movement_id) AS required_json,
+            (SELECT d.supported_prefixes FROM movement_detail d
+             WHERE d.movement_id = m.movement_id) AS prefixes_json,
+            (SELECT p.progression_group FROM movement_progression p
+             WHERE p.movement_id = m.movement_id) AS progression_group
+     FROM movement m ORDER BY m.movement_id`,
+  ).all();
+  check('[28] full corpus fixture is the live library, not the 001-015 subset',
+    corpus.length === 300, `${corpus.length} movements`);
+
+  const byName = new Map(corpus.map((r) => [r.name, r]));
+  const prefixesOf = (name) => JSON.parse(byName.get(name)?.prefixes_json ?? '[]');
+
+  // The three movements the audit named, plus the rest of the mixed set.
+  const MIXED = ['Bulgarian Split Squat', 'Walking Lunge', 'Weighted Pull-up',
+    'Chin-up', 'Glute Bridge', 'Nordic Curl', 'Push-up'];
+  check('[28] the mixed set lists Bodyweight FIRST and also supports external load',
+    MIXED.every((n) => {
+      const p = prefixesOf(n);
+      return p[0] === 'Bodyweight' && p.length > 1;
+    }), MIXED.map((n) => `${n}=${JSON.stringify(prefixesOf(n))}`).join(' '));
+
+  // A movement is only a member of a capability chain when movement_progression
+  // says so. 40 of the 55 dropdown-bodyweight movements are NOT members.
+  const chainMembers = new Set(corpus.filter((r) => r.progression_group !== null)
+    .map((r) => Number(r.movement_id)));
+  const dropdownBodyweight = corpus.filter((r) => JSON.parse(r.prefixes_json ?? '[]')[0] === 'Bodyweight');
+  check('[28] the corpus separates chain members from unrelated bodyweight work',
+    dropdownBodyweight.length === 55
+    && dropdownBodyweight.filter((r) => !chainMembers.has(Number(r.movement_id))).length === 40,
+    `${dropdownBodyweight.length} bodyweight-first, ${dropdownBodyweight.filter((r) => !chainMembers.has(Number(r.movement_id))).length} off-chain`);
+
+  /** Build a generator pool carrying an EXPLICIT prospective load intent.
+   *  `intent` maps movement name -> the implement selected for its planned
+   *  slot. Anything unnamed carries no intent at all. */
+  const poolWithIntent = (intent = {}) => corpus.map((r) => ({
+    movement_id: Number(r.movement_id),
+    name: r.name,
+    pattern: r.pattern,
+    is_compound: Number(r.is_compound) === 1,
+    required: JSON.parse(r.required_json ?? '[]'),
+    difficulty: 'Beginner',
+    beginner_ok: false,
+    sportTracking: false,
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: true,
+    // L1(a): the implement ACTUALLY selected for the planned slot. Absent means
+    // unknown, which must fail closed to the loaded path.
+    plannedImplement: Object.prototype.hasOwnProperty.call(intent, r.name)
+      ? intent[r.name] : undefined,
+    // Chain membership + applicable policy arrive as typed planning inputs
+    // (work order §7.3): the engine never queries the database.
+    progressionGroup: r.progression_group ?? undefined,
+  }));
+
+  const planFor = (pool, over = {}) =>
+    generateBlock({ profile: prof(over), movements: pool, startDate: START });
+
+  /** The generator picks per pattern, so a named movement may simply not be
+   *  selected — which would make every assertion about it vacuously true.
+   *  Drop its pattern-mates so it is the ONLY candidate for its slot. */
+  const focusedOn = (name, intent = {}) => {
+    const target = byName.get(name);
+    const targetId = Number(target.movement_id);
+    return poolWithIntent(intent).filter((m) =>
+      m.movement_id === targetId || m.pattern !== target.pattern);
+  };
+
+  const slotsOf = (plan) => plan.sessions.flatMap((s) => s.slots);
+  const repsForMovement = (plan, movementId) =>
+    slotsOf(plan).filter((s) => s.movement_id === movementId).map((s) => s.reps);
+  /** sets x reps — Option C routes VOLUME, and an off-chain bodyweight movement
+   *  correctly keeps its phase reps, so reps alone cannot tell the classes apart. */
+  const shapeForMovement = (plan, movementId) =>
+    slotsOf(plan).filter((s) => s.movement_id === movementId).map((s) => `${s.sets}x${s.reps}`);
+
+  // --- the falsifier: ordering alone must not move the dose ------------------
+  // Permuting supported_prefixes changes element zero and nothing else. Under
+  // L1(a) the plan must be byte-identical, because order is not intent.
+  const baseline = planFor(poolWithIntent());
+  const reorderedCorpus = corpus.map((r) => {
+    const p = JSON.parse(r.prefixes_json ?? '[]');
+    return { ...r, prefixes_json: JSON.stringify([...p].reverse()) };
+  });
+  const reorderedPool = reorderedCorpus.map((r, i) => ({
+    ...poolWithIntent()[i],
+  }));
+  check('[28] reversing every supported_prefixes list cannot change the plan',
+    JSON.stringify(planFor(reorderedPool)) === JSON.stringify(baseline));
+
+  // --- explicit intent routes, both directions ------------------------------
+  const pushUp = byName.get('Push-up');
+  if (pushUp !== undefined) {
+    const id = Number(pushUp.movement_id);
+    const atPeak = (pool) => generateBlock({
+      profile: prof(), movements: pool, startDate: START, macroBlockIndex: 7,
+    });
+    const unloaded = atPeak(focusedOn('Push-up', { 'Push-up': 'Bodyweight' }));
+    const loaded = atPeak(focusedOn('Push-up', { 'Push-up': 'Banded' }));
+    const unknown = atPeak(focusedOn('Push-up'));
+
+    const unloadedReps = repsForMovement(unloaded, id);
+    const loadedReps = repsForMovement(loaded, id);
+    const unknownReps = repsForMovement(unknown, id);
+
+    check('[28] an explicitly unloaded selection takes the bodyweight path',
+      unloadedReps.length > 0
+      && JSON.stringify(unloadedReps) !== JSON.stringify(loadedReps),
+      `unloaded=${JSON.stringify(unloadedReps)} loaded=${JSON.stringify(loadedReps)}`);
+    check('[28] an explicit external-load selection takes the loaded path',
+      loadedReps.length > 0 && JSON.stringify(loadedReps) !== JSON.stringify(unloadedReps),
+      JSON.stringify(loadedReps));
+    check('[28] missing intent fails CLOSED — identical to the loaded path, never bodyweight',
+      JSON.stringify(unknownReps) === JSON.stringify(loadedReps),
+      `unknown=${JSON.stringify(unknownReps)} loaded=${JSON.stringify(loadedReps)}`);
+  }
+
+  // --- weighted calisthenics is loaded --------------------------------------
+  const weightedPullUp = byName.get('Weighted Pull-up');
+  if (weightedPullUp !== undefined) {
+    const id = Number(weightedPullUp.movement_id);
+    const asLoaded = shapeForMovement(planFor(focusedOn('Weighted Pull-up', { 'Weighted Pull-up': 'Banded' })), id);
+    const asUnloaded = shapeForMovement(planFor(focusedOn('Weighted Pull-up', { 'Weighted Pull-up': 'Bodyweight' })), id);
+    check('[28] weighted calisthenics follows the loaded path despite supporting Bodyweight',
+      asLoaded.length > 0 && JSON.stringify(asLoaded) !== JSON.stringify(asUnloaded),
+      `loaded=${JSON.stringify(asLoaded)} unloaded=${JSON.stringify(asUnloaded)}`);
+  }
+
+  // --- the named dropdown-order victims -------------------------------------
+  for (const name of ['Bulgarian Split Squat', 'Walking Lunge']) {
+    const row = byName.get(name);
+    if (row === undefined) continue;
+    const id = Number(row.movement_id);
+    const loadedSelection = shapeForMovement(planFor(focusedOn(name, { [name]: 'DB' })), id);
+    const bodyweightSelection = shapeForMovement(planFor(focusedOn(name, { [name]: 'Bodyweight' })), id);
+    check(`[28] ${name} is not bodyweight merely because the dropdown starts with it`,
+      loadedSelection.length > 0
+      && JSON.stringify(loadedSelection) !== JSON.stringify(bodyweightSelection),
+      `DB=${JSON.stringify(loadedSelection)} BW=${JSON.stringify(bodyweightSelection)}`);
+  }
+
+  // --- L2(b): the floor is chain-scoped -------------------------------------
+  // An off-chain bodyweight movement keeps its PHASE prescription; it must not
+  // be lifted to the ladder bar it is not measured against.
+  const offChain = dropdownBodyweight.find((r) => !chainMembers.has(Number(r.movement_id))
+    && r.pattern !== 'locomotion');
+  const onChain = dropdownBodyweight.find((r) => chainMembers.has(Number(r.movement_id))
+    && r.pattern !== 'locomotion');
+  if (offChain !== undefined && onChain !== undefined) {
+    const repsAtPeak = (row) => repsForMovement(generateBlock({
+      profile: prof(),
+      movements: focusedOn(row.name, { [row.name]: 'Bodyweight' }),
+      startDate: START, macroBlockIndex: 7,
+    }), Number(row.movement_id));
+    const offReps = repsAtPeak(offChain);
+    const onReps = repsAtPeak(onChain);
+    // The pair is the point: L2(b) says the floor is chain-scoped, so exactly
+    // one of these two is lifted to the bar.
+    check(`[28] L2(b) the ladder floor is chain-scoped (on=${onChain.name}, off=${offChain.name})`,
+      onReps.length > 0 && offReps.length > 0
+      && onReps.some((r) => r >= DEFAULT_ADVANCEMENT_POLICY.requiredReps)
+      && offReps.every((r) => r < DEFAULT_ADVANCEMENT_POLICY.requiredReps),
+      `on-chain=${JSON.stringify(onReps)} off-chain=${JSON.stringify(offReps)}`);
+  }
+
+  // --- L2(b): a per-chain policy overrides the default ----------------------
+  // progression_policy ships with zero rows; insert a supported custom value
+  // and prove the prescription follows the CHAIN's bar, not the global default.
+  fullDb.prepare(
+    'INSERT INTO progression_policy (progression_group, required_sets, required_value) VALUES (?, ?, ?)',
+  ).run('pull-up', 3, 12);
+  const chainMember = corpus.find((r) => r.progression_group === 'pull-up'
+    && JSON.parse(r.prefixes_json ?? '[]')[0] === 'Bodyweight');
+  if (chainMember !== undefined) {
+    const id = Number(chainMember.movement_id);
+    const pool = focusedOn(chainMember.name, { [chainMember.name]: 'Bodyweight' }).map((m) => (
+      m.movement_id === id
+        ? { ...m, chainAdvancementReps: 12 }
+        : m));
+    const reps = repsForMovement(planFor(pool), id);
+    check(`[28] a custom per-chain policy governs the floor (${chainMember.name}, bar 12)`,
+      reps.length > 0 && reps.some((r) => r >= 12),
+      JSON.stringify(reps));
+  }
+
+  // --- loaded prescriptions are untouched by all of the above ---------------
+  const loadedOnly = corpus.filter((r) => JSON.parse(r.prefixes_json ?? '[]')[0] !== 'Bodyweight');
+  const loadedIds = new Set(loadedOnly.map((r) => Number(r.movement_id)));
+  const loadedRepsBaseline = slotsOf(baseline)
+    .filter((s) => loadedIds.has(s.movement_id)).map((s) => `${s.movement_id}:${s.reps}:${s.sets}`);
+  const loadedRepsWithIntent = slotsOf(planFor(poolWithIntent({ 'Push-up': 'Bodyweight' })))
+    .filter((s) => loadedIds.has(s.movement_id)).map((s) => `${s.movement_id}:${s.reps}:${s.sets}`);
+  check('[28] declaring one bodyweight intent leaves every loaded prescription unchanged',
+    JSON.stringify(loadedRepsBaseline) === JSON.stringify(loadedRepsWithIntent));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

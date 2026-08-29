@@ -81,24 +81,37 @@ export interface GeneratorMovement {
    *  test — Feet-Elevated Push-Up requires a bench and is still bodyweight
    *  loaded. Use `primaryImplement` for the loading question. */
   required: readonly string[];
-  /** movement_detail.supported_prefixes[0] — the canonical primary implement,
-   *  the same signal SessionScreen resolves bodyweightMode from. Absent,
-   *  empty or non-canonical is NOT bodyweight evidence: it fails toward
-   *  external-load behaviour (P2-2). Omitting it keeps legacy callers
-   *  byte-identical, exactly like the optional fields above. */
-  primaryImplement?: MovementPrefix;
+  /** L1(a), owner-ratified 2026-08-29: the implement ACTUALLY selected for this
+   *  planned slot (059 planned_slot_load_intent), threaded in by the store.
+   *
+   *  This is deliberately NOT `supported_prefixes[0]`. That array is the UI
+   *  dropdown DOMAIN (010:41-43), and element zero is an ordering artefact: on
+   *  the live corpus `Weighted Pull-up`, `Bulgarian Split Squat` and
+   *  `Walking Lunge` all start with `Bodyweight` while supporting external
+   *  load. Loading is not a property of a movement — it is a per-slot choice.
+   *
+   *  Absent means NO declared intent and fails closed to the loaded path. */
+  plannedImplement?: MovementPrefix;
+  /** L2(b): the capability chain this movement belongs to (movement_progression),
+   *  or undefined when it is on no chain. Supplied as a typed planning input so
+   *  the pure engine never reads the database (work order §7.3). */
+  progressionGroup?: string;
+  /** L2(b): the advancement bar for that chain — a per-chain progression_policy
+   *  row where one exists, otherwise the imported default. Never restated as a
+   *  literal here, so prescription and criterion cannot drift. */
+  chainAdvancementReps?: number;
 }
 
-/** Strictly bodyweight: the canonical primary implement is exactly
- *  'Bodyweight'. Weighted calisthenics, plate-loaded variants and every
+/** Strictly bodyweight: the athlete's PLANNED implement for this slot is
+ *  exactly 'Bodyweight'. Weighted calisthenics, plate-loaded variants and every
  *  external implement resolve false, as does an absent or non-canonical
- *  prefix — the same fail-toward-external-load rule the session screen uses.
+ *  selection — an undeclared slot fails closed to external load.
  *
  *  This is the routing predicate for the Option C bodyweight progression
  *  (owner-ratified 2026-08-27): a purely bodyweight movement has no load
  *  channel, so an effort ramp alone is unobservable to the athlete. */
 export const isPurelyBodyweight = (m: GeneratorMovement): boolean =>
-  m.primaryImplement === 'Bodyweight';
+  m.plannedImplement === 'Bodyweight';
 
 export type BlockFocus = 'lower' | 'upper' | 'full' | 'conditioning' | 'bjj';
 export type BlockPhase = 'accumulation' | 'intensification' | 'realization' | 'deload';
@@ -656,9 +669,17 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // stripping 1-2 working sets from accessory/secondary slots — concurrent
   // grappling load leaves no CNS budget for both.
   // Routed through the loading-class accessor so a ratified bodyweight
-  // coefficient becomes a table edit. Both branches resolve identically
-  // today; `false` preserves the existing loaded price exactly.
-  const fatigueCost = schemaFatigueCost(schemaType, macroPhase, false);
+  // coefficient becomes a table edit. Until 2026-08-29 this passed a hardcoded
+  // `false`, which made the bodyweight branch unreachable and the claim that
+  // future pricing is "only a table edit" untrue. It now carries the real
+  // classification: a block whose entire available pool is planned bodyweight.
+  //
+  // This is provably DOSE-NEUTRAL today. SCHEMA_FATIGUE_COST_BODYWEIGHT is an
+  // exact alias of SCHEMA_FATIGUE_COST, so both branches return the same number
+  // for every (schema, phase). No fatigue coefficient is ratified and none is
+  // introduced here — only the branch is made reachable.
+  const bodyweightDominant = input.movements.length > 0 && input.movements.every(isPurelyBodyweight);
+  const fatigueCost = schemaFatigueCost(schemaType, macroPhase, bodyweightDominant);
   const accessoryCut =
     profile.objective === 'hybrid'
       ? fatigueCost >= 1.5 ? 2 : fatigueCost >= HYBRID_TAX_THRESHOLD ? 1 : 0
@@ -731,9 +752,23 @@ export function generateBlock(input: BlockInput): BlockPlan {
       // advancement criterion cannot drift apart — the same single-source rule
       // the e1rm.ts/targetPct tripwire enforces. Loaded movements are
       // untouched: they progress by load, and their rep deltas are meaningful.
-      const bodyweightReps = deload
-        ? reps
-        : Math.max(reps, DEFAULT_ADVANCEMENT_POLICY.requiredReps);
+      // L2(b), owner-ratified 2026-08-29: the floor is CHAIN-SCOPED. The owner's
+      // instruction was to reconcile the ladder so athletes can level up; the
+      // original implementation applied it to every strictly bodyweight
+      // movement and disclosed that broadening as needing the owner's eye. It
+      // now reaches only movements that are actually on a capability chain —
+      // 15 of the 55 bodyweight movements in the live corpus — so a crunch or a
+      // sit-up keeps its phase prescription. An off-chain movement is measured
+      // against no bar, so there is nothing to floor it to.
+      //
+      // The bar is the chain's own: a per-chain progression_policy row when one
+      // exists, else the IMPORTED default. Never restated as a literal, so the
+      // prescription and the criterion it must satisfy cannot drift apart.
+      const bodyweightRepsFor = (m: GeneratorMovement): number => {
+        if (deload) return reps;
+        if (m.progressionGroup === undefined) return reps;
+        return Math.max(reps, m.chainAdvancementReps ?? DEFAULT_ADVANCEMENT_POLICY.requiredReps);
+      };
 
       // Effort: schema row picks the wave position; deload pulls below week
       // 1 and ignores phase/schema heat. Every cap below stays monotone
@@ -824,7 +859,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
         let slotSets = locomotion
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
           : Math.max(1, slotWorkingSets - (taxed ? accessoryCut : 0));
-        const slotReps = bodyweightSlot ? bodyweightReps : reps;
+        const slotReps = bodyweightSlot ? bodyweightRepsFor(m) : reps;
         let slotRpe = rpe;
         const preAutopilotSets = slotSets;
         const preAutopilotRpe = slotRpe;

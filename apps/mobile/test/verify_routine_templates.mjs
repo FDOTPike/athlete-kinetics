@@ -320,7 +320,11 @@ check('both block_meta writers share one macro-continuation helper', () => {
   // One reader, one increment, one place to change it for the STANDALONE path.
   assert.ok(storeSource.includes('const nextMacroPosition = (d: DB)'),
     'nextMacroPosition helper must exist');
-  assert.equal((storeSource.match(/SELECT macro_block_index FROM block_meta/g) ?? []).length, 1,
+  // Matched without the SELECT list so the S6(b) suspension-exclusion rewrite
+  // (aliased `SELECT bm.macro_block_index FROM block_meta bm ...`) is still
+  // pinned to EXACTLY ONE site. The invariant is unchanged: one reader, one
+  // increment, one place to change it.
+  assert.equal((storeSource.match(/macro_block_index FROM block_meta/g) ?? []).length, 1,
     'the continuation query must live in exactly one place');
   // The helper stays on the standalone path (generateNewBlock fallback +
   // routine-template freeze). The guided-program path is program-owned and

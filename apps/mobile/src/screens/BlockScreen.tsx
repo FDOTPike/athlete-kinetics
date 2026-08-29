@@ -84,6 +84,16 @@ const focusName = (focus: string): string => focus
 
 const phaseLabel = (phase: string): string => PHASE_LABEL[phase] ?? phase;
 
+/** The 058 CHECK domain, in the athlete's words. `life` is deliberate: travel,
+ *  work and bereavement are the commonest reasons for a gap, and restricting
+ *  the pause to injury would leave them burning the progression track. */
+const SUSPENSION_REASONS = ['injury', 'illness', 'life'] as const;
+const SUSPENSION_REASON_LABEL: Record<(typeof SUSPENSION_REASONS)[number], string> = {
+  injury: 'an injury',
+  illness: 'illness',
+  life: 'life',
+};
+
 function targetLabel(slot: TodaySlot): string {
   return slot.target.kind === 'time'
     ? `${slot.sets} x ${slot.target.seconds}s`
@@ -176,6 +186,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const previewNextProgramBlock = useStore((s) => s.previewNextProgramBlock);
   const continueTrainingProgram = useStore((s) => s.continueTrainingProgram);
   const archiveTrainingProgram = useStore((s) => s.archiveTrainingProgram);
+  const suspension = useStore((s) => s.suspension);
+  const beginSuspension = useStore((s) => s.beginSuspension);
+  const endSuspension = useStore((s) => s.endSuspension);
+  const [suspendError, setSuspendError] = useState<string | null>(null);
   const [editingProgram, setEditingProgram] = useState(false);
   const [nextProgramPreview, setNextProgramPreview] = useState<BlockPlan | null>(null);
   const startSession = useStore((s) => s.startSession);
@@ -445,6 +459,59 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
           {lastTriage.directive.followUp !== null && (
             <Text style={styles.followUpText}>{lastTriage.directive.followUp}</Text>
+          )}
+        </View>
+      )}
+
+      {/* RR-02 suspension. Athlete-owned in BOTH directions: the app never
+          infers an episode and never ends one. Suspension freezes the macro
+          position and NOTHING else — training, substitution, the RPE ceiling
+          and halt supremacy all keep working, which is why this card offers no
+          "stop training" affordance. */}
+      {suspension != null ? (
+        <View style={[styles.card, styles.haltCard]}>
+          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.cardTitle}>Your place is being held</Text>
+          <Text style={styles.bodyText}>
+            Paused for {SUSPENSION_REASON_LABEL[suspension.reason]}. You are held at block{' '}
+            {suspension.frozen_macro_index} of 8 and will come back to it — training you do now
+            will not use it up. Keep training if you can; everything else works as normal.
+          </Text>
+          <PrimaryButton
+            label="Resume my programme"
+            onPress={() => { setSuspendError(null); endSuspension(Date.now()); }}
+            accessibilityLabel={`Resume the programme and return to block ${suspension.frozen_macro_index} of 8`}
+            testID="suspension-resume"
+          />
+        </View>
+      ) : (
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>PAUSE</Text>
+          <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
+          <Text style={styles.bodyText}>
+            Pausing holds your place in the programme so a gap does not cost you a block. You can
+            still train while paused.
+          </Text>
+          {SUSPENSION_REASONS.map((reason) => (
+            <PrimaryButton
+              key={reason}
+              label={`Pause — ${SUSPENSION_REASON_LABEL[reason]}`}
+              onPress={() => {
+                try {
+                  setSuspendError(null);
+                  beginSuspension(reason, Date.now());
+                } catch (e) {
+                  setSuspendError(e instanceof Error ? e.message : String(e));
+                }
+              }}
+              accessibilityLabel={`Pause my programme for ${SUSPENSION_REASON_LABEL[reason]}`}
+              testID={`suspension-begin-${reason}`}
+            />
+          ))}
+          {/* Action-scoped, not the global error channel: an unrelated store
+              error must never read as a refusal of this control. */}
+          {suspendError !== null && (
+            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
           )}
         </View>
       )}

@@ -637,6 +637,10 @@ interface KineticsStore {
   todayPlan: TodayPlan | null;
   hasArchivedBlock: boolean;
   program: TrainingProgram | null;
+  /** RR-02: the open suspension episode, mirrored into reactive state so the
+   *  UI can show the banner and the resume affordance. Derived from 058, never
+   *  a stored flag — refreshSuspension re-reads it. */
+  suspension: SuspensionEpisode | null;
   routineTemplates: RoutineTemplate[];
   pendingAutopilotAdjustments: PendingAutopilotAdjustment[];
   /** Absolute 1RMs by movement_id (one_rep_max rows). */
@@ -682,6 +686,8 @@ interface KineticsStore {
   continueTrainingProgram: () => void;
   archiveTrainingProgram: () => void;
   refreshProgram: () => void;
+  /** Re-read the open episode into state. Called on boot and after entry/exit. */
+  refreshSuspension: () => void;
   getPendingAutopilotAdjustments: () => PendingAutopilotAdjustment[];
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
@@ -1812,6 +1818,43 @@ const persistSessionOutcome = (
  *  index 1 / 'gpp', so using a template after a block expired rewound an
  *  athlete mid-macrocycle back to the start (audit 6ff5449 s2). Deterministic:
  *  reads persisted state only, no clock, no RNG. */
+/** L1(a), owner-ratified 2026-08-29 — the implement PLANNED for a slot.
+ *
+ *  `supportedPrefixes` is the UI dropdown DOMAIN (010:41-43). Element zero of a
+ *  MULTI-member list is an ordering artefact, and on the live corpus
+ *  `Weighted Pull-up`, `Bulgarian Split Squat` and `Walking Lunge` all begin
+ *  with `Bodyweight` while supporting external load — so reading it as intent
+ *  handed loaded work the bodyweight dose.
+ *
+ *  A movement whose supported set has exactly ONE member offers the athlete no
+ *  choice, so that member IS the selection. Anything ambiguous stays undeclared
+ *  and fails CLOSED to the loaded path until the athlete declares it. Absence is
+ *  never bodyweight evidence. */
+const plannedImplementFor = (m: { supportedPrefixes: MovementPrefix[] }): MovementPrefix | undefined =>
+  (m.supportedPrefixes.length === 1 ? m.supportedPrefixes[0] : undefined);
+
+/** L2(b): capability-chain membership and the applicable advancement bar, read
+ *  ONCE per generation and handed to the pure engine as typed planning input —
+ *  the engine never queries the database (work order §7.3). A per-chain
+ *  `progression_policy` row wins; otherwise the chain carries no override and
+ *  the engine falls back to its own imported default. */
+const chainPlanningInputs = (d: DB): Map<number, { group: string; bar?: number }> => {
+  const rows = rowsOf<{ movement_id: number; progression_group: string; required_value: number | null }>(
+    d.executeSync(
+      `SELECT mp.movement_id, mp.progression_group, pp.required_value
+         FROM movement_progression mp
+         LEFT JOIN progression_policy pp ON pp.progression_group = mp.progression_group`,
+    ),
+  );
+  const out = new Map<number, { group: string; bar?: number }>();
+  for (const r of rows) {
+    out.set(Number(r.movement_id), r.required_value === null || r.required_value === undefined
+      ? { group: r.progression_group }
+      : { group: r.progression_group, bar: Number(r.required_value) });
+  }
+  return out;
+};
+
 /** The open suspension episode, or null. `is_suspended` is DERIVED here and
  *  never stored (058), so a flag and a history cannot drift apart. */
 const openSuspension = (d: DB): { episode_id: number; frozen_macro_index: number } | null =>
@@ -1830,8 +1873,16 @@ const nextMacroPosition = (d: DB): { macroBlockIndex: number; macroPhase: MacroP
     const frozen = Math.min(Math.max(suspended.frozen_macro_index, 1), MACRO_BLOCKS);
     return { macroBlockIndex: frozen, macroPhase: macroPhaseOf(frozen) };
   }
+  // S6(b), owner-ratified 2026-08-29: blocks generated DURING an episode consume
+  // no position. 059's block_suspension_origin attributes them and they are
+  // excluded here, so after resume the athlete returns to exactly the frozen
+  // index rather than one past it. Without this exclusion an athlete who was in
+  // `volume`, froze `volume` and trained through the episode resumed in `peak`.
   const lastMeta = rowsOf<{ macro_block_index: number }>(d.executeSync(
-    'SELECT macro_block_index FROM block_meta ORDER BY block_id DESC LIMIT 1',
+    `SELECT bm.macro_block_index FROM block_meta bm
+      WHERE NOT EXISTS (SELECT 1 FROM block_suspension_origin bso
+                         WHERE bso.block_id = bm.block_id)
+      ORDER BY bm.block_id DESC LIMIT 1`,
   ))[0];
   const macroBlockIndex = lastMeta !== undefined
     ? (lastMeta.macro_block_index % MACRO_BLOCKS) + 1
@@ -2042,6 +2093,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   todayPlan: null,
   hasArchivedBlock: false,
   program: null,
+  suspension: null,
   routineTemplates: [],
   pendingAutopilotAdjustments: [],
   oneRepMaxes: {},
@@ -2140,6 +2192,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // The block lives only in SQLite; the store is a read surface over it.
       get().refreshBlock();
       get().refreshProgram();
+      get().refreshSuspension();
       get().loadRoutineTemplates();
       get().refreshReturnCheckin();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
@@ -2608,10 +2661,43 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // Freeze the position the athlete would next have occupied, so resuming
     // returns them to it exactly.
     const frozen = nextMacroPosition(d).macroBlockIndex;
-    d.executeSync(
-      'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, NULL, ?, ?)',
-      [atMs, reason, frozen],
-    );
+    // S5(c): a guided program's position is NOT the global macro index — it is
+    // derived from starting_macro_block_index plus the sequence index its
+    // generated blocks have consumed. Freezing the global index alone leaves the
+    // program path unprotected, which is the bypass S5 was raised to close.
+    const activeProgram = rowsOf<{ program_id: number; seq: number }>(d.executeSync(
+      `SELECT tp.program_id,
+              COALESCE(MAX(CASE WHEN NOT EXISTS (
+                SELECT 1 FROM block_suspension_origin bso WHERE bso.block_id = tbp.block_id
+              ) THEN tbp.sequence_index END), 0) AS seq
+         FROM training_program tp
+         LEFT JOIN training_block_program tbp ON tbp.program_id = tp.program_id
+        WHERE tp.status IN ('active', 'review_due')
+        GROUP BY tp.program_id LIMIT 1`,
+    ))[0];
+    // Episode + frozen program state are ONE transaction: a crash between them
+    // would leave a suspension whose program position was never recorded.
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, NULL, ?, ?)',
+        [atMs, reason, frozen],
+      );
+      if (activeProgram !== undefined) {
+        const episodeId = rowsOf<{ id: number }>(
+          d.executeSync('SELECT last_insert_rowid() AS id'),
+        )[0]!.id;
+        d.executeSync(
+          'INSERT INTO suspension_episode_program (episode_id, program_id, frozen_sequence_index) VALUES (?, ?, ?)',
+          [episodeId, activeProgram.program_id, activeProgram.seq],
+        );
+      }
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      throw e;
+    }
+    get().refreshSuspension();
     return frozen;
   },
 
@@ -2623,6 +2709,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       'UPDATE suspension_episode SET ended_at_ms = ? WHERE episode_id = ?',
       [atMs, open.episode_id],
     );
+    get().refreshSuspension();
+  },
+
+  refreshSuspension: () => {
+    set({ suspension: get().activeSuspension() });
   },
 
   activeSuspension: () => {
@@ -2946,6 +3037,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         throw new Error('A preferred movement is teaching-only for this athlete.');
       }
     }
+    const chainInputs = chainPlanningInputs(d);
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id, name: m.name, pattern: m.pattern as MovementPattern,
       is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,
@@ -2955,11 +3047,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // Store-side null <-> generator-side "absent": GeneratorMovement's optional
       // fields all use undefined as their absent signal (see blockGenerator).
       scope: m.scope ?? undefined,
-      // Option C (ratified 2026-08-27): the canonical primary implement, the
-      // same signal SessionScreen resolves bodyweightMode from. An absent or
-      // empty prefix list is NOT bodyweight evidence and stays undefined, so
-      // the generator fails toward external-load behaviour (P2-2).
-      primaryImplement: m.supportedPrefixes[0] ?? undefined,
+      // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
+      // order. Ambiguous movements stay undeclared and fail closed to loaded.
+      plannedImplement: plannedImplementFor(m),
+      // L2(b): chain membership and the chain's own bar, as typed inputs.
+      progressionGroup: chainInputs.get(m.movement_id)?.group,
+      chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
     }));
     // Program-owned macro position (AUD-GP-2): when a program exists, the
     // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
@@ -3066,6 +3159,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const capabilityAvailableSport = capabilityAvailableMovementIds(
       d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
     );
+    const chainInputs = chainPlanningInputs(d);
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id,
       name: m.name,
@@ -3080,11 +3174,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       capability_available_sport_conditioning: capabilityAvailableSport.has(m.movement_id),
       // Store-side null <-> generator-side "absent" (see blockGenerator).
       scope: m.scope ?? undefined,
-      // Option C (ratified 2026-08-27): the canonical primary implement, the
-      // same signal SessionScreen resolves bodyweightMode from. An absent or
-      // empty prefix list is NOT bodyweight evidence and stays undefined, so
-      // the generator fails toward external-load behaviour (P2-2).
-      primaryImplement: m.supportedPrefixes[0] ?? undefined,
+      // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
+      // order. Ambiguous movements stay undeclared and fail closed to loaded.
+      plannedImplement: plannedImplementFor(m),
+      // L2(b): chain membership and the chain's own bar, as typed inputs.
+      progressionGroup: chainInputs.get(m.movement_id)?.group,
+      chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
     }));
     // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
     // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate
@@ -3201,13 +3296,31 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       const blockId = rowsOf<{ id: number }>(
         d.executeSync('SELECT last_insert_rowid() AS id'),
       )[0]!.id;
-      if (programId !== null) {
+      // S6(b): a block generated while an episode is open consumes NO program
+      // sequence position, so it takes no slot in training_block_program. That
+      // table's UNIQUE(program_id, sequence_index) is the proof this matters —
+      // linking a suspension block would claim the very index the athlete is
+      // supposed to return to, and the next real continuation would collide
+      // with it. The block is still fully attributed through
+      // block_suspension_origin, so "trained around the injury" stays legible.
+      const openAtGeneration = openSuspension(d);
+      if (programId !== null && openAtGeneration === null) {
         linkTrainingBlockProgram(d, blockId, programId, pendingProgramContinuation?.sequenceIndex ?? 1);
       }
       d.executeSync(
         'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
         [blockId, plan.macroBlockIndex, plan.macroPhase, plan.schemaType, plan.peakShifted ? 1 : 0],
       );
+      // S6(b): the athlete may keep training while suspended, but this block
+      // must not consume the frozen position. Attribute it to the open episode
+      // (059) inside the SAME transaction as the block itself, so a crash can
+      // never leave an unattributed suspension block behind.
+      if (openAtGeneration !== null) {
+        d.executeSync(
+          'INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (?, ?)',
+          [blockId, openAtGeneration.episode_id],
+        );
+      }
       for (const s of plan.sessions) {
         d.executeSync(
           'INSERT INTO planned_session (block_id, week_index, day_index, focus, phase, session_date) VALUES (?, ?, ?, ?, ?, ?)',
@@ -3228,6 +3341,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
             [sessionId, sl.slot_index, sl.movement_id, plannedSets, legacyReps, sl.target_rpe],
           );
           const plannedSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+          // L1(a): record the PROSPECTIVE load intent for this slot (059). Only
+          // when it is actually declared — an absent row means "undeclared" and
+          // is read as the conservative loaded path, which is why nothing is
+          // written for an ambiguous movement.
+          const slotImplement = movement === undefined ? undefined : plannedImplementFor(movement);
+          if (slotImplement !== undefined) {
+            d.executeSync(
+              'INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (?, ?)',
+              [plannedSlotId, slotImplement],
+            );
+          }
           if (sl.autopilotDelta !== undefined) {
             d.executeSync(
               'INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (?, ?, ?, ?)',
@@ -3378,7 +3502,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       starting_macro_block_index: number; schema_type: SchemaType;
       status: 'active' | 'review_due' | 'archived'; current_sequence_index: number;
     }>(d.executeSync(
-      `SELECT tp.*, COALESCE(MAX(tbp.sequence_index), 0) AS current_sequence_index
+      `SELECT tp.*, COALESCE(MAX(CASE WHEN NOT EXISTS (
+             SELECT 1 FROM block_suspension_origin bso WHERE bso.block_id = tbp.block_id
+           ) THEN tbp.sequence_index END), 0) AS current_sequence_index
          FROM training_program tp
          LEFT JOIN training_block_program tbp ON tbp.program_id = tp.program_id
         WHERE tp.status IN ('active','review_due')
