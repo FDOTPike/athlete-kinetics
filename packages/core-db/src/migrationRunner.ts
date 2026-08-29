@@ -182,6 +182,18 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'suspension_episode' },                      // 058
   { type: 'trigger', name: 'trg_suspension_episode_single_open_bi' }, // 058
   { type: 'trigger', name: 'trg_suspension_episode_no_reopen_bu' },   // 058
+  // 059 suspension state + load intent. The three tables are durable athlete
+  // state; the four triggers are fail-closed invariants. Losing the immutability
+  // triggers silently reopens the audit trail 058 claims to keep, and losing
+  // block_suspension_origin makes every block generated during an episode
+  // consume the frozen position again (the exact S6(b) defect).
+  { type: 'table', name: 'suspension_episode_program' },              // 059
+  { type: 'table', name: 'block_suspension_origin' },                 // 059
+  { type: 'table', name: 'planned_slot_load_intent' },                // 059
+  { type: 'trigger', name: 'trg_suspension_episode_immutable_entry_bu' },     // 059
+  { type: 'trigger', name: 'trg_suspension_episode_close_once_bu' },          // 059
+  { type: 'trigger', name: 'trg_suspension_episode_no_delete_closed_bd' },    // 059
+  { type: 'trigger', name: 'trg_suspension_episode_program_immutable_bu' },   // 059
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it

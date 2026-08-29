@@ -58,7 +58,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '055_return_checkin_ack.sql',
   '056_movement_taxonomy_backfill.sql',
   '057_block_meta_phase_invariant.sql',
-  '058_suspension_episode.sql'];
+  '058_suspension_episode.sql', '059_suspension_state_and_load_intent.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1713,16 +1713,16 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     db.raw.prepare('UPDATE block_meta SET macro_phase = ? WHERE block_id = ?').run(phase, blockId);
   };
 
-  // --- fresh install reaches user_version 57 with the invariant enforced ---
+  // --- fresh install reaches user_version 58 with the invariant enforced ---
   {
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 57 files (slots 001-058, no 004) -> user_version 57. This count is
+    // 58 files (slots 001-059, no 004) -> user_version 58. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one.
-    check('fresh install reaches user_version 57 (57 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 57,
+    // silent one. Re-pinned for 059 (suspension state + load intent).
+    check('fresh install reaches user_version 58 (58 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 58,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
