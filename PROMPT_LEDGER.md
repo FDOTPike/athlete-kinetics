@@ -3067,8 +3067,73 @@ Do not push or approve the release until the exact final APK passes C6 on a phys
 
 ### Output F(G(x))
 
-**OPEN.** Authorizes C2–C5 execution and local commits on `claude/rc-48719b0`. Push, release
-approval, and C6 sign-off remain owner-only and are explicitly gated on the exact final APK passing
-on a physical owner-authorized 4 GB device; a pass on any other device does not substitute.
+**C1–C5 COMPLETE. C6/C7 OPEN — owner-gated.** Push, release approval and C6 sign-off remain
+owner-only and are explicitly gated on the exact final APK passing on a physical owner-authorized
+4 GB device; a pass on any other device does not substitute.
 
-Completed at handback per work order §12.
+### C0 — environment
+
+Branch `claude/rc-48719b0` created at the audited base. `npm ci` inside the worktree (787 packages,
+no lifecycle-script violation); `node_modules` a real directory, both `@ak/*` links resolving
+in-worktree. Node v24.11.1 / npm 11.18.0 satisfy `engines`, so `.npmrc` `strict-allow-scripts` is
+enforced rather than advisory. Pinned embedder artifacts copied from
+`.worktrees/antigravity-pre-release-acceptance` — **not** the main checkout, which is on `master`
+and predates the supply-chain pinning commits, so its cache is the pre-pin flat layout. Identity
+established by hash: all four match `KNOWN_SHA256`, `tokenizer.min.json` matches
+`TOKENIZER_MIN_SHA256`. No download performed. `verify-preflight` 13/13. Untouched baseline
+`verify:ci` exit `0` — apparently its first full completion.
+
+### C2 — tests first, failing against 48719b0
+
+`apps/mobile/test/components/SuspensionLifecycle.test.js` boots the REAL store against the REAL
+migration chain (the DemoLoadStore two-seam pattern), replacing the source-text tripwires at
+`verify_store_sql.mjs:442`. 6 of 11 failed at the base, each on a ratified ruling; the standalone
+counterexample reproduced exactly — froze 2, resumed 3.
+
+`verify_blocks.mjs` section `[28]` builds a second fixture from the FULL 300-movement corpus,
+because the existing fixture stops at migration 015 and derived `primaryImplement` from
+`supported_prefixes[0]`, reproducing the defect under test. 7 of 13 failed at the base.
+
+Two of my own assertions passed vacuously on first write — one because the movement was never
+selected into the plan, one because the base engine ignores the new field entirely so nothing
+routed as bodyweight. Both were made contrast-based and sensitive in both directions.
+
+### C3 — implementation
+
+Migration 059 (side-car tables, per the 012/015 precedent that ADD COLUMN is not viable under
+self-heal): `suspension_episode_program`, `block_suspension_origin`, `planned_slot_load_intent`,
+plus four immutability triggers closing the M1 exposure. Both pinned migration counts re-pinned
+57→58, never loosened; seven sentinels registered.
+
+Engine: `plannedImplement` replaces `primaryImplement`; the ladder floor is chain-scoped and honours
+a per-chain `progression_policy` bar; `schemaFatigueCost` receives a real classification instead of
+a hardcoded `false` — provably dose-neutral, since the bodyweight table is an exact alias.
+
+Store: position readers exclude suspension-attributed blocks, entry is transactional and records the
+frozen program state, and load intent is persisted per slot. UI: the athlete can finally begin,
+inspect and end an episode, with action-scoped refusal state.
+
+### C4 — verification
+
+`npm run verify:ci` exit `0` (231 tests, 18 suites). Mutation-tested: five deliberate reversions,
+five caught. The first run found one that ESCAPED — reverting the store's rule to
+`supportedPrefixes[0]` was invisible because `[28]` supplies intents to the engine and never
+exercises the store's derivation; two store-side assertions close it. All files byte-restored.
+
+Three defects were found in my own work by the gates and fixed rather than worked around: a trigger
+that swallowed the reopen case 058 owns; a suspension block claiming the program's
+`sequence_index` and colliding with `UNIQUE(program_id, sequence_index)`; and an LF→CRLF conversion
+across eight files that broke the working-tree source anchors.
+
+### C5 — QA artifact
+
+Built from the clean committed candidate. The first build was REJECTED by `verify:qa-candidate` for
+a missing `assets/minilm.onnx`: the model is gitignored (`.gitignore:12`) and staged manually per
+`docs/PRE_RELEASE_ANDROID.md:44`, a prerequisite a fresh worktree does not satisfy. Staged at the
+ratified pin `afdb6f1a...` and rebuilt. Artifact identity is recorded in the handback.
+
+### Not done — owner-gated
+
+C6 memory/device evidence requires the physical owner-authorized 4 GB device and an owner-signed
+packet; `verify:memory-contract` and therefore `verify:release` cannot pass without it. No push, no
+release approval, no signing-key use.
