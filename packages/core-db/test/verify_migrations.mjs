@@ -41,7 +41,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '031_planned_session_method.sql',
   '032_capability_content.sql',
   '033_goal_program.sql',
-  '034_autopilot_attribution.sql'];
+  '034_autopilot_attribution.sql',
+  '058_suspension_episode.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
@@ -464,6 +465,67 @@ runMigrations(attributionDb, MIGRATIONS);
 check('034 self-heal restores the side-car table',
   !sentinelsMissing(attributionDb).includes('planned_slot_autopilot')
     && uv(attributionDb) === MIGRATIONS.length);
+
+// --- 2i. 058 suspension episode invariants ----------------------------------
+console.log('[2i] 058 suspension episode invariants');
+{
+  const suspensionDb = freshDb();
+  runMigrations(suspensionDb, MIGRATIONS);
+  const open = () => suspensionDb.raw.prepare(
+    'SELECT episode_id, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL',
+  ).all();
+  const insertSql = 'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, ?, ?, ?)';
+  const begin = (startedAt, reason, frozen) =>
+    suspensionDb.raw.prepare(insertSql).run(startedAt, null, reason, frozen);
+  const rejects = (args) => {
+    try { suspensionDb.raw.prepare(insertSql).run(...args); return false; } catch { return true; }
+  };
+
+  check('058 creates the episode table, triggers, and single-open index',
+    suspensionDb.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name='suspension_episode'").get().c === 1
+      && suspensionDb.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='trigger' AND name IN ('trg_suspension_episode_single_open_bi','trg_suspension_episode_no_reopen_bu')").get().c === 2
+      && suspensionDb.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='index' AND name='ux_suspension_episode_single_open'").get().c === 1);
+  check('fresh install has no open suspension', open().length === 0);
+  begin(1000, 'injury', 5);
+  check('opening an episode freezes its macro position',
+    open().length === 1 && open()[0].frozen_macro_index === 5);
+  let secondRejected = false;
+  try { begin(2000, 'illness', 3); } catch (error) {
+    secondRejected = /already open/i.test(String(error.message));
+  }
+  check('a second open episode is rejected', secondRejected);
+  suspensionDb.raw.prepare(insertSql).run(400, 900, 'life', 2);
+  check('closed history can coexist with an open episode',
+    suspensionDb.raw.prepare('SELECT COUNT(*) AS c FROM suspension_episode').get().c === 2);
+  suspensionDb.raw.prepare('UPDATE suspension_episode SET ended_at_ms = ? WHERE ended_at_ms IS NULL').run(3000);
+  check('closing the active episode leaves none open', open().length === 0);
+  let reopenRejected = false;
+  try {
+    suspensionDb.raw.prepare('UPDATE suspension_episode SET ended_at_ms = NULL WHERE episode_id = 1').run();
+  } catch (error) {
+    reopenRejected = /cannot be reopened/i.test(String(error.message));
+  }
+  check('a closed episode cannot be reopened', reopenRejected);
+  begin(5000, 'injury', 7);
+  check('a new episode may open after the previous one closes', open().length === 1);
+  check('058 rejects invalid reason, macro index, and time order',
+    rejects([6000, 6100, 'sprain', 3])
+      && rejects([6000, 6100, 'injury', 9])
+      && rejects([6000, 5000, 'injury', 3]));
+
+  suspensionDb.raw.exec('DROP TRIGGER trg_suspension_episode_single_open_bi');
+  check('a dropped 058 trigger is a missing sentinel',
+    sentinelsMissing(suspensionDb).includes('trg_suspension_episode_single_open_bi'));
+  runMigrations(suspensionDb, MIGRATIONS);
+  check('self-heal restores the dropped 058 trigger',
+    !sentinelsMissing(suspensionDb).includes('trg_suspension_episode_single_open_bi'));
+  suspensionDb.raw.exec('DROP TABLE suspension_episode');
+  check('a dropped 058 table is a missing sentinel',
+    sentinelsMissing(suspensionDb).includes('suspension_episode'));
+  runMigrations(suspensionDb, MIGRATIONS);
+  check('self-heal restores the dropped 058 table',
+    !sentinelsMissing(suspensionDb).includes('suspension_episode'));
+}
 const c = freshDb();
 const broken = [...MIGRATIONS];
 broken[2] = 'CREATE TABLE will_fail (x INTEGER); SELECT no_such_fn(1);';

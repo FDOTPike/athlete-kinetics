@@ -87,6 +87,9 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'training_block_program' },    // 033
   { type: 'index', name: 'idx_training_program_one_current' }, // 033 correctness constraint
   { type: 'table', name: 'planned_slot_autopilot' },     // 034
+  { type: 'table', name: 'suspension_episode' },          // 058
+  { type: 'trigger', name: 'trg_suspension_episode_single_open_bi' }, // 058
+  { type: 'trigger', name: 'trg_suspension_episode_no_reopen_bu' },   // 058
 ];
 
 function userVersion(db: MigrationDb): number {

@@ -91,6 +91,8 @@ import {
   type HistoryParseResult,
   type LoadedCodebase,
   type MacroPhase,
+  type SuspensionEpisode,
+  type SuspensionReason,
   type MovementPattern,
   type MovementPrefix,
   type MovementPrefixCondition,
@@ -592,6 +594,12 @@ interface KineticsStore {
    *  logged history (pure read — UI consumers land with P17). Null when the
    *  group has no chain rows. */
   resolveGoalRung: (progressionGroup: string, today: string) => RungResolution | null;
+  /** Freeze macro progression in an explicit athlete-owned episode. */
+  beginSuspension: (reason: SuspensionReason, atMs: number) => number;
+  /** Close the open episode; a no-op when none is open. */
+  endSuspension: (atMs: number) => void;
+  /** The open episode, or null. */
+  activeSuspension: () => SuspensionEpisode | null;
   /** Capability attestation: manual coach/athlete override for attestation-gated edges. */
   attestEdge: (prerequisiteMovementId: number, movementId: number) => void;
   revokeAttestation: (prerequisiteMovementId: number, movementId: number) => void;
@@ -1443,6 +1451,12 @@ const persistSessionOutcome = (
   );
 };
 
+/** The open suspension episode, or null. */
+const openSuspension = (d: DB): { episode_id: number; frozen_macro_index: number } | null =>
+  rowsOf<{ episode_id: number; frozen_macro_index: number }>(d.executeSync(
+    'SELECT episode_id, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL LIMIT 1',
+  ))[0] ?? null;
+
 /** Macro-cycle continuation — the ONLY place the next position is derived.
  *  Every path that mints a block_meta row must call this. Two callers used to
  *  compute it independently and drifted: the routine-template freeze hardcoded
@@ -1450,6 +1464,11 @@ const persistSessionOutcome = (
  *  athlete mid-macrocycle back to the start (audit 6ff5449 s2). Deterministic:
  *  reads persisted state only, no clock, no RNG. */
 const nextMacroPosition = (d: DB): { macroBlockIndex: number; macroPhase: MacroPhase } => {
+  const suspended = openSuspension(d);
+  if (suspended !== null) {
+    const frozen = Math.min(Math.max(suspended.frozen_macro_index, 1), MACRO_BLOCKS);
+    return { macroBlockIndex: frozen, macroPhase: macroPhaseOf(frozen) };
+  }
   const lastMeta = rowsOf<{ macro_block_index: number }>(d.executeSync(
     'SELECT macro_block_index FROM block_meta ORDER BY block_id DESC LIMIT 1',
   ))[0];
@@ -2153,6 +2172,36 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return resolveActiveRung(chain, [...bySession.values()], { requiredSets: pol.required_sets, requiredReps: pol.required_value });
     }
     return resolveActiveRung(chain, [...bySession.values()]);
+  },
+
+  beginSuspension: (reason, atMs) => {
+    const d = getDb();
+    if (openSuspension(d) !== null) {
+      throw new Error('A suspension is already open. Resume it before starting another.');
+    }
+    const frozen = nextMacroPosition(d).macroBlockIndex;
+    d.executeSync(
+      'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, NULL, ?, ?)',
+      [atMs, reason, frozen],
+    );
+    return frozen;
+  },
+
+  endSuspension: (atMs) => {
+    const d = getDb();
+    const open = openSuspension(d);
+    if (open === null) return;
+    d.executeSync(
+      'UPDATE suspension_episode SET ended_at_ms = ? WHERE episode_id = ?',
+      [atMs, open.episode_id],
+    );
+  },
+
+  activeSuspension: () => {
+    const d = getDb();
+    return rowsOf<SuspensionEpisode>(d.executeSync(
+      'SELECT episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL LIMIT 1',
+    ))[0] ?? null;
   },
 
   attestEdge: (prerequisiteMovementId, movementId) => {

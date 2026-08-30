@@ -31,7 +31,8 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-  '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql']) {
+  '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
+  '058_suspension_episode.sql']) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -190,6 +191,28 @@ check('continuation carries the program anchor, never re-reads the global cycle'
 check('standalone block generation still advances the athlete global cycle',
   src.includes('nextMacroPosition(d).macroBlockIndex'),
 );
+
+console.log('[058 suspension store contract]');
+check('nextMacroPosition consults the open suspension before advancing',
+  /const nextMacroPosition[\s\S]{0,700}?openSuspension\(d\)[\s\S]{0,500}?ORDER BY block_id DESC/.test(src));
+const sqlBearingLines = src.split('\n').filter((line) => /SELECT|INSERT|UPDATE|CREATE/i.test(line));
+check('is_suspended is derived, never stored as a column',
+  src.includes('WHERE ended_at_ms IS NULL')
+    && !sqlBearingLines.some((line) => line.includes('is_suspended')));
+check('the frozen macro index drives suspended progression',
+  src.includes('frozen_macro_index'));
+check('episodes require explicit begin/end timestamps',
+  src.includes('beginSuspension: (reason, atMs)')
+    && src.includes('endSuspension: (atMs)'));
+check('the store refuses a second open episode',
+  /beginSuspension[\s\S]{0,300}?openSuspension\(d\) !== null[\s\S]{0,180}?throw new Error/.test(src));
+check('suspension adds no dose modifier',
+  !/dLoad|dRpe|dSet|multiplier|deload/i.test(src.slice(
+    src.indexOf('beginSuspension: (reason, atMs)'),
+    src.indexOf('beginSuspension: (reason, atMs)') + 1200,
+  )));
+check('activeSuspension returns the full episode shape',
+  src.includes('SELECT episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index'));
 
 check(
   'planned completion is joined through exact session_origin provenance and immutable session_outcome',
