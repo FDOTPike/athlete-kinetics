@@ -21,6 +21,7 @@ import { DIFFICULTY_RANK } from './types';
 // autopilot controller and applies its forward-looking corrections to the next
 // block (a recorded halt snaps the whole block to a recovery template).
 import { deriveControlAction, type ControlAction, type FlawReport } from './kinematicAutopilot';
+import { DEFAULT_ADVANCEMENT_POLICY } from './progressionEngine';
 
 // ---------------------------------------------------------------------------
 // Inputs / outputs (mirror the 007 block tables 1:1)
@@ -605,23 +606,25 @@ export function generateBlock(input: BlockInput): BlockPlan {
 
       // Working sets: objective scheme + macro phase + schema row, damped for
       // hybrid strength days (interference) and beginners, +1 for elites.
-      const workingSetsFor = (setsDelta: number): number => {
-        let baseSets = scheme.sets + phaseMod.sets + (deload ? 0 : setsDelta);
+      const workingSetsFor = (setsDelta: number, phaseSets: number): number => {
+        let baseSets = scheme.sets + phaseSets + (deload ? 0 : setsDelta);
         if (profile.objective === 'hybrid' && STRENGTH_FOCI.has(focus)) baseSets -= 1;
         if (profile.training_age === 'beginner') baseSets -= 1;
         if (profile.training_age === 'elite') baseSets += 1;
         baseSets = clamp(baseSets, 2, 6);
         return deload ? Math.max(1, Math.ceil(baseSets / 2)) : baseSets;
       };
-      const workingSets = workingSetsFor(wmod.setsDelta);
-      const workingSetsBodyweight = workingSetsFor(
-        SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA[schemaType][progIdx as 0 | 1 | 2],
-      );
 
       // Reps: scheme reps through the schema's scale, then the phase delta.
       const reps = deload
         ? clamp(scheme.reps + phaseMod.reps, 1, 30)
         : clamp(Math.round(scheme.reps * wmod.repsScale) + phaseMod.reps, 1, 30);
+      // Bodyweight prescriptions must reach the same rep threshold used by
+      // the capability ladder. Loaded movements retain their phase-shaped
+      // rep prescription, and deloads remain exempt from the floor.
+      const bodyweightReps = deload
+        ? reps
+        : Math.max(reps, DEFAULT_ADVANCEMENT_POLICY.requiredReps);
 
       // Effort: schema row picks the wave position; deload pulls below week
       // 1 and ignores phase/schema heat. Every cap below stays monotone
@@ -669,7 +672,16 @@ export function generateBlock(input: BlockInput): BlockPlan {
           !deload && accessoryCut > 0 && STRENGTH_FOCI.has(focus) &&
           slotIndex >= ACCESSORY_SLOT_FROM && !locomotion;
         const bodyweightSlot = isPurelyBodyweight(m);
-        const slotWorkingSets = bodyweightSlot ? workingSetsBodyweight : workingSets;
+        // RR-04: the macro phase's set delta belongs to primary work. Volume
+        // is the only phase carrying a non-zero delta today, so accessories
+        // stay at base volume while primary slots receive it.
+        const primarySlot = slotIndex < ACCESSORY_SLOT_FROM;
+        const slotWorkingSets = workingSetsFor(
+          bodyweightSlot
+            ? SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA[schemaType][progIdx as 0 | 1 | 2]
+            : wmod.setsDelta,
+          primarySlot ? phaseMod.sets : 0,
+        );
         const setCap = m.set_cap === undefined
           ? 10
           : Number.isFinite(m.set_cap)
@@ -678,6 +690,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
         let slotSets = Math.min(setCap, locomotion
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
           : Math.max(1, slotWorkingSets - (taxed ? accessoryCut : 0)));
+        const slotReps = bodyweightSlot ? bodyweightReps : reps;
         let slotRpe = rpe;
         const preAutopilotSets = slotSets;
         const preAutopilotRpe = slotRpe;
@@ -739,7 +752,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
           slot_index: slotIndex,
           movement_id: m.movement_id,
           sets: slotSets,
-          reps: locomotion ? LOCOMOTION_REPS : reps,
+          reps: locomotion ? LOCOMOTION_REPS : slotReps,
           target_rpe: slotRpe,
           ...(autopilotDelta === undefined ? {} : { autopilotDelta }),
         });

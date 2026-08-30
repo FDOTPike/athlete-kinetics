@@ -26,7 +26,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
-  SCHEMA_FATIGUE_COST, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
+  SCHEMA_FATIGUE_COST, MACRO_BLOCKS, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
   normalizeProgramHorizon, programFocuses, programHorizonAnchor,
   programMacroIndex } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
@@ -35,6 +35,7 @@ const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
   SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
   MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
   PATTERN_TO_CATEGORY } = require('./.build/types.js');
+const { DEFAULT_ADVANCEMENT_POLICY } = require('./.build/progressionEngine.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', '..', 'core-db', 'src', 'schema');
 const START = '2026-06-15';
@@ -451,8 +452,104 @@ check('legacy callers are byte-identical to explicit external-load routing',
 for (const st of SCHEMA_TYPES.filter((x) => x !== 'LINEAR')) {
   const withBw = generateBlock({ profile: prof(bwProfile), movements, startDate: START, schemaType: st });
   const asLoaded = generateBlock({ profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: st });
-  check(`${st}: bodyweight routing mirrors the loaded schema`,
-    JSON.stringify(withBw) === JSON.stringify(asLoaded));
+  const doseShape = (plan) => plan.sessions.map((sess) =>
+    sess.slots.map((sl) => `${sl.slot_index}:${sl.movement_id}:${sl.sets}:${sl.target_rpe}`).join(','));
+  check(`${st}: bodyweight routing leaves sets and RPE unchanged`,
+    JSON.stringify(doseShape(withBw)) === JSON.stringify(doseShape(asLoaded)));
+  const workingReps = withBw.sessions
+    .filter((x) => x.phase !== 'deload')
+    .flatMap((x) => x.slots)
+    .map((sl) => sl.reps);
+  check(`${st}: capability rep floor is schema-independent`,
+    workingReps.length > 0
+      && Math.min(...workingReps) >= DEFAULT_ADVANCEMENT_POLICY.requiredReps);
+}
+
+// --- [9c] RR-04 primary-slot volume bias ------------------------------------
+console.log('[9c] macro-phase volume delta lands on primary slots only');
+{
+  const volumeBlock = generateBlock({
+    profile: prof({ objective: 'strength' }), movements, startDate: START,
+    schemaType: 'LINEAR', macroBlockIndex: 5 });
+  check('macroBlockIndex 5 resolves to volume', volumeBlock.macroPhase === 'volume');
+  const work = volumeBlock.sessions.filter((x) => x.phase !== 'deload' && x.slots.length >= 3);
+  const isLoaded = (sl) => {
+    const mv = movements.find((x) => x.movement_id === sl.movement_id);
+    return mv !== undefined && mv.pattern !== 'locomotion' && mv.primaryImplement !== 'Bodyweight';
+  };
+  let compared = 0;
+  let biased = true;
+  for (const sess of work) {
+    const primary = sess.slots.filter((sl) => sl.slot_index < 3 && isLoaded(sl));
+    const accessory = sess.slots.filter((sl) => sl.slot_index >= 3 && isLoaded(sl));
+    if (primary.length === 0 || accessory.length === 0) continue;
+    compared += 1;
+    if (Math.min(...primary.map((sl) => sl.sets))
+      <= Math.max(...accessory.map((sl) => sl.sets))) biased = false;
+  }
+  check('volume gives every loaded primary more sets than loaded accessories',
+    compared > 0 && biased, `${compared} sessions compared`);
+
+  const gppBlock = generateBlock({
+    profile: prof({ objective: 'strength' }), movements, startDate: START,
+    schemaType: 'LINEAR', macroBlockIndex: 1 });
+  let flat = true;
+  for (const sess of gppBlock.sessions.filter((x) => x.phase !== 'deload')) {
+    const loadedSlots = sess.slots.filter(isLoaded);
+    if (loadedSlots.length >= 2 && new Set(loadedSlots.map((sl) => sl.sets)).size !== 1) flat = false;
+  }
+  check('gpp keeps loaded primary and accessory sets flat', flat);
+}
+
+// --- [9d] capability-ladder reconciliation ----------------------------------
+console.log('[9d] bodyweight reps reach the capability advancement bar');
+{
+  const floor = DEFAULT_ADVANCEMENT_POLICY.requiredReps;
+  check('the generator reads the ladder policy instead of restating a literal',
+    typeof floor === 'number' && floor > 0, `requiredReps=${floor}`);
+  let reachableBlocks = 0;
+  let totalBlocks = 0;
+  const loadedRepsByBlock = [];
+  for (let i = 1; i <= MACRO_BLOCKS; i += 1) {
+    const bwPlan = generateBlock({
+      profile: prof({ objective: 'strength', equipment_inventory: [] }), movements,
+      startDate: START, schemaType: 'LINEAR', macroBlockIndex: i });
+    const bwSlots = bwPlan.sessions
+      .filter((x) => x.phase !== 'deload')
+      .flatMap((x) => x.slots);
+    if (bwSlots.length === 0) continue;
+    totalBlocks += 1;
+    if (bwSlots.every((sl) => sl.reps >= floor)) reachableBlocks += 1;
+
+    const loadedPlan = generateBlock({
+      profile: prof({ objective: 'strength' }), movements: noPrefixPool,
+      startDate: START, schemaType: 'LINEAR', macroBlockIndex: i });
+    const loadedSlots = loadedPlan.sessions
+      .filter((x) => x.phase !== 'deload')
+      .flatMap((x) => x.slots)
+      .filter((sl) => patternById.get(sl.movement_id) !== 'locomotion');
+    loadedRepsByBlock.push(Math.min(...loadedSlots.map((sl) => sl.reps)));
+  }
+  check('all eight macro blocks can satisfy the bodyweight ladder threshold',
+    totalBlocks === MACRO_BLOCKS && reachableBlocks === totalBlocks,
+    `${reachableBlocks}/${totalBlocks}`);
+  check('loaded rep prescriptions retain their phase shape below the floor',
+    new Set(loadedRepsByBlock).size > 1 && Math.min(...loadedRepsByBlock) < floor,
+    `min loaded reps=${Math.min(...loadedRepsByBlock)}`);
+
+  const peakPlan = generateBlock({
+    profile: prof({ objective: 'strength', equipment_inventory: [] }), movements,
+    startDate: START, schemaType: 'LINEAR', macroBlockIndex: 7 });
+  const peakDeload = peakPlan.sessions
+    .filter((x) => x.phase === 'deload')
+    .flatMap((x) => x.slots);
+  const peakWork = peakPlan.sessions
+    .filter((x) => x.phase !== 'deload')
+    .flatMap((x) => x.slots);
+  check('peak deload reps remain below the floor',
+    peakDeload.length > 0 && Math.min(...peakDeload.map((sl) => sl.reps)) < floor);
+  check('peak working reps meet the floor',
+    peakWork.length > 0 && Math.min(...peakWork.map((sl) => sl.reps)) >= floor);
 }
 
 // --- [10] deadlift auto-regulation (peak shift) -----------------------------------
