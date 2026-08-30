@@ -2334,6 +2334,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,
       beginner_ok: m.beginnerOk, capability_available: capabilityAvailable.has(m.movement_id),
       set_cap: m.timePolicy?.defaultSets,
+      primaryImplement: m.supportedPrefixes[0] ?? undefined,
     }));
     // Program-owned macro position (AUD-GP-2): when a program exists, the
     // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
@@ -2440,6 +2441,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       beginner_ok: m.beginnerOk,
       capability_available: capabilityAvailable.has(m.movement_id),
       set_cap: m.timePolicy?.defaultSets,
+      primaryImplement: m.supportedPrefixes[0] ?? undefined,
     }));
     const today = localToday();
     const flawReport = hydrateAutopilotFlawReport(d, today, profile);

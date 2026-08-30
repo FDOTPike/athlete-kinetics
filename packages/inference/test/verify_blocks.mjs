@@ -62,7 +62,9 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
 const movements = db.prepare(
   `SELECT m.movement_id, m.name, m.pattern, m.is_compound,
           (SELECT json_group_array(me.item) FROM movement_equipment me
-           WHERE me.movement_id = m.movement_id) AS required_json
+           WHERE me.movement_id = m.movement_id) AS required_json,
+          (SELECT d.supported_prefixes FROM movement_detail d
+           WHERE d.movement_id = m.movement_id) AS prefixes_json
    FROM movement m ORDER BY m.movement_id`,
 ).all().map((r) => ({
   movement_id: Number(r.movement_id),
@@ -70,6 +72,7 @@ const movements = db.prepare(
   pattern: r.pattern,
   is_compound: Number(r.is_compound) === 1,
   required: JSON.parse(r.required_json ?? '[]'),
+  primaryImplement: JSON.parse(r.prefixes_json ?? '[]')[0] ?? undefined,
 }));
 const requiredById = new Map(movements.map((m) => [m.movement_id, m.required]));
 const prof = (over = {}) => ({ ...DEFAULT_PROFILE, ...over });
@@ -361,17 +364,18 @@ console.log('[9] hybrid tax (schema fatigue cost matrix)');
 const accessorySets = (plan) => plan.sessions
   .filter((s) => ['lower', 'upper', 'full'].includes(s.focus))
   .reduce((a, s) => a + s.slots.filter((sl) => sl.slot_index >= 3).reduce((b, sl) => b + sl.sets, 0), 0);
+const loadedMovements = movements.map((m) => ({ ...m, primaryImplement: undefined }));
 const hybridApre = generateBlock({
-  profile: prof({ objective: 'hybrid' }), movements, startDate: START, schemaType: 'APRE' });
+  profile: prof({ objective: 'hybrid' }), movements: loadedMovements, startDate: START, schemaType: 'APRE' });
 const hybridLinear = generateBlock({
-  profile: prof({ objective: 'hybrid' }), movements, startDate: START, schemaType: 'LINEAR' });
+  profile: prof({ objective: 'hybrid' }), movements: loadedMovements, startDate: START, schemaType: 'LINEAR' });
 check('hybrid APRE block has strictly fewer accessory sets than hybrid LINEAR',
   accessorySets(hybridApre) < accessorySets(hybridLinear),
   `${accessorySets(hybridApre)} < ${accessorySets(hybridLinear)}`);
 const strengthApre = generateBlock({
-  profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType: 'APRE' });
+  profile: prof({ objective: 'strength' }), movements: loadedMovements, startDate: START, schemaType: 'APRE' });
 const strengthLinear = generateBlock({
-  profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType: 'LINEAR' });
+  profile: prof({ objective: 'strength' }), movements: loadedMovements, startDate: START, schemaType: 'LINEAR' });
 check('the tax fires ONLY for hybrid (strength APRE keeps its accessory sets)',
   accessorySets(strengthApre) === accessorySets(strengthLinear),
   `${accessorySets(strengthApre)} == ${accessorySets(strengthLinear)}`);
@@ -379,6 +383,77 @@ check('cost matrix: APRE outweighs LINEAR in every macro phase',
   MACRO_PHASES.every((p) => SCHEMA_FATIGUE_COST.APRE[p] > SCHEMA_FATIGUE_COST.LINEAR[p]));
 check('hybrid APRE accessories never fall below one working set',
   hybridApre.sessions.every((s) => s.slots.every((sl) => sl.sets >= 1)));
+
+// --- [9b] implement-routed bodyweight progression ----------------------------
+console.log('[9b] bodyweight LINEAR progression routes on implement');
+const pushUp = movements.find((m) => m.name === 'Push-up');
+check('fixture: Push-up seeds primaryImplement Bodyweight',
+  pushUp !== undefined && pushUp.primaryImplement === 'Bodyweight',
+  String(pushUp?.primaryImplement));
+
+const plateLoadedPool = movements.map((m) =>
+  (m.movement_id === pushUp.movement_id ? { ...m, primaryImplement: 'BB' } : m));
+const patternById = new Map(movements.map((m) => [m.movement_id, m.pattern]));
+const bwProfile = { objective: 'strength', equipment_inventory: [] };
+const pushSlots = (pool) => {
+  const plan = generateBlock({
+    profile: prof(bwProfile), movements: pool, startDate: START, schemaType: 'LINEAR' });
+  const out = new Map();
+  for (const sess of plan.sessions) {
+    for (const sl of sess.slots) {
+      if (patternById.get(sl.movement_id) !== 'push_h') continue;
+      if (!out.has(sess.week_index)) out.set(sess.week_index, { ...sl, phase: sess.phase });
+    }
+  }
+  return [1, 2, 3, 4].map((w) => out.get(w)).filter((x) => x !== undefined);
+};
+
+const bw = pushSlots(movements);
+const loaded = pushSlots(plateLoadedPool);
+check('both pools emit the same push_h movement in all four weeks',
+  bw.length === 4 && loaded.length === 4
+    && bw.every((sl, i) => sl.movement_id === loaded[i].movement_id));
+check('bodyweight Push-up adds sets 0 -> 1 -> 1 across working weeks',
+  bw[1].sets === bw[0].sets + 1 && bw[2].sets === bw[1].sets,
+  `${bw[0].sets} -> ${bw[1].sets} -> ${bw[2].sets}`);
+check('bodyweight Push-up holds reps flat across working weeks',
+  bw[0].reps === bw[1].reps && bw[1].reps === bw[2].reps);
+check('bodyweight Push-up preserves the effort ramp',
+  bw[0].target_rpe < bw[1].target_rpe && bw[1].target_rpe < bw[2].target_rpe);
+check('week 4 remains a strict volume deload',
+  bw[3].phase === 'deload' && bw[3].sets < bw[0].sets);
+check('plate-loaded Push-up keeps working sets flat',
+  loaded[0].sets === loaded[1].sets && loaded[1].sets === loaded[2].sets);
+check('plate-loaded Push-up preserves the identical effort ramp',
+  loaded[0].target_rpe < loaded[1].target_rpe
+    && loaded[1].target_rpe < loaded[2].target_rpe
+    && bw.every((sl, i) => sl.target_rpe === loaded[i].target_rpe));
+check('the loading classes diverge only through observable set volume',
+  bw[1].sets !== loaded[1].sets && bw[2].sets !== loaded[2].sets);
+
+const noPrefixPool = movements.map((m) => ({ ...m, primaryImplement: undefined }));
+const emptyPrefixSlots = pushSlots(noPrefixPool);
+check('absent primaryImplement fails toward external load',
+  emptyPrefixSlots[0].sets === emptyPrefixSlots[1].sets
+    && emptyPrefixSlots[1].sets === emptyPrefixSlots[2].sets);
+check('a non-canonical implement fails toward external load', (() => {
+  const junk = movements.map((m) => ({ ...m, primaryImplement: 'Bodyweight ' }));
+  const slots = pushSlots(junk);
+  return slots[0].sets === slots[1].sets && slots[1].sets === slots[2].sets;
+})());
+
+const legacyPool = movements.map(({ primaryImplement: _drop, ...rest }) => rest);
+check('legacy callers are byte-identical to explicit external-load routing',
+  JSON.stringify(generateBlock({
+    profile: prof(bwProfile), movements: legacyPool, startDate: START, schemaType: 'LINEAR' }))
+  === JSON.stringify(generateBlock({
+    profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: 'LINEAR' })));
+for (const st of SCHEMA_TYPES.filter((x) => x !== 'LINEAR')) {
+  const withBw = generateBlock({ profile: prof(bwProfile), movements, startDate: START, schemaType: st });
+  const asLoaded = generateBlock({ profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: st });
+  check(`${st}: bodyweight routing mirrors the loaded schema`,
+    JSON.stringify(withBw) === JSON.stringify(asLoaded));
+}
 
 // --- [10] deadlift auto-regulation (peak shift) -----------------------------------
 console.log('[10] deadlift auto-regulation (ACWR gate on the peak block)');

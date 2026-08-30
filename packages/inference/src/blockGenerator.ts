@@ -38,13 +38,25 @@ export interface GeneratorMovement {
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
-  /** movement_equipment rows; empty = bodyweight. */
+  /** movement_equipment rows; empty = needs no equipment. NOT a bodyweight
+   *  test — Feet-Elevated Push-Up requires a bench and is still bodyweight
+   *  loaded. Use `primaryImplement` for the loading question. */
   required: readonly string[];
   /** Optional persisted set ceiling (for example a timed-movement policy).
    *  The generator applies this before and after autopilot correction so its
    *  returned plan is the exact plan the store can persist. */
   set_cap?: number;
+  /** movement_detail.supported_prefixes[0] — the canonical primary implement.
+   *  Absent, empty, or non-canonical is not bodyweight evidence and fails
+   *  toward external-load behaviour. */
+  primaryImplement?: MovementPrefix;
 }
+
+/** Strictly bodyweight movements have exactly the canonical Bodyweight
+ * implement. Weighted calisthenics and missing/non-canonical values stay on
+ * the external-load path. */
+export const isPurelyBodyweight = (m: GeneratorMovement): boolean =>
+  m.primaryImplement === 'Bodyweight';
 
 export type BlockFocus = 'lower' | 'upper' | 'full' | 'conditioning' | 'bjj';
 export type BlockPhase = 'accumulation' | 'intensification' | 'realization' | 'deload';
@@ -322,6 +334,16 @@ const SCHEMA_WEEKS: Record<SchemaType, readonly [SchemaWeekMod, SchemaWeekMod, S
   ],
 };
 
+/** Per-schema working-set delta for strictly bodyweight slots. LINEAR gains a
+ * visible volume channel; all other rows mirror their loaded schema. */
+const SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA:
+  Record<SchemaType, readonly [number, number, number]> = {
+  LINEAR: [0, 1, 1],
+  WAVE: [0, 0, 0],
+  STEP: [0, 1, 1],
+  APRE: [0, 0, 0],
+};
+
 /** The Schema Cost Matrix: fatigue weight per (schema, macro phase). Pure
  *  data — the hybrid tax below is its only in-engine consumer today; the
  *  store/UI may surface it later. */
@@ -331,6 +353,17 @@ export const SCHEMA_FATIGUE_COST: Record<SchemaType, Record<MacroPhase, number>>
   STEP: { gpp: 1.1, hypertrophy: 1.2, volume: 1.4, peak: 1.3 },
   APRE: { gpp: 1.3, hypertrophy: 1.4, volume: 1.5, peak: 1.6 },
 };
+/** No separate bodyweight fatigue coefficient has been ratified. Keep the
+ * routing explicit while preserving the existing cost table exactly. */
+const SCHEMA_FATIGUE_COST_BODYWEIGHT = SCHEMA_FATIGUE_COST;
+
+export const schemaFatigueCost = (
+  schemaType: SchemaType,
+  macroPhase: MacroPhase,
+  bodyweightDominant: boolean,
+): number => (bodyweightDominant
+  ? SCHEMA_FATIGUE_COST_BODYWEIGHT
+  : SCHEMA_FATIGUE_COST)[schemaType][macroPhase];
 /** Hybrid athletes pay for high-fatigue schemas (>= threshold strips one
  *  accessory set, >= 1.5 strips two) — CNS budget protection. */
 export const HYBRID_TAX_THRESHOLD = 1.3;
@@ -548,7 +581,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // The Hybrid Tax: high-fatigue schemas (cost matrix) are paid for by
   // stripping 1-2 working sets from accessory/secondary slots — concurrent
   // grappling load leaves no CNS budget for both.
-  const fatigueCost = SCHEMA_FATIGUE_COST[schemaType][macroPhase];
+  const fatigueCost = schemaFatigueCost(schemaType, macroPhase, false);
   const accessoryCut =
     profile.objective === 'hybrid'
       ? fatigueCost >= 1.5 ? 2 : fatigueCost >= HYBRID_TAX_THRESHOLD ? 1 : 0
@@ -572,12 +605,18 @@ export function generateBlock(input: BlockInput): BlockPlan {
 
       // Working sets: objective scheme + macro phase + schema row, damped for
       // hybrid strength days (interference) and beginners, +1 for elites.
-      let baseSets = scheme.sets + phaseMod.sets + (deload ? 0 : wmod.setsDelta);
-      if (profile.objective === 'hybrid' && STRENGTH_FOCI.has(focus)) baseSets -= 1;
-      if (profile.training_age === 'beginner') baseSets -= 1;
-      if (profile.training_age === 'elite') baseSets += 1;
-      baseSets = clamp(baseSets, 2, 6);
-      const workingSets = deload ? Math.max(1, Math.ceil(baseSets / 2)) : baseSets;
+      const workingSetsFor = (setsDelta: number): number => {
+        let baseSets = scheme.sets + phaseMod.sets + (deload ? 0 : setsDelta);
+        if (profile.objective === 'hybrid' && STRENGTH_FOCI.has(focus)) baseSets -= 1;
+        if (profile.training_age === 'beginner') baseSets -= 1;
+        if (profile.training_age === 'elite') baseSets += 1;
+        baseSets = clamp(baseSets, 2, 6);
+        return deload ? Math.max(1, Math.ceil(baseSets / 2)) : baseSets;
+      };
+      const workingSets = workingSetsFor(wmod.setsDelta);
+      const workingSetsBodyweight = workingSetsFor(
+        SCHEMA_WEEKS_BODYWEIGHT_SETS_DELTA[schemaType][progIdx as 0 | 1 | 2],
+      );
 
       // Reps: scheme reps through the schema's scale, then the phase delta.
       const reps = deload
@@ -629,6 +668,8 @@ export function generateBlock(input: BlockInput): BlockPlan {
         const taxed =
           !deload && accessoryCut > 0 && STRENGTH_FOCI.has(focus) &&
           slotIndex >= ACCESSORY_SLOT_FROM && !locomotion;
+        const bodyweightSlot = isPurelyBodyweight(m);
+        const slotWorkingSets = bodyweightSlot ? workingSetsBodyweight : workingSets;
         const setCap = m.set_cap === undefined
           ? 10
           : Number.isFinite(m.set_cap)
@@ -636,7 +677,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
             : 1;
         let slotSets = Math.min(setCap, locomotion
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
-          : Math.max(1, workingSets - (taxed ? accessoryCut : 0)));
+          : Math.max(1, slotWorkingSets - (taxed ? accessoryCut : 0)));
         let slotRpe = rpe;
         const preAutopilotSets = slotSets;
         const preAutopilotRpe = slotRpe;
