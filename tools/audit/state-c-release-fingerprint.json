@@ -15,12 +15,12 @@
   },
   "carried_audit_documents": {
     "MASTER_AUDIT_SYNTHESIS.md": {
-      "sha256": "a8b6599f6b1fdb60ef9618263d171a2b2d32bdefd2da2a563297470b1fa95918",
-      "lines": 1241
+      "sha256": "ab6f53d27a32d15dc4b1ce9691d32442db74f903fa4d50f9bf01f175c81526fb",
+      "lines": 1272
     },
     "docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md": {
-      "sha256": "93c82429beb6118005320ec7d1c1ca24bfbff1968f6e87693a2a7e414eeb691e",
-      "lines": 343
+      "sha256": "284f86ffe702a12faead4c776503cda40cb3e10b879dc8c023b618ebbfa09114",
+      "lines": 345
     },
     "docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md": {
       "sha256": "9377394e9cb473cae76506a3e3ad12b6efbf015feed43dce5dcf0b35632fc155",
@@ -38,5 +38,26 @@
     "entry": "PROMPT_LEDGER.md Entry 0058"
   },
   "curated_evidence_root": "docs/audits/state-c-release-readiness/",
-  "note": "Fingerprint covers the pre-certification freeze; commit hashes are appended by the verifier from git."
+  "note": "Fingerprint covers the pre-certification freeze; commit hashes are appended by the verifier from git.",
+  "round_13_review_handoffs": {
+    "docs/audits/state-c-release-readiness/reviews/round-13-reviewer-a.txt": {
+      "sha256": "36c6420f29ed48e403056fbe3f116365cac9863b51f904b477e98f9637e2b153",
+      "lines": 67
+    },
+    "docs/audits/state-c-release-readiness/reviews/round-13-reviewer-b.txt": {
+      "sha256": "12cfdae76d18c4aec348f0437210cb0c8b21f395d1ce146ecd2f4678ec639d1d",
+      "lines": 21
+    }
+  },
+  "certification": {
+    "candidate_freeze": "952afd3ce0c45497e0d46c66d2d71788a56dead2",
+    "round_13_attempt_1": {
+      "reviewer_a": "REQUEST_CHANGES",
+      "reviewer_b": "APPROVE"
+    },
+    "round_13_attempt_2": {
+      "reviewer_a": "APPROVE",
+      "reviewer_b": "APPROVE"
+    }
+  }
 }

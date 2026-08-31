@@ -3223,3 +3223,9 @@ RELEASE/PUSH: NO-GO — C6 DEFERRED; C7/OWNER AND DEVICE GATES OPEN
 ```
 
 ### Output F(G(x))
+
+- **Commit 1:** `88f5b5c` `fix(progression): decouple chain rep floor from load routing` — OW-036 closed; all product gates green (`typecheck`, `verify:blocks`, `verify:migrations`, `verify:store`, `verify:components`, `verify:ci` exit 0; `verify:memory-contract` exit 1 as expected closed-gate check).
+- **Commit 2 (frozen):** `952afd3` `docs(audit): reconcile State C release evidence` — rebuilt revision-4 synthesis closes `OW-036` and `OW-024` and supersedes `OW-025`; tracked verifier 18/18 + 7/7; freeze verified under `ENFORCE_CLEAN=1`.
+- **Review:** Round 13 attempt 1 — Reviewer A `REQUEST_CHANGES` (manifest §6.2 boundary-arithmetic P2), Reviewer B `APPROVE`; remediation corrected the row (13 → 10, column 82 → 79), fingerprint re-pinned, re-frozen. Round 13 attempt 2 — Reviewer A `APPROVE`, Reviewer B `APPROVE`, full charters, zero findings.
+- **Handoffs:** `docs/audits/state-c-release-readiness/reviews/round-13-reviewer-a.txt` (SHA-256 `36c6420f29ed48e4…`) and `round-13-reviewer-b.txt` (SHA-256 `12cfdae76d18c4ae…`).
+- **Status:** IMPLEMENTATION AND DOCUMENTATION: COMPLETE; AUDIT SYNTHESIS: APPROVED; RELEASE/PUSH: NO-GO — C6 DEFERRED; C7/OWNER AND DEVICE GATES OPEN. No push, signing, C6, C7, or store action taken; branch local, clean, no upstream.

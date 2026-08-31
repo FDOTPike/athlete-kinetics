@@ -47,9 +47,12 @@ no release, and authorizes no code change.
   Reviewer B verified Entry 0065's single-Input/single-Output structure with the complete verbatim
   execution prompt (full work-order body, no elision), the corrected count labels, heading schema,
   zero mojibake, and the chronology. Review status for revision 3: **`APPROVED` (Round 12,
-  Reviewers A and B, focused completion of the full charter).** This revision 4 rebuild changes
-  substantive ledger dispositions, so its status is **`PENDING_EXTERNAL_REVIEW`** until a fresh
-  Reviewer A/B pair certifies the revision-4 candidate.
+  Reviewers A and B, focused completion of the full charter).** Revision 4 rebuilt the substantive
+  ledger dispositions and was certified by a fresh full-scope pair: Round 13 Reviewer A and
+  Reviewer B both returned **`APPROVE`** against the freeze at `952afd3` (see §6.2), after one
+  `REQUEST_CHANGES` (Round 13 attempt 1, Reviewer A, a manifest §6.2 boundary-arithmetic P2) was
+  remediated, the fingerprint re-pinned, and the candidate re-frozen. Review status for revision 4:
+  **`APPROVED` (Round 13, Reviewers A and B, fresh full-scope certification).**
 - **Author:** Claude Code Opus as `DOCUMENT_EXECUTOR`. Not the owner, ratifier, or release approver.
 - **Supersedes:** revision 1 of this file — SHA-256
   `bf3f4961d62990b66cb32558964fb815ba17e9ff9cf510f2523e9cc5c556521b`, 397 lines, captured
@@ -853,6 +856,30 @@ Two independent read-only reviews are required by work-order §3.13 and §4.6.
 | 11, attempt 2 | Reviewer B | HEAD/state, progression substance both states, five findings + code spot-checks, chronology, Entry 0064 | **APPROVE** |
 | 12 | Reviewer A | Focused completion: semantic entailment for the remaining 41 enumerated §4 rows + §5 supersession | **APPROVE** |
 | 12 | Reviewer B | Focused confirmation: corrected count labels, ledger 0065 structure, final bytes | **APPROVE** |
+| 13, attempt 1 | Reviewer A | Fresh full-scope re-certification of the revision-4 freeze | **REQUEST_CHANGES** |
+| 13, attempt 1 | Reviewer B | Fresh full-scope re-certification of the revision-4 freeze | **APPROVE** |
+| 13, attempt 2 | Reviewer A | Fresh full-scope re-certification of the remediated freeze at `952afd3` | **APPROVE** |
+| 13, attempt 2 | Reviewer B | Fresh full-scope re-certification of the remediated freeze at `952afd3` | **APPROVE** |
+
+**Round 13 verdicts — revision-4 certification.** The first attempt pair reviewed the revision-4
+freeze at `19f7e28` in full scope. Reviewer B returned `APPROVE`; Reviewer A returned
+`REQUEST_CHANGES` on one P2: the manifest §6.2 boundary table declared 13 source records for the
+untracked-outside-`.agents/` boundary where 10 rows exist (three Corpus B Markdown files are listed
+in §1.2 but carry no source records), so the boundary column summed to 82 against its declared
+total of 79. The row was corrected to 10 with the exact record list, the fingerprint re-pinned, and
+the candidate re-frozen at `952afd3`. The second attempt pair then re-certified the remediated
+freeze in full scope: both returned `APPROVE` with zero findings. Reviewer A verified both ledger
+lineages, the corrected manifest arithmetic (79 records, boundaries 30+10+27+10+1+1=79, `S-OUT-01`
+self-count 343), the 56-row §4 ledger with T0/T1/T2 admissibility, the three dispositions at their
+cited revisions, all citations mechanically plus 27 semantically, the verifier runs (18/18 and
+7/7), and the `PENDING_EXTERNAL_REVIEW`-to-`APPROVED` status wording; Reviewer B verified HEAD and
+ancestry at `952afd3`, the OW-036 decoupling and its mutation consistency, the green gates
+(`verify:blocks`, `typecheck`), empty `packages/core-db` and `apps/mobile` diffs, the C6/C7 deferral
+wording, curated-diff safety, and the verifier runs. Verbatim handoffs:
+
+`[Working-tree source: docs/audits/state-c-release-readiness/reviews/round-13-reviewer-a.txt; SHA-256 36c6420f29ed48e403056fbe3f116365cac9863b51f904b477e98f9637e2b153; lines 1-67; captured 2026-09-01]`
+`[Working-tree source: docs/audits/state-c-release-readiness/reviews/round-13-reviewer-b.txt; SHA-256 12cfdae76d18c4aec348f0437210cb0c8b21f395d1ce146ecd2f4678ec639d1d; lines 1-21; captured 2026-09-01]`
+
 
 **Round 2 did not run.** Both round-2 reviewers were launched read-only with the same charters and
 terminated early on an environment rate limit (HTTP 429, session limit) before producing any verdict.
@@ -1169,10 +1196,14 @@ occurred. It is not evidence that its output was correct.
   observations noticed during the bounded five-finding audit are recorded in
   `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` §4.3 and deliberately excluded here.
 - **`REPORTED` gate rows are inherited claims.** They were not re-run.
-- **Independent review status: `PENDING_EXTERNAL_REVIEW` for revision 4.** The revision-3 candidate
-  was approved at Round 12 (Reviewers A and B, completing the full charter), but this revision-4
-  rebuild changes substantive ledger dispositions (`OW-036`, `OW-024`, `OW-025`), so the revision-4
-  candidate requires a fresh full-scope Reviewer A/B pair before any approval claim. Twelve review rounds ran to a verdict or documented truncation — round 1, operative round 2,
+- **Independent review status: `APPROVED` (Round 13, Reviewers A and B, fresh full-scope
+  certification of the revision-4 freeze at `952afd3`).** The revision-3 candidate was approved at
+  Round 12 (Reviewers A and B, completing the full charter); the revision-4 rebuild changed
+  substantive ledger dispositions (`OW-036`, `OW-024`, `OW-025`), so a fresh full-scope pair was
+  required. Round 13 attempt 1 returned one `REQUEST_CHANGES` (Reviewer A, manifest §6.2 boundary
+  arithmetic) and one `APPROVE` (Reviewer B); the arithmetic was corrected, the fingerprint
+  re-pinned, the candidate re-frozen at `952afd3`, and Round 13 attempt 2 returned two `APPROVE`
+  verdicts covering the full charters. See §6.2. Twelve review rounds ran to a verdict or documented truncation — round 1, operative round 2,
   operative round 3, and round 4 each returned two `REQUEST_CHANGES`; Round 5 returned one
   `APPROVE` (Reviewer A) and one `REQUEST_CHANGES` (Reviewer B); Round 6 returned two `APPROVE` for
   the 992-line candidate at SHA-256

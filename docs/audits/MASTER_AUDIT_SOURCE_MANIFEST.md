@@ -215,6 +215,8 @@ files the synthesis names; the remainder are covered by the Corpus C total and a
 | `S-T3-26` | `.agents/audit-synthesis-remediation/round-11-reviewer-b.txt` | Worktree, untracked | `4764da7e294e83b1` | 55 | 2026-08-31 | No |
 | `S-T3-27` | `.agents/audit-synthesis-remediation/round-12-reviewer-a.txt` | Worktree, untracked | `657e0cde6154c355` | 50 | 2026-08-31 | No |
 | `S-T3-28` | `.agents/audit-synthesis-remediation/round-12-reviewer-b.txt` | Worktree, untracked | `22bc26befe469396` | 51 | 2026-08-31 | No |
+| `S-T3-29` | `docs/audits/state-c-release-readiness/reviews/round-13-reviewer-a.txt` | Worktree, untracked, outside `.agents/` | `36c6420f29ed48e4` | 67 | 2026-09-01 | No |
+| `S-T3-30` | `docs/audits/state-c-release-readiness/reviews/round-13-reviewer-b.txt` | Worktree, untracked, outside `.agents/` | `12cfdae76d18c4ae` | 21 | 2026-09-01 | No |
 
 Encoding note: `S-T3-14` and `S-T3-15` (the Round 5 handoffs) are cp1252-encoded files, not UTF-8;
 their SHA-256 values are computed over the raw bytes, which is what the synthesis cites. They are
@@ -231,7 +233,7 @@ gate, and the State C code at `S-T4-09`–`S-T4-15` is corroboration.
 
 | source_id | path | tier | boundary | SHA-256 | line_count | source_date | admissible_for_open_work |
 |---|---|---|---|---|---|---|---|
-| `S-OUT-01` | `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` | n/a — output | Worktree, untracked | self-referential; see §6.4 | 343 after the State C release-readiness rebuild (342 after the GLM-5.3 Round-12 closeout edit; 340 at Round 12; 322 at the pre-continuation issue) | 2026-08-31 | No |
+| `S-OUT-01` | `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` | n/a — output | Worktree, untracked | self-referential; see §6.4 | 345 after the State C release-readiness rebuild (342 after the GLM-5.3 Round-12 closeout edit; 340 at Round 12; 322 at the pre-continuation issue) | 2026-08-31 | No |
 | `S-OUT-02` | `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` | n/a — output | Worktree, untracked | recorded in §6.4 after the final edit | recorded in §6.4 | 2026-08-31 | Gate only, not an origin |
 | `S-OUT-03` | `docs/audits/state-c-release-readiness/LEDGER_LINEAGE_CROSSWALK.md` | n/a — output | Worktree, untracked | SHA-256 `c73354c8ef244abac72c6599da9c3ae954178ce4ad58f97a5b3ae5ba974fb959` | 48 | 2026-08-31 | Namespace map for the closed `OW-024`; a coordination artifact, not an origin |
 
@@ -254,8 +256,8 @@ document. It does not exist in the audit worktree at any revision:
 
 ### 6.1 Totals by Tier
 
-Counted from the rows in this manifest, not restated from a previous revision. **79 source records**
-name **76 distinct paths**: `packages/inference/src/blockGenerator.ts` is recorded twice, once at
+Counted from the rows in this manifest, not restated from a previous revision. **81 source records**
+name **78 distinct paths**: `packages/inference/src/blockGenerator.ts` is recorded twice, once at
 State A (`S-T4-07`) and once at State C (`S-T4-11`); `apps/mobile/src/state/useStore.ts` is recorded
 twice, once at State C (`S-T4-10`) and once at State B (`S-T4-20`); and `S-T4-05` is Git metadata,
 which has no path at all. 79 records minus two duplicated paths minus one pathless record is 76.
@@ -265,11 +267,11 @@ which has no path at all. 79 records minus two duplicated paths minus one pathle
 | T0 | 9 | Yes | Yes |
 | T1 | 16 | Yes | Yes |
 | T2 | 0 | Yes, if any existed | Yes |
-| T3 | 28 named. **6** are Corpus C paths under `.agents/`; **21** are out-of-corpus `.txt` review handoffs under `.agents/audit-synthesis-remediation/` (Rounds 2–4, 5, 6, 7, 8-B, 9, 10, 11 and 12); `S-T3-07` is the superseded revision 1 of the synthesis, a Corpus B path at the repository root | No | Yes |
+| T3 | 30 named. **6** are Corpus C paths under `.agents/`; **23** are out-of-corpus `.txt` review handoffs (Rounds 2–4, 5, 6, 7, 8-B, 9, 10, 11, 12 under `.agents/audit-synthesis-remediation/`, and 13 under `docs/audits/state-c-release-readiness/reviews/`); `S-T3-07` is the superseded revision 1 of the synthesis, a Corpus B path at the repository root | No | Yes |
 | T4 | 22 | **No** | Yes |
 | T5 | 1 | **No** | Yes, labelled external |
 | Outputs of this task (`S-OUT-*`) | 3 | **No** — `S-OUT-02` is an admission gate, not an origin; `S-OUT-03` is a coordination artifact | Yes |
-| **Total** | **79** | — | — |
+| **Total** | **81** | — | — |
 
 T2 has no rows: both State C branch documents carry higher T0 authority and each source takes exactly
 one tier. See §4.1.
@@ -279,12 +281,12 @@ one tier. See §4.1.
 | Boundary | Source records | Population under the §1.1 rule |
 |---|---|---|
 | Worktree, tracked at State A | 30 | 62 Markdown files match Corpus A, of 117 tracked Markdown |
-| Worktree, untracked, outside `.agents/` | 10 | 6 Corpus B Markdown with records (`S-T0-07`, `S-T0-08`, `S-T0-09`, `S-T3-07`, `S-OUT-01`, `S-OUT-02`) + 3 State B code/components (`S-T4-18`, `S-T4-19`, `S-T4-20`) + 1 State C crosswalk output (`S-OUT-03`) |
+| Worktree, untracked, outside `.agents/` | 12 | 6 Corpus B Markdown with records (`S-T0-07`, `S-T0-08`, `S-T0-09`, `S-T3-07`, `S-OUT-01`, `S-OUT-02`) + 3 State B code/components (`S-T4-18`, `S-T4-19`, `S-T4-20`) + 1 State C crosswalk output (`S-OUT-03`) + 2 Round 13 review handoffs (`S-T3-29`, `S-T3-30`) |
 | Worktree, untracked, under `.agents/` | 27 | 213 (Corpus C Markdown, re-counted; mutable T3 corpus) + 21 `.txt` review handoffs (Rounds 2–4, 5, 6, 7, 8-B, 9, 10, 11 and 12) |
 | Branch `claude/rc-48719b0` at an exact commit | 10 | 16 files changed, of which 2 are Markdown documents (Corpus D) |
 | Repository metadata, no single path | 1 | n/a — `S-T4-05` |
 | Outside the audit worktree | 1 | 1 (Corpus E) |
-| **Total** | **79** | — |
+| **Total** | **81** | — |
 
 Source records exceed the Markdown populations because Corpus A–E enumerate **documents**, while the
 manifest also registers the non-Markdown code, test, schema and metadata sources used as T4
