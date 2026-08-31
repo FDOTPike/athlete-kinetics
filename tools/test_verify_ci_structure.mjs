@@ -231,6 +231,14 @@ console.log('\n[6] the REAL workflow in this repository');
     Boolean(cmakePin) && effectiveWorkflow.includes(`"cmake;${cmakePin}"`), cmakePin ?? '(pin missing)');
   check('  ...and CI installs the Gradle-pinned NDK revision',
     Boolean(ndkPin) && effectiveWorkflow.includes(`"ndk;${ndkPin}"`), ndkPin ?? '(pin missing)');
+
+  const qaBuildAt = effectiveWorkflow.indexOf('- name: Build QA candidate APK');
+  const cleanGateAt = effectiveWorkflow.indexOf('- name: Assert QA candidate source stayed clean');
+  const candidateGateAt = effectiveWorkflow.indexOf('- name: verify:qa-candidate (real artifact, fails closed)');
+  check('  ...and CI rejects build-induced source changes before artifact verification',
+    qaBuildAt >= 0 && cleanGateAt > qaBuildAt && candidateGateAt > cleanGateAt
+      && effectiveWorkflow.includes('git diff --exit-code -- .')
+      && effectiveWorkflow.includes('git diff --cached --exit-code -- .'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CI STRUCTURE FIXTURES PASSED' : `${fail} CI STRUCTURE FIXTURE(S) FAILED`}`);

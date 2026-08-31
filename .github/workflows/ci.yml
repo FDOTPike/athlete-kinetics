@@ -123,6 +123,13 @@ jobs:
       - name: Build QA candidate APK
         working-directory: apps/mobile/android
         run: ./gradlew assembleQa --no-daemon
+      # A hosted release candidate must describe a clean checkout. Catch
+      # build-induced tracked or staged changes before trusting the manifest's
+      # provenance comparison inside the same mutated checkout.
+      - name: Assert QA candidate source stayed clean
+        run: |
+          git diff --exit-code -- .
+          git diff --cached --exit-code -- .
       - name: verify:qa-candidate (real artifact, fails closed)
         run: npm run verify:qa-candidate
       # The CANDIDATE artifact — the one verify:qa-candidate just gated.
