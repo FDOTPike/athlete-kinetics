@@ -217,11 +217,20 @@ console.log('\n[6] the REAL workflow in this repository');
 
 {
   const real = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf-8');
+  const effectiveWorkflow = stripYamlComments(real);
+  const androidBuild = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'build.gradle'), 'utf-8');
   const r = checkWorkflowStructure(real, { gateCount: 21 });
   check('the shipped ci.yml passes every structural assertion',
     r.ok === true, r.problems.join('; ').slice(0, 160));
   check('  ...and its prerequisite job is the verify suite',
     r.observed.prereq === 'verify', r.observed.prereq ?? '(none)');
+
+  const cmakePin = androidBuild.match(/cmakeVersion\s*=\s*"([^"]+)"/)?.[1];
+  const ndkPin = androidBuild.match(/ndkVersion\s*=\s*"([^"]+)"/)?.[1];
+  check('  ...and CI installs the Gradle-pinned CMake revision',
+    Boolean(cmakePin) && effectiveWorkflow.includes(`"cmake;${cmakePin}"`), cmakePin ?? '(pin missing)');
+  check('  ...and CI installs the Gradle-pinned NDK revision',
+    Boolean(ndkPin) && effectiveWorkflow.includes(`"ndk;${ndkPin}"`), ndkPin ?? '(pin missing)');
 }
 
 console.log(`\n${fail === 0 ? 'ALL CI STRUCTURE FIXTURES PASSED' : `${fail} CI STRUCTURE FIXTURE(S) FAILED`}`);

@@ -81,6 +81,16 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: gradle
+      # ubuntu-latest does not guarantee every repository-pinned Android
+      # native-toolchain revision. Install the exact Gradle pins so AGP can
+      # resolve externalNativeBuild for every autolinked native module.
+      - name: Install pinned Android native toolchain
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "cmake;3.30.5" \
+            "ndk;28.2.13676358"
+          test -x "$ANDROID_HOME/cmake/3.30.5/bin/cmake"
+          test -d "$ANDROID_HOME/ndk/28.2.13676358"
       - run: npm ci
       # The triage embedding model ships inside the APK (Android assets);
       # cache-first fetch, then stage it where AGP packages assets from.
