@@ -790,7 +790,7 @@ console.log('[9d] ladder reconciliation — bodyweight reps reach the advancemen
   check('the gate reads the ladder policy rather than restating a literal',
     typeof floor === 'number' && floor > 0, `requiredReps=${floor}`);
 
-  let reachableBlocks = 0; let totalBlocks = 0; let loadedUnchanged = true;
+  let reachableBlocks = 0; let totalBlocks = 0;
   const loadedRepsByBlock = [];
   for (let i = 1; i <= MACRO_BLOCKS; i += 1) {
     const bwPlan = generateBlock({
@@ -803,8 +803,10 @@ console.log('[9d] ladder reconciliation — bodyweight reps reach the advancemen
     totalBlocks += 1;
     if (bwSlots.every((sl) => sl.reps >= floor)) reachableBlocks += 1;
 
-    // A block with full equipment must keep its LOADED rep prescription, which
-    // is phase-shaped and must NOT be floored.
+    // This compact 001-015 fixture deliberately marks every movement as a
+    // capability-chain member (see the fixture comment above). Loading class
+    // must not make those members lose the same chain floor; off-chain phase
+    // prescriptions are tested against real membership in [28].
     const loadedPlan = generateBlock({
       profile: prof({ objective: 'strength' }),
       movements: movements.map((m) => ({ ...m, plannedImplement: undefined })),
@@ -820,8 +822,9 @@ console.log('[9d] ladder reconciliation — bodyweight reps reach the advancemen
   }
   check('EVERY macro block now prescribes bodyweight work at or above the ladder bar',
     totalBlocks > 0 && reachableBlocks === totalBlocks, `${reachableBlocks}/${totalBlocks}`);
-  check('loaded prescriptions are NOT floored — the phase rep shape survives',
-    new Set(loadedRepsByBlock).size > 1 && Math.min(...loadedRepsByBlock) < floor,
+  check('loaded chain members retain the advancement floor in every macro block',
+    loadedRepsByBlock.length === MACRO_BLOCKS
+      && loadedRepsByBlock.every((minimum) => minimum >= floor),
     `min loaded reps across blocks = ${Math.min(...loadedRepsByBlock)}`);
 
   // The deload is exempt: it must stay a strict cut, never floored upward.
@@ -2018,6 +2021,17 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   const slotsOf = (plan) => plan.sessions.flatMap((s) => s.slots);
   const repsForMovement = (plan, movementId) =>
     slotsOf(plan).filter((s) => s.movement_id === movementId).map((s) => s.reps);
+  const routedSlotsForMovement = (plan, movementId) => plan.sessions.flatMap((session) =>
+    session.slots.filter((slot) => slot.movement_id === movementId).map((slot) => ({
+      ...slot,
+      week_index: session.week_index,
+      phase: session.phase,
+    })));
+  const nonDeloadSlotsForMovement = (plan, movementId) =>
+    routedSlotsForMovement(plan, movementId).filter((slot) => slot.phase !== 'deload');
+  const deloadRepsForMovement = (plan, movementId) =>
+    routedSlotsForMovement(plan, movementId)
+      .filter((slot) => slot.phase === 'deload').map((slot) => slot.reps);
   /** sets x reps — Option C routes VOLUME, and an off-chain bodyweight movement
    *  correctly keeps its phase reps, so reps alone cannot tell the classes apart. */
   const shapeForMovement = (plan, movementId) =>
@@ -2048,20 +2062,33 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     const loaded = atPeak(focusedOn('Push-up', { 'Push-up': 'Banded' }));
     const unknown = atPeak(focusedOn('Push-up'));
 
-    const unloadedReps = repsForMovement(unloaded, id);
-    const loadedReps = repsForMovement(loaded, id);
-    const unknownReps = repsForMovement(unknown, id);
+    const unloadedSlots = nonDeloadSlotsForMovement(unloaded, id);
+    const loadedSlots = nonDeloadSlotsForMovement(loaded, id);
+    const unknownSlots = nonDeloadSlotsForMovement(unknown, id);
+    const floor = DEFAULT_ADVANCEMENT_POLICY.requiredReps;
 
-    check('[28] an explicitly unloaded selection takes the bodyweight path',
-      unloadedReps.length > 0
-      && JSON.stringify(unloadedReps) !== JSON.stringify(loadedReps),
-      `unloaded=${JSON.stringify(unloadedReps)} loaded=${JSON.stringify(loadedReps)}`);
-    check('[28] an explicit external-load selection takes the loaded path',
-      loadedReps.length > 0 && JSON.stringify(loadedReps) !== JSON.stringify(unloadedReps),
-      JSON.stringify(loadedReps));
-    check('[28] missing intent fails CLOSED — identical to the loaded path, never bodyweight',
-      JSON.stringify(unknownReps) === JSON.stringify(loadedReps),
-      `unknown=${JSON.stringify(unknownReps)} loaded=${JSON.stringify(loadedReps)}`);
+    check('[28] explicit Bodyweight intent: chain floor applies on the Option C bodyweight set route',
+      unloadedSlots.length > 0 && unloadedSlots.every((slot) => slot.reps >= floor)
+      && JSON.stringify(unloadedSlots.map((slot) => slot.sets))
+        !== JSON.stringify(loadedSlots.map((slot) => slot.sets)),
+      `bodyweight=${JSON.stringify(unloadedSlots.map((slot) => `${slot.sets}x${slot.reps}`))}`);
+    check('[28] explicit external-load intent: chain floor remains while sets stay on the loaded route',
+      loadedSlots.length > 0 && loadedSlots.every((slot) => slot.reps >= floor)
+      && JSON.stringify(loadedSlots.map((slot) => slot.sets))
+        === JSON.stringify(unknownSlots.map((slot) => slot.sets)),
+      `loaded=${JSON.stringify(loadedSlots.map((slot) => `${slot.sets}x${slot.reps}`))}`);
+    check('[28] undeclared intent: chain floor remains while fail-closed routing matches loaded sets',
+      unknownSlots.length > 0 && unknownSlots.every((slot) => slot.reps >= floor)
+      && JSON.stringify(unknownSlots.map((slot) => `${slot.sets}x${slot.reps}`))
+        === JSON.stringify(loadedSlots.map((slot) => `${slot.sets}x${slot.reps}`)),
+      `unknown=${JSON.stringify(unknownSlots.map((slot) => `${slot.sets}x${slot.reps}`))}`);
+    check('[28] deload reps are intent-independent and bypass the chain floor',
+      JSON.stringify(deloadRepsForMovement(unloaded, id))
+        === JSON.stringify(deloadRepsForMovement(loaded, id))
+      && JSON.stringify(deloadRepsForMovement(unknown, id))
+        === JSON.stringify(deloadRepsForMovement(loaded, id))
+      && deloadRepsForMovement(loaded, id).every((reps) => reps < floor),
+      `deload=${JSON.stringify(deloadRepsForMovement(loaded, id))}`);
   }
 
   // --- weighted calisthenics is loaded --------------------------------------
@@ -2092,24 +2119,37 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // An off-chain bodyweight movement keeps its PHASE prescription; it must not
   // be lifted to the ladder bar it is not measured against.
   const offChain = dropdownBodyweight.find((r) => !chainMembers.has(Number(r.movement_id))
-    && r.pattern !== 'locomotion');
+    && r.pattern !== 'locomotion'
+    && JSON.parse(r.prefixes_json ?? '[]').some((prefix) => prefix !== 'Bodyweight'));
   const onChain = dropdownBodyweight.find((r) => chainMembers.has(Number(r.movement_id))
     && r.pattern !== 'locomotion');
   if (offChain !== undefined && onChain !== undefined) {
-    const repsAtPeak = (row) => repsForMovement(generateBlock({
+    const repsAtPeak = (row, intent) => routedSlotsForMovement(generateBlock({
       profile: prof(),
-      movements: focusedOn(row.name, { [row.name]: 'Bodyweight' }),
+      movements: focusedOn(row.name, intent === undefined ? {} : { [row.name]: intent }),
       startDate: START, macroBlockIndex: 7,
     }), Number(row.movement_id));
-    const offReps = repsAtPeak(offChain);
-    const onReps = repsAtPeak(onChain);
+    const offBodyweight = repsAtPeak(offChain, 'Bodyweight');
+    const offLoaded = repsAtPeak(offChain,
+      JSON.parse(offChain.prefixes_json ?? '[]').find((prefix) => prefix !== 'Bodyweight'));
+    const offUnknown = repsAtPeak(offChain, undefined);
+    const onReps = repsAtPeak(onChain, 'Bodyweight').filter((slot) => slot.phase !== 'deload');
     // The pair is the point: L2(b) says the floor is chain-scoped, so exactly
     // one of these two is lifted to the bar.
     check(`[28] L2(b) the ladder floor is chain-scoped (on=${onChain.name}, off=${offChain.name})`,
-      onReps.length > 0 && offReps.length > 0
-      && onReps.some((r) => r >= DEFAULT_ADVANCEMENT_POLICY.requiredReps)
-      && offReps.every((r) => r < DEFAULT_ADVANCEMENT_POLICY.requiredReps),
-      `on-chain=${JSON.stringify(onReps)} off-chain=${JSON.stringify(offReps)}`);
+      onReps.length > 0 && offBodyweight.length > 0
+      && onReps.every((slot) => slot.reps >= DEFAULT_ADVANCEMENT_POLICY.requiredReps)
+      && offBodyweight.filter((slot) => slot.phase !== 'deload')
+        .every((slot) => slot.reps < DEFAULT_ADVANCEMENT_POLICY.requiredReps),
+      `on-chain=${JSON.stringify(onReps.map((slot) => slot.reps))}`
+      + ` off-chain=${JSON.stringify(offBodyweight.map((slot) => slot.reps))}`);
+    check(`[28] off-chain phase reps are intent-independent (${offChain.name})`,
+      JSON.stringify(offBodyweight.map((slot) => slot.reps))
+        === JSON.stringify(offLoaded.map((slot) => slot.reps))
+      && JSON.stringify(offUnknown.map((slot) => slot.reps))
+        === JSON.stringify(offLoaded.map((slot) => slot.reps)),
+      `bodyweight=${JSON.stringify(offBodyweight.map((slot) => slot.reps))}`
+      + ` loaded=${JSON.stringify(offLoaded.map((slot) => slot.reps))}`);
   }
 
   // --- L2(b): a per-chain policy overrides the default ----------------------
@@ -2119,17 +2159,40 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     'INSERT INTO progression_policy (progression_group, required_sets, required_value) VALUES (?, ?, ?)',
   ).run('pull-up', 3, 12);
   const chainMember = corpus.find((r) => r.progression_group === 'pull-up'
-    && JSON.parse(r.prefixes_json ?? '[]')[0] === 'Bodyweight');
+    && JSON.parse(r.prefixes_json ?? '[]').includes('Bodyweight')
+    && JSON.parse(r.prefixes_json ?? '[]').some((prefix) => prefix !== 'Bodyweight'));
   if (chainMember !== undefined) {
     const id = Number(chainMember.movement_id);
-    const pool = focusedOn(chainMember.name, { [chainMember.name]: 'Bodyweight' }).map((m) => (
-      m.movement_id === id
-        ? { ...m, chainAdvancementReps: 12 }
-        : m));
-    const reps = repsForMovement(planFor(pool), id);
-    check(`[28] a custom per-chain policy governs the floor (${chainMember.name}, bar 12)`,
-      reps.length > 0 && reps.some((r) => r >= 12),
-      JSON.stringify(reps));
+    const external = JSON.parse(chainMember.prefixes_json ?? '[]')
+      .find((prefix) => prefix !== 'Bodyweight');
+    const withPolicy = (intent) => focusedOn(chainMember.name,
+      intent === undefined ? {} : { [chainMember.name]: intent }).map((m) => (
+      m.movement_id === id ? { ...m, chainAdvancementReps: 12 } : m));
+    const bodyweightPlan = planFor(withPolicy('Bodyweight'));
+    const loadedPlan = planFor(withPolicy(external));
+    const unknownPlan = planFor(withPolicy(undefined));
+    const bodyweightSlots = nonDeloadSlotsForMovement(bodyweightPlan, id);
+    const loadedSlots = nonDeloadSlotsForMovement(loadedPlan, id);
+    const unknownSlots = nonDeloadSlotsForMovement(unknownPlan, id);
+    check(`[28] custom per-chain policy floors Bodyweight, loaded, and undeclared routes (${chainMember.name}, bar 12)`,
+      bodyweightSlots.length > 0
+      && [bodyweightSlots, loadedSlots, unknownSlots]
+        .every((slots) => slots.every((slot) => slot.reps >= 12)),
+      `BW=${JSON.stringify(bodyweightSlots.map((slot) => slot.reps))}`
+      + ` loaded=${JSON.stringify(loadedSlots.map((slot) => slot.reps))}`
+      + ` unknown=${JSON.stringify(unknownSlots.map((slot) => slot.reps))}`);
+    check('[28] custom policy preserves loaded fail-closed set routing',
+      JSON.stringify(loadedSlots.map((slot) => slot.sets))
+        === JSON.stringify(unknownSlots.map((slot) => slot.sets))
+      && JSON.stringify(bodyweightSlots.map((slot) => slot.sets))
+        !== JSON.stringify(loadedSlots.map((slot) => slot.sets)));
+    check('[28] custom policy never floors deload reps',
+      JSON.stringify(deloadRepsForMovement(bodyweightPlan, id))
+        === JSON.stringify(deloadRepsForMovement(loadedPlan, id))
+      && JSON.stringify(deloadRepsForMovement(unknownPlan, id))
+        === JSON.stringify(deloadRepsForMovement(loadedPlan, id))
+      && deloadRepsForMovement(loadedPlan, id).every((reps) => reps < 12),
+      JSON.stringify(deloadRepsForMovement(loadedPlan, id)));
   }
 
   // --- loaded prescriptions are untouched by all of the above ---------------

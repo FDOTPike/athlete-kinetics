@@ -750,8 +750,9 @@ export function generateBlock(input: BlockInput): BlockPlan {
       //
       // The floor is IMPORTED, never restated, so the prescription and the
       // advancement criterion cannot drift apart — the same single-source rule
-      // the e1rm.ts/targetPct tripwire enforces. Loaded movements are
-      // untouched: they progress by load, and their rep deltas are meaningful.
+      // the e1rm.ts/targetPct tripwire enforces. Loading class is independent:
+      // it controls Option C SET routing, never whether a chain member can
+      // receive the rep floor it is measured against.
       // L2(b), owner-ratified 2026-08-29: the floor is CHAIN-SCOPED. The owner's
       // instruction was to reconcile the ladder so athletes can level up; the
       // original implementation applied it to every strictly bodyweight
@@ -764,7 +765,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
       // The bar is the chain's own: a per-chain progression_policy row when one
       // exists, else the IMPORTED default. Never restated as a literal, so the
       // prescription and the criterion it must satisfy cannot drift apart.
-      const bodyweightRepsFor = (m: GeneratorMovement): number => {
+      const chainScopedRepsFor = (m: GeneratorMovement): number => {
         if (deload) return reps;
         if (m.progressionGroup === undefined) return reps;
         return Math.max(reps, m.chainAdvancementReps ?? DEFAULT_ADVANCEMENT_POLICY.requiredReps);
@@ -859,7 +860,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
         let slotSets = locomotion
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
           : Math.max(1, slotWorkingSets - (taxed ? accessoryCut : 0));
-        const slotReps = bodyweightSlot ? bodyweightRepsFor(m) : reps;
+        const slotReps = chainScopedRepsFor(m);
         let slotRpe = rpe;
         const preAutopilotSets = slotSets;
         const preAutopilotRpe = slotRpe;
