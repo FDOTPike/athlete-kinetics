@@ -1,0 +1,53 @@
+All charter items checked. Composing the report.
+
+---
+
+# Round 8 Reviewer B — Independent Read-Only Review Report
+
+**Scope:** progression/UI, state provenance, chronology incl. Round 7 records, encoding, C6/release wording. Read-only; no files modified, staged, committed, or gated.
+
+## 1. Verified Hashes Table
+
+| File | Computed SHA-256 | Expected | Match |
+|---|---|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` (1057 lines) | `62c563d64288e94d12b3516756f3a4572dfc657a7a5066d774588b3b412340b3` | `62c563d6…340b3` | ✅ |
+| `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` (332 lines) | `7ee8e8124b48daaf38bc2dd701c25dbe9dc1ebea1076eb07ccd4c493c9edcbc4` | `7ee8e812…bc4` | ✅ |
+| `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` (456 lines) | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | `2e347231…d90c` | ✅ |
+| `.agents/audit-synthesis-remediation/round-7-reviewer-a.txt` | `9c391b23aba025edb38c1e40cfe74336b043e25a54582a016526dee4c866ffdb` | cited §6.2:914 | ✅ |
+| `.agents/audit-synthesis-remediation/round-7-reviewer-b.txt` | `d52481ceb54b144c451647117ec861bcd5e9ced0ed39f2866017aa7f1358a8d8` | cited §6.2:915 | ✅ |
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` §0.1 lines 14–21 | "…so **the current candidate is pending a fresh independent review (Round 7)** and carries review status `PENDING_EXTERNAL_REVIEW` until both Round 7 reviewers approve." | Stale chronology. Round 7 has completed and is recorded in the same frozen file: §6.2 lines 905–933 ("Round 7 verdicts… Reviewer A returned `REQUEST_CHANGES` with two findings… both were remediated in the revision now frozen for Round 8… The candidate now before Round 8 carries review status `PENDING_EXTERNAL_REVIEW`") and §6.3 lines 1014–1020 ("Round 7 returned one APPROVE (Reviewer B) and one REQUEST_CHANGES (Reviewer A)… The Round 8 pair has not yet run"). §0.1 was one of the continuation's named chronology deliverables (§6.2:926) and was updated to "pending Round 7" but never advanced after Round 7 ran; it also never mentions Round 8. Additionally, "until both Round 7 reviewers approve" is now counterfactual — Reviewer A did not approve. This is the document's own stated stale-current defect class (the stale-row pattern of OW-021/OW-016/OW-015, and "assume a fourth may exist", §6.2:942). The charter requires §0.1/§6.2/§6.3 to tell one consistent story incl. Round 7 and a pending Round 8; §6.2/§6.3 do, §0.1 does not. | **MAJOR** |
+
+No other discrepancies found in my charter scope.
+
+## 3. Commands / Source Locators Checked
+
+- `sha256sum` + `wc -l` on the three candidate documents and both round-7 handoff files; `git rev-parse HEAD` → `48719b07988ad30d255b0fed37f45ed5db49c935`, branch `codex/progression-evidence-remediation`.
+- **RR-04 / Option C:** `git show 48719b0:packages/inference/src/blockGenerator.ts` lines 804–818 — `const primarySlot = slotIndex < ACCESSORY_SLOT_FROM;` at **line 817** ✅; `git show 34f91ff:…blockGenerator.ts` — same statement at **line 852** ✅; lines 844–862 confirm `slotReps = bodyweightSlot ? bodyweightRepsFor(m) : reps` (loaded/raw-reps bypass) as §3.1:355 claims.
+- **SCHEMES RPE ramps:** State A lines 346–355 — `rpeWave: [7.5, 8.0, 8.5]` at lines **347** (strength), **349** (hypertrophy), **352** (hybrid) ✅, matching §4.3 RG-03 (line 646) and its `blockGenerator.ts@48719b0, lines 346-355` citation.
+- **Handover expectation:** `HANDOVER_2026-08-27_SOL.md@48719b0` lines 78–89 — loaded block "RPE 7 → 7.5 → 8", sets flat 4, weighted-calisthenics row ✅; RG-03's "historical handover checklist expected 7→7.5→8" note is accurate.
+- **Closeout mirror:** closeout §4.1 verdict table (lines 402–408) vs synthesis §3.3 table (lines 470–476) — all five dispositions match: F1 `PARTIALLY_CONFIRMED`→OW-001/OW-036; F2 `CONFIRMED`→OW-002/003; F3 `CONFIRMED`→OW-004/005; F4 `CONFIRMED`→OW-006; F5 `CONFIRMED`→OW-007. Also cross-checked against §4 ledger rows (lines 601–607, 628) — release_effect values consistent.
+- **State C spot-verification:** `useStore.ts@34f91ff` lines 2053–2060 — `PER_ATHLETE_RESET` omits `suspension` ✅ (OW-003); lines 6078–6130 — exactly **49** `DELETE FROM` statements, **zero** occurrences of "suspension" ✅ (OW-002); lines 6141–6156 — post-reset `set()` without `suspension` + exactly **5** refresh calls, no `refreshSuspension` ✅.
+- **Migrations:** `git ls-tree 48719b0 packages/core-db/src/schema/` → 058 present, **no 059** ✅; `git ls-tree 34f91ff …` → both 058 and 059 present ✅; working tree has 059 absent (59 .sql = 058 + `_chain_projection.sql.tpl`) ✅.
+- **Task U3 overlay:** the three untracked files (`SuspensionCard.tsx`, `SuspensionSheet.tsx`, `SuspensionUI.test.js`) are `ABSENT_FROM_COMMIT` at 48719b0 ✅; all six working-tree hashes and line counts match synthesis §3.2 table (lines 382–387) byte-for-byte, and S-T4-18/19/20 hashes (`cb6506…`, `77d798…`, `fa5616…`) match manifest lines 176–178 ✅.
+- **Chronology/encoding:** §0.1, §6.2, §6.3 read in full; UTF-8 byte-pattern grep for mojibake (`Â§`, `â€` sequences, `â†'`, `â˜`, `Â±`, `Â·`) → **0 hits** in all three docs; `### 3.3 Claude C1–C5 Branch at 34f91ff` (line 432, en-dash) and `RELEASE_GATE — DEFERRED` (lines 490, 553, em-dash) render as valid UTF-8 punctuation ✅.
+- **C6/release wording:** §3.4 — C6 `RELEASE_GATE — DEFERRED`, never passed/failed/run (490); 471,936,000 B explicitly characterised as *modelled component envelope* vs `UNKNOWN` *device measurement*, kept distinct (506–521, 538–541); §3.4 release posture (549–556) names OW-036 + OW-024/OW-025/OW-035 as `BLOCKING` before C6 — all four §4 rows verified to carry `BLOCKING` ✅.
+- **Round 7 narrative:** §6.2:905–915 describes A=`REQUEST_CHANGES` with the two findings (manifest §6.4 locator/attributions; corpus totals 6/115/121 → 9/213/222) and B=`APPROVE`; both handoff files on disk confirm — reviewer A line 47 `VERDICT: REQUEST_CHANGES` with the same two findings at line 43, reviewer B line 58 `VERDICT: APPROVE`. The cited "lines 1-47"/"1-58" bounds are correct (files lack trailing newlines, so `wc -l` shows 46/57).
+
+## 4. Coverage Limits
+
+- Did not re-verify manifest §6.4 record counts (69/66) or corpus re-count arithmetic in depth — that was Reviewer A's Round 7 finding and is Reviewer A's charter; I verified only the narrative description matches the reviewer-A handoff.
+- Did not re-run `verify:ci`, `verify:migrations`, the empirical SQL probe, or any gate (read-only mandate); C0–C5 gate results accepted as `REPORTED` per §3.3.
+- Did not verify every one of the 456 closeout lines — spot-verified Finding 2 in full and Finding 1's blockGenerator corroboration; Findings 3–5 verified only at the disposition/mirror level.
+- Did not independently verify State C ledger `PROMPT_LEDGER.md@34f91ff` lines 3074–3139 or the four State C commits' lineage (`git log` ancestry not walked).
+- State B hashes verified at capture time 2026-08-30 claims only; working tree is mutable and files could have been restored to matching bytes since (they currently match).
+
+## 5. Summary of Findings
+
+One finding: **§0.1's review-chronology bullet is stale** — it still presents the current (Round-8-frozen) candidate as "pending a fresh independent review (Round 7)" and conditions status on "both Round 7 reviewers approve", directly contradicting §6.2:905–933 and §6.3:1010–1020, which correctly record Round 7 as completed (A=REQUEST_CHANGES with two remediated findings, B=APPROVE) and the current candidate as pending Round 8. Every other charter item verified exactly: RR-04 locators and RPE ramps at both states, handover note, all five closeout dispositions mirrored, both State C code spot-checks exact (including the 49-DELETE/zero-suspension count), 058/059 state separation, all six overlay hashes byte-identical to §3.2/manifest, zero mojibake, correct em/en-dash rendering, C6 wording, modelled-vs-measured distinction, and the four BLOCKING rows underpinning §3.4's NO-GO posture. The Round 7 narrative and both cited handoff hashes are accurate against disk bytes.
+
+VERDICT: REQUEST_CHANGES

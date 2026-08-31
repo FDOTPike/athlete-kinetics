@@ -1,0 +1,110 @@
+ROUND 4 — REVIEWER B HANDOFF (verbatim as returned)
+Charter: progression, UI, state provenance, and the closeout audit. Read-only.
+Persisted by the executor without edit.
+Candidate reviewed:
+  MASTER_AUDIT_SYNTHESIS.md                            4d9a85183e9cb7e5fe9f9afbacb89b9356ca234114d70ccba3feb6953b86ee7c  907 lines
+  docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md          ff1c3d3b65dd4345fc17f10e517988effba256f4699175ac49696a7ee9410ee1  309 lines
+  docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md 62bcc4331e0fbac8d2674e946d2f0e02c7eff690d854121ae58e852b87c0fd62  446 lines
+All three match. Line counts match.
+=====================================================================
+
+## 2. What verified clean
+
+Priority 1 — the rewritten 3.1 attribution. The new formulation is accurate and adequately hedged.
+TRAINING_PROGRESSION_LAYERS.md@48719b0:280 is exactly a 2026-08-27 Settled row for RR-04's
+primary-slot bias; row 281 (the bodyweight floor) is the adjacent row the docket retracts at
+419-425, and 3.1 names that limitation itself. The demotion of HANDOVER_2026-08-27_SOL.md:31-33 to
+an implementation report is correct — lines 31-33 read "RR-04 is implemented. The capability ladder
+now agrees with what blocks prescribe", which is status, not ratification. The architecture-review
+disclaimer at 209-211 is verbatim. 3.1's engine markers at 48719b0:blockGenerator.ts:804-812 and
+:720 both carry "owner-ratified 2026-08-27".
+
+Priority 2 — the five findings. Every verdict holds and no impact is overstated. bodyweightSlot =
+isPurelyBodyweight(m) is computed at 34f91ff:blockGenerator.ts:846 and gates the set ramp at 853-857
+and bodyweightRepsFor at 862; bodyweightDominant at :681 is the separate third consumer.
+bodyweightRepsFor (:767-771) returns reps unless m.progressionGroup !== undefined, then Math.max(reps,
+m.chainAdvancementReps ?? DEFAULT_ADVANCEMENT_POLICY.requiredReps); progressionEngine.ts:53 pins
+requiredReps: 8 and verify_blocks.mjs:2116 states progression_policy ships with zero rows — so the
+bar of 8 is live, and OW-036's BLOCKING inference is supportable. plannedImplementFor (:1833-1834)
+returns undefined for any multi-prefix list, so Push-up is undeclared. At State A the floor is
+unconditional (48719b0:blockGenerator.ts:734-736, no chain test) — 3.1's State A/State C contrast is
+exact. The four 059 triggers, the seven sentinels at migrationRunner.ts:190-196, both re-pins
+(verify_migrations.mjs:1724-1726, verify_pipeline.mjs:517), the absent [059] section (058 block runs
+1932-1994, file ends 1997), the 49 DELETEs at 6078-6130, the five refresh calls at 6152-6156, the
+bare endSuspension(Date.now()) at BlockScreen.tsx:482 and the suspension-error node at 513-515
+inside the not-suspended branch — all confirmed as written.
+
+Priority 3 — rulings. S1-S6, L1, L2, M1, A1 all check against docket a80f955:444-455. "legacy" is
+retained in L1; L2's future-only and per-chain clauses are retained; M1's "Do not edit 058... or
+block explicit whole-athlete erasure" is intact.
+
+Four-state matrix, State B, State C commits, corpus, gates. All six State B hashes and line counts
+reproduce byte-for-byte. SuspensionCard is imported at ProfileScreen.tsx:36 and never rendered; the
+only <SuspensionCard element is BlockScreen.tsx:413. Zero occurrences of the three 059 objects in
+the overlay. State B field is suspensionEpisode (:775, in PER_ATHLETE_RESET at :2013); State C field
+is suspension (:643, absent from PER_ATHLETE_RESET at 2053-2060) — the two lineages are correctly
+kept distinct, and RC-12 is right. All four State C commits and all four diffstats reproduce.
+Corpus: A 62/117, B 6, C 115, D 16/2, 121 untracked Markdown — every count reproduced, AGENTS.md
+included. git cat-file -e exits 128. Memory pair (450,000,000 / 536,870,912), the review band, and
+the 471,936,000 B modelled envelope all verify at memory_gate.mjs:56-57, RELEASE_READINESS.md:106-108
+and budget.json:40-43; the modelled-envelope vs physical-device-measurement distinction is held in
+3.4, RG-01 and 6.3 without slippage. RG-03's four rows are verbatim from HANDOVER...:82-87, and its
+State C claims are both correct: Push-up's ramp and floor lapse, and the weighted-calisthenics row
+genuinely improves. The 0.3 probe is honestly characterised — 59 schema files vs the production
+58-migration chain is stated, not glossed.
+
+## 3. Discrepancy table
+
+1  MAJOR — 2.1, "Autopilot C6B ratification, 2026-07-31". Claims the schedule
+   MAX_MACROCYCLE_RPE_RAISE = 2.5 (0.5 x5, 0, 0, 0) "was ratified across a 2,385-case sweep", cited
+   to docs/AUDIT_C6B_2026-07-30.md@48719b0, lines 55-77. The cited span is section 4 "Follow-up —
+   restate the historical figures under the corrected classifier"; it supports only the second
+   sentence (the C3 aggregates). git grep over the whole file at 48719b0 returns ZERO hits for
+   2,385, MAX_MACROCYCLE_RPE_RAISE, or the schedule tuple — those figures live in DEVIATION_LOG.md:171,
+   AUDIT_C3_2026-07-30.md:12-13, HANDOVER_2026-07-30_R1a_C5.md:27 and RELEASE_READINESS.md:75.
+   Worse, the file is titled "C6B audit — authority 2.5 (Claude/Opus ratification pass)", its verdict
+   is "GO. Ratify and land" (:3) and it closes "Recommend ratifying C6B" (:81) — a recommendation,
+   not a ratification record, and no owner ratification or date appears anywhere in it. The heading
+   date 2026-07-31 also does not match the source (2026-07-30). This re-commits, in 2.1, the exact
+   recommended-vs-ratified conflation that 3.1 and the round-2 remediation of 2.1 were written to remove.
+
+2  MODERATE — 3.3 and 6.1 "059 mutation surface" row. "059 refuses six mutation classes on
+   suspension_episode and permits exactly one — the athlete's own ended_at_ms NULL-to-non-NULL
+   resume"; 6.1 records "7 refusals, 1 permitted transition, 3 unprotected side-car mutations". Six
+   refusals on the base table is right, and 059:147-152 fires WHEN OLD.ended_at_ms IS NOT NULL only —
+   so DELETE of an open episode is also permitted on suspension_episode. The closeout's own 2.1 table
+   lists it as a bolded second ALLOWED row and flags it as "what 1.2's narrowest remediation depends
+   on". Neither 3.3 nor 6.1 counts it. This leaves 3.3 inconsistent with OW-002, whose remediation —
+   "Deleting only the open episode is required" — is viable only because that deletion is permitted.
+
+3  MINOR — 3.1 paragraph 1. "'A, with three corrections' for RR-02 at slot 058", cited to
+   AUDIT_architecture_review_8b4e75b.md@48719b0, lines 14-21. Line 19 records the panel
+   recommendation as "A (Migration 059)" — the cited span says 059, not 058. The slot-058 correction
+   is at 54-56, which is not cited.
+
+4  MINOR — 3.2 "What the overlay does not contain". "The store diff adds reactive state plumbing
+   only — a suspensionEpisode field, a refreshSuspension action, and a boot() call to it", cited to
+   useStore.ts; lines 2610-2652. All three facts are true, but only the actions lie in the cited
+   span. The field is declared at :775, initialised at :2066, added to PER_ATHLETE_RESET at :2013,
+   and the boot() call is at :2151.
+
+5  MINOR — 2.2, C1 ruling table. S6 binding content given as "Generation may continue while
+   suspended; blocks generated during an episode consume neither frozen state". Docket a80f955:451
+   binds one further clause: "Resume returns to exactly the recorded position." Similarly L2 (:453)
+   drops "Unrelated bodyweight movements retain their phase prescription" and L1 (:452) drops
+   "/implement".
+
+6  MINOR — 3.3 "Migration 059, verified at f3ebab3". "Three side-car tables ... plus four
+   immutability triggers", cited to 059...sql@f3ebab3, lines 1-33. Lines 1-33 are the header. They
+   support the side-car rationale and the no-numeric claim, but name none of the three tables and
+   none of the four triggers; the tables are defined from :35 onward and the triggers at 116-160.
+
+## 5. Assessment
+
+Items 1 and 2 are progression/state-provenance discrepancies within the charter's approval bar.
+Item 1 in particular is the same failure class the document twice records itself as having repaired,
+surviving in a section the round-2 remediation explicitly touched.
+
+REQUEST_CHANGES
+=====================================================================
+END OF VERBATIM HANDOFF

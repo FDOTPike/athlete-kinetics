@@ -1,0 +1,42 @@
+{
+  "lineage": "state-c-release-readiness",
+  "base_commit": "34f91ffe548a0b9e51db863ffc6fad993619f940",
+  "canonical_ledger_base": {
+    "path": "PROMPT_LEDGER.md",
+    "sha256": "00f3d78475d4192a0bcbe03db2432301ab23fdabb5bb6a994b5835cb4f8f9c68",
+    "lines": 3139
+  },
+  "audit_lineage_archive": {
+    "path": "docs/audits/state-c-release-readiness/lineage/PROMPT_LEDGER_AUDIT_LINEAGE_1A878602.md",
+    "source_path": "progression-evidence-remediation worktree PROMPT_LEDGER.md (dirty, preserved)",
+    "sha256": "1a8786020be1eef107a1b3c8b6e1d02ff7826b688e67789adaf1414bc8e5c3b0",
+    "lines": 3942,
+    "status": "immutable external lineage; never the canonical ledger"
+  },
+  "carried_audit_documents": {
+    "MASTER_AUDIT_SYNTHESIS.md": {
+      "sha256": "a8b6599f6b1fdb60ef9618263d171a2b2d32bdefd2da2a563297470b1fa95918",
+      "lines": 1241
+    },
+    "docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md": {
+      "sha256": "93c82429beb6118005320ec7d1c1ca24bfbff1968f6e87693a2a7e414eeb691e",
+      "lines": 343
+    },
+    "docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md": {
+      "sha256": "9377394e9cb473cae76506a3e3ad12b6efbf015feed43dce5dcf0b35632fc155",
+      "lines": 484
+    },
+    "docs/WORKORDER_MASTER_AUDIT_SYNTHESIS_REMEDIATION.md": {
+      "sha256": "687617d9e6dfa7222d6cfd85fc25978caa92303109031ac0ed771bec2d20f2ec"
+    },
+    "docs/WORKORDER_GLM53_AUDIT_SYNTHESIS_CONTINUATION.md": {
+      "sha256": "72e1166b1c44564c2fc799621d5cd9512b8c8c65e7b7318331c0d80f38104338"
+    }
+  },
+  "release_work_order": {
+    "path": "docs/WORKORDER_STATE_C_RELEASE_READINESS.md",
+    "entry": "PROMPT_LEDGER.md Entry 0058"
+  },
+  "curated_evidence_root": "docs/audits/state-c-release-readiness/",
+  "note": "Fingerprint covers the pre-certification freeze; commit hashes are appended by the verifier from git."
+}

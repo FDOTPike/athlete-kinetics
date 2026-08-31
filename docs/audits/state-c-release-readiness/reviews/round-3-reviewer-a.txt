@@ -1,0 +1,161 @@
+ROUND 3 (OPERATIVE) — REVIEWER A HANDOFF (verbatim as returned)
+Charter: strict outstanding-ledger provenance. Read-only. Persisted by the executor without edit.
+Candidate reviewed:
+  MASTER_AUDIT_SYNTHESIS.md                            417e515a6b208e0bd7a12fc71e2ecd62c86dd533c71c4f2c77b3122b47e81840  867 lines
+  docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md          e99cf10dfa42ed0617f58edcc432bf067d5bf79257f586e1f2cee808f759b5d7  307 lines
+  docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md 03d367c350b35b720e8816c61f234df6c99facb3bff958f0a361a0d254380bcd  436 lines
+All three verified by the reviewer as matching.
+=====================================================================
+
+## 2. Discrepancy table
+
+60 ledger rows examined (23 in 4.1, 11 in 4.2, 26 in 4.3). Every 4.1 and 4.3 citation was
+re-derived at its stated revision; every 4.2 citation span was read.
+
+D-1  OW-015 — STALE-CURRENT (blocking). Actively tried to falsify the row at its own
+     as_of_revision 48719b0. The condition does not exist at 48719b0. The DeltaE aggregate at
+     useStore.ts:3114-3125 joins LEFT JOIN set_target st ON st.set_id = sr.set_id — a per-set
+     snapshot keyed on set_id, one row per set. There is no (session_date, movement_id) join to
+     planned_slot and no MIN(target_rpe) dedup anywhere in apps/ or packages/. Migration
+     022_set_target.sql replaced that join, and State A carries a live regression gate for exactly
+     the stated failure mode: apps/mobile/test/verify_store_sql.mjs:539-548, whose comment reads
+     "the old MIN(target_rpe)-by-(date,movement) join (no status filter) would have used 6.0 -> a
+     false +3.0 deficit. The snapshot keeps DeltaE at (9-8)+(8-8)=1.0", asserted as "provenance:
+     overlapping archived plan (target 6.0) does NOT corrupt DeltaE". The DEVIATION_LOG.md citation
+     (267-272) still resolves — it is a 2026-06-15 Phase 13 "Accepted limitation" superseded by
+     Phase-17-era 022 — which is precisely why the row survived. Identical failure class to OW-021
+     and OW-016. Not raised in round 2.
+
+D-2  Section 3.1, lines 327-328 — internal contradiction / stale release effect.
+     "It is tracked as part of OW-001, whose release effect is BLOCKING for this reason." Both
+     clauses false post-split: the chain-floor regression is OW-036, and OW-001 is NON_BLOCKING.
+
+D-3  Section 4 preamble, lines 511-516 — preamble contradicts its own table.
+     "OW-001 is marked BLOCKING because its consequence is an unratified dose change..." The table
+     10 lines later carries NON_BLOCKING. The CR-05.1 contradiction reproduced in a new form.
+
+D-4  Addendum lines 137-146 — admission gate contradicts the ledger it admits.
+     "The BLOCKING value carried on ledger row OW-001 in MASTER_AUDIT_SYNTHESIS.md..." The frozen,
+     hash-cited admission gate asserts a release effect the ledger no longer carries. grep -n
+     "OW-036" over the addendum and manifest returns nothing — the split is registered in exactly
+     one place.
+
+D-5  OW-036 — origination defect. Work-order line 191 (the stated origin) states that
+     plannedImplementFor leaves multi-implement movements undeclared and asks whether any reachable
+     UI captures an athlete's ambiguous per-slot selection. It says nothing about a predicate
+     fan-out or the L2(b) rep floor. The only source that states the fan-out is the addendum
+     (121-135) — which manifest 4.3 labels "Gate only, not an origin". Two sources that would
+     properly originate it exist and are cited elsewhere but not in the row:
+     docs/AUDIT_architecture_review_8b4e75b.md@48719b0:134-170 (T1) and docket line 453 (T0).
+     Content correct, provenance defective.
+
+D-6  Section 4 preamble, line 497 — origination rule inconsistent. "OW-001-OW-007 concern runtime
+     code..." is the only rule admitting code-derived rows. OW-036 is such a row and sits outside
+     the enumeration. Manifest 4.2 lines 151-153 repeat the stale enumeration.
+
+D-7  Section 4 preamble, lines 518-520 — disposition bookkeeping. "ID gaps are deliberate. OW-021
+     is absent." Two IDs are absent: OW-016 and OW-021. OW-016 is dispositioned in 5.1 line 614 but
+     the gap rule does not name it.
+
+D-8  OW-022 vs 5.1 line 610 — contradictory supersession bookkeeping. Row: supersedes = "Revision 1
+     item 20, first half only". 5.1: "OW-022 was re-scoped ... and no longer supersedes item 20."
+     Direct contradiction. Compounded: 5.1 line 610 assigns the getMovementE1rmSeries half to
+     OW-021 and the naming half to OW-022, so "first half" points at the half that went to the
+     other row.
+
+D-9  Manifest 6.2 — arithmetic. Table declares 29 for "Worktree, tracked at State A" (actual 28:
+     4 T0 + 16 T1 + 8 T4) and Total 52, but its rows sum to 53 (29+6+6+10+1+1). 6.1's tier table is
+     correct and totals 52. CR-03's "derive tier/boundary summaries from rows" not met for 6.2.
+
+D-10 Synthesis 6.1, line 678 — stale total contradicting the same table. The CR-03 row, dated
+     2026-08-31, records "B 5 ... 120 untracked Markdown — every declared count reproduced". Line
+     672 of the same table, same date, records "B 6 ... 121 untracked Markdown total". The final
+     declared counts are B 6 / 121 (which I reproduced), so the CR-03 row certifies counts the
+     document no longer declares.
+
+D-11 Section 6.3, lines 829-831 — stale limitation. "Round 1 returned two REQUEST_CHANGES verdicts;
+     round 2 could not run. Every round-1 correction is unverified..." — contradicts 6.2 lines
+     703-704 and 720-749, which record an operative round 2 with two REQUEST_CHANGES verdicts and
+     eight substantive corrections.
+
+D-12 Section 6.2, lines 756-765 — stale framing. Heading "What a round-2 reviewer should attack
+     first" and "which is why round 2 exists" while the table records round 3 in progress; the
+     listed first attack — "whether the OW-001 release-effect escalation to BLOCKING is justified"
+     — no longer describes the ledger.
+
+D-13 Manifest 0.3 — minor. "Every untracked source... hashed in a single capture pass at
+     2026-08-30", but S-T0-09 (AGENTS.md) and S-OUT-01/02 carry source_date 2026-08-31.
+
+D-14 Section 5.2 RC-02 — minor arithmetic. "a mechanical bounds check of all 91 citations in
+     revision 1" vs 6.1's "80 in bounds, 11 out of bounds, 3 external-only" = 94. 91 is the
+     bounds-checkable subset, not "all".
+
+### Checks that passed cleanly
+
+- Locator re-derivation. OW-009's re-derived locators are exact: resolveActiveRung imported at
+  useStore.ts@48719b0:140, called at :2598 and :2600; the handover's :138/:2568/:2570 do not
+  resolve, as stated. OW-003's PER_ATHLETE_RESET at :2053-2060 is exact, and the field name
+  suspension (State C) vs suspensionEpisode (State B) is correctly distinguished, not conflated.
+  S-T4-08's round-2 correction to 016_movement_library_seed.sql:281 resolves.
+- Manifest totals. All reproduce: Corpus A 62 of 117; B 6; C 115; D 16 changed / 2 Markdown; E 1;
+  total untracked Markdown 121; find .agents 116. Per-tier row counts verify: T0 9, T1 16, T2 0,
+  T3 7, T4 17, T5 1, outputs 2, total 52.
+- Citation syntax, hash, bounds. Every citation in 4 and 5 uses one of the three permitted forms;
+  no bare paths. Every hash recomputed matches. Every cited span is within its blob's line count.
+- Status purity. 4.1 all OPEN; 4.2 only PARKED/OWNER_ONLY; 4.3 all RELEASE_GATE. Clean.
+- Bundling. The 26 release gates map one-to-one onto distinct RELEASE_READINESS.md bullets; the
+  RG-19-RG-26 splits are genuine, and line 67-69's "Currently N/A" HealthKit bullet is correctly
+  not made a gate.
+- Stale-current on the other 22 4.1 rows: OW-008, OW-011, OW-012, OW-013, OW-014, OW-017, OW-018,
+  OW-019, OW-020, OW-022, OW-023, OW-005 — all confirmed genuinely open.
+- Section 5 correctness. The OW-016 disposition is factually right. The OW-021 and item-20/057
+  dispositions are right. Nothing else in 5 should have stayed open — except that OW-015 should
+  have joined 5 (D-1).
+
+## 3. Adjudication of the OW-001 / OW-036 split
+
+The split is correct and was required. I confirmed independence at the code level:
+bodyweightRepsFor (blockGenerator.ts@34f91ff:767-771) already keys on m.progressionGroup !==
+undefined; only its call site at :862 is gated by bodyweightSlot. Lifting that call out of the
+ternary closes the floor regression in one line, with no schema change and no athlete-facing
+surface — so OW-036 is closable with OW-001 untouched, and vice versa.
+
+OW-001 = NON_BLOCKING — SUPPORTED. With the floor regression carved out, the residue is that seven
+measured multi-prefix movements fail closed to the loaded path with no athlete route back. That
+direction is the one L1(a) itself mandates for missing state, and docket 246-262 measured that no
+alternative classification source changes anything across all 300 movements. A ruling-completeness
+gap and a disclosable exception — not a dose regression.
+
+OW-036 = BLOCKING — SUPPORTED on facts re-derived end to end:
+1. plannedImplementFor returns undefined for any multi-prefix movement — useStore.ts@34f91ff:1833-1834.
+2. Push-up carries the prefix list ["Bodyweight","Banded"] — 010_movement_library.sql:83 — undeclared at State C.
+3. isPurelyBodyweight is equality against a declared Bodyweight value — blockGenerator.ts@34f91ff:113-114.
+4. slotReps = bodyweightSlot ? bodyweightRepsFor(m) : reps — :862 — raw phase reps.
+5. Push-up is ('Push-up','handstand-push-up',0) — rung 0 — 016_movement_library_seed.sql:281.
+6. progression_policy has zero seeded rows (docket 291-296), so both the prescription floor and
+   resolveActiveRung's criterion fall back to DEFAULT_ADVANCEMENT_POLICY.requiredReps = 8 —
+   progressionEngine.ts@34f91ff:51-54.
+7. At State A, primaryImplement = supportedPrefixes[0] = Bodyweight, so Push-up did receive the floor.
+
+The bar of 8 is live today, not hypothetical, and State C prescribes an entry-rung movement below
+the bar its own capability advancement is measured against. A dose regression against a shipped,
+owner-ratified reconciliation, reinstating the exact defect class section 6 of
+AUDIT_architecture_review_8b4e75b.md found. Conservative BLOCKING is correct. Release posture
+unchanged either way, because RG-01 (C6) is independently deferred.
+
+But the document contradicts its own adjudication in four places (D-2, D-3, D-4, D-12), and
+OW-036's stated origin does not entail it (D-5). The values are right; the provenance and internal
+consistency are not.
+
+## 5. Verdict
+
+One row (OW-015) is stale-current — its condition was fixed by Migration 022 before its own
+as_of_revision, and State A carries a live regression gate proving it. One row (OW-036) is
+originated by a span that does not state it and by a document the manifest forbids from
+originating. The OW-001/OW-036 release-effect split is contradicted in four places, including
+inside the hash-cited admission gate. Two totals do not reconcile. The charter's approval bar —
+zero unsupported and zero stale-current items — is not met.
+
+REQUEST_CHANGES
+=====================================================================
+END OF VERBATIM HANDOFF

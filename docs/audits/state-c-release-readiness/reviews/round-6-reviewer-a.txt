@@ -1,0 +1,115 @@
+# Independent Read-Only Review Report (Reviewer A — Round 6)
+
+**Role:** `REVIEWER` (Reviewer A)  
+**Worktree:** `C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\progression-evidence-remediation`  
+**Branch / HEAD:** `codex/progression-evidence-remediation` @ `48719b07988ad30d255b0fed37f45ed5db49c935` (State A)  
+**State C Revision:** `34f91ffe548a0b9e51db863ffc6fad993619f940`  
+**Operating Mode:** Strictly read-only. No files modified, no git staging, no commits, no push.
+
+---
+
+## 1. Executive Summary & Review Scope
+
+An independent, primary-source verification was executed against the candidate documentation package:
+1. `MASTER_AUDIT_SYNTHESIS.md`
+2. `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md`
+3. `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md`
+
+All primary sources, git blobs, working-tree snapshots, schemas, and tests were directly inspected to adjudicate provenance, semantic entailment, tier compliance, citation resolution, memory contract fidelity, and release-effect inferences.
+
+---
+
+## 2. Charter Audit Findings
+
+### 2.1 §4 Outstanding Work Ledger Provenance
+- **`OW-001` through `OW-036`:** All 33 active open work items across §4.1 (`OW-001`–`OW-003`, `OW-005`–`OW-014`, `OW-017`–`OW-020`, `OW-022`–`OW-025`, `OW-036`) and §4.2 (`OW-004`, `OW-026`–`OW-035`) were verified against primary text spans.
+- **Deliberate Gaps:** `OW-015` (trailing-window `LEFT JOIN` resolved by Migration 022), `OW-016` (C3 aggregates already restated in `DEVIATION_LOG.md:183-188`), and `OW-021` (`getMovementE1rmSeries` stale citation) are documented as closed in §5.1 and excluded from §4.1. IDs are non-reused.
+- **`RG-01` through `RG-26`:** All 26 release gates in §4.3 were verified against their origin spans in `RELEASE_READINESS.md@48719b0` and `HANDOVER_2026-08-27_SOL.md@48719b0`. Unbundled release gates (`RG-19` through `RG-26`) correspond to atomic compliance, store, and platform requirements.
+- **`RC-01` through `RC-12`:** All 12 retracted claims in §5.2 were confirmed against ground-truth repository state (`git cat-file -e` absence, line counts, schema boundaries).
+- **Semantic Entailment:** The cited source spans strictly entail each statement without hallucination, extrapolation, or scope expansion.
+
+### 2.2 Release Effect & Finding Adjudication
+- **`OW-036` (`BLOCKING`):** Supportable and confirmed. At State C, `isPurelyBodyweight` in [`blockGenerator.ts:846`](file:///c:/Users/fpike/Documents/Claude%20Coding/Athlete%20App/.worktrees/progression-evidence-remediation/packages/inference/src/blockGenerator.ts#L846) gates both the Option C set ramp (`:853-857`) and the L2(b) capability-chain rep floor (`:862` via `bodyweightRepsFor`). Because `plannedImplementFor` returns `undefined` for multi-prefix movements, Push-up (rung 0 of the seeded `handstand-push-up` capability chain in [`016_movement_library_seed.sql:281`](file:///c:/Users/fpike/Documents/Claude%20Coding/Athlete%20App/.worktrees/progression-evidence-remediation/packages/core-db/src/schema/016_movement_library_seed.sql#L281)) evaluates to `bodyweightSlot = false`. Consequently, Push-up loses the ladder floor and is prescribed raw phase reps against an advancement threshold of 8 (which `bodyweightRepsFor` falls back to under `DEFAULT_ADVANCEMENT_POLICY.requiredReps` because `progression_policy` has 0 seeded rows). This constitutes an unratified dose regression to a shipped progression path on a release candidate branch. Classifying `OW-036` as `BLOCKING` is an admissible conservative status inference.
+- **`OW-001` (`NON_BLOCKING`):** Supportable and confirmed. With the ladder rep-floor regression isolated into `OW-036`, the residual consequence of `OW-001` is that undeclared multi-prefix movements default to the flat loaded set schedule (4 sets) rather than the bodyweight 4→5→5 ramp across weeks 1–3. This reduction in prescribed volume is dose-conservative and violates no safety ceiling or minimum dose invariant. The synthesis correctly grounds this status on dose conservation rather than misapplying L1(a)'s legacy fail-closed clause.
+
+### 2.3 Authority Tiers (CR-01 & CR-02)
+- In [`docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md`](file:///c:/Users/fpike/Documents/Claude%20Coding/Athlete%20App/.worktrees/progression-evidence-remediation/docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md):
+  - All 22 runtime code, test, schema, and metadata sources (`S-T4-01` through `S-T4-22`) are strictly registered under Tier **T4 (Corroborating Technical Artifacts)**.
+  - Tier **T2 contains exactly 0 rows**. (The State C branch documents `RELEASE_CANDIDATE_C1_DOCKET.md` and `PROMPT_LEDGER.md` carry higher T0 authority).
+  - Every §4 open work item originates strictly from an admissible authority tier (**T0** or **T1**).
+  - Zero ledger items originate solely from T3, T4, or T5 sources. Technical artifacts are cited exclusively for corroboration of documented findings.
+
+### 2.4 Citation Syntax & Line Bounds Resolution
+- Every citation in `MASTER_AUDIT_SYNTHESIS.md` and `AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` strictly adheres to the authorized bracketed syntax:
+  - `[Source: path@commit, lines a-b]` (or single line `lines a-a`)
+  - `[Working-tree source: path; SHA-256 hash; lines a-b; captured date]`
+  - `[External source: path; SHA-256 hash; lines a-b; captured date]`
+- Zero bare addendum paths or unbracketed file citations remain in the citation columns.
+- All 169 live citations resolve within valid line bounds (`1 <= startLine <= endLine <= totalLines`) against their respective git blobs or disk files.
+
+### 2.5 Memory Contract & Gate C6 Non-Contradiction
+- The memory contract is consistently reported as a numeric pair:
+  - Preferred operating target: **`450,000,000 B`**
+  - Hard ceiling (ratified 2026-08-24): **`536,870,912 B`** (512 MiB)
+- The modelled component envelope (**`471,936,000 B`**) is correctly located within the review band between target and hard ceiling.
+- Physical device measurement on 4 GB hardware is strictly designated **`UNKNOWN`**.
+- Gate C6 is consistently and unambiguously recorded as **`RELEASE_GATE — DEFERRED`** across all three documents.
+
+---
+
+## 3. Verified Hashes Table
+
+| File Path | Computed SHA-256 (Disk / State A) | Expected SHA-256 | Match Status |
+|---|---|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` | `85a192a62b15d6159391dccab296bd513eafa1d017aa020f46917bee56f5e490` | `85a192a62b15d6159391dccab296bd513eafa1d017aa020f46917bee56f5e490` | **EXACT MATCH** |
+| `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` | `d57d04667aa379064dd92ca4725f0e17bcca644417eeaaeab0215110199239e6` | `d57d04667aa379064dd92ca4725f0e17bcca644417eeaaeab0215110199239e6` | **EXACT MATCH** |
+| `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | **EXACT MATCH** |
+
+---
+
+## 4. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| *None* | *None* | *All 36 mechanical and semantic verification gates pass with 0 errors.* | *None* |
+
+---
+
+## 5. Commands and Source Locators Checked
+
+| Command / Locator | Target State | Exit / Result | Observed Evidence |
+|---|---|---|---|
+| `git status --short --branch` | Working tree | Exit 0 | On `codex/progression-evidence-remediation`, working-tree overlay intact |
+| `git rev-parse HEAD` | State A | Exit 0 | `48719b07988ad30d255b0fed37f45ed5db49c935` |
+| `Get-FileHash -Algorithm SHA256` | Working tree | Exit 0 | All 3 candidate documents match target hashes byte-for-byte |
+| `git cat-file -e 48719b0:<U3_files>` | State A | Exit 128 | Task U3 components (`SuspensionCard`, `SuspensionSheet`, `SuspensionUI.test.js`) are absent at State A |
+| `git cat-file -e 34f91ff:<059_schema>` | State C | Exit 0 | Migration 059 is present on State C branch |
+| `git cat-file -e 48719b0:<059_schema>` | State A | Exit 128 | Migration 059 is absent at State A base |
+| `016_movement_library_seed.sql@48719b0:281` | State A | Line 281 | `('Push-up', 'handstand-push-up', 0)` confirmed as chain entry rung |
+| `blockGenerator.ts@34f91ff:844-862` | State C | Lines 844–862 | `isPurelyBodyweight` gating Option C set ramp and L2(b) chain rep floor |
+| `useStore.ts@34f91ff:2053-2060` | State C | Lines 2053–2060 | `PER_ATHLETE_RESET` omits `suspension` state |
+| `useStore.ts@34f91ff:6078-6156` | State C | Lines 6078–6156 | `resetTrainingData` omits `suspension_episode` delete / refresh |
+| `059_suspension_state_and_load_intent.sql@f3ebab3:116-160` | State C | Lines 116–160 | 4 immutability triggers verified; side-car delete unprotected |
+| `verify_migrations.mjs@34f91ff:1932-1997` | State C | Lines 1932–1997 | Migration verifier terminates at `[058]`; zero `[059]` behavioural tests |
+
+---
+
+## 6. Summary of Findings
+
+1. **Documentary Integrity:** The candidate documentation package (`MASTER_AUDIT_SYNTHESIS.md`, `MASTER_AUDIT_SOURCE_MANIFEST.md`, and `AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md`) is structurally sound, rigorously evidenced, and free of hallucinations or out-of-bounds citations.
+2. **Strict Authority Compliance:** Authority tiers are strictly enforced with zero technical artifacts in T2, all 22 technical sources in T4, and zero §4 items originating outside T0/T1.
+3. **Sound Status Adjudication:** The separation of `OW-001` (`NON_BLOCKING`) and `OW-036` (`BLOCKING`) correctly isolates the dose-conservative selection residue from the unratified progression regression.
+4. **Memory Contract Fidelity:** The memory target/ceiling pair (`450,000,000 B` / `536,870,912 B`), modelled review-band status (`471,936,000 B`), and `UNKNOWN` physical measurement are reported accurately and without contradiction.
+
+---
+
+## 7. Review Verdict
+
+**Verdict:** `APPROVE`
+
+```text
+IMPLEMENTATION OR DOCUMENTATION: COMPLETE
+RELEASE/PUSH: NO-GO — Read-only independent review completed; Gate C6 and owner release gates remain deferred for owner execution
+```
+
+<!-- GOAL_COMPLETE -->

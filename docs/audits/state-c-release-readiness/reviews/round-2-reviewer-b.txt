@@ -1,0 +1,182 @@
+ROUND 2 — REVIEWER B HANDOFF (verbatim as returned)
+Charter: progression, UI, state provenance, and the closeout audit
+Reviewer ran read-only. Persisted by the document executor without edit.
+Candidate reviewed: MASTER_AUDIT_SYNTHESIS.md eb1cb9dd57893e64cd896fabede8b8628e3549b6935cff6062866d0357019a5d (795 lines)
+                    docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md 80641c393b7b9bbc771992cc8981ae48046c08b6a125abc1d712e38250dbd703 (304 lines)
+                    docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md 1b0ceb2c723bd64375c1f8d42c7c6c81f71b67d51bfc8fc9860ccbee72663963 (434 lines)
+
+=====================================================================
+## 1. Candidate hashes as observed
+
+| Artifact | Lines observed | SHA-256 observed | Match |
+|---|---:|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` | 795 | `eb1cb9dd57893e64cd896fabede8b8628e3549b6935cff6062866d0357019a5d` | MATCH |
+| `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` | 304 | `80641c393b7b9bbc771992cc8981ae48046c08b6a125abc1d712e38250dbd703` | MATCH |
+| `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` | 434 | `1b0ceb2c723bd64375c1f8d42c7c6c81f71b67d51bfc8fc9860ccbee72663963` | MATCH |
+
+All three match. Proceeded to substantive review.
+
+## What I verified clean (so the table below is read in proportion)
+
+Confirmed independently and correct: the four State C commits, their subjects and diffstats, and
+that 48719b0..34f91ff is exactly those four; the 058/059 head separation and both re-pins (57->58
+in verify_migrations.mjs AND verify_pipeline.mjs, per f3ebab3's own diff); 059 absent at State A
+(git cat-file -e non-zero) and present at State C; all six State B hashes and line counts
+byte-exact; State B's suspensionEpisode field / refreshSuspension / boot() call / PER_ATHLETE_RESET
+entry and zero occurrences of the three 059 objects; State C's suspension field at :643, its
+omission from PER_ATHLETE_RESET at :2053-2060, and boot()'s refreshSuspension() at :2195; all five
+closeout verdicts, including the full 12-row 059 mutation table (7 refusals, 1 permitted
+transition, 3 unprotected side-car classes), the 49 DELETEs in resetTrainingData, the bare
+endSuspension at BlockScreen:480-485 versus the guarded entry at :499-506, and the suspension-error
+node mounted only in the not-suspended branch; the exact 7-path plannedImplement grep,
+SuspensionLifecycle.test.js's 393 lines with 0 matches, and no [059] section (file ends 1997, [058]
+runs 1932-1994); the C6 pair (450,000,000 B / 536,870,912 B), the 471,936,000 B modelled envelope,
+and the review band — with the known-modelled/unknown-measured distinction held consistently in
+every occurrence I grepped; C6 recorded DEFERRED, never passed or failed; the corpus totals
+(117/120/5/115/16/2) reproducing exactly from the manifest's own printed commands; and CR-05's two
+required fixes both landed.
+
+Critically, I also confirmed the substance of the escalated progression finding: at State C
+isPurelyBodyweight is plannedImplement === 'Bodyweight' (:113-114), plannedImplementFor returns
+undefined for any multi-prefix list (:1833-1834), Push-up is ["Bodyweight","Banded"], so
+bodyweightSlot is false at :846 — losing the ramp at :854 AND short-circuiting bodyweightRepsFor at
+:862. Push-up is ('Push-up','handstand-push-up',0). At State A the floor was unconditional
+(:734-736, no progressionGroup guard) and primaryImplement = supportedPrefixes[0] made Push-up
+bodyweight. The dose regression is real and is neither overstated nor understated.
+
+## 2. Discrepancy table
+
+A. Section 2.1, "External-architecture-review audit" — Medium.
+   Claims "RR-01, RR-02 and RR-04 were ratified; RR-03 was deferred; section 6 discovered...;
+   section 7 found..." cited [docs/AUDIT_architecture_review_8b4e75b.md@48719b0, lines 173-188].
+   Lines 173-188 are section 7 ONLY (WO-04/WO-02). The RR verdicts are at 14-21; section 6 at
+   134-170. And that file records audit verdicts ("A stands", "A, with three corrections", "Defer
+   both", "A — the strongest of the three"), then states at 209-211: "no ruling was signed on the
+   owner's behalf." Section 3.1 of the same document makes this the headline correction — "the
+   architecture-review audit recommended; the owner ratified" — and section 2.1 re-commits the
+   exact error it retracts, on a span entailing one conjunct of four.
+
+B. Manifest 4.2 S-T4-08 — Medium.
+   Registered as packages/core-db/src/schema/032_capability_content.sql, "Line 281,
+   ('Push-up', 'handstand-push-up', 0) — the chain entry rung". That tuple is at
+   packages/core-db/src/schema/016_movement_library_seed.sql:281 (identical at 48719b0 and
+   34f91ff). 032_capability_content.sql is 283 lines and its line 281 is
+   "SELECT movement_id, progression_group, progression_rank" — a recursive-CTE projection.
+   Compounding: neither 3.1/OW-001 nor closeout 1.1 cites any source for "Push-up — rung 0", so
+   S-T4-08 is the sole registered provenance for the fact that drives OW-001's escalation to
+   BLOCKING, and it points at the wrong file.
+
+C. Section 3.3; closeout 2.1 — Low.
+   "Both pinned migration counts were re-pinned from 57 to 58 files" cited
+   verify_migrations.mjs@34f91ff, lines 1719-1726 (closeout: 1721-1725). True, but the cited span
+   holds only the verify:migrations pin. The second pin is
+   packages/inference/test/verify_pipeline.mjs:511-520 (57->58, last file 058...->059...), cited
+   nowhere in either document.
+
+D. Section 3.1 — Low.
+   (i) "a single predicate...gates three separate behaviours: the Option C set ramp, the L2(b)
+   chain rep floor, and the fatigue-class accessor" cited blockGenerator@34f91ff 844-862 and
+   765-771. The fatigue-class accessor is bodyweightDominant at :671-682 — in neither cited span.
+   (ii) "carries the same ratification date at each affected site — Option C routing, the ladder
+   reconciliation, and RR-04" cited blockGenerator@48719b0 804-812. 804 is the Option C marker and
+   812 the RR-04 marker; the "Ladder reconciliation (owner-ratified 2026-08-27)" marker is at line
+   720, outside the span.
+
+E. Section 2.2 ruling table, L1 row — Low.
+   "Missing state fails closed to loaded." Docket a80f955:...C1_DOCKET.md:452: "Missing LEGACY
+   state fails closed toward the conservative loaded path." The ruling scopes fail-closed to legacy
+   state and separately requires athlete selection for ambiguous mixed movements. Dropping "legacy"
+   makes permanent fail-closed read as ruling-compliant for all undeclared state — the exact
+   posture OW-001 says is defective. Closeout 1.1 quotes the ruling in full, then makes the same
+   elision in prose ("fail-closed-to-loaded is exactly what L1(a) mandates for missing state"). An
+   abridgement that changes meaning.
+
+F. Section 3.2, "What the overlay contains" — Low.
+   "Both [SuspensionSheet and SuspensionCard] are wired into BlockScreen.tsx and ProfileScreen.tsx".
+   <SuspensionCard renders only at BlockScreen.tsx:413. ProfileScreen.tsx:36 imports SuspensionCard
+   and never renders it — it hand-rolls an equivalent block at :814-846 using only
+   SUSPENSION_REASON_LABELS. The sheet is wired into both; the card is not.
+
+G. Section 6.1, row 1 — Low.
+   "Task U3 files absent at State A ... exit / result: 1 (non-zero = absent)".
+   git cat-file -e 48719b0:<path> exits 128 for all three paths (and for 059 at State A). The
+   parenthetical hedge is right; the recorded exit code is not.
+
+H. Section 6.2, closing paragraph — Low.
+   "its verbatim handoffs ARE PERSISTED under .agents/audit-synthesis-remediation/". The directory
+   exists and is EMPTY at the candidate hash. Asserted in the present tense as accomplished, while
+   the verdict cells correctly say "(recorded on completion)".
+
+I. Section 1.1 — Low.
+   "the State C branch ADDS 2 documents". The two changed Markdown files are PROMPT_LEDGER.md
+   (MODIFIED; present at State A) and docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md (added).
+   Manifest 1.2 Corpus D states this correctly ("2 ARE Markdown documents"); the synthesis's "adds"
+   is loose.
+
+J. RG-03 (section 4.3) — Low.
+   U1 expectations restated as "bodyweight push-up sets 4->5->5 with week 4 dropping to 2; ...", and
+   "These expectations were written against State A routing and do not all hold at State C, where
+   Push-up is no longer classified bodyweight and so no longer receives the 4->5->5 ramp."
+   Two problems. (i) HANDOVER_2026-08-27_SOL.md:84 reads "8 REPS; sets 4 -> 5 -> 5 ...". RG-03
+   drops the 8-rep expectation — which is the second expectation that breaks at State C, since an
+   undeclared Push-up gets raw phase reps (7/8/5/3) instead of the floored 8. (ii) The framing
+   implies State C is uniformly regressive against U1. It is not: HANDOVER:87 "Weighted calisthenics
+   behaves as LOADED, not bodyweight" FAILED at State A — useStore@48719b0:2962/:3087 sets
+   primaryImplement = supportedPrefixes[0], and Weighted Pull-up is ["Bodyweight","Banded"], so
+   State A routed it as bodyweight (the docket's own "sharp point", a80f955:...DOCKET.md:259-262) —
+   and PASSES at State C. Neither document records that the State C routing change repairs a U1
+   check.
+
+Not adopted as findings (I checked and they hold): the BLOCKING inference on OW-001 is now
+internally consistent and provenance-flagged in three places (CR-05.1 landed); the modelled/measured
+distinction is clean everywhere (CR-05.2 landed); C6 stays DEFERRED (CR-05.3 landed); the closeout
+0.3 probe characterisation is honest — it names the 59-file probe chain, quotes the production
+contract verbatim ("58 files (slots 001-059, no 004) -> user_version 58",
+verify_migrations.mjs:1720-1723), states slot 004 is loaded separately as m004 (confirmed at
+index.ts:23,27), and disclaims application-behaviour proof; the "six refusals + a seventh on a
+side-car" arithmetic is right; Finding 4's unreachability AND dose-neutrality are both correct
+(SCHEMA_FATIGUE_COST_BODYWEIGHT = SCHEMA_FATIGUE_COST at :498); and OW-021's closure is sound
+(git grep getMovementE1rmSeries 48719b0 -- ...TRAINING_PROGRESSION_LAYERS.md exits 1).
+
+## 3. Commands and locators used
+
+sha256sum on the three candidates.
+git log --oneline 48719b0..34f91ff ; git rev-list --count ; git rev-parse claude/rc-48719b0
+for c in a80f955 f3ebab3 0cd8db9 34f91ff; do git show --stat --format='%H %s' $c; done
+git ls-tree -r --name-only {48719b0,34f91ff} -- packages/core-db/src/schema/
+git cat-file -e 48719b0:apps/mobile/src/components/Suspension{Card,Sheet}.tsx   -> 128
+git cat-file -e 48719b0:packages/core-db/src/schema/059_...sql  -> 128 ; @34f91ff -> 0
+git show f3ebab3 -- packages/core-db/src/migrations.ts packages/core-db/test/verify_migrations.mjs packages/inference/test/verify_pipeline.mjs
+git show 34f91ff:packages/inference/src/blockGenerator.ts   # :113-114, :671-682, :750-771, :839-862
+git show 48719b0:packages/inference/src/blockGenerator.ts   # :92-101, :715-736, :800-818
+git show 48719b0:packages/inference/src/blockGenerator.ts | grep -n "owner-ratified 2026-08-27"
+git show 34f91ff:apps/mobile/src/state/useStore.ts          # :643, :1821-1834, :2053-2060, :2094-2096, :2193-2195, :2367-2368, :2676-2716, :2848-2890, :3040-3056, :3163-3183, :3340-3360, :6071-6158
+git grep -n "primaryImplement" 48719b0 -- apps/mobile/src/state/useStore.ts
+git show 34f91ff:apps/mobile/src/screens/BlockScreen.tsx    # :465-517
+git show a80f955:docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md  # :20-29, :55-125, :240-320, :380-435, :436-479
+git show 48719b0:docs/AUDIT_architecture_review_8b4e75b.md  # :1-30, :130-200, :205-215
+git show 48719b0:HANDOVER_2026-08-27_SOL.md                 # :25-40, :76-102
+git show 48719b0:{tools/memory-audit/{memory_gate.mjs,audit.mjs,budget.json},RELEASE_READINESS.md,package.json,CHIEF_ORCHESTRATOR_MANDATE_SOL.md}
+git grep -n "'Push-up', 'handstand-push-up'" 48719b0 -- packages/core-db/src/schema/
+git show 48719b0:packages/core-db/src/schema/032_capability_content.sql | nl -ba | sed -n '275,285p'
+git grep -l "planned_slot_load_intent\|plannedImplement" 34f91ff -- apps/ packages/
+git grep -ln "trg_suspension_episode_*" 34f91ff -- apps/ packages/   # migrationRunner + migration only
+sha256sum / wc -l on the six State B overlay files
+git diff -U2 -- apps/mobile/src/state/useStore.ts ; grep -n "<SuspensionCard" apps/mobile/src/screens/*.tsx
+git ls-tree -r --name-only 48719b0 | grep -cE '\.md$'                    # 117
+git ls-files --others --exclude-standard | grep -cE '\.md$'              # 120 (5 outside .agents, 115 inside)
+git diff --name-only 48719b0 34f91ff | wc -l ; ... | grep -cE '\.md$'    # 16 / 2
+ls -la .agents/audit-synthesis-remediation/                              # exists, empty
+
+## 4. Verdict
+
+Two Medium findings sit squarely in my charter — an attribution error on the RR verdicts that
+reverses the recommend-versus-ratify distinction the document elsewhere makes its centrepiece (A),
+and a misregistered provenance record for the Push-up chain-rung fact that carries the BLOCKING
+escalation, with no inline citation anywhere else to fall back on (B). Both are cheap to fix and
+neither disturbs the document's substantive conclusions, which I found well-evidenced. But my bar is
+zero progression, UI or state-provenance discrepancies, and A, B, F and J each cross it.
+
+REQUEST_CHANGES
+=====================================================================
+END OF VERBATIM HANDOFF

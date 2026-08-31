@@ -1,0 +1,58 @@
+# Round 7 Reviewer B Report — Progression/UI, State Provenance, Closeout Findings, Chronology, Encoding, C6
+
+## 1. Verified Hashes Table
+
+| Candidate | Computed SHA-256 | Expected | Match |
+|---|---|---|---|
+| MASTER_AUDIT_SYNTHESIS.md (1038 lines) | `fb91b7e965997d7e75bdfc537f87f164b55f8af040278d458b5896f9877f5a68` | `fb91b7e9…7f5a68` | ✅ |
+| docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md (330 lines) | `fe7eb9afadfd569d10b043f07197a6be6ad103faa9c16cf7b393ec9c4d97800a` | `fe7eb9af…97800a` | ✅ |
+| docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md (456 lines) | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | `2e347231…531d90c` | ✅ |
+
+State B overlay files (working tree, all byte-match their recorded values):
+
+| File | Computed | Recorded (§3.2 write-boundary + manifest) | Lines | Match |
+|---|---|---|---|---|
+| SuspensionCard.tsx | `77d798e6…473e999` | same (§3.2:381, S-T4-19) | 148 | ✅ |
+| SuspensionSheet.tsx | `cb65064b…218e7b4d` | same (§3.2:382, S-T4-18) | 138 | ✅ |
+| SuspensionUI.test.js | `d6635e3c…4eff991` | same (§3.2:383) | 414 | ✅ |
+| useStore.ts | `fa561697…a9e244ee5c` | same (§3.2:386, S-T4-20) | 6216 | ✅ |
+| BlockScreen.tsx | `eb5cf5fa…773e970b` | same (§3.2:384) | 1596 | ✅ |
+| ProfileScreen.tsx | `acd799d5…ef4d4e65c6c3` | same (§3.2:385) | 1345 | ✅ |
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| Charter item 1 (not a document defect) | "`const primarySlot = slotIndex < ACCESSORY_SLOT_FROM` at State C line 817" | At State C (34f91ff) the line is **852**; line **817** is the State A (48719b0) location. The synthesis itself is correct: §3.1:338 cites State A `blockGenerator.ts@48719b0 lines 804-817`, and State C is covered by the 844-862 span (846 `bodyweightSlot`, 852 `primarySlot`). The review charter swapped the states. | None (document accurate) |
+| MASTER_AUDIT_SOURCE_MANIFEST.md §0.1 vs synthesis §0.2:56 / §3.2:383 | "Every source path cited in that report maps to a source record here" | `apps/mobile/test/components/SuspensionUI.test.js` is cited by path + SHA-256 in the synthesis but has no manifest row (S-T4-18/19 are the two components; S-T4-20 is useStore.ts, not the test file as the charter assumed). Mitigating: the manifest declares T4 sources are "enumerated per-claim," and the test file is cited for existence/absence and write-boundary only, never for content — no line-span citation exists. The file's hash is recorded in the synthesis and verified matching here. | Minor (non-blocking; hash independently verified) |
+
+No other discrepancies found.
+
+## 3. Commands / Source Locators Checked
+
+- `git rev-parse HEAD` → `48719b0…` on `codex/progression-evidence-remediation` (State A) ✅
+- `sha256sum` + `wc -l` on all three candidate docs and all six dirty product files
+- `git show 48719b0:packages/inference/src/blockGenerator.ts` — SCHEMES at 346-355: strength:347, hypertrophy:349, hybrid:352 all `rpeWave: [7.5, 8.0, 8.5]` ✅; `primarySlot` at line 817 ✅
+- `git show 34f91ff:packages/inference/src/blockGenerator.ts` — `isPurelyBodyweight` (113, 681, 846), `primarySlot = slotIndex < ACCESSORY_SLOT_FROM` at 852, inside the §3.1-cited 844-862 span; `bodyweightDominant` at 681 inside cited 671-682 ✅
+- `git show 48719b0:HANDOVER_2026-08-27_SOL.md` lines 78-89 — loaded block expects "RPE **7 → 7.5 → 8**" ✅ (RG-03 at §4.3:645 quotes [7.5, 8.0, 8.5] *and* explicitly notes the handover's 7→7.5→8 expectation, citing both sources)
+- `git cat-file -e 48719b0:…059_suspension_state_and_load_intent.sql` → exit 128 (absent at State A) ✅; 058 present at State A, both 058+059 in `git ls-tree -r 34f91ff` ✅; three Suspension* UI files absent from State A tree, present untracked in worktree ✅
+- `git show 34f91ff:apps/mobile/src/state/useStore.ts` — `PER_ATHLETE_RESET` at 2053-2060 with no `suspension` key (Finding 2a ✅); `resetTrainingData` declared 6071, 49 `DELETE FROM` statements 6078-6130 with zero suspension-table mentions (Finding 2b ✅); `endSuspension` bare unguarded `executeSync('UPDATE suspension_episode…')` with no try/catch vs `beginSuspension`'s BEGIN/COMMIT/ROLLBACK (Finding 5 ✅)
+- `git show 34f91ff:apps/mobile/src/screens/BlockScreen.tsx` 478-486 — resume `onPress` calls `endSuspension(Date.now())` bare ✅; grep for `implement|load_intent|supported_prefixes` returns nothing (Finding 1's "athlete selection did not land" ✅)
+- Closeout doc verdict lines 65/160/231/298/337 vs synthesis §3.3 table 471-475 — all five mirrored accurately, ledger mappings OW-001/036, OW-002/003, OW-004/005, OW-006, OW-007 ✅
+- Synthesis §0.1:14-20, §6.2:773-788+897+906-914, §6.3:991-1001 — one consistent chronology: rounds 1-4 two REQUEST_CHANGES; round 5 A=APPROVE, B=REQUEST_CHANGES; round 6 both APPROVE scoped to the 992-line candidate `85a192a6…f5e490`; current 1038-line candidate `PENDING_EXTERNAL_REVIEW` pending Round 7 ✅
+- Encoding: `grep -c` for `Â§, â€, â†, âˆ, Â±, Ã, Â ` → **0 occurrences in all three files**; `file` confirms valid UTF-8; `### 3.3 Claude C1–C5 Branch at 34f91ff` renders with a proper en dash (line 431); `RELEASE_GATE — DEFERRED` appears 2× with proper em dash ✅
+- C6 wording: §3.4:489 "has not passed, has not failed, and has not been run"; RG-01 "Not run"; §6.3 distinct modelled envelope (471,936,000 B, in band) from `UNKNOWN` device measurement; contradiction grep over all C6 mentions found no passed/failed/ran claim ✅; §3.4:548-555 release posture: OW-036/OW-024/OW-025/OW-035 BLOCKING findings named first, C6+C7 as additional deferred gates, `NO-GO — CODE FINDINGS OPEN; C6 DEFERRED` ✅
+
+## 4. Coverage Limits
+
+- Did not re-run any gate (`verify:ci`, memory probes) — the three `REPORTED` rows in §6.1 are inherited claims, correctly labeled as such.
+- Did not verify the round 1-6 reviewer handoff files' SHA-256 values (`.agents/audit-synthesis-remediation/round-N-*.txt`) beyond confirming they are cited with hashes; the chronology table's internal consistency was verified, not the external transcripts' bytes.
+- Did not exhaustively audit all 33 OW rows / 26 RG rows — only the charter-relevant subset (OW-001 through OW-007, OW-036, RG-01, RG-02, RG-03).
+- Charter's expected "State C line 817" for `primarySlot` could not be confirmed as stated because the actual State C line is 852 (see Discrepancy Table); the synthesis's own citations were verified instead.
+- State C worktree contents beyond commit 34f91ff not inspected (out of scope per §6.3).
+
+## 5. Summary of Findings
+
+Every charter item verified clean against primary sources: (1) Option C/RR-04 reporting is accurate at both states, with the ramp values, handover note, and slot restriction all entailed by the cited code; (2) all five closeout findings are accurately mirrored in §3.3, and the two spot-checked code findings (reset lifecycle, resume error handling) hold at the exact State C revisions, with Finding 1's "athlete selection did not land" independently confirmed by grep; (3) Migration 058/059 separation is correct and the synthesis explicitly disclaims 059 at State A (§0.1:37-38, §0.2:48, §3.3:454); (4) the State B overlay is absent from State A, present in the working tree, and byte-identical to all recorded hashes; (5) chronology tells one consistent story across §0.1/§6.2/§6.3 and the encoding is clean UTF-8 with zero mojibake and correctly rendered en/em dashes; (6) C6 is consistently `RELEASE_GATE — DEFERRED`, the modelled-vs-measured distinction is maintained everywhere, and the release posture correctly subordinates C6 to the four open BLOCKING code findings. Two observations, both non-blocking: the charter's line-817 attribution belongs to State A, not State C (documents correct), and SuspensionUI.test.js lacks a manifest row though its recorded hash verifies (Minor). No repository files were modified; all operations were read-only.
+
+VERDICT: APPROVE

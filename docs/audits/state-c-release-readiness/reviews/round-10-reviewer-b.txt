@@ -1,0 +1,56 @@
+All checks complete (exit code 1 on call 2 was the final `grep -c` returning zero matches — expected). Persisting the required handback verbatim.
+
+---
+
+# Round 10 Reviewer B — Chronology / Round 9 Narrative / Encoding Report
+
+## 1. Verified Hashes Table
+
+| File (path from worktree root) | SHA-256 (first 16) | Expected | Match |
+|---|---|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` (1101 lines) | `97482f3164e1203e` | `97482f3164e1203e…d4c69e` | ✅ full match |
+| `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` (336 lines) | `9c4a048e2b688cd8` | `9c4a048e2b688cd8…182d4e4` | ✅ full match |
+| `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` (456 lines) | `2e347231e16281ea` | `2e347231e16281ea…57531d90c` | ✅ full match |
+| `.agents/audit-synthesis-remediation/round-9-reviewer-a.txt` | `e4f4793371a9caa0` | `e4f4793371a9caa0…c38b10f1c` | ✅ full match |
+| `.agents/audit-synthesis-remediation/round-9-reviewer-b.txt` | `fd6f2de358d89f7d` | `fd6f2de358d89f7d…e4e7ea9abd` | ✅ full match |
+
+Full hashes printed by `sha256sum` and compared character-for-character against the task brief — all five identical.
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| None | — | — | — |
+
+Notes (non-discrepancies): (a) the round-9 handoffs live at `.agents/audit-synthesis-remediation/` rather than the worktree root — the synthesis's own verbatim citations name that exact path, so this is consistent, not a defect. (b) An additional 64-hex string `cd1a7ccce0aac52b…` appears in the §6.2 window above the Round 9 verdicts heading; it is outside the two handoff citations and was not part of this audit's required cross-check (unverified, see Coverage Limits).
+
+## 3. Commands Checked
+
+1. `sha256sum` on all three candidates + `wc -l` on all three.
+2. `find . -name 'round-9-reviewer-*.txt'` + `sha256sum` on both hits.
+3. `grep -n 'Round 9\|Round 10' MASTER_AUDIT_SYNTHESIS.md | head -25`.
+4. `grep -n 'Round 7 reviewers approve\|Round 9 pair has not yet run\|pending a fresh independent review (Round 7/8/9)' MASTER_AUDIT_SYNTHESIS.md docs/audits/*.md` → zero matches (no stale forward-references).
+5. `sed -n '1048,1070p' MASTER_AUDIT_SYNTHESIS.md` (§6.3 review-status bullet).
+6. `grep -n 'Round 9 verdicts'` + `sed -n '941,976p'` (§6.2 Round 9 block) + hash extraction from the block.
+7. `grep -c 'Â§'; grep -c 'â€'; grep -c 'â†'` on all three candidates → `0 0 0` for every file.
+
+## 4. Coverage Limits
+
+- The `cd1a7ccce0aac52bf05849d186f0a9b20e7c7cd1a919656c6954d783f3642bf5` hash in the §6.2 window (outside the two handoff citations) was not cross-checked against any declared value.
+- §6.2's claim that handoffs are "lines 1-53" (A) and "lines 1-56" (B) was not independently verified by `wc -l` on the handoff files.
+- Per the anti-timeout protocol I did not audit sections beyond the charter (chronology, Round 9 narrative, encoding); correctness of §4/§5 substance is out of scope.
+- I did not independently re-verify git HEAD/branch; I relied on the task brief's stated state.
+
+## 5. Summary
+
+**Hashes:** all three candidate digests and both round-9 handoffs match their declared SHA-256 values exactly (five of five). Line counts of the three candidates (1101/336/456) also match the brief.
+
+**Chronology (charter §2):** ✅ The story correctly runs through Round 9 with Round 10 pending. Line 23: "A's run was truncated… Round 9 returned two"; lines 27 and 1062–1063: Round 10 pending / `PENDING_EXTERNAL_REVIEW` "until both Round 10 reviewers" return verdicts; "The Round 10 pair has not yet run." The §6.3 bullet accurately recounts rounds 1–8 (including Round 8's single REQUEST_CHANGES with no Reviewer A verdict, and explicit non-coverage of later bytes by Round 6's approvals). Zero stale forward-references across all three grep targets — no "Round 7 reviewers approve", no live "Round 9 pair has not yet run", no "pending a fresh independent review (Round 7/8/9)".
+
+**Round 9 narrative (charter §3):** ✅ §6.2's "Round 9 verdicts" block (line 941) accurately reports: both reviewers verified frozen hashes against disk; both returned `REQUEST_CHANGES`; four minor findings enumerated individually (manifest §1.3 stale exclusion-note count, OW-036 citation-scope gap at `blockGenerator.ts:671-682`, §6.3 off-by-one round count, withdrawn unverifiable Round 8 attribution); all remediated. Reviewer A's verification is accurately described: verbatim §1.1 discovery commands with every declared total reproducing, manifest arithmetic re-parsed, §6.4 ledger attributions checked, six OPEN rows spot-checked at their `as_of_revision` with none stale, four-row BLOCKING set and chronology confirmed. Reviewer B's independent confirmation (zero stale forward-references, Round 8 narrative vs. persisted handoff) is also described. The block's two verbatim citation hashes — `e4f4793371a9caa0…c38b10f1c` (reviewer-a.txt) and `fd6f2de358d89f7d…e4e7ea9abd` (reviewer-b.txt) — match the on-disk `sha256sum` values character-for-character.
+
+**Encoding (charter §4):** ✅ `Â§`, `â€`, `â†` counts are 0/0/0 on all three candidates.
+
+No discrepancies found on any charter item.
+
+VERDICT: APPROVE

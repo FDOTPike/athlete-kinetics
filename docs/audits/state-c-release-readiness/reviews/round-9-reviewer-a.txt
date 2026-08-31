@@ -1,0 +1,53 @@
+All charter items are complete. Here is my report.
+
+---
+
+# Round 9 Independent Review — Reviewer A (Ledger Provenance, Tiers, Manifest Coverage, Release-Effect Consistency)
+
+Reviewer: independent, read-only. No files created, modified, staged, committed, or gated. All primary sources inspected directly at the working tree and via `git show` at the pinned revisions.
+
+## 1. Verified Hashes Table
+
+| Candidate | Expected SHA-256 | Computed SHA-256 | Lines (expected / computed) | Match |
+|---|---|---|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` | `96c70557fd2540c35996f744cca398ccfcac18505475ef5e1c277538a1601c13` | `96c70557fd2540c35996f744cca398ccfcac18505475ef5e1c277538a1601c13` | 1077 / 1077 | ✅ |
+| `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` | `7ee8e8124b48daaf38bc2dd701c25dbe9dc1ebea1076eb07ccd4c493c9edcbc4` | `7ee8e8124b48daaf38bc2dd701c25dbe9dc1ebea1076eb07ccd4c493c9edcbc4` | 332 / 332 | ✅ |
+| `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | 456 / 456 | ✅ |
+| `.agents/audit-synthesis-remediation/round-8-reviewer-b.txt` (§6.2 handoff) | `cd1a7ccce0aac52bf05849d186f0a9b20e7c7cd1a919656c6954d783f3642bf5` | `cd1a7ccce0aac52bf05849d186f0a9b20e7c7cd1a919656c6954d783f3642bf5` | 53 / 53 (`awk END{print NR}`; `wc -l` = 52 because the final line lacks a trailing newline — consistent with the manifest's declared §0.2 convention) | ✅ |
+
+Environment confirmed: HEAD `48719b07988ad30d255b0fed37f45ed5db49c935` on `codex/progression-evidence-remediation` (State A).
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| Manifest §1.3, line 82 | "`find .agents -type f -name '*.md'` returns **116** files, one more than Corpus C." | Live execution returns **214** files; Corpus C is 213 (§1.2), so "one more than Corpus C" is 214, not 116 — the sentence is internally inconsistent with its own §1.2 recount even before touching the filesystem. The sole find-vs-Corpus-C delta is `.agents/rules/coding-rules-general.md` (verified: exactly one file differs, and it is absent from `git ls-files --others --exclude-standard`). 116 was correct only against the pre-remediation Corpus C of 115; the Round 7 re-count updated §1.2 to 213 but missed §1.3. No source row or synthesis claim cites the figure, but it is the same stale-current defect class Round 7's remediation was meant to eliminate. | Minor |
+| Synthesis §4.1 `OW-036` (line 606) | Claim states `isPurelyBodyweight` selects three behaviours: "the Option C set ramp, the L2(b) chain rep floor **and the fatigue class**" | Cited T4 spans (`blockGenerator.ts@34f91ff` 844–862 and 765–771) entail only the first two (set ramp at 846/855, rep floor at 862). The fatigue-class conjunct is entailed by lines **681–682** (`bodyweightDominant = …every(isPurelyBodyweight)` → `fatigueCost`), which lie outside both cited spans (681 falls in `OW-006`'s 671–682 span instead). The underlying fact is verified true at 34f91ff; this is a citation-scope gap in the row, not a falsehood. | Minor |
+
+Not counted as defects (disclosed or past-tense): (a) §6.4 cites `PROMPT_LEDGER.md` Entries 0059/0061/0062/0063, which exist only in the worktree-lineage ledger (working tree, 3182 lines, tracked-modified) while `S-T0-06` pins the State C blob (3139 lines, ends at Entry 0057) — §6.5 lines 320–322 explicitly disclose the two-lineage divergence and `OW-024` tracks reconciliation as BLOCKING; (b) the single "pending Round 7" text match (synthesis line 927) is the past-tense narrative *describing* Round 8's finding, not a live claim.
+
+## 3. Commands / Source Locators Checked
+
+- `sha256sum` + `wc -l` on all three candidates and the Round 8 handoff; `git rev-parse`/`branch`/`status`.
+- Manifest §1.1 discovery commands executed verbatim: Corpus A **62** (of **117** tracked `.md` at State A) ✅; Corpus B **9** ✅; Corpus C **213** ✅ (untracked total 9+213 = **222** ✅); Corpus D **16** total / **2** Markdown (`PROMPT_LEDGER.md`, `docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md`) ✅; Corpus E file exists ✅.
+- Manifest arithmetic parsed programmatically: **69** source records (T0=9, T1=16, T2=0, T3=19, T4=22, T5=1, S-OUT=2) ✅; **69 distinct source_ids, zero duplicates** ✅; **66 distinct paths** — 69 records − 2 duplicated paths (`blockGenerator.ts`, `useStore.ts`, each recorded twice per the manifest's own §4.4 explanation) − 1 pathless record (`S-T3-07`) = 66 ✅.
+- §6.4 attributions vs worktree ledger entries: Entry 0059 records pre-continuation manifest 312 lines `b0f5a833…` ✅; Entry 0061 records 992-line synthesis `85a192a…` ✅; Entry 0062 records 1007-line synthesis `e1a9374…` ✅; Entry 0063 (lines 3132–3182) exists but records only the continuation-package hashes — §6.4's "recorded in Entry 0063 **on completion**" wording correctly claims only a future recording ✅.
+- Ledger provenance spans at pinned revisions: OW-036 — `AUDIT_architecture_review_8b4e75b.md` origin + docket `@a80f955` line 453 (L2(b) chain-scoped ruling) + `blockGenerator.ts@34f91ff` 844–862/765–771, with `requiredReps: 8` confirmed at `progressionEngine.ts:53@34f91ff`; OW-001 — docket line 452 (L1(a) constrained) + closeout 63–157 (Finding 1 remediation text matches the row statement nearly verbatim) + `blockGenerator.ts` 844–862; OW-024 — docket 399–403 (divergent ledgers, "reconciling before any merge") exact entailment; OW-025 — docket 61–95 (conditional position-consumption defect) + 105–118 (zero UI reachability at base) exact entailment; OW-035 — docket 467–468 (S3(a) disclosure in C7 handback) exact entailment. §3.4 lines 553–557 name exactly OW-036/OW-024/OW-025/OW-035 as the BLOCKING set ahead of the C6/C7 discussion ✅; OW-001 correctly NON_BLOCKING.
+- Stale-current spot-check, six OPEN rows at their own `as_of_revision`: OW-002 (`resetTrainingData` at `useStore.ts:6071@34f91ff`, span 6078–6156 in-bounds; 059 closed-episode delete trigger at 147–152) ✅; OW-003 (`PER_ATHLETE_RESET` 2053–2060, no `suspension` key) ✅; OW-009 (`resolveActiveRung` import at :140, calls at :2598/:2600 at State A) ✅; OW-011 (`SCHEMA_FILES` present with 057 still deliberately absent at **both** 48719b0 and 34f91ff, at `apps/mobile/test/verify_store_sql.mjs:20/47`) ✅; OW-022 (`resumed_macro_index` at proposal line 45 §2.1) ✅; OW-023 (`TRAINING_PROGRESSION_LAYERS.md` 325–331 verbatim) ✅. Absences of OW-015/OW-016/OW-021 are declared deliberate (§ lines 597–599) with dispositions in §5.1 (lines 692–695) ✅.
+- Chronology consistency: §0.1 (lines 15–25), §6.2 (lines 911–951, incl. the Round 8 citation at line 933), and §6.3/§5 (lines 1031–1040) tell one consistent story through Round 8 (B = REQUEST_CHANGES on the chronology bullet, now corrected; A = truncated, no verdict) with Round 9 pending and `PENDING_EXTERNAL_REVIEW` until both Round 9 reviewers approve. Regex sweep for stale forward-references across all three candidates found none beyond the disclosed past-tense narrative.
+
+## 4. Coverage Limits
+
+- I did not re-verify all 69 manifest rows' hashes/revisions — only the discovery totals, record arithmetic, §6.4 attributions, and the five charter rows' citations.
+- I did not re-verify the Round 2–7 handoff hashes (S-T3-08…19) beyond the Round 8 file, nor the 12 retracted claims or 26 release gates (Round 6 scope).
+- I did not verify `git status` "no staged changes at capture" (a dated historical claim in §0.3) against the capture-time state; current working tree has 76 dirty entries, which does not contradict the declared totals since all live counts reproduced.
+- Staleness spot-check covered 6 of the ~22 OPEN rows, chosen for risk; the remainder inherit Rounds 1–8's coverage.
+- I did not independently re-derive the modelled 471,936,000 B envelope in §3.4 (T4 budget/vector arithmetic out of charter scope).
+
+## 5. Summary of Findings
+
+The Round 7 remediation is substantively verified: every §1.1 discovery total reproduces exactly, the manifest's record arithmetic (69/66/0-dup) is correct, §6.4's ledger attributions match the actual ledger entries including the correctly-worded not-yet-completed Entry 0063 claim, and the chronology now reads consistently through Round 8 with Round 9 pending. All five high-risk ledger rows' citations entail their claims, §3.4 names the correct four-row BLOCKING set before C6, and six spot-checked OPEN rows are current at their own revisions. Two minor defects remain: a stale exclusion-note count in manifest §1.3 ("116" vs the true 214, internally inconsistent with §1.2's own recount — a leftover of the Round 7 re-count that missed this sentence), and a one-conjunct citation-scope gap in OW-036 (fatigue class entailed at blockGenerator.ts:681–682, outside the row's cited spans). Neither falsehood propagates into a source row's admissibility, a release posture, or a chronology claim, but the §1.3 figure is a factual error in a frozen provenance document of precisely the class this review exists to catch, and the freeze standard applied in Rounds 7–8 treats such defects as blocking.
+
+## 6. Final Verdict
+
+VERDICT: REQUEST_CHANGES

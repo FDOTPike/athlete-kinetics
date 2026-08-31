@@ -1,0 +1,51 @@
+All checks complete. Writing the report now.
+
+---
+
+# Round 12 — Reviewer B Focused Handback (ledger 0065 structure, count labels, final bytes, chronology)
+
+## 1. Verified Hashes Table
+
+| File | Lines | SHA-256 (recomputed this session) | Matches declared |
+|---|---|---|---|
+| MASTER_AUDIT_SYNTHESIS.md | 1182 | `d68efe422abb3a9eec572dd51f0e1951099c5b2eaf113e6b3fa5c792a8af9091` | ✓ |
+| docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md | 340 | `e1023d89b86d9ff56f3d260972f2da52e912d83188ec17c8abec8702857ce683` | (recomputed; no expected given) |
+| docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md | 456 | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | ✓ |
+| docs/WORKORDER_GLM53_AUDIT_SYNTHESIS_CONTINUATION.md | 380 | `72e1166b1c44564c2fc799621d5cd9512b8c8c65e7b7318331c0d80f38104338` | ✓ (matches 0065 Input attestation) |
+| HEAD | — | `48719b07988ad30d255b0fed37f45ed5db49c935` (State A) | ✓ |
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| PROMPT_LEDGER.md line 3812 (0065 Input) | Transcribed work-order body is "token-identical (2,603/2,603)" to on-disk file | `diff` of ledger lines 3432–3812 vs the work-order file yields exactly one hunk, `381d380`: one extra blank line in the ledger transcription. Attestation claims token-identity, not byte-identity; a blank line carries no tokens, so the claim is consistent. No text elided. | Informational (Low) |
+| .agents/audit-synthesis-remediation/round-11-reviewer-a.txt:35 | Handoff says "all 8 conditions" while enumerating nine rows (OW-001, 005, 006, 007, 008, 010, 012, 014, 020) | This is the original 8-vs-9 mislabel that Entry 0065's [P2] relabels to nine; archive retained unedited as append-only history, synthesis now says "nine-row". | Informational (Low) |
+| docs/audits/* (manifest, closeout) | Charter item "'RELEASE_GATE — DEFERRED' present" | Present ×2 in MASTER_AUDIT_SYNTHESIS.md (lines 508, 571); absent from manifest and closeout. Charter does not require it in those two files. | Informational (Low) |
+| All other charter checks | — | No discrepancies found | None |
+
+## 3. Commands / Locators Checked
+
+- `sha256sum` + `wc -l` on all three candidates and the work-order file; `git rev-parse HEAD`, `git diff --check` (clean), `git diff --cached --name-only | wc -l` → 0 staged, `git status --porcelain` (unstaged mods + untracked .agents/ artifacts only — no staging).
+- PROMPT_LEDGER.md: `## Entry 0065` at line 3426 → EOF (3868). Within 0065: `### Input G(x)` count = **1**, `### Output F(G(x))` count = **1**. Marker grep inside Input: `Required reasoning effort` ×1 (line ~3439, start), `### 2.6 Review Boundary` ×1 (line 3620, middle), `## 7. Required Final Handback` ×1 (line 3792, end). Elision scan (`…`, `...`, hash-pointer, "omitted/elided/truncat"): only hits are verbatim prompt content (the §2.2 mojibake table quoting `…`, §2.6's historical truncated hashes `85a192...`/`e1a937...`, the `[Working-tree source: ...]` instruction template) — no elision of the prompt itself. Full heading structure §0.1–§7 present; Input fence closes at 3813 with attestation at 3814–3820.
+- `diff <(sed -n '3432,3812p' PROMPT_LEDGER.md) docs/WORKORDER_GLM53_AUDIT_SYNTHESIS_CONTINUATION.md` → only hunk `381d380` (one blank line); directive line 3431 verbatim.
+- Entry 0064 corroboration: two `### Output` headings (lines 3269+41, 3269+109) and Input hash-pointer elision text ("the pasted work order elided to a hash-pointer") — matches 0065's disclosures.
+- 0065 Output (lines 3821–3868) discloses all five required items: (a) [P1] 0064 verbatim-prompt elision ✓; (b) [P1] 0064 two-Output structure ✓; (c) [P1] Round 11 remainder rescinded/rescoped, PENDING_EXTERNAL_REVIEW ✓; (d) [P2] count labels corrected, "84 citations across 59 rows", 8→nine rows with the full nine-ID list ✓; (e) [P2] reasoning-effort waiver — "An explicit owner waiver is requested… not self-waived" ✓ (open).
+- MASTER_AUDIT_SYNTHESIS.md §4 span (lines 576–688): `[Source:` ×69 + `[Working-tree source:` ×15 = **84** ✓; table lines 65 − 3 headers − 3 separators = **59 data rows** ✓ (rows are `` `OW-…` `` format).
+- Count labels: line 32 (§0.1) "all 84 citations across the 59 §4 rows … nine-row stale hunt"; line 821 (§6.2, Round 11 attempt 2 Reviewer A) same labels, **APPROVE** (31 rows + §5 supersession outstanding); lines 1000–1004 (§6.3) same. Nine-ID enumeration verified in round-11-reviewer-a.txt:35 = exactly OW-001, 005, 006, 007, 008, 010, 012, 014, 020 ✓, matching 0065's [P2] list.
+- Headings: markdown H1 = 1 per file (SYNTHESIS's other six `^# ` hits at 1154–1172 sit inside the 1152 ```` ```bash ```` reproduction fence; MANIFEST's at 48–63 inside the 47–65 ```` ```text ```` fence; closeout has exactly 1); `^####` count = 0 in all three. Mojibake `Â§|â€|â†` = 0 in all three (em-dash verified as proper UTF-8 `E2 80 94` via `cat -A`).
+- Chronology: §0.1 lines 30–39, §6.2 table rows (Round 11 attempt 2 → APPROVE ×2 with remainder; Round 12 Reviewer A "pending", Reviewer B "pending"), §6.3 lines 997–1010 and 1121–1145 — all consistent: Round 11 APPROVE-with-remainder → orchestrator REQUEST_CHANGES → focused Round 12 commissioned, `PENDING_EXTERNAL_REVIEW` until both Round 12 verdicts. All five "Round 12" mentions are pending/commissioned language; no stale completion/approval claims.
+
+## 4. Coverage Limits
+
+- Read-only pass; no verifier scripts executed, no tests re-run, no State C checkout (`34f91ff` content inspected only via citations).
+- Token-identity of the 0065 Input accepted on diff evidence (single blank-line delta) plus matching on-disk work-order hash; no independent tokenizer run.
+- Round 11 reviewer handoff files accepted as archived primary sources; their hashes not recomputed.
+- Untracked `.agents/**` working-tree artifacts and the four unstaged modified product files were not audited (outside this charter; charter requires only "no staged changes").
+
+## 5. Summary
+
+Entry 0065 has exactly one Input and one Output heading; the Input carries the complete verbatim execution prompt (full §0–§7 work-order structure, three widely-separated markers present once each, no ellipsis or hash-pointer elision; diff vs the on-disk work order shows only one extra blank line, consistent with the token-identity attestation). The Output discloses all five required 0064/Round 11 defects, with the reasoning-effort waiver left explicitly open and not self-waived. The synthesis count labels are accurate as stated: 84 citations (69 `[Source:` + 15 `[Working-tree source:`) across 59 §4 data rows, and the nine-row stale hunt matches the enumerated nine IDs; §0.1/§6.2/§6.3 are mutually consistent on Round 11 APPROVE-with-remainder and Round 12 pending, with no stale forward-references. All three candidate documents verify on hash, line count, heading schema (one H1, no H4+), encoding (zero mojibake), and `RELEASE_GATE — DEFERRED` is present; git diff --check is clean and nothing is staged.
+
+## 6. Verdict
+
+VERDICT: APPROVE

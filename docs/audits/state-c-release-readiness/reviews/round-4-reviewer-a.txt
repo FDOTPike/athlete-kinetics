@@ -1,0 +1,177 @@
+ROUND 4 — REVIEWER A HANDOFF (verbatim as returned)
+Charter: strict outstanding-ledger provenance. Read-only. Persisted by the executor without edit.
+Candidate reviewed:
+  MASTER_AUDIT_SYNTHESIS.md                            4d9a85183e9cb7e5fe9f9afbacb89b9356ca234114d70ccba3feb6953b86ee7c  907 lines
+  docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md          ff1c3d3b65dd4345fc17f10e517988effba256f4699175ac49696a7ee9410ee1  309 lines
+  docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md 62bcc4331e0fbac8d2674e946d2f0e02c7eff690d854121ae58e852b87c0fd62  446 lines
+All three verified by the reviewer as matching.
+=====================================================================
+
+## 2. Priority 1 result — stale-current hunt
+
+NO FOURTH STALE-CURRENT ROW FOUND. I attacked all 22 OPEN rows in 4.1, trying to falsify each at
+its own as_of_revision. The rows I judged most exposed (the older accepted-limitation entries from
+the same DEVIATION_LOG.md lineage that produced OW-015) all survive:
+
+OW-014  tonnage_kg no longer reps * load_kg? Still GENERATED ALWAYS AS (reps * load_kg) STORED at
+        001_mechanical_input.sql:84. Live.
+OW-017  Later migration adds per-prefix equipment? No migration 050-058 touches prefix equipment. Live.
+OW-018  Migration after 049 rewrites v2 coaching intents? 050-058 are role convergence, routine
+        access, microcycle roles, role compatibility, cutoff provenance, return-checkin ack,
+        taxonomy backfill, block-meta phase, suspension episode. None touch coaching content. Live.
+OW-019  deriveDailyAdjustment composed into derivePrescription? Referenced only in
+        kinematicAutopilot.ts (def), index.ts (export), diagnostics/coachVerificationLab.ts, and
+        verify_autopilot.mjs. Not in the live prescription path. Live.
+OW-011  057 gap closed? SCHEMA_FILES still skips 057 at both 48719b0:20-51 and 34f91ff. Live at both.
+OW-012  P3-1 already in AGENT_WORKFLOW.md? Zero hits for P3-1/capture-at-issue at 48719b0. Live.
+OW-013  RR-01 rationale corrected? Still present at docs/AUDIT_architecture_review_8b4e75b.md:30-37. Live.
+OW-008  progression_methodology read by a planner? Hydrated/validated in the store and typed in
+        packages/inference/src/types.ts:270; read by no engine. Live.
+OW-022  resumed_macro_index renamed? Still at docs/PROPOSAL_suspended_state_trigger.md:45, :86, :123. Live.
+OW-005  Any [059] behavioural test? The four trigger names appear only in 059_*.sql and
+        migrationRunner.ts. Zero test hits; no [059] section. Live.
+OW-002  resetTrainingData refreshes suspension? Refresh block at 34f91ff:6152-6156 is
+        vector/block/program/niggles/returnCheckin — no refreshSuspension, no suspension_episode
+        delete. Live.
+OW-003  suspension in PER_ATHLETE_RESET? 34f91ff:2053-2060 — absent; store field is suspension (:643). Live.
+OW-007  Resume wrapped? BlockScreen.tsx@34f91ff:482 is a bare endSuspension(Date.now()); the
+        suspension-error node sits only in the non-suspended branch. Live.
+OW-001/OW-036  Selection surface exists? plannedImplementFor returns undefined for length !== 1;
+        planned_slot_load_intent is written only at generation (useStore.ts:3351). Push-up =
+        ["Bodyweight","Banded"] -> undeclared -> slotReps = reps at :862. Live.
+
+I also re-checked the round-3 closure of OW-015 rather than assuming it: the aggregate at
+48719b0:3114-3125 genuinely uses LEFT JOIN set_target st ON st.set_id = sr.set_id, and
+verify_store_sql.mjs:539-548 carries the "PROVENANCE (022)" regression gate. That closure is correct.
+
+## 3. Discrepancy table
+
+D-1  OW-001 / OW-036 — internal consistency, residual stale release effect. 6.2 line 793: "whether
+     the OW-001 release-effect escalation to BLOCKING is justified or overreaches". 4.1 carries
+     OW-001 = NON_BLOCKING; OW-036 carries BLOCKING. A fifth surviving instance of the class round 3
+     fixed — line 776 enumerates 3.1, the 4 preamble and the addendum as corrected, and missed this
+     one. It sits in the paragraph that tells the next reviewer what to attack first, so it
+     misdirects the next round, and it omits OW-036 from the attack list entirely.
+
+D-2  OW-036 — internal consistency (same sentence). Line 794 describes "the 4 preamble's
+     T0-origination rule for OW-001-OW-007". The preamble at line 507 scopes that rule to
+     "OW-001-OW-007 and OW-036", and 519-522 expressly state OW-036's origin is not work-order 3.5
+     but the T1 architecture review plus the T0 docket.
+
+D-3  OW-001 — release-effect justification vs the document's own adopted correction. The preamble
+     justifies NON_BLOCKING because OW-001 "fails closed in the direction L1(a) mandates". 6.2
+     records as an adopted round-2 correction that L1(a)'s fail-closed clause is scoped to legacy
+     state, and that "permanent fail-closed for an undeclarable movement is the defect rather than
+     the remedy". OW-001's own statement says "ambiguous slots are permanently undeclared and
+     permanently loaded". The addendum repeats the discarded reading at line 425. The value survives
+     on dose-conservatism grounds; the recorded reason contradicts the document's own correction record.
+
+D-4  OW-001 vs OW-036 — authority tier. OW-001 labels [Source: RELEASE_CANDIDATE_C1_DOCKET.md@a80f955,
+     lines 452-452] as "T4 corroboration". That span is the L1 ruling row of the ratified owner
+     docket = manifest S-T0-01, tier T0. The immediately following row OW-036 labels line 453 of the
+     same file at the same commit as "Origin". Adjacent rows assign the same source contradictory
+     tiers. Direction is conservative, but it breaks the tier apparatus.
+
+D-5  3.1 — locator entailment. Line 292 says "'A, with three corrections' for RR-02 at slot 058".
+     Line 19 of the cited span reads "| RR-02 suspended state | A (Migration 059) | A, with three
+     corrections |" — the span says slot 059. The "at slot 058" gloss is factually true (per
+     TRAINING_PROGRESSION_LAYERS.md@48719b0:293-294) but is not entailed by the cited span.
+
+D-6  Manifest 6.1 — declared total not reproducible. "52 source records name 51 distinct paths."
+     S-T4-05 is Git metadata with no path. 52 records - 1 duplicate path (blockGenerator.ts at two
+     revisions) - 1 pathless record = 50.
+
+D-7  Manifest 6.1 — per-tier population mislabel. "T3 | 7 named, of 115 in the Corpus C population."
+     Only 6 of the 7 T3 rows are in Corpus C; S-T3-07 (superseded rev 1) is a Corpus B path. 6.2
+     gets the split right, so 6.1 is the defective statement.
+
+D-8  (low) 4.1/4.2 work-order citations — capture-date consistency. Manifest 0.3 states the capture
+     pass was 2026-08-30 with later additions on 08-31, and S-T0-08 carries source_date 2026-08-30.
+     Seven section-4 rows declare the work order "captured 2026-08-31". Hash verifies at both
+     readings, so bookkeeping inconsistency, not a false citation.
+
+### What I verified clean
+
+- Status purity. 4.1 = 22 rows, all OPEN. 4.2 = 11 rows, exactly PARKED (OW-027-OW-031) and
+  OWNER_ONLY (OW-004, OW-026, OW-032-OW-035). 4.3 = 26 rows, all RELEASE_GATE. 59 ledger rows verified.
+- ID integrity. OW-001-OW-036 present except OW-015, OW-016, OW-021, all three dispositioned in 5.1
+  as declared. No reuse. RG-01-RG-26 all present, 26 distinct.
+- Locator re-derivation. I re-derived every section-4 file:line asserted as current fact. All
+  resolved exactly, including useStore.ts@48719b0:140/:2598/:2600; verify_store_sql.mjs@48719b0:689
+  and @34f91ff:701; docket @a80f955:399-403/416-417/419-425/427-435/444-455/467-468;
+  TRAINING_PROGRESSION_LAYERS@48719b0:206-212/280/281/293-294/309-319/325-331/332-338;
+  DEVIATION_LOG@48719b0:95-98/142-154/183-188/298-307/593-598;
+  blockGenerator@34f91ff:671-682/765-771/844-862; useStore@34f91ff:2053-2060/3041-3056/6078-6156/2195;
+  BlockScreen@34f91ff:471-517; migrationRunner@34f91ff:190-196; verify_migrations@34f91ff:1719-1726;
+  verify_pipeline@34f91ff:511-520; 059_*.sql:116-160/142-146/147-152; RELEASE_READINESS 18 spans;
+  memory_gate.mjs:56-61; 016_movement_library_seed.sql:281.
+- The RG-08/09/10/13/15 bundle splits are genuine. I read all 17 RELEASE_READINESS.md spans behind
+  RG-07-RG-26; every citation maps to exactly one separately-closable checklist item. No re-bundling.
+- S-T4-08 correction holds. 016_movement_library_seed.sql@48719b0:281 is literally
+  ('Push-up', 'handstand-push-up', 0),.
+- Manifest discovery commands reproduce every declared total, re-run verbatim: Corpus A 62 of 117;
+  B 6 (list matches 1.2 exactly, including AGENTS.md); C 115; D 16 changed / 2 Markdown; E 1;
+  untracked Markdown total 121; find .agents = 116, the delta being the gitignored
+  coding-rules-general.md as declared. Per-tier row counts: T0 9, T1 16, T2 0, T3 7, T4 17, T5 1,
+  outputs 2 = 52. Boundary split: 28 + 6 + 6 + 10 + 1 + 1 = 52.
+- Citation syntax. Only the three permitted forms appear, in 5 as well as 4. Every hash verifies and
+  every line bound is in range, including all four reviewer handoffs.
+- The 471,859,200 B trap is avoided. memory_gate.mjs:61 defines a superseded
+  CEILING_MIB_READING_BYTES = 471,859,200, close to but not the 471,936,000 B envelope. The document
+  sources the envelope from RELEASE_READINESS.md:106-108 and budget.json:40-43 and never conflates them.
+
+## 3. Adjudication of the OW-001 / OW-036 split and both release effects
+
+The split is correct. The two conditions are independently closable and I confirmed both directions
+in code. OW-001 closes by adding a selection surface writing to planned_slot_load_intent (the table,
+CHECK domain and read path already exist at 34f91ff), leaving isPurelyBodyweight's triple duty
+untouched. OW-036 closes by keying the chain floor on progressionGroup — already threaded in as a
+typed generator input at useStore.ts@34f91ff:3055 — rather than on bodyweightSlot, leaving the
+selection gap untouched. Neither is a prerequisite for the other.
+
+OW-036 = BLOCKING: affirmed, chain re-derived independently:
+1. plannedImplementFor returns undefined unless supportedPrefixes.length === 1 (useStore.ts@34f91ff:1834-1835).
+2. Push-up's supported_prefixes is ["Bodyweight","Banded"] (010_movement_library.sql@48719b0:83) -> undeclared.
+3. isPurelyBodyweight(m) false -> bodyweightSlot = false (blockGenerator.ts@34f91ff:846).
+4. slotReps = bodyweightSlot ? bodyweightRepsFor(m) : reps (:862) -> raw phase reps, floor bypassed.
+5. bodyweightRepsFor would have applied Math.max(reps, chainAdvancementReps ?? DEFAULT_ADVANCEMENT_POLICY.requiredReps) (:770).
+6. progression_policy has zero seeded rows (docket @a80f955:295), so the imported default of 8 is the
+   operative bar today — not hypothetically.
+7. Push-up is rung 0 (016_movement_library_seed.sql@48719b0:281), so the entry rung of the seeded
+   chain is prescribed 7/5/3 reps against a bar of 8 in 6 of 8 macro blocks.
+
+That is the exact defect AUDIT_architecture_review_8b4e75b.md section 6 identified and that L2(b)
+was ratified to close. Correctly inferred BLOCKING by a conservative executor, and explicitly
+declared a status inference rather than an owner ruling.
+
+OW-001 = NON_BLOCKING: affirmed, but the stated reason is wrong (D-3). The value survives on dose
+grounds: with the reps consequence carved into OW-036, OW-001's residual effect is that an ambiguous
+slot takes the loaded set schedule (flat) instead of the bodyweight ramp (4->5->5) — fewer sets, and
+no ratified constraint violated. The justification the document gives — "fails closed in the
+direction L1(a) mandates" — is the reading 6.2 records as corrected out in round 2. The reason
+should be restated on dose-conservatism; the value should stay NON_BLOCKING.
+
+Consequence for D-1: because both values are correct as tabled, 6.2's surviving instruction to
+attack "the OW-001 release-effect escalation to BLOCKING" points the next reviewer at a claim the
+document no longer makes, while leaving the one it does make (OW-036) off the list.
+
+## 5. Required remediation
+
+1. D-1 — rewrite 6.2 line 793 to name OW-036 as the row carrying BLOCKING.
+2. D-2 — extend the sentence's scope to "OW-001-OW-007 and OW-036".
+3. D-3 — restate OW-001's NON_BLOCKING justification on dose-conservatism, in 4's preamble and the
+   addendum 4.2. Note this changes the addendum's bytes and therefore the hash cited in nine
+   section-4 rows and manifest 6.4.
+4. D-4 — relabel the docket lines 452-452 citation in OW-001 from "T4 corroboration" to a T0 label.
+5. D-5 — drop "at slot 058" from 3.1 or add the TRAINING_PROGRESSION_LAYERS.md@48719b0:293-294 citation.
+6. D-6/D-7 — manifest 6.1: "50 distinct paths", and "6 of the 7 T3 rows are in Corpus C".
+7. D-8 — reconcile the S-T0-08 capture date.
+
+The ledger itself is in good shape: 59 rows, every locator re-derived, every declared total
+reproduced, no stale-current row, and both release effects correctly valued. The defects are in the
+surrounding prose and tier labelling — but D-1 lands in the sentence that steers the next review,
+and D-4 is a contradiction between two adjacent ledger rows, so this cannot be approved as-is.
+
+REQUEST_CHANGES
+=====================================================================
+END OF VERBATIM HANDOFF

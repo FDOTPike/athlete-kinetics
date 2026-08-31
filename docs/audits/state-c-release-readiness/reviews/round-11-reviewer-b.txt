@@ -1,0 +1,55 @@
+All charter items are complete. Final report:
+
+---
+
+# Round 11 attempt 2 — FULL-SCOPE Review, Reviewer B (State verification, progression substance, findings mirror, chronology, ledger 0064)
+
+## 1. Verified Hashes Table
+
+| Artifact | Claimed | Verified | Match |
+|---|---|---|---|
+| HEAD (State A) | `48719b07988ad30d255b0fed37f45ed5db49c935` | `git rev-parse HEAD` → `48719b07988ad30d255b0fed37f45ed5db49c935` | ✅ |
+| Branch | `codex/progression-evidence-remediation` | `git rev-parse --abbrev-ref HEAD` → same | ✅ |
+| State C | `34f91ffe548a0b9e51db863ffc6fad993619f940` | resolvable; `48719b0..34f91ff` = exactly 4 commits: `a80f955`, `f3ebab3`, `0cd8db9`, `34f91ff` | ✅ |
+| MASTER_AUDIT_SYNTHESIS.md | 1138 lines, `4ab4a3db…9e7be51` | sha256 `4ab4a3dbff06d25a2c0981cb539e6736c80ae77a156691f1f7579bc929e7be51`, 1138 lines | ✅ |
+| docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md | 338 lines, `75e2f733…ede4360` | sha256 `75e2f733cf07311a41afca78a9c36e22b67fbc4ac9f10bff8a243c5b5ede4360`, 338 lines | ✅ |
+| docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md | 456 lines, `2e347231…531d90c` | sha256 `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c`, 456 lines | ✅ |
+| U3 overlay `SuspensionCard.tsx` | §3.2: `77d798e6…84 73e999` | sha256 of working-tree file = identical | ✅ |
+| U3 overlay `SuspensionSheet.tsx` | §3.2: `cb65064b…218e7b4d` | sha256 of working-tree file = identical | ✅ |
+| U3 overlay `SuspensionUI.test.js` | §3.2: `d6635e3c…4eff991` | sha256 of working-tree file = identical | ✅ |
+
+State-object checks: `git cat-file -e 48719b0:<path>` → ABSENT for `apps/mobile/src/components/SuspensionCard.tsx`, `SuspensionSheet.tsx`, `apps/mobile/test/components/SuspensionUI.test.js`, and `packages/core-db/src/schema/059_suspension_state_and_load_intent.sql`; 059 PRESENT at `34f91ff`. All three U3 files are untracked in the working tree (State B overlay), consistent with §3.2's "Untracked, new".
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| — | None material | — | — |
+
+Minor observations (not defects): (a) the U3 overlay hashes are recorded in synthesis **§3.2** (lines 392-394), not §6.1 — §6.1 records the ABSENT-at-State-A check (line 750); the charter's §6.1 pointer was a locator imprecision, the substance verifies. (b) `PROMPT_LEDGER.md` is +862 lines uncommitted vs `48719b0` in the working tree — Entry 0064 lives in that append, expected for a working ledger.
+
+## 3. Commands / Locators Checked
+
+- `git rev-parse HEAD`; `git rev-parse --abbrev-ref HEAD`; `git log --oneline 48719b0..34f91ff` (4 commits, exact set)
+- `git cat-file -e` × 4 paths at `48719b0`; `34f91ff` tree listing for U3/059 paths
+- `sha256sum` + `wc -l` × 3 candidates; sha256 × 3 overlay files; grep of recorded hashes (synthesis 392-394)
+- Progression substance: `packages/inference/src/blockGenerator.ts` — `primarySlot` at **817**@48719b0 and **852**@34f91ff; `isPurelyBodyweight` gating at **846** within chartered 844-862@34f91ff (sport/primary-only RR-04 comment intact); SCHEMES `rpeWave [7.5, 8.0, 8.5]` at **347/349/352**@48719b0 (strength/hypertrophy/hybrid)
+- `HANDOVER_2026-08-27_SOL.md` 78-89@48719b0: loaded block "RPE **7 → 7.5 → 8**" ✅
+- Findings mirror: closeout §4.1 Verdict Table (lines 400-416) vs synthesis §3.3 table (lines ~478-487): all five findings agree on verdict and ledger split — 1 PARTIALLY_CONFIRMED → OW-001/OW-036; 2 CONFIRMED → OW-002/OW-003; 3 CONFIRMED → OW-004/OW-005; 4 CONFIRMED → OW-006; 5 CONFIRMED → OW-007; "Nothing was refuted" consistent in both
+- State C code spot-checks: `useStore.ts`@34f91ff 2053-2060 (`PER_ATHLETE_RESET` payload) and 6078-6130 (parent-first table wipe) — real reset-lifecycle substance; `BlockScreen.tsx:482`@34f91ff bare `endSuspension(Date.now())` corroborates Finding 5
+- Chronology: synthesis grep Round 10/11; §6.3 bullet 1080-1101 — ten rounds enumerated exactly (1-4 dual REQUEST_CHANGES; 5 A-approve/B-changes; 6 dual approve; 7 B-approve/A-changes; 8 B-changes/A truncated; 9 dual changes; 10 dual APPROVE with partial coverage), "Round 11 pending", `PENDING_EXTERNAL_REVIEW` (§0.1 line 31 and §6.3 agree), Round-10 coverage rescoping and Sol's REQUEST_CHANGES recorded, self-referential round-count fix noted
+- Ledger Entry 0064 (PROMPT_LEDGER.md ~3268-3374): execution-input pairing disclosure (verbatim paste + hash-pointer elision + pairing-defect root cause), OW-024 `DOCUMENT_ONLY` correction with `release_effect: BLOCKING` (code-confirmed blockers named as OW-036/OW-025; OW-035 OWNER_EVIDENCE_REQUIRED), reasoning-effort deviation (`max` required, `high` ran, disclosed). Re-freeze hashes in the entry match my verified digests exactly
+- Encoding: `grep -c 'Â§\|â€\|â†'` → **0 / 0 / 0** on all three candidates; `RELEASE_GATE — DEFERRED` at synthesis 500, 563; §3.4 (498-567): "UNKNOWN is the correct status for the *device measurement*; REVIEW_BAND at 471,936,000 B … for the *modelled envelope*" — distinction maintained; OW-036/OW-024/OW-025/OW-035 named BLOCKING before the C6 NO-GO reason
+
+## 4. Coverage Limits
+
+- Read-only inspection of git objects, the three candidate documents, the working-tree overlay, and PROMPT_LEDGER.md Entry 0064. I did not re-run `verify:ci`, the verifier, migration probes, or any build/test gates (REPORTED rows accepted as REPORTED, per §3.4/§6.3 framing).
+- The remaining three closeout findings (OW-002/003/004/005/006 substance) were verified at the mirrored-verdict level plus the three chartered State C spans; I did not independently re-prove each finding's full empirical claim.
+- Five-finding mirror verified table-vs-table and two findings at code level, per charter; the other three not independently code-verified.
+- Manifest's 338 records were not re-counted row-by-row (outside this charter).
+
+## 5. Summary
+
+State A is exactly `48719b0` on the correct branch with exactly the four claimed commits to `34f91ff`; the Task U3 files and Migration 059 are provably absent at State A and 059 present at State C. Progression substance holds at both states at the chartered line numbers (RR-04 primarySlot 817→852, isPurelyBodyweight gating at 846, SCHEMES rpeWave 347/349/352, HANDOVER RPE 7→7.5→8). The five closeout findings mirror one-to-one between closeout §4.1 and synthesis §3.3 with agreeing verdicts and ledger splits, corroborated by real State C code. Task U3 State B overlay hashes match the recorded §3.2 values byte-for-byte. Chronology is internally consistent: ten rounds enumerated exactly, Round 11 pending, no stale forward-references. Ledger Entry 0064 carries all three required disclosures, and its re-freeze hashes match the verified candidate digests. Zero mojibake; C6 correctly `RELEASE_GATE — DEFERRED` with the modelled/UNKNOWN distinction and the four BLOCKING rows intact.
+
+**VERDICT: APPROVE**

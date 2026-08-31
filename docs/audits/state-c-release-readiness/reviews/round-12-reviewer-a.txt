@@ -1,0 +1,50 @@
+All verification complete. The 84 splits as 69 `[Source:` + 15 `[Working-tree source:` = 84 ✓. Writing the handback report.
+
+---
+
+# Round 12 — Reviewer A (Focused Completion) Handback
+
+## 1. Verified Hashes Table
+
+| File | Expected (brief) | Observed (sha256sum) | Status |
+|---|---|---|---|
+| MASTER_AUDIT_SYNTHESIS.md | `d68efe42…` | `d68efe422abb3a9eec572dd51f0e1951099c5b2eaf113e6b3fa5c792a8af9091` (1182 lines) | MATCH |
+| docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md | `9e0a5398…` | **`e1023d89b86d9ff56f3d260972f2da52e912d83188ec17c8abec8702857ce683`** (340 lines) | MISMATCH — used observed value per instruction; file is **untracked, absent from HEAD** (`git show HEAD:<path>` fails), so the candidate digest is stale/unattributable |
+| docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md | `2e347231…` | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` (456 lines) | MATCH |
+| docs/WORKORDER_MASTER_AUDIT_SYNTHESIS_REMEDIATION.md (in-row working-tree origin) | `687617d9…` (in-row) | `687617d9e6dfa7222d6cfd85fc25978caa92303109031ac0ed771bec2d20f2ec` | MATCH (also cross-confirmed in manifest line 108) |
+| HEAD | `48719b0…` | `48719b07988ad30d255b0fed37f45ed5db49c935` | MATCH |
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| §4.1 `OW-009` | Row's locator-correction detail ("resolveActiveRung imported at :140, called at :2598/:2600; handover's :138/:2568/:2570 do not resolve") is **not entailed by its cited origin** — the origin (HANDOVER 131-135) asserts the opposite locators — and no T4 citation is in-row | I verified the T4 facts directly at 48719b0: useStore.ts:140 = `resolveActiveRung,`; :2598/:2600 = the two calls; :2568 = `computePrescription([])`, :2570 = blank — the row's claims are TRUE, just uncited in-row | Minor |
+| §4.1 `OW-017` | Row says "strict-subset equipment filter"; origin span (DEVIATION_LOG 593-598) says "equipment filter" | Characterization enrichment from surrounding context; substance entailed verbatim | Minor |
+| Round-12 brief itself | Brief labels the remainder "31 rows total" but enumerates 41 IDs; brief's prior-read list names only 17 of the claimed 28 | Document is internally consistent (§0.1: "semantically read 28 origin spans… leaving 31 rows" = 59); brief-side arithmetic is lossy | Info (not a document defect) |
+
+No material discrepancy: every origin span entails its row's statement and status.
+
+## 3. Commands / Locators Checked
+
+- Hashes/counts: `git rev-parse HEAD`; `sha256sum` (4 files); `git show HEAD:<f> | sha256sum`; §4 span `sed -n '576,688p' | grep -o` → **84** citation brackets (69 `[Source:` + 15 `[Working-tree source:`) and **59** row lines — both §6.2 figures reproduced exactly; labels "all 84 citations across the 59 §4 rows" / "nine-row stale hunt" confirmed at lines 32-33, 821, 1000-1008.
+- §4.1 origins: work-order lines 188-196 (Findings 1-5; line 192 ⇒ OW-002/OW-003); closeout 158-226 (Finding 2 CONFIRMED, probe output, blanket-delete REFUSED + ROLLBACK, "Delete only the open episode" ⇒ OW-002 claim, TEST_CONFIRMED, OPEN); HANDOVER@48719b0 123-135 (U5 ⇒ OW-009), 167-173 (U8 ⇒ OW-011/012/013); DEVIATION_LOG@48719b0 95-98 (OW-018), 298-307 (OW-019), 593-598 (OW-017); docket@a80f955 414-417 (OW-022), 427-435 (OW-033), 452-455 (M1 row, line 454 ⇒ OW-034); TPL@48719b0 309-338 (OW-023 span 325-331, OW-032 span 332-338).
+- T4 corroboration: useStore.ts@48719b0 136-141, 2566-2572, 2596-2601 (OW-009 locators); verify_store_sql.mjs@48719b0:20/47/49 and @34f91ff:20/47/53 (OW-011 "deliberate and documented in the file itself", "still open at 34f91ff" — both TRUE); 059 sql@f3ebab38 142-152 (OW-034, and OW-002's refusal trigger).
+- §4.2 origins: PMOD@48719b0 30-44 (OW-028), 61-75 (OW-029), 92-104 (OW-030), 156-171 (OW-031); ratification record 266-273 pins Decision numbering 1-6 — OW-028/029/030/031 and §5.1 items 6/7 label correctly; HANDOVER 144-163 (OW-027).
+- §4.3 origins: RELEASE_READINESS@48719b0 19-99 — all 24 remainder rows' spans located and entailed (RG-04→30-32, RG-05→20-22, RG-06→33-36, RG-07→58-64, RG-08→51-52, RG-09→43-44, RG-10→39, RG-11→23-24, RG-12→19-20, RG-13→78-81, RG-14→84-86, RG-15→89-90, RG-16→96-99, RG-17→47-48, RG-18→65-66, RG-19→53-55, RG-20→56-57, RG-21→45-46, RG-22→40, RG-23→41-42, RG-24→82-83, RG-25→91, RG-26→92-93); RG-02 ← HANDOVER 189-192.
+- §5.1 supersessions: PMOD 189-199 (item 6 = Decision 5, option (a) do-not-pursue, option (b) remains ✓); PMOD 215-241 (item 7 = Decision 6, indefinite in-repo preservation, `-text` attribute ✓); useStore.ts@34f91ff:2195 = `get().refreshSuspension();` (item 22 boot-half ✓); item 23 split → RG-04 present/open ✓; item 20 split → OW-021/OW-022 dispositions ✓; item 25 → RG-01 (exact 536,870,912 B / 450,000,000 B pair + review band ✓); item 24 → RG-03 ✓; item 29 → §5.3 KineStrike external ✓; OW-015 closure: useStore@48719b0 3114-3125 (`LEFT JOIN set_target st ON st.set_id = sr.set_id` verbatim) + verify_store_sql@48719b0 539-548 (022 provenance gate) ✓; OW-016 closure: DEVIATION_LOG@48719b0 183-188 ("14 to 7 limit cycles… 1,711 to 1,687… 1,445 upward and 242 downward" verbatim) ✓; OW-021 closure: TPL@48719b0 206-212 corrected wording + `grep -c getMovementE1rmSeries` on TPL@48719b0 = **0** ✓; 057-half closure: TPL@48719b0 293-294 ("slot **058**, since `057…` now occupies 057") + PROPOSAL@48719b0 134-137 (requesting source itself stale) ✓; item 8/OW-010 removal guard: verify_store_sql@48719b0:689 and @34f91ff:701 both `!src.includes('getMovementE1rmSeries'));` ✓.
+- Stale-supersession check: no §4 row has a `superseded_by` other than NONE; §5.1 restatements target live §4 gates (RG-01/RG-03/RG-04 all present and open); revision-3 split families exactly tile their origin spans (51-57→RG-08/19/20; 43-46→RG-09/21; 39-42→RG-10/22/23; 78-83→RG-13/24; 89-93→RG-15/25/26); the three historical stale-current rows (OW-015/016/021) are closed with evidence at their own `as_of_revision`. **No §4 OPEN row is superseded by a newer source.**
+
+## 4. Coverage Limits
+
+- **All 41 enumerated remainder rows were semantically read** (origin span text → claim AND status): 9 §4.1 + 8 §4.2 + 24 §4.3. Note the brief's "31" label vs 41-ID enumeration — I covered the superset (see Discrepancy Table).
+- Combined with the 17 rows named as Round-11-read, 58 of 59 §4 rows are covered; the 59th (OW-026) was **not in my charter** but its origin span (TPL@48719b0 309-319) was incidentally read and entails its claim. Effective §4 semantic coverage: 59/59 across the two rounds.
+- The "nine-row stale hunt" figure is consistent across all three document mentions (lines 32-33, 821, 1004) but the nine-row set is not enumerated in any artifact, so the 9 itself is not independently recomputable; I substituted an exhaustive stale check across all 59 rows (above), which is strictly stronger.
+- Round 11 rows (OW-001/003/004/005/006/007/008/010/012/014/020/024/025/035/036, RG-01, RG-03) were not re-adjudicated, though OW-003/005/006/007's work-order origins and RG-01's span passed under my reads.
+- Manifest's candidate digest `9e0a5398…` could not be reconciled (file untracked; no git object) — only the observed hash is vouched.
+- Read-only pass: no files modified, nothing staged/committed; working-tree modifications observed (PROMPT_LEDGER.md, BlockScreen.tsx, ProfileScreen.tsx, useStore.ts, `.agents/`) were noted and ignored per charter.
+
+## 5. Summary
+
+Semantic entailment confirmed for **all 41** enumerated remaining §4 rows: every origin span resolves at its pinned revision (`48719b0`, `a80f955`, `34f91ff`, `f3ebab38`, or working-tree with matching SHA) and entails both the row's statement and its status (OPEN/PARKED/OWNER_ONLY/RELEASE_GATE; verification and release_effect columns consistent with the §4 preamble's declared inference convention). §5.1 supersession verified in full: Revision 1 items 6, 7, 22, 23, 25, 24, 29, the OW-015/OW-016/OW-021 closures, the two SPLIT rows, and item 12's three-way split all check against their named superseding sources at the cited revisions; no §4 OPEN row is superseded by a newer source. Count labels verified mechanically: **84** citations / **59** rows exact; "nine-row" consistent but not independently recomputable. Three minor discrepancies, none material. The manifest digest mismatch in the brief is stale-metadata, not a document defect.
+
+**VERDICT: APPROVE**

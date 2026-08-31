@@ -1,0 +1,51 @@
+All checks complete — record hashes 20/20 OK, Entry 0064's OW-024 correction matches the §4.1 row. Final report:
+
+---
+
+# Round 11 attempt 2 — Reviewer A FULL-SCOPE Report (State A @ 48719b0)
+
+## 1. Verified Hashes Table
+
+| Item | Expected | Verified | Result |
+|---|---|---|---|
+| HEAD / branch | `48719b07988ad30d255b0fed37f45ed5db49c935` / `codex/progression-evidence-remediation` | `git rev-parse` / `git branch` | MATCH |
+| MASTER_AUDIT_SYNTHESIS.md (1138 ln) | `4ab4a3dbff06d25a…929e7be51` | sha256sum | MATCH |
+| docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md (338 ln) | `75e2f733cf07311a…5b5ede4360` | sha256sum | MATCH |
+| docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md (456 ln) | `2e347231e16281ea…93577531d90c` | sha256sum | MATCH |
+| S-T0-07 `CLAUDE.md` | `d1b7cdd54e2efb57…e9c8ce` | sha256sum vs disk | MATCH |
+| S-T0-08 `docs/WORKORDER_MASTER_AUDIT_SYNTHESIS_REMEDIATION.md` | `687617d9e6dfa722…d20f2ec` | sha256sum vs disk | MATCH |
+| S-T0-09 `AGENTS.md` | `1fa93413922a454e…cc5773063` | sha256sum vs disk | MATCH |
+| S-T3-08…24 (17 rows, SHA-256 first-16) | per manifest §4.3 | sha256sum prefix-16 vs disk | 17/17 MATCH |
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| None (material) | — | — | — |
+| RG-03 (§4.3) | "fails at State A, where `primaryImplement = supportedPrefixes[0]`" | Fact verified true (`useStore.ts:2962`,`:3087` @48719b0), but that locator is not cited in the row (row cites HANDOVER 78-89 + blockGenerator 346-355, which backs the RPE/set expectations) | Minor |
+| Citation style, OW-002/OW-004 | `059_suspension…sql@f3ebab38…` | `f3ebab38` is a commit, not 34f91ff; blob of the SQL at that commit = `f544bfd0…` = blob at 34f91ff — citation valid, file unchanged between the two | Info (no action) |
+| Manifest §6.1 distinct-path count | 71 | Raw extraction yields 72 path-column values; 71 is correct after excluding pathless `S-T4-05` (Git metadata) — reconciles exactly (74 − 2 dup [blockGenerator.ts, useStore.ts] − 1 pathless) | Info (no action) |
+
+## 3. Commands / Locators Checked
+- `sha256sum` + `wc -l` on 3 candidate docs; `git rev-parse`/`branch`.
+- Manifest arithmetic: row-anchored greps on `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` (`^\| \`S-`), per-tier counts, `uniq -d` on source_ids, path dedupe, T0/T1 code-extension scan, S-OUT/T5/S-T4-05 row inspection.
+- §1.1 corpus commands run verbatim: Corpus A `git ls-tree -r 48719b0 | grep -E '(^|/)(AUDIT_|…)…|\.md$'` → 62 of 117; B `git ls-files --others --exclude-standard | grep '\.md$' | grep -v '^\.agents/'` → 9; C `^\.agents/.*\.md$` → 213; D `git diff --name-only 48719b0..34f91ff` → 16 files, 2 `.md` (PROMPT_LEDGER.md, RELEASE_CANDIDATE_C1_DOCKET.md); E `ls` parent-root KINESTRIKE report → 1.
+- §4 ledger (33 OW + 26 RG rows): automated resolution of every `[Source:…]`/`[Working-tree source:…]` citation — `git cat-file -e rev:path`, `git show rev:path | wc -l` bounds, WT existence/bounds. All resolve, zero out-of-bounds.
+- Entailment reads (28 rows incl. required OW-036/OW-001/OW-024/OW-025/OW-035/RG-01/RG-03): docket@a80f955 (61-70, 105-118, 399-403, 419-425, 427-435, 452-454, 467-468); HANDOVER@48719b0 (78-89, 123-129, 137-142, 144-163, 167-173, 189-192); DEVIATION_LOG (95-98, 142-154, 298-307, 593-598); TRAINING_PROGRESSION_LAYERS (272-290, 300-319, 325-338); PROGRESSION_MEASUREMENT (30-44); RELEASE_READINESS (25-29); WORKORDER (191-195); AUDIT_architecture_review (134-170); blockGenerator@34f91ff (844-862, 765-771, 671-682), @48719b0 (346-355); 059 SQL@f3ebab38 (142-152); closeout (63-75); useStore@34f91ff (1821-1834).
+- Stale re-derivations at each row's own as_of_revision: OW-001, OW-005, OW-006, OW-007 (34f91ff), OW-008, OW-010, OW-012, OW-014, OW-020 (48719b0) — all 8 conditions still hold; none stale.
+- Release chain: progressionEngine.ts:51-53 (`requiredReps: 8`), blockGenerator.ts:48 import, `git grep progression_policy -- '*.sql'` @34f91ff (0 seeds), 016_movement_library_seed.sql:281, BlockScreen 471-517, verify_migrations 059 grep, PROMPT_LEDGER Entry 0064 (3269-3356), §3.4 (498-568).
+
+## 4. Coverage Limits
+- Entailment read for 28 of 59 §4 rows; the remaining 31 rows' citations were resolution- and bounds-checked only (all passed).
+- Non-ledger §3.4 citations (memory_gate.mjs, audit.mjs, budget.json, package.json, RELEASE_READINESS 106-108, HANDOVER 35-37) not opened; §3.4 naming check done from synthesis text.
+- RG-04…RG-26 RELEASE_READINESS spans not semantically read (bounds-checked at 48719b0 only).
+- Corpus C total re-counted live (213); the §1.3 `find`-vs-`--exclude-standard` delta (214th file, gitignored rules file) accepted from manifest, not re-derived.
+- Synthesis §0-§2, §5, §6, manifest §6.3-6.5, and the 76 dirty working-tree entries were not audited (outside Reviewer A charter).
+- BlockScreen/verify_migrations checks were targeted greps/span reads, not full-file audits.
+
+## 5. Summary
+All seven charter items pass. Manifest arithmetic is exact (74 records; T0=9/T1=16/T2=0/T3=24/T4=22/T5=1/S-OUT=2; 0 duplicate IDs; 71 distinct paths; no code/test/schema in T0/T1). All five §1.1 corpus totals reproduce exactly. Every §4 citation resolves and is in bounds (including the commit-rev 059 citation and all five admission-gate spans); 28 origin spans read with semantic entailment confirmed in every case. The 8-row stale hunt found nothing stale. The OW-036 BLOCKING chain is fully re-derivable from primary sources (one `isPurelyBodyweight` predicate → set ramp + rep floor + fatigue class; imported bar of 8; zero `progression_policy` seeds; Push-up rung 0 at 016:281); §3.4 names OW-036/OW-024/OW-025/OW-035 BLOCKING with C6 DEFERRED/C7 owner-only on top; Entry 0064's OW-024 DOCUMENT_ONLY/BLOCKING correction is consistent with the §4.1 row and with OW-036/OW-025 as the code-confirmed blockers. Record hashes 20/20 verified against disk. No repository files were created, modified, staged, or committed (scratch list written to /tmp only).
+
+## 6. Verdict
+
+VERDICT: APPROVE

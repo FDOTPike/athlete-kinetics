@@ -1,0 +1,47 @@
+# Round 7 Reviewer A — Independent Read-Only Review Report
+
+## 1. Verified Hashes Table
+
+| Candidate | Lines | Computed SHA-256 | Expected | Match |
+|---|---|---|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` | 1038 | `fb91b7e965997d7e75bdfc537f87f164b55f8af040278d458b5896f9877f5a68` | `fb91b7e9…` | ✅ |
+| `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` | 330 | `fe7eb9afadfd569d10b043f07197a6be6ad103faa9c16cf7b393ec9c4d97800a` | `fe7eb9af…` | ✅ |
+| `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` | 456 | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | `2e347231…` | ✅ |
+
+HEAD confirmed `48719b07988ad30d255b0fed37f45ed5db49c935` on `codex/progression-evidence-remediation`. Supporting hashes verified against disk bytes: work order `687617d9…` (550 lines, T0 origin), all 10 reviewer handoffs S-T3-08…S-T3-17 (hash + line count, all match), `CLAUDE.md`, `AGENTS.md`, `.agents/orchestrator/GATE_STATUS.md`, all six State B overlay files (hash + line count), external KINESTRIKE doc `6a7be0f8…` (443 lines). State C blob abbreviations (docket `af83e8560b66`@a80f955, ledger `3fd1e236fb51`@34f91ff, `0b40508c3d18`, `40a79bba1de3`, `e149ade84496`) and manifest line counts (550/268/275/118) all re-derived exactly.
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| Manifest §6.4 (lines 296–297) | Final hashes of the synthesis and manifest are "recorded in `PROMPT_LEDGER.md` Entry 0063 (final hashes after the GLM-5.3 continuation closeout…)" | Entry 0063 (worktree ledger lines 3132–3182) is the *package-preparation* closeout and contains only the continuation-package hashes (work order `72e1166b…`, SOUL.md `6d5e58af…`, AGENTS.override.md `836cbd80…`). Neither `fb91b7e9…` nor `fe7eb9af…` appears anywhere in `PROMPT_LEDGER.md` (grep: 0 hits). The parenthetical is also wrong about which entries hold earlier revisions: the 992-line `85a192a…` is recorded in Entry 0061 (ledger lines 2957, 3009), not 0062; Entry 0062 holds the 1007-line `e1a93745…`. Continuation work order W2.4 ("Correct the final-ledger locator") and the instruction to complete Entry 0063 with the final hashes were not fulfilled — the current candidate's hashes are recorded nowhere in the append-only ledger. | **MEDIUM** |
+| Manifest §1.2 row B / §6.1–6.2; Synthesis §1.1, §6.1 CR-03 row, §6.3 reproduction script | Corpus B = 6 untracked non-`.agents/` Markdown, Corpus C = 115, total 121 — "reproducible by a third party running the stated command"; `# expect 121` | Running the manifest's own §1.1 commands now yields **9** outside `.agents/` (new: `AGENTS.override.md`, `docs/WORKORDER_GLM53_AUDIT_SYNTHESIS_CONTINUATION.md`, `docs/hermes-glm53-audit-closeout/SOUL.md` — all created *before* the manifest's final edit) and **213** under `.agents/` (new teamwork directories), total **222**. Continuation W2.3 ("Recompute source totals") was not executed for corpus counts. Mitigating: totals are dated to capture and T3 mutability is disclosed; ledger-row provenance is unaffected. By this process's own precedent (round 3 treated stale CR-03 totals as a remediation item), this is a reportable consistency failure. | **MEDIUM** |
+
+No other discrepancies found. Specifically verified clean: every §4 row's citation span semantically entails its statement and status (details §3); authority tiers; no stale-current OPEN row; §0.1/§6.2/§6.3 chronology; §3.4 release narrative; State B/C snapshot claims; `ProfileScreen.tsx:36` imports `SuspensionCard` and renders it zero times, as §3.2 states.
+
+## 3. Commands / Source Locators Checked
+
+- `sha256sum` + `wc -l` over all three candidates, work order, 10 handoff `.txt` files, 6 State B files, `CLAUDE.md`, `AGENTS.md`, `GATE_STATUS.md`, external KINESTRIKE doc.
+- `git show` span reads (semantic entailment): work order §3.5 lines 185–200; closeout lines 60–370 (Findings 1–5 verbatim); `HANDOVER` 78–89, 123–135, 137–142, 144–163, 167–173, 189–192; `DEVIATION_LOG` 95–98, 142–154, 298–307, 593–598; docket@a80f955 60–118, 398–404, 414–426, 427–435, 450–455, 464–470; `TRAINING_PROGRESSION_LAYERS` 278–282, 305–340; `PROGRESSION_MEASUREMENT_OPEN_DECISIONS` 28–46, 59–77, 90–106, 154–173, 187–200, 213–243; `RELEASE_READINESS` 18–99 (all 26 RG spans mapped); `memory_gate.mjs` 56–61, `audit.mjs` 173–175, `budget.json` 40–43, `package.json` 37–48; `blockGenerator.ts`@34f91ff 671–682, 765–771, 844–862; `blockGenerator.ts`@48719b0 346–355; `useStore.ts`@48719b0 136–142, 2566–2572, 2596–2602.
+- OW-036 causal chain re-derived independently: `isPurelyBodyweight` gates the set ramp (`:853–857`) and the floor (`:862`); `bodyweightRepsFor` falls back to `DEFAULT_ADVANCEMENT_POLICY.requiredReps = 8` (`progressionEngine.ts:53`); zero `progression_policy` seeds at both states; Push-up = `('Push-up','handstand-push-up',0)` at `016_movement_library_seed.sql:281`; `plannedImplementFor` returns `undefined` for multi-prefix. The bar of 8 is live now.
+- Staleness greps: `SCHEMA_FILES` missing 057 at both states; no `capture-at-issue-time` in `AGENT_WORKFLOW.md`; `resumed_macro_index` still at `PROPOSAL:45/86/123`; no `[059]` section in `verify_migrations.mjs` at 34f91ff; main-checkout ledger 29 entries vs worktree 63 (OW-024 live); State B hashes unchanged (OW-025 live).
+- Reproduction battery: `git log 48719b0..34f91ff` = 4 commits; `cat-file -e` = all three U3 files and 059 absent at A, 059 present at C; `ls-tree | grep -ci kinestrike` = 0; Corpus A = 62/117.
+- Verdict lines read from all 10 handoff files; PROMPT_LEDGER Entry 0063 read in full (3132–3182); ledger grepped for both candidate hashes; continuation work order lines 150–260 read for the W2 deliverables.
+
+## 4. Coverage Limits
+
+- Did not re-run the mechanical verifier (not my role; not evidence of entailment) and did not re-check all 163 individual citations — only every span cited by a §4 row, §5 closure rows, and the reproduction battery.
+- Revision 1 is unrecoverable (overwritten in place); §5.1/§5.2 "revision 1 item N" mappings could not be independently audited — documented limitation, accepted.
+- State C read only at exact commits via `git show`, never its worktree, per scope.
+- Corpus C growth (115→213) was counted but individual new `.agents/` files were not triaged; they are T3 and originate nothing either way.
+- Manifest blob abbreviations spot-checked (5 of 30), not exhaustively enumerated.
+
+## 5. Summary of Findings
+
+The substantive ledger is clean. All 33 OW-*/owner rows and 26 RG-* rows trace to admissible T0/T1 origins with spans that semantically entail them; the T0-origin-plus-admission-gate construction for OW-001…007/OW-036 is sound, and every T4 citation in the ledger is labeled corroboration. T2 has zero rows and all 22 technical records sit in T4 (67 records / 64 distinct paths arithmetic confirmed). OW-036's `BLOCKING` is a supportable conservative inference — I re-derived the seven-step chain and the bar of 8 is live for all 15 chain movements today; OW-001's `NON_BLOCKING` is defensible on dose grounds with the residue honestly disclosed, and the §3.4 NO-GO narrative correctly names OW-036/OW-024/OW-025/OW-035 rather than C6 alone. The review chronology is internally consistent and matches all ten persisted handoffs. **No fourth stale-current OPEN row exists** — I attacked all 33 rows at their own `as_of_revision` and all conditions still hold.
+
+The two defects are both in the continuation's own deliverables, not the ledger: (1) the manifest's §6.4 claims the current candidate's final hashes are recorded in ledger Entry 0063, and they are not — the append-only record the package's provenance chain depends on was never completed; (2) the declared corpus totals (6/115/121) no longer reproduce under the manifest's own commands (9/213/222), including three files the process itself created before the manifest's final edit. Both are narrow, mechanical to fix, and both are exactly the defect classes prior rounds returned REQUEST_CHANGES for.
+
+## 6. Final Verdict
+
+VERDICT: REQUEST_CHANGES
