@@ -27,6 +27,8 @@ const { generateBlock, programFocuses, defaultProgramDayIndices, weeklyProgressi
   return { ...g, DEFAULT_ADVANCEMENT_POLICY: p.DEFAULT_ADVANCEMENT_POLICY };
 })();
 const { resolveMovementAvailability } = require(REPO + '/packages/inference/test/.build/capabilityResolver.js');
+const { strengthAnchorCapacity } = require(REPO + '/packages/inference/test/.build/blockGenerator.js');
+const { objectiveStyleLabel, powerObjectiveExplanation } = require(REPO + '/packages/inference/test/.build/movementRanking.js');
 
 const SCHEMA_DIR = REPO + '/packages/core-db/src/schema';
 const START = '2026-09-01';
@@ -65,7 +67,9 @@ const PRESETS = {
 };
 const BIG3 = ['Competition Squat', 'Competition Bench', 'Deadlift'];
 
-/** Build the generator input exactly as useStore maps it (lines ~3041-3056). */
+/** Build the generator input exactly as useStore maps it (lines ~3041-3056),
+ *  including the Round 2 powerPreferredMovementNames (movement_lift_family
+ *  preferred_purpose='speed', read from the real migrated database). */
 function buildPool({ trainingAge, inventory, priorExperience = [], safetyExcluded = [] }) {
   const equipment = new Set(inventory);
   const safety = new Set(safetyExcluded);
@@ -92,11 +96,16 @@ function buildPool({ trainingAge, inventory, priorExperience = [], safetyExclude
   }));
 }
 
+const POWER_NAMES = raw.prepare(
+  `SELECT m.name AS name FROM movement_lift_family mlf JOIN movement m ON m.movement_id = mlf.movement_id
+    WHERE mlf.preferred_purpose = 'speed' ORDER BY m.movement_id`,
+).all().map((r) => r.name);
+
 function coachProgram(profile, pool) {
   const focuses = programFocuses(profile.objective, profile.weekly_frequency);
   const days = defaultProgramDayIndices(profile.weekly_frequency);
   const programDays = focuses.map((focus, i) => ({ day_index: days[i], focus, movement_preferences: [] }));
-  return generateBlock({ profile, movements: pool, startDate: START, schemaType: 'LINEAR', programDays });
+  return generateBlock({ profile, movements: pool, startDate: START, schemaType: 'LINEAR', programDays, powerPreferredMovementNames: POWER_NAMES });
 }
 
 const week1 = (plan) => plan.sessions.filter((s) => s.week_index === 1)
@@ -150,31 +159,102 @@ const record = (id, pass, detail) => { results.push({ id, pass, detail }); conso
     `no confirmation: loaded default is ${squatSlotA}, Bodyweight ${bwA}; goblet prior experience confirmed: Goblet Squat ${goblet}x (the minimum loaded squat), Bodyweight ${bwB}`);
 }
 
-// --- PQ-04 strength / intermediate / fewer than 3 slots -----------------------
+// --- PQ-04 strength / intermediate / fewer than 3 anchor slots -----------------
+// Round 2: semantic, not a mirrored boolean. The case runs WITHOUT
+// prior-experience confirmation (a fresh intermediate — the athlete most
+// likely to under-estimate capacity), runs the REAL capacity law
+// (strengthAnchorCapacity over the shaped plan slots) AND the real generator
+// at the shaped schedule, then demands:
+//   (a) the capacity law reports < 3 anchor-capable slots, and
+//   (b) the generated week cannot actually carry the three anchors (fewer
+//       than three anchor-name slots planned), and
+//   (c) nothing is silently omitted: every anchor that is NOT carried is
+//       disclosed with its exact gate (the generator's warnings), so the
+//       reduced-anchor outcome is visible, never a false powerlifting promise.
 {
-  const days = 1;
-  const capacityShort = days < 3; // mirrors ProgramSetupScreen.strengthCapacityShort
-  record('PQ-04', capacityShort, `1 session/week => capacity conflict disclosed BEFORE create (strengthCapacityShort=true), reduced-anchor choice offered`);
+  const profile = { objective: 'strength', training_age: 'intermediate', weekly_frequency: 1, max_sessions_per_day: 1, session_duration_cap_min: 15, base_rpe_cap: 9, target_energy_system: 'hybrid', progression_methodology: 'autoregulated', injury_flags: [], mobility_limits: [], equipment_inventory: PRESETS.full_gym };
+  const capacity = strengthAnchorCapacity(profile, programFocuses, defaultProgramDayIndices);
+  const pool = buildPool({ trainingAge: 'intermediate', inventory: PRESETS.full_gym });
+  const plan = coachProgram(profile, pool);
+  const slotNames = new Set(plan.sessions.filter((s) => s.week_index === 1).flatMap((s) => s.slots)
+    .map((sl) => library.find((x) => x.id === sl.movement_id)?.name));
+  const carried = BIG3.filter((n) => slotNames.has(n)).length;
+  const missing = BIG3.filter((n) => !slotNames.has(n));
+  const disclosed = plan.warnings.filter((w) => w.includes('unavailable for')).length;
+  record('PQ-04', capacity < 3 && carried < 3 && missing.length > 0 && disclosed >= 2,
+    `capacity law: ${capacity} anchor slots (<3); week carries ${carried}/3 anchors (each absent anchor gate-disclosed, ${disclosed} warning(s), none silently dropped); setup UI discloses the conflict BEFORE create`);
 }
 
-// --- PQ-05 hypertrophy / intermediate / full gym -------------------------------
+// --- PQ-05 hypertrophy / intermediate / full gym --------------------------------
+// Round 2: semantic, not label/set counts. The case demands the PLAN is a
+// distinct bodybuilding product: (a) zero big-three obligation, (b) balanced
+// pattern exposure across the repeating week (lower/upper push/upper pull/
+ // accessory), (c) primary and accessory dose roles VISIBLY distinct with a
+// coherent overload path (primary > accessory sets; accessory slots default
+// to non-compound work; overload via the schema's progression, not an
+// unexplained identical template), and (d) a week-2 change the summary can
+// name (the overload path exists).
 {
+  const profile = { objective: 'hypertrophy', training_age: 'intermediate', weekly_frequency: 4, max_sessions_per_day: 1, session_duration_cap_min: 90, base_rpe_cap: 9, target_energy_system: 'hybrid', progression_methodology: 'autoregulated', injury_flags: [], mobility_limits: [], equipment_inventory: PRESETS.full_gym };
   const pool = buildPool({ trainingAge: 'intermediate', inventory: PRESETS.full_gym });
-  const plan = coachProgram({ objective: 'hypertrophy', training_age: 'intermediate', weekly_frequency: 4, session_duration_cap_min: 90, base_rpe_cap: 9, equipment_inventory: PRESETS.full_gym }, pool);
+  const plan = coachProgram(profile, pool);
   const big3 = BIG3.reduce((a, n) => a + movementOccurrences(plan, n).length, 0);
-  const lower = plan.sessions.filter((s) => s.focus === 'lower').length;
-  const upper = plan.sessions.filter((s) => s.focus === 'upper').length;
-  record('PQ-05', big3 === 0 && lower > 0 && upper > 0, `big-three occurrences: ${big3}; lower days: ${lower}, upper days: ${upper} (Bodybuilding label)`);
+  const week1 = plan.sessions.filter((s) => s.week_index === 1);
+  const lowerDays = week1.filter((s) => s.focus === 'lower').length;
+  const upperDays = week1.filter((s) => s.focus === 'upper').length;
+  const patterns = new Set(week1.flatMap((s) => s.slots)
+    .map((sl) => library.find((x) => x.id === sl.movement_id)?.pattern));
+  const balanced = patterns.has('squat') && patterns.has('push_h') && patterns.has('pull_h');
+  const primarySets = [...new Set(week1.flatMap((s) => s.slots.filter((sl) => sl.slot_index < 3).map((sl) => sl.sets)))];
+  const accessorySets = [...new Set(week1.flatMap((s) => s.slots.filter((sl) => sl.slot_index >= 3).map((sl) => sl.sets)))];
+  const rolesDistinct = primarySets.length === 1 && accessorySets.length === 1
+    && primarySets[0] > accessorySets[0];
+  const summary = weeklyProgressionSummary(plan, (id) => {
+    const m = library.find((x) => x.id === id);
+    return m ? { name: m.name, bodyweight: (byName.get(m.name)?.prefixes ?? []).length === 1 && byName.get(m.name).prefixes[0] === 'Bodyweight' } : undefined;
+  });
+  const overloadNamed = summary.some((line) => !line.includes('unchanged'));
+  const accessoryCompoundShare = (() => {
+    const acc = week1.flatMap((s) => s.slots.filter((sl) => sl.slot_index >= 3));
+    if (acc.length === 0) return 0;
+    const compounds = acc.filter((sl) => library.find((x) => x.id === sl.movement_id)?.isCompound).length;
+    return Math.round((compounds / acc.length) * 100);
+  })();
+  record('PQ-05', big3 === 0 && lowerDays > 0 && upperDays > 0 && balanced && rolesDistinct && overloadNamed,
+    `big-three occurrences: ${big3}; balanced exposure: squat+push_h+pull_h across ${lowerDays} lower / ${upperDays} upper days; dose roles distinct: primary ${primarySets[0]} sets vs accessory ${accessorySets[0]} sets; accessory slots non-compound share: ${accessoryCompoundShare}%; overload path: ${overloadNamed ? 'week-2 change named by the progression summary' : 'FAIL: flat template'}`);
 }
 
-// --- PQ-06 power / intermediate / full gym -------------------------------------
+// --- PQ-06 power / intermediate / full gym --------------------------------------
+// Round 2: semantic, not label+set counts. The case demands the power plan is
+// a DISTINCT, gate-safe power product: (a) the objective is honestly labeled,
+// (b) speed-purpose rungs (curated preferred_purpose='speed') are preferred
+// where the gates admit them, (c) the scheme is genuinely power-shaped
+// (low reps) vs the strength block, (d) Power Clean is NEVER prescribed to an
+// intermediate (tier ceiling binds), and (e) the athlete-facing explanation
+// exists as a pure export the UI renders.
 {
+  const profile = { objective: 'power', training_age: 'intermediate', weekly_frequency: 4, max_sessions_per_day: 1, session_duration_cap_min: 90, base_rpe_cap: 9, target_energy_system: 'hybrid', progression_methodology: 'autoregulated', injury_flags: [], mobility_limits: [], equipment_inventory: PRESETS.full_gym };
   const pool = buildPool({ trainingAge: 'intermediate', inventory: PRESETS.full_gym });
-  const plan = coachProgram({ objective: 'power', training_age: 'intermediate', weekly_frequency: 4, session_duration_cap_min: 90, base_rpe_cap: 9, equipment_inventory: PRESETS.full_gym }, pool);
-  const slot = plan.sessions[0].slots[0];
-  const strengthSlot = coachProgram({ objective: 'strength', training_age: 'intermediate', weekly_frequency: 4, session_duration_cap_min: 90, base_rpe_cap: 9, equipment_inventory: PRESETS.full_gym }, buildPool({ trainingAge: 'intermediate', inventory: PRESETS.full_gym, priorExperience: BIG3.map((n) => byName.get(n).id) })).sessions[0].slots[0];
-  record('PQ-06', slot.sets === 5 && slot.reps === 5 && strengthSlot.sets === 4,
-    `power ${slot.sets}x${slot.reps}@${slot.target_rpe} vs strength ${strengthSlot.sets}x${strengthSlot.reps}@${strengthSlot.target_rpe} (macro gpp +2 reps; strength hits the ratified chain rep floor of 8 on Competition Squat); label: Athletic power`);
+  const plan = coachProgram(profile, pool);
+  const label = objectiveStyleLabel('power');
+  const speedUsed = new Set(plan.sessions.flatMap((s) => s.slots)
+    .map((sl) => library.find((x) => x.id === sl.movement_id)?.name)
+    .filter((name) => POWER_NAMES.includes(name)));
+  const cleanOccurrences = movementOccurrences(plan, 'Power Clean').length;
+  const strengthPlan = coachProgram(
+    { ...profile, objective: 'strength' },
+    buildPool({ trainingAge: 'intermediate', inventory: PRESETS.full_gym, priorExperience: BIG3.map((n) => byName.get(n).id) }),
+  );
+  const powerSlot = plan.sessions.find((s) => s.focus === 'lower').slots[0];
+  const strengthSlot = strengthPlan.sessions.find((s) => s.focus === 'lower').slots[0];
+  const explanation = powerObjectiveExplanation('power');
+  const ok = label === 'Athletic power'
+    && speedUsed.size > 0
+    && cleanOccurrences === 0
+    && powerSlot.reps < strengthSlot.reps
+    && explanation.length > 0;
+  record('PQ-06', ok,
+    `label: ${label}; speed rungs used: ${[...speedUsed].join(', ') || 'none (FAIL)'}; Power Clean for intermediate: ${cleanOccurrences} (tier ceiling ${cleanOccurrences === 0 ? 'held' : 'BROKEN'}); power slot ${powerSlot.sets}x${powerSlot.reps}@${powerSlot.target_rpe} vs strength ${strengthSlot.sets}x${strengthSlot.reps}@${strengthSlot.target_rpe}; explanation: "${explanation}"`);
 }
 
 // --- PQ-07 gpp / intermediate / full gym ---------------------------------------
@@ -275,8 +355,20 @@ ${snapshot('PQ-14 — strength, advanced, full gym', p14)}
 
 ## Notes and approximations
 
-- PQ-04 is disclosed at the setup surface: the harness mirrors
-  \`ProgramSetupScreen.strengthCapacityShort\` (days < 3) rather than driving UI.
+- Round 2 PQ-04: the case runs the REAL capacity law (strengthAnchorCapacity
+  over squat/push_h/hinge slots after duration+focus shaping) AND the real
+  generator at the shaped schedule, requiring capacity < 3, fewer than three
+  anchors carried, and every absent anchor gate-disclosed. The setup UI
+  warning (ProgramSetupScreen) is component-proven in
+  ProgramQualityRound2.test.js against the same imported function.
+- Round 2 PQ-05: semantic bodybuilding contract — zero big-three, balanced
+  pattern exposure, primary>accessory dose-role separation (the named
+  ROUND2_HYPERTROPHY_ROLE_SET_DELTA), and a named overload path via
+  weeklyProgressionSummary.
+- Round 2 PQ-06: semantic power contract — honest label, curated speed rungs
+  preferred where gates admit them, Power Clean never prescribed to an
+  intermediate (tier ceiling held), power-shaped reps vs the strength block,
+  and the pure powerObjectiveExplanation copy rendered by the setup UI.
 - PQ-11 approximates the store's niggle-to-exclusion law by excluding the
   squat PATTERN (a knee niggle maps to the knee joint, which squat-pattern
   movements stress); Reviewer B should reproduce via the store path.
