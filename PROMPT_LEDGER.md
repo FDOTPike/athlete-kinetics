@@ -3378,9 +3378,15 @@ separate until reconciliation.
   ratified); "jump-style alternatives" copy is generic guidance; limitations gate enforced at
   the footer NEXT (no persistence path bypasses it); PQ-11 pattern-level approximation and
   PQ-12/13 component-proven notes carry over from Round 1.
-- **Review:** two fresh isolated reviewer runs dispatched post-freeze (Reviewer A semantics,
-  Reviewer B verification); conclusions kept separate until reconciliation; reduced model
-  diversity disclosed — both reviewers are the same model as the executor (GLM-5.3 Flash).
+- **Review rounds:** three rounds total. Round 1: REQUEST_CHANGES ×2 on one blocking finding
+  (stale committed matrix, not reproducible from the frozen harness) + P2s (beginner copy
+  overpromise, count drift) → remediated in bc2c744. Round 2: SPLIT (B2 APPROVE, A2
+  REQUEST_CHANGES on three non-blocking items) → remediated in 048ca85 (caption scoped out for
+  beginners; handoff count row corrected to 23/23; re-freeze pin chain declared). Round 3:
+  **dual APPROVE** against 048ca85 — certification block in EXECUTOR_HANDOFF_R2.md; verbatim
+  reviewer handoffs at docs/audits/program-quality-remediation/reviews/round-3-reviewer-{a,b}.txt.
+  Conclusions kept separate until reconciliation each round; reduced model diversity disclosed
+  (same model family as executor).
 - **Review round 1 outcome and remediation:** both reviewers returned REQUEST_CHANGES on one
   identical blocking finding — the committed GENERATED_PROGRAM_MATRIX.md predated the final
   harness notes patch and still carried the Round 1 'mirrors days<3' note, so it did not

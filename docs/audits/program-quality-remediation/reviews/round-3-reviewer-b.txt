@@ -1,0 +1,81 @@
+# Round 3 Reviewer B — Code, Data, Safety & Verification — VERBATIM HANDOFF
+
+Candidate: 048ca85e11bccafae860d28281fd4598b9be0873 (tree de683c3ff292d34b5afec82e97e7234bf08e45cb) · 2026-09-01
+Model: z-ai/glm-5.3-flash via nous (reduced model diversity disclosed — same model family as executor)
+
+```json
+{
+  "verdict": "APPROVE",
+  "findings": [
+    {
+      "class": "P3-nonblocking",
+      "detail": "The newly-scoped power-card caption (rendered only when profile.training_age !== 'beginner') is not pinned by any test. The [P1b] gate checks pin the pure powerObjectiveExplanation copy, but the screen-local caption could silently regress to untiered rendering without a failing gate.",
+      "evidence": "grep for 'caption|Fast barbell' in apps/mobile/test/components/ProgramQualityRound2.test.js returns no caption assertions; ProgramSetupScreen.tsx:272 guards the caption with {profile.training_age !== 'beginner' && (...)} untested. Docs-only follow-up candidate; consistent with how prior rounds treated disclosure-only notes."
+    },
+    {
+      "class": "P3-nonblocking",
+      "detail": "matrix_harness.mjs crashes with ERR_INVALID_ARG_VALUE when run without the PROBE_CWD environment variable; the run command is documented only in the file's header comment.",
+      "evidence": "Header comment states 'Run: PROBE_CWD=<repo-windows-path> node matrix_harness.mjs'; bare invocation fails at line 22 (createRequire(REPO + '/x.js') with REPO undefined). With PROBE_CWD set the harness runs 14/14 PASS. Documentation nit only."
+    },
+    {
+      "class": "verified-consistency",
+      "detail": "The caption scoping direction is safe and consistent with the engine law: modeFor returns 'legacy' only for beginner training age or rehab objective (movementRanking.ts:252-255), the caption renders only inside the power card (objective === 'power', line 184/266), and non-beginner power athletes run the loaded-mode speed law that backs the caption's 'are planned' claim. TypeScript typing rules out an undefined training_age reaching the guard (typecheck exit 0).",
+      "evidence": "movementRanking.ts:252 'if (age === 'beginner' || objective === 'rehab') return 'legacy';'; ProgramSetupScreen.tsx:272; npm run typecheck exit 0."
+    }
+  ],
+  "verification_table": [
+    {
+      "command": "git rev-parse HEAD HEAD^{tree}",
+      "exit": 0,
+      "summary": "HEAD = 048ca85e11bccafae860d28281fd4598b9be0873; tree = de683c3ff292d34b5afec82e97e7234bf08e45cb — both match the declared candidate; branch codex/program-quality-remediation"
+    },
+    {
+      "command": "git diff --name-only b8d5056..048ca85 (plus git diff --name-only filtered to packages/, apps/mobile/src/state/, apps/mobile/test/, package.json)",
+      "exit": 0,
+      "summary": "Exactly two files above the certified re-freeze: ProgramSetupScreen.tsx and EXECUTOR_HANDOFF_R2.md; empty diff for engine/state/test/package.json — handoff's 'no engine, gate, or data change' claim verified"
+    },
+    {
+      "command": "npm run typecheck",
+      "exit": 0,
+      "summary": "Clean tsc over apps/mobile"
+    },
+    {
+      "command": "npm run verify:migrations",
+      "exit": 0,
+      "summary": "ALL CHECKS PASSED; no new migration above b8d5056 (060 remains newest slot, matching the disclosed limitation)"
+    },
+    {
+      "command": "npm run verify:blocks",
+      "exit": 0,
+      "summary": "ALL CHECKS PASSED; verify_programQualityRound2.mjs machine-counted at 23 checks via grep: [P1] 7 + [P1b] 3 + [P2] 6 + [P3] 7 — matches the handoff's corrected 23/23 row exactly"
+    },
+    {
+      "command": "npm run verify:store",
+      "exit": 0,
+      "summary": "ALL CHECKS PASSED (698 PASS lines incl. invariance gate and routine templates)"
+    },
+    {
+      "command": "npm run verify:components",
+      "exit": 0,
+      "summary": "19 suites / 247 tests passed — matches the handoff table"
+    },
+    {
+      "command": "npm run verify:ci (background, ~10 min)",
+      "exit": 0,
+      "summary": "FINAL_EXIT=0 across all 22 chained gates (incl. verify:pipeline, verify:progression, verify:qa-artifact); the 40 FAIL lines in the log are the qa-artifact suite's own fixture-mode negative probes, each followed by a PASS 'rejected' check — the handoff's characterization verified by spot-reads"
+    },
+    {
+      "command": "PROBE_CWD=<repo> node docs/audits/program-quality-remediation/matrix_harness.mjs (after backup of the committed matrix)",
+      "exit": 0,
+      "summary": "14/14 PASS and regenerated GENERATED_PROGRAM_MATRIX.md is byte-identical to the committed file (diff -q clean, backup discarded) — Round 1's blocking reproducibility finding remains remediated at this tip"
+    },
+    {
+      "command": "git diff --check HEAD && git status --porcelain",
+      "exit": 0,
+      "summary": "Whitespace clean; tracked worktree clean — only the pre-existing untracked .agents/ and team-preview/ coordination dirs, untouched; reviewer changed nothing, staged nothing"
+    }
+  ],
+  "git_integrity": "HEAD is 048ca85e11bccafae860d28281fd4598b9be0873 with tree de683c3ff292d34b5afec82e97e7234bf08e45cb, exactly matching the declared candidate; branch codex/program-quality-remediation. The diff above the certified re-freeze b8d505687120b843ca5523578192ea8ae4202786 contains exactly two commits (cb900c8 docs-only SHA-pin amendment, 048ca85 the round-2-pair remediation) touching exactly the two files the handoff declares (ProgramSetupScreen.tsx +10/-4 inside the power card's caption; EXECUTOR_HANDOFF_R2.md). No engine, gate, migration, data, or test change above b8d5056. Tracked worktree clean; untracked .agents/ and team-preview/ untouched; read-only constraint honored throughout (harness backup taken and discarded only after byte-identity was proven).",
+  "prior_findings_resolution": "All three Round 2 (Reviewer A2) items are resolved and independently verified. (1) A2 P2 #1 — the untiered caption beneath the tier-scoped power explanation now renders only for non-beginners (ProgramSetupScreen.tsx:272, `profile.training_age !== 'beginner'`), so beginners see only the honest base-first beginner variant; direction checked against modeFor (legacy only for beginner/rehab) — safe and consistent. (2) A2 P2 #2 / B2 P3 — the handoff gate-table row now states 23/23 (20 Round 2 + 3 [P1b]) and I machine-counted exactly 23 check() calls with the stated [P1]/[P1b]/[P2]/[P3] breakdown; grep confirms no stale '20/20' remains anywhere under docs/audits/program-quality-remediation/. (3) A2 P3 — the re-freeze pin no longer self-references: line 5 names b8d5056/tree dde6332 and explicitly declares the two docs-only follow-ups (cb900c8 and the commit containing the sentence), with git log confirming exactly those two commits above b8d5056; line 95's fresh-pair requirement names the candidate tip consistently with what I reviewed. Round 1 findings (matrix byte-reproducibility, tier-scoped explanation copy, count drift) re-verified as still remediated at this tip: harness reproduces the committed matrix byte-identically, [P1b] checks pin both copy variants, and all counts reconcile."
+}
+```

@@ -95,6 +95,54 @@ the executor — reduced model diversity disclosed) returned **REQUEST_CHANGES**
 A **fresh reviewer pair** is required against the candidate tip at dispatch time (HEAD above `b8d5056`, containing only the round-2-pair remediation: the untiered power-card caption scoped out for beginners in `ProgramSetupScreen.tsx` and this handoff's corrected rows; no engine, gate, or data change)
 before the candidate can be certified; conclusions will again be kept separate until reconciliation.
 
+## Review round 2 (fresh pair against the round-1 re-freeze)
+
+Split verdict: **Reviewer B2 APPROVE**, **Reviewer A2 REQUEST_CHANGES** on three non-blocking
+items (both independently verified the round-1 blocking finding closed — the harness
+reproduces the committed matrix byte-for-byte). Per the split-verdict rule, remediated and
+re-frozen at `048ca85e11bccafae860d28281fd4598b9be0873` (tree `de683c3ff292d34b5afec82e97e7234bf08e45cb`,
+commit `048ca85`):
+
+- **A2 P2 #1:** the static caption under the tier-scoped power explanation was itself untiered
+  and told beginners that fast alternatives "are planned" — contradicted the [P1b]-pinned
+  beginner copy in the same card. Fixed: the caption renders only when
+  `training_age !== 'beginner'`.
+- **A2 P2 #2 / B2 P3:** one handoff gate-table row still said "20/20". Fixed: now 23/23 with
+  the breakdown (20 Round 2 + 3 [P1b] review-proof).
+- **A2 P3:** the re-freeze pin was self-referential. Fixed: the docs-only follow-up chain
+  above `b8d5056` (cb900c8 SHA-pin amendment + the remediation commit) is declared explicitly,
+  with the diff scope (caption + handoff docs, no engine/gate/data change) stated.
+
+## Review round 3 (fresh pair against 048ca85) — CERTIFICATION
+
+Both fresh isolated reviewers returned **APPROVE** (verbatim handoffs:
+`reviews/round-3-reviewer-a.txt`, `reviews/round-3-reviewer-b.txt`; conclusions kept separate
+until reconciliation as required; reduced model diversity disclosed):
+
+- Reviewer B3 independently reproduced the committed matrix byte-identically from the frozen
+  harness (14/14 PASS), ran the full gate battery (`verify:ci` FINAL_EXIT=0 across all 22
+  chained gates), machine-counted the 23 checks matching the corrected handoff row, and
+  verified the diff above `b8d5056` touches exactly the two declared files with no engine,
+  gate, migration, data, or test change.
+- Reviewer A3 verified all three round-2 findings resolved, the caption gating consistent
+  with `modeFor` (legacy only for beginner/rehab), the [P1b] copy contract, and the honest
+  athlete experience by training age; re-ran typecheck, verify:blocks (23/23), and the
+  ProgramSetupScreen + ProgramQualityRound2 suites (16/16).
+- Non-blocking observations logged for a future docs touch: the caption's wording could be
+  sharpened for advanced/elite ("until your training history supports…" is conditional
+  elsewhere), the caption's rendering has no dedicated regression test (proof-by-inspection;
+  [P1b] pins the export copy), and the harness crashes without PROBE_CWD (documented
+  invocation). None contradicts a ratified law; none blocks.
+
+```text
+AUDIT VERDICT: APPROVED (round 3, dual APPROVE)
+FROZEN CANDIDATE: 048ca85e11bccafae860d28281fd4598b9be0873 (tree de683c3ff292d34b5afec82e97e7234bf08e45cb)
+REVIEWER A3: APPROVE   REVIEWER B3: APPROVE
+BLOCKING FINDINGS: 0   NON-BLOCKING: logged in the round-3 handoffs
+FULL VERIFY REPRODUCED: YES   MATRIX REPRODUCED: YES (byte-identical)
+RELEASE / PUSH AUTHORITY: NOT GRANTED
+```
+
 ## Gate outcomes (all run this round)
 
 | Gate | Result |
