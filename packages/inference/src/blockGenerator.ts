@@ -220,6 +220,16 @@ export interface BlockInput {
    *  corrections to NON-deload weeks; a `globalGuardrail.halt` snaps the whole
    *  block to the recovery template. Absent ⇒ the pre-Step-4 block, byte-identical. */
   flawReport?: FlawReport;
+
+  /**
+   * R1 (Round 2, ledger 0060): the athlete's curated POWER movement names —
+   * the movement_lift_family rows whose owner-authored preferred_purpose is
+   * 'speed' (migration 052). The store reads the table and threads the names
+   * in, exactly like chainPlanningInputs; the engine never re-derives the
+   * classification. Absent/empty = no power preference (byte-stable for
+   * every existing caller).
+   */
+  powerPreferredMovementNames?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -519,6 +529,72 @@ export const HYBRID_TAX_THRESHOLD = 1.3;
 /** Accessory/secondary work = slots after the first two compounds. */
 const ACCESSORY_SLOT_FROM = 3;
 
+/**
+ * R2 (Round 2, ledger 0060) — the HYPERTROPHY DOSE-ROLE RULE, named and
+ * boundary-tested. An ACCESSORY slot (slot_index >= ACCESSORY_SLOT_FROM) on a
+ * hypertrophy strength-day carries ONE FEWER working set than the session's
+ * primary slots: ROUND2_HYPERTROPHY_ROLE_SET_DELTA = -1.
+ *
+ * Why -1 and nothing else: it is the exact precedent the engine already uses
+ * for accessory-vs-primary separation (the hybrid tax subtracts whole working
+ * sets from accessory slots; RR-04 restricts phase set deltas to primary
+ * slots). No new coefficient is invented — this rule reuses the same unit
+ * (one whole working set) and the same landing zone (accessory slots only).
+ *
+ * Boundaries, all machine-checked in verify_programQualityRound2.mjs:
+ *   - the delta lands on accessory slots of non-deload hypertrophy strength
+ *     days ONLY; loaded and bodyweight slots alike;
+ *   - never below the 2-set floor (clamp 2..6 still applies before the
+ *     deload halving, so a beginner's reduced scheme stays >= 2);
+ *   - the deload still halves whatever remains — the deload transform is
+ *     untouched and lands ON TOP of the role delta;
+ *   - other objectives are byte-stable: the delta applies only when the
+ *     profile's objective is exactly 'hypertrophy'.
+ */
+export const ROUND2_HYPERTROPHY_ROLE_SET_DELTA = -1;
+
+/**
+ * R4 (Round 2, ledger 0060) — the STRENGTH ANCHOR CAPACITY calculation.
+ * Replaces the old `days < 3` screen heuristic with a pure computation over
+ * the athlete's ACTUAL plan shape: the objective's focus split (after the
+ * athlete's own day-count shaping), counting the slots that can carry a
+ * squat / horizontal-push / hinge anchor on each focus after the DURATION
+ * shaping (slot budget = clamp(round(minutes / 22), 2, 5), the generator's
+ * own law) has trimmed each focus's pattern menu.
+ *
+ * A focus can carry anchors when its pattern menu contains squat, push_h or
+ * hinge with at least one slot available for it; the capacity is the total
+ * number of such slots across the repeating week. The result is the number
+ * the setup screen discloses: capacity < 3 means the big three cannot all
+ * be carried, whatever the day count says.
+ *
+ * Pure: the focus-menu table and the budget law live in this module; the
+ * focus list is passed in by the caller (programFocuses) so the law and its
+ * consumer cannot drift while staying deterministic.
+ */
+export const strengthAnchorCapacity = (
+  profile: Pick<UserProfile, 'objective' | 'weekly_frequency' | 'session_duration_cap_min'>,
+  focusesFor: (objective: Objective, frequency: number) => readonly BlockFocus[],
+  _dayIndicesFor: (frequency: number) => readonly number[],
+): number => {
+  void _dayIndicesFor;
+  const frequency = clamp(Math.round(profile.weekly_frequency), 1, 7);
+  const minutes = clamp(Math.round(profile.session_duration_cap_min), 15, 240);
+  const budget = clamp(Math.round(minutes / 22), 2, 5);
+  const focuses = focusesFor(profile.objective, frequency);
+  const ANCHOR_PATTERNS: ReadonlySet<string> = new Set(['squat', 'push_h', 'hinge']);
+  let capacity = 0;
+  for (const focus of focuses) {
+    // FOCUS_PATTERNS law mirrored by budget: the menu is trimmed to the
+    // session's slot budget before any slot is planned.
+    const patterns = FOCUS_PATTERNS[focus].slice(0, budget);
+    for (const pattern of patterns) {
+      if (ANCHOR_PATTERNS.has(pattern)) capacity += 1;
+    }
+  }
+  return capacity;
+};
+
 // --- RPE/rep -> %1RM translation (Epley): pct = 1 / (1 + totalReps/30) ------
 /** Fraction of 1RM implied by `reps` at `rpe` (RIR = 10 - rpe). */
 export const targetPct = (reps: number, rpe: number): number => {
@@ -748,8 +824,22 @@ export function generateBlock(input: BlockInput): BlockPlan {
         if (profile.training_age === 'beginner') baseSets -= 1;
         if (profile.training_age === 'elite') baseSets += 1;
         baseSets = clamp(baseSets, 2, 6);
+        // R2 dose-role rule (Round 2, ledger 0060): accessory slots of a
+        // hypertrophy strength day take the named role delta AFTER the
+        // clamp, so the 2..6 band is never violated and the deload halving
+        // below still lands on top. Non-hypertrophy objectives are
+        // byte-stable. The law's boundaries are pinned in
+        // verify_programQualityRound2.mjs [P2].
+        if (!deload && profile.objective === 'hypertrophy' && STRENGTH_FOCI.has(focus)
+          && roleAccessor === true) {
+          baseSets = Math.max(2, baseSets + ROUND2_HYPERTROPHY_ROLE_SET_DELTA);
+        }
         return deload ? Math.max(1, Math.ceil(baseSets / 2)) : baseSets;
       };
+      // The slot's dose role, resolved BEFORE the slot loop (the loop's
+      // slotIndex counts planned slots, so it is unavailable here — the
+      // caller passes this flag per slot).
+      let roleAccessor = false;
 
       // Reps: scheme reps through the schema's scale, then the phase delta.
       const reps = deload
@@ -858,7 +948,8 @@ export function generateBlock(input: BlockInput): BlockPlan {
           inventory: profile.equipment_inventory,
           preferredMovementIds: new Set<number>(),
           accessContext,
-        }, pattern);
+          powerPreferredMovementNames: input.powerPreferredMovementNames,
+        }, pattern, { accessorySlot: (slots.length + 1) >= ACCESSORY_SLOT_FROM });
         const rankedDefault = ranking.movementId >= 0
           ? pool.find((candidate) => candidate.movement_id === ranking.movementId) ?? null
           : null;
@@ -903,6 +994,9 @@ export function generateBlock(input: BlockInput): BlockPlan {
         usedIds.add(m.movement_id);
         const locomotion = m.pattern === 'locomotion';
         const slotIndex = slots.length + 1;
+        // The slot's dose role for the R2 hypertrophy rule: accessory slots
+        // (slot_index >= ACCESSORY_SLOT_FROM) carry the role delta.
+        roleAccessor = slotIndex >= ACCESSORY_SLOT_FROM;
         // The hybrid tax lands on accessory/secondary slots of strength
         // sessions only, never below one working set, never on the deload.
         const taxed =

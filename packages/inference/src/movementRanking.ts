@@ -53,7 +53,17 @@ import { isDifficultyAllowed } from './tierPolicy';
 
 export type RankingGate = 'equipment' | 'tier' | 'safety' | 'capability';
 
+/** The gate list every exclusion report is ordered by. */
 const GATE_ORDER: readonly RankingGate[] = ['equipment', 'tier', 'safety', 'capability'];
+
+/**
+ * The objective's block-generating focus KINDS. A focus is a SLOT-BEARING day
+ * kind; the strength anchor capacity law (below) counts slots on the foci
+ * that can carry the big three, after the duration shaping has already
+ * trimmed each focus's pattern menu.
+ */
+const ANCHOR_FOCUS_KINDS: ReadonlySet<string> = new Set(['lower', 'full']);
+
 
 /** A candidate already carrying the shared capability verdict. `excludedBy`,
  *  when provided, is the upstream gate report and is trusted as-is; when
@@ -91,6 +101,22 @@ export interface MovementRankingInput {
    *  must apply the SAME context, not assume the weight room. Default:
    *  'weight_room'. */
   readonly accessContext?: 'weight_room' | 'sport_conditioning';
+  /**
+   * R1 (Round 2, ledger 0060): the athlete's curated POWER movement names —
+   * the `movement_lift_family` rows whose owner-authored
+   * `preferred_purpose` is 'speed' (migration 052). The store reads the
+   * table and hands the names in; the ranker never re-derives the
+   * classification, so the curated data stays the single source of truth.
+   * Absent/empty = no power preference (every other objective, and any
+   * objective when the table carries no rows).
+   *
+   * This is a PREFERENCE among already-gated candidates, not a gate: a
+   * speed rung that lost a gate is reported in blockersById exactly like
+   * any other candidate and is never re-admitted here. The tier ceiling
+   * (isDifficultyAllowed) binds identically for power — an intermediate is
+   * never handed Power Clean (Advanced) because the objective says power.
+   */
+  readonly powerPreferredMovementNames?: readonly string[];
 }
 
 export type RankingReason = 'preference' | 'anchor' | 'loaded' | 'bodyweight';
@@ -147,6 +173,23 @@ const OBJECTIVE_STYLE_LABELS: Record<Objective, string> = {
 
 export const objectiveStyleLabel = (objective: Objective): string =>
   OBJECTIVE_STYLE_LABELS[objective];
+
+/**
+ * R1 (Round 2, ledger 0060): the athlete-facing POWER explanation, as a pure
+ * export so the UI copy and the evidence harness can never drift. It states
+ * what athletic power training means here, that speed-focused rungs of the
+ * big lifts are planned, and that the tier ceiling (Power Clean is Advanced)
+ * binds — no tier-unlock, no invented policy, no medical claim.
+ */
+export const powerObjectiveExplanation = (objective: Objective): string => {
+  if (objective !== 'power') return '';
+  return 'Power training builds explosive force: the same big lifts, moved fast, '
+    + 'with full recovery between sets. The coach plans the speed-focused versions '
+    + 'of the lifts and keeps the reps low so every rep stays sharp. All safety, '
+    + 'equipment and experience gates still apply — olympic-lift competition '
+    + 'movements are Advanced-tier and appear only when your training history '
+    + 'supports them.';
+};
 
 const isStrictlyBodyweight = (c: RankingCandidate): boolean =>
   c.plannedImplement === 'Bodyweight';
@@ -208,6 +251,54 @@ const orderLegacy = (available: readonly RankingCandidate[]): number[] =>
   [...available].sort(compareLegacy).map((c) => c.movementId);
 
 /**
+ * R2 (Round 2, ledger 0060): accessory-slot ordering. Prefer NON-compound
+ * candidates first (legacy law within each class), so an accessory slot's
+ * movement class matches its dose role — the same visible-distinctness the
+ * §2.6 contract demands of the working sets. Bodyweight handling is
+ * unchanged: callers keep the loaded-first/bodyweight separation outside
+ * this comparison.
+ */
+const compareAccessoryFirst = (a: RankingCandidate, b: RankingCandidate): number => {
+  const byClass = Number(a.isCompound ?? false) - Number(b.isCompound ?? false);
+  if (byClass !== 0) return byClass;
+  return compareLegacy(a, b);
+};
+
+/**
+ * R1 (Round 2, ledger 0060): POWER ordering. The objective's power names are
+ * the owner-curated speed-purpose rows (migration 052's
+ * movement_lift_family.preferred_purpose='speed'). Ordering:
+ *   1. gated-available speed-purpose candidates (legacy law within);
+ *   2. other loaded candidates (legacy law within);
+ *   3. strictly bodyweight candidates (stable id).
+ * A power-preferred candidate is still just a preference: gates bind exactly
+ * as before, so an intermediate's tier ceiling keeps Power Clean out and a
+ * gate-rejected speed rung lands in blockersById untouched.
+ */
+const orderPowerFirst = (
+  available: readonly RankingCandidate[],
+  powerNames: readonly string[],
+): number[] => {
+  const wanted = new Set(powerNames);
+  const isSpeed = (c: RankingCandidate): boolean => wanted.has(c.name);
+  return [
+    ...available.filter((c) => !isStrictlyBodyweight(c) && isSpeed(c)).sort(compareLegacy),
+    ...available.filter((c) => !isStrictlyBodyweight(c) && !isSpeed(c)).sort(compareLegacy),
+    ...available.filter(isStrictlyBodyweight).sort((a, b) => a.movementId - b.movementId),
+  ].map((c) => c.movementId);
+};
+
+/**
+ * The optional per-slot role hint (R2, Round 2): an ACCESSORY slot
+ * (slot_index >= ACCESSORY_SLOT_FROM in blockGenerator) prefers non-compound
+ * candidates, keeping the dose role and the movement class visibly aligned.
+ * A primary slot passes nothing and keeps the compound-first law.
+ */
+export interface RankingSlotRole {
+  readonly accessorySlot?: boolean;
+}
+
+/**
  * Rank one pattern's candidates for an athlete. The pool handed in is the
  * pattern's candidates WITH the shared capability verdict attached; every
  * gate is (re-)evaluated here from raw inputs, so this function alone cannot
@@ -217,6 +308,7 @@ export function rankMovementsForPattern(
   candidates: readonly RankingCandidate[],
   input: MovementRankingInput,
   _pattern: string,
+  slotRole?: RankingSlotRole,
 ): MovementRanking {
   void _pattern; // the pool is already pattern-scoped by the caller
   const available: RankingCandidate[] = [];
@@ -227,7 +319,13 @@ export function rankMovementsForPattern(
     else blockersById[c.movementId] = gates;
   }
   const mode = modeFor(input.trainingAge, input.objective);
-  const rankedIds = mode === 'legacy' ? orderLegacy(available) : orderLoadedFirst(available);
+  const powerNames = input.powerPreferredMovementNames ?? [];
+  const usePowerLaw = mode === 'loaded' && input.objective === 'power' && powerNames.length > 0;
+  const rankedIds = mode === 'legacy'
+    ? orderLegacy(available)
+    : usePowerLaw
+      ? orderPowerFirst(available, powerNames)
+      : orderLoadedFirst(available);
 
   const preferenceId = (input.preferredMovementIds ?? new Set<number>());
   const preferred = available.find((c) => preferenceId.has(c.movementId));
@@ -295,6 +393,24 @@ export function rankMovementsForPattern(
     : available;
   const loadedAvailable = defaultLoadedPool.filter((c) => !isStrictlyBodyweight(c))
     .sort(compareLegacy);
+
+  // A loaded rung survives: an intermediate-or-higher athlete is never
+  // defaulted to bodyweight while it does (WO §2.4). A blocked strength
+  // anchor with a loaded fallback = the disclosed substitute (rung + anchor
+  // name + the exact blocker in blockersById).
+  //
+  // The default loaded pool honors the slot's ordering law:
+  //   - power (R1): curated speed-purpose rungs first, then other loaded;
+  //   - accessory slots (R2): non-compound candidates first, so the dose
+  //     role and the movement class stay visibly aligned;
+  //   - otherwise the legacy law, byte-stable.
+  const orderedLoadedPool = usePowerLaw
+    ? available.filter((c) => !isStrictlyBodyweight(c))
+        .sort((a, b) => orderPowerFirst([a, b], powerNames).indexOf(a.movementId)
+          - orderPowerFirst([a, b], powerNames).indexOf(b.movementId))
+    : slotRole?.accessorySlot === true
+      ? available.filter((c) => !isStrictlyBodyweight(c)).sort(compareAccessoryFirst)
+      : loadedAvailable;
   const bodyweightAvailable = available.filter(isStrictlyBodyweight)
     .sort((a, b) => a.movementId - b.movementId);
 
@@ -313,11 +429,7 @@ export function rankMovementsForPattern(
     };
   }
 
-  // A loaded rung survives: an intermediate-or-higher athlete is never
-  // defaulted to bodyweight while it does (WO §2.4). A blocked strength
-  // anchor with a loaded fallback = the disclosed substitute (rung + anchor
-  // name + the exact blocker in blockersById).
-  const chosenLoaded = loadedAvailable[0];
+  const chosenLoaded = orderedLoadedPool[0];
   if (chosenLoaded !== undefined) {
     const blockedAnchor = anchorExcluded[0];
     return {

@@ -3276,3 +3276,76 @@ RELEASE/PUSH: NO-GO — C6 DEFERRED; C7/OWNER AND DEVICE GATES OPEN
 
 - Executor: GLM-5.3 Flash (Hermes agent, z-ai/glm-5.3-flash via nous), session 2026-09-01.
 - W0 identity: worktree `.worktrees/program-quality-remediation`, branch `codex/program-quality-remediation` (ahead 1 of origin), HEAD `71b1a2f0ad75bc71b1ecbc5cada06f8ecec27c58`, tree `f468bbd96fb6c3c65174c4cabc6ae79f58d48cee`, status clean, ancestor `965492e02184e07ddab20391740f10a694bd9149` verified. Root master checkout not used. Node v26.5.1, npm 12.0.2. Migration slot 060 confirmed next free (disk has 010–059). PROMPT_LEDGER.md at 3231 lines / 58 entries before this entry. Baseline targeted results: recorded at W1 start.
+
+---
+
+## Entry 0060 — 2026-09-01 · Program Quality Remediation — Round 2 (post-audit continuation)
+
+### Input G(x)
+
+```
+Continue Program Quality Remediation Round 2.
+
+Working directory:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\program-quality-remediation
+
+Branch:
+codex/program-quality-remediation
+
+Current HEAD:
+9f2e1e9459da020f80d8b8711aa527c709a4a8e2
+
+Previous implementation freeze:
+cfbcf67e6b810bfb2e7793cf92980bff3f04d3d6
+
+Treat the existing Team Preview reports as failed, read-only historical evidence.
+Do not overwrite them and do not stage .agents metadata. The known untracked
+Antigravity outputs may remain untouched while this continuation proceeds.
+
+Append the next sequential PROMPT_LEDGER entry as the first tracked write.
+Add failing tests before product fixes.
+
+Required remediation:
+
+1. Implement genuinely power-specific, gate-safe program selection and an
+   athlete-facing power-specific explanation. Preserve tier, equipment, safety,
+   capability and attestation gates. Do not tier-unlock Power Clean for an
+   Intermediate athlete. If the existing curated data cannot support a
+   deterministic power classification without inventing policy, stop and
+   produce an owner-decision docket.
+
+2. Make hypertrophy primary and accessory dose roles visibly distinct and give
+   them a coherent overload path. Do not invent an unexplained coefficient.
+   Any new numeric rule must be named, documented and boundary-tested.
+
+3. Render weeklyProgressionSummary, or an equivalent proven summary, in the
+   actual program preview for representative slots.
+
+4. Replace the strength `days < 3` capacity rule with a pure calculation based
+   on scheduled squat, horizontal-push and hinge plan slots after duration and
+   focus shaping. Cover 1–7 days and 15–240 minute boundaries.
+
+5. Prevent leaving the onboarding limitations screen until the athlete
+   explicitly chooses Yes or No. Preserve draft/back behavior and atomic
+   Finish persistence.
+
+6. Disclose progression_methodology in the onboarding review alongside every
+   other removed advanced default.
+
+7. Strengthen PQ-04, PQ-05 and PQ-06 so they test product semantics rather than
+   mirroring implementation booleans or checking labels/set counts alone.
+   Rebuild PQ-01–PQ-14 with exact work-order IDs and candidate-generated output.
+   No unconditional PASS rows or hand-authored expected-looking evidence.
+
+Run all focused gates, npm run verify:ci, and git diff --check. Create a new
+implementation freeze and superseding executor handoff. Do not merge, rebase,
+push, tag, build an APK, perform C6, or start biometric-RPE work.
+
+Afterward require two fresh isolated reviewer runs. The same model may be used
+if necessary, but disclose reduced model diversity and keep reviewer conclusions
+separate until reconciliation.
+```
+
+### Output F(G(x))
+
+(open — completed when the work lands)
