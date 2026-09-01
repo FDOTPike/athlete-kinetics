@@ -239,7 +239,10 @@ Three directives executed at `d9865f4` → this commit, red-first where applicab
    (or full)"). Component tests assert the exact copy.
 
 Untracked `.agents/**` and `team-preview/**` remain untracked and excluded (non-evidence per
-the audit round 4 record); nothing was deleted.
+the audit round 4 record); nothing was deleted. Accurate inventory at the Round 5 commit:
+`.agents/ORIGINAL_REQUEST.md`, `.agents/{orchestrator_1,reviewer_a_1,reviewer_b_1,sentinel,victory_auditor_1}/`,
+and `docs/audits/program-quality-remediation/team-preview/` — preserved exactly as received,
+staged by nothing, referenced by committed docs only as non-evidence.
 
 ## Gate outcomes (all run this round)
 
