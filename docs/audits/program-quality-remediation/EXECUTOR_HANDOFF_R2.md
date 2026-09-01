@@ -2,7 +2,7 @@
 
 **Executor:** GLM-5.3 Flash (z-ai/glm-5.3-flash via nous), Hermes Agent session, 2026-09-01 · Effort: High
 **Supersedes:** `docs/audits/program-quality-remediation/EXECUTOR_HANDOFF.md` (Round 1, freeze `cfbcf67`)
-**Re-freeze (post-review):** `b8d505687120b843ca5523578192ea8ae4202786` (tree `dde6332b01e8b201825a8fdb13081e3593b8da15`) — supersedes the pre-review freeze `19a17ae` after review round 1; see "Review round 1" below.
+**Re-freeze (post-review):** `b8d505687120b843ca5523578192ea8ae4202786` (tree `dde6332b01e8b201825a8fdb13081e3593b8da15`) — supersedes the pre-review freeze `19a17ae` after review round 1; see "Review round 1" below. **Docs-only follow-ups** `cb900c8` (SHA-pin amendment) and the commit containing this sentence (Round 2 reviewer-pair remediation: handoff rows + untiered power-card caption) sit above it; the certified candidate for review round 3 is the tip HEAD at the time of dispatch, whose diff above `b8d5056` touches only `ProgramSetupScreen.tsx` (caption scoping) and this handoff/ledger — no engine, gate, or data change.
 **Status of prior Team Preview reports:** FAILED evidence — the three APPROVE verdicts in
 `docs/audits/program-quality-remediation/team-preview/` are retained unmodified as read-only
 historical records of a failed audit round. They do not certify anything; this handoff and the
@@ -92,7 +92,7 @@ the executor — reduced model diversity disclosed) returned **REQUEST_CHANGES**
   call signature), reload resets the limitations gate (safe direction — silence never persists
   as an implicit "no").
 
-A **fresh reviewer pair** is required against the re-freeze `b8d505687120b843ca5523578192ea8ae4202786`
+A **fresh reviewer pair** is required against the candidate tip at dispatch time (HEAD above `b8d5056`, containing only the round-2-pair remediation: the untiered power-card caption scoped out for beginners in `ProgramSetupScreen.tsx` and this handoff's corrected rows; no engine, gate, or data change)
 before the candidate can be certified; conclusions will again be kept separate until reconciliation.
 
 ## Gate outcomes (all run this round)
@@ -101,7 +101,7 @@ before the candidate can be certified; conclusions will again be kept separate u
 |---|---|
 | `npm run typecheck` | exit 0 |
 | `npm run verify:migrations` | ALL CHECKS PASSED |
-| `npm run verify:blocks` | 0 | ALL CHECKS PASSED — new `verify_programQualityRound2.mjs`: 20/20 Round 2 checks |
+| `npm run verify:blocks` | 0 | ALL CHECKS PASSED — new `verify_programQualityRound2.mjs`: 23/23 checks (20 Round 2: [P1] 7 + [P2] 6 + [P3] 7, plus 3 [P1b] review-proof checks added in bc2c744) |
 | `npm run verify:store` | 0 | ALL CHECKS PASSED (638/638 + routine templates) |
 | `npm run verify:pipeline` | 51/51 |
 | `npm run verify:progression` | 17/17 |

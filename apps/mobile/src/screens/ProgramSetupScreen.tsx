@@ -269,10 +269,12 @@ export default function ProgramSetupScreen({
           <Text style={styles.notice}>
             {powerObjectiveExplanation('power', profile.training_age)}
           </Text>
-          <Text style={styles.caption}>
-            Fast barbell, kettlebell and jump-style alternatives are planned until your training
-            history supports the competition olympic lifts.
-          </Text>
+          {profile.training_age !== 'beginner' && (
+            <Text style={styles.caption}>
+              Fast barbell, kettlebell and jump-style alternatives are planned until your training
+              history supports the competition olympic lifts.
+            </Text>
+          )}
         </View>
       )}
 
