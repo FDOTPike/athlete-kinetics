@@ -240,9 +240,9 @@ Warnings:
 
 ```
 lower d1: Box Squat 3x7@7 | Kettlebell Swing 3x7@7 | Walking Lunge 3x7@7 | Band External Rotation 3x7@7
-bjj d2: Road Run 5x1@7 | Barbell Rollout from Bench 4x7@7 | Band External Rotation 4x7@7
+bjj d2: BJJ Sparring Round 5x1@7 | Kettlebell Turkish Get-Up 4x7@7 | Band External Rotation 4x7@7
 upper d4: Push-up 3x8@7 | Cable Row 3x7@7 | Dumbbell Shoulder Press 3x8@7 | Chin-up 3x7@7
-bjj d6: Road Run 5x1@7 | Barbell Rollout from Bench 4x7@7 | Band External Rotation 4x7@7
+bjj d6: BJJ Sparring Round 5x1@7 | Kettlebell Turkish Get-Up 4x7@7 | Band External Rotation 4x7@7
 ```
 
 Weekly progression (weeks 1->2 and 3->4):
@@ -252,29 +252,29 @@ Box Squat: same work at a higher target effort (RPE 7 -> 7.5).
 Kettlebell Swing: same work at a higher target effort (RPE 7 -> 7.5).
 Walking Lunge: same work at a higher target effort (RPE 7 -> 7.5).
 Band External Rotation: same work at a higher target effort (RPE 7 -> 7.5).
-Road Run: same work at a higher target effort (RPE 7 -> 7.5).
-Barbell Rollout from Bench: same work at a higher target effort (RPE 7 -> 7.5).
+BJJ Sparring Round: same work at a higher target effort (RPE 7 -> 7.5).
+Kettlebell Turkish Get-Up: same work at a higher target effort (RPE 7 -> 7.5).
 Band External Rotation: same work at a higher target effort (RPE 7 -> 7.5).
 Push-up: same work at a higher target effort (RPE 7 -> 7.5).
 Cable Row: same work at a higher target effort (RPE 7 -> 7.5).
 Dumbbell Shoulder Press: same work at a higher target effort (RPE 7 -> 7.5).
 Chin-up: same work at a higher target effort (RPE 7 -> 7.5).
-Road Run: same work at a higher target effort (RPE 7 -> 7.5).
-Barbell Rollout from Bench: same work at a higher target effort (RPE 7 -> 7.5).
+BJJ Sparring Round: same work at a higher target effort (RPE 7 -> 7.5).
+Kettlebell Turkish Get-Up: same work at a higher target effort (RPE 7 -> 7.5).
 Band External Rotation: same work at a higher target effort (RPE 7 -> 7.5).
 Box Squat: deload — reduced effort (RPE 8 -> 6.5).
 Kettlebell Swing: deload — reduced effort (RPE 8 -> 6.5).
 Walking Lunge: deload — reduced effort (RPE 8 -> 6.5).
 Band External Rotation: deload — reduced effort (RPE 8 -> 6.5).
-Road Run: deload — reduced effort (RPE 8 -> 6.5).
-Barbell Rollout from Bench: deload — reduced effort (RPE 8 -> 6.5).
+BJJ Sparring Round: deload — reduced effort (RPE 8 -> 6.5).
+Kettlebell Turkish Get-Up: deload — reduced effort (RPE 8 -> 6.5).
 Band External Rotation: deload — reduced effort (RPE 8 -> 6.5).
 Push-up: deload — reduced effort (RPE 8 -> 6.5).
 Cable Row: deload — reduced effort (RPE 8 -> 6.5).
 Dumbbell Shoulder Press: deload — reduced effort (RPE 8 -> 6.5).
 Chin-up: deload — reduced effort (RPE 8 -> 6.5).
-Road Run: deload — reduced effort (RPE 8 -> 6.5).
-Barbell Rollout from Bench: deload — reduced effort (RPE 8 -> 6.5).
+BJJ Sparring Round: deload — reduced effort (RPE 8 -> 6.5).
+Kettlebell Turkish Get-Up: deload — reduced effort (RPE 8 -> 6.5).
 Band External Rotation: deload — reduced effort (RPE 8 -> 6.5).
 ```
 
