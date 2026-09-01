@@ -9,7 +9,7 @@ Environment: `.worktrees/program-quality-remediation`, Node v26.5.1 / npm 12.0.2
 |---|---|---|
 | `verify_programQualityRound2.mjs` [P1] power law (7 checks) | 4 FAIL — no power preference existed; gate-rejected speed rung case and advanced-tier case failed | 7/7 PASS |
 | `verify_programQualityRound2.mjs` [P2] dose-role law | FAIL — `ROUND2_HYPERTROPHY_ROLE_SET_DELTA` undefined; primary/accessory set separation absent | 6/6 PASS |
-| `verify_programQualityRound2.mjs` [P3] capacity law | TypeError — `strengthAnchorCapacity` did not exist | 8/8 PASS (incl. 21-point boundary sweep) |
+| `verify_programQualityRound2.mjs` [P3] capacity law | TypeError — `strengthAnchorCapacity` did not exist | 7/7 PASS (incl. the 1–7-day × 15/90/240-min sweep) |
 | `ProgramQualityRound2.test.js` (components) | 6/8 FAIL — no limitations gate, no methodology row, no power card, no capacity law in UI, no summary card | 8/8 PASS |
 
 Note: initial P2/P3 expectations were corrected during development where they mis-modeled the
@@ -24,7 +24,7 @@ was weakened to pass.
 |---|---|---|
 | `npm run typecheck` | 0 | clean (apps/mobile + inference + core-db) |
 | `npm run verify:migrations` | 0 | ALL CHECKS PASSED (60-slot chain unchanged; no Round 2 migration needed) |
-| `npm run verify:blocks` | 0 | ALL CHECKS PASSED — includes new `verify_programQualityRound2.mjs`: 21 checks across [P1]/[P2]/[P3] |
+| `npm run verify:blocks` | 0 | ALL CHECKS PASSED — new `verify_programQualityRound2.mjs`: 20 checks across [P1]=7 / [P2]=6 / [P3]=7 (23/23 after the [P1b] review-proof additions) |
 | `npm run verify:store` | 0 | ALL CHECKS PASSED (638/638 + routine templates; needles intact) |
 | `npm run verify:pipeline` | 0 | 51 checks passed |
 | `npm run verify:progression` | 0 | 17/17 |

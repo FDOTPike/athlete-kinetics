@@ -3362,7 +3362,7 @@ separate until reconciliation.
   docs/audits/program-quality-remediation/{matrix_harness.mjs, GENERATED_PROGRAM_MATRIX.md,
   EXECUTOR_HANDOFF_R2.md, TEST_EVIDENCE_R2.md}. No migration (060 remains newest slot).
 - **Tests and exit codes:** typecheck 0; verify:migrations PASS; verify:blocks PASS (new Round 2
-  gate: 21 checks — [P1] power law 7, [P2] dose-role 6, [P3] capacity 8 incl. the 1–7-day ×
+  gate: 20 checks — [P1] power law 7, [P2] dose-role 6, [P3] capacity 7 incl. the 1–7-day ×
   15/90/240-min sweep); verify:store PASS; verify:pipeline 51/51; verify:progression 17/17;
   verify:components 19 suites / 247 tests; verify:ci exit 0 (run twice); git diff --check clean.
 - **Red-first proof:** verify_programQualityRound2.mjs and ProgramQualityRound2.test.js written
@@ -3381,6 +3381,16 @@ separate until reconciliation.
 - **Review:** two fresh isolated reviewer runs dispatched post-freeze (Reviewer A semantics,
   Reviewer B verification); conclusions kept separate until reconciliation; reduced model
   diversity disclosed — both reviewers are the same model as the executor (GLM-5.3 Flash).
+- **Review round 1 outcome and remediation:** both reviewers returned REQUEST_CHANGES on one
+  identical blocking finding — the committed GENERATED_PROGRAM_MATRIX.md predated the final
+  harness notes patch and still carried the Round 1 'mirrors days<3' note, so it did not
+  reproduce from the frozen harness (all 14 PASS rows were byte-identical; only the notes
+  drifted). Remediated: matrix regenerated and recommitted from the frozen harness; the
+  check-count drift (handoff 19, ledger 21 vs the true 20) corrected to the machine-counted
+  20 (then 23 after adding the [P1b] review-proof checks); and Reviewer A's P2 fixed by
+  tier-scoping the power explanation (a beginner power athlete is no longer promised speed
+  rungs the legacy ranking mode does not guarantee). Re-freeze at bc2c744; a fresh reviewer
+  pair is required before the candidate can be certified.
 - **Confirmations:** no sensor/biometric RPE work; no merge, rebase, push, tag, signing,
   release, APK, C6, or store action; root master checkout untouched; .agents/ and team-preview/
   left untracked and unmodified; prior Team Preview reports treated as failed read-only evidence.
