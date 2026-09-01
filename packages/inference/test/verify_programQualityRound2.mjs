@@ -138,6 +138,21 @@ console.log('[P1] power-specific ranking from curated speed-purpose rows');
   check('[P1] power ranking is deterministic under pool reordering', again.movementId === 47, JSON.stringify(again));
 }
 
+// --- [P1b] Round 2 review proof: beginner power copy is scoped by tier ---------
+console.log('[P1b] beginner-scoped power explanation');
+{
+  const { powerObjectiveExplanation } = require('./.build/movementRanking.js');
+  const advancedCopy = powerObjectiveExplanation('power', 'intermediate');
+  const beginnerCopy = powerObjectiveExplanation('power', 'beginner');
+  check('[P1b] the intermediate+ power copy promises speed-focused rungs (the loaded-mode law)',
+    advancedCopy.includes('speed-focused versions'), advancedCopy);
+  check('[P1b] the beginner power copy does NOT promise speed rungs (legacy mode has no speed law) and discloses the base-first path',
+    !beginnerCopy.includes('The coach plans the speed-focused versions')
+    && beginnerCopy.includes('strength base first'), beginnerCopy);
+  check('[P1b] non-power objectives render no power explanation',
+    powerObjectiveExplanation('strength') === '' && powerObjectiveExplanation('hypertrophy', 'beginner') === '');
+}
+
 // --- [P2] hypertrophy dose roles -------------------------------------------------
 console.log('[P2] hypertrophy primary/accessory dose roles');
 {

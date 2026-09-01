@@ -180,9 +180,26 @@ export const objectiveStyleLabel = (objective: Objective): string =>
  * what athletic power training means here, that speed-focused rungs of the
  * big lifts are planned, and that the tier ceiling (Power Clean is Advanced)
  * binds — no tier-unlock, no invented policy, no medical claim.
+ *
+ * Round 2 review correction (Reviewer A P2): the speed-first preference is a
+ * `loaded`-mode law, and `modeFor('beginner', …)` returns 'legacy' — so the
+ * engine does NOT guarantee speed rungs for a beginner power athlete. The
+ * beginner variant honestly describes the beginner path instead of
+ * overpromising: conservative basics first, power training refines them
+ * later. The UI renders the variant matching the athlete's training age.
  */
-export const powerObjectiveExplanation = (objective: Objective): string => {
+export const powerObjectiveExplanation = (
+  objective: Objective,
+  trainingAge: TrainingAge = 'intermediate',
+): string => {
   if (objective !== 'power') return '';
+  if (trainingAge === 'beginner') {
+    return 'Power training builds explosive force: big lifts moved fast, with full '
+      + 'recovery between sets. As a new lifter you will build the strength base first '
+      + '— the coach plans controlled strength work now, and the fast, speed-focused '
+      + 'versions of the lifts come once the basics are solid. All safety, equipment '
+      + 'and experience gates still apply.';
+  }
   return 'Power training builds explosive force: the same big lifts, moved fast, '
     + 'with full recovery between sets. The coach plans the speed-focused versions '
     + 'of the lifts and keeps the reps low so every rep stays sharp. All safety, '

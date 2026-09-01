@@ -266,7 +266,9 @@ export default function ProgramSetupScreen({
       {powerExplanation && (
         <View style={styles.card} testID="power-explanation-card">
           <Text style={styles.sectionTitle}>How athletic power works here</Text>
-          <Text style={styles.notice}>{powerObjectiveExplanation('power')}</Text>
+          <Text style={styles.notice}>
+            {powerObjectiveExplanation('power', profile.training_age)}
+          </Text>
           <Text style={styles.caption}>
             Fast barbell, kettlebell and jump-style alternatives are planned until your training
             history supports the competition olympic lifts.

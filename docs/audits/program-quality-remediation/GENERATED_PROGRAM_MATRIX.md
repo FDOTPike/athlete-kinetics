@@ -434,8 +434,20 @@ Warnings:
 
 ## Notes and approximations
 
-- PQ-04 is disclosed at the setup surface: the harness mirrors
-  `ProgramSetupScreen.strengthCapacityShort` (days < 3) rather than driving UI.
+- Round 2 PQ-04: the case runs the REAL capacity law (strengthAnchorCapacity
+  over squat/push_h/hinge slots after duration+focus shaping) AND the real
+  generator at the shaped schedule, requiring capacity < 3, fewer than three
+  anchors carried, and every absent anchor gate-disclosed. The setup UI
+  warning (ProgramSetupScreen) is component-proven in
+  ProgramQualityRound2.test.js against the same imported function.
+- Round 2 PQ-05: semantic bodybuilding contract — zero big-three, balanced
+  pattern exposure, primary>accessory dose-role separation (the named
+  ROUND2_HYPERTROPHY_ROLE_SET_DELTA), and a named overload path via
+  weeklyProgressionSummary.
+- Round 2 PQ-06: semantic power contract — honest label, curated speed rungs
+  preferred where gates admit them, Power Clean never prescribed to an
+  intermediate (tier ceiling held), power-shaped reps vs the strength block,
+  and the pure powerObjectiveExplanation copy rendered by the setup UI.
 - PQ-11 approximates the store's niggle-to-exclusion law by excluding the
   squat PATTERN (a knee niggle maps to the knee joint, which squat-pattern
   movements stress); Reviewer B should reproduce via the store path.
