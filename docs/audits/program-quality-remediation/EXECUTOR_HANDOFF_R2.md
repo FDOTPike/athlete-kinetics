@@ -2,7 +2,7 @@
 
 **Executor:** GLM-5.3 Flash (z-ai/glm-5.3-flash via nous), Hermes Agent session, 2026-09-01 · Effort: High
 **Supersedes:** `docs/audits/program-quality-remediation/EXECUTOR_HANDOFF.md` (Round 1, freeze `cfbcf67`)
-**Re-freeze (post-review):** `022360373f851e7bd49769194873b7b05b8d87e7` (tree `8f687a65042de2aa62d3f877783a6e074e593520`) — supersedes the pre-review freeze `19a17ae` after review round 1; see "Review round 1" below.
+**Re-freeze (post-review):** `b8d505687120b843ca5523578192ea8ae4202786` (tree `dde6332b01e8b201825a8fdb13081e3593b8da15`) — supersedes the pre-review freeze `19a17ae` after review round 1; see "Review round 1" below.
 **Status of prior Team Preview reports:** FAILED evidence — the three APPROVE verdicts in
 `docs/audits/program-quality-remediation/team-preview/` are retained unmodified as read-only
 historical records of a failed audit round. They do not certify anything; this handoff and the
@@ -92,7 +92,7 @@ the executor — reduced model diversity disclosed) returned **REQUEST_CHANGES**
   call signature), reload resets the limitations gate (safe direction — silence never persists
   as an implicit "no").
 
-A **fresh reviewer pair** is required against the re-freeze `022360373f851e7bd49769194873b7b05b8d87e7`
+A **fresh reviewer pair** is required against the re-freeze `b8d505687120b843ca5523578192ea8ae4202786`
 before the candidate can be certified; conclusions will again be kept separate until reconciliation.
 
 ## Gate outcomes (all run this round)
