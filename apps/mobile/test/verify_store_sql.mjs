@@ -109,12 +109,40 @@ check(
   /tab === 'coach' && status === 'ready' && \(\s*<BlockScreen/.test(appSrc),
 );
 
+/** Slice one store action's body out of useStore.ts between two anchors.
+ *
+ *  `indexOf` returns -1 for a missing anchor, and an unguarded
+ *  `src.slice(start, end)` then silently produces the WRONG region rather than
+ *  failing: `slice(start, -1)` hands back nearly the whole file (so an
+ *  `includes()` contract can PASS on text from an unrelated action), and a
+ *  missing start anchor yields `''` (so a NEGATIVE contract like "this action
+ *  never writes block tables" passes with no code inspected at all). This
+ *  stack renames and moves store actions, so both failure modes are live.
+ *  Fail loudly on a missing anchor instead — a broken anchor is a broken
+ *  contract, not a passing one. */
+function sliceBetween(label, startAnchor, endAnchor) {
+  const start = src.indexOf(startAnchor);
+  const end = start < 0 ? -1 : src.indexOf(endAnchor, start);
+  const resolved = start >= 0 && end > start;
+  check(`${label}: both source anchors resolve`, resolved,
+    resolved ? '' : `start=${start} end=${end}`);
+  if (!resolved) {
+    throw new Error(
+      `verify:store anchor drift — cannot slice ${label} `
+      + `(start ${JSON.stringify(startAnchor)} at ${start}, `
+      + `end ${JSON.stringify(endAnchor)} at ${end}). `
+      + 'Update the anchors to match the current useStore.ts.',
+    );
+  }
+  return src.slice(start, end);
+}
+
 console.log('[onboarding guided-program contract]');
-const onboardingStart = src.indexOf('completeOnboarding: (patch, athleteName) => {');
-const onboardingEnd = src.indexOf('previewTrainingProgram: (input) => {', onboardingStart);
-const onboardingBody = onboardingStart >= 0 && onboardingEnd > onboardingStart
-  ? src.slice(onboardingStart, onboardingEnd)
-  : '';
+const onboardingBody = sliceBetween(
+  'completeOnboarding',
+  'completeOnboarding: (patch, athleteName) => {',
+  'previewTrainingProgram: (input) => {',
+);
 const onboardingSave = onboardingBody.indexOf('get().saveProfile(patch)');
 check(
   'completed questionnaire persists its profile',
@@ -126,12 +154,19 @@ check(
 );
 check(
   'fresh onboarded athletes route into explicit guided program setup',
-  appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen />'),
+  appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen'),
+);
+check(
+  'program setup is dismissible, so an archived-program athlete is never stranded',
+  appSrc.includes('const showProgramSetup = programSetupPending && !setupDismissed')
+    && appSrc.includes('onCancel={() => setSetupDismissed(true)}'),
 );
 
-const previewProgramStart = src.indexOf('previewTrainingProgram: (input) => {');
-const previewProgramEnd = src.indexOf('createTrainingProgram: (input) => {', previewProgramStart);
-const previewProgramBody = src.slice(previewProgramStart, previewProgramEnd);
+const previewProgramBody = sliceBetween(
+  'previewTrainingProgram',
+  'previewTrainingProgram: (input) => {',
+  'createTrainingProgram: (input) => {',
+);
 check(
   'program preview session guard lives on the preview action, not onboarding registry failure',
   previewProgramBody.includes('get().session !== null')
@@ -143,23 +178,29 @@ console.log('[planned-session completion contract]');
 const completionSql = statements.find((sql) => sql.includes('END AS completion_status')) ?? '';
 
 console.log('[guided goal-program contract]');
-const shapeStart = src.indexOf('const trainingProgramShape =');
-const shapeEnd = src.indexOf('/** Everything per-athlete', shapeStart);
-const shapeBody = src.slice(shapeStart, shapeEnd);
+const shapeBody = sliceBetween(
+  'trainingProgramShape',
+  'const trainingProgramShape =',
+  '/** Everything per-athlete',
+);
 check('date horizon rejects under 4 and over 32 weeks and rounds up to a complete block boundary',
   shapeBody.includes('normalizeProgramHorizon(horizonAnchorDate, input.horizon)')
     && previewProgramBody.includes('programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount)'),
 );
-const createStart = src.indexOf('createTrainingProgram: (input) => {');
-const createEnd = src.indexOf('rolloverDay: () => {', createStart);
-const createBody = src.slice(createStart, createEnd);
+const createBody = sliceBetween(
+  'createTrainingProgram',
+  'createTrainingProgram: (input) => {',
+  'rolloverDay: () => {',
+);
 check('program creation refuses active sessions and existing blocks/programs',
   createBody.includes('get().session !== null')
     && createBody.includes('get().block !== null || get().program !== null'),
 );
-const generatorStart = src.indexOf('generateNewBlock: (schemaType =');
-const generatorEnd = src.indexOf('refreshBlock:', generatorStart);
-const generatorBody = src.slice(generatorStart, generatorEnd);
+const generatorBody = sliceBetween(
+  'generateNewBlock',
+  'generateNewBlock: (schemaType =',
+  'refreshBlock:',
+);
 check('program creation is transactional and calls the SHARED programTx helpers',
   generatorBody.includes("d.executeSync('BEGIN')")
     && generatorBody.includes('insertTrainingProgram(d, {')
@@ -167,9 +208,11 @@ check('program creation is transactional and calls the SHARED programTx helpers'
     && generatorBody.includes('archiveActiveTrainingBlock(d)')
     && generatorBody.includes("d.executeSync('COMMIT')"),
 );
-const updateStart = src.indexOf('updateProgramPreferences: (input) => {');
-const updateEnd = src.indexOf('previewNextProgramBlock:', updateStart);
-const updateBody = src.slice(updateStart, updateEnd);
+const updateBody = sliceBetween(
+  'updateProgramPreferences',
+  'updateProgramPreferences: (input) => {',
+  'previewNextProgramBlock:',
+);
 check('future preference edits never write current or historical block tables',
   !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(training_block|block_meta|planned_session|planned_slot)\b/i.test(updateBody),
 );

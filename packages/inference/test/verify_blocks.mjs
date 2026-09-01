@@ -386,6 +386,16 @@ check('hybrid APRE accessories never fall below one working set',
   hybridApre.sessions.every((s) => s.slots.every((sl) => sl.sets >= 1)));
 
 // --- [9b] implement-routed bodyweight progression ----------------------------
+// `check` RECORDS a failure and continues — it does not stop the script. So an
+// unguarded index into a fixture array whose length was merely *checked* turns
+// a regression into an uncaught TypeError that aborts this file, taking every
+// later section's results with it. `slotAt` hands back a shaped placeholder
+// whose NaN metrics fail any comparison, so a regression reports FAIL and the
+// remaining sections still run.
+const SLOT_PLACEHOLDER = Object.freeze({
+  movement_id: -1, sets: NaN, reps: NaN, target_rpe: NaN, phase: 'absent',
+});
+const slotAt = (arr, i) => (Array.isArray(arr) ? arr[i] : undefined) ?? SLOT_PLACEHOLDER;
 console.log('[9b] bodyweight LINEAR progression routes on implement');
 const pushUp = movements.find((m) => m.name === 'Push-up');
 check('fixture: Push-up seeds primaryImplement Bodyweight',
@@ -393,7 +403,7 @@ check('fixture: Push-up seeds primaryImplement Bodyweight',
   String(pushUp?.primaryImplement));
 
 const plateLoadedPool = movements.map((m) =>
-  (m.movement_id === pushUp.movement_id ? { ...m, primaryImplement: 'BB' } : m));
+  (m.movement_id === pushUp?.movement_id ? { ...m, primaryImplement: 'BB' } : m));
 const patternById = new Map(movements.map((m) => [m.movement_id, m.pattern]));
 const bwProfile = { objective: 'strength', equipment_inventory: [] };
 const pushSlots = (pool) => {
@@ -413,34 +423,38 @@ const bw = pushSlots(movements);
 const loaded = pushSlots(plateLoadedPool);
 check('both pools emit the same push_h movement in all four weeks',
   bw.length === 4 && loaded.length === 4
-    && bw.every((sl, i) => sl.movement_id === loaded[i].movement_id));
+    && bw.every((sl, i) => sl.movement_id === slotAt(loaded, i).movement_id));
 check('bodyweight Push-up adds sets 0 -> 1 -> 1 across working weeks',
-  bw[1].sets === bw[0].sets + 1 && bw[2].sets === bw[1].sets,
-  `${bw[0].sets} -> ${bw[1].sets} -> ${bw[2].sets}`);
+  slotAt(bw, 1).sets === slotAt(bw, 0).sets + 1 && slotAt(bw, 2).sets === slotAt(bw, 1).sets,
+  `${slotAt(bw, 0).sets} -> ${slotAt(bw, 1).sets} -> ${slotAt(bw, 2).sets}`);
 check('bodyweight Push-up holds reps flat across working weeks',
-  bw[0].reps === bw[1].reps && bw[1].reps === bw[2].reps);
+  slotAt(bw, 0).reps === slotAt(bw, 1).reps && slotAt(bw, 1).reps === slotAt(bw, 2).reps);
 check('bodyweight Push-up preserves the effort ramp',
-  bw[0].target_rpe < bw[1].target_rpe && bw[1].target_rpe < bw[2].target_rpe);
+  slotAt(bw, 0).target_rpe < slotAt(bw, 1).target_rpe
+    && slotAt(bw, 1).target_rpe < slotAt(bw, 2).target_rpe);
 check('week 4 remains a strict volume deload',
-  bw[3].phase === 'deload' && bw[3].sets < bw[0].sets);
+  slotAt(bw, 3).phase === 'deload' && slotAt(bw, 3).sets < slotAt(bw, 0).sets);
 check('plate-loaded Push-up keeps working sets flat',
-  loaded[0].sets === loaded[1].sets && loaded[1].sets === loaded[2].sets);
+  slotAt(loaded, 0).sets === slotAt(loaded, 1).sets
+    && slotAt(loaded, 1).sets === slotAt(loaded, 2).sets);
 check('plate-loaded Push-up preserves the identical effort ramp',
-  loaded[0].target_rpe < loaded[1].target_rpe
-    && loaded[1].target_rpe < loaded[2].target_rpe
-    && bw.every((sl, i) => sl.target_rpe === loaded[i].target_rpe));
+  slotAt(loaded, 0).target_rpe < slotAt(loaded, 1).target_rpe
+    && slotAt(loaded, 1).target_rpe < slotAt(loaded, 2).target_rpe
+    && bw.every((sl, i) => sl.target_rpe === slotAt(loaded, i).target_rpe));
 check('the loading classes diverge only through observable set volume',
-  bw[1].sets !== loaded[1].sets && bw[2].sets !== loaded[2].sets);
+  slotAt(bw, 1).sets !== slotAt(loaded, 1).sets
+    && slotAt(bw, 2).sets !== slotAt(loaded, 2).sets);
 
 const noPrefixPool = movements.map((m) => ({ ...m, primaryImplement: undefined }));
 const emptyPrefixSlots = pushSlots(noPrefixPool);
 check('absent primaryImplement fails toward external load',
-  emptyPrefixSlots[0].sets === emptyPrefixSlots[1].sets
-    && emptyPrefixSlots[1].sets === emptyPrefixSlots[2].sets);
+  slotAt(emptyPrefixSlots, 0).sets === slotAt(emptyPrefixSlots, 1).sets
+    && slotAt(emptyPrefixSlots, 1).sets === slotAt(emptyPrefixSlots, 2).sets);
 check('a non-canonical implement fails toward external load', (() => {
   const junk = movements.map((m) => ({ ...m, primaryImplement: 'Bodyweight ' }));
   const slots = pushSlots(junk);
-  return slots[0].sets === slots[1].sets && slots[1].sets === slots[2].sets;
+  return slotAt(slots, 0).sets === slotAt(slots, 1).sets
+    && slotAt(slots, 1).sets === slotAt(slots, 2).sets;
 })());
 
 const legacyPool = movements.map(({ primaryImplement: _drop, ...rest }) => rest);
@@ -835,14 +849,19 @@ check('the adjusted pattern is recorded in autopilotAdjusted', defPlan.autopilot
 const upPlan = genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: -0.5 } }));
 const upSq = ndSlots(upPlan, 'squat');
 check('latent_headroom raises squat target_rpe vs baseline (≤ base_rpe_cap)',
-  upSq.some((sl, i) => sl.target_rpe > baseSq[i].target_rpe) && upSq.every((sl) => sl.target_rpe <= prof().base_rpe_cap));
+  upSq.some((sl, i) => sl.target_rpe > slotAt(baseSq, i).target_rpe)
+    && upSq.every((sl) => sl.target_rpe <= prof().base_rpe_cap));
 
 // Direct attribution provenance: the side-car carries only the effective post-clamp change.
 const easedSlot = defSq.find((sl) => sl.autopilotDelta !== undefined);
+// baseSq and defSq are produced by separate generateBlock runs; neither their
+// equal length nor easedSlot's presence in defSq is asserted anywhere, so index
+// through slotAt rather than letting a short array throw.
+const easedBaseline = slotAt(baseSq, defSq.indexOf(easedSlot));
 check('eased attribution records effective post-clamp deltas',
   easedSlot?.autopilotDelta?.reason === 'eased'
-    && easedSlot.autopilotDelta.rpe_delta === easedSlot.target_rpe - baseSq[defSq.indexOf(easedSlot)].target_rpe
-    && easedSlot.autopilotDelta.set_delta === easedSlot.sets - baseSq[defSq.indexOf(easedSlot)].sets,
+    && easedSlot.autopilotDelta.rpe_delta === easedSlot.target_rpe - easedBaseline.target_rpe
+    && easedSlot.autopilotDelta.set_delta === easedSlot.sets - easedBaseline.sets,
   JSON.stringify(easedSlot?.autopilotDelta));
 const raisedSlot = upSq.find((sl) => sl.autopilotDelta !== undefined);
 check('raised attribution records the raised reason and effective deltas',
@@ -858,6 +877,29 @@ check('held-safety attribution records the safety reason',
     && safetySlot.autopilotDelta.rpe_delta < 0
     && safetySlot.autopilotDelta.set_delta < 0,
   JSON.stringify(safetySlot?.autopilotDelta));
+
+// Every emitted attribution must satisfy migration 034's CHECK constraints, or
+// the INSERT fails INSIDE the block-generation transaction and costs the
+// athlete the whole block. Assert the schema's own predicate against every
+// delta this file can generate, so a ladder change that broke the sign
+// invariant is caught here rather than on a device.
+const satisfies034 = (d) =>
+  [-0.5, 0.0, 0.5].includes(d.rpe_delta)
+  && Number.isInteger(d.set_delta) && d.set_delta >= -1 && d.set_delta <= 1
+  && ['eased', 'raised', 'held_safety'].includes(d.reason)
+  && (d.rpe_delta !== 0 || d.set_delta !== 0)
+  && (d.reason === 'raised'
+    ? d.rpe_delta >= 0 && d.set_delta >= 0
+    : d.rpe_delta <= 0 && d.set_delta <= 0);
+const everyDelta = [defPlan, upPlan, safetyPlan]
+  .flatMap((plan) => plan.sessions)
+  .flatMap((sess) => sess.slots)
+  .map((sl) => sl.autopilotDelta)
+  .filter((d) => d !== undefined);
+const bad034 = everyDelta.filter((d) => !satisfies034(d));
+check('every emitted autopilot attribution satisfies migration 034 CHECKs',
+  everyDelta.length > 0 && bad034.length === 0,
+  `${everyDelta.length} deltas, ${bad034.length} invalid${bad034.length ? `: ${JSON.stringify(bad034[0])}` : ''}`);
 const clampPlan = genFR({ objective: 'hybrid', training_age: 'beginner', base_rpe_cap: 5, session_duration_cap_min: 90, weekly_frequency: 2 },
   makeFlawReport({ squat: { phi: 0.5 } }));
 const clampedSlot = clampPlan.sessions.filter((s) => s.week_index === 4)
@@ -1087,9 +1129,11 @@ console.log('[17] guided goal-program schedule and preference laws');
   const baselineSquat = baseline.sessions[0].slots.find((slot) =>
     movements.find((movement) => movement.movement_id === slot.movement_id)?.pattern === 'squat');
   const alternate = movements.find((movement) => movement.pattern === 'squat' && movement.movement_id !== baselineSquat?.movement_id);
+  check('fixture: library offers a second squat movement to prefer', alternate !== undefined,
+    String(alternate?.movement_id));
   const preferenceDays = [{
     day_index: 2, focus: 'full',
-    movement_preferences: [{ slot_index: 1, pattern: 'squat', movement_id: alternate.movement_id }],
+    movement_preferences: [{ slot_index: 1, pattern: 'squat', movement_id: alternate?.movement_id ?? -1 }],
   }];
   const preferred = generateBlock({
     profile: prof({ objective, weekly_frequency: 1 }), movements, startDate: START, programDays: preferenceDays,

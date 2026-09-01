@@ -4,7 +4,7 @@
  * Coaching information is arranged around one immediate decision, a compact
  * four-week trajectory (liquid calendar), and inline disclosures for management and context.
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SCHEMA_TYPES, addDaysIso, targetLoadKg, type BlockPlan, type SchemaType } from '@ak/inference';
 import {
@@ -92,7 +92,14 @@ function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): strin
   }`;
 }
 
-const AUTOPILOT_BUDGET_NOTE = 'Autopilot still eases effort and adjusts sets whenever your sessions call for it. Only upward RPE moves are rationed, and those grants are spent over the first five blocks of each cycle.';
+/** Both attribution disclosures are a bare "·" glyph at theme.font.label, whose
+ *  laid-out box is far under theme.touch.min (56). Growing the Pressable to 56
+ *  would push a 56pt box into a text row that is otherwise label-height, so
+ *  extend the touchable region instead: 20pt on every side takes a ~16pt glyph
+ *  past the 56pt minimum without moving a single pixel of layout. */
+const ATTRIBUTION_HIT_SLOP = { top: 20, bottom: 20, left: 20, right: 20 } as const;
+
+const AUTOPILOT_BUDGET_NOTE ='Autopilot still eases effort and adjusts sets whenever your sessions call for it. Only upward RPE moves are rationed, and those grants are spent over the first five blocks of each cycle.';
 
 function autopilotExplanation(slot: TodaySlot): string | null {
   if (slot.autopilot === undefined) return null;
@@ -125,6 +132,7 @@ function AutopilotAttribution({
     <View style={styles.attribution}>
       <Pressable
         onPress={onPress}
+        hitSlop={ATTRIBUTION_HIT_SLOP}
         accessibilityRole="button"
         accessibilityLabel={`Why ${slot.movementName} target changed`}
         accessibilityState={{ expanded }}
@@ -150,6 +158,7 @@ function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
 
 export default function BlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX.Element {
   const vector = useStore((s) => s.vector);
+  const storeError = useStore((s) => s.error);
   const today = useStore((s) => s.today);
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
@@ -172,6 +181,8 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const archiveTrainingProgram = useStore((s) => s.archiveTrainingProgram);
   const [editingProgram, setEditingProgram] = useState(false);
   const [nextProgramPreview, setNextProgramPreview] = useState<BlockPlan | null>(null);
+  const [continuationError, setContinuationError] = useState<string | null>(null);
+  const [continuationPending, setContinuationPending] = useState(false);
   const startSession = useStore((s) => s.startSession);
 
   const routineTemplates = useStore((s) => s.routineTemplates) ?? [];
@@ -201,6 +212,23 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
+
+  // continueTrainingProgram reports every refusal through the store's `error`
+  // and returns without creating a block, so dismissing the preview card the
+  // moment the button is pressed would leave the athlete with no next block,
+  // no message, and nothing to retry. The store's post-call error is only
+  // observable on the NEXT render, so settle the confirmation here: close the
+  // card once the continuation actually landed, keep it up and surface the
+  // reason when it did not.
+  useEffect(() => {
+    if (!continuationPending) return;
+    setContinuationPending(false);
+    if (storeError !== null && storeError !== undefined) {
+      setContinuationError(storeError);
+      return;
+    }
+    setNextProgramPreview(null);
+  }, [continuationPending, storeError]);
 
   const hasSubView =
     editingProgram ||
@@ -478,11 +506,20 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               Late confirmation moves the review boundary to {continuationReviewDate}, preserving four full weeks per remaining block.
             </Text>
           )}
+          {continuationError !== null && (
+            <Text style={styles.errorText}>{continuationError}</Text>
+          )}
+          {/* The preview is dismissed by the effect above, only once the
+              continuation has actually landed. */}
           <PrimaryButton label="Confirm next block" onPress={() => {
+            setContinuationError(null);
+            setContinuationPending(true);
             continueTrainingProgram();
-            setNextProgramPreview(null);
           }} accessibilityLabel="Confirm and start next program block" />
-          <SecondaryButton label="Not yet" onPress={() => setNextProgramPreview(null)} />
+          <SecondaryButton label="Not yet" onPress={() => {
+            setContinuationError(null);
+            setNextProgramPreview(null);
+          }} />
         </View>
       )}
 
@@ -496,6 +533,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <View style={styles.blockAttribution}>
             <Pressable
               onPress={() => setMacroBudgetOpen((open) => !open)}
+              hitSlop={ATTRIBUTION_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Why RPE is held steady"
               accessibilityState={{ expanded: macroBudgetOpen }}
@@ -793,33 +831,39 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               </View>
             )}
 
-            {(block === null || todayPlan === null) && !halted && session === null && (
-              <Disclosure label="Start without a planned session">
-                <View style={styles.disclosureContent}>
-                  {!confirmUnplannedStart ? (
-                    <>
-                      <Text style={styles.captionText}>
-                        This starts a session without the day's planned exercise order.
-                      </Text>
-                      <SecondaryButton
-                        label="Start an unplanned session"
-                        onPress={() => setConfirmUnplannedStart(true)}
-                        accessibilityLabel="Start an unplanned session"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
-                      <PrimaryButton label="Start unplanned session" onPress={startUnplannedSession} accessibilityLabel="Start unplanned session" />
-                      <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
-                    </>
-                  )}
-                </View>
-              </Disclosure>
-            )}
           </View>
         </Disclosure>
         </View>
+        )}
+
+        {/* Deliberately OUTSIDE the program gate above. "Manage block" is hidden
+            while a program is active, and freezeRoutineTemplateToPlannedSession
+            refuses to run then as well — so nesting the unplanned start inside
+            that gate left a program athlete on a rest day with no way to begin
+            an ad-hoc session at all. Only block regeneration is program-gated. */}
+        {(block === null || todayPlan === null) && !halted && session === null && (
+          <Disclosure label="Start without a planned session">
+            <View style={styles.disclosureContent}>
+              {!confirmUnplannedStart ? (
+                <>
+                  <Text style={styles.captionText}>
+                    This starts a session without the day's planned exercise order.
+                  </Text>
+                  <SecondaryButton
+                    label="Start an unplanned session"
+                    onPress={() => setConfirmUnplannedStart(true)}
+                    accessibilityLabel="Start an unplanned session"
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
+                  <PrimaryButton label="Start unplanned session" onPress={startUnplannedSession} accessibilityLabel="Start unplanned session" />
+                  <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
+                </>
+              )}
+            </View>
+          </Disclosure>
         )}
 
         <Disclosure
@@ -982,6 +1026,13 @@ const styles = StyleSheet.create({
   adjustedText: {
     ...theme.font.label,
     color: theme.color.textMid,
+  },
+  errorText: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.color.textHi,
+    paddingLeft: theme.space[2],
   },
   statusBadge: {
     borderWidth: 1,

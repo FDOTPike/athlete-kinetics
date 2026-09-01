@@ -738,15 +738,33 @@ export function generateBlock(input: BlockInput): BlockPlan {
             || flaw?.flawClass === 'caution'
             || (flaw !== undefined
               && flaw.maxJointSev >= EXPERIENCE_SEVERITY[profile.training_age].triageMin);
-          autopilotDelta = {
-            rpe_delta: rpeDelta,
-            set_delta: setDelta,
-            reason: heldForSafety
-              ? 'held_safety'
-              : rpeDelta < 0 || setDelta < 0
-                ? 'eased'
-                : 'raised',
-          };
+          // 034 ties `reason` to the SIGN of BOTH deltas: 'raised' requires
+          // rpe_delta >= 0 AND set_delta >= 0; 'eased'/'held_safety' require
+          // both <= 0. A mixed-sign row satisfies no reason at all, and the
+          // insert happens inside the block-generation transaction — so one
+          // contradictory attribution row would roll back the athlete's entire
+          // block to save a piece of descriptive metadata.
+          //
+          // That cannot happen today: the φ-ladder always moves dRpe_p and
+          // dSet_p together, the §2 monotone-conservative override clamps both
+          // to <= 0 under exactly the three conditions `heldForSafety` tests,
+          // and every clamp above only shrinks a delta toward zero — never
+          // across it. Make that invariant STRUCTURAL rather than incidental:
+          // derive the attributed pair from the chosen reason, so a future
+          // ladder change can at worst under-report an adjustment instead of
+          // destroying the block. If normalization leaves both at zero there
+          // is nothing to attribute (034 also rejects an all-zero row), so no
+          // row is emitted.
+          const easing = heldForSafety || rpeDelta < 0 || setDelta < 0;
+          const attributedRpe = easing ? Math.min(0, rpeDelta) : Math.max(0, rpeDelta);
+          const attributedSet = easing ? Math.min(0, setDelta) : Math.max(0, setDelta);
+          if (attributedRpe !== 0 || attributedSet !== 0) {
+            autopilotDelta = {
+              rpe_delta: attributedRpe,
+              set_delta: attributedSet,
+              reason: heldForSafety ? 'held_safety' : easing ? 'eased' : 'raised',
+            };
+          }
         }
         slots.push({
           slot_index: slotIndex,

@@ -1159,7 +1159,7 @@ dashboard clutter with progressive disclosure and a vertical session timeline.
 
 ### Input G(x)
 
-```
+```text
 OWNER AUTHORIZATION: Proceed autonomously. You may commit and push strictly scoped fixes if required, publish the QA prerelease, and update the remediation branch. Do not merge master or publish a production release.
 
 Repository:
