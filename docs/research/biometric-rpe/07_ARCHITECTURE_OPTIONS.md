@@ -8,7 +8,7 @@ Six value classes must remain distinct at the type, persistence, and UI levels �
 
 1. **Observed biometric** — raw-ish compacted daily values as ingested (`DailyBiometrics`, one row/day [R01]).
 2. **Derived biometric feature** — computed descriptors (e.g. `ln_rmssd`, `hrv_z`, sleep efficiency) produced by the materialization layer [R01b].
-3. **Readiness** — the ratified composite score [R01b].
+3. **Readiness** — the ratified HRV+sleep composite score [R01b]; **corrected per audit: it is a prescription input**, not a merely descriptive metric — the policy engine (`policyReference.ts:36-55` [R07]) maps it to planned load/set/rpe_cap modifiers. The separation law therefore distinguishes planned-side prescription authority (readiness → plan) from athlete-authored actual RPE, which no biometric path may touch.
 4. **Advisory effort estimate** (future, hypothetical) — a model output with explicit uncertainty; would live in its own type with its own provenance, never in `state_vector`.
 5. **Athlete-confirmed actual RPE** — `set_record.rpe` / `session_rpe`, nullable, athlete-authored only [R03, R04].
 6. **Planned target RPE** — prescription-side `target_rpe` [R04], untouched by all biometric paths.
@@ -47,7 +47,7 @@ Enforcement shape (already the repo's idiom): pure functions in `packages/infere
 
 ## 5. Option O4 — Biometric context displayed beside, never converted into, athlete RPE
 
-- **Architecture (smallest):** a read-only disclosure surface drawing from existing `state_vector`/`hrv_daily`/`sleep_daily` reads [R01, R01b] — e.g. on the Readiness surface, not the Session screen; no new ingestion, no new types, no new permission (already-held types only [R01]); pure formatter in inference for any derived display value; provenance + date shown (05 §4).
+- **Architecture (smallest):** a read-only disclosure surface drawing from existing `state_vector`/`hrv_daily`/`sleep_daily` reads [R01, R01b] — e.g. on the Readiness surface, not the Session screen; no new ingestion, no new types, no new permission (already-held types only [R01]); pure formatter in inference for any derived display value; provenance + date shown (05 §4). Prerequisite: the RHR declaration gap (UD-9, `05` §1b) must be resolved by the owner before any Play filing touches the current permission set.
 - **Benefit:** gives the already-connected athlete visible value from data the app already holds; zero new collection.
 - **Risk:** the *anchor-contamination* risk — a number near the RPE stepper can nudge self-reports; hence the boundary: context lives on the readiness surface, never beside the set-entry UI; copy states what each number is and is not (05 §5).
 - **Data:** existing three types. **Validation burden:** comprehension/usability only. **Privacy:** consent copy update + Health declaration consistency check [D02, D04]; no new permission.
@@ -90,4 +90,4 @@ Identical to O1 plus nothing: the app ships today's honest subjective instrument
 
 ## 9. Boundary statements (what no option may do)
 
-No option writes or displays anything inside the RPE entry flow except the athlete's own input and the ratified cues [R05]. No option merges biometric context into readiness beyond the ratified formula [R01b]. No option backfills NULLs [R03]. No option adds a permission or record type without a consuming feature, declaration, and owner ratification [D02, D04]. No option speaks medically (05 §7). O5 additionally: never ships without the full 06 chain.
+No option writes or displays anything inside the RPE entry flow except the athlete's own input and the ratified cues [R05]. No option adds biometric inputs to the readiness formula beyond the ratified HRV+sleep composition [R01b] — noting readiness already carries planned-prescription authority via the policy engine [R07], which is exactly why its inputs stay frozen. No option backfills NULLs [R03]. No option adds a permission or record type without a consuming feature, declaration, and owner ratification [D02, D04]; the existing RHR gap (UD-9) must be resolved before any filing. No option speaks medically (05 §7). O5 additionally: never ships without the full 06 chain.

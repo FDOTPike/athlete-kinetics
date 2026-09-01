@@ -3,14 +3,14 @@
 - **Work order:** `docs/WORKORDER_ADVANCED_BIOMETRIC_RPE_DISCOVERY.md` (Phase C of `docs/PROGRAM_QUALITY_REMEDIATION_SEQUENCE.md`)
 - **Base commit (verified):** `e15bbe9301fe756ecda9d8296877b19e425ac112`
 - **Deliverable set:** documentation-only discovery, ten files under `docs/research/biometric-rpe/`
-- **Independent review status:** `PENDING — OWNER ASSIGNED TO CODEX/SOL` (owner override for this run: the two in-run reviewers described in WO §9 were not commissioned; Codex/Sol audit tomorrow audits this frozen output)
+- **Remediation status:** this document set was independently audited (verdict: REQUEST CHANGES, five P1 findings) and remediated on the same branch; the remediation record is `09` §11. Independent review remains **PENDING — OWNER ASSIGNED TO CODEX/SOL** for the post-remediation state.
 - **This run's executor:** GLM 5.3, high effort, per owner dispatch (the sequence's "recommended lead" rows name Gemini models; the owner's model switch is the role assignment)
 
 ## 1. Decision
 
-**DECISION TOKEN: RESEARCH PILOT ONLY**
+**DECISION TOKEN: RESEARCH PILOT ONLY** — unchanged by remediation, now **provisional** pending the post-remediation Codex/Sol audit.
 
-Exactly one authorized token is returned: **RESEARCH PILOT ONLY — no prescription or athlete-facing estimate.**
+Exactly one authorized token is returned: **RESEARCH PILOT ONLY — no prescription or athlete-facing estimate.** The audit accepted this token and the SpO2 ruling; its changes correct the evidence landscape and protocol design beneath the token, and the token's rationale is now worded at the bounded scope the corrected evidence supports (consumer-modality validity is *unproven*, not disproven — `02` §4b/§6).
 
 What this token authorizes, and nothing more:
 
@@ -49,4 +49,8 @@ These are restatements of the WO's non-negotiables, kept beside the decision so 
 
 ## 5. Review status
 
-Independent review is **PENDING — OWNER ASSIGNED TO CODEX/SOL**. This run did not commission the two reviewers the WO describes, did not fabricate reviewer verdicts, and does not claim the workorder's independent-review acceptance criterion (§10) is satisfied. `09_INDEPENDENT_REVIEW_HANDOVER.md` is the auditor entry point.
+The first freeze was independently audited (REQUEST CHANGES, five P1 findings — S12 misreport, missed resistance-training literature, incoherent validation split, privacy/architecture mapping errors, and residual citation errors). All five findings are remediated in the remediation record `09` §11; the audit's additional required corrections (memory claim, retention truth, partial-grant model, chest-strap attribution, D05 row) are likewise addressed. **Independent review of the post-remediation state remains PENDING — OWNER ASSIGNED TO CODEX/SOL.** This run did not fabricate reviewer verdicts and does not claim the workorder's independent-review acceptance criterion (§10) is satisfied. `09_INDEPENDENT_REVIEW_HANDOVER.md` is the auditor entry point.
+
+## 6. Addendum: the RHR consuming-feature gap (UD-9, disclosed per audit)
+
+Resting heart rate is currently requested and stored but feeds **no computation** — the materialized readiness score uses HRV and sleep only [R01b], and no display consumes RHR. Under Google's per-data-type justification requirement [D02, D05], this is a declaration risk. The owner must choose: drop the RHR request, give it a consuming feature, or document an explicit justification (`08` UD-9). Until resolved, no Health apps declaration should be filed for the current permission set, and any consent copy must not claim RHR feeds readiness.

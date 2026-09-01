@@ -39,9 +39,8 @@ This document defines every candidate construct precisely enough that no future 
 - **Time window:** one calendar day, materialized per date.
 - **Subjective or physiological:** physiological-input composite (HRV z-score, sleep efficiency) — neither input is an effort rating.
 - **Applies to:** the day, before or between sessions.
-- **Ground truth:** none claimed. Calibration Policy v1 fixes its meaning as a descriptive recovery-signal composite; ACWR/load has been removed from it entirely [R01, R01b].
-- **Evidence state:** each input has its own evidence row (§7, §8) — and neither input measures effort during lifting.
-- **Why it must not be conflated:** readiness is a morning/day-scale recovery descriptor; a heavy session on a "ready" day can still produce set RPE 9.5, and a fresh athlete on a poor-readiness day can still cruise at RPE 6. The WO's boundaries forbid converting readiness into set RPE in either direction.
+- **Ground truth:** none claimed. Calibration Policy v1 fixed its *composition* (HRV+sleep only; ACWR/load removed) — but readiness is **not merely descriptive**: the live prescription engine (`policyReference.ts:36-55` [R07]) maps it to a planned load modifier (0.85–1.05), planned set modifier (−2…+1), and a planned-RPE cap (6.5–9.5). **Corrected per audit** — the first freeze mislabeled readiness "descriptive," importing the ACWR story onto the wrong signal. The precise authority boundary: readiness modulates **planned** prescription numbers; it never writes, grades, or replaces athlete-entered actual RPE.
+- **Why it must not be conflated:** readiness is a day-scale recovery descriptor with planned-side prescription authority; a heavy session on a "ready" day can still produce set RPE 9.5, and a fresh athlete on a poor-readiness day can still cruise at RPE 6. The WO's boundaries forbid converting readiness into set RPE in either direction.
 
 ## 5. Talk/breathing cues (subjective, observed)
 
@@ -127,7 +126,7 @@ This document defines every candidate construct precisely enough that no future 
 | **Set RPE** | — | anchor language | different window (set vs session) | different window & kind | no conversion either way |
 | **RIR** | anchor of RPE | — | — | — | — |
 | **Session RPE** | aggregation ≠ new perception | — | — | — | no conversion |
-| **Readiness** | never sets/grades RPE | — | never derived from set RPE | — | inputs only (HRV, sleep) |
+| **Readiness** | never fills/grades athlete RPE; modulates **planned** load/sets/rpe_cap via the policy engine [R07] | — | never derived from set RPE | — | inputs: HRV, sleep only (RHR feeds nothing [R01]) |
 | **Biometric observations** | never fill, never grade | — | never fill | may feed readiness *only* | — |
 
 The three critical conflation traps, stated as invariants for tomorrow's auditor:

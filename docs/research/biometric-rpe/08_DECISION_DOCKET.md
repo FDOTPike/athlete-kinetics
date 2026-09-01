@@ -15,6 +15,7 @@ A bounded record of what this discovery decided, what it deliberately left open,
 | D-MADE-7 | The validation pilot (06) is the only authorized forward artifact and requires separate owner ratification before execution | WO §5; decision token | 00 §1; 06 §0/§11 |
 | D-MADE-8 | No new Health Connect record type, no new permission, no schema change proposed by this discovery | minimization [D02]; 04 feasibility | 04 §1/§10 |
 | D-MADE-9 | Pilot thresholds in 06 §8 are unratified placeholders — explicitly owner/domain-expert decisions | WO §5 ("do not invent acceptance thresholds") | 06 §8/§11 |
+| D-MADE-10 | Audit remediation (REQUEST CHANGES, 5×P1): S12 corrected to two-class/n=10/85.7% KNN; three-band "ceiling" justification withdrawn; direct resistance-training literature added ([S25] PERSIST, [S26] BSPC, [S27] Sensors) with bounded conclusions; `06` redesigned into Arm P (population, athlete-disjoint) and Arm I (individualisation, chronological) with contemporaneous-RIR leakage rules; readiness re-attributed as a prescription input [R07]; RHR no-consumer gap disclosed (UD-9); memory claim bounded; retention stated as-built; partial-grant model documented; citation repairs (S16/S18/S19/S20/S21, S24 split out, D05 replaced by page-dated publishing row) | independent audit of the first freeze; remediated at high effort on the same branch | `09` §11; per-document correction notes |
 
 ## 2. Unresolved decisions requiring an owner (or owner-delegated domain expert)
 
@@ -26,8 +27,9 @@ A bounded record of what this discovery decided, what it deliberately left open,
 | UD-4 | Whether session RPE should become a direct athlete global rating (Foster-aligned) instead of / alongside the current mean-of-rated-sets derivation [R03] | touches existing behavior; WO scope excludes behavior change this run | Francis Pike |
 | UD-5 | iOS bridge path (HealthKit) — out of scope here; interacts with O4/O5 device support | separate platform work order | Francis Pike |
 | UD-6 | Whether the `spo2_component` column should be formally deprecated in a future migration vs left neutral-excluded | schema change is outside this discovery's authority | Francis Pike |
-| UD-7 | Pilot data governance sign-off (retention limit, export mechanics, ethics/consent text) if UD-1 = execute | 06 §9/§11 | Owner + ethics-literate reviewer |
-| UD-8 | Disposition of this docket after Codex/Sol audit (accept token, re-open decisions, commission deeper evidence review) | audit outcome pending | Francis Pike |
+| UD-7 | Pilot data governance sign-off (retention limit, export mechanics, ethics/consent text) if UD-1 = execute | 06 §9/§11; `05` §1 bounded pilot retention | Owner + ethics-literate reviewer |
+| UD-8 | Disposition of this docket after the post-remediation Codex/Sol audit (accept token, re-open decisions, commission deeper evidence review) | audit outcome pending | Francis Pike |
+| UD-9 | Resting-heart-rate consuming-feature gap: drop the RHR request, give it a real consuming feature, or document an explicit justification — before any Health apps declaration is filed | per audit: RHR is requested and stored but feeds no computation [R01b, R08]; Google requires per-type consuming features [D02, D05] | Francis Pike |
 
 ## 3. Scientific disagreements the evidence leaves open (recorded, not resolved)
 
