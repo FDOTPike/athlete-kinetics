@@ -10,8 +10,8 @@
 - **Commit chain (all local; no push/merge/tag):**
   1. `9dd3ba9f3a489563bfb1c1340078c14f3d59d63a` — first deliverables commit (ten files; tree `caecdd3e23e2d4e2667734df2c928668ce0f94eb`).
   2. `f9eb6bd56aaf0abd9502348a33b35fd7c28db82a` — first freeze record (Freeze Log fill; touched only `09` §0).
-  3. **REMEDIATION COMMIT** = `<filled-by-final-freeze-commit>` — the audit-remediation commit (five P1 findings + additional corrections; touches only the ten files in §2).
-  4. **FINAL FREEZE COMMIT (audit target)** = `<filled-by-final-freeze-commit>` — fills the two placeholders above and this §0; touches only this file. HEAD after it is what you audit; recompute with `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` — never trust a SHA written inside a commit's own text.
+  3. **REMEDIATION COMMIT** = `3ddfd78692c1cb8c87033039fa1992491762e30e` — the audit-remediation commit (five P1 findings + additional corrections; 10 files, 184 insertions / 103 deletions, all within the ten files in §2).
+  4. **FINAL FREEZE COMMIT (audit target)** = the commit that wrote this freeze log (it cannot record its own SHA; it is `HEAD`). It touches only this file. Recompute everything with `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` — never trust a SHA written inside a commit's own text.
 - **Deliverables tree:** exactly ten files, `docs/research/biometric-rpe/00…09` (§2 lists them). `git show --stat` for commits 1 and 3 must list only these (commit 1: all ten new; commit 3: remediation edits within the same set); commits 2 and 4 must touch only this file.
 - **First-freeze audit:** REQUEST CHANGES (five P1 findings + additional required corrections). Remediation record: §11. The audit's provisional acceptance of the decision token and SpO2 ruling is recorded there verbatim in substance.
 
