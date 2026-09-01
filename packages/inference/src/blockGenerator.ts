@@ -857,6 +857,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
           objective: profile.objective,
           inventory: profile.equipment_inventory,
           preferredMovementIds: new Set<number>(),
+          accessContext,
         }, pattern);
         const rankedDefault = ranking.movementId >= 0
           ? pool.find((candidate) => candidate.movement_id === ranking.movementId) ?? null

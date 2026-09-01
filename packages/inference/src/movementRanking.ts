@@ -86,6 +86,11 @@ export interface MovementRankingInput {
   readonly inventory: readonly string[];
   readonly safetyExcludedMovementIds?: ReadonlySet<number>;
   readonly preferredMovementIds?: ReadonlySet<number>;
+  /** The executable access context the slot runs in. The sport/conditioning
+   *  context removes the difficulty-tier ceiling by ratified law; the ranker
+   *  must apply the SAME context, not assume the weight room. Default:
+   *  'weight_room'. */
+  readonly accessContext?: 'weight_room' | 'sport_conditioning';
 }
 
 export type RankingReason = 'preference' | 'anchor' | 'loaded' | 'bodyweight';
@@ -164,7 +169,7 @@ const exclusionsOf = (c: RankingCandidate, input: MovementRankingInput): Ranking
     input.trainingAge,
     c.difficulty,
     c.beginnerOk ?? false,
-    'weight_room',
+    input.accessContext ?? 'weight_room',
     c.sportTracking ?? false,
   );
   if (!tierOk) gates.add('tier');
