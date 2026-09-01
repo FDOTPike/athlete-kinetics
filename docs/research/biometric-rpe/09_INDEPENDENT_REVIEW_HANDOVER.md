@@ -10,7 +10,7 @@
 - **DELIVERABLES COMMIT:** the single local commit that adds the ten files under `docs/research/biometric-rpe/`. Its SHA is recorded in the Freeze Log immediately below (added by the freeze-record commit, which edits only this §0). Nothing else about this document changes between the two commits.
 - **AUDIT TARGET:** `HEAD` of `codex/biometric-rpe-discovery` when you begin. Valid audit target = DELIVERABLES COMMIT, or its single documented successor (the freeze-record commit that only writes the Freeze Log into this §0). Any other history means this handover is stale — stop and ask the owner.
 - **Deliverables tree:** exactly ten files, `docs/research/biometric-rpe/00…09` (§2 lists them). `git show --stat <DELIVERABLES_COMMIT>` must list only these; the freeze-record commit must touch only this file.
-- **Freeze Log:** DELIVERABLES COMMIT = `<filled-by-freeze-record-commit>`; DELIVERABLES-COMMIT TREE SHA = `<filled-by-freeze-record-commit>`. The freeze-record commit that fills these values touches only this §0. The final HEAD (its single successor) is the audit target; recompute its SHA and tree with `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` — never trust a SHA written inside a commit's own text.
+- **Freeze Log:** DELIVERABLES COMMIT = `9dd3ba9f3a489563bfb1c1340078c14f3d59d63a`; DELIVERABLES-COMMIT TREE SHA = `caecdd3e23e2d4e2667734df2c928668ce0f94eb`. This freeze-record commit touches only this §0 of this file. HEAD after it is the audit target; recompute SHAs with `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` — never trust a SHA written inside a commit's own text.
 
 ## 1. What this run was (and was not)
 
