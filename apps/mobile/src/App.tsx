@@ -3,7 +3,7 @@
  *
  * Zero navigation library: five tabs, NavigationProvider stack, 64pt tab targets.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AppState,
   KeyboardAvoidingView,
@@ -21,6 +21,7 @@ import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
+import ProgramSetupScreen from './screens/ProgramSetupScreen';
 import BlockScreen from './screens/BlockScreen';
 import LibraryScreen from './screens/LibraryScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -75,6 +76,20 @@ export default function App(): React.JSX.Element {
 }
 
 function AppShell(): React.JSX.Element {
+  const programSetupPending = useStore((s) =>
+    s.status === 'ready' && s.onboarded && s.block === null && s.program === null);
+  // "No block and no program" is NOT only a first-run state: archiving a
+  // program archives its active block too, and an existing install can hold
+  // nothing but archived blocks. Program setup is therefore an invitation, not
+  // a gate — without a dismissal it hides the tab bar and strands the athlete
+  // away from BlockScreen, routine templates, and the ATHLETE tab with no way
+  // back. Dismissal is per-visit: it resets as soon as the athlete leaves the
+  // state, so archiving again re-offers setup.
+  const [setupDismissed, setSetupDismissed] = useState(false);
+  useEffect(() => {
+    if (!programSetupPending) setSetupDismissed(false);
+  }, [programSetupPending]);
+  const showProgramSetup = programSetupPending && !setupDismissed;
   const { tab, setTab } = useNavigation();
   const boot = useStore((s) => s.boot);
   const status = useStore((s) => s.status);
@@ -115,6 +130,8 @@ function AppShell(): React.JSX.Element {
       >
         {showOnboarding ? (
           <OnboardingScreen />
+        ) : showProgramSetup ? (
+          <ProgramSetupScreen onCancel={() => setSetupDismissed(true)} />
         ) : (
           <>
             {tab === 'readiness' && (
@@ -132,7 +149,7 @@ function AppShell(): React.JSX.Element {
           </>
         )}
       </KeyboardAvoidingView>
-      {!showOnboarding && (
+      {!showOnboarding && !showProgramSetup && (
         <View style={styles.tabBar} accessibilityRole="tablist">
           {TABS.map((t) => {
             const active = t.key === tab;

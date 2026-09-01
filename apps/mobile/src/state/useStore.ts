@@ -19,11 +19,15 @@ import {
   MATERIALIZE_STATE_VECTOR_SQL,
   SPO2_FOLD_SQL,
   SPO2_TRIM_SQL,
+  archiveActiveTrainingBlock,
   closeKineticsDb,
   demoDates,
   generateDemoHistory,
+  insertTrainingProgram,
+  linkTrainingBlockProgram,
   migrate,
   openKineticsDb,
+  updateTrainingProgramEndDate,
   type DemoSql,
 } from '@ak/core-db';
 import {
@@ -37,6 +41,7 @@ import {
 import { loadRegistry, saveRegistry } from './athleteRegistry';
 import {
   buildPatternWindow,
+  addDaysIso,
   composeRoutine,
   computeSubstitutions,
   DEFAULT_PROFILE,
@@ -48,6 +53,10 @@ import {
   generateBlock,
   historyContentFingerprint,
   parseHistoryImport,
+  defaultProgramDayIndices,
+  normalizeProgramHorizon,
+  programHorizonAnchor,
+  programFocuses,
   OBJECTIVES,
   PROGRESSION_METHODS,
   TRAINING_AGES,
@@ -57,6 +66,7 @@ import {
   loadCodebase,
   MACRO_BLOCKS,
   macroPhaseOf,
+  programMacroIndex,
   MOVEMENT_PREFERENCE,
   MOVEMENT_PREFIXES,
   RED_FLAG_PAIN,
@@ -71,13 +81,18 @@ import {
   type RoutineRole,
   type DifficultyRating,
   type Embedder,
+  type BlockPlan,
+  type ProgramDayPreference,
   type FutureSlot,
   type GeneratorMovement,
   type Guardrail,
+  type FlawReport,
   type Joint,
   type HistoryParseResult,
   type LoadedCodebase,
   type MacroPhase,
+  type SuspensionEpisode,
+  type SuspensionReason,
   type MovementPattern,
   type MovementPrefix,
   type MovementPrefixCondition,
@@ -108,6 +123,7 @@ import {
   type SessionOutcomeProvenanceKind,
   type Prescription,
   type ProfileContext,
+  type ProgramReviewHorizon,
   type SchemaType,
   type SessionDirective,
   type StateVectorRow,
@@ -320,6 +336,14 @@ export interface BlockSessionSummary {
   completionStatus: 'complete' | 'halted' | null;
 }
 
+export type AutopilotAttributionReason = 'eased' | 'raised' | 'held_safety';
+
+export interface AutopilotAttribution {
+  rpeDelta: number;
+  setDelta: number;
+  reason: AutopilotAttributionReason;
+}
+
 export interface TodaySlot {
   slotIndex: number;
   plannedSlotId: number;
@@ -334,6 +358,8 @@ export interface TodaySlot {
   overrideLoadKg: number | null;
   /** WHY the load moved — rendered verbatim as a badge. */
   overrideReason: string | null;
+  /** Optional planned_slot_autopilot provenance; absent means untouched. */
+  autopilot?: AutopilotAttribution;
 }
 
 /** The active block's periodization metadata (block_meta side-car). */
@@ -350,6 +376,54 @@ export interface TodayPlan {
   focus: string;
   phase: string;
   slots: TodaySlot[];
+}
+
+export interface TrainingProgramMovementPreference {
+  dayIndex: number;
+  slotIndex: number;
+  pattern: MovementPattern;
+  movementId: number;
+}
+
+export interface TrainingProgramDay {
+  dayIndex: number;
+  focus: string;
+}
+
+export interface TrainingProgram {
+  programId: number;
+  objective: UserProfile['objective'];
+  startDate: string;
+  horizonKind: 'weeks' | 'date';
+  requestedReviewDate: string | null;
+  plannedEndDate: string;
+  plannedBlockCount: number;
+  startingMacroBlockIndex: number;
+  schemaType: SchemaType;
+  status: 'active' | 'review_due' | 'archived';
+  currentSequenceIndex: number;
+  days: TrainingProgramDay[];
+  movementPreferences: TrainingProgramMovementPreference[];
+}
+
+export type TrainingProgramHorizon = ProgramReviewHorizon;
+
+export interface TrainingProgramInput {
+  horizon: TrainingProgramHorizon;
+  schemaType: SchemaType;
+  dayIndices: number[];
+  movementPreferences?: TrainingProgramMovementPreference[];
+}
+
+export interface TrainingProgramPreview {
+  objective: UserProfile['objective'];
+  startDate: string;
+  requestedReviewDate: string | null;
+  plannedEndDate: string;
+  plannedBlockCount: number;
+  schemaType: SchemaType;
+  days: TrainingProgramDay[];
+  plan: BlockPlan;
 }
 
 export interface RoutineTemplateSlot {
@@ -434,6 +508,7 @@ interface KineticsStore {
   blockSessions: BlockSessionSummary[];
   todayPlan: TodayPlan | null;
   hasArchivedBlock: boolean;
+  program: TrainingProgram | null;
   routineTemplates: RoutineTemplate[];
   /** Absolute 1RMs by movement_id (one_rep_max rows). */
   oneRepMaxes: Record<number, number>;
@@ -465,6 +540,13 @@ interface KineticsStore {
    *  SQLite transaction). Deterministic: profile + equipment + schema +
    *  macro position + today. Continues the 32-week macro-cycle. */
   generateNewBlock: (schemaType?: SchemaType) => void;
+  previewTrainingProgram: (input: TrainingProgramInput) => TrainingProgramPreview;
+  createTrainingProgram: (input: TrainingProgramInput) => boolean;
+  updateProgramPreferences: (input: TrainingProgramInput) => boolean;
+  previewNextProgramBlock: () => BlockPlan | null;
+  continueTrainingProgram: () => void;
+  archiveTrainingProgram: () => void;
+  refreshProgram: () => void;
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
@@ -512,6 +594,12 @@ interface KineticsStore {
    *  logged history (pure read — UI consumers land with P17). Null when the
    *  group has no chain rows. */
   resolveGoalRung: (progressionGroup: string, today: string) => RungResolution | null;
+  /** Freeze macro progression in an explicit athlete-owned episode. */
+  beginSuspension: (reason: SuspensionReason, atMs: number) => number;
+  /** Close the open episode; a no-op when none is open. */
+  endSuspension: (atMs: number) => void;
+  /** The open episode, or null. */
+  activeSuspension: () => SuspensionEpisode | null;
   /** Capability attestation: manual coach/athlete override for attestation-gated edges. */
   attestEdge: (prerequisiteMovementId: number, movementId: number) => void;
   revokeAttestation: (prerequisiteMovementId: number, movementId: number) => void;
@@ -1363,6 +1451,12 @@ const persistSessionOutcome = (
   );
 };
 
+/** The open suspension episode, or null. */
+const openSuspension = (d: DB): { episode_id: number; frozen_macro_index: number } | null =>
+  rowsOf<{ episode_id: number; frozen_macro_index: number }>(d.executeSync(
+    'SELECT episode_id, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL LIMIT 1',
+  ))[0] ?? null;
+
 /** Macro-cycle continuation — the ONLY place the next position is derived.
  *  Every path that mints a block_meta row must call this. Two callers used to
  *  compute it independently and drifted: the routine-template freeze hardcoded
@@ -1370,6 +1464,11 @@ const persistSessionOutcome = (
  *  athlete mid-macrocycle back to the start (audit 6ff5449 s2). Deterministic:
  *  reads persisted state only, no clock, no RNG. */
 const nextMacroPosition = (d: DB): { macroBlockIndex: number; macroPhase: MacroPhase } => {
+  const suspended = openSuspension(d);
+  if (suspended !== null) {
+    const frozen = Math.min(Math.max(suspended.frozen_macro_index, 1), MACRO_BLOCKS);
+    return { macroBlockIndex: frozen, macroPhase: macroPhaseOf(frozen) };
+  }
   const lastMeta = rowsOf<{ macro_block_index: number }>(d.executeSync(
     'SELECT macro_block_index FROM block_meta ORDER BY block_id DESC LIMIT 1',
   ))[0];
@@ -1450,6 +1549,131 @@ const latestLoadMap = (d: DB): Record<number, number> => {
     rows.filter((row) => row.load_kg !== null).map((row) => [row.movement_id, row.load_kg as number]),
   );
 };
+
+/** Hydrate the exact bounded autopilot input used by every block preview and
+ *  commit. Keeping this read path shared prevents a confirmed program preview
+ *  from silently omitting corrections that appear only after persistence. */
+const hydrateAutopilotFlawReport = (
+  d: DB,
+  today: string,
+  profile: UserProfile,
+): FlawReport => {
+  const autopilotWindowDays = 21;
+  const winCalendar = demoDates(today, autopilotWindowDays);
+  const winStart = winCalendar[0];
+  const svByDate = new Map(rowsOf<StateVectorRow>(d.executeSync(
+    'SELECT * FROM state_vector WHERE date >= ? AND date <= ? ORDER BY date',
+    [winStart, today],
+  )).map((row) => [row.date, row] as const));
+  const windowVectors = winCalendar.map((date) => svByDate.get(date) ?? blankVector(date));
+  const setAgg = rowsOf<{
+    date: string; pattern: MovementPattern; set_count: number;
+    sum_delta_rpe: number; delta_count: number; sum_attenuation: number;
+  }>(d.executeSync(
+    `SELECT s.session_date AS date, m.pattern AS pattern, COUNT(*) AS set_count,
+            COALESCE(SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN sr.rpe - st.target_rpe END), 0) AS sum_delta_rpe,
+            SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN 1 ELSE 0 END) AS delta_count,
+            SUM(1.0 / MAX(1.0, COALESCE(sp.effective_load_kg, sr.load_kg) / MAX(sr.load_kg, 0.01))) AS sum_attenuation
+       FROM set_record sr
+       JOIN session s ON s.session_id = sr.session_id
+       JOIN movement m ON m.movement_id = sr.movement_id
+       LEFT JOIN set_prefix sp ON sp.set_id = sr.set_id
+       LEFT JOIN set_target st ON st.set_id = sr.set_id
+      WHERE s.session_date >= ? AND s.session_date <= ?
+      GROUP BY s.session_date, m.pattern`,
+    [winStart, today],
+  ));
+  const [startYear, startMonth, startDay] = winStart.split('-').map(Number);
+  const winStartMs = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0).getTime();
+  const niggleRows = rowsOf<{ region: string; severity: number; reported_at_ms: number }>(d.executeSync(
+    'SELECT region, severity, reported_at_ms FROM niggle WHERE reported_at_ms >= ?',
+    [winStartMs],
+  ));
+  const patternWindow = buildPatternWindow(
+    winCalendar,
+    setAgg.map((row) => ({
+      date: row.date,
+      pattern: row.pattern,
+      setCount: row.set_count,
+      sumDeltaRpe: row.sum_delta_rpe,
+      deltaCount: row.delta_count,
+      sumAttenuation: row.sum_attenuation,
+    })),
+    niggleRows.map((row) => ({
+      date: localDateOf(row.reported_at_ms),
+      region: row.region as Joint,
+      severity: row.severity,
+    })),
+  );
+  const haltMin = EXPERIENCE_SEVERITY[profile.training_age].haltMin;
+  const maxNiggleToday = rowsOf<{ s: number }>(d.executeSync(
+    'SELECT COALESCE(MAX(severity), 0) AS s FROM niggle WHERE reported_at_ms >= ?',
+    [startOfTodayMs()],
+  ))[0]?.s ?? 0;
+  const guardrail: Guardrail | null = maxNiggleToday >= haltMin
+    ? { load_multiplier: 1, set_delta: 0, rpe_cap_max: 10, halt: true, follow_up: null }
+    : null;
+  return detectFlaws(windowVectors, patternWindow, profile.training_age, guardrail);
+};
+
+interface PendingProgramCreation {
+  input: TrainingProgramInput;
+  preview: TrainingProgramPreview;
+  programDays: ProgramDayPreference[];
+}
+
+let pendingProgramCreation: PendingProgramCreation | null = null;
+
+interface PendingProgramContinuation {
+  programId: number;
+  sequenceIndex: number;
+  /** The program's own anchor macro position (training_program.starting_macro_block_index).
+   *  Carried through so preview and committed generation share the SAME
+   *  program-owned derivation (AUD-GP-2) — never re-read from the global cycle. */
+  startingMacroBlockIndex: number;
+  plannedEndDate: string;
+  programDays: ProgramDayPreference[];
+  weeklyFrequency: number;
+  objective: UserProfile['objective'];
+}
+
+let pendingProgramContinuation: PendingProgramContinuation | null = null;
+
+const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput, horizonAnchorDate: string) => {
+  const selected = [...new Set(input.dayIndices)].sort((a, b) => a - b);
+  if (selected.length < 1 || selected.length > 7
+      || selected.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
+    throw new Error('Choose between one and seven training days.');
+  }
+  const horizon = normalizeProgramHorizon(horizonAnchorDate, input.horizon);
+  const focuses = programFocuses(profile.objective, selected.length);
+  const days = selected.map((dayIndex, i) => ({ dayIndex, focus: focuses[i] }));
+  const allowedDays = new Set(selected);
+  const seenSlots = new Set<string>();
+  const movementPreferences = [...(input.movementPreferences ?? [])].sort(
+    (a, b) => a.dayIndex - b.dayIndex || a.slotIndex - b.slotIndex,
+  );
+  for (const preference of movementPreferences) {
+    const key = `${preference.dayIndex}:${preference.slotIndex}`;
+    if (!allowedDays.has(preference.dayIndex) || !Number.isInteger(preference.slotIndex)
+        || preference.slotIndex < 1 || preference.slotIndex > 5 || seenSlots.has(key)) {
+      throw new Error('A movement preference points to an invalid program slot.');
+    }
+    seenSlots.add(key);
+  }
+  const programDays: ProgramDayPreference[] = days.map((day) => ({
+    day_index: day.dayIndex,
+    focus: day.focus as ProgramDayPreference['focus'],
+    movement_preferences: movementPreferences.filter((p) => p.dayIndex === day.dayIndex).map((p) => ({
+      slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
+    })),
+  }));
+  return {
+    ...horizon,
+    days, movementPreferences, programDays,
+  };
+};
+
 /** Everything per-athlete in the store, cleared on a Coach Mode file swap so
  *  nothing bleeds across athletes (the re-boot re-hydrates all of it from the
  *  target file). `onboarded: true` here is the no-flash default; boot() then
@@ -1458,7 +1682,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   vector: null, trend: [], session: null, prescription: null,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
-  block: null, blockMeta: null, blockSessions: [], todayPlan: null, routineTemplates: [],
+  block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [],
   oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), bandLadder: [], onboarded: true,
 };
 
@@ -1491,6 +1715,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   blockSessions: [],
   todayPlan: null,
   hasArchivedBlock: false,
+  program: null,
   routineTemplates: [],
   oneRepMaxes: {},
   lastLoggedLoads: {},
@@ -1576,6 +1801,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().refreshBandLadder();
       // The block lives only in SQLite; the store is a read surface over it.
       get().refreshBlock();
+      get().refreshProgram();
       get().loadRoutineTemplates();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
@@ -1867,6 +2093,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('UPDATE profile_slot SET is_active = CASE WHEN slot_id = ? THEN 1 ELSE 0 END', [slotId]);
       persistProfileFields(d, loaded);
       runBlockWipe(d, localToday());
+      d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE status IN ('active','review_due')", [Date.now()]);
       d.executeSync('COMMIT');
     } catch (e) {
       d.executeSync('ROLLBACK');
@@ -1875,7 +2102,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
     set({
       profile: loaded,
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+      block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
       niggles: [], lastTriage: null,
     });
     get().refreshProfileSlots();
@@ -1883,6 +2110,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshBandLadder();
     get().refreshNiggles();
     get().refreshBlock();
+    get().refreshProgram();
     get().refreshVector();
     get().computePrescription([]);
   },
@@ -1896,6 +2124,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     d.executeSync('BEGIN');
     try {
       runBlockWipe(d, localToday());
+      d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE status IN ('active','review_due')", [Date.now()]);
       d.executeSync('COMMIT');
     } catch (e) {
       d.executeSync('ROLLBACK');
@@ -1905,9 +2134,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // Clear EVERY piece of UI state derived from the wiped rows (audit: stale
     // prescription/substitution/plan state survived the wipe). profileNotes are
     // NOT cleared — athlete_profile is intentionally preserved by this wipe.
-    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, lastEndedSessionId: null });
+    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, lastEndedSessionId: null });
     get().refreshNiggles();
     get().refreshBlock();
+    get().refreshProgram();
     get().refreshVector();
     get().computePrescription([]);
   },
@@ -1942,6 +2172,36 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return resolveActiveRung(chain, [...bySession.values()], { requiredSets: pol.required_sets, requiredReps: pol.required_value });
     }
     return resolveActiveRung(chain, [...bySession.values()]);
+  },
+
+  beginSuspension: (reason, atMs) => {
+    const d = getDb();
+    if (openSuspension(d) !== null) {
+      throw new Error('A suspension is already open. Resume it before starting another.');
+    }
+    const frozen = nextMacroPosition(d).macroBlockIndex;
+    d.executeSync(
+      'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, NULL, ?, ?)',
+      [atMs, reason, frozen],
+    );
+    return frozen;
+  },
+
+  endSuspension: (atMs) => {
+    const d = getDb();
+    const open = openSuspension(d);
+    if (open === null) return;
+    d.executeSync(
+      'UPDATE suspension_episode SET ended_at_ms = ? WHERE episode_id = ?',
+      [atMs, open.episode_id],
+    );
+  },
+
+  activeSuspension: () => {
+    const d = getDb();
+    return rowsOf<SuspensionEpisode>(d.executeSync(
+      'SELECT episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL LIMIT 1',
+    ))[0] ?? null;
   },
 
   attestEdge: (prerequisiteMovementId, movementId) => {
@@ -2081,10 +2341,6 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     // that marks this athlete onboarded on every future boot).
     get().saveProfile(patch);
     set({ onboarded: true });
-    // The questionnaire is the first-block brief. saveProfile publishes the
-    // clamped answers synchronously, so the generator reads the athlete's real
-    // objective, equipment, and weekly frequency. Never replace an existing block.
-    if (get().block === null) get().generateNewBlock('LINEAR');
     void (async () => {
       const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
       if (!(await saveRegistry(reg))) {
@@ -2093,6 +2349,87 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
       set({ athletes: reg.athletes });
     })();
+  },
+
+  previewTrainingProgram: (input) => {
+    if (get().session !== null) {
+      throw new Error('End the active session before previewing program changes.');
+    }
+    const { profile, movements, vector, niggles } = get();
+    if (!(['LINEAR', 'WAVE', 'STEP', 'APRE'] as readonly string[]).includes(input.schemaType)) {
+      throw new Error('Choose a training method.');
+    }
+    const activeProgram = get().program;
+    const planningProfile = activeProgram === null ? profile
+      : { ...profile, objective: activeProgram.objective };
+    const startDate = localToday();
+    const horizonAnchorDate = activeProgram === null
+      ? startDate
+      : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
+    const shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
+    const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
+    for (const preference of shape.movementPreferences) {
+      const movement = byId.get(preference.movementId);
+      if (movement === undefined || movement.pattern !== preference.pattern) {
+        throw new Error('A preferred movement does not match that slot.');
+      }
+    }
+    const d = getDb();
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, niggles),
+    );
+    const genMovements: GeneratorMovement[] = movements.map((m) => ({
+      movement_id: m.movement_id, name: m.name, pattern: m.pattern as MovementPattern,
+      is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,
+      beginner_ok: m.beginnerOk, capability_available: capabilityAvailable.has(m.movement_id),
+      set_cap: m.timePolicy?.defaultSets,
+      primaryImplement: m.supportedPrefixes[0] ?? undefined,
+    }));
+    // Program-owned macro position (AUD-GP-2): when a program exists, the
+    // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
+    // the identical derivation committed generation uses. Only a brand-new
+    // program (no program row yet) anchors to the athlete's global position.
+    const macroBlockIndex = activeProgram !== null
+      ? programMacroIndex(activeProgram.startingMacroBlockIndex, activeProgram.currentSequenceIndex + 1)
+      : nextMacroPosition(d).macroBlockIndex;
+    const effectiveProfile = { ...planningProfile, weekly_frequency: shape.days.length };
+    const flawReport = hydrateAutopilotFlawReport(d, startDate, effectiveProfile);
+    const plan = generateBlock({
+      profile: effectiveProfile, movements: genMovements, startDate,
+      schemaType: input.schemaType, macroBlockIndex,
+      recentAcwr: vector?.acwr ?? null, programDays: shape.programDays, flawReport,
+    });
+    return {
+      objective: planningProfile.objective, startDate, requestedReviewDate: shape.requestedReviewDate,
+      plannedEndDate: shape.plannedEndDate, plannedBlockCount: shape.plannedBlockCount,
+      schemaType: input.schemaType, days: shape.days, plan,
+    };
+  },
+
+  createTrainingProgram: (input) => {
+    if (get().session !== null) {
+      set({ error: 'End the active session before creating a program.' });
+      return false;
+    }
+    if (get().block !== null || get().program !== null) {
+      set({ error: 'Archive the current block or program before creating another.' });
+      return false;
+    }
+    try {
+      const preview = get().previewTrainingProgram(input);
+      const shape = trainingProgramShape(get().profile, input, preview.startDate);
+      pendingProgramCreation = { input, preview, programDays: shape.programDays };
+      set({ error: null });
+      get().generateNewBlock(input.schemaType);
+      get().refreshProgram();
+      const created = get().program !== null && get().error === null;
+      pendingProgramCreation = null;
+      return created;
+    } catch (e) {
+      pendingProgramCreation = null;
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
   },
 
   rolloverDay: () => {
@@ -2107,11 +2444,18 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshVector();   // also advances store.today
     get().refreshNiggles();  // yesterday's niggles drop out of the active set
     get().refreshBlock();
+    get().refreshProgram();
     get().computePrescription([]);
   },
 
   generateNewBlock: (schemaType = 'LINEAR') => {
-    const { profile, movements, status, vector } = get();
+    const { profile: storedProfile, movements, status, vector } = get();
+    const pendingFrequency = pendingProgramCreation?.preview.days.length
+      ?? pendingProgramContinuation?.weeklyFrequency;
+    const pendingObjective = pendingProgramCreation?.preview.objective
+      ?? pendingProgramContinuation?.objective;
+    const profile = pendingFrequency === undefined && pendingObjective === undefined ? storedProfile
+      : { ...storedProfile, weekly_frequency: pendingFrequency ?? storedProfile.weekly_frequency, objective: pendingObjective ?? storedProfile.objective };
     if (status !== 'ready') return;
     // Audit A2: regenerating mid-session archives the plan the live session
     // was built from — APRE completion would then read the WRONG plan.
@@ -2119,10 +2463,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: 'End the active session before generating a new block.' });
       return;
     }
+    if (get().program?.status === 'active' && pendingProgramContinuation === null && pendingProgramCreation === null) {
+      set({ error: 'Review and confirm the next program block before starting it.' });
+      return;
+    }
     const d = getDb();
-    // Macro continuation: the next block advances through the 32-week cycle
-    // (8 positions, wrapping) from wherever the last generated block sat.
-    const { macroBlockIndex } = nextMacroPosition(d);
+    // Macro continuation: STANDALONE blocks advance through the athlete's
+    // GLOBAL 32-week cycle from wherever the last generated block sat. A
+    // guided-program continuation OWNS its macro position (AUD-GP-2): block N
+    // sits at starting_macro_block_index + (N-1) mod 8 — the SAME derivation
+    // the preview used, never the global counter.
+    const macroBlockIndex = pendingProgramContinuation !== null
+      ? programMacroIndex(pendingProgramContinuation.startingMacroBlockIndex, pendingProgramContinuation.sequenceIndex)
+      : nextMacroPosition(d).macroBlockIndex;
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
     const capabilityAvailable = capabilityAvailableMovementIds(d, movements, profile, safetyExcludedMovementIdsFor(movements, profile, get().niggles));
@@ -2136,78 +2489,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       difficulty: m.difficulty,
       beginner_ok: m.beginnerOk,
       capability_available: capabilityAvailable.has(m.movement_id),
+      set_cap: m.timePolicy?.defaultSets,
+      primaryImplement: m.supportedPrefixes[0] ?? undefined,
     }));
-    // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
-    // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate
-    // (set_record ⋈ session ⋈ movement ⋈ set_prefix ⋈ the per-set set_target
-    // snapshot) + ONE windowed niggle scan. mech_daily is the cross-movement raw
-    // rollup (no per-pattern dimension) so it is NOT the per-pattern source and
-    // stays untouched; state_vector supplies the calendar. detectFlaws then feeds
-    // the generator, which auto-corrects the next (entirely forward-dated) block.
     const today = localToday();
-    const AUTOPILOT_WINDOW_DAYS = 21;
-    // The window is the FIXED 21-calendar-day grid (gap-tolerant, oldest first),
-    // NOT the sparse set of materialized state_vector dates — so rest-day niggles
-    // are not dropped and detectFlaws' EMA recency stays per-calendar-day.
-    const winCalendar = demoDates(today, AUTOPILOT_WINDOW_DAYS);
-    const winStart = winCalendar[0];
-    const svByDate = new Map(rowsOf<StateVectorRow>(d.executeSync(
-      'SELECT * FROM state_vector WHERE date >= ? AND date <= ? ORDER BY date',
-      [winStart, today],
-    )).map((r) => [r.date, r] as const));
-    // Align state_vector to the calendar (rest day → neutral placeholder); F reads
-    // only the length, so the placeholders are inert but keep the grid fixed at 21.
-    const windowVectors: StateVectorRow[] = winCalendar.map((dt) => svByDate.get(dt) ?? blankVector(dt));
-    const setAgg = rowsOf<{
-      date: string; pattern: MovementPattern; set_count: number;
-      sum_delta_rpe: number; delta_count: number; sum_attenuation: number;
-    }>(d.executeSync(
-      `SELECT s.session_date AS date, m.pattern AS pattern, COUNT(*) AS set_count,
-              COALESCE(SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN sr.rpe - st.target_rpe END), 0) AS sum_delta_rpe,
-              SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN 1 ELSE 0 END) AS delta_count,
-              SUM(1.0 / MAX(1.0, COALESCE(sp.effective_load_kg, sr.load_kg) / MAX(sr.load_kg, 0.01))) AS sum_attenuation
-       FROM set_record sr
-       JOIN session s ON s.session_id = sr.session_id
-       JOIN movement m ON m.movement_id = sr.movement_id
-       LEFT JOIN set_prefix sp ON sp.set_id = sr.set_id
-       LEFT JOIN set_target st ON st.set_id = sr.set_id
-       WHERE s.session_date >= ? AND s.session_date <= ?
-       GROUP BY s.session_date, m.pattern`,
-      [winStart, today],
-    ));
-    // Niggles are bucketed to LOCAL calendar days in JS (mirroring startOfTodayMs),
-    // never via SQLite UTC date() — so they agree with session/state_vector dates.
-    // Over-fetch by ms then let buildPatternWindow keep only in-calendar dates.
-    // Calendar-anchored lower bound: local midnight of the window's OLDEST day,
-    // NOT a fixed (WINDOW-1)x24h ms subtraction — that over/under-shoots across a
-    // DST transition inside the window and can under-fetch day 0's niggles.
-    // buildPatternWindow keeps only in-calendar dates, so any over-fetch is inert.
-    const [wsY, wsM, wsD] = winCalendar[0].split('-').map(Number);
-    const winStartMs = new Date(wsY, wsM - 1, wsD, 0, 0, 0, 0).getTime();
-    const niggleRows = rowsOf<{ region: string; severity: number; reported_at_ms: number }>(d.executeSync(
-      'SELECT region, severity, reported_at_ms FROM niggle WHERE reported_at_ms >= ?',
-      [winStartMs],
-    ));
-    const patternWindow = buildPatternWindow(
-      winCalendar,
-      setAgg.map((r) => ({
-        date: r.date, pattern: r.pattern, setCount: r.set_count,
-        sumDeltaRpe: r.sum_delta_rpe, deltaCount: r.delta_count, sumAttenuation: r.sum_attenuation,
-      })),
-      niggleRows.map((r) => ({ date: localDateOf(r.reported_at_ms), region: r.region as Joint, severity: r.severity })),
-    );
-    // Severe ACTIVE joint load (>= the experience-weighted halt threshold) is a
-    // block-level halt → the generator snaps to the recovery template. Uses the
-    // SAME local-midnight bound as the active-niggle path (runBlockWipe).
-    const haltMin = EXPERIENCE_SEVERITY[profile.training_age].haltMin;
-    const maxNiggleToday = rowsOf<{ s: number }>(d.executeSync(
-      'SELECT COALESCE(MAX(severity), 0) AS s FROM niggle WHERE reported_at_ms >= ?',
-      [startOfTodayMs()],
-    ))[0]?.s ?? 0;
-    const autopilotGuardrail: Guardrail | null = maxNiggleToday >= haltMin
-      ? { load_multiplier: 1, set_delta: 0, rpe_cap_max: 10, halt: true, follow_up: null }
-      : null;
-    const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
+    const flawReport = hydrateAutopilotFlawReport(d, today, profile);
 
     const plan = generateBlock({
       profile,
@@ -2216,13 +2502,36 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       schemaType,
       macroBlockIndex,
       recentAcwr: vector !== null ? vector.acwr : null,
+      programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
       flawReport,
     });
     d.executeSync('BEGIN');
     try {
-      d.executeSync(
-        "UPDATE training_block SET status = 'archived' WHERE status = 'active'",
-      );
+      let programId: number | null = pendingProgramContinuation?.programId ?? null;
+      const programDraft = pendingProgramCreation;
+      if (programDraft !== null) {
+        // Shared production helper (AUD P2): the Node verifier exercises the
+        // SAME function via the compiled core-db build.
+        programId = insertTrainingProgram(d, {
+          objective: profile.objective,
+          startDate: programDraft.preview.startDate,
+          horizonKind: programDraft.input.horizon.kind,
+          requestedReviewDate: programDraft.preview.requestedReviewDate,
+          plannedEndDate: programDraft.preview.plannedEndDate,
+          plannedBlockCount: programDraft.preview.plannedBlockCount,
+          startingMacroBlockIndex: plan.macroBlockIndex,
+          schemaType,
+          days: programDraft.preview.days,
+          movementPreferences: programDraft.input.movementPreferences ?? [],
+          weeklyFrequency: programDraft.preview.days.length,
+          now: Date.now(),
+        });
+      }
+      if (pendingProgramContinuation !== null) {
+        updateTrainingProgramEndDate(d, pendingProgramContinuation.programId,
+          pendingProgramContinuation.plannedEndDate, Date.now());
+      }
+      archiveActiveTrainingBlock(d);
       d.executeSync(
         'INSERT INTO training_block (start_date, objective, created_at_ms) VALUES (?, ?, ?)',
         [plan.start_date, plan.objective, Date.now()],
@@ -2230,6 +2539,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       const blockId = rowsOf<{ id: number }>(
         d.executeSync('SELECT last_insert_rowid() AS id'),
       )[0]!.id;
+      if (programId !== null) {
+        linkTrainingBlockProgram(d, blockId, programId, pendingProgramContinuation?.sequenceIndex ?? 1);
+      }
       d.executeSync(
         'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
         [blockId, plan.macroBlockIndex, plan.macroPhase, plan.schemaType, plan.peakShifted ? 1 : 0],
@@ -2245,15 +2557,22 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         for (const sl of s.slots) {
           const movement = movements.find((m) => m.movement_id === sl.movement_id);
           const target = targetForMovement(movement, sl.reps);
-          // Time policies own their default set count. The generated plan may
-          // still be reduced later by readiness, but never grown past policy.
-          const plannedSets = defaultSetsForTarget(movement, sl.sets);
+          // The generator already applied each movement's persisted set cap,
+          // including the effective autopilot clamp. Persist its exact result
+          // so the side-car delta describes the target the athlete can see.
+          const plannedSets = sl.sets;
           const legacyReps = target.kind === 'reps' ? target.reps : sl.reps;
           d.executeSync(
             'INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, ?, ?, ?, ?)',
             [sessionId, sl.slot_index, sl.movement_id, plannedSets, legacyReps, sl.target_rpe],
           );
           const plannedSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+          if (sl.autopilotDelta !== undefined) {
+            d.executeSync(
+              'INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (?, ?, ?, ?)',
+              [plannedSlotId, sl.autopilotDelta.rpe_delta, sl.autopilotDelta.set_delta, sl.autopilotDelta.reason],
+            );
+          }
           d.executeSync(
             `INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds)
              VALUES (?, ?, ?, ?)`,
@@ -2272,7 +2591,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
+    if (pendingFrequency !== undefined) set({ profile });
     get().refreshBlock();
+    get().refreshProgram();
   },
 
   refreshBlock: () => {
@@ -2367,6 +2688,197 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       blockSessions,
       todayPlan,
     });
+  },
+
+  refreshProgram: () => {
+    const d = getDb();
+    const row = rowsOf<{
+      program_id: number; objective: string; start_date: string; horizon_kind: 'weeks' | 'date';
+      requested_review_date: string | null; planned_end_date: string; planned_block_count: number;
+      starting_macro_block_index: number; schema_type: SchemaType;
+      status: 'active' | 'review_due' | 'archived'; current_sequence_index: number;
+    }>(d.executeSync(
+      `SELECT tp.*, COALESCE(MAX(tbp.sequence_index), 0) AS current_sequence_index
+         FROM training_program tp
+         LEFT JOIN training_block_program tbp ON tbp.program_id = tp.program_id
+        WHERE tp.status IN ('active','review_due')
+        GROUP BY tp.program_id
+        ORDER BY tp.program_id DESC LIMIT 1`,
+    ))[0];
+    if (row === undefined) {
+      set({ program: null });
+      return;
+    }
+    const days = rowsOf<{ day_index: number; focus: string }>(d.executeSync(
+      'SELECT day_index, focus FROM training_program_day WHERE program_id = ? ORDER BY day_index',
+      [row.program_id],
+    )).map((day) => ({ dayIndex: day.day_index, focus: day.focus }));
+    const movementPreferences = rowsOf<{
+      day_index: number; slot_index: number; pattern: MovementPattern; movement_id: number;
+    }>(d.executeSync(
+      `SELECT day_index, slot_index, pattern, movement_id
+         FROM training_program_movement_preference
+        WHERE program_id = ? ORDER BY day_index, slot_index`,
+      [row.program_id],
+    )).map((preference) => ({
+      dayIndex: preference.day_index, slotIndex: preference.slot_index,
+      pattern: preference.pattern, movementId: preference.movement_id,
+    }));
+    set({ program: {
+      programId: row.program_id, objective: row.objective as UserProfile['objective'], startDate: row.start_date,
+      horizonKind: row.horizon_kind, requestedReviewDate: row.requested_review_date,
+      plannedEndDate: row.planned_end_date, plannedBlockCount: row.planned_block_count,
+      startingMacroBlockIndex: row.starting_macro_block_index, schemaType: row.schema_type,
+      status: row.status, currentSequenceIndex: row.current_sequence_index, days, movementPreferences,
+    } });
+  },
+
+  updateProgramPreferences: (input) => {
+    const current = get().program;
+    if (get().session !== null) {
+      set({ error: 'End the active session before managing the program.' });
+      return false;
+    }
+    if (current === null || current.status !== 'active') {
+      set({ error: 'No active program to manage.' });
+      return false;
+    }
+    try {
+      const preview = get().previewTrainingProgram(input);
+      if (preview.plannedBlockCount < current.currentSequenceIndex) {
+        throw new Error('The horizon cannot remove a block already started.');
+      }
+      const d = getDb();
+      const now = Date.now();
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync(
+          `UPDATE training_program SET horizon_kind = ?, requested_review_date = ?, planned_end_date = ?,
+             planned_block_count = ?, schema_type = ?, updated_at_ms = ?
+           WHERE program_id = ? AND status = 'active'`,
+          [input.horizon.kind, preview.requestedReviewDate, preview.plannedEndDate,
+            preview.plannedBlockCount, input.schemaType, now, current.programId],
+        );
+        d.executeSync('DELETE FROM training_program_movement_preference WHERE program_id = ?', [current.programId]);
+        d.executeSync('DELETE FROM training_program_day WHERE program_id = ?', [current.programId]);
+        for (const day of preview.days) {
+          d.executeSync('INSERT INTO training_program_day (program_id, day_index, focus) VALUES (?, ?, ?)',
+            [current.programId, day.dayIndex, day.focus]);
+        }
+        for (const preference of input.movementPreferences ?? []) {
+          d.executeSync(
+            `INSERT INTO training_program_movement_preference
+               (program_id, day_index, slot_index, pattern, movement_id) VALUES (?, ?, ?, ?, ?)`,
+            [current.programId, preference.dayIndex, preference.slotIndex, preference.pattern, preference.movementId],
+          );
+        }
+        d.executeSync('UPDATE athlete_profile SET weekly_frequency = ?, updated_at_ms = ? WHERE profile_id = 1',
+          [preview.days.length, now]);
+        d.executeSync('COMMIT');
+      } catch (e) {
+        d.executeSync('ROLLBACK');
+        throw e;
+      }
+      set({ profile: { ...get().profile, weekly_frequency: preview.days.length }, error: null });
+      get().refreshProgram();
+      return true;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+  },
+
+  previewNextProgramBlock: () => {
+    const current = get().program;
+    const block = get().block;
+    if (current === null || block === null || current.status !== 'active'
+        || localToday() <= addDaysIso(block.startDate, 27)
+        || current.currentSequenceIndex >= current.plannedBlockCount) return null;
+    const input: TrainingProgramInput = {
+      horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
+      schemaType: current.schemaType, dayIndices: current.days.map((day) => day.dayIndex),
+      movementPreferences: current.movementPreferences,
+    };
+    return get().previewTrainingProgram(input).plan;
+  },
+
+  continueTrainingProgram: () => {
+    const current = get().program;
+    const block = get().block;
+    if (get().session !== null) {
+      set({ error: 'End the active session before continuing the program.' });
+      return;
+    }
+    if (current === null || block === null || current.status !== 'active'
+        || localToday() <= addDaysIso(block.startDate, 27)) {
+      set({ error: 'The current block is not ready to continue.' });
+      return;
+    }
+    const d = getDb();
+    if (current.currentSequenceIndex >= current.plannedBlockCount) {
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync("UPDATE training_block SET status = 'archived' WHERE block_id = ?", [block.blockId]);
+        d.executeSync("UPDATE training_program SET status = 'review_due', updated_at_ms = ? WHERE program_id = ?",
+          [Date.now(), current.programId]);
+        d.executeSync('COMMIT');
+      } catch (e) {
+        d.executeSync('ROLLBACK');
+        set({ error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      get().refreshBlock();
+      get().refreshProgram();
+      return;
+    }
+    const programDays: ProgramDayPreference[] = current.days.map((day) => ({
+      day_index: day.dayIndex, focus: day.focus as ProgramDayPreference['focus'],
+      movement_preferences: current.movementPreferences.filter((p) => p.dayIndex === day.dayIndex).map((p) => ({
+        slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
+      })),
+    }));
+    const nextSequence = current.currentSequenceIndex + 1;
+    const remainingBlocks = current.plannedBlockCount - current.currentSequenceIndex;
+    pendingProgramContinuation = {
+      programId: current.programId, sequenceIndex: nextSequence,
+      startingMacroBlockIndex: current.startingMacroBlockIndex,
+      plannedEndDate: addDaysIso(localToday(), remainingBlocks * 28),
+      objective: current.objective,
+      programDays, weeklyFrequency: current.days.length,
+    };
+    try {
+      set({ error: null });
+      get().generateNewBlock(current.schemaType);
+    } finally {
+      pendingProgramContinuation = null;
+    }
+  },
+
+  archiveTrainingProgram: () => {
+    const current = get().program;
+    if (current === null) return;
+    if (get().session !== null) {
+      set({ error: 'End the active session before archiving the program.' });
+      return;
+    }
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE program_id = ?",
+        [Date.now(), current.programId]);
+      d.executeSync(
+        `UPDATE training_block SET status = 'archived' WHERE block_id IN
+          (SELECT block_id FROM training_block_program WHERE program_id = ?) AND status = 'active'`,
+        [current.programId],
+      );
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    get().refreshBlock();
+    get().refreshProgram();
   },
 
   getMovementAvailabilityVerdicts: () => {
@@ -2573,6 +3085,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   freezeRoutineTemplateToPlannedSession: (routineTemplateId, sessionDate, routineDayIndex = 1) => {
     if (get().session !== null) throw new Error('End the active session before replacing today\'s plan.');
+    if (get().program?.status === 'active') {
+      throw new Error('Standalone routines cannot replace a goal-program block. Manage the program instead.');
+    }
     const d = getDb();
     const today = sessionDate ?? localToday();
     const template = get().routineTemplates.find((candidate) => candidate.routineTemplateId === routineTemplateId);
@@ -2948,14 +3463,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       movement_name: string; sets: number; reps: number; target_rpe: number;
       target_kind: string | null; target_reps: number | null; target_seconds: number | null;
       override_load_kg: number | null; override_reason: string | null;
+      autopilot_rpe_delta: number | null; autopilot_set_delta: number | null; autopilot_reason: AutopilotAttributionReason | null;
     }>(getDb().executeSync(
       `SELECT sl.slot_index, sl.planned_slot_id, sl.movement_id, m.name AS movement_name,
               sl.sets, sl.reps, sl.target_rpe,
               st.target_kind, st.target_reps, st.target_seconds,
+              pa.rpe_delta AS autopilot_rpe_delta, pa.set_delta AS autopilot_set_delta, pa.reason AS autopilot_reason,
               so.target_load_kg AS override_load_kg, so.reason AS override_reason
        FROM planned_slot sl
        JOIN movement m ON m.movement_id = sl.movement_id
        LEFT JOIN planned_slot_target st ON st.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_autopilot pa ON pa.planned_slot_id = sl.planned_slot_id
        LEFT JOIN slot_override so ON so.planned_slot_id = sl.planned_slot_id
        WHERE sl.planned_session_id = ?
          AND sl.planned_slot_id NOT IN (SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped')
@@ -2973,6 +3491,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       targetRpe: sl.target_rpe,
       overrideLoadKg: sl.override_load_kg,
       overrideReason: sl.override_reason,
+      autopilot: sl.autopilot_reason === null ? undefined : {
+        rpeDelta: sl.autopilot_rpe_delta ?? 0,
+        setDelta: sl.autopilot_set_delta ?? 0,
+        reason: sl.autopilot_reason as AutopilotAttributionReason,
+      },
     }));
   },
 
@@ -4353,6 +4876,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM session_runner_checkpoint');
       d.executeSync('DELETE FROM session_slot_target');
       d.executeSync('DELETE FROM planned_slot_disposition');
+      d.executeSync('DELETE FROM planned_slot_autopilot');
       d.executeSync('DELETE FROM planned_slot_target');
       d.executeSync('DELETE FROM planned_session_method');
       d.executeSync('DELETE FROM session_plan_slot');
@@ -4369,6 +4893,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM planned_slot');
       d.executeSync('DELETE FROM planned_session');
       d.executeSync('DELETE FROM block_meta');
+      d.executeSync('DELETE FROM training_program_movement_preference');
+      d.executeSync('DELETE FROM training_program_day');
+      d.executeSync('DELETE FROM training_block_program');
+      d.executeSync('DELETE FROM training_program');
       d.executeSync('DELETE FROM session');
       // Same parent-first rule as set_dose_target.
       d.executeSync('DELETE FROM session_outcome');
@@ -4399,11 +4927,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       lastLoggedLoads: {},
       session: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null,
       prescription: null, substitution: null, lastTriage: null, niggles: [],
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null,
+      block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
       lastEndedSessionId: null,
     });
     get().refreshVector();
     get().refreshBlock();
+    get().refreshProgram();
     get().refreshNiggles();
     return (had?.c ?? 0) > 0;
   },

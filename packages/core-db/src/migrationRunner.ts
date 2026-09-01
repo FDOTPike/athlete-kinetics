@@ -81,6 +81,15 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'import_readiness_daily' },     // 029
   { type: 'view', name: 'v_readiness_inputs' },          // 030
   { type: 'table', name: 'planned_session_method' },     // 031
+  { type: 'table', name: 'training_program' },          // 033
+  { type: 'table', name: 'training_program_day' },      // 033
+  { type: 'table', name: 'training_program_movement_preference' }, // 033
+  { type: 'table', name: 'training_block_program' },    // 033
+  { type: 'index', name: 'idx_training_program_one_current' }, // 033 correctness constraint
+  { type: 'table', name: 'planned_slot_autopilot' },     // 034
+  { type: 'table', name: 'suspension_episode' },          // 058
+  { type: 'trigger', name: 'trg_suspension_episode_single_open_bi' }, // 058
+  { type: 'trigger', name: 'trg_suspension_episode_no_reopen_bu' },   // 058
 ];
 
 function userVersion(db: MigrationDb): number {

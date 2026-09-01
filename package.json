@@ -19,7 +19,7 @@
     "verify:biometrics": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/biometrics/test/.build packages/biometrics/src/aggregate.ts && node packages/biometrics/test/verify_biometrics.mjs",
     "verify:semantic": "npm run build:inference-test && node packages/inference/test/verify_semantic.mjs",
     "verify:embedder": "npm run build:inference-test && node packages/inference/test/verify_embedder.mjs",
-    "verify:store": "node apps/mobile/test/verify_store_sql.mjs && node apps/mobile/test/verify_routine_templates.mjs",
+    "verify:store": "npm run build:inference-test && tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/programTx.ts && node apps/mobile/test/verify_store_sql.mjs && node apps/mobile/test/verify_routine_templates.mjs",
     "verify:coach": "tsc --strict --target es2020 --module commonjs --lib es2020 --outDir apps/mobile/test/.build apps/mobile/src/state/athleteRegistryCore.ts && node apps/mobile/test/verify_coach.mjs",
     "verify:memory": "node tools/memory-audit/audit.mjs",
     "verify:library": "node scripts/py.mjs packages/core-db/test/verify_library.py",
