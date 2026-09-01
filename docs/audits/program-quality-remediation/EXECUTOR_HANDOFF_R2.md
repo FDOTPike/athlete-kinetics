@@ -75,8 +75,8 @@ candidate. Existing passing coverage was not re-labeled as new red proof.
 |---|---|
 | `npm run typecheck` | exit 0 |
 | `npm run verify:migrations` | ALL CHECKS PASSED |
-| `npm run verify:blocks` (now includes verify_programQualityRound2) | ALL CHECKS PASSED — 19/19 Round 2 checks |
-| `npm run verify:store` | ALL CHECKS PASSED (638/638 + routine templates) |
+| `npm run verify:blocks` | 0 | ALL CHECKS PASSED — new `verify_programQualityRound2.mjs`: 20/20 Round 2 checks |
+| `npm run verify:store` | 0 | ALL CHECKS PASSED (638/638 + routine templates) |
 | `npm run verify:pipeline` | 51/51 |
 | `npm run verify:progression` | 17/17 |
 | `npm run verify:components` | 19 suites / 247 tests |
