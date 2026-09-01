@@ -274,7 +274,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<OnboardingScreen />);
     advance(2);
     fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
-    advance(6);
+    advance(4); // beginner flow is 7 screens; review is the 7th
 
     expect(screen.queryByTestId('onboarding-loads-step')).toBeNull();
     expect(screen.getByTestId('onboarding-summary-loads-row').props.children)
@@ -382,5 +382,68 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(chip.props.accessibilityState.disabled).toBe(true);
       expect(chip.props.accessibilityState.selected).toBe(age === 'intermediate');
     }
+  });
+
+  // --- W2: the seven-screen first-run contract (WO §2.1) ---------------------
+
+  test('first-run flow is at most seven screens and combines days with minutes (WO 2.1)', () => {
+    render(<OnboardingScreen />);
+    expect(screen.getByLabelText('Step 1 of 7')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Next')); // goal
+    fireEvent.press(screen.getByLabelText('Next')); // experience
+    fireEvent.press(screen.getByLabelText('Next')); // logistics
+    expect(screen.getByText('TRAINING DAYS PER WEEK')).toBeOnTheScreen();
+    expect(screen.getByText('MINUTES IN A SESSION, TOPS')).toBeOnTheScreen();
+    // The retired per-decision screens never appear anywhere in the flow.
+    for (const retired of ['HOW HARD SHOULD HARD DAYS GET?', 'THE SCIENCE BITS', 'WHO PICKS THE WEIGHTS?', 'MAX SESSIONS IN ONE DAY', 'HOW LONG IS A SESSION?']) {
+      expect(screen.queryByText(retired)).toBeNull();
+    }
+    for (let i = 0; i < 3; i += 1) fireEvent.press(screen.getByLabelText('Next'));
+    expect(screen.getByLabelText('Step 7 of 7')).toBeOnTheScreen();
+  });
+
+  test('limitations asks one explicit no/yes; yes reveals notes, no clears drafts, review discloses', () => {
+    render(<OnboardingScreen />);
+    advance(3); // -> logistics
+    fireEvent.press(screen.getByLabelText('Next')); // equipment
+    fireEvent.press(screen.getByLabelText('Next')); // limits
+    expect(screen.queryByLabelText('Past injuries, one per line as region colon note')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Yes, let me add notes'));
+    expect(screen.getByLabelText('Past injuries, one per line as region colon note')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByLabelText('Past injuries, one per line as region colon note'), 'knee: old ACL');
+    // "No" is an explicit clearing of the draft notes, not a silent skip.
+    fireEvent.press(screen.getByLabelText('No, nothing to note'));
+    expect(screen.queryByLabelText('Past injuries, one per line as region colon note')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Next')); // review
+    expect(screen.getByTestId('onboarding-summary-limits-row').props.children.join(''))
+      .toBe('LIMITATIONS — none noted');
+  });
+
+  test('nothing persists before Finish and back navigation keeps the draft', () => {
+    mockState.completeOnboarding = jest.fn();
+    render(<OnboardingScreen />);
+    fireEvent.press(screen.getByLabelText('Next')); // welcome -> goal
+    fireEvent.press(screen.getByLabelText(/ALL-ROUND FITNESS/));
+    fireEvent.press(screen.getByLabelText('Next')); // goal -> experience
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE/));
+    expect(mockState.completeOnboarding).not.toHaveBeenCalled();
+    // Android/back navigation walks the DRAFT back a step, keeping answers.
+    fireEvent.press(screen.getByLabelText('Back'));
+    expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
+    expect(screen.getByLabelText(/ALL-ROUND FITNESS/).props.accessibilityState.selected).toBe(true);
+    expect(mockState.completeOnboarding).not.toHaveBeenCalled();
+  });
+
+  test('non-beginner load preference is visible and changeable on the review screen', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE/));
+    advance(4); // review
+    expect(screen.getByTestId('onboarding-loads-step')).toBeOnTheScreen();
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
+    fireEvent.press(screen.getByTestId('onboarding-loads-manual'));
+    expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(true);
+    // Coach defaults are disclosed honestly with their later-editability.
+    expect(screen.getByText(/EDIT ANYTIME IN ATHLETE \/ PROFILE/)).toBeOnTheScreen();
   });
 });

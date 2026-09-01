@@ -248,7 +248,9 @@ describe('049 specialist equipment is explicit opt-in only', () => {
       if (next === null) break;
       fireEvent.press(next);
     }
-    expect(screen.getByText('WHAT CAN YOU GET YOUR HANDS ON?')).toBeOnTheScreen();
+    // W2 (program-quality work order §6.2): presets come first and the
+    // standard grid is collapsed until the athlete explicitly customizes.
+    fireEvent.press(screen.getByLabelText('Customize equipment'));
     expect(screen.getByText('SPECIALIST')).toBeOnTheScreen();
     // The onboarding draft starts from DEFAULT_PROFILE: every STANDARD item is
     // pre-owned, and the specialist toggle is off — that asymmetry is the point.

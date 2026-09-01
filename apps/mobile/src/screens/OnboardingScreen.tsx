@@ -1,15 +1,22 @@
 /**
- * OnboardingScreen.tsx — first-run questionnaire (Phase 15 Step 2).
+ * OnboardingScreen.tsx — first-run questionnaire, program-quality edition.
  *
- * The interview a real coach gives a new athlete: ONE decision per screen,
- * plain language, big targets, sensible defaults on everything. Answers are
- * held in a local draft and committed in a SINGLE completeOnboarding() call —
- * no partial profiles can ever be persisted by an abandoned wizard.
+ * The interview a real coach gives a new athlete, shortened to SEVEN screens
+ * (work order §2.1): welcome, goal, experience, weekly logistics (days AND
+ * session length together), equipment (presets first, customization collapsed
+ * until asked), limitations (one explicit no/yes), review. Only five screens
+ * ask a decision — welcome and review do not count.
  *
- * Information-overload principle (rev4 plan, P15/P16): a BEGINNER is never
- * shown the programming-science decisions (energy system, periodization) —
- * those steps are skipped and safe defaults applied (hybrid + autoregulated,
- * which is also DEFAULT_PROFILE). Advanced athletes get every screen.
+ * The programming-science decisions that used to be screens (effort ceiling,
+ * energy focus, load preference) ride the REVIEW screen as disclosed coach
+ * defaults with an optional fine-tuning area: they are shown honestly, stay
+ * editable later in the ATHLETE tab, and no longer tax every first run. A
+ * beginner never sees the load choice at all — coach auto, with the
+ * first-use explanation — per WO_FOUR_MODE_LOAD.
+ *
+ * Answers are held in a local draft and committed in a SINGLE
+ * completeOnboarding() call — no partial profiles can ever be persisted by an
+ * abandoned wizard, and Android back navigation only walks the draft back.
  *
  * Law 1: Zero hex literals in screen files — use theme tokens.
  * Law 2: Selected cards/chips = inverted white fill (textHi fill, ink0 text). NOT chalk.
@@ -29,6 +36,7 @@ import {
   TRAINING_AGES,
   defaultLoadPreference,
   transitionLoadPreference,
+  effortCue,
   type EnergySystem,
   type EquipmentItem,
   type LoadPreference,
@@ -50,9 +58,9 @@ const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
   power: { label: 'GET EXPLOSIVE', blurb: 'Speed and force for sport' },
   endurance: { label: 'LAST LONGER', blurb: 'Engine work, higher reps' },
   gpp: { label: 'ALL-ROUND FITNESS', blurb: 'Strong, capable, ready for anything' },
-  hybrid: { label: 'STRENGTH + ENGINE', blurb: 'Lift heavy and stay conditioned' },
-  rehab: { label: 'REBUILD', blurb: 'Coming back from an injury, carefully' },
-  weight_loss: { label: 'LOSE WEIGHT', blurb: 'Drop fat while keeping muscle' },
+  hybrid: { label: 'STRENGTH + GRAPPLING', blurb: 'Lift heavy and keep mat time first' },
+  rehab: { label: 'RETURN TO TRAINING', blurb: 'Coming back carefully, no diagnosis' },
+  weight_loss: { label: 'FAT-LOSS SUPPORT', blurb: 'Stay active and keep your muscle' },
 };
 
 const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
@@ -90,8 +98,7 @@ const effortBlurb = (rpe: number): string => {
 };
 
 type StepKey =
-  | 'welcome' | 'goal' | 'experience' | 'schedule' | 'time' | 'effort'
-  | 'loads' | 'science' | 'body' | 'equipment' | 'summary';
+  | 'welcome' | 'goal' | 'experience' | 'logistics' | 'equipment' | 'limits' | 'review';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -107,12 +114,18 @@ export default function OnboardingScreen(): React.JSX.Element {
   const [name, setName] = useState(registryName === 'Athlete 1' ? '' : registryName);
   const [injuryText, setInjuryText] = useState('');
   const [mobilityText, setMobilityText] = useState('');
+  // The limitations gate: null = unanswered, false = "no, nothing to note",
+  // true = "yes" (reveals the note fields). Choosing no clears both drafts.
+  const [limitsAnswered, setLimitsAnswered] = useState<boolean | null>(null);
+  // Equipment customization stays collapsed until the athlete asks for it;
+  // presets come first and never grant specialist items.
+  const [showCustomEquipment, setShowCustomEquipment] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   // Four-mode load selection (WO_FOUR_MODE_LOAD): the durable two-way
   // preference rides the wizard as draft state and commits in the same
   // transaction as the profile. `loadPreferenceExplicit` flips true ONLY when
-  // the athlete presses a chip on the loads step — a value that came from a
-  // tier default is not explicit and re-derives on tier change.
+  // the athlete presses a chip in the review fine-tuning area — a value that
+  // came from a tier default is not explicit and re-derives on tier change.
   const [loadPreference, setLoadPreference] = useState<LoadPreference>(defaultLoadPreference(DEFAULT_PROFILE.training_age));
   const [loadPreferenceExplicit, setLoadPreferenceExplicit] = useState(false);
   // Set when a demo load was refused because real history exists; explains the
@@ -135,15 +148,21 @@ export default function OnboardingScreen(): React.JSX.Element {
     setLoadPreferenceExplicit(true);
   };
 
+  // Seven screens for EVERY athlete — the shortening is the point (WO §2.1).
   const steps: StepKey[] = useMemo(
-    () =>
-      draft.training_age === 'beginner'
-        ? ['welcome', 'goal', 'experience', 'schedule', 'time', 'effort', 'body', 'equipment', 'summary']
-        : ['welcome', 'goal', 'experience', 'schedule', 'time', 'effort', 'loads', 'science', 'body', 'equipment', 'summary'],
-    [draft.training_age],
+    () => ['welcome', 'goal', 'experience', 'logistics', 'equipment', 'limits', 'review'],
+    [],
   );
   const step = steps[Math.min(stepIdx, steps.length - 1)];
-  const isLast = step === 'summary';
+  const isLast = step === 'review';
+
+  /** Truthful preset state: a preset chip reads selected only when the draft
+   *  inventory is exactly that preset's bundle. */
+  const presetSelected = (preset: 'full_gym' | 'home_basic' | 'minimal'): boolean => {
+    const bundle = EQUIPMENT_PRESETS[preset];
+    return bundle.length === draft.equipment_inventory.length
+      && bundle.every((item) => draft.equipment_inventory.includes(item));
+  };
 
   const parseNotes = (text: string): UserProfile['injury_flags'] =>
     text
@@ -183,6 +202,15 @@ export default function OnboardingScreen(): React.JSX.Element {
     if (owned.has(item)) owned.delete(item);
     else owned.add(item);
     patch({ equipment_inventory: EQUIPMENT_ITEMS.filter((i) => owned.has(i)) });
+  };
+
+  const answerLimits = (hasLimits: boolean): void => {
+    setLimitsAnswered(hasLimits);
+    // "No" is an explicit clearing of both draft note lists, not a skip.
+    if (!hasLimits) {
+      setInjuryText('');
+      setMobilityText('');
+    }
   };
 
   return (
@@ -261,7 +289,7 @@ export default function OnboardingScreen(): React.JSX.Element {
           </View>
         )}
 
-        {step === 'schedule' && (
+        {step === 'logistics' && (
           <View>
             <Text style={styles.h2}>YOUR WEEK</Text>
             <Stepper
@@ -272,124 +300,16 @@ export default function OnboardingScreen(): React.JSX.Element {
               style={styles.stepperBlock}
             />
             <Stepper
-              label="MAX SESSIONS IN ONE DAY"
-              value={String(draft.max_sessions_per_day)}
-              onDecrement={() => patch({ max_sessions_per_day: Math.max(1, draft.max_sessions_per_day - 1) })}
-              onIncrement={() => patch({ max_sessions_per_day: Math.min(3, draft.max_sessions_per_day + 1) })}
-              style={styles.stepperBlock}
-            />
-            <Text style={styles.pDim}>
-              The coach treats these as hard limits — extra work past them gets
-              damped, not rewarded.
-            </Text>
-          </View>
-        )}
-
-        {step === 'time' && (
-          <View>
-            <Text style={styles.h2}>HOW LONG IS A SESSION?</Text>
-            <Stepper
-              label="MINUTES, TOPS"
+              label="MINUTES IN A SESSION, TOPS"
               value={`${draft.session_duration_cap_min} min`}
               onDecrement={() => patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) })}
               onIncrement={() => patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) })}
               style={styles.stepperBlock}
             />
-            <Text style={styles.pDim}>A realistic ceiling beats an optimistic one.</Text>
-          </View>
-        )}
-
-        {step === 'effort' && (
-          <View>
-            <Text style={styles.h2}>HOW HARD SHOULD HARD DAYS GET?</Text>
             <Text style={styles.pDim}>
-              Effort is measured 5–10 (RPE): 10 means nothing left, 8 means about
-              two more reps were in you. This is a ceiling the coach can never
-              prescribe past.
+              A realistic ceiling beats an optimistic one. The coach treats these
+              as hard limits — extra work past them gets damped, not rewarded.
             </Text>
-            <Stepper
-              label="EFFORT CEILING (RPE)"
-              value={draft.base_rpe_cap.toFixed(1)}
-              onDecrement={() => patch({ base_rpe_cap: Math.max(5, draft.base_rpe_cap - 0.5) })}
-              onIncrement={() => patch({ base_rpe_cap: Math.min(10, draft.base_rpe_cap + 0.5) })}
-              style={styles.stepperBlock}
-            />
-            <Text style={styles.p}>{effortBlurb(draft.base_rpe_cap)}</Text>
-            {draft.training_age === 'beginner' && draft.base_rpe_cap > 8.5 && (
-              <Text style={styles.note}>
-                Heads up: while you&apos;re new, the coach caps effort at 8.5 anyway —
-                you&apos;ll grow into the rest.
-              </Text>
-            )}
-          </View>
-        )}
-
-        {step === 'loads' && (
-          <View style={styles.cardGroup} testID="onboarding-loads-step">
-            <Text style={styles.h2}>WHO PICKS THE WEIGHTS?</Text>
-            <Text style={styles.pDim}>
-              You can change this later in the ATHLETE tab when no session is active.
-            </Text>
-            {(['auto', 'manual'] as const).map((p) => (
-              <Chip
-                key={p}
-                testID={p === 'auto' ? 'onboarding-loads-auto' : 'onboarding-loads-manual'}
-                label={`${LOAD_PREFERENCE_COPY[p].label} — ${LOAD_PREFERENCE_COPY[p].blurb}`}
-                selected={loadPreference === p}
-                onPress={() => chooseLoadPreference(p)}
-                accessibilityLabel={p === 'auto'
-                  ? 'Coach suggests. Targets come from your numbers and history.'
-                  : 'I choose. You set every load, with coach suggestions as reference.'}
-                style={styles.cardChip}
-              />
-            ))}
-          </View>
-        )}
-
-        {step === 'science' && (
-          <View style={styles.cardGroup}>
-            <Text style={styles.h2}>THE SCIENCE BITS</Text>
-            <Text style={styles.fieldLabel}>ENERGY FOCUS</Text>
-            {ENERGY_SYSTEMS.map((e) => (
-              <Chip
-                key={e}
-                label={`${ENERGY_COPY[e].label} — ${ENERGY_COPY[e].blurb}`}
-                selected={draft.target_energy_system === e}
-                onPress={() => patch({ target_energy_system: e })}
-                accessibilityLabel={`${ENERGY_COPY[e].label}. ${ENERGY_COPY[e].blurb}`}
-                style={styles.cardChip}
-              />
-            ))}
-          </View>
-        )}
-
-        {step === 'body' && (
-          <View>
-            <Text style={styles.h2}>ANYTHING I SHOULD KNOW?</Text>
-            <Text style={styles.pDim}>
-              One per line, like &quot;knee: old ACL, careful with deep squats&quot;.
-              Leave empty if nothing applies — you can add these any time.
-            </Text>
-            <Text style={styles.fieldLabel}>PAST INJURIES</Text>
-            <TextInput
-              style={styles.notesInput}
-              value={injuryText}
-              onChangeText={setInjuryText}
-              multiline
-              placeholder="shoulder: dislocated 2023"
-              placeholderTextColor={theme.color.textLow}
-              accessibilityLabel="Past injuries, one per line as region colon note"
-            />
-            <Text style={styles.fieldLabel}>MOBILITY LIMITS</Text>
-            <TextInput
-              style={styles.notesInput}
-              value={mobilityText}
-              onChangeText={setMobilityText}
-              multiline
-              placeholder="ankles: can't hit depth without heel lift"
-              placeholderTextColor={theme.color.textLow}
-              accessibilityLabel="Mobility limits, one per line as region colon note"
-            />
           </View>
         )}
 
@@ -401,52 +321,115 @@ export default function OnboardingScreen(): React.JSX.Element {
                 <Chip
                   key={p}
                   label={p.replace('_', ' ').toUpperCase()}
-                  selected={false}
+                  selected={presetSelected(p)}
                   onPress={() => patch({ equipment_inventory: [...EQUIPMENT_PRESETS[p]] })}
-                  accessibilityLabel={`Preset: ${p.replace('_', ' ')}`}
+                  accessibilityLabel={`Preset: ${p.replace('_', ' ')}${presetSelected(p) ? ', selected' : ''}`}
                 />
               ))}
             </View>
-            <View style={styles.chipWrap}>
-              {STANDARD_EQUIPMENT_ITEMS.map((item) => {
-                const owned = draft.equipment_inventory.includes(item);
-                return (
-                  <Chip
-                    key={item}
-                    label={EQUIPMENT_LABEL[item]}
-                    selected={owned}
-                    onPress={() => toggleEquipment(item)}
-                    accessibilityLabel={`${EQUIPMENT_LABEL[item]}: ${owned ? 'owned' : 'not owned'}`}
-                  />
-                );
-              })}
-            </View>
-            {/* Specialist equipment is a SEPARATE, explicit opt-in: no preset and
-                no default ever grants it, so movements needing it stay
-                teaching-only until it is deliberately selected here. */}
-            <Text style={styles.fieldLabel}>SPECIALIST</Text>
-            <View style={styles.chipWrap}>
-              {SPECIALIST_EQUIPMENT_ITEMS.map((item) => {
-                const owned = draft.equipment_inventory.includes(item);
-                return (
-                  <Chip
-                    key={item}
-                    label={EQUIPMENT_LABEL[item]}
-                    selected={owned}
-                    onPress={() => toggleEquipment(item)}
-                    accessibilityLabel={`Specialist equipment ${EQUIPMENT_LABEL[item]}: ${owned ? 'owned' : 'not owned'}`}
-                  />
-                );
-              })}
-            </View>
             <Text style={styles.pDim}>
-              The coach only ever prescribes movements your equipment allows.
-              Specialist items stay off unless you turn them on.
+              Pick the closest setup. Need something more specific? Customize below.
             </Text>
+            <QuietAction
+              label={showCustomEquipment ? 'Hide customization' : 'Customize your setup'}
+              onPress={() => setShowCustomEquipment((v) => !v)}
+              accessibilityLabel={showCustomEquipment ? 'Hide equipment customization' : 'Customize equipment'}
+            />
+            {showCustomEquipment && (
+              <View>
+                <View style={styles.chipWrap}>
+                  {STANDARD_EQUIPMENT_ITEMS.map((item) => {
+                    const owned = draft.equipment_inventory.includes(item);
+                    return (
+                      <Chip
+                        key={item}
+                        label={EQUIPMENT_LABEL[item]}
+                        selected={owned}
+                        onPress={() => toggleEquipment(item)}
+                        accessibilityLabel={`${EQUIPMENT_LABEL[item]}: ${owned ? 'owned' : 'not owned'}`}
+                      />
+                    );
+                  })}
+                </View>
+                {/* Specialist equipment is a SEPARATE, explicit opt-in: no preset and
+                    no default ever grants it, so movements needing it stay
+                    teaching-only until it is deliberately selected here. */}
+                <Text style={styles.fieldLabel}>SPECIALIST</Text>
+                <View style={styles.chipWrap}>
+                  {SPECIALIST_EQUIPMENT_ITEMS.map((item) => {
+                    const owned = draft.equipment_inventory.includes(item);
+                    return (
+                      <Chip
+                        key={item}
+                        label={EQUIPMENT_LABEL[item]}
+                        selected={owned}
+                        onPress={() => toggleEquipment(item)}
+                        accessibilityLabel={`Specialist equipment ${EQUIPMENT_LABEL[item]}: ${owned ? 'owned' : 'not owned'}`}
+                      />
+                    );
+                  })}
+                </View>
+                <Text style={styles.pDim}>
+                  The coach only ever prescribes movements your equipment allows.
+                  Specialist items stay off unless you turn them on.
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
-        {step === 'summary' && (
+        {step === 'limits' && (
+          <View>
+            <Text style={styles.h2}>ANYTHING I SHOULD TRAIN AROUND?</Text>
+            <Text style={styles.pDim}>
+              Old injuries or mobility limits the coach should respect. This never
+              replaces medical advice.
+            </Text>
+            <View style={styles.cardGroup}>
+              <Chip
+                label="NO — NOTHING TO NOTE"
+                selected={limitsAnswered === false}
+                onPress={() => answerLimits(false)}
+                accessibilityLabel="No, nothing to note"
+                style={styles.cardChip}
+              />
+              <Chip
+                label="YES — LET ME ADD NOTES"
+                selected={limitsAnswered === true}
+                onPress={() => answerLimits(true)}
+                accessibilityLabel="Yes, let me add notes"
+                style={styles.cardChip}
+              />
+            </View>
+            {limitsAnswered === true && (
+              <View>
+                <Text style={styles.fieldLabel}>PAST INJURIES</Text>
+                <Text style={styles.pDim}>One per line, like &quot;knee: old ACL, careful with deep squats&quot;.</Text>
+                <TextInput
+                  style={styles.notesInput}
+                  value={injuryText}
+                  onChangeText={setInjuryText}
+                  multiline
+                  placeholder="shoulder: dislocated 2023"
+                  placeholderTextColor={theme.color.textLow}
+                  accessibilityLabel="Past injuries, one per line as region colon note"
+                />
+                <Text style={styles.fieldLabel}>MOBILITY LIMITS</Text>
+                <TextInput
+                  style={styles.notesInput}
+                  value={mobilityText}
+                  onChangeText={setMobilityText}
+                  multiline
+                  placeholder="ankles: can't hit depth without heel lift"
+                  placeholderTextColor={theme.color.textLow}
+                  accessibilityLabel="Mobility limits, one per line as region colon note"
+                />
+              </View>
+            )}
+          </View>
+        )}
+
+        {step === 'review' && (
           <View>
             <Text style={styles.h2}>
               {name.trim().length > 0 ? `READY, ${name.trim().toUpperCase()}.` : 'READY.'}
@@ -457,13 +440,14 @@ export default function OnboardingScreen(): React.JSX.Element {
               <Text style={styles.summaryRow}>
                 WEEK — {draft.weekly_frequency} days, ≤{draft.session_duration_cap_min} min
               </Text>
-              <Text style={styles.summaryRow}>EFFORT CEILING — RPE {draft.base_rpe_cap.toFixed(1)}</Text>
               <Text style={styles.summaryRow}>
                 EQUIPMENT — {draft.equipment_inventory.length}/{EQUIPMENT_ITEMS.length} items
               </Text>
-              {draft.training_age === 'beginner' && (
-                <Text style={styles.summaryRow}>PROGRAMMING — handled by your coach (auto)</Text>
-              )}
+              <Text style={styles.summaryRow} testID="onboarding-summary-limits-row">
+                LIMITATIONS — {(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
+                  ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} noted`
+                  : 'none noted'}
+              </Text>
               <Text style={styles.summaryRow} testID="onboarding-summary-loads-row">
                 {draft.training_age === 'beginner'
                   ? 'LOADS — you choose the first; next time starts from what you logged'
@@ -472,6 +456,42 @@ export default function OnboardingScreen(): React.JSX.Element {
                     : 'LOADS — you choose'}
               </Text>
             </View>
+
+            {/* Coach defaults, disclosed honestly. Every value here is a safe
+                default the athlete can change later in the ATHLETE tab; the
+                fine-tuning area below is optional. */}
+            <Text style={styles.fieldLabel}>COACH DEFAULTS — EDIT ANYTIME IN ATHLETE / PROFILE</Text>
+            <Text style={styles.pDim}>
+              Effort ceiling RPE {draft.base_rpe_cap.toFixed(1)} — {effortBlurb(draft.base_rpe_cap)}
+              {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
+              {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
+            </Text>
+
+            {draft.training_age !== 'beginner' && (
+              <View style={styles.fineTune} testID="onboarding-loads-step">
+                <Text style={styles.fieldLabel}>WHO PICKS THE WEIGHTS? (OPTIONAL)</Text>
+                {(['auto', 'manual'] as const).map((p) => (
+                  <Chip
+                    key={p}
+                    testID={p === 'auto' ? 'onboarding-loads-auto' : 'onboarding-loads-manual'}
+                    label={`${LOAD_PREFERENCE_COPY[p].label} — ${LOAD_PREFERENCE_COPY[p].blurb}`}
+                    selected={loadPreference === p}
+                    onPress={() => chooseLoadPreference(p)}
+                    accessibilityLabel={p === 'auto'
+                      ? 'Coach suggests. Targets come from your numbers and history.'
+                      : 'I choose. You set every load, with coach suggestions as reference.'}
+                    style={styles.cardChip}
+                  />
+                ))}
+              </View>
+            )}
+            {draft.training_age === 'beginner' && (
+              <Text style={styles.pDim}>
+                While you&apos;re new, the coach picks the weights and caps effort at
+                8.5 — you&apos;ll grow into the rest.
+              </Text>
+            )}
+
             <Text style={styles.pDim}>
               Change any of this later in the ATHLETE tab. Your first prescription
               is waiting on the READY tab.
@@ -540,6 +560,7 @@ const styles = StyleSheet.create({
   },
   presetRow: { flexDirection: 'row', gap: theme.space[2], marginBottom: theme.space[3] },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
+  fineTune: { marginBottom: theme.space[3] },
   summaryBox: {
     backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.control,
     padding: theme.space[4], marginBottom: theme.space[4], gap: theme.space[2],
