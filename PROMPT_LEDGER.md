@@ -1146,3 +1146,70 @@ dashboard clutter with progressive disclosure and a vertical session timeline.
 - Deliver pure runner hardening, additive persistence, coaching/timed-set support,
   utility-first READY/COACH/SESSION surfaces, and verification coverage before the
   required physical-device visual checkpoint.
+
+---
+
+## Entry 0023 — 2026-09-01 · State C QA prerelease publication (release-lineage action, logged here to keep the release worktree pristine)
+
+> Lineage note: the substantive work targets `codex/state-c-release-readiness`
+> (release lineage, ledger Entry 0058 is its tail). This entry is recorded in the
+> master-lineage ledger from the QA session worktree
+> `claude/state-c-release-qa-d45df8` because the prompt requires the release
+> worktree to remain clean at the exact expected HEAD `965492e`.
+
+### Input G(x)
+
+```
+OWNER AUTHORIZATION: Proceed autonomously. You may commit and push strictly scoped fixes if required, publish the QA prerelease, and update the remediation branch. Do not merge master or publish a production release.
+
+Repository:
+C:\Users\fpike\Documents\Claude Coding\Athlete App
+
+Release worktree:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\state-c-release-readiness
+
+Release branch:
+codex/state-c-release-readiness
+
+Expected HEAD:
+965492e02184e07ddab20391740f10a694bd9149
+
+Successful GitHub CI:
+https://github.com/FDOTPike/athlete-kinetics/actions/runs/33447738019
+
+Continue from here only:
+
+1. Confirm the release worktree is clean and at the exact expected HEAD.
+2. Download artifact `athlete-kinetics-qa-candidate-apk` from run 33447738019.
+3. Run:
+   node tools/verify_qa_artifact.mjs <downloaded-app-qa.apk>
+4. Require a complete PASS, including clean provenance at HEAD 965492e. Do not use the older artifact from run 33445783745; it recorded dirty provenance.
+5. Compute and record the APK SHA-256 and size.
+6. Publish it as a GitHub PRERELEASE tagged `qa-c6-965492e`, targeted at the exact HEAD. Clearly label it:
+   - QA only
+   - debug-key signed
+   - not for Play/production
+   - intended for physical 4 GB-device C6 testing
+   - program-quality remediation remains open
+7. Return the release page, direct APK link, SHA-256, size, package name, and installation instructions.
+8. Fast-forward this existing worktree/branch to the final release HEAD and push it:
+   C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\program-quality-remediation
+   branch: codex/program-quality-remediation
+9. Do not alter the dirty master worktree.
+10. If local verification fails, do not publish. Diagnose, make the minimum fix, commit, push, rerun CI, and repeat verification.
+
+Final verdict must distinguish:
+QA DEVICE TEST: READY or BLOCKED
+PRODUCTION RELEASE: NOT AUTHORIZED
+```
+
+### Output F(G(x))
+
+- Confirmed release worktree `.worktrees/state-c-release-readiness` clean at 965492e02184e07ddab20391740f10a694bd9149 (branch codex/state-c-release-readiness); CI run 33447738019 conclusion=success, headSha identical.
+- Downloaded artifact `athlete-kinetics-qa-candidate-apk` -> `app-qa.apk`, 194,404,420 bytes, SHA-256 98abdaf8c3e8edf2359042acae634b20a3c7a28c0de57b31a56ef116b53a5a87.
+- `node tools/verify_qa_artifact.mjs` => QA ARTIFACT VERIFIED, exit 0, every check PASS, including clean provenance (head=965492e02184, sourceDirty=false, empty tracked-diff fingerprint e3b0c442...b855, 0 staged files). Run 33445783745 artifact was NOT used.
+- Published GitHub PRERELEASE `qa-c6-965492e` targeting 965492e (prerelease=true, draft=false) with assets `app-qa.apk` and `app-qa.apk.sha256`; notes label it QA-only, debug-key signed, not for Play/production, 4 GB-device C6 testing, program-quality remediation open.
+- Round-tripped the published asset from the release download URL: byte-identical SHA-256 and size, re-verified => QA ARTIFACT VERIFIED.
+- Fast-forwarded `.worktrees/program-quality-remediation` (codex/program-quality-remediation) 1a7e80d -> 965492e and pushed; origin ref now 965492e.
+- No repository code changes were required; no fix commits made. Master worktree left untouched (HEAD 3358be6, its pre-existing dirt preserved).
+- Verdict: QA DEVICE TEST: READY. PRODUCTION RELEASE: NOT AUTHORIZED.
