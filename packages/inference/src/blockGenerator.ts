@@ -692,6 +692,11 @@ export function generateBlock(input: BlockInput): BlockPlan {
 
   const warnings = new Set<string>();
   const sessions: PlannedSessionPlan[] = [];
+  // W4 bodyweight rep floors: a running per-(week, day, slot) maximum so a
+  // strictly bodyweight slot's working-week reps never fall while its target
+  // effort rises. Session-slot identity is stable across weeks by schedule
+  // construction, so the key is (week, day, slot) within this generation.
+  const bodyweightRepFloors = new Map<string, number>();
 
   for (let week = 1; week <= BLOCK_WEEKS; week++) {
     const phase = phaseByWeek[week - 1];
@@ -905,7 +910,22 @@ export function generateBlock(input: BlockInput): BlockPlan {
         let slotSets = locomotion
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
           : Math.max(1, slotWorkingSets - (taxed ? accessoryCut : 0));
-        const slotReps = chainScopedRepsFor(m);
+        let slotReps = chainScopedRepsFor(m);
+        // W4 bodyweight rep law (owner's regression case, WO §6.5): a strictly
+        // bodyweight slot has NO external-load channel, so its working-week
+        // reps may never FALL while its effort target RISES — "fewer reps at
+        // higher RPE" presumes invisible added load the athlete cannot see.
+        // The running per-(day, slot) maximum is the monotone floor across
+        // weeks (session-slot identity is stable by schedule construction);
+        // a deload stays exempt — its drop is a volume cut, not a load claim —
+        // and the floor is neither updated nor erased by it. Loaded and
+        // undeclared slots are untouched.
+        const bwFloorKey = `${dayIndex}:${slotIndex}`;
+        if (bodyweightSlot && !deload) {
+          const previous = bodyweightRepFloors.get(bwFloorKey);
+          if (previous !== undefined && slotReps < previous) slotReps = previous;
+          bodyweightRepFloors.set(bwFloorKey, slotReps);
+        }
         let slotRpe = rpe;
         const preAutopilotSets = slotSets;
         const preAutopilotRpe = slotRpe;
@@ -1001,4 +1021,79 @@ export function generateBlock(input: BlockInput): BlockPlan {
     recovery,
     autopilotAdjusted: [...autopilotAdjusted].sort(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// W4: weekly progression legibility (WO §6.5). One honest line per
+// representative slot (week 1 vs week 2 of the repeating schedule), classifying
+// the change into the contract's four explanations. A strictly bodyweight slot
+// is NEVER explained as "fewer reps at higher external load" — without a load
+// channel that sentence is the defect this work order removes.
+// ---------------------------------------------------------------------------
+
+const explainSlotChange = (
+  before: { sets: number; reps: number; target_rpe: number },
+  after: { sets: number; reps: number; target_rpe: number },
+  name: string,
+  bodyweight: boolean,
+): string => {
+  const label = `${name}`;
+  if (after.sets > before.sets && after.reps === before.reps) {
+    return `${label}: same reps plus a set (${before.sets}x${before.reps} -> ${after.sets}x${after.reps}).`;
+  }
+  if (after.target_rpe > before.target_rpe && after.reps === before.reps && after.sets === before.sets) {
+    return `${label}: same work at a higher target effort (RPE ${before.target_rpe} -> ${after.target_rpe}).`;
+  }
+  if (after.reps < before.reps && after.target_rpe > before.target_rpe) {
+    if (bodyweight) {
+      // The regression this work order bans: reps fall while effort rises on
+      // a slot with no external-load channel. With the W4 floor this cannot
+      // be generated, but the classifier must still refuse to dress it up as
+      // a load trade if it ever appears.
+      return `${label}: fewer reps at higher effort — no external-load channel, so this is a volume reduction, not added weight.`;
+    }
+    return `${label}: fewer reps at a higher external-load target (RPE ${before.target_rpe} -> ${after.target_rpe}).`;
+  }
+  if (after.target_rpe < before.target_rpe) {
+    return `${label}: deload — reduced effort (RPE ${before.target_rpe} -> ${after.target_rpe}).`;
+  }
+  return `${label}: unchanged (${after.sets}x${after.reps} @ RPE ${after.target_rpe}).`;
+};
+
+export function weeklyProgressionSummary(
+  plan: BlockPlan,
+  resolveMovement: (movementId: number) => { name: string; bodyweight: boolean } | undefined,
+): string[] {
+  // Two representative transitions: the first working step (week 1 -> 2) and
+  // the deload step (week 3 -> 4). Together they show every explanation the
+  // contract names, including the deload.
+  const pairs: readonly [number, number][] = [[1, 2], [3, 4]];
+  const lines: string[] = [];
+  for (const [beforeWeek, afterWeek] of pairs) {
+    const beforeSessions = plan.sessions.filter((s) => s.week_index === beforeWeek);
+    const afterSessions = plan.sessions.filter((s) => s.week_index === afterWeek);
+    const afterBySlot = new Map<string, { sets: number; reps: number; target_rpe: number }>();
+    for (const session of afterSessions) {
+      for (const slot of session.slots) {
+        afterBySlot.set(`${session.focus}:${slot.slot_index}`, {
+          sets: slot.sets, reps: slot.reps, target_rpe: slot.target_rpe,
+        });
+      }
+    }
+    for (const session of beforeSessions) {
+      for (const slot of session.slots) {
+        const after = afterBySlot.get(`${session.focus}:${slot.slot_index}`);
+        if (after === undefined) continue;
+        const movement = resolveMovement(slot.movement_id);
+        const name = movement?.name ?? `Movement ${slot.movement_id}`;
+        lines.push(explainSlotChange(
+          { sets: slot.sets, reps: slot.reps, target_rpe: slot.target_rpe },
+          { sets: after.sets, reps: after.reps, target_rpe: after.target_rpe },
+          name,
+          movement?.bodyweight === true,
+        ));
+      }
+    }
+  }
+  return lines;
 }

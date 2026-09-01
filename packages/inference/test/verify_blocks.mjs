@@ -27,7 +27,7 @@ import { DatabaseSync } from 'node:sqlite';
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
   SCHEMA_FATIGUE_COST, MACRO_BLOCKS, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
-  programFocuses, programMacroIndex, datedProgramMacroAnchor } = require('./.build/blockGenerator.js');
+  programFocuses, programMacroIndex, datedProgramMacroAnchor, weeklyProgressionSummary } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
 const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
@@ -2204,6 +2204,70 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     .filter((s) => loadedIds.has(s.movement_id)).map((s) => `${s.movement_id}:${s.reps}:${s.sets}`);
   check('[28] declaring one bodyweight intent leaves every loaded prescription unchanged',
     JSON.stringify(loadedRepsBaseline) === JSON.stringify(loadedRepsWithIntent));
+
+  // --- [29] W4 bodyweight rep law: working-week reps never fall while target
+  // RPE rises on a slot with NO external-load channel (owner's device finding:
+  // gpp + WAVE gave 3x10 @ 6.5 in week 1 and 3x8 @ 7.5 in week 2). Deload
+  // stays exempt; loaded slots keep the WAVE shrink because their load
+  // channel is real. ---
+  console.log('[29] bodyweight rep law (no rep fall with rising RPE without a load channel)');
+  {
+    const planW4 = (pool, over = {}, schema = 'WAVE') =>
+      generateBlock({ profile: prof(over), movements: pool, startDate: START, schemaType: schema });
+
+    // The owner's exact case: gpp, WAVE, three-day split, Push-up planned
+    // bodyweight on the upper day (week 1: 10 @ 6.5, week 2 would be 8 @ 7.5).
+    const bwPool = focusedOn('Push-up', { 'Push-up': 'Bodyweight' });
+    const bwPlan = planW4(bwPool, { objective: 'gpp', weekly_frequency: 3, session_duration_cap_min: 90 });
+    const pushupId = Number(byName.get('Push-up').movement_id);
+    const routed = bwPlan.sessions.flatMap((s) =>
+      s.slots.filter((sl) => sl.movement_id === pushupId).map((sl) => ({
+        week: s.week_index, phase: s.phase, sets: sl.sets, reps: sl.reps, rpe: sl.target_rpe,
+      })));
+    const week1 = routed.find((r) => r.week === 1);
+    const week2 = routed.find((r) => r.week === 2);
+    const deloadWeek = routed.find((r) => r.phase === 'deload');
+    check('[29] the owner regression reproduces the start point: WAVE gpp week 1 is 10 reps @ 6.5',
+      week1 !== undefined && week1.reps === 10 && week1.rpe === 6.5, JSON.stringify(week1));
+    check('[29] week 2 does NOT become 8 reps at 7.5 — reps hold while effort rises',
+      week2 !== undefined && week2.rpe > week1.rpe && week2.reps >= week1.reps, JSON.stringify(week2));
+    // The general conditional law across ALL working weeks of the block:
+    // whenever target RPE rises week-over-week, reps must not fall.
+    const working = routed.filter((r) => r.phase !== 'deload');
+    const lawHolds = working.every((r, i) =>
+      i === 0 || r.rpe <= working[i - 1].rpe || r.reps >= working[i - 1].reps);
+    check('[29] the conditional law holds across every working-week pair (RPE up => reps never down)',
+      lawHolds, JSON.stringify(working));
+    check('[29] deload volume cut lands on SETS, never as a rep claim',
+      deloadWeek !== undefined && deloadWeek.sets < working[working.length - 1].sets,
+      JSON.stringify(deloadWeek));
+
+    // Loaded counter-check: with a real load channel the WAVE rep shrink is
+    // preserved (that is the "fewer reps at higher external load" route).
+    const loadedPlan = planW4(focusedOn('Romanian Deadlift', {}),
+      { objective: 'gpp', weekly_frequency: 3, session_duration_cap_min: 90 });
+    const rdlId = Number(byName.get('Romanian Deadlift').movement_id);
+    const rdl = loadedPlan.sessions.flatMap((s) =>
+      s.slots.filter((sl) => sl.movement_id === rdlId).map((sl) => ({
+        week: s.week_index, reps: sl.reps, rpe: sl.target_rpe,
+      })));
+    check('[29] loaded WAVE shrink is preserved (10 -> 8 with a real load channel)',
+      rdl.some((r) => r.week === 1 && r.reps === 10) && rdl.some((r) => r.week === 2 && r.reps === 8),
+      JSON.stringify(rdl));
+
+    // Weekly legibility: every representative slot gets one honest line, and
+    // no bodyweight slot is ever explained as an external-load trade.
+    const resolveMovement = (id) => {
+      const row = bwPool.find((m) => m.movement_id === id);
+      return row === undefined ? undefined
+        : { name: row.name, bodyweight: row.plannedImplement === 'Bodyweight' };
+    };
+    const summary = weeklyProgressionSummary(bwPlan, resolveMovement);
+    check('[29] weekly progression summary explains the deload and never claims a bodyweight load trade',
+      summary.some((line) => line.includes('deload'))
+      && !summary.some((line) => line.includes('external load') && line.includes('Bodyweight')),
+      JSON.stringify(summary));
+  }
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
