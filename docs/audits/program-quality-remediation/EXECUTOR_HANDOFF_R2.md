@@ -2,6 +2,7 @@
 
 **Executor:** GLM-5.3 Flash (z-ai/glm-5.3-flash via nous), Hermes Agent session, 2026-09-01 · Effort: High
 **Supersedes:** `docs/audits/program-quality-remediation/EXECUTOR_HANDOFF.md` (Round 1, freeze `cfbcf67`)
+**Re-freeze (post-review):** `022360373f851e7bd49769194873b7b05b8d87e7` (tree `8f687a65042de2aa62d3f877783a6e074e593520`) — supersedes the pre-review freeze `19a17ae` after review round 1; see "Review round 1" below.
 **Status of prior Team Preview reports:** FAILED evidence — the three APPROVE verdicts in
 `docs/audits/program-quality-remediation/team-preview/` are retained unmodified as read-only
 historical records of a failed audit round. They do not certify anything; this handoff and the
@@ -68,6 +69,31 @@ candidate. Existing passing coverage was not re-labeled as new red proof.
 2. `8f42d2c` feat(app): preview progression summary, shaped capacity law, required limitations answer
 3. `e22a1cf` docs(audit): rebuild the PQ matrix with semantic PQ-04/05/06
 4. `<FREEZE_COMMIT>` docs(audit): freeze the Round 2 candidate and supersede the executor handoff (implementation freeze)
+
+## Review round 1 (two fresh isolated reviewer runs)
+
+Both reviewers (isolated subagent runs against the pre-review freeze `19a17ae`, same model as
+the executor — reduced model diversity disclosed) returned **REQUEST_CHANGES**:
+
+- **Blocking (both, identical substance):** the committed `GENERATED_PROGRAM_MATRIX.md` was not
+  byte-reproducible from the frozen `matrix_harness.mjs` — the file predated the final harness
+  notes patch and still carried the Round 1 "mirrors days<3" note, misdescribing PQ-04. All 14
+  PASS rows reproduced byte-identically. **Remediated:** matrix regenerated from the frozen
+  harness and recommitted (`bc2c744`).
+- **P2-A (Reviewer A, non-blocking):** the power explanation overpromised for beginners — the
+  speed-first preference is a `loaded`-mode law and beginners run the legacy ordering.
+  **Remediated:** `powerObjectiveExplanation` is tier-scoped; the beginner variant honestly
+  describes the base-first path; [P1b] checks pin the contract.
+- **P2-B (Reviewer B, non-blocking):** check-count drift (commit message 19, ledger 21, true
+  count 20). **Remediated:** all references corrected to the machine-counted figures (20 at
+  re-freeze prep, 23 after the [P1b] additions).
+- Non-actionable notes acknowledged: `rankedIds` accessory-order disclosure asymmetry
+  (disclosure-only, no consumer), dead `_dayIndicesFor` parameter (kept for the documented
+  call signature), reload resets the limitations gate (safe direction — silence never persists
+  as an implicit "no").
+
+A **fresh reviewer pair** is required against the re-freeze `022360373f851e7bd49769194873b7b05b8d87e7`
+before the candidate can be certified; conclusions will again be kept separate until reconciliation.
 
 ## Gate outcomes (all run this round)
 
