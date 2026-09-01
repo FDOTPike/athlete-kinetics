@@ -36,8 +36,13 @@
  */
 import type { DifficultyRating, MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
 import { EXPERIENCE_SEVERITY } from './types';
-import { DIFFICULTY_RANK } from './types';
 import { isDifficultyAllowed, type ExecutableMovementAccessContext } from './tierPolicy';
+// W3 (program-quality work order): the pure, deterministic movement-ranking
+// policy. Runs ONLY as the DEFAULT choice among candidates that already
+// passed the equipment, tier, safety, capability and attestation gates; it
+// can never re-admit a rejected candidate. Explicit athlete preferences keep
+// their separate, earlier precedence in the slot loop below.
+import { rankMovementsForPattern, type RankingCandidate } from './movementRanking';
 // Phase 13 Step 4 — the Block Generator Intercept: the generator imports the
 // autopilot controller and applies its forward-looking corrections to the next
 // block (a recorded halt snaps the whole block to a recovery template).
@@ -783,6 +788,9 @@ export function generateBlock(input: BlockInput): BlockPlan {
 
       const usedIds = new Set<number>();
       const slots: PlannedSlotPlan[] = [];
+      // W3 ranking disclosures for this session (anchor substitutes and the
+      // exact fallback reasons for strictly-bodyweight defaults).
+      const sessionRankingNotes: Set<string> = new Set();
       for (const [slotIdx, pattern] of patterns.entries()) {
         const preferred = preferences.find((p) => p.pattern === pattern);
         const preferredMovement = preferred === undefined
@@ -790,9 +798,10 @@ export function generateBlock(input: BlockInput): BlockPlan {
           : pool.find((candidate) => candidate.movement_id === preferred.movement_id
               && candidate.pattern === pattern && !usedIds.has(candidate.movement_id));
         // Precedence is fixed: a valid explicit athlete preference ALWAYS wins,
-        // then a full-body-scoped candidate at this focus's scope slot, then the
-        // slot's own pattern. pickScoped runs ONLY when no preference resolved,
-        // so an explicit carry preference is never overridden.
+        // then a full-body-scoped candidate at this focus's scope slot, then
+        // the goal/tier ranking default (WO §2.4-2.6), then the legacy pick.
+        // pickScoped and rankMovementsForPattern run ONLY when no preference
+        // resolved, so an explicit carry preference is never overridden.
         // NOTE the off-by-one: ProgramMovementPreference.slot_index is 1-based
         // (1..5) while FOCUS_SCOPE_SLOT indexes FOCUS_PATTERNS 0-based — scope
         // slot 4 corresponds to preference slot_index 5. Preferences are matched
@@ -801,9 +810,45 @@ export function generateBlock(input: BlockInput): BlockPlan {
         const scopeMovement = preferredMovement === undefined && scopeSlot === slotIdx
           ? pickScoped(pool, 'full_body', usedIds) ?? undefined
           : undefined;
-        const m = preferredMovement ?? scopeMovement ?? pickForPattern(pool, pattern, usedIds);
+        // W3: the pure ranking default. Only candidates the gates already
+        // admitted reach it (capability_available_* true in this context),
+        // so it can never re-admit a rejected movement; it re-checks the
+        // gates from raw inputs as a belt-and-braces invariant.
+        const rankingCandidates: readonly RankingCandidate[] = pool
+          .filter((candidate) => candidate.pattern === pattern && !usedIds.has(candidate.movement_id))
+          .map((candidate) => ({
+            movementId: candidate.movement_id,
+            name: candidate.name,
+            difficulty: candidate.difficulty ?? 'Beginner',
+            required: candidate.required,
+            plannedImplement: candidate.plannedImplement,
+            capabilityAvailable: true,
+            isCompound: candidate.is_compound,
+            beginnerOk: candidate.beginner_ok,
+            sportTracking: candidate.sportTracking,
+          }));
+        const ranking = rankMovementsForPattern(rankingCandidates, {
+          trainingAge: profile.training_age,
+          objective: profile.objective,
+          inventory: profile.equipment_inventory,
+          preferredMovementIds: new Set<number>(),
+        }, pattern);
+        const rankedDefault = ranking.movementId >= 0
+          ? pool.find((candidate) => candidate.movement_id === ranking.movementId) ?? null
+          : null;
+        const m = preferredMovement ?? scopeMovement ?? rankedDefault ?? pickForPattern(pool, pattern, usedIds);
         if (preferred !== undefined && preferredMovement === undefined && m !== null) {
           warnings.add(`${focus}: preferred ${pattern} movement unavailable; safe fallback used`);
+        }
+        // W3 disclosure (WO §2.4): when the ranking default landed and an
+        // anchor was blocked, name the blocked anchor, its gate, and the
+        // loaded substitute; when the default is strictly bodyweight, name
+        // the gates that removed every loaded option.
+        if (m !== null && m.movement_id === ranking.movementId && ranking.substituteId !== null) {
+          sessionRankingNotes.add(`${focus}: ${ranking.substituteAnchorName} unavailable for ${pattern} (${(ranking.blockersById[ranking.substituteId] ?? []).join('/')}); ${ranking.name} planned instead`);
+        }
+        if (m !== null && m.movement_id === ranking.movementId && ranking.reason === 'bodyweight' && ranking.blockers.length > 0) {
+          sessionRankingNotes.add(`${focus}: ${ranking.name} planned — no loaded ${pattern} is available (blocked: ${ranking.blockers.join('/')})`);
         }
         if (preferred !== undefined && preferredMovement === undefined && m === null) {
           warnings.add(`${focus}: preferred ${pattern} movement unavailable; slot dropped`);
@@ -926,6 +971,11 @@ export function generateBlock(input: BlockInput): BlockPlan {
       if (slots.length === 0) {
         warnings.add(`${focus}: session dropped, no available movements at all`);
         continue;
+      }
+      // W3: flush this session's ranking disclosures into the block warnings
+      // (deduped by the Set, sorted at block assembly below).
+      for (const note of sessionRankingNotes) {
+        warnings.add(note);
       }
       sessions.push({
         week_index: week,

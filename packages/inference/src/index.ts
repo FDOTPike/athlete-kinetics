@@ -66,6 +66,19 @@ export {
   type MovementAccessContext,
 } from './tierPolicy';
 export {
+  ANCHOR_MOVEMENT_NAMES,
+  anchorNamesForObjective,
+  anchorSubstituteFor,
+  bigLiftAnchorNames,
+  objectiveStyleLabel,
+  rankMovementsForPattern,
+  type MovementRanking,
+  type MovementRankingInput,
+  type RankingCandidate,
+  type RankingGate,
+  type RankingReason,
+} from './movementRanking';
+export {
   defaultLoadPreference,
   resolveLoadSelection,
   transitionLoadPreference,

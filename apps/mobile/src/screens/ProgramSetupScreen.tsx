@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   accessContextForBlockFocus,
+  ANCHOR_MOVEMENT_NAMES,
+  objectiveStyleLabel,
   SELECTABLE_SCHEMA_TYPES,
   defaultProgramDayIndices,
   programFocuses,
@@ -45,6 +47,8 @@ export default function ProgramSetupScreen({
   const updateProgramPreferences = useStore((s) => s.updateProgramPreferences);
   const getVerdicts = useStore((s) => s.getMovementAvailabilityVerdicts);
   const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
+  const confirmMovementPriorExperience = useStore((s) => s.confirmMovementPriorExperience);
+  const activePriorExperienceMovementIds = useStore((s) => s.activePriorExperienceMovementIds);
   const storeError = useStore((s) => s.error);
 
   const initialFrequency = program?.days.length ?? profile.weekly_frequency;
@@ -164,6 +168,50 @@ export default function ProgramSetupScreen({
 
   const weekOne = previewResult.preview?.plan.sessions.filter((session) => session.week_index === 1) ?? [];
 
+  // --- W3 disclosures: honest style, capacity, anchor coverage -------------
+  // The athlete-facing style is the goal's honest meaning (WO §2.2), shown
+  // beside the raw persisted objective so the label can never silently
+  // misrepresent the split actually scheduled.
+  const styleLabel = objectiveStyleLabel(profile.objective);
+  // Strength anchor capacity (WO §2.5): fewer than three weekly plan slots
+  // cannot carry squat + bench + deadlift anchors. This must be visible
+  // BEFORE creation, with the choice to add days or accept the reduction.
+  const strengthCapacityShort = profile.objective === 'strength' && dayIndices.length < 3;
+  // Anchor coverage for strength: which of the big three are gated-available
+  // this week, which are blocked (with reasons), and whether a local
+  // prior-experience declaration would clear an ordinary capability gap
+  // (shared verdict: capability is the ONLY blocker and confirmationWouldClear).
+  const anchorCoverage = useMemo(() => {
+    if (profile.objective !== 'strength') return [];
+    return ANCHOR_MOVEMENT_NAMES.map((name) => {
+      const movement = movements.find((m) => m.name === name);
+      if (movement === undefined) {
+        return { name, state: 'missing_from_library' as const, confirmWouldClear: false, reasons: [] as string[], movementId: -1, confirmed: false };
+      }
+      const verdict = getVerdicts('weight_room').find((v) => v.movementId === movement.movement_id);
+      const reasons = verdict?.reasons ?? [];
+      const confirmWouldClear = (verdict?.state === 'teaching_only'
+        && verdict.confirmationWouldClear
+        && !verdict.separateAttestationRequired
+        && verdict.reasons.length === 1
+        && verdict.reasons[0] === 'capability');
+      const confirmed = activePriorExperienceMovementIds.includes(movement.movement_id);
+      return {
+        name,
+        movementId: movement.movement_id,
+        state: verdict?.state === 'available' || confirmed ? ('available' as const) : ('blocked' as const),
+        confirmWouldClear: confirmWouldClear && !confirmed,
+        reasons,
+        confirmed,
+      };
+    });
+  }, [profile.objective, profile, movements, getVerdicts, movementAvailabilityRevision, activePriorExperienceMovementIds, niggles]);
+
+  // Ranking decisions from the generated preview: anchor substitutions and
+  // reasoned bodyweight fallbacks surface verbatim in the preview card.
+  const rankingNotes = previewResult.preview?.plan.warnings.filter((w) =>
+    w.includes('unavailable for') || w.includes('no loaded')) ?? [];
+
   // First unmet requirement for enabling Create program, in the order the form
   // asks for them. Rendered next to the disabled button so the rule is never
   // enforced invisibly.
@@ -179,8 +227,53 @@ export default function ProgramSetupScreen({
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{editing ? 'MANAGE PROGRAM' : 'BUILD YOUR PROGRAM'}</Text>
-      <Text style={styles.title}>{profile.objective.replace('_', ' ')}</Text>
-      <Text style={styles.body}>Four-week blocks stay intact. You choose when to review the goal.</Text>
+      <Text style={styles.title}>{styleLabel}</Text>
+      <Text style={styles.body}>
+        Goal: {profile.objective.replace('_', ' ')} — {styleLabel}. Four-week blocks stay intact. You choose when to review the goal.
+      </Text>
+
+      {strengthCapacityShort && (
+        <View style={styles.card} testID="strength-capacity-warning">
+          <Text style={styles.sectionTitle}>Not enough training days for the big three</Text>
+          <Text style={styles.notice}>
+            Big-lift strength needs at least three weekly sessions to carry squat, bench press and
+            deadlift anchors. With {dayIndices.length} session{dayIndices.length === 1 ? '' : 's'} a week
+            the plan cannot include every main lift — it will not silently promise powerlifting and
+            skip one.
+          </Text>
+          <Text style={styles.caption}>Add training days above, or continue with a reduced-anchor plan.</Text>
+        </View>
+      )}
+
+      {anchorCoverage.length > 0 && (
+        <View style={styles.card} testID="anchor-coverage-card">
+          <Text style={styles.sectionTitle}>Big-lift availability</Text>
+          {anchorCoverage.map((anchor) => (
+            <View key={anchor.name} style={styles.anchorRow}>
+              <Text style={styles.anchorName}>
+                {anchor.name}: {anchor.state === 'available' ? 'ready' : anchor.state === 'missing_from_library' ? 'not in your library' : 'blocked'}
+              </Text>
+              {anchor.state === 'blocked' && anchor.reasons.length > 0 && (
+                <Text style={styles.caption}>{anchor.reasons.join(', ')}</Text>
+              )}
+              {anchor.confirmWouldClear && (
+                <>
+                  <Text style={styles.caption}>
+                    You can declare you have trained this lift before — a local statement about your own
+                    history, not a coaching assessment.
+                  </Text>
+                  <Chip
+                    label={`I have trained ${anchor.name} before`}
+                    selected={false}
+                    onPress={() => confirmMovementPriorExperience(anchor.movementId, 'weight_room')}
+                    testID={`anchor-confirm-${anchor.movementId}`}
+                  />
+                </>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>1. Who chooses movements?</Text>
@@ -318,6 +411,14 @@ export default function ProgramSetupScreen({
       {(localError ?? previewResult.error ?? storeError) !== null && (
         <Text style={styles.error}>{localError ?? previewResult.error ?? storeError}</Text>
       )}
+      {rankingNotes.length > 0 && (
+        <View style={styles.card} testID="ranking-notes-card">
+          <Text style={styles.sectionTitle}>Coach decisions in this plan</Text>
+          {rankingNotes.map((note) => (
+            <Text key={note} style={styles.caption}>{note}</Text>
+          ))}
+        </View>
+      )}
       {missingRequirement !== null && (
         <Text style={styles.caption} accessibilityLiveRegion="polite">
           {missingRequirement}
@@ -387,5 +488,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+  },
+  anchorRow: {
+    gap: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.line,
+  },
+  anchorName: {
+    color: theme.color.textHi,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

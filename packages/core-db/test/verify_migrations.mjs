@@ -58,7 +58,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '055_return_checkin_ack.sql',
   '056_movement_taxonomy_backfill.sql',
   '057_block_meta_phase_invariant.sql',
-  '058_suspension_episode.sql', '059_suspension_state_and_load_intent.sql'];
+  '058_suspension_episode.sql', '059_suspension_state_and_load_intent.sql',
+  '060_program_goal_tier_alignment.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1713,16 +1714,16 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     db.raw.prepare('UPDATE block_meta SET macro_phase = ? WHERE block_id = ?').run(phase, blockId);
   };
 
-  // --- fresh install reaches user_version 58 with the invariant enforced ---
+  // --- fresh install reaches user_version 59 with the invariant enforced ---
   {
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 58 files (slots 001-059, no 004) -> user_version 58. This count is
+    // 59 files (slots 001-060, no 004) -> user_version 59. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 059 (suspension state + load intent).
-    check('fresh install reaches user_version 58 (58 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 58,
+    // silent one. Re-pinned for 060 (program-goal tier alignment, WO §2.3).
+    check('fresh install reaches user_version 59 (59 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 59,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -1991,6 +1992,112 @@ console.log('\n[058] suspension episode invariants');
   runMigrations(db, MIGRATIONS);
   check('self-heal restores the dropped suspension_episode table',
     db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name='suspension_episode'").get().c === 1);
+}
+
+// --- 2z. 060 program-goal tier alignment: exact three rows, idempotent, fail-closed ---
+console.log('[2z] 060 program-goal tier alignment (WO §2.3)');
+{
+const difficultyRows = (db) => db.raw.prepare(`
+    SELECT m.name, d.difficulty_rating
+    FROM movement m JOIN movement_detail d USING(movement_id)
+    WHERE m.name IN ('Competition Squat','Competition Bench','Deadlift')
+    ORDER BY m.name`).all();
+  const alignmentRows = (db) => db.raw.prepare(
+    'SELECT movement_id, movement_name, previous_difficulty, aligned_difficulty FROM movement_tier_alignment ORDER BY movement_name',
+  ).all();
+
+  // (1) The fresh-install chain lands the correction exactly.
+  const a60 = freshDb();
+  runMigrations(a60, MIGRATIONS);
+  check('060 fresh install: exactly the three big-lift rows are Intermediate after the chain',
+    JSON.stringify(difficultyRows(a60)) === JSON.stringify([
+      { name: 'Competition Bench', difficulty_rating: 'Intermediate' },
+      { name: 'Competition Squat', difficulty_rating: 'Intermediate' },
+      { name: 'Deadlift', difficulty_rating: 'Intermediate' },
+    ]) && uv(a60) === MIGRATIONS.length,
+    JSON.stringify(difficultyRows(a60)));
+  check('060 provenance records exactly three Advanced -> Intermediate rows',
+    JSON.stringify(alignmentRows(a60)) === JSON.stringify([
+      { movement_id: 3, movement_name: 'Competition Bench', previous_difficulty: 'Advanced', aligned_difficulty: 'Intermediate' },
+      { movement_id: 1, movement_name: 'Competition Squat', previous_difficulty: 'Advanced', aligned_difficulty: 'Intermediate' },
+      { movement_id: 2, movement_name: 'Deadlift', previous_difficulty: 'Advanced', aligned_difficulty: 'Intermediate' },
+    ]),
+    JSON.stringify(alignmentRows(a60)));
+  const allAdvancedAfter = a60.raw.prepare(
+    "SELECT m.name FROM movement m JOIN movement_detail d USING(movement_id) WHERE d.difficulty_rating = 'Advanced' ORDER BY m.name",
+  ).all().map((r) => r.name);
+  check('060 did not widen the correction beyond the three named rows',
+    !allAdvancedAfter.includes('Competition Squat')
+    && !allAdvancedAfter.includes('Competition Bench')
+    && !allAdvancedAfter.includes('Deadlift')
+    && allAdvancedAfter.length === a60.raw.prepare(
+      "SELECT COUNT(*) AS c FROM movement m JOIN movement_detail d USING(movement_id) WHERE d.difficulty_rating = 'Advanced'").get().c,
+    `${allAdvancedAfter.length} Advanced rows remain`);
+
+  // (2) Replay from the 059 boundary: idempotent, zero re-correction.
+  const r60 = freshDb();
+  const idx060 = FILES.indexOf('060_program_goal_tier_alignment.sql');
+  for (let i = 0; i < idx060; i += 1) r60.executeSync(MIGRATIONS[i]);
+  r60.executeSync(`PRAGMA user_version = ${idx060};`);
+  const pre60 = difficultyRows(r60);
+  check('060 precondition: the three rows are still Advanced at the 059 boundary',
+    JSON.stringify(pre60) === JSON.stringify([
+      { name: 'Competition Bench', difficulty_rating: 'Advanced' },
+      { name: 'Competition Squat', difficulty_rating: 'Advanced' },
+      { name: 'Deadlift', difficulty_rating: 'Advanced' },
+    ]), JSON.stringify(pre60));
+  runMigrations(r60, MIGRATIONS);
+  check('060 upgrade from 059 flips exactly the three rows',
+    difficultyRows(r60).every((r) => r.difficulty_rating === 'Intermediate'));
+  r60.executeSync(`PRAGMA user_version = ${idx060};`);
+  const alignmentSnapshot = JSON.stringify(alignmentRows(r60));
+  runMigrations(r60, MIGRATIONS);
+  check('060 replays idempotently from its own boundary (provenance rows unchanged)',
+    uv(r60) === MIGRATIONS.length && JSON.stringify(alignmentRows(r60)) === alignmentSnapshot);
+
+  // (3) Poisoned DB: user_version claims latest, the sentinel side-table is absent.
+  const p60 = freshDb();
+  for (let i = 0; i < idx060; i += 1) p60.executeSync(MIGRATIONS[i]);
+  p60.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+  check('060 poison precondition: user_version claims latest but the alignment sentinel is absent',
+    sentinelsMissing(p60).includes('movement_tier_alignment'));
+  runMigrations(p60, MIGRATIONS);
+  check('060 poison self-heal re-applies the chain, restores the sentinel and lands the correction',
+    sentinelsMissing(p60).length === 0
+    && difficultyRows(p60).every((r) => r.difficulty_rating === 'Intermediate'));
+
+  // (4) Full re-apply from zero (the row-healing path the runner supports —
+  // the same shape the 049 section proves): 037-059 rebuild the library, then
+  // 060 re-asserts the correction and its provenance last.
+  const d60 = freshDb();
+  runMigrations(d60, MIGRATIONS);
+  d60.raw.prepare("UPDATE movement_detail SET difficulty_rating = 'Advanced' WHERE movement_id = (SELECT movement_id FROM movement WHERE name = 'Deadlift')").run();
+  d60.raw.exec('DELETE FROM movement_tier_alignment');
+  d60.raw.exec('PRAGMA user_version = 0;');
+  runMigrations(d60, MIGRATIONS);
+  check('060 full re-apply from zero restores the corrected difficulty row AND its provenance row',
+    d60.raw.prepare("SELECT difficulty_rating AS d FROM movement_detail WHERE movement_id = (SELECT movement_id FROM movement WHERE name = 'Deadlift')").get().d === 'Intermediate'
+    && alignmentRows(d60).length === 3);
+
+  // (5) Dropped sentinel table self-heals.
+  d60.raw.exec('DROP TABLE movement_tier_alignment');
+  check('060 a dropped alignment table is detected as a missing sentinel',
+    sentinelsMissing(d60).includes('movement_tier_alignment'));
+  runMigrations(d60, MIGRATIONS);
+  check('060 self-heal restores the dropped alignment table with its three provenance rows',
+    alignmentRows(d60).length === 3);
+
+  // (6) CHECK-rejection and FK-cascade surface of the new table.
+  const c60 = freshDb();
+  runMigrations(c60, MIGRATIONS);
+  let alignmentFkRejected = false;
+  try {
+    c60.raw.prepare("INSERT INTO movement_tier_alignment (movement_id, movement_name, previous_difficulty, aligned_difficulty) VALUES (99999, 'Ghost Lift', 'Advanced', 'Intermediate')").run();
+  } catch { alignmentFkRejected = true; }
+  check('060 alignment table rejects an unknown movement (FK fail-closed)', alignmentFkRejected);
+  c60.raw.exec("DELETE FROM movement WHERE name = 'Deadlift'");
+  check('060 alignment rows cascade on movement delete (FK surface)',
+    c60.raw.prepare("SELECT COUNT(*) AS c FROM movement_tier_alignment WHERE movement_name = 'Deadlift'").get().c === 0);
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
