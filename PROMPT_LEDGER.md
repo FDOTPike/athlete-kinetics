@@ -3348,4 +3348,44 @@ separate until reconciliation.
 
 ### Output F(G(x))
 
-(open — completed when the work lands)
+- **Frozen candidate SHA:** `19a17aeddc0752bf3dffeba25c95da980333e764` (tree
+  `b25442e86a1fed8644143e743d0d186241436a4a`) — the Round 2 implementation freeze.
+- **Commits:** bd831a3 (feat programs: power-specific ranking + named hypertrophy dose-role law +
+  pure strengthAnchorCapacity), 8f42d2c (feat app: preview progression summary + shaped capacity
+  law + required limitations answer + methodology disclosure), e22a1cf (docs audit: semantic PQ
+  matrix rebuild, 14/14 candidate-generated), 19a17ae (docs audit: Round 2 freeze + superseding
+  handoff EXECUTOR_HANDOFF_R2.md + TEST_EVIDENCE_R2.md).
+- **Files changed:** 12 paths — PROMPT_LEDGER.md, package.json, packages/inference/src/{movementRanking,blockGenerator,index}.ts,
+  packages/inference/test/verify_programQualityRound2.mjs, apps/mobile/src/state/useStore.ts,
+  apps/mobile/src/screens/{ProgramSetupScreen,OnboardingScreen}.tsx,
+  apps/mobile/test/components/{ProgramQualityRound2.test.js,ProfileScreens.test.js},
+  docs/audits/program-quality-remediation/{matrix_harness.mjs, GENERATED_PROGRAM_MATRIX.md,
+  EXECUTOR_HANDOFF_R2.md, TEST_EVIDENCE_R2.md}. No migration (060 remains newest slot).
+- **Tests and exit codes:** typecheck 0; verify:migrations PASS; verify:blocks PASS (new Round 2
+  gate: 21 checks — [P1] power law 7, [P2] dose-role 6, [P3] capacity 8 incl. the 1–7-day ×
+  15/90/240-min sweep); verify:store PASS; verify:pipeline 51/51; verify:progression 17/17;
+  verify:components 19 suites / 247 tests; verify:ci exit 0 (run twice); git diff --check clean.
+- **Red-first proof:** verify_programQualityRound2.mjs and ProgramQualityRound2.test.js written
+  before the fixes; recorded 7/12 and 6/8 failing against the frozen Round 1 candidate.
+- **Generated matrix result:** PQ-01…PQ-14 = 14/14 PASS from matrix_harness.mjs; PQ-04 semantic
+  (real capacity law + real generator + gate-disclosed absent anchors), PQ-05 semantic
+  (big-three 0, balanced exposure, primary 4 vs accessory 3 sets, named overload path), PQ-06
+  semantic (speed rungs selected: Speed Box Squat + Double Kettlebell Push Press; Power Clean 0
+  for intermediate — tier ceiling held; power reps 5 < strength 8; pure explanation copy).
+- **Power classification basis:** owner-curated movement_lift_family.preferred_purpose='speed'
+  rows (migration 052) — no policy invented; owner-decision docket not required.
+- **Known limitations:** power intra-tier ordering reuses the legacy law (no finer order
+  ratified); "jump-style alternatives" copy is generic guidance; limitations gate enforced at
+  the footer NEXT (no persistence path bypasses it); PQ-11 pattern-level approximation and
+  PQ-12/13 component-proven notes carry over from Round 1.
+- **Review:** two fresh isolated reviewer runs dispatched post-freeze (Reviewer A semantics,
+  Reviewer B verification); conclusions kept separate until reconciliation; reduced model
+  diversity disclosed — both reviewers are the same model as the executor (GLM-5.3 Flash).
+- **Confirmations:** no sensor/biometric RPE work; no merge, rebase, push, tag, signing,
+  release, APK, C6, or store action; root master checkout untouched; .agents/ and team-preview/
+  left untracked and unmodified; prior Team Preview reports treated as failed read-only evidence.
+- Executor: GLM-5.3 Flash (Hermes agent, z-ai/glm-5.3-flash via nous), session 2026-09-01.
+- W0 identity: branch `codex/program-quality-remediation`, HEAD `9f2e1e9459da020f80d8b8711aa527c709a4a8e2`,
+  tree `9bc304e6c3e5f35c5bb6af97f8eb5ef623cbd3c3`, ancestor `965492e02184e07ddab20391740f10a694bd9149`
+  verified, diff cfbcf67..HEAD docs-only confirmed before any Round 2 write, git diff --check clean.
+  PROMPT_LEDGER.md at 3278 lines / 59 entries before this entry. Node v26.5.1, npm 12.0.2.
