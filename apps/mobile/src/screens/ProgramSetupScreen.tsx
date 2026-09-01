@@ -206,11 +206,47 @@ export default function ProgramSetupScreen({
     const ALL_ROLES = ['squat', 'horizontal push (bench)', 'hinge (deadlift)'];
     return ALL_ROLES.filter((role) => !anchorRoleNames.includes(role));
   }, [anchorRoleNames]);
-  const missingAnchorRemedies: Record<string, string> = {
-    squat: 'lower (or full)',
-    'horizontal push (bench)': 'upper (or full)',
-    'hinge (deadlift)': 'lower (or full)',
-  };
+  // Round 6: the advice is GENERATED from actual capacity-improving edits —
+  // simulate changing each drafted day's focus to every other focus and keep
+  // only the edits that raise the distinct-role count to all three. If no
+  // focus-only edit succeeds, the remedy is a training day; if the slot
+  // budget (session duration) is what keeps roles out of a day's menu, point
+  // at the Athlete/Profile session-length setting. The reduced-anchor choice
+  // is always retained. Pure derivation, no invented copy.
+  const focusFixSuggestions = useMemo(() => {
+    if (missingAnchorRoles.length === 0) return [];
+    const draft = dayIndices.map((dayIndex) => ({
+      dayIndex,
+      focus: (dayFocuses[dayIndex] ?? 'full') as BlockFocus,
+    }));
+    const fixes: string[] = [];
+    const DAY_NAME_FIX = ['Today', 'Tomorrow', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
+    for (const day of draft) {
+      for (const candidate of BLOCK_FOCUS_LIST) {
+        if (candidate === day.focus) continue;
+        const simulated = strengthAnchorCapacity(
+          profile, programFocuses, defaultProgramDayIndices,
+          draft.map((d) => (d.dayIndex === day.dayIndex ? { ...d, focus: candidate } : d)),
+        );
+        if (simulated === 3) {
+          fixes.push(`set ${DAY_NAME_FIX[day.dayIndex - 1]}'s focus to ${candidate}`);
+        }
+      }
+    }
+    return fixes;
+  }, [missingAnchorRoles, dayIndices, dayFocuses, profile.objective, profile.weekly_frequency, profile.session_duration_cap_min]);
+  const durationConstrained = useMemo(() => {
+    // Duration is the constraint when a longer session would let a drafted
+    // day's menu reach a role the budget currently trims away.
+    if (missingAnchorRoles.length === 0) return false;
+    const longer = { ...profile, session_duration_cap_min: Math.min(240, profile.session_duration_cap_min + 15) };
+    const draft = dayIndices.map((dayIndex) => ({
+      dayIndex,
+      focus: (dayFocuses[dayIndex] ?? 'full') as BlockFocus,
+    }));
+    return strengthAnchorCapacity(longer, programFocuses, defaultProgramDayIndices, draft)
+      > anchorCapacity;
+  }, [missingAnchorRoles, profile, dayIndices, dayFocuses, anchorCapacity]);
   // Anchor coverage for strength: which of the big three are gated-available
   // this week, which are blocked (with reasons), and whether a local
   // prior-experience declaration would clear an ordinary capability gap
@@ -301,21 +337,34 @@ export default function ProgramSetupScreen({
 
       {strengthCapacityShort && (
         <View style={styles.card} testID="strength-capacity-warning">
-          <Text style={styles.sectionTitle}>Not enough training days for the big three</Text>
+          <Text style={styles.sectionTitle}>Your draft cannot cover all three big lifts.</Text>
           <Text style={styles.notice}>
             The big three need three lift roles a week: a squat, a horizontal push (bench), and a
             hinge (deadlift). Your drafted week covers {anchorCapacity} of those roles
             {' '}({anchorRoleNames.length === 0 ? 'none' : anchorRoleNames.join(', ')}), so the plan
             cannot include every main lift. It will not silently promise powerlifting and skip one.
           </Text>
-          {missingAnchorRoles.length > 0 && (
-            <Text style={styles.caption}>
-              Easiest fix: change one day&apos;s focus above to{' '}
-              {missingAnchorRoles.length === 1 ? missingAnchorRemedies[missingAnchorRoles[0]] : 'a focus that covers ' + missingAnchorRoles.join(' and ')}
-              {' '}— then continue, or keep a reduced-anchor plan.
+          {focusFixSuggestions.length > 0 && (
+            <Text style={styles.caption} testID="capacity-focus-fixes">
+              Capacity fix — {focusFixSuggestions.length === 1 ? 'this edit' : 'any of these edits'}
+              {' '}cover all three roles: {focusFixSuggestions.join('; ')}.
             </Text>
           )}
-          <Text style={styles.caption}>Add training days or session time above, or continue with a reduced-anchor plan.</Text>
+          {focusFixSuggestions.length === 0 && missingAnchorRoles.length > 0 && (
+            <Text style={styles.caption} testID="capacity-day-fix">
+              No single focus change covers all three roles — add a training day whose focus
+              carries {missingAnchorRoles.join(' or ')}.
+            </Text>
+          )}
+          {durationConstrained && (
+            <Text style={styles.caption} testID="capacity-duration-fix">
+              Your session length is also limiting which lifts fit in a day — you can raise it
+              later in Athlete / Profile (minutes per session).
+            </Text>
+          )}
+          <Text style={styles.caption}>
+            You can also continue with a reduced-anchor plan.
+          </Text>
         </View>
       )}
 

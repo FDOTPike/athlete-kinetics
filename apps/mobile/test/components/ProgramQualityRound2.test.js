@@ -212,13 +212,22 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     );
     expect(shaped).toBe(2); // two lower days repeat squat+hinge; push_h absent
     expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
-    // Round 5: the copy speaks in ROLES, not slot counts — it names the
-    // covered roles and the missing one with the focus change that fixes it.
+    // Round 5/6: role-based heading and body; the advice is GENERATED from
+    // simulated edits, never hand-authored role->focus claims.
+    expect(screen.getByText('Your draft cannot cover all three big lifts.')).toBeOnTheScreen();
     expect(screen.getByText(/The big three need three lift roles/)).toBeOnTheScreen();
     expect(screen.getByText(/covers 2 of those roles/)).toBeOnTheScreen();
     expect(screen.getByText(/squat, hinge \(deadlift\)/)).toBeOnTheScreen();
-    expect(screen.getByText(/Easiest fix: change one day's focus above to upper \(or full\)/)).toBeOnTheScreen();
-    expect(screen.getByText(/keep a reduced-anchor plan/)).toBeOnTheScreen();
+    // Simulated edits: with two lower days, changing either day's focus to
+    // upper (or full) covers all three roles — both are real fixes.
+    const fixLine = screen.getByTestId('capacity-focus-fixes').props.children.join('');
+    expect(fixLine).toContain("set Today's focus to upper");
+    expect(fixLine).toContain("set Day 4's focus to upper");
+    // No stale/conflicting copy (Round 6 removals).
+    expect(screen.queryByText(/Not enough training days for the big three/)).toBeNull();
+    expect(screen.queryByText(/Easiest fix/)).toBeNull();
+    expect(screen.queryByText(/Add training days or session time above/)).toBeNull();
+    expect(screen.getByText(/continue with a reduced-anchor plan/)).toBeOnTheScreen();
 
     // The persisted-profile claim would be 3 — the warning is driven by the
     // DRAFT, not the profile (the defect the auditor demonstrated).
@@ -228,6 +237,46 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     // all three roles and the warning disappears.
     fireEvent.press(screen.getAllByText('upper')[1]); // day-4 row's upper chip
     expect(screen.queryByTestId('strength-capacity-warning')).toBeNull();
+  });
+
+  test('capacity advice: a 60-minute lower day CAN be fixed by an upper day (upper fix claimed)', () => {
+    mockState.profile.objective = 'strength';
+    mockState.profile.session_duration_cap_min = 60;
+    render(<ProgramSetupScreen />);
+    fireEvent.press(screen.getByText('Coach build'));
+    fireEvent.press(screen.getByText('Duration'));
+    fireEvent.press(screen.getByText('4 wk'));
+    fireEvent.press(screen.getAllByText('Tomorrow')[0]);
+    fireEvent.press(screen.getAllByText('Day 6')[0]);
+    // 60 min -> budget 3; lower menu [squat, hinge, lunge] keeps both anchor
+    // roles, so the draft covers squat+hinge (2). Changing a day to upper
+    // adds push_h -> 3 roles: the fix IS claimable.
+    expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
+    const fixLine = screen.getByTestId('capacity-focus-fixes').props.children.join('');
+    expect(fixLine).toContain("set Today's focus to upper");
+    expect(screen.queryByTestId('capacity-day-fix')).toBeNull();
+  });
+
+  test('capacity advice: a single 15-minute lower day gets the add-a-day advice (no focus-only fix)', () => {
+    mockState.profile.objective = 'strength';
+    mockState.profile.session_duration_cap_min = 15;
+    render(<ProgramSetupScreen />);
+    fireEvent.press(screen.getByText('Coach build'));
+    fireEvent.press(screen.getByText('Duration'));
+    fireEvent.press(screen.getByText('4 wk'));
+    // The directive's scenario: ONE 15-minute lower day (drop Tomorrow,
+    // Day 4, Day 6). No single-focus day carries all three roles at a
+    // 2-slot budget, so NO focus-only edit is claimed; the advice is to
+    // add a day. (With TWO lower days an upper swap does fix it — covered
+    // by the 60-minute case above.)
+    fireEvent.press(screen.getAllByText('Tomorrow')[0]);
+    fireEvent.press(screen.getAllByText('Day 4')[0]);
+    fireEvent.press(screen.getAllByText('Day 6')[0]);
+    expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
+    expect(screen.queryByTestId('capacity-focus-fixes')).toBeNull();
+    expect(screen.getByTestId('capacity-day-fix').props.children.join(''))
+      .toContain('No single focus change covers all three roles');
+    expect(screen.getByText(/continue with a reduced-anchor plan/)).toBeOnTheScreen();
   });
 
   test('the preview renders the weekly progression summary for representative slots', () => {
