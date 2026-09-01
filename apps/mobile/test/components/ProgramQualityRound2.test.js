@@ -212,8 +212,13 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     );
     expect(shaped).toBe(2); // two lower days repeat squat+hinge; push_h absent
     expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
-    expect(screen.getByText(/Not enough training days for the big three/)).toBeOnTheScreen();
-    expect(screen.getByText(/shapes to 2 anchor slots/)).toBeOnTheScreen();
+    // Round 5: the copy speaks in ROLES, not slot counts — it names the
+    // covered roles and the missing one with the focus change that fixes it.
+    expect(screen.getByText(/The big three need three lift roles/)).toBeOnTheScreen();
+    expect(screen.getByText(/covers 2 of those roles/)).toBeOnTheScreen();
+    expect(screen.getByText(/squat, hinge \(deadlift\)/)).toBeOnTheScreen();
+    expect(screen.getByText(/Easiest fix: change one day's focus above to upper \(or full\)/)).toBeOnTheScreen();
+    expect(screen.getByText(/keep a reduced-anchor plan/)).toBeOnTheScreen();
 
     // The persisted-profile claim would be 3 — the warning is driven by the
     // DRAFT, not the profile (the defect the auditor demonstrated).

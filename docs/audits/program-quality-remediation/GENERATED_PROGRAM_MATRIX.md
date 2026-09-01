@@ -6,7 +6,7 @@ blockGenerator modules, and the store's documented input mapping. Run:
 
     PROBE_CWD=<repo path> node matrix_harness.mjs
 
-## Results: 14/14 PASS
+## Results: 16/16 PASS
 
 - **PQ-01: PASS** — anchors in week 1: Competition Squat, Competition Bench, Deadlift
 - **PQ-02: PASS** — no false anchors (0); loaded substitutes: Box Squat, Kettlebell Swing; disclosures: 3 (lower: Competition Squat unavailable for squat (capability); Box Squat planned instead)
@@ -19,8 +19,10 @@ blockGenerator modules, and the store's documented input mapping. Run:
 - **PQ-09: PASS** — max target RPE across block: 6.5 (rehab cap 7.0); label: Return to training — no medical claim
 - **PQ-10: PASS** — Bodyweight Squat occurrences: 8; equipment reason disclosed in 2 warning(s)
 - **PQ-11: PASS** — squat-pattern slots selected after knee restriction: 0 (drop with warning, never re-admitted)
-- **PQ-12: PASS** — executed component evidence: 2 PQ-12 test(s) in SessionScreen.test.js, statuses [passed, passed] (actual bodyweight reps edited from target and logged exactly)
-- **PQ-13: PASS** — executed component evidence: 1 PQ-13 test(s) in SessionScreen.test.js, statuses [passed] (untouched RPE stored as null with informational cue + verify_effort_cues.mjs)
+- **PQ-12: PASS** — invocation-scoped executed evidence (jest completed successfully): 2 PQ-12 test(s) in SessionScreen.test.js, statuses [passed, passed] (actual bodyweight reps edited from target and logged exactly)
+- **PQ-13: PASS** — invocation-scoped executed evidence (jest completed successfully): 1 PQ-13 test(s) in SessionScreen.test.js, statuses [passed] (untouched RPE stored as null with informational cue + verify_effort_cues.mjs)
+- **PQ-NEG-1: PASS** — stale-JSON probe: forced jest failure=true; pre-seeded PASS JSON present=true and would have looked passed=true; harness law rejects it (no completed invocation -> FAIL regardless of file contents)
+- **PQ-NEG-2: PASS** — concurrency probe: two per-run evidence dirs are unique (true), neither pre-exists on disk, and this run's dir was created then removed (true)
 - **PQ-14: PASS** — anchors: Competition Squat, Competition Bench, Deadlift; Bodyweight Squat occurrences: 0
 
 ### PQ-01 — strength, intermediate, full gym, big-three prior experience confirmed

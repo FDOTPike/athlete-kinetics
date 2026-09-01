@@ -117,6 +117,7 @@ export {
   BLOCK_FOCI,
   BLOCK_FOCUS_LIST,
   strengthAnchorCapacity,
+  strengthAnchorRoleNames,
   targetLoadKg,
   targetPct,
   weeklyProgressionSummary,

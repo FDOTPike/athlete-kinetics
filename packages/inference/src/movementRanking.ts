@@ -427,13 +427,24 @@ export function rankMovementsForPattern(
   // `available` directly, which let a competition lift return as a
   // hypertrophy accessory default. `defaultLoadedPool` already excludes
   // the anchor names for hypertrophy, so both role paths start there.
+  //
+  // Round 5 (owner directive): the bodybuilding contract keeps competition
+  // lifts out of DEFAULTS whenever a non-competition loaded rung exists,
+  // but the loaded-first law (WO §2.4) outranks the exclusion — if the
+  // anchor-excluded pool is EMPTY, an available compatible competition
+  // lift is the default before any bodyweight movement. Explicit
+  // preference still outranks everything.
+  const anchorExcludedLoadedPool = defaultLoadedPool.filter((c) => !isStrictlyBodyweight(c));
   const orderedLoadedPool = usePowerLaw
     ? available.filter((c) => !isStrictlyBodyweight(c))
         .sort((a, b) => orderPowerFirst([a, b], powerNames).indexOf(a.movementId)
           - orderPowerFirst([a, b], powerNames).indexOf(b.movementId))
     : slotRole?.accessorySlot === true
-      ? defaultLoadedPool.filter((c) => !isStrictlyBodyweight(c)).sort(compareAccessoryFirst)
-      : loadedAvailable;
+      ? (anchorExcludedLoadedPool.length > 0 ? anchorExcludedLoadedPool : available.filter((c) => !isStrictlyBodyweight(c)))
+          .sort(compareAccessoryFirst)
+      : (loadedAvailable.length > 0
+        ? loadedAvailable
+        : available.filter((c) => !isStrictlyBodyweight(c)).sort(compareLegacy));
   const bodyweightAvailable = available.filter(isStrictlyBodyweight)
     .sort((a, b) => a.movementId - b.movementId);
 

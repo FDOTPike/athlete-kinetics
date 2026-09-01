@@ -382,6 +382,89 @@ console.log('[P4b] accessory slots keep the bodybuilding contract');
     hypPrim.movementId === 9, JSON.stringify(hypPrim));
 }
 
+console.log('[P5] hypertrophy loaded fallback: competition lift before bodyweight');
+{
+  // Round 5 (owner directive): the bodybuilding contract excludes the big
+  // three from DEFAULTS, but if no non-competition loaded rung survives the
+  // gates, an available compatible competition lift is still a better
+  // default than bodyweight — the athlete has external load and the lift is
+  // preference-selectable. Explicit preference keeps its earlier priority.
+  const HYP_FALLBACK_POOL = [
+    { movementId: 1, name: 'Competition Squat', difficulty: 'Intermediate', required: ['barbell', 'squat_rack'], plannedImplement: undefined, capabilityAvailable: true, isCompound: true },
+    { movementId: 28, name: 'Bodyweight Squat', difficulty: 'Beginner', required: [], plannedImplement: 'Bodyweight', capabilityAvailable: true, isCompound: true },
+  ];
+  // Primary slot: no non-anchor loaded rung exists -> Competition Squat (NOT
+  // Bodyweight Squat).
+  const prim = rankMovementsForPattern(HYP_FALLBACK_POOL, baseInput({ objective: 'hypertrophy' }), 'squat');
+  check('[P5] primary hypertrophy with ONLY a competition lift available: competition lift is the default, never bodyweight',
+    prim.movementId === 1 && prim.reason === 'loaded', JSON.stringify(prim));
+  // Accessory slot: same fallback through the accessory ordering.
+  const acc = rankMovementsForPattern(HYP_FALLBACK_POOL, baseInput({ objective: 'hypertrophy' }), 'squat', { accessorySlot: true });
+  check('[P5] accessory hypertrophy with ONLY a competition lift available: competition lift before bodyweight',
+    acc.movementId === 1 && acc.reason === 'loaded', JSON.stringify(acc));
+  // Hinge variant with a bodyweight alternative: Deadlift before Glute Bridge.
+  const hinge = rankMovementsForPattern(
+    [
+      { movementId: 2, name: 'Deadlift', difficulty: 'Intermediate', required: ['barbell'], plannedImplement: undefined, capabilityAvailable: true, isCompound: true },
+      { movementId: 29, name: 'Glute Bridge', difficulty: 'Beginner', required: [], plannedImplement: 'Bodyweight', capabilityAvailable: true, isCompound: true },
+    ],
+    baseInput({ objective: 'hypertrophy' }), 'hinge', { accessorySlot: true },
+  );
+  check('[P5] accessory hypertrophy hinge: Deadlift before the bodyweight alternative',
+    hinge.movementId === 2, JSON.stringify(hinge));
+  // A non-competition loaded rung STILL outranks the competition lift (the
+  // bodybuilding contract holds whenever it can).
+  const withRDL = rankMovementsForPattern(
+    [
+      { movementId: 1, name: 'Competition Squat', difficulty: 'Intermediate', required: ['barbell', 'squat_rack'], plannedImplement: undefined, capabilityAvailable: true, isCompound: true },
+      { movementId: 55, name: 'Dumbbell Squat', difficulty: 'Beginner', required: ['dumbbells'], plannedImplement: undefined, capabilityAvailable: true, isCompound: false },
+      { movementId: 28, name: 'Bodyweight Squat', difficulty: 'Beginner', required: [], plannedImplement: 'Bodyweight', capabilityAvailable: true, isCompound: true },
+    ],
+    baseInput({ objective: 'hypertrophy' }), 'squat',
+  );
+  check('[P5] with a non-competition loaded rung available, the competition lift is still excluded from defaults',
+    withRDL.movementId === 55, JSON.stringify(withRDL));
+  // Explicit athlete preference keeps its priority above the whole law.
+  const preferred = rankMovementsForPattern(HYP_FALLBACK_POOL, baseInput({ objective: 'hypertrophy', preferredMovementIds: new Set([28]) }), 'squat');
+  check('[P5] an explicit bodyweight preference still wins over the competition-lift fallback',
+    preferred.movementId === 28 && preferred.reason === 'preference', JSON.stringify(preferred));
+}
+
+// --- [P6] capacity role names (Round 5: roles, not slot counts) -----------------
+console.log('[P6] capacity role names for the athlete-facing warning');
+{
+  const { strengthAnchorRoleNames } = require('./.build/blockGenerator.js');
+  const mk = (days, minutes) => ({
+    objective: 'strength', training_age: 'intermediate', weekly_frequency: days,
+    max_sessions_per_day: 1, session_duration_cap_min: minutes, base_rpe_cap: 9,
+    target_energy_system: 'hybrid', progression_methodology: 'autoregulated',
+    injury_flags: [], mobility_limits: [], equipment_inventory: FULL_GYM,
+  });
+  const twoLower = strengthAnchorRoleNames(mk(4, 90), programFocuses, [
+    { dayIndex: 1, focus: 'lower' }, { dayIndex: 4, focus: 'lower' },
+  ]);
+  check('[P6] two lower days carry squat + hinge (deadlift) roles only — no push role',
+    JSON.stringify(twoLower) === JSON.stringify(['squat', 'hinge (deadlift)']), JSON.stringify(twoLower));
+  const withUpper = strengthAnchorRoleNames(mk(4, 90), programFocuses, [
+    { dayIndex: 1, focus: 'lower' }, { dayIndex: 4, focus: 'upper' },
+  ]);
+  check('[P6] lower + upper covers all three roles in the stable athlete order',
+    JSON.stringify(withUpper) === JSON.stringify(['squat', 'horizontal push (bench)', 'hinge (deadlift)']), JSON.stringify(withUpper));
+  const draftWins = strengthAnchorRoleNames(mk(4, 90), programFocuses, [{ dayIndex: 1, focus: 'upper' }]);
+  check('[P6] the draft wins over the persisted profile (upper-only draft = push role only)',
+    JSON.stringify(draftWins) === JSON.stringify(['horizontal push (bench)']), JSON.stringify(draftWins));
+  // Consistency: role count always equals strengthAnchorCapacity.
+  let consistent = true;
+  for (let days = 1; days <= 7; days++) {
+    for (const minutes of [15, 90, 240]) {
+      const cap = strengthAnchorCapacity(mk(days, minutes), programFocuses, defaultProgramDayIndices);
+      const roles = strengthAnchorRoleNames(mk(days, minutes), programFocuses);
+      if (cap !== roles.length) consistent = false;
+    }
+  }
+  check('[P6] role-name count equals strengthAnchorCapacity across the 1..7-day x {15,90,240} sweep', consistent);
+}
+
 console.log('[P4c] progression summary identity (see component + generated matrix)');
 {
   // The identity fix (day_index + slot_index + movement) is pinned by the

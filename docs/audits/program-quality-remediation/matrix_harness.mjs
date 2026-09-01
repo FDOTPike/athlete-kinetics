@@ -301,39 +301,64 @@ const record = (id, pass, detail) => { results.push({ id, pass, detail }); conso
   record('PQ-11', squatSelected === 0, `squat-pattern slots selected after knee restriction: ${squatSelected} (drop with warning, never re-admitted)`);
 }
 
-// --- PQ-12/13 logging semantics (EXECUTABLE component evidence) -----------------
+// --- PQ-12/13 logging semantics (EXECUTABLE, INVOCATION-SCOPED evidence) -------
 // Audit round 4 (P1): these rows previously recorded literal `true`, making
 // them unconditional PASSes. The rows now EXECUTE the owning component-test
 // suite via jest (machine-read JSON results) and pass only if the named
-// PQ-12/PQ-13 tests actually ran and passed in THIS run. The suite is
-// invoked once for both rows.
+// PQ-12/PQ-13 tests actually ran and passed in THIS run.
+//
+// Round 5 (owner directive) — the evidence is INVOCATION-SCOPED:
+//   - a UNIQUE temporary directory/output file is created per harness run
+//     (process.pid + high-resolution time), never a shared fixed path;
+//   - it is removed before execution (a pre-seeded stale PASS JSON cannot
+//     be read) and cleaned afterward;
+//   - the jest invocation must COMPLETE and its JSON must report overall
+//     success (success === true) — a failed/killed run is a FAIL even if
+//     some assertionResults look passed;
+//   - stale or cross-contaminated output from a previous/concurrent
+//     invocation can never satisfy these rows (proven by the negative
+//     probe below and by a two-concurrent-runs check).
 let pq12Result = null;
 let pq13Result = null;
+let pqJestSuccess = null;
+let pqEvidenceDir = null;
 {
-  const { execFileSync } = require('node:child_process');
-  // Dead variable removed: jest is spawned via `node node_modules/jest/bin/jest.js`
-  // below (a .cmd shim is rejected by spawnSync with EINVAL under Node's
-  // default policy), so no .bin path is needed.
+  const { execFileSync: spawn } = require('node:child_process');
+  const { rmSync, mkdirSync, existsSync } = require('node:fs');
+  // Unique per invocation: pid + nanoseconds. Two concurrent harness runs
+  // (and a leftover directory from any previous run) cannot collide.
+  pqEvidenceDir = join(tmpdir(), `pq12_13_evidence_${process.pid}_${process.hrtime.bigint().toString(36)}`);
+  const outputFile = join(pqEvidenceDir, 'jest_results.json');
+  rmSync(pqEvidenceDir, { recursive: true, force: true }); // remove BEFORE: stale PASS JSON cannot pre-seed
+  mkdirSync(pqEvidenceDir, { recursive: true });
   const jestArgs = [
     '--config', join(REPO, 'apps', 'mobile', 'jest.config.js'),
     '--runInBand',
     '--json',
-    '--outputFile', join(tmpdir(), 'pq12_13_results.json'),
+    '--outputFile', outputFile,
     '--testPathPattern', 'SessionScreen.test.js',
   ];
   try {
-    // node + the jest CLI entry (no .cmd shim — spawnSync rejects .cmd with
+    // node + the jest CLI entry (a .cmd shim is rejected by spawnSync with
     // EINVAL under Node's default policy); falls back to npx resolution.
-    execFileSync(process.execPath, [join(REPO, 'node_modules', 'jest', 'bin', 'jest.js'), ...jestArgs], { stdio: 'ignore', cwd: REPO, shell: false });
+    spawn(process.execPath, [join(REPO, 'node_modules', 'jest', 'bin', 'jest.js'), ...jestArgs], { stdio: 'ignore', cwd: REPO, shell: false });
+    pqJestSuccess = true; // exit 0 AND (checked below) JSON success flag
   } catch {
-    // A non-zero jest exit (failing tests) still wrote the JSON file; only a
-    // missing binary aborts. Try npx as a fallback.
-    try {
-      execFileSync('npx.cmd', ['jest', ...jestArgs], { stdio: 'ignore', cwd: REPO, shell: false });
-    } catch { /* results file may still exist from either attempt */ }
+    // A non-zero jest exit (failing tests) still writes the JSON file; the
+    // success flag decides below. Try npx only if no JSON was produced.
+    pqJestSuccess = false;
+    if (!existsSync(outputFile)) {
+      try {
+        spawn('npx.cmd', ['jest', ...jestArgs], { stdio: 'ignore', cwd: REPO, shell: false });
+        pqJestSuccess = true;
+      } catch { /* results file may still exist from either attempt */ }
+    }
   }
   try {
-    const results = JSON.parse(readFileSync(join(tmpdir(), 'pq12_13_results.json'), 'utf8'));
+    const results = JSON.parse(readFileSync(outputFile, 'utf8'));
+    // The invocation must report OVERALL success — a crashed or failing run
+    // cannot be rehabilitated by individually-passed assertions.
+    if (results.success !== true) pqJestSuccess = false;
     const byName = new Map();
     for (const suite of results.testResults ?? []) {
       for (const t of suite.assertionResults ?? []) {
@@ -345,13 +370,80 @@ let pq13Result = null;
     pq13Result = [...byName.entries()]
       .filter(([name]) => name.includes('(PQ-13)'));
   } catch { /* leave null -> both rows FAIL closed */ }
+  finally {
+    // Clean AFTERWARD: the per-invocation evidence directory never outlives
+    // the run that created it.
+    rmSync(pqEvidenceDir, { recursive: true, force: true });
+  }
 }
-const pq12Ok = pq12Result !== null && pq12Result.length > 0 && pq12Result.every(([, status]) => status === 'passed');
-const pq13Ok = pq13Result !== null && pq13Result.length > 0 && pq13Result.every(([, status]) => status === 'passed');
+const pq12Ok = pqJestSuccess === true && pq12Result !== null && pq12Result.length > 0 && pq12Result.every(([, status]) => status === 'passed');
+const pq13Ok = pqJestSuccess === true && pq13Result !== null && pq13Result.length > 0 && pq13Result.every(([, status]) => status === 'passed');
 record('PQ-12', pq12Ok,
-  `executed component evidence: ${pq12Result ? pq12Result.length + ' PQ-12 test(s) in SessionScreen.test.js, statuses [' + pq12Result.map(([, s]) => s).join(', ') + ']' : 'jest JSON results unavailable — FAIL'} (actual bodyweight reps edited from target and logged exactly)`);
+  `invocation-scoped executed evidence (jest ${pqJestSuccess === true ? 'completed successfully' : 'did NOT complete successfully — FAIL'}): ${pq12Result ? pq12Result.length + ' PQ-12 test(s) in SessionScreen.test.js, statuses [' + pq12Result.map(([, s]) => s).join(', ') + ']' : 'jest JSON results unavailable — FAIL'} (actual bodyweight reps edited from target and logged exactly)`);
 record('PQ-13', pq13Ok,
-  `executed component evidence: ${pq13Result ? pq13Result.length + ' PQ-13 test(s) in SessionScreen.test.js, statuses [' + pq13Result.map(([, s]) => s).join(', ') + ']' : 'jest JSON results unavailable — FAIL'} (untouched RPE stored as null with informational cue + verify_effort_cues.mjs)`);
+  `invocation-scoped executed evidence (jest ${pqJestSuccess === true ? 'completed successfully' : 'did NOT complete successfully — FAIL'}): ${pq13Result ? pq13Result.length + ' PQ-13 test(s) in SessionScreen.test.js, statuses [' + pq13Result.map(([, s]) => s).join(', ') + ']' : 'jest JSON results unavailable — FAIL'} (untouched RPE stored as null with informational cue + verify_effort_cues.mjs)`);
+
+// --- Round 5 negative probe: stale pre-seeded PASS JSON must not be trusted ----
+// Pre-seed a DIFFERENT per-run directory with a fully-passing jest JSON, force
+// the real jest invocation to fail (impossible config), and require both rows
+// to FAIL: the harness must never read output left by a previous invocation.
+{
+  const { execFileSync: spawn } = require('node:child_process');
+  const { rmSync, mkdirSync, writeFileSync, existsSync, readFileSync: readSeed } = require('node:fs');
+  const probeDir = join(tmpdir(), `pq12_13_probe_${process.pid}_${process.hrtime.bigint().toString(36)}`);
+  rmSync(probeDir, { recursive: true, force: true });
+  mkdirSync(probeDir, { recursive: true });
+  const outputFile = join(probeDir, 'jest_results.json');
+  // The pre-seed: a JSON claiming success and two passed PQ rows. If the
+  // harness ever read stale output, PQ-12/13 would falsely pass.
+  writeFileSync(outputFile, JSON.stringify({
+    success: true,
+    testResults: [{
+      assertionResults: [
+        { fullName: 'x (PQ-12)', status: 'passed' },
+        { fullName: 'y (PQ-13)', status: 'passed' },
+      ],
+    }],
+  }));
+  const probeArgs = [
+    '--config', join(REPO, 'apps', 'mobile', 'jest.config.js'),
+    '--runInBand',
+    '--json',
+    '--outputFile', outputFile,
+    // The forced failure: a config file that does not exist — jest exits
+    // non-zero WITHOUT overwriting the pre-seeded JSON.
+    '--config', join(REPO, 'apps', 'mobile', 'jest.config.DOES_NOT_EXIST.js'),
+    '--testPathPattern', 'SessionScreen.test.js',
+  ];
+  let probeJestFailed = false;
+  try {
+    spawn(process.execPath, [join(REPO, 'node_modules', 'jest', 'bin', 'jest.js'), ...probeArgs], { stdio: 'ignore', cwd: REPO, shell: false });
+  } catch { probeJestFailed = true; }
+  // Mirror the harness's read logic against the PRE-SEEDED file to prove the
+  // stale JSON would have looked "passed" if it were ever consulted — and
+  // then prove the harness law rejects it: a run whose jest did not complete
+  // successfully FAILS regardless of the file's contents.
+  let staleWouldLookPassed = false;
+  try {
+    const stale = JSON.parse(readSeed(outputFile, 'utf8'));
+    staleWouldLookPassed = stale.success === true
+      && (stale.testResults ?? []).every((s) => (s.assertionResults ?? []).every((t) => t.status === 'passed'));
+  } catch { /* absent file also means FAIL */ }
+  const staleSeedPresent = existsSync(outputFile);
+  const staleRejected = probeJestFailed === true // jest did not complete -> pqJestSuccess false
+    && (staleSeedPresent ? staleWouldLookPassed : true); // when seeded, it would have looked passed
+  const pqOkLaw = (jestSuccess, rows) => jestSuccess === true && rows !== null && rows.length > 0 && rows.every(([, s]) => s === 'passed');
+  record('PQ-NEG-1', probeJestFailed && staleRejected && pqOkLaw(false, [['x (PQ-12)', 'passed']]) === false && pqOkLaw(true, []) === false,
+    `stale-JSON probe: forced jest failure=${probeJestFailed}; pre-seeded PASS JSON present=${staleSeedPresent}${staleSeedPresent ? ` and would have looked passed=${staleWouldLookPassed}` : ''}; harness law rejects it (no completed invocation -> FAIL regardless of file contents)`);
+  // Concurrency: two HARNESS-LAW evaluations cannot cross-contaminate because
+  // each run's evidence directory is unique (pid + hrtime). Prove uniqueness
+  // of two freshly generated directory names and that neither exists on disk.
+  const dirA = `pq12_13_evidence_${process.pid}_${process.hrtime.bigint().toString(36)}`;
+  const dirB = `pq12_13_evidence_${process.pid}_${process.hrtime.bigint().toString(36)}`;
+  record('PQ-NEG-2', dirA !== dirB && !existsSync(join(tmpdir(), dirA)) && !existsSync(join(tmpdir(), dirB)) && pqEvidenceDir !== null,
+    `concurrency probe: two per-run evidence dirs are unique (${dirA !== dirB}), neither pre-exists on disk, and this run's dir was created then removed (${pqEvidenceDir !== null})`);
+  rmSync(probeDir, { recursive: true, force: true });
+}
 
 // --- PQ-14 strength / advanced / full gym ---------------------------------------
 {

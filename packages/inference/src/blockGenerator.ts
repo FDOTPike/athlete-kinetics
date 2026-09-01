@@ -611,6 +611,37 @@ export const strengthAnchorCapacity = (
   return carriesAnchor.size;
 };
 
+/**
+ * Round 5: the ROLE NAMES (athlete-facing labels) of the distinct anchor
+ * patterns the shaped week carries, in a stable order. The setup warning
+ * uses this to speak in roles ("covers squat, hinge — missing horizontal
+ * push (bench)") rather than slot counts. Same shaping law as
+ * strengthAnchorCapacity: the draft schedule wins when present, and each
+ * focus's pattern menu is trimmed to the duration's slot budget.
+ */
+export const strengthAnchorRoleNames = (
+  profile: Pick<UserProfile, 'objective' | 'weekly_frequency' | 'session_duration_cap_min'>,
+  focusesFor: (objective: Objective, frequency: number) => readonly BlockFocus[],
+  draftDays?: readonly DraftProgramDayFocus[],
+): readonly string[] => {
+  const minutes = clamp(Math.round(profile.session_duration_cap_min), 15, 240);
+  const budget = clamp(Math.round(minutes / 22), 2, 5);
+  const carried = new Set<string>();
+  const focuses = draftDays !== undefined && draftDays.length > 0
+    ? draftDays.map((day) => day.focus)
+    : focusesFor(profile.objective, clamp(Math.round(profile.weekly_frequency), 1, 7));
+  for (const focus of focuses) {
+    const patterns = FOCUS_PATTERNS[focus].slice(0, budget);
+    for (const pattern of patterns) {
+      if (pattern === 'squat') carried.add('squat');
+      if (pattern === 'push_h') carried.add('horizontal push (bench)');
+      if (pattern === 'hinge') carried.add('hinge (deadlift)');
+    }
+  }
+  // Stable athlete-facing order: squat, horizontal push, hinge.
+  return ['squat', 'horizontal push (bench)', 'hinge (deadlift)'].filter((r) => carried.has(r));
+};
+
 // --- RPE/rep -> %1RM translation (Epley): pct = 1 / (1 + totalReps/30) ------
 /** Fraction of 1RM implied by `reps` at `rpe` (RIR = 10 - rpe). */
 export const targetPct = (reps: number, rpe: number): number => {

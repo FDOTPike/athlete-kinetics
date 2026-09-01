@@ -12,6 +12,7 @@ import {
   SPLIT_EXPLAINER_FOOTER,
   BLOCK_FOCUS_LIST,
   strengthAnchorCapacity,
+  strengthAnchorRoleNames,
   weeklyProgressionSummary,
   type BlockFocus,
   type SchemaType,
@@ -194,6 +195,22 @@ export default function ProgramSetupScreen({
     dayIndices.map((dayIndex) => ({ dayIndex, focus: dayFocuses[dayIndex] ?? 'full' })),
   ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min, dayIndices, dayFocuses]);
   const strengthCapacityShort = profile.objective === 'strength' && anchorCapacity < 3;
+  // Round 5: the warning speaks in ROLES, not slot counts — the pure export
+  // names the distinct squat/push/hinge roles the drafted week covers, and
+  // the copy names the missing role with the focus change that remedies it.
+  const anchorRoleNames = useMemo(() => strengthAnchorRoleNames(
+    profile, programFocuses,
+    dayIndices.map((dayIndex) => ({ dayIndex, focus: dayFocuses[dayIndex] ?? 'full' })),
+  ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min, dayIndices, dayFocuses]);
+  const missingAnchorRoles = useMemo(() => {
+    const ALL_ROLES = ['squat', 'horizontal push (bench)', 'hinge (deadlift)'];
+    return ALL_ROLES.filter((role) => !anchorRoleNames.includes(role));
+  }, [anchorRoleNames]);
+  const missingAnchorRemedies: Record<string, string> = {
+    squat: 'lower (or full)',
+    'horizontal push (bench)': 'upper (or full)',
+    'hinge (deadlift)': 'lower (or full)',
+  };
   // Anchor coverage for strength: which of the big three are gated-available
   // this week, which are blocked (with reasons), and whether a local
   // prior-experience declaration would clear an ordinary capability gap
@@ -286,12 +303,18 @@ export default function ProgramSetupScreen({
         <View style={styles.card} testID="strength-capacity-warning">
           <Text style={styles.sectionTitle}>Not enough training days for the big three</Text>
           <Text style={styles.notice}>
-            Big-lift strength needs three squat, push and hinge slots a week to carry the big three.
-            Your plan shapes to {anchorCapacity} anchor slot{anchorCapacity === 1 ? '' : 's'} — with{' '}
-            {dayIndices.length} session{dayIndices.length === 1 ? '' : 's'} at up to{' '}
-            {profile.session_duration_cap_min} minutes, the plan cannot include every main lift.
-            It will not silently promise powerlifting and skip one.
+            The big three need three lift roles a week: a squat, a horizontal push (bench), and a
+            hinge (deadlift). Your drafted week covers {anchorCapacity} of those roles
+            {' '}({anchorRoleNames.length === 0 ? 'none' : anchorRoleNames.join(', ')}), so the plan
+            cannot include every main lift. It will not silently promise powerlifting and skip one.
           </Text>
+          {missingAnchorRoles.length > 0 && (
+            <Text style={styles.caption}>
+              Easiest fix: change one day&apos;s focus above to{' '}
+              {missingAnchorRoles.length === 1 ? missingAnchorRemedies[missingAnchorRoles[0]] : 'a focus that covers ' + missingAnchorRoles.join(' and ')}
+              {' '}— then continue, or keep a reduced-anchor plan.
+            </Text>
+          )}
           <Text style={styles.caption}>Add training days or session time above, or continue with a reduced-anchor plan.</Text>
         </View>
       )}

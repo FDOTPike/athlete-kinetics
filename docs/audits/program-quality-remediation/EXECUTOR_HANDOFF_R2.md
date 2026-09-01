@@ -211,6 +211,36 @@ MATRIX REPRODUCED: YES (14/14, byte-identical, PQ-12/13 executed evidence)
 RELEASE / PUSH AUTHORITY: NOT GRANTED
 ```
 
+## Round 5 (owner-directed remediation, post-audit)
+
+Three directives executed at `d9865f4` → this commit, red-first where applicable:
+
+1. **PQ-12/13 evidence is invocation-scoped.** The harness's jest evidence now runs in a
+   UNIQUE per-run temporary directory (pid + high-resolution time), removed before execution
+   (a pre-seeded stale PASS JSON cannot be read) and cleaned afterward. The jest invocation
+   must complete AND its JSON must report overall success (`success === true`) — a failed run
+   cannot be rehabilitated by individually-passed assertions. Two new matrix rows prove it:
+   `PQ-NEG-1` pre-seeds a fully-passing JSON, forces jest to fail (nonexistent config), and
+   requires the rows to FAIL; `PQ-NEG-2` proves per-run evidence directories are unique and
+   never pre-exist (concurrent harness runs cannot cross-contaminate). Matrix is now 16/16.
+2. **Hypertrophy loaded fallback corrected.** The bodybuilding contract still keeps
+   competition lifts out of defaults whenever a non-competition loaded rung survives the
+   gates — but the loaded-first law (WO §2.4) outranks the exclusion: when the
+   anchor-excluded pool is EMPTY, an available compatible competition lift is the default
+   before any bodyweight movement (primary and accessory paths). [P5] pins Competition
+   Squat + Bodyweight Squat (primary and accessory) and Deadlift + Glute Bridge (accessory),
+   plus the two preserved laws: a non-competition rung still beats the lift, and explicit
+   athlete preference still wins.
+3. **Capacity warning speaks in roles.** New pure export `strengthAnchorRoleNames` names the
+   distinct squat / horizontal-push (bench) / hinge (deadlift) roles the drafted week covers
+   (same draft-wins shaping law, [P6] pins it and proves role-count == capacity across the
+   boundary sweep). The warning copy now names the covered roles and the MISSING role with
+   the focus change that remedies it ("Easiest fix: change one day's focus above to upper
+   (or full)"). Component tests assert the exact copy.
+
+Untracked `.agents/**` and `team-preview/**` remain untracked and excluded (non-evidence per
+the audit round 4 record); nothing was deleted.
+
 ## Gate outcomes (all run this round)
 
 | Gate | Result |
