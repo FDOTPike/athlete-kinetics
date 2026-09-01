@@ -511,10 +511,10 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
   }
   for (const file of fullChain) db.exec(readFileSync(join(schemaDir, file), 'utf-8'));
 
-  check('the acceptance database is the real 001-059 chain, not a trimmed subset', () => {
+  check('the acceptance database is the real 001-060 chain, not a trimmed subset', () => {
     assert.equal(fullChain[0], '001_mechanical_input.sql');
-    assert.equal(fullChain[fullChain.length - 1], '059_suspension_state_and_load_intent.sql');
-    assert.equal(fullChain.length, 58, `applied ${fullChain.length} migrations`);
+    assert.equal(fullChain[fullChain.length - 1], '060_program_goal_tier_alignment.sql');
+    assert.equal(fullChain.length, 59, `applied ${fullChain.length} migrations`);
     assert.equal(Number(db.prepare('SELECT COUNT(*) AS c FROM movement').get().c), 300);
   });
 
@@ -570,12 +570,18 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     return new Map(rows.map((row) => [row.movementId, row]));
   };
 
-  check('named competition lifts are pinned to Advanced and their gateways to Intermediate', () => {
+  // POLICY UPDATE (program-quality work order §2.3, migration 060): the
+  // competition lifts were pinned 'Advanced' by the pre-060 ratification;
+  // the owner's new explicit and bounded ruling realigns exactly those three
+  // rows to 'Intermediate' so the tier gate stops blocking an intermediate
+  // from the loaded rungs of their own chains. The 060 provenance table
+  // records the correction and the remaining Advanced rows are untouched.
+  check('named competition lifts are aligned to Intermediate by 060, with provenance and gateways intact', () => {
     for (const name of COMPETITION) {
       assert.equal(
         db.prepare('SELECT difficulty_rating AS d FROM movement_detail WHERE movement_id = ?').get(idOf(name)).d,
-        'Advanced',
-        `${name} must stay Advanced`,
+        'Intermediate',
+        `${name} must be Intermediate after the 060 alignment`,
       );
     }
     for (const name of [...CONFIRMABLE, CONTROL]) {
@@ -585,6 +591,11 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
         `${name} must stay Intermediate`,
       );
     }
+    // The correction is provenance-backed and exactly three rows wide.
+    const aligned = db.prepare(
+      'SELECT movement_name FROM movement_tier_alignment ORDER BY movement_name',
+    ).all().map((row) => row.movement_name);
+    assert.deepEqual(aligned, ['Competition Bench', 'Competition Squat', 'Deadlift']);
   });
 
   check('Sumo Deadlift is the already-available Intermediate control: no gate to clear', () => {
@@ -626,17 +637,27 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     assert.equal(onlyFrontSquat.get(ids[2]).state, 'teaching_only');
   });
 
-  check('confirmation can never unlock Competition Squat, Deadlift or Competition Bench for Intermediate', () => {
-    const ids = COMPETITION.map(idOf);
+  // POLICY UPDATE (program-quality work order §2.3/§6.3): for INTERMEDIATE the
+  // competition lifts are no longer tier-locked (060 aligned them), so plain
+  // prior-experience confirmation legitimately clears their ordinary
+  // capability edge — that is the owner-ratified route to the big three. The
+  // surviving safety property is now proven against a movement whose tier
+  // ceiling STILL binds: an Advanced difficulty row cannot be tier-unlocked by
+  // any declaration, and the same declarations DO unlock everything at
+  // Advanced age, proving the refusal is the tier ceiling and not a broken
+  // fixture.
+  const LOCKED = ['Kettlebell Pistol Squat', 'Zercher Squat', 'Power Clean'];
+  check('confirmation can never tier-unlock a still-Advanced movement for Intermediate', () => {
+    const ids = LOCKED.map(idOf);
     const confirmed = libraryVerdicts({
-      // The maximally permissive fixture: every competition lift AND every
-      // gateway declared, so only the tier ceiling can still refuse.
-      priorExperienceMovementIds: new Set([...ids, ...CONFIRMABLE.map(idOf)]),
+      // Maximally permissive fixture: every locked lift AND every gateway
+      // declared, so only the tier ceiling can still refuse.
+      priorExperienceMovementIds: new Set([...ids, ...CONFIRMABLE.map(idOf), ...COMPETITION.map(idOf)]),
     });
     for (const [index, id] of ids.entries()) {
       const verdict = confirmed.get(id);
-      assert.equal(verdict.state, 'teaching_only', `${COMPETITION[index]} must stay locked for Intermediate`);
-      assert.ok(verdict.reasons.includes('tier'), `${COMPETITION[index]} must still report the tier ceiling`);
+      assert.equal(verdict.state, 'teaching_only', `${LOCKED[index]} must stay locked for Intermediate`);
+      assert.ok(verdict.reasons.includes('tier'), `${LOCKED[index]} must still report the tier ceiling`);
     }
     // The same declarations DO unlock them once the athlete is Advanced, which
     // proves the refusal above is the tier ceiling and not a broken fixture.
@@ -645,7 +666,7 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
       priorExperienceMovementIds: new Set([...ids, ...CONFIRMABLE.map(idOf)]),
     });
     for (const [index, id] of ids.entries()) {
-      assert.equal(advanced.get(id).state, 'available', `${COMPETITION[index]} should open at Advanced`);
+      assert.equal(advanced.get(id).state, 'available', `${LOCKED[index]} should open at Advanced`);
     }
   });
 
