@@ -41,6 +41,7 @@ import {
   type EquipmentItem,
   type LoadPreference,
   type Objective,
+  type ProgressionMethod,
   type TrainingAge,
   type UserProfile,
 } from '@ak/inference';
@@ -80,6 +81,16 @@ const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
 const LOAD_PREFERENCE_COPY: Record<LoadPreference, { label: string; blurb: string }> = {
   auto: { label: 'COACH SUGGESTS', blurb: 'Targets come from your numbers and history. You can always adjust before logging.' },
   manual: { label: 'I CHOOSE', blurb: 'You set every load. Coach suggestions appear as reference only.' },
+};
+
+/** Plain-language label for each persisted progression methodology (R6,
+ * Round 2 — the review screen discloses the default like every other
+ * removed advanced default). */
+const PROGRESSION_METHOD_LABEL: Record<ProgressionMethod, string> = {
+  linear: 'Linear',
+  undulating: 'Undulating',
+  conjugate: 'Conjugate',
+  autoregulated: 'Autoregulated',
 };
 
 const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
@@ -155,6 +166,11 @@ export default function OnboardingScreen(): React.JSX.Element {
   );
   const step = steps[Math.min(stepIdx, steps.length - 1)];
   const isLast = step === 'review';
+  // R5 (Round 2, ledger 0060): the limitations decision is REQUIRED. The
+  // athlete cannot leave this screen — NEXT stays disabled — until they have
+  // explicitly chosen Yes or No. Silence is never an answer to a safety
+  // question; a skip would silently claim "no limitations" in the profile.
+  const limitsGateOpen = step === 'limits' && limitsAnswered === null;
 
   /** Truthful preset state: a preset chip reads selected only when the draft
    *  inventory is exactly that preset's bundle. */
@@ -459,13 +475,20 @@ export default function OnboardingScreen(): React.JSX.Element {
 
             {/* Coach defaults, disclosed honestly. Every value here is a safe
                 default the athlete can change later in the ATHLETE tab; the
-                fine-tuning area below is optional. */}
-            <Text style={styles.fieldLabel}>COACH DEFAULTS — EDIT ANYTIME IN ATHLETE / PROFILE</Text>
-            <Text style={styles.pDim}>
-              Effort ceiling RPE {draft.base_rpe_cap.toFixed(1)} — {effortBlurb(draft.base_rpe_cap)}
-              {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
-              {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
-            </Text>
+                fine-tuning area below is optional. Round 2 (ledger 0060)
+                adds the progression methodology so EVERY removed advanced
+                default is disclosed in one place. */}
+            <View testID="onboarding-coach-defaults">
+              <Text style={styles.fieldLabel}>
+                COACH DEFAULTS — EDIT ANYTIME IN ATHLETE / PROFILE
+              </Text>
+              <Text style={styles.pDim}>
+                Effort ceiling RPE {draft.base_rpe_cap.toFixed(1)} — {effortBlurb(draft.base_rpe_cap)}
+                {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
+                {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
+                {'\n'}Progression method: {PROGRESSION_METHOD_LABEL[draft.progression_methodology]}
+              </Text>
+            </View>
 
             {draft.training_age !== 'beginner' && (
               <View style={styles.fineTune} testID="onboarding-loads-step">
@@ -499,14 +522,17 @@ export default function OnboardingScreen(): React.JSX.Element {
             <PrimaryButton
               label="START TRAINING"
               onPress={finish}
-              accessibilityLabel="Finish setup and start training"
+              accessibilityLabel="START TRAINING"
               style={styles.startBtn}
             />
           </View>
         )}
       </ScrollView>
 
-      {/* Footer: BACK / NEXT */}
+      {/* Footer: BACK / NEXT. On the limitations screen NEXT stays disabled
+          until an explicit yes/no answer exists (R5, Round 2); the caption
+          says why, so the rule is never invisible. BACK still walks the
+          draft — an unanswered limitations screen only blocks going FORWARD. */}
       <View style={styles.footer}>
         <QuietAction
           label="BACK"
@@ -518,10 +544,19 @@ export default function OnboardingScreen(): React.JSX.Element {
           <PrimaryButton
             label="NEXT"
             onPress={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
+            disabled={limitsGateOpen}
             accessibilityLabel="Next"
           />
         )}
       </View>
+      {limitsGateOpen && (
+        <View style={styles.limitsGateNotice}>
+          <Text style={styles.pDim} accessibilityLiveRegion="polite">
+            Choose YES or NO to continue — the coach plans around limitations
+            only when you tell them.
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -561,6 +596,7 @@ const styles = StyleSheet.create({
   presetRow: { flexDirection: 'row', gap: theme.space[2], marginBottom: theme.space[3] },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   fineTune: { marginBottom: theme.space[3] },
+  limitsGateNotice: { paddingHorizontal: theme.space[3], paddingBottom: theme.space[2] },
   summaryBox: {
     backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.control,
     padding: theme.space[4], marginBottom: theme.space[4], gap: theme.space[2],

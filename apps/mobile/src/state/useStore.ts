@@ -1855,6 +1855,29 @@ const chainPlanningInputs = (d: DB): Map<number, { group: string; bar?: number }
   return out;
 };
 
+/** R1 (Round 2, ledger 0060): the owner-curated POWER movement names — the
+ * movement_lift_family rows whose preferred_purpose is 'speed' (migration
+ * 052). Read ONCE per generation and handed to the pure engine as typed
+ * input; the engine never queries the database (work order §7.3 law) and
+ * never re-derives the classification. Absent table/rows -> empty list =
+ * no power preference (byte-stable for every pre-052 corpus). */
+const powerPreferredMovementNames = (d: DB): string[] => {
+  try {
+    const rows = rowsOf<{ name: string }>(d.executeSync(
+      `SELECT m.name AS name
+         FROM movement_lift_family mlf
+         JOIN movement m ON m.movement_id = mlf.movement_id
+        WHERE mlf.preferred_purpose = 'speed'
+        ORDER BY m.movement_id`,
+    ));
+    return rows.map((r) => r.name);
+  } catch {
+    // A corpus predating 052 has no table; fail open to "no preference"
+    // because absence of curated data is NOT a gate.
+    return [];
+  }
+};
+
 /** The open suspension episode, or null. `is_suspended` is DERIVED here and
  *  never stored (058), so a flag and a history cannot drift apart. */
 const openSuspension = (d: DB): { episode_id: number; frozen_macro_index: number } | null =>
@@ -3038,6 +3061,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
     }
     const chainInputs = chainPlanningInputs(d);
+    const powerNames = powerPreferredMovementNames(d);
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id, name: m.name, pattern: m.pattern as MovementPattern,
       is_compound: m.is_compound, required: m.required, difficulty: m.difficulty,
@@ -3070,6 +3094,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       profile: effectiveProfile, movements: genMovements, startDate,
       schemaType: input.schemaType, macroBlockIndex,
       programDays: shape.programDays,
+      powerPreferredMovementNames: powerNames,
     });
     return {
       objective: planningProfile.objective, startDate, requestedReviewDate: shape.requestedReviewDate,
@@ -3160,6 +3185,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
     );
     const chainInputs = chainPlanningInputs(d);
+    const powerNamesGenerate = powerPreferredMovementNames(d);
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id,
       name: m.name,
@@ -3261,6 +3287,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       macroBlockIndex,
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
       flawReport,
+      powerPreferredMovementNames: powerNamesGenerate,
     });
     d.executeSync('BEGIN');
     try {

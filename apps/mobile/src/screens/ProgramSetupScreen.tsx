@@ -4,12 +4,15 @@ import {
   accessContextForBlockFocus,
   ANCHOR_MOVEMENT_NAMES,
   objectiveStyleLabel,
+  powerObjectiveExplanation,
   SELECTABLE_SCHEMA_TYPES,
   defaultProgramDayIndices,
   programFocuses,
   splitExplainer,
   SPLIT_EXPLAINER_FOOTER,
   BLOCK_FOCUS_LIST,
+  strengthAnchorCapacity,
+  weeklyProgressionSummary,
   type BlockFocus,
   type SchemaType,
 } from '@ak/inference';
@@ -173,10 +176,20 @@ export default function ProgramSetupScreen({
   // beside the raw persisted objective so the label can never silently
   // misrepresent the split actually scheduled.
   const styleLabel = objectiveStyleLabel(profile.objective);
-  // Strength anchor capacity (WO §2.5): fewer than three weekly plan slots
-  // cannot carry squat + bench + deadlift anchors. This must be visible
-  // BEFORE creation, with the choice to add days or accept the reduction.
-  const strengthCapacityShort = profile.objective === 'strength' && dayIndices.length < 3;
+  // R1 (Round 2, ledger 0060): the POWER explanation. Athletic power is
+  // explosive-force work — the coach plans fast, speed-purpose rungs of the
+  // big lifts (the curated 'speed' rows) and keeps every gate intact. The
+  // copy states the tier law plainly: olympic-lift competition movements are
+  // Advanced-tier and appear only for athletes whose tier admits them.
+  const powerExplanation = profile.objective === 'power';
+  // Strength anchor capacity (WO §2.5), Round 2 R4: the disclosed number is
+  // the PURE shaped-slot calculation (squat / horizontal-push / hinge slots
+  // after the duration and focus shaping), not a raw day-count heuristic.
+  // Fewer than three anchor-capable slots cannot carry the big three.
+  const anchorCapacity = useMemo(() => strengthAnchorCapacity(
+    profile, programFocuses, defaultProgramDayIndices,
+  ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min]);
+  const strengthCapacityShort = profile.objective === 'strength' && anchorCapacity < 3;
   // Anchor coverage for strength: which of the big three are gated-available
   // this week, which are blocked (with reasons), and whether a local
   // prior-experience declaration would clear an ordinary capability gap
@@ -212,6 +225,24 @@ export default function ProgramSetupScreen({
   const rankingNotes = previewResult.preview?.plan.warnings.filter((w) =>
     w.includes('unavailable for') || w.includes('no loaded')) ?? [];
 
+  // R3 (Round 2, ledger 0060): the weekly progression summary rendered in the
+  // ACTUAL preview. The pure classifier explains the week-1 -> 2 and
+  // week-3 -> 4 (deload) changes for every representative slot of the
+  // generated plan — the same function the evidence harness prints.
+  const progressionSummary = useMemo(() => {
+    if (previewResult.preview === null) return [];
+    const bodyweightNames = new Set((movements ?? [])
+      .filter((m) => (m.supportedPrefixes ?? []).length === 1 && m.supportedPrefixes[0] === 'Bodyweight')
+      .map((m) => m.movement_id));
+    return weeklyProgressionSummary(
+      previewResult.preview.plan,
+      (movementId) => {
+        const m = (movements ?? []).find((item) => item.movement_id === movementId);
+        return m ? { name: m.name, bodyweight: bodyweightNames.has(m.movement_id) } : undefined;
+      },
+    );
+  }, [previewResult.preview, movements]);
+
   // First unmet requirement for enabling Create program, in the order the form
   // asks for them. Rendered next to the disabled button so the rule is never
   // enforced invisibly.
@@ -232,16 +263,28 @@ export default function ProgramSetupScreen({
         Goal: {profile.objective.replace('_', ' ')} — {styleLabel}. Four-week blocks stay intact. You choose when to review the goal.
       </Text>
 
+      {powerExplanation && (
+        <View style={styles.card} testID="power-explanation-card">
+          <Text style={styles.sectionTitle}>How athletic power works here</Text>
+          <Text style={styles.notice}>{powerObjectiveExplanation('power')}</Text>
+          <Text style={styles.caption}>
+            Fast barbell, kettlebell and jump-style alternatives are planned until your training
+            history supports the competition olympic lifts.
+          </Text>
+        </View>
+      )}
+
       {strengthCapacityShort && (
         <View style={styles.card} testID="strength-capacity-warning">
           <Text style={styles.sectionTitle}>Not enough training days for the big three</Text>
           <Text style={styles.notice}>
-            Big-lift strength needs at least three weekly sessions to carry squat, bench press and
-            deadlift anchors. With {dayIndices.length} session{dayIndices.length === 1 ? '' : 's'} a week
-            the plan cannot include every main lift — it will not silently promise powerlifting and
-            skip one.
+            Big-lift strength needs three squat, push and hinge slots a week to carry the big three.
+            Your plan shapes to {anchorCapacity} anchor slot{anchorCapacity === 1 ? '' : 's'} — with{' '}
+            {dayIndices.length} session{dayIndices.length === 1 ? '' : 's'} at up to{' '}
+            {profile.session_duration_cap_min} minutes, the plan cannot include every main lift.
+            It will not silently promise powerlifting and skip one.
           </Text>
-          <Text style={styles.caption}>Add training days above, or continue with a reduced-anchor plan.</Text>
+          <Text style={styles.caption}>Add training days or session time above, or continue with a reduced-anchor plan.</Text>
         </View>
       )}
 
@@ -410,6 +453,14 @@ export default function ProgramSetupScreen({
 
       {(localError ?? previewResult.error ?? storeError) !== null && (
         <Text style={styles.error}>{localError ?? previewResult.error ?? storeError}</Text>
+      )}
+      {progressionSummary.length > 0 && (
+        <View style={styles.card} testID="weekly-progression-summary">
+          <Text style={styles.sectionTitle}>How the weeks progress</Text>
+          {progressionSummary.map((line, index) => (
+            <Text key={`${index}:${line}`} style={styles.caption}>{line}</Text>
+          ))}
+        </View>
       )}
       {rankingNotes.length > 0 && (
         <View style={styles.card} testID="ranking-notes-card">

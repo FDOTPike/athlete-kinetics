@@ -269,12 +269,23 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   const retreat = (count) => {
     for (let i = 0; i < count; i += 1) fireEvent.press(screen.getByLabelText('Back'));
   };
+  // Round 2 (ledger 0060): the limitations screen requires an explicit
+  // no/yes answer BEFORE NEXT enables — a full walk to review must answer
+  // it. Helpers that pass through the limits screen press the explicit No.
+  const advanceAnsweringLimits = (count, fromStep) => {
+    for (let i = 0; i < count; i += 1) {
+      fireEvent.press(screen.getByLabelText('Next'));
+      if (fromStep + i === 4) { // arriving at limits (0-based step 5)
+        fireEvent.press(screen.getByLabelText('No, nothing to note'));
+      }
+    }
+  };
 
   test('onboarding omits the load question for beginners and explains first-use history on summary', () => {
     render(<OnboardingScreen />);
     advance(2);
     fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
-    advance(4); // beginner flow is 7 screens; review is the 7th
+    advanceAnsweringLimits(4, 2); // beginner flow is 7 screens; review is the 7th
 
     expect(screen.queryByTestId('onboarding-loads-step')).toBeNull();
     expect(screen.getByTestId('onboarding-summary-loads-row').props.children)
@@ -285,7 +296,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<OnboardingScreen />);
     advance(2);
     fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
-    advance(4);
+    advanceAnsweringLimits(4, 2);
     expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
 
     // Press the already-selected default: this is now an explicit athlete
@@ -293,7 +304,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByTestId('onboarding-loads-auto'));
     retreat(4);
     fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
-    advance(4);
+    advanceAnsweringLimits(4, 2);
 
     expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
     expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(false);
@@ -303,14 +314,14 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<OnboardingScreen />);
     advance(2);
     fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
-    advance(4);
+    advanceAnsweringLimits(4, 2);
     expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
 
     // No load chip was pressed, so the intermediate auto value is only a
     // default. Advanced must independently derive its manual default.
     retreat(4);
     fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
-    advance(4);
+    advanceAnsweringLimits(4, 2);
 
     expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(true);
     expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(false);
@@ -398,7 +409,13 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     for (const retired of ['HOW HARD SHOULD HARD DAYS GET?', 'THE SCIENCE BITS', 'WHO PICKS THE WEIGHTS?', 'MAX SESSIONS IN ONE DAY', 'HOW LONG IS A SESSION?']) {
       expect(screen.queryByText(retired)).toBeNull();
     }
-    for (let i = 0; i < 3; i += 1) fireEvent.press(screen.getByLabelText('Next'));
+    fireEvent.press(screen.getByLabelText('Next')); // equipment
+    // Round 2: NEXT is disabled on limitations until an explicit answer.
+    fireEvent.press(screen.getByLabelText('Next')); // limits
+    expect(screen.getByLabelText('Next')).toBeDisabled();
+    fireEvent.press(screen.getByLabelText('No, nothing to note'));
+    expect(screen.getByLabelText('Next')).not.toBeDisabled();
+    fireEvent.press(screen.getByLabelText('Next'));
     expect(screen.getByLabelText('Step 7 of 7')).toBeOnTheScreen();
   });
 
@@ -438,7 +455,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<OnboardingScreen />);
     advance(2);
     fireEvent.press(screen.getByLabelText(/SOME MILEAGE/));
-    advance(4); // review
+    advanceAnsweringLimits(4, 2); // review
     expect(screen.getByTestId('onboarding-loads-step')).toBeOnTheScreen();
     expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
     fireEvent.press(screen.getByTestId('onboarding-loads-manual'));
