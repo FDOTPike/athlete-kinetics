@@ -244,6 +244,29 @@ the audit round 4 record); nothing was deleted. Accurate inventory at the Round 
 and `docs/audits/program-quality-remediation/team-preview/` — preserved exactly as received,
 staged by nothing, referenced by committed docs only as non-evidence.
 
+## Round 6 (owner-directed micro-fix — copy/UI only)
+
+No programming or evidence logic modified. Three changes in ProgramSetupScreen.tsx and its
+component test (commit `8ef5728`):
+
+1. The capacity heading is role-based: "Your draft cannot cover all three big lifts."
+2. The advice is GENERATED from actual capacity-improving edits: each drafted day's focus is
+   simulated across every focus and only edits that raise the distinct-role count to all
+   three are named, using the day's real name ("set Today's focus to upper", …). When no
+   focus-only edit succeeds the advice becomes "add a training day whose focus carries
+   <missing role>"; when session duration is the constraint (a +15-minute simulation raises
+   capacity) the athlete is directed to the real Athlete / Profile session-length setting.
+   The reduced-anchor choice is always retained.
+3. The obsolete unconditional caption is removed, and no copy says "above" — the day/focus
+   controls render below the warning card.
+
+Component tests added for the four mandated scenarios: two lower days (upper fix named for
+both days), one 60-minute lower day (upper fix claimed — budget 3 keeps lower's both roles),
+one 15-minute lower day (no focus-only fix claimed → add-a-day advice), and
+obsolete/conflicting copy asserted absent. Gates: targeted suites 127/127, verify:blocks ALL
+CHECKS PASSED, typecheck exit 0, verify:components 19 suites / 249 tests, git diff --check
+clean.
+
 ## Gate outcomes (all run this round)
 
 | Gate | Result |
