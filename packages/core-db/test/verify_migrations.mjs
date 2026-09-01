@@ -411,8 +411,6 @@ check('026 failure rolls both side-cars and all six triggers back atomically',
 runMigrations(phase18Rollback, MIGRATIONS);
 check('026 retry with the valid migration completes',
   uv(phase18Rollback) === MIGRATIONS.length && sentinelsMissing(phase18Rollback).length === 0);
-// --- 3. failing migration: fail fast, recover on retry --------------------------
-console.log('[3] failing migration mid-chain (the device "ln" scenario)');
 // --- 2h. 034 autopilot attribution side-car: replay, exact rows, cascade ---
 console.log('[2h] 034 autopilot attribution side-car');
 const attributionDb = freshDb();
@@ -526,6 +524,8 @@ console.log('[2i] 058 suspension episode invariants');
   check('self-heal restores the dropped 058 table',
     !sentinelsMissing(suspensionDb).includes('suspension_episode'));
 }
+// --- 3. failing migration: fail fast, recover on retry --------------------------
+console.log('[3] failing migration mid-chain (the device "ln" scenario)');
 const c = freshDb();
 const broken = [...MIGRATIONS];
 broken[2] = 'CREATE TABLE will_fail (x INTEGER); SELECT no_such_fn(1);';

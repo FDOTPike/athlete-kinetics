@@ -92,7 +92,7 @@ function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): strin
   }`;
 }
 
-const AUTOPILOT_BUDGET_NOTE = 'Autopilot effort nudges are limited to the first five blocks of each cycle.';
+const AUTOPILOT_BUDGET_NOTE = 'Autopilot still eases effort and adjusts sets whenever your sessions call for it. Only upward RPE moves are rationed, and those grants are spent over the first five blocks of each cycle.';
 
 function autopilotExplanation(slot: TodaySlot): string | null {
   if (slot.autopilot === undefined) return null;
@@ -497,7 +497,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             <Pressable
               onPress={() => setMacroBudgetOpen((open) => !open)}
               accessibilityRole="button"
-              accessibilityLabel="Why effort is held steady"
+              accessibilityLabel="Why RPE is held steady"
               accessibilityState={{ expanded: macroBudgetOpen }}
             >
               <Text style={styles.attributionMarker}>·</Text>

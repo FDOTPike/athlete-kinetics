@@ -1,9 +1,20 @@
 'use strict';
 
+const path = require('path');
+
+// Resolve the component-test directory once, with FORWARD slashes. Jest's
+// `<rootDir>` substitution on Windows leaves backslash-dot sequences intact
+// (e.g. `Athlete App\.worktrees`), and micromatch reads backslash-dot as an
+// ESCAPED dot — so a testMatch built as `<rootDir>/test/components/...` matches
+// zero files whenever the checkout path contains a dot-directory (any git
+// worktree under `.worktrees/` or `.claude/worktrees/`). Normalizing the
+// absolute path to forward slashes makes the pattern location-independent.
+const testComponentsDir = path.join(__dirname, 'test', 'components').split(path.sep).join('/');
+
 module.exports = {
   preset: 'react-native',
   rootDir: __dirname,
-  testMatch: ['<rootDir>/test/components/**/*.test.js'],
+  testMatch: [`${testComponentsDir}/**/*.test.js`],
   transform: {
     '^.+\\.(js|ts|tsx)$': ['babel-jest', { babelrc: false, configFile: false, presets: ['module:@react-native/babel-preset'] }],
   },
