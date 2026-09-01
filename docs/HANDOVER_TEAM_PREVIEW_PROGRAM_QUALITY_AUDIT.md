@@ -12,8 +12,8 @@ Start an independent Team Preview audit of the frozen program-quality candidate.
 - **Worktree:** C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\program-quality-remediation
 - **Branch:** codex/program-quality-remediation
 - **Required product ancestor:** 965492e02184e07ddab20391740f10a694bd9149
-- **Frozen candidate SHA:** cfbcf67e6b810bfb2e7793cf92980bff3f04d3d6
-- **Candidate tree SHA:** 13caa7ca3decd83e3dc0438372898cd9e69c5faf
+- **Frozen candidate SHA:** cfbcf67e6b810bfb2e7793cf92980bff3f04d3d6 — the implementation freeze. Docs-only commits (PROMPT_LEDGER.md Entry 0059 close, this handover's completion, and the three evidence files) land ABOVE the freeze; the reviewer MUST verify `git diff --name-only cfbcf67e6b810bfb2e7793cf92980bff3f04d3d6..HEAD` touches only PROMPT_LEDGER.md and docs/, i.e. no code changes after the freeze. Audit HEAD for the docs and cfbcf67 for the code.
+- **Candidate tree SHA:** 13caa7ca3decd83e3dc0438372898cd9e69c5faf (tree of the implementation freeze)
 - **Base for review diff:** 71b1a2f0ad75bc71b1ecbc5cada06f8ecec27c58 (docs-only handoff-definition commit; the product ancestor 965492e is its parent and remains the required ancestor)
 - **Executor:** GLM-5.3 Flash (z-ai/glm-5.3-flash via nous), Hermes Agent session, 2026-09-01
 - **Executor effort:** High
