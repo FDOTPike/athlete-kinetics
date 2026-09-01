@@ -42,7 +42,7 @@ import { isDifficultyAllowed, type ExecutableMovementAccessContext } from './tie
 // passed the equipment, tier, safety, capability and attestation gates; it
 // can never re-admit a rejected candidate. Explicit athlete preferences keep
 // their separate, earlier precedence in the slot loop below.
-import { rankMovementsForPattern, type RankingCandidate } from './movementRanking';
+import { rankMovementsForPattern, type RankingCandidate, type RankingGate } from './movementRanking';
 // Phase 13 Step 4 — the Block Generator Intercept: the generator imports the
 // autopilot controller and applies its forward-looking corrections to the next
 // block (a recorded halt snaps the whole block to a recovery template).
@@ -726,6 +726,13 @@ export function generateBlock(input: BlockInput): BlockPlan {
       const pool = tierPool.filter((movement) =>
         capabilityAvailableForContext(movement, accessContext));
       const patterns = FOCUS_PATTERNS[focus].slice(0, slotBudget);
+      // W3: gate-reason visibility for the ranking default. equipAvailableIds
+      // and tierAvailableIds are computed once per session; a movement outside
+      // the equipment pool is reported to the ranker as equipment-excluded, so
+      // a bodyweight fallback can honestly name the gate that removed every
+      // loaded option.
+      const equipAvailableIds = new Set(equipPool.map((m) => m.movement_id));
+      const tierAvailableIds = new Set(tierPool.map((m) => m.movement_id));
 
       // Working sets: objective scheme + macro phase + schema row, damped for
       // hybrid strength days (interference) and beginners, +1 for elites.
@@ -815,23 +822,36 @@ export function generateBlock(input: BlockInput): BlockPlan {
         const scopeMovement = preferredMovement === undefined && scopeSlot === slotIdx
           ? pickScoped(pool, 'full_body', usedIds) ?? undefined
           : undefined;
-        // W3: the pure ranking default. Only candidates the gates already
-        // admitted reach it (capability_available_* true in this context),
-        // so it can never re-admit a rejected movement; it re-checks the
-        // gates from raw inputs as a belt-and-braces invariant.
-        const rankingCandidates: readonly RankingCandidate[] = pool
+        // W3: the pure ranking default. The ranker sees EVERY movement of the
+        // pattern WITH its gate report — equipment (outside equipPool), tier
+        // (outside tierPool), and the shared capability verdict — so a blocked
+        // anchor or a loaded rung removed by a gate is visible to it and the
+        // fallback reasons/substitute disclosures can name the gate. It
+        // re-checks every gate from raw inputs, so a rejected candidate is
+        // still never re-admitted.
+        const rankingCandidates: readonly RankingCandidate[] = input.movements
           .filter((candidate) => candidate.pattern === pattern && !usedIds.has(candidate.movement_id))
-          .map((candidate) => ({
-            movementId: candidate.movement_id,
-            name: candidate.name,
-            difficulty: candidate.difficulty ?? 'Beginner',
-            required: candidate.required,
-            plannedImplement: candidate.plannedImplement,
-            capabilityAvailable: true,
-            isCompound: candidate.is_compound,
-            beginnerOk: candidate.beginner_ok,
-            sportTracking: candidate.sportTracking,
-          }));
+          .map((candidate) => {
+            const capOk = capabilityAvailableForContext(candidate, accessContext);
+            const equipOk = equipAvailableIds.has(candidate.movement_id);
+            const tierOk = tierAvailableIds.has(candidate.movement_id);
+            const excludedBy: RankingGate[] = [];
+            if (!equipOk) excludedBy.push('equipment');
+            if (!tierOk && equipOk) excludedBy.push('tier');
+            if (!capOk) excludedBy.push('capability');
+            return {
+              movementId: candidate.movement_id,
+              name: candidate.name,
+              difficulty: candidate.difficulty ?? 'Beginner',
+              required: candidate.required,
+              plannedImplement: candidate.plannedImplement,
+              capabilityAvailable: equipOk && tierOk && capOk,
+              excludedBy,
+              isCompound: candidate.is_compound,
+              beginnerOk: candidate.beginner_ok,
+              sportTracking: candidate.sportTracking,
+            };
+          });
         const ranking = rankMovementsForPattern(rankingCandidates, {
           trainingAge: profile.training_age,
           objective: profile.objective,
@@ -850,7 +870,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
         // loaded substitute; when the default is strictly bodyweight, name
         // the gates that removed every loaded option.
         if (m !== null && m.movement_id === ranking.movementId && ranking.substituteId !== null) {
-          sessionRankingNotes.add(`${focus}: ${ranking.substituteAnchorName} unavailable for ${pattern} (${(ranking.blockersById[ranking.substituteId] ?? []).join('/')}); ${ranking.name} planned instead`);
+          sessionRankingNotes.add(`${focus}: ${ranking.substituteAnchorName} unavailable for ${pattern} (${(ranking.blockersById[ranking.substituteAnchorId ?? 0] ?? []).join('/')}); ${ranking.name} planned instead`);
         }
         if (m !== null && m.movement_id === ranking.movementId && ranking.reason === 'bodyweight' && ranking.blockers.length > 0) {
           sessionRankingNotes.add(`${focus}: ${ranking.name} planned — no loaded ${pattern} is available (blocked: ${ranking.blockers.join('/')})`);

@@ -109,6 +109,8 @@ export interface MovementRanking {
   readonly substituteId: number | null;
   /** The NAME of the blocked anchor a substitute stands in for. */
   readonly substituteAnchorName: string | null;
+  /** The movementId of the blocked anchor a substitute stands in for. */
+  readonly substituteAnchorId: number | null;
 }
 
 /** The big-three anchor NAMES (authored keys in 010/016; ids are corpus
@@ -234,6 +236,7 @@ export function rankMovementsForPattern(
       blockersById,
       substituteId: null,
       substituteAnchorName: null,
+      substituteAnchorId: null,
     };
   }
 
@@ -253,6 +256,7 @@ export function rankMovementsForPattern(
         blockersById,
         substituteId: null,
         substituteAnchorName: null,
+      substituteAnchorId: null,
       };
     }
     return {
@@ -264,6 +268,7 @@ export function rankMovementsForPattern(
       blockersById,
       substituteId: null,
       substituteAnchorName: null,
+      substituteAnchorId: null,
     };
   }
 
@@ -299,6 +304,7 @@ export function rankMovementsForPattern(
       blockersById,
       substituteId: null,
       substituteAnchorName: null,
+      substituteAnchorId: null,
     };
   }
 
@@ -318,6 +324,7 @@ export function rankMovementsForPattern(
       blockersById,
       substituteId: blockedAnchor !== undefined ? chosenLoaded.movementId : null,
       substituteAnchorName: blockedAnchor?.name ?? null,
+      substituteAnchorId: blockedAnchor?.movementId ?? null,
     };
   }
 
@@ -337,6 +344,7 @@ export function rankMovementsForPattern(
       blockersById,
       substituteId: null,
       substituteAnchorName: null,
+      substituteAnchorId: null,
     };
   }
   const blockerSet = new Set<RankingGate>();
@@ -354,6 +362,7 @@ export function rankMovementsForPattern(
     blockersById,
     substituteId: null,
     substituteAnchorName: null,
+      substituteAnchorId: null,
   };
 }
 
