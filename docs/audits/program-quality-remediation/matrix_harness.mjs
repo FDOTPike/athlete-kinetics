@@ -311,7 +311,9 @@ let pq12Result = null;
 let pq13Result = null;
 {
   const { execFileSync } = require('node:child_process');
-  const jestBin = join(REPO, 'node_modules', '.bin', 'jest.cmd');
+  // Dead variable removed: jest is spawned via `node node_modules/jest/bin/jest.js`
+  // below (a .cmd shim is rejected by spawnSync with EINVAL under Node's
+  // default policy), so no .bin path is needed.
   const jestArgs = [
     '--config', join(REPO, 'apps', 'mobile', 'jest.config.js'),
     '--runInBand',

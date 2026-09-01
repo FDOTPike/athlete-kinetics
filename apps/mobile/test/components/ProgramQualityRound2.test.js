@@ -195,10 +195,6 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
 
   test('the capacity warning follows the DRAFT schedule and counts distinct anchor roles (audit round 4)', () => {
     mockState.profile.objective = 'strength';
-    // The auditor's exact scenario: a four-day profile drafted down to one
-    // 15-minute session. The persisted profile would claim 3 roles; the
-    // DRAFT (one lower day, budget 2 = squat only at 15 min) claims 1 < 3,
-    // so the warning MUST appear.
     // The auditor's scenario: a four-day profile drafted down to fewer
     // sessions. Default draft is [1 lower, 4 lower, 6 upper] (3 roles, no
     // warning). Drop Tomorrow and Day 6 -> draft [1 lower, 4 lower]: the
