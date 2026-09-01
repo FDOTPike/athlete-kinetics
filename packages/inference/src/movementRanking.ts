@@ -421,12 +421,18 @@ export function rankMovementsForPattern(
   //   - accessory slots (R2): non-compound candidates first, so the dose
   //     role and the movement class stay visibly aligned;
   //   - otherwise the legacy law, byte-stable.
+  //
+  // Audit round 4 (P1): the accessory branch must sort the SAME
+  // objective-excluded pool the primary path uses. It previously sorted
+  // `available` directly, which let a competition lift return as a
+  // hypertrophy accessory default. `defaultLoadedPool` already excludes
+  // the anchor names for hypertrophy, so both role paths start there.
   const orderedLoadedPool = usePowerLaw
     ? available.filter((c) => !isStrictlyBodyweight(c))
         .sort((a, b) => orderPowerFirst([a, b], powerNames).indexOf(a.movementId)
           - orderPowerFirst([a, b], powerNames).indexOf(b.movementId))
     : slotRole?.accessorySlot === true
-      ? available.filter((c) => !isStrictlyBodyweight(c)).sort(compareAccessoryFirst)
+      ? defaultLoadedPool.filter((c) => !isStrictlyBodyweight(c)).sort(compareAccessoryFirst)
       : loadedAvailable;
   const bodyweightAvailable = available.filter(isStrictlyBodyweight)
     .sort((a, b) => a.movementId - b.movementId);

@@ -15,6 +15,7 @@
 import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -300,9 +301,55 @@ const record = (id, pass, detail) => { results.push({ id, pass, detail }); conso
   record('PQ-11', squatSelected === 0, `squat-pattern slots selected after knee restriction: ${squatSelected} (drop with warning, never re-admitted)`);
 }
 
-// --- PQ-12/13 logging semantics (component-proof references) --------------------
-record('PQ-12', true, 'actual bodyweight reps edited from target and logged exactly — SessionScreen.test.js "bodyweight actual reps initialize from the plan, edit, and reach logSet unchanged (PQ-12)"');
-record('PQ-13', true, 'untouched RPE stored as null with informational cue — SessionScreen.test.js "untouched RPE stays null and shows its plain-language cue (PQ-13)" + verify_effort_cues.mjs');
+// --- PQ-12/13 logging semantics (EXECUTABLE component evidence) -----------------
+// Audit round 4 (P1): these rows previously recorded literal `true`, making
+// them unconditional PASSes. The rows now EXECUTE the owning component-test
+// suite via jest (machine-read JSON results) and pass only if the named
+// PQ-12/PQ-13 tests actually ran and passed in THIS run. The suite is
+// invoked once for both rows.
+let pq12Result = null;
+let pq13Result = null;
+{
+  const { execFileSync } = require('node:child_process');
+  const jestBin = join(REPO, 'node_modules', '.bin', 'jest.cmd');
+  const jestArgs = [
+    '--config', join(REPO, 'apps', 'mobile', 'jest.config.js'),
+    '--runInBand',
+    '--json',
+    '--outputFile', join(tmpdir(), 'pq12_13_results.json'),
+    '--testPathPattern', 'SessionScreen.test.js',
+  ];
+  try {
+    // node + the jest CLI entry (no .cmd shim — spawnSync rejects .cmd with
+    // EINVAL under Node's default policy); falls back to npx resolution.
+    execFileSync(process.execPath, [join(REPO, 'node_modules', 'jest', 'bin', 'jest.js'), ...jestArgs], { stdio: 'ignore', cwd: REPO, shell: false });
+  } catch {
+    // A non-zero jest exit (failing tests) still wrote the JSON file; only a
+    // missing binary aborts. Try npx as a fallback.
+    try {
+      execFileSync('npx.cmd', ['jest', ...jestArgs], { stdio: 'ignore', cwd: REPO, shell: false });
+    } catch { /* results file may still exist from either attempt */ }
+  }
+  try {
+    const results = JSON.parse(readFileSync(join(tmpdir(), 'pq12_13_results.json'), 'utf8'));
+    const byName = new Map();
+    for (const suite of results.testResults ?? []) {
+      for (const t of suite.assertionResults ?? []) {
+        byName.set(t.fullName ?? t.title, t.status);
+      }
+    }
+    pq12Result = [...byName.entries()]
+      .filter(([name]) => name.includes('(PQ-12)'));
+    pq13Result = [...byName.entries()]
+      .filter(([name]) => name.includes('(PQ-13)'));
+  } catch { /* leave null -> both rows FAIL closed */ }
+}
+const pq12Ok = pq12Result !== null && pq12Result.length > 0 && pq12Result.every(([, status]) => status === 'passed');
+const pq13Ok = pq13Result !== null && pq13Result.length > 0 && pq13Result.every(([, status]) => status === 'passed');
+record('PQ-12', pq12Ok,
+  `executed component evidence: ${pq12Result ? pq12Result.length + ' PQ-12 test(s) in SessionScreen.test.js, statuses [' + pq12Result.map(([, s]) => s).join(', ') + ']' : 'jest JSON results unavailable — FAIL'} (actual bodyweight reps edited from target and logged exactly)`);
+record('PQ-13', pq13Ok,
+  `executed component evidence: ${pq13Result ? pq13Result.length + ' PQ-13 test(s) in SessionScreen.test.js, statuses [' + pq13Result.map(([, s]) => s).join(', ') + ']' : 'jest JSON results unavailable — FAIL'} (untouched RPE stored as null with informational cue + verify_effort_cues.mjs)`);
 
 // --- PQ-14 strength / advanced / full gym ---------------------------------------
 {

@@ -255,35 +255,36 @@ console.log('[P3] pure strength anchor capacity over shaped plan slots');
     injury_flags: [], mobility_limits: [], equipment_inventory: FULL_GYM,
   });
 
-  // The law: capacity = the count of squat/push_h/hinge SLOTS in the shaped
-  // week. lower carries squat+hinge (2), upper carries push_h (1), full
-  // carries squat+hinge then push_h (3) — always trimmed to the duration's
-  // slot budget (clamp(round(minutes/22), 2, 5)).
-  //   1 day  = [full]: budget 90min=4 -> squat,hinge,push_h -> 3.
-  //   2 days = [lower,upper]: 2+1 = 3.
-  //   3 days = [lower,upper,full]: 2+1+3 = 6.
-  check('[P3] a 1-day plan shapes to [full] with 90-min budget 4: capacity 3 (squat+hinge+push_h)',
+  // The law (audit round 4 corrected): capacity = the count of DISTINCT
+  // anchor PATTERNS (squat / push_h / hinge) reachable in the shaped week.
+  // The big three are three ROLES, not three occurrences of two patterns.
+  //   1 day  = [full]: budget 90min=4 -> squat,hinge,push_h reachable -> 3.
+  //   2 days = [lower,upper]: squat+hinge (lower), push_h (upper) -> 3.
+  //   3 days = [lower,upper,full]: same three roles -> 3 (more repeats of
+  //            the same roles do not add capacity).
+  check('[P3] a 1-day plan shapes to [full] with 90-min budget 4: all 3 anchor roles reachable',
     strengthAnchorCapacity(mkProfile(1, 90), programFocuses, defaultProgramDayIndices) === 3,
     String(strengthAnchorCapacity(mkProfile(1, 90), programFocuses, defaultProgramDayIndices)));
-  check('[P3] a 2-day split (lower+upper) yields capacity 3 at 90 min',
+  check('[P3] a 2-day split (lower+upper) reaches all 3 anchor roles at 90 min',
     strengthAnchorCapacity(mkProfile(2, 90), programFocuses, defaultProgramDayIndices) === 3,
     String(strengthAnchorCapacity(mkProfile(2, 90), programFocuses, defaultProgramDayIndices)));
-  check('[P3] a 3-day, 90-minute strength plan carries 6 anchor-capable slots (lower 2 + upper 1 + full 3)',
-    strengthAnchorCapacity(mkProfile(3, 90), programFocuses, defaultProgramDayIndices) === 6,
+  check('[P3] a 3-day, 90-minute strength plan reaches all 3 anchor roles (lower 2 + upper 1 + full 3 occurrences, 3 distinct roles)',
+    strengthAnchorCapacity(mkProfile(3, 90), programFocuses, defaultProgramDayIndices) === 3,
     String(strengthAnchorCapacity(mkProfile(3, 90), programFocuses, defaultProgramDayIndices)));
 
-  // Duration shaping: 15 minutes clamps the budget to 2. lower = squat+hinge
-  // (2, budget 2 keeps both), upper = push_h (budget 2 keeps it), full =
-  // budget 2 keeps squat+hinge only.
-  check('[P3] 15-minute sessions: budget clamps to 2; a 3-day plan counts lower 2 + upper 1 + full 2 = 5',
-    strengthAnchorCapacity(mkProfile(3, 15), programFocuses, defaultProgramDayIndices) === 5,
+  // Duration shaping: 15 minutes clamps the budget to 2. lower's menu is
+  // squat+hinge, upper's push_h, full's trimmed menu is squat+hinge — the
+  // three roles are still all reachable across a 3-day week.
+  check('[P3] 15-minute sessions: budget clamps to 2; a 3-day plan still reaches all 3 roles',
+    strengthAnchorCapacity(mkProfile(3, 15), programFocuses, defaultProgramDayIndices) === 3,
     String(strengthAnchorCapacity(mkProfile(3, 15), programFocuses, defaultProgramDayIndices)));
-  check('[P3] 240-minute sessions: budget clamps to 5, menus are already shorter, so 3 days = 6 (same as 90 min)',
-    strengthAnchorCapacity(mkProfile(3, 240), programFocuses, defaultProgramDayIndices) === 6,
+  check('[P3] 240-minute sessions: budget clamps to 5, menus are already shorter, so all 3 roles remain reachable',
+    strengthAnchorCapacity(mkProfile(3, 240), programFocuses, defaultProgramDayIndices) === 3,
     String(strengthAnchorCapacity(mkProfile(3, 240), programFocuses, defaultProgramDayIndices)));
 
   // Boundary sweep 1..7 days x {15, 90, 240} minutes: capacity is finite,
-  // monotone non-decreasing in days, and strictly shaped by minutes.
+  // positive, capped by the three anchor roles, and monotone non-decreasing
+  // in days (a longer week can only reach more roles, never fewer).
   let sweepOk = true;
   let sweepDetail = '';
   let previousDaysCap = 0;
@@ -291,19 +292,125 @@ console.log('[P3] pure strength anchor capacity over shaped plan slots');
     let cap90 = -1;
     for (const minutes of [15, 90, 240]) {
       const cap = strengthAnchorCapacity(mkProfile(days, minutes), programFocuses, defaultProgramDayIndices);
-      if (!(Number.isFinite(cap) && cap > 0)) { sweepOk = false; sweepDetail = `days=${days} min=${minutes} cap=${cap}`; }
+      if (!(Number.isFinite(cap) && cap > 0 && cap <= 3)) { sweepOk = false; sweepDetail = `days=${days} min=${minutes} cap=${cap}`; }
       if (minutes === 90) cap90 = cap;
     }
     if (cap90 < previousDaysCap) { sweepOk = false; sweepDetail = `days=${days} cap90=${cap90} < previous ${previousDaysCap}`; }
     previousDaysCap = cap90;
   }
-  check('[P3] sweep 1..7 days x {15,90,240} min: positive, finite, monotone in days at fixed minutes', sweepOk, sweepDetail);
+  check('[P3] sweep 1..7 days x {15,90,240} min: positive, capped at 3 roles, monotone in days at fixed minutes', sweepOk, sweepDetail);
 
-  // The full 7-day strength split [lower,upper,lower,upper,full,cond,full]:
-  // anchor slots = 2+1+2+1+3+0+3 = 12 at 90 min.
-  check('[P3] a 7-day strength plan at 90 min carries 12 anchor-capable slots (full/cond days contribute per their menus)',
-    strengthAnchorCapacity(mkProfile(7, 90), programFocuses, defaultProgramDayIndices) === 12,
+  // The 7-day strength split reaches all three roles (lower, upper, full
+  // days together cover squat/push_h/hinge; conditioning days add none).
+  check('[P3] a 7-day strength plan reaches all 3 anchor roles',
+    strengthAnchorCapacity(mkProfile(7, 90), programFocuses, defaultProgramDayIndices) === 3,
     String(strengthAnchorCapacity(mkProfile(7, 90), programFocuses, defaultProgramDayIndices)));
+}
+
+// --- [P4] audit round 4: capacity law must follow the DRAFT schedule -----------
+console.log('[P4a] capacity from the actual draft days/focuses');
+{
+  // The screen computes capacity from the persisted profile when it must
+  // follow the athlete's CURRENT dayIndices/dayFocuses draft. The pure
+  // overload takes the explicit draft and counts DISTINCT anchor PATTERNS
+  // the shaped week can carry — squat, horizontal-push, hinge — because the
+  // big three are the three roles, not three occurrences of two patterns.
+  const mk = (days, minutes) => ({
+    objective: 'strength', training_age: 'intermediate', weekly_frequency: days,
+    max_sessions_per_day: 1, session_duration_cap_min: minutes, base_rpe_cap: 9,
+    target_energy_system: 'hybrid', progression_methodology: 'autoregulated',
+    injury_flags: [], mobility_limits: [], equipment_inventory: FULL_GYM,
+  });
+  // Audit scenario: a four-day profile drafted down to ONE session. The
+  // persisted profile would claim all 3 roles, but the DRAFT (one lower
+  // day) carries only squat+hinge = 2 distinct roles < 3, so the warning
+  // must appear. The property under test is DRAFT-following, not the
+  // specific minutes: with 90 minutes the lower menu keeps both patterns.
+  const draft = strengthAnchorCapacity(mk(4, 90), programFocuses, defaultProgramDayIndices, [
+    { dayIndex: 1, focus: 'lower' },
+  ]);
+  check('[P4a] a 4-day profile drafted to ONE lower day counts 2 distinct anchor roles while the persisted profile claims 3',
+    draft === 2 && strengthAnchorCapacity(mk(4, 90), programFocuses, defaultProgramDayIndices) === 3, String(draft));
+  // Default 3-day 90-min split: lower(2) + upper(1) + full(3) = 3 distinct roles.
+  const threeDay = strengthAnchorCapacity(mk(3, 90), programFocuses, defaultProgramDayIndices);
+  check('[P4a] the default 3-day 90-min split carries all 3 distinct anchor roles',
+    threeDay === 3, String(threeDay));
+  // Custom all-lower schedule with no upper day: push_h never appears, so
+  // capacity < 3 even though squat+hinge both do.
+  const allLower = strengthAnchorCapacity(mk(4, 90), programFocuses, defaultProgramDayIndices, [
+    { dayIndex: 1, focus: 'lower' }, { dayIndex: 3, focus: 'lower' },
+    { dayIndex: 5, focus: 'lower' }, { dayIndex: 6, focus: 'lower' },
+  ]);
+  check('[P4a] a custom all-lower schedule caps at 2 distinct anchor roles (no push_h slot)',
+    allLower === 2, String(allLower));
+  // Omitting the draft falls back to the persisted profile (byte-compatible
+  // with every existing caller and the earlier sweep expectations).
+  const fallback = strengthAnchorCapacity(mk(1, 90), programFocuses, defaultProgramDayIndices);
+  check('[P4a] no draft days -> the persisted profile shapes the week (1-day full: 3 roles)',
+    fallback === 3, String(fallback));
+}
+
+// --- [P4b] accessory ordering must respect the bodybuilding exclusion ----------
+console.log('[P4b] accessory slots keep the bodybuilding contract');
+{
+  // The accessory branch sorted `available`, bypassing the competition-lift
+  // exclusion: a hypertrophy accessory slot could auto-pick Deadlift even
+  // when Romanian Deadlift was available. The fix routes the accessory sort
+  // over defaultLoadedPool (which already excludes the big three for
+  // hypertrophy).
+  const hypAcc = rankMovementsForPattern(
+    [
+      { movementId: 2, name: 'Deadlift', difficulty: 'Intermediate', required: ['barbell'], plannedImplement: undefined, capabilityAvailable: true, isCompound: true },
+      { movementId: 9, name: 'Romanian Deadlift', difficulty: 'Intermediate', required: ['barbell'], plannedImplement: undefined, capabilityAvailable: true, isCompound: true },
+      { movementId: 55, name: 'Dumbbell Squat', difficulty: 'Beginner', required: ['dumbbells'], plannedImplement: undefined, capabilityAvailable: true, isCompound: false },
+    ],
+    baseInput({ objective: 'hypertrophy' }), 'hinge',
+    { accessorySlot: true },
+  );
+  check('[P4b] a hypertrophy accessory slot NEVER auto-selects a competition lift (Deadlift) while a non-anchor loaded rung exists',
+    hypAcc.movementId !== 2 && hypAcc.name !== 'Deadlift', JSON.stringify(hypAcc));
+  // Primary slots keep their existing behavior (anchor exclusion already
+  // applied via defaultLoadedPool -> loadedAvailable).
+  const hypPrim = rankMovementsForPattern(
+    [
+      { movementId: 2, name: 'Deadlift', difficulty: 'Intermediate', required: ['barbell'], plannedImplement: undefined, capabilityAvailable: true, isCompound: true },
+      { movementId: 9, name: 'Romanian Deadlift', difficulty: 'Intermediate', required: ['barbell'], plannedImplement: undefined, capabilityAvailable: true, isCompound: true },
+    ],
+    baseInput({ objective: 'hypertrophy' }), 'hinge',
+  );
+  check('[P4b] the primary hypertrophy slot also stays competition-free',
+    hypPrim.movementId === 9, JSON.stringify(hypPrim));
+}
+
+console.log('[P4c] progression summary identity (see component + generated matrix)');
+{
+  // The identity fix (day_index + slot_index + movement) is pinned by the
+  // real-generator block assertions below and exercised end-to-end by the
+  // regenerated PQ-05/PQ-12/13 matrix evidence.
+  const { weeklyProgressionSummary } = require('./.build/blockGenerator.js');
+  const gm = (id, name, pattern) => ({ name, bodyweight: pattern === undefined ? false : pattern });
+  const dayPlan = {
+    objective: 'hypertrophy', start_date: '2026-09-01', weeks: 4, schemaType: 'LINEAR',
+    macroBlockIndex: 1, macroPhase: 'gpp', peakShifted: false, recovery: false,
+    autopilotAdjusted: [], warnings: [],
+    sessions: [
+      // Two lower days at the same day_index-in-week positions across weeks.
+      { week_index: 1, day_index: 1, focus: 'lower', slots: [{ slot_index: 1, movement_id: 14, sets: 4, reps: 12, target_rpe: 7 }] },
+      { week_index: 1, day_index: 4, focus: 'lower', slots: [{ slot_index: 1, movement_id: 28, sets: 4, reps: 12, target_rpe: 7 }] },
+      { week_index: 2, day_index: 1, focus: 'lower', slots: [{ slot_index: 1, movement_id: 14, sets: 5, reps: 12, target_rpe: 7 }] },
+      { week_index: 2, day_index: 4, focus: 'lower', slots: [{ slot_index: 1, movement_id: 28, sets: 4, reps: 12, target_rpe: 7.5 }] },
+    ],
+  };
+  const lines = weeklyProgressionSummary(dayPlan, (id) => (id === 14 ? { name: 'Goblet Squat', bodyweight: false } : { name: 'Bodyweight Squat', bodyweight: true }));
+  const goblet = lines.find((l) => l.startsWith('Goblet Squat'));
+  const bw = lines.find((l) => l.startsWith('Bodyweight Squat'));
+  check('[P4c] two same-focus days are described separately (Goblet day: same reps plus a set)',
+    goblet !== undefined && goblet.includes('same reps plus a set'), JSON.stringify(lines));
+  check('[P4c] the bodyweight day keeps its OWN progression (higher effort, not a collision with the other lower day)',
+    bw !== undefined && bw.includes('higher target effort'), JSON.stringify(lines));
+  // Determinism: repeated runs give identical output.
+  check('[P4c] the summary is deterministic across repeated runs',
+    JSON.stringify(weeklyProgressionSummary(dayPlan, (id) => (id === 14 ? { name: 'Goblet Squat', bodyweight: false } : { name: 'Bodyweight Squat', bodyweight: true }))) === JSON.stringify(lines));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

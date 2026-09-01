@@ -19,8 +19,8 @@ blockGenerator modules, and the store's documented input mapping. Run:
 - **PQ-09: PASS** — max target RPE across block: 6.5 (rehab cap 7.0); label: Return to training — no medical claim
 - **PQ-10: PASS** — Bodyweight Squat occurrences: 8; equipment reason disclosed in 2 warning(s)
 - **PQ-11: PASS** — squat-pattern slots selected after knee restriction: 0 (drop with warning, never re-admitted)
-- **PQ-12: PASS** — actual bodyweight reps edited from target and logged exactly — SessionScreen.test.js "bodyweight actual reps initialize from the plan, edit, and reach logSet unchanged (PQ-12)"
-- **PQ-13: PASS** — untouched RPE stored as null with informational cue — SessionScreen.test.js "untouched RPE stays null and shows its plain-language cue (PQ-13)" + verify_effort_cues.mjs
+- **PQ-12: PASS** — executed component evidence: 2 PQ-12 test(s) in SessionScreen.test.js, statuses [passed, passed] (actual bodyweight reps edited from target and logged exactly)
+- **PQ-13: PASS** — executed component evidence: 1 PQ-13 test(s) in SessionScreen.test.js, statuses [passed] (untouched RPE stored as null with informational cue + verify_effort_cues.mjs)
 - **PQ-14: PASS** — anchors: Competition Squat, Competition Bench, Deadlift; Bodyweight Squat occurrences: 0
 
 ### PQ-01 — strength, intermediate, full gym, big-three prior experience confirmed

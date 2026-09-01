@@ -193,36 +193,40 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     expect(screen.queryByText('Athletic power')).toBeNull();
   });
 
-  test('the capacity warning is computed by the real shaped-slot calculation, not days<3', () => {
+  test('the capacity warning follows the DRAFT schedule and counts distinct anchor roles (audit round 4)', () => {
     mockState.profile.objective = 'strength';
-    // 3 days x 90 minutes: the shaped calculation counts 6 anchor slots
-    // (lower 2 + upper 1 + full 3) -> NO warning, even though the old
-    // days-based reasoning would also pass this. The UI number must agree
-    // with the pure function exactly.
-    mockState.profile.weekly_frequency = 3;
-    mockState.profile.session_duration_cap_min = 90;
+    // The auditor's exact scenario: a four-day profile drafted down to one
+    // 15-minute session. The persisted profile would claim 3 roles; the
+    // DRAFT (one lower day, budget 2 = squat only at 15 min) claims 1 < 3,
+    // so the warning MUST appear.
+    // The auditor's scenario: a four-day profile drafted down to fewer
+    // sessions. Default draft is [1 lower, 4 lower, 6 upper] (3 roles, no
+    // warning). Drop Tomorrow and Day 6 -> draft [1 lower, 4 lower]: the
+    // distinct roles are squat+hinge only (2 < 3), so the warning MUST
+    // appear — even though the persisted 4-day profile claims 3 roles.
     render(<ProgramSetupScreen />);
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
-    const shaped = strengthAnchorCapacity(mockState.profile, programFocuses, defaultProgramDayIndices);
-    expect(shaped).toBe(6);
-    expect(screen.queryByTestId('strength-capacity-warning')).toBeNull();
-
-    // 1 day x 15 minutes: budget clamps to 2, the full-day menu carries only
-    // squat+hinge = 2 anchor slots < 3 -> the warning appears and names the
-    // shortfall. The OLD days<3 rule would also fire here; the distinguishing
-    // evidence is the shaped NUMBER in the copy (2 slots), which no day count
-    // can produce.
-    mockState.profile.weekly_frequency = 1;
-    mockState.profile.session_duration_cap_min = 15;
-    render(<ProgramSetupScreen />);
-    fireEvent.press(screen.getByText('Coach build'));
-    fireEvent.press(screen.getByText('Duration'));
-    fireEvent.press(screen.getByText('4 wk'));
+    fireEvent.press(screen.getAllByText('Tomorrow')[0]);
+    fireEvent.press(screen.getAllByText('Day 6')[0]);
+    const shaped = strengthAnchorCapacity(
+      mockState.profile, programFocuses, defaultProgramDayIndices,
+      [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 4, focus: 'lower' }],
+    );
+    expect(shaped).toBe(2); // two lower days repeat squat+hinge; push_h absent
     expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
-    expect(screen.getByText(/shapes to 2 anchor slots/)).toBeOnTheScreen();
     expect(screen.getByText(/Not enough training days for the big three/)).toBeOnTheScreen();
+    expect(screen.getByText(/shapes to 2 anchor slots/)).toBeOnTheScreen();
+
+    // The persisted-profile claim would be 3 — the warning is driven by the
+    // DRAFT, not the profile (the defect the auditor demonstrated).
+    expect(strengthAnchorCapacity(mockState.profile, programFocuses, defaultProgramDayIndices)).toBe(3);
+
+    // Switching day 4 to 'upper' adds the push_h role: the draft now covers
+    // all three roles and the warning disappears.
+    fireEvent.press(screen.getAllByText('upper')[1]); // day-4 row's upper chip
+    expect(screen.queryByTestId('strength-capacity-warning')).toBeNull();
   });
 
   test('the preview renders the weekly progression summary for representative slots', () => {

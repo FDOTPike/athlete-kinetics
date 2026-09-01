@@ -182,13 +182,17 @@ export default function ProgramSetupScreen({
   // copy states the tier law plainly: olympic-lift competition movements are
   // Advanced-tier and appear only for athletes whose tier admits them.
   const powerExplanation = profile.objective === 'power';
-  // Strength anchor capacity (WO §2.5), Round 2 R4: the disclosed number is
-  // the PURE shaped-slot calculation (squat / horizontal-push / hinge slots
-  // after the duration and focus shaping), not a raw day-count heuristic.
-  // Fewer than three anchor-capable slots cannot carry the big three.
+  // Strength anchor capacity (WO §2.5), Round 2 R4 + audit round 4 (P1):
+  // the disclosed number comes from the DRAFT schedule (the athlete's live
+  // dayIndices/dayFocuses choices), not the persisted profile — toggling a
+  // day or changing a focus updates the warning BEFORE creation. The pure
+  // law counts the DISTINCT anchor roles (squat/push_h/hinge) the drafted,
+  // duration-shaped week can carry; fewer than 3 cannot carry the big
+  // three (an all-lower week can never bench).
   const anchorCapacity = useMemo(() => strengthAnchorCapacity(
     profile, programFocuses, defaultProgramDayIndices,
-  ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min]);
+    dayIndices.map((dayIndex) => ({ dayIndex, focus: dayFocuses[dayIndex] ?? 'full' })),
+  ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min, dayIndices, dayFocuses]);
   const strengthCapacityShort = profile.objective === 'strength' && anchorCapacity < 3;
   // Anchor coverage for strength: which of the big three are gated-available
   // this week, which are blocked (with reasons), and whether a local

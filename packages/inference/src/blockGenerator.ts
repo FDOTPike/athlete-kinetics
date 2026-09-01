@@ -556,43 +556,59 @@ export const ROUND2_HYPERTROPHY_ROLE_SET_DELTA = -1;
 /**
  * R4 (Round 2, ledger 0060) — the STRENGTH ANCHOR CAPACITY calculation.
  * Replaces the old `days < 3` screen heuristic with a pure computation over
- * the athlete's ACTUAL plan shape: the objective's focus split (after the
- * athlete's own day-count shaping), counting the slots that can carry a
- * squat / horizontal-push / hinge anchor on each focus after the DURATION
- * shaping (slot budget = clamp(round(minutes / 22), 2, 5), the generator's
- * own law) has trimmed each focus's pattern menu.
+ * the athlete's ACTUAL plan shape: counting the DISTINCT anchor PATTERNS —
+ * squat, horizontal-push, hinge — the repeating week can carry, after the
+ * DURATION shaping (slot budget = clamp(round(minutes / 22), 2, 5), the
+ * generator's own law) has trimmed each focus's pattern menu.
  *
- * A focus can carry anchors when its pattern menu contains squat, push_h or
- * hinge with at least one slot available for it; the capacity is the total
- * number of such slots across the repeating week. The result is the number
- * the setup screen discloses: capacity < 3 means the big three cannot all
- * be carried, whatever the day count says.
+ * The big three are three ROLES, not three occurrences of two patterns: an
+ * all-lower schedule that carries squat+hinge on every day still cannot
+ * bench-press, so it caps at two roles and the setup screen must warn. The
+ * capacity is therefore `Set.size` over the anchor patterns reachable in
+ * the shaped week; capacity < 3 means the big three cannot all be carried.
  *
- * Pure: the focus-menu table and the budget law live in this module; the
- * focus list is passed in by the caller (programFocuses) so the law and its
- * consumer cannot drift while staying deterministic.
+ * Audit round 4 (P1): the calculation follows the athlete's DRAFT schedule,
+ * not the persisted profile. When `draftDays` is supplied (the setup
+ * screen's current dayIndices/dayFocuses state), those focuses shape the
+ * week; when it is omitted, the call falls back to the persisted profile's
+ * own focus split — byte-compatible with every caller that has no draft.
+ * The screen passes its live draft, so toggling a day or changing a focus
+ * updates the warning before creation.
+ *
+ * Pure and deterministic: the focus-menu table and the budget law live in
+ * this module; the default focus list is passed in by the caller
+ * (programFocuses) so the law and its consumer cannot drift.
  */
+export interface DraftProgramDayFocus {
+  readonly dayIndex: number;
+  readonly focus: BlockFocus;
+}
+
 export const strengthAnchorCapacity = (
   profile: Pick<UserProfile, 'objective' | 'weekly_frequency' | 'session_duration_cap_min'>,
   focusesFor: (objective: Objective, frequency: number) => readonly BlockFocus[],
   _dayIndicesFor: (frequency: number) => readonly number[],
+  draftDays?: readonly DraftProgramDayFocus[],
 ): number => {
   void _dayIndicesFor;
-  const frequency = clamp(Math.round(profile.weekly_frequency), 1, 7);
   const minutes = clamp(Math.round(profile.session_duration_cap_min), 15, 240);
   const budget = clamp(Math.round(minutes / 22), 2, 5);
-  const focuses = focusesFor(profile.objective, frequency);
   const ANCHOR_PATTERNS: ReadonlySet<string> = new Set(['squat', 'push_h', 'hinge']);
-  let capacity = 0;
+  const carriesAnchor = new Set<string>();
+  // Audit round 4 (P1): the DRAFT schedule wins when present; the persisted
+  // profile only shapes the fallback (no-draft) call.
+  const focuses = draftDays !== undefined && draftDays.length > 0
+    ? draftDays.map((day) => day.focus)
+    : focusesFor(profile.objective, clamp(Math.round(profile.weekly_frequency), 1, 7));
   for (const focus of focuses) {
     // FOCUS_PATTERNS law mirrored by budget: the menu is trimmed to the
     // session's slot budget before any slot is planned.
     const patterns = FOCUS_PATTERNS[focus].slice(0, budget);
     for (const pattern of patterns) {
-      if (ANCHOR_PATTERNS.has(pattern)) capacity += 1;
+      if (ANCHOR_PATTERNS.has(pattern)) carriesAnchor.add(pattern);
     }
   }
-  return capacity;
+  return carriesAnchor.size;
 };
 
 // --- RPE/rep -> %1RM translation (Epley): pct = 1 / (1 + totalReps/30) ------
@@ -1187,17 +1203,23 @@ export function weeklyProgressionSummary(
   for (const [beforeWeek, afterWeek] of pairs) {
     const beforeSessions = plan.sessions.filter((s) => s.week_index === beforeWeek);
     const afterSessions = plan.sessions.filter((s) => s.week_index === afterWeek);
+    // Audit round 4 (P1): slot identity is (day_index, slot_index,
+    // movement_id). Keying on focus:slot_index alone collided when a
+    // schedule repeated a focus — two lower days overwrote each other in
+    // the map and the summary described one slot against another day's
+    // movement. Including the movement in the key also makes a
+    // movement-change mismatch a skip (no line) rather than a false claim.
     const afterBySlot = new Map<string, { sets: number; reps: number; target_rpe: number }>();
     for (const session of afterSessions) {
       for (const slot of session.slots) {
-        afterBySlot.set(`${session.focus}:${slot.slot_index}`, {
+        afterBySlot.set(`${session.day_index}:${slot.slot_index}:${slot.movement_id}`, {
           sets: slot.sets, reps: slot.reps, target_rpe: slot.target_rpe,
         });
       }
     }
     for (const session of beforeSessions) {
       for (const slot of session.slots) {
-        const after = afterBySlot.get(`${session.focus}:${slot.slot_index}`);
+        const after = afterBySlot.get(`${session.day_index}:${slot.slot_index}:${slot.movement_id}`);
         if (after === undefined) continue;
         const movement = resolveMovement(slot.movement_id);
         const name = movement?.name ?? `Movement ${slot.movement_id}`;

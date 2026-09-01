@@ -143,6 +143,37 @@ FULL VERIFY REPRODUCED: YES   MATRIX REPRODUCED: YES (byte-identical)
 RELEASE / PUSH AUTHORITY: NOT GRANTED
 ```
 
+## Audit round 4 (owner-dispatched adversarial audit, post-certification)
+
+The owner's auditor returned REQUEST CHANGES at `1705577` with four P1 findings and one P2.
+All are remediated in this round; red proofs were added first and each fix is verified:
+
+- **[P1] Capacity evaluated the persisted profile, not the draft.**
+  `strengthAnchorCapacity` now takes the screen's live `dayIndices`/`dayFocuses` draft and
+  counts DISTINCT anchor roles (squat/push_h/hinge) — an all-lower schedule caps at 2 roles
+  and warns even though squat+hinge repeat every day. [P4a] pins the auditor's scenario
+  (draft 2 roles vs persisted 3) and the all-lower case; the component test drives the real
+  screen: dropping to two lower days warns, switching a day to upper clears it.
+- **[P1] Accessory ordering bypassed the bodybuilding exclusion.** The accessory branch sorted
+  `available` directly, re-admitting competition lifts as hypertrophy accessory defaults. It
+  now sorts `defaultLoadedPool` (anchor-excluded) — [P4b] proves Deadlift is never
+  auto-selected while a non-anchor rung exists.
+- **[P1] Progression summary slot collisions.** Identity was `focus:slot_index`, so repeated
+  lower/upper days overwrote each other and slots were described against the wrong
+  counterpart. Identity is now `day_index:slot_index:movement_id`; a movement mismatch is a
+  skip, never a false claim. [P4c] pins the two-same-focus-days scenario including the
+  auditor's Bodyweight Squat case, and the regenerated matrix output no longer mixes days.
+- **[P1] PQ-12/13 were unconditional PASSes.** The harness now EXECUTES SessionScreen.test.js
+  via jest (`--json`), reads the machine results, and passes the rows only if the named
+  PQ-12/PQ-13 tests ran and passed in that run — fail-closed (verified: a broken invocation
+  yields FAIL rows, as observed during development).
+- **[P2] Untracked `.agents/**` and `team-preview/**`.** These stay UNTRACKED and are now
+  explicitly recorded as non-evidence: the Team Preview reports target the earlier SHA
+  `cfbcf67`, contain demonstrably incorrect claims (invented `+1000`/`-50` ranking scores, an
+  intermediate receiving Power Clean), and are superseded by this handoff and the committed
+  round-1..3 review handoffs. They are deliberately excluded from every commit and from the
+  audit evidence set; reviewers are directed to `reviews/` only.
+
 ## Gate outcomes (all run this round)
 
 | Gate | Result |
