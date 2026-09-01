@@ -1,7 +1,7 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork } from '@ak/inference';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
@@ -826,12 +826,18 @@ export default function SessionScreen(): React.JSX.Element {
                           <Stepper
                             testID="current-reps-stepper"
                             repeatOnHold={target?.kind === 'time'}
-                            label={target?.kind === 'time' ? 'Seconds' : 'Reps'}
+                            label={target?.kind === 'time' ? 'Seconds' : 'Actual reps'}
+                            tip="RIR"
                             value={String(target?.kind === 'time' ? seconds : reps)}
                             onDecrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n - 5, 5, 3600)) : setReps((n) => clamp(n - 1, 1, 50))}
                             onIncrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n + 5, 5, 3600)) : setReps((n) => clamp(n + 1, 1, 50))}
                             style={styles.sessionStepper}
                           />
+                          {target?.kind !== 'time' && (
+                            <Text style={styles.effortCue} testID="actual-reps-cue">
+                              Planned target {target?.kind === 'reps' ? target.reps : '—'}. Enter what you actually did — the plan stays unchanged.
+                            </Text>
+                          )}
                           <View style={styles.loadField}>
                             <Text style={styles.loadFieldLabel} testID="session-load-label">{loadLabel.toUpperCase()}</Text>
                             <View style={styles.loadFieldRow}>
@@ -911,6 +917,11 @@ export default function SessionScreen(): React.JSX.Element {
                             }}
                             style={styles.sessionStepper}
                           />
+                          <Text style={styles.effortCue} testID="rpe-cue">
+                            {effortCue(rpe) ?? 'RPE is optional evidence — leave it untouched to skip.'}
+                          </Text>
+                          <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
+                          <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
                           <View style={styles.rpeConfirmation}>
                             <Chip
                               label={rpeTouched ? `RPE ${rpe.toFixed(1)} recorded` : `Confirm target RPE ${rpe.toFixed(1)}`}
@@ -1700,6 +1711,17 @@ const styles = StyleSheet.create({
   teachingOnlyOption: {
     ...theme.font.label,
     color: theme.color.textLow,
+    marginTop: theme.space[1],
+  },
+  effortCue: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    marginTop: theme.space[1],
+  },
+  effortStop: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    fontWeight: '600',
     marginTop: theme.space[1],
   },
 });

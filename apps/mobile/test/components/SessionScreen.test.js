@@ -27,6 +27,11 @@ jest.mock('@ak/inference', () => {
     targetLoadKg: actual.targetLoadKg,
     resolveLoadSelection: actual.resolveLoadSelection,
     isDifficultyAllowed: actualTierPolicy.isDifficultyAllowed,
+    // W5 effort cues: the screen imports them through the alias; the REAL
+    // copy is what the cues tests must assert against.
+    EFFORT_STOP_GUIDANCE: actual.EFFORT_STOP_GUIDANCE,
+    EFFORT_BREATHING_NOTE: actual.EFFORT_BREATHING_NOTE,
+    effortCue: actual.effortCue,
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
@@ -156,7 +161,7 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
 
   const usablePhoneWidth = 411 - 40;
   [
-    ['current-reps-stepper', 'Reps', 'Reps 5', '5'],
+    ['current-reps-stepper', 'Actual reps', 'Actual reps 5', '5'],
     ['current-rpe-stepper', 'Actual RPE', 'Actual RPE 8.0', '8.0'],
   ].forEach(([testID, label, accessibilityLabel, expectedValue]) => {
     expect(StyleSheet.flatten(screen.getByTestId(testID).props.style)).toMatchObject({
@@ -562,6 +567,61 @@ test('an active session with no frozen access context fails closed', () => {
   render(<SessionScreen />);
   expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
   expect(screen.queryByText('First movement')).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// W5 — actual reps and plain-language effort cues (WO §2.7)
+// ---------------------------------------------------------------------------
+
+test('bodyweight actual reps initialize from the plan, edit, and reach logSet unchanged (PQ-12)', () => {
+  render(<SessionScreen />);
+  // Initial draft comes from the planned target (5), shown with the honest
+  // planned-vs-actual cue.
+  expect(screen.getByTestId('actual-reps-cue').props.children.join(''))
+    .toContain('Planned target 5');
+  expect(screen.getByLabelText('Actual reps 5')).toBeOnTheScreen();
+
+  // The athlete did 12, not the planned 5: increment 7 times and log.
+  for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Increase Actual reps'));
+  expect(screen.getByLabelText('Actual reps 12')).toBeOnTheScreen();
+
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement$/));
+  // The stored set carries the ATHLETE-ENTERED number (12), the bodyweight
+  // identity load (0), and null RPE — the planned target in the plan row is
+  // untouched (it only exists in the slot, not the set).
+  expect(mockState.logSet).toHaveBeenCalledWith(1, 12, 0, null, undefined, undefined, undefined, undefined, 1);
+});
+
+test('actual-reps draft survives a rerender until the set is logged (PQ-12)', () => {
+  const { rerender } = render(<SessionScreen />);
+  for (let i = 0; i < 3; i += 1) fireEvent.press(screen.getByLabelText('Increase Actual reps'));
+  expect(screen.getByLabelText('Actual reps 8')).toBeOnTheScreen();
+  rerender(<SessionScreen />);
+  // Same slot, no set logged: the athlete's edit must not reset to the plan.
+  expect(screen.getByLabelText('Actual reps 8')).toBeOnTheScreen();
+});
+
+test('untouched RPE stays null and shows its plain-language cue (PQ-13)', () => {
+  render(<SessionScreen />);
+  expect(screen.getByLabelText(/Log set 1 for First movement$/)).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement$/));
+  const [movementId, , , rpe] = mockState.logSet.mock.calls[0];
+  expect(movementId).toBe(1);
+  expect(rpe).toBeNull();
+  // Cue is informational text, not a second score or an input.
+  expect(screen.getByTestId('rpe-cue')).toBeOnTheScreen();
+});
+
+test('effort cues render plain-language anchors with stop guidance and no biometric claim', () => {
+  mockState.profile = { ...mockState.profile, training_age: 'beginner' };
+  render(<SessionScreen />);
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Hard but controlled; about two good reps left.',
+  );
+  expect(screen.getByTestId('effort-stop-guidance').props.children).toBe(
+    'Pain, dizziness, or losing control of the movement: stop the set. Pain is not effort — never trade form for the number.',
+  );
+  expect(screen.getByText(/vary by exercise and fitness/)).toBeOnTheScreen();
 });
 
 test('a triage halt on a live runner persists safety before ending the session', () => {
