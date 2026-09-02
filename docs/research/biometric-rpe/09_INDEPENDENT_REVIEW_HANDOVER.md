@@ -339,6 +339,34 @@ Third verdict: REQUEST CHANGES — freeze integrity, docs-only scope, and all ro
 
 **Boundaries unchanged by Round 4.** Decision token: **RESEARCH PILOT ONLY**. **Pilot execution: NO-GO**, pending UD-1, UD-2, UD-7 and the `06` §11 qualified approvals. **UD-9** (RHR consuming-feature gap) and **UD-10** (ProfileScreen copy defect) both remain **open**; UD-10 is deliberately unfixed because product-code changes are out of scope. No merge, rebase, force-push, tag, release, APK build, permission change, schema change, product-code change or pilot execution was performed.
 
+## 13. Reviewer A — independent evidence audit (COMPLETED; verdict REQUEST CHANGES)
+
+**This is the first completed independent review lens on this branch.** It is recorded here because the status changed: Reviewer A is no longer pending. It did **not** approve.
+
+- **Auditor:** Hermes running GLM 5.3, read-only. It performed no repository writes and no GitHub mutations, and reported the worktree byte-identical at audit end.
+- **Audit target:** `337778f1dc72604d4b360478c662180b5ec9c35a` (tree `02360399…`, parent `16ff5485…`, base `e15bbe93…`).
+- **Verdict: REQUEST CHANGES.** Two P2 findings, **no P1**. Merge/release authority explicitly **not granted**. **Reviewer B: still required.**
+
+### Findings and disposition
+
+| # | Reviewer A finding | Disposition |
+|---|---|---|
+| P2-1 | **[S09]'s headline "MAPE up to ~18.66%" does not exist in the primary source.** The paper reports no MAPE statistic at all; its error magnitudes are accuracy root-mean-square (Aᵣₘₛ) **in bpm**. The figure most plausibly came from the Apple Watch treadmill Aᵣₘₛ of 18.34 bpm — a different metric in a different unit | **FIXED and independently re-verified.** This executor confirmed against the PMC full text (PMC9952291) that `18.66` occurs **0 times** and `MAPE` occurs **0 times**, while all six cited Aᵣₘₛ values are present. The figure is withdrawn from `02` §4, `01` §7 and the S09 manifest row and replaced with the paper's actual reported statistics. **Two further S09 errors were found in the same pass and are also fixed:** the population was recorded as "healthy adults" (actual: **8 athletes**, 1,286 HR pairs) and the modality as "intense free-running exercise" (actual: **maximal stress testing on a cycle ergometer or treadmill**) |
+| P2-2 | **[S08]'s sample size is wrong — the paper enrolled 13, not 16.** The row was typed `primary_research` with `verified_this_run = Y`, so the error sat inside a row the package asserted was fully verified | **FIXED and independently re-verified.** The PubMed record (PMID 30041435) states "Thirteen male HIFT practitioners". Corrected in `02` §2 and the S08 manifest row. **A third error in the same sentence, which Reviewer A did not flag, was found and fixed:** the entry said "three HIFT sessions"; the paper names **two** (Fight Gone Bad and Fran). The validity conclusion is unchanged by either correction |
+
+### What Reviewer A verified and did not challenge
+
+Recorded because a reviewer should know what has already been reproduced independently: the ten-file scope and focused three-file diff; the four-round audit history with no approving verdict; the D-MADE-6 `07` O4 cross-reference; the historical-vs-current freeze structure; all five post-freeze commits; PR #7's draft/stacked/base/head state; the CodeRabbit distinction (30 threads / 30 resolved / 26 outdated / 0 unresolved, versus the "review skipped: draft" green non-verdict); the **48 / 48 / 0 / 0** citation invariant; and both GitHub jobs `success` at the audit target itself. It re-ran a fresh five-lane literature search and found nothing that changes the decision token. It independently confirmed the construct separations, the `evaluatePolicy` biometric-to-`rpe_cap` path behind M0's exclusion of planned target RPE, the Arm P/Arm I designs, the blinding gate, the evaluability floors, and the platform-capability statements against live Android documentation.
+
+### Reviewer A INFO items (not findings; recorded for the owner)
+
+- **[S06] could be upgraded from partially verified to fully verified** — its identity and sample (Hackett et al. 2019, JFMK 4(3):56, n = 27 M + 11 F) are resolvable from the publisher page. **Left as-is deliberately:** changing a verification flag is an evidence decision, and no numeric claim rests on the row. Owner call.
+- **[S06]'s one-line gloss in `02` §1 compresses the paper's finding.** The correlation is with *absolute* error, which the authors attribute mainly to proximity-to-failure (error is larger in easy early sets). The package uses S06 only as a qualitative confounder flag and extracts no number from it. Recorded, not changed.
+
+### Status after this remediation
+
+**Reviewer A: COMPLETED, verdict REQUEST CHANGES — findings remediated above, re-review NOT run.** A remediation is not an approval, and this executor has not sought, inferred, or recorded one. **Reviewer B (engineering/privacy): NOT STARTED.** Its handover scope is `09` §14. The work order's acceptance criterion requiring **both** independent reviews attached remains **NOT met**, and merge/release authority remains **not granted**.
+
 ## 12. How to fail this work
 
 For clarity, the findings that would most change the outcome: any verified primary source demonstrating per-set biometric RPE estimation; any repository claim in `02` §7 that does not reproduce; any conflated construct in `01`; any missing manifest row behind a material claim; any place the deliverables promise a feature rather than a decision. If you find one, the token, the docket, or the document set needs revision — say which.
