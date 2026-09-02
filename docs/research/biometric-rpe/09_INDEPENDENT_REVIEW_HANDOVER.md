@@ -13,9 +13,12 @@
   3. `3ddfd78692c1cb8c87033039fa1992491762e30e` — first remediation (five P1 findings + additional corrections; 10 files, 184 insertions / 103 deletions).
   4. `9388edb6d24c7fde4b379f486b1a3cac56923111` — first final freeze record (freeze-log fill; touched only `09` §0; tree `6a998c388b6bd473ebb8566540198f89be1a3dc5`). **This is the commit the second audit reviewed.**
   5. `0f1d7be4b0442ff0c7ff0a4f2b8ee0779de809a3` — **SECOND REMEDIATION COMMIT** — the second audit's fixes (six findings; 10 files, 80 insertions / 53 deletions, all within the ten files in §2).
-  6. **FINAL FREEZE COMMIT (audit target)** = the commit that wrote this freeze log (it cannot record its own SHA; it is `HEAD`). It touches only this file. Recompute everything with `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` — never trust a SHA written inside a commit's own text.
+  6. `1649c8ed45f539ae8b5e4a7f09ef0c965280cbe3` — second final freeze record (tree `82ee3500ada9fc313763beb51fdbbe3ccf81f090`). **This is the commit the third audit reviewed.**
+  7. **THIRD REMEDIATION COMMIT** = the focused-cleanup commit for the third audit's six findings (touches only the ten files in §2; exact SHA visible via `git log`).
+  8. **FINAL FREEZE COMMIT (audit target)** = the commit that wrote this freeze log (it cannot record its own SHA; it is `HEAD`). It touches only this file. Recompute everything with `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` — never trust a SHA written inside a commit's own text.
 - **Second audit verdict:** REQUEST CHANGES — freeze integrity, documentation-only scope, the two-arm split, the RIR leakage rules, and the SpO2 ruling passed; six substantive findings followed. Remediation record: §11 (Round 2 table).
-- **Deliverables tree:** exactly ten files, `docs/research/biometric-rpe/00…09` (§2 lists them). `git show --stat` for commits 1, 3, and 5 must list only these (commit 1: all ten new; commits 3 and 5: remediation edits within the same set); commits 2, 4, and 6 must touch only this file.
+- **Third audit verdict:** REQUEST CHANGES as a final recheck — freeze integrity, docs-only scope, and all round-2 literature/platform fixes passed; four P1s + a P2 set of residual inconsistencies followed. Remediation record: §11 (Round 3 table).
+- **Deliverables tree:** exactly ten files, `docs/research/biometric-rpe/00…09` (§2 lists them). `git show --stat` for commits 1, 3, 5, and 7 must list only these; commits 2, 4, 6, and 8 must touch only this file.
 - **First-freeze audit:** REQUEST CHANGES (five P1 findings + additional required corrections). Remediation record: §11. The audit's provisional acceptance of the decision token and SpO2 ruling is recorded there verbatim in substance.
 
 ## 1. What this run was (and was not)
@@ -37,13 +40,13 @@ Executor: GLM 5.3 at high effort, per the owner's dispatch (the remediation sequ
 
 Nothing outside `docs/research/biometric-rpe/` was added, modified, or deleted. No `.agents/**` or historical `team-preview/**` files were copied across (verified at W0: clean tree at base).
 
-## 3. Source totals (03_SOURCE_MANIFEST.csv, 44 rows after the second remediation)
+## 3. Source totals (03_SOURCE_MANIFEST.csv, 46 rows after the third remediation; counts mechanically derived and cross-checked against the CSV by script)
 
-- Primary research: 27 (18 `primary_research` + 6 `primary_research_review` + 2 `primary_research_meta` + 1 `journal_commentary` [S24, classified as literature not platform policy per second audit])
-- Official platform/policy documentation: 6 (`D01`–`D05`, `D08`–`D09` count within `official_documentation`)
-- Repository controls (live code/schema/policy inspection): 9 (`R01`, `R01b`, `R02`–`R05`, `R06`–`R08`)
+- Primary research: 27 (18 `primary_research` + 6 `primary_research_review` + 2 `primary_research_meta` + 1 `journal_commentary` [S24, classified as literature])
+- Official platform/policy documentation: **8** (`D01`–`D05`, `D08`, `D09`, `D10` — corrected per third audit; the round-2 handover said six)
+- Repository controls (live code/schema/policy inspection): 10 (`R01`, `R01b`, `R02`–`R05`, `R06`–`R08`, **`R09`** — RHR's actual code handling, added per third audit)
 - Non-peer-reviewed preprint (context only, supports no claim): 1 (`S23`)
-- Partially verified rows: 6 — `S05`, `S06`, `S21`, `S22`, `S23`, `S10`-sample-size. `S25`–`S28` are now fully attributed from publisher records (**second-audit corrections**: PERSIST authors are Albert/Herdick/Brahms/Granacher/Arnrich — not Schumann et al.; BSPC 105701 is "A computer vision approach to continuously monitor fatigue during resistance training" by Albert & Arnrich — not "Hard set" by Wei et al.; Sensors is 25(**21**):6588 by Baek/Kwon/Khan/Lee — not 25(20)). **The second audit found and the second remediation fixed: the first remediation's new literature rows were themselves bibliographically wrong in three places and missed the IEEE BIBM paper [S28].** No numeric claim rests on any partially verified row.
+- Partially verified rows: 5 — `S05`, `S06`, `S21`, `S22`, `S23` (`S10` moved out after the third audit supplied its full record: n = 17 healthy young adults, 12 M / 5 F, age 26.53±2.70). **Standing disclosure:** citation verification has failed across three audit rounds (round 3 caught residual stale figures, the RHR overstatement, the missing `HeartRateRecord` capability, and manifest field inconsistencies); treat every row as unverified until independently checked.
 
 ## 4. Important claims requiring your verification (highest-stakes first)
 
@@ -103,9 +106,13 @@ Re-run everything yourself — this handover is an input to your audit, not a su
 - **Reviewer B — engineering/privacy:** repository fit, permissions, data minimization, failure modes, 4 GB implications, separation of planned prescription from athlete-entered actual RPE (`04`, `05` §1b, `07`, `02` §7).
 - The first audit (REQUEST CHANGES) was returned against the pre-remediation state; its findings are closed in §11 and must be re-verified, not trusted. No verdict on the post-remediation state exists yet; do not treat any sentence in this document as a reviewer's conclusion. Material disagreements you find belong in the decision docket (`08`), per the work order.
 
-## 11. Remediation record (audit response, this branch)
+## 11. Remediation record (audit responses, this branch)
 
-**Audit verdict on the first freeze:** REQUEST CHANGES. Five P1 findings plus additional required corrections; decision token and SpO2 ruling provisionally accepted; pilot execution NO-GO until the protocol is fixed; merge-as-approved-research NO-GO pending remediation. Disposition of every finding:
+**Round 1** (against the first deliverables commit): REQUEST CHANGES, five P1 findings + additional corrections — all dispositioned below.
+**Round 2** (against `9388edb6d24c7fde4b379f486b1a3cac56923111`): REQUEST CHANGES, six findings, three of them errors in the round-1 remediation itself — dispositioned below.
+**Round 3** (against `1649c8ed45f539ae8b5e4a7f09ef0c965280cbe3`): REQUEST CHANGES as a final recheck — freeze integrity, docs-only scope, and all round-2 literature/platform fixes passed; four P1s + a P2 set of residual inconsistencies followed. All dispositioned below.
+
+### Round 1 (five P1 findings + additional required corrections)
 
 | # | Audit finding | Disposition |
 |---|---|---|
@@ -133,6 +140,18 @@ Second verdict: REQUEST CHANGES — freeze integrity, documentation-only scope, 
 | P1-4 | Documented flow still contradicted live code: `evaluatePolicy` uses `hrv_z` and `sleep_efficiency_pct` **directly** in rule conditions, not only via readiness; ProfileScreen copy claims RHR feeds readiness | **FIXED** — `01` §13.3 states the flow as composite **plus** direct rule conditions (`policyReference.ts:39,46,51`); the ProfileScreen defect logged as **UD-10** (`08` §2, `01` §13.4) — a code-remediation item, out of scope for this documentation-only WO |
 | P1-5 | Pilot could not establish whether biometrics add value (no matched workload/context model); "three app cue bands" contradicts the five bands in `effortCues.ts`; IRB requirement | **FIXED** — `06` §7 adds the decision-critical **M0 (workload/context: relative load, reps, set index, rest, movement class, target RPE) vs M1 (+biometric features) matched ablation** with identical splits/tuning and out-of-sample Δ reporting; §1 corrects to the five owner-ratified cue bands; §11 requires **IRB/EC approval** per Google's human-subjects-research rules [D02] |
 | P2 | Memory arithmetic wrong (0.2–0.4 MB, not 5–15 MB); S09 does not directly validate chest straps; S10 is an original study not a review; S24 is a journal commentary not platform documentation; residual "ceiling" language; `^3.3.0` is a range (lockfile: 3.5.3); "40 cited IDs" undercount | **FIXED** — `04` §9 arithmetic corrected with the wrong figure withdrawn; S09 attribution scoped; S10 reclassified `primary_research` with sample size flagged; S24 retyped `journal_commentary`; "ceiling" retired in `02` §6/§9 and `07` O5; version statement corrected; handover counts mechanically regenerated (44 manifest rows; the prose↔manifest join count is now stated only from script output) |
+
+### Round 3 (third audit against `1649c8ed45f539ae8b5e4a7f09ef0c965280cbe3` — final recheck)
+
+Third verdict: REQUEST CHANGES — freeze integrity, docs-only scope, and all round-2 literature/platform fixes passed (S25–S28 reproduce against the HPI publication record; `ExerciseSegment` correctly documented; memory arithmetic corrected); four P1s + a P2 set of residual inconsistencies followed. Dispositions:
+
+| # | Third-audit finding | Disposition |
+|---|---|---|
+| P1-1 | Executive rationale contradicted the corrected evidence: `00` §2 still said "no existing evidence converts HR/HRV into set RPE" and "no validation dataset exists" — conflicts with PERSIST [S25] and [S28] | **FIXED** — `00` §2 narrowed to the defensible claim: no *representative consumer-watch/phone field validation* exists for this app's population/modality, while lab-grade estimation and HRV increments exist under instrumentation the app lacks; the ADVISORY rejection re-worded on the same scope |
+| P1-2 | RHR data map wrong: "stored and feeds no computation" ignored `useStore.ts:4237` (RHR-only data updates an existing HRV row, else discarded) and `coachVerificationLab.ts:376` (`hrvDays` diagnostic counts RHR) | **FIXED** — `00` §6, `05` §0, `01` §13 matrix, `08` UD-9 restated: RHR has no *athlete-facing* readiness/prescription consumer, is stored only when an HRV row exists, and is counted by diagnostics [**R09** added]; the declaration-risk argument now correctly rests on the absence of a user-facing feature |
+| P1-3 | "No Health Connect record captures rest-interval HR" was false — `HeartRateRecord` samples are timestamped and queryable over an exercise session's time range [workouts guide] | **FIXED** — `04` §5.3 corrected: platform capability exists [**D10** added]; the limitation is the app's ingestion and unverified vendor coverage, not the schema |
+| P1-4 | Ablation ambiguous: M1's "any session-context features" clause would confound M1−M0 | **FIXED** — `06` §7: M1 adds **only pre-registered biometric features** (prior-night HRV z, sleep efficiency) with every non-biometric feature identical; paired deltas on biometric-eligible rows with **coverage reported separately**; Arm P new-athlete availability rules for relative-capacity and HRV-z defined without label leakage |
+| P2 | Handover said six official-documentation rows (CSV had seven→eight with D10); S10 typed primary research but classed "review" (actual: n = 17 healthy young adults); S24 classed "platform policy"; S12 applicability said "ceiling"; R06 said versions "pinned"; `01` §7 still gave chest-strap accuracy directly to S09; `06` §8 still said "three-band" | **FIXED** — all counts now mechanically derived (45 rows: 28 literature / 8 official docs / 10 repo controls / 1 preprint); S10 updated to n=17 with class `correlation`; S24 classed `journal commentary`; S12 wording fixed; R06 wording fixed (`^3.3.0` → lockfile 3.5.3); `01` §7 attribution scoped; `06` §8 wording aligned to five bands + collapsed-three-band robustness view |
 
 ## 12. How to fail this work
 

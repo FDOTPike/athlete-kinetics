@@ -121,9 +121,9 @@ Partially verified — identity/DOI confirmed, remaining fields flagged; **no nu
 - **[S21]** wrist-HR review (Paluch et al. 2024, Quality of Sport Sciences) — publisher/DOAJ identity; numeric ranges not extracted.
 - **[S22]** wearable stress-episode ML review (Pataca et al. 2025, Comput Biol Med) — PMID-verified identity; values not extracted.
 - **[S23]** arXiv:2510.03197 inertial RPE preprint — non-peer-reviewed; landscape context only.
-- **[S26]** BSPC 105701 computer-vision RPE prediction — DOI/publisher identity verified; full text bot-walled at remediation time; no numbers cited in prose.
+- ([S26] was on this list after round 1 — its full text was bot-walled at the time; it is now fully extracted from the publisher page and moved out of this register per the second audit.)
 
-**RHR → set RPE** — no primary source located; UNRESOLVED; RHR is stored as descriptive ingestion data and feeds **no** computation (see §7 and `05` §1b).
+**RHR → set RPE** — no primary source located; UNRESOLVED; RHR's exact current handling: absorbed into existing `hrv_daily` rows only, no athlete-facing consumer, counted by diagnostics (`05` §0, `00` §6).
 **Talk test → resistance sets** — no primary source located for strength work; construct excluded from any quantitative role.
 
 ## 9. What this evidence base supports (and forbids)

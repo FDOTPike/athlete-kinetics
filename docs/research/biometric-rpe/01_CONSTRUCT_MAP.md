@@ -69,7 +69,7 @@ This document defines every candidate construct precisely enough that no future 
 - **Subjective or physiological:** physiological.
 - **Applies to:** a work bout or session; HRR is a post-bout measurement.
 - **Ground truth:** cardiac autonomic (vagal) reactivation for HRR.
-- **Evidence state:** HRR's strongest evidence is *prognostic*: a blunted 1-minute HRR predicted all-cause mortality in 2,428 referred adults (adjusted relative risk 2.0, 95% CI 1.5–2.7) [S11] — a clinical-risk finding in a clinical population, with no demonstrated mapping to resistance-training effort. Wrist optical HR is unreliable during intense, intermittent, grip-heavy exercise (Mean Absolute Percentage Error up to ~18.66% reported for intense free-running exercise in a validation review [S09]); chest-strap ECG is far more accurate [S09] but measures the same non-effort quantity. Resistance-training HR is confounded by Valsalva, small vs large muscle mass, rest intervals, and heat.
+- **Evidence state:** HRR's strongest evidence is *prognostic*: a blunted 1-minute HRR predicted all-cause mortality in 2,428 referred adults (adjusted relative risk 2.0, 95% CI 1.5–2.7) [S11] — a clinical-risk finding in a clinical population, with no demonstrated mapping to resistance-training effort. Wrist optical HR is unreliable during intense, intermittent, grip-heavy exercise (MAPE up to ~18.66% vs an ECG criterion in a validation study of intense free-running exercise [S09]; **no cited source directly validates chest straps themselves** — corrected per third audit); chest-worn ECG-class sensors are nonetheless treated as the criterion method in that literature, and they measure the same non-effort quantity. Resistance-training HR is confounded by Valsalva, small vs large muscle mass, rest intervals, and heat.
 - **Why it must not be conflated:** HR during a heavy set reflects pressor responses, breath holding, and muscle-mass effects as much as metabolic demand — identical HR traces can come from a grinding RPE 9.5 set and an easy RPE 6 set with different breathing strategies.
 
 ## 8. Resting heart rate (RHR)
@@ -126,7 +126,7 @@ This document defines every candidate construct precisely enough that no future 
 | **Set RPE** | — | anchor language | different window (set vs session) | different window & kind | no conversion either way |
 | **RIR** | anchor of RPE | — | — | — | — |
 | **Session RPE** | aggregation ≠ new perception | — | — | — | no conversion |
-| **Readiness** | never fills/grades athlete RPE; modulates **planned** load/sets/rpe_cap via the policy engine [R07] | — | never derived from set RPE | — | inputs: HRV, sleep only (RHR feeds nothing [R01]) |
+| **Readiness** | never fills/grades athlete RPE; modulates **planned** load/sets/rpe_cap via the policy engine [R07] | — | never derived from set RPE | — | inputs: HRV, sleep only (RHR: no athlete-facing consumer [R01, R09]) |
 | **Biometric observations** | never fill, never grade | — | never fill | may feed readiness *only* | — |
 
 The three critical conflation traps, stated as invariants for tomorrow's auditor:
