@@ -21,9 +21,53 @@
 - **Deliverables tree:** exactly ten files, `docs/research/biometric-rpe/00…09` (§2 lists them). `git show --stat` for commits 1, 3, 5, and 7 must list only these; commits 2, 4, 6, and 8 must touch only this file.
 - **First-freeze audit:** REQUEST CHANGES (five P1 findings + additional required corrections). Remediation record: §11. The audit's provisional acceptance of the decision token and SpO2 ruling is recorded there verbatim in substance.
 
+### Round 3 closure freeze (this state)
+
+Recorded mechanically from the repository; recompute everything yourself rather than trusting these strings.
+
+- **Remediation commit (Commit 1):** `517505ca835f15f6cd0c32133bd7cff66116f2f4` — tree `785ab9f2a8c58113d5ffdf10e4a3baf2ddc078a2`. Message: `docs(research): close final biometric-RPE audit findings`.
+- **Files changed by Commit 1:** **9** of the ten deliverables (`00`, `01`, `02`, `03`, `04`, `05`, `06`, `08`, `09`), **86 insertions / 34 deletions**. `07_ARCHITECTURE_OPTIONS.md` required no change in this pass and is unchanged by Commit 1; it remains inside the cumulative ten-file scope from the base commit.
+- **Cumulative changed paths, `e15bbe9…` → this freeze:** exactly **10**, all under `docs/research/biometric-rpe/`. No product code, TypeScript, JavaScript, SQL/migration, dependency, permission, native, or release-configuration file appears in the diff.
+- **Freeze commit (Commit 2):** the commit that wrote this block. It cannot record its own SHA and touches only this file — resolve it with `git rev-parse HEAD` / `git rev-parse HEAD^{tree}`.
+- **Predecessor state audited:** the Round 3 audit was returned against `1649c8ed45f539ae8b5e4a7f09ef0c965280cbe3`; its first remediation landed as `0820fe5…` + `e2dde70…`, and this closure pass completes the residual findings left open at `e2dde70…` (§11, Round 3 closure table).
+
+**Manifest totals (mechanically derived from `03_SOURCE_MANIFEST.csv`):**
+
+| Metric | Value |
+|---|---|
+| Columns | 15 |
+| Rows | 46 |
+| Unique IDs | 46 (no duplicates) |
+| `primary_research` | 18 |
+| `primary_research_review` | 6 |
+| `primary_research_meta` | 2 |
+| `journal_commentary` | 1 |
+| `official_documentation` | 8 |
+| `repository_control` | 10 |
+| `preprint_context` | 1 |
+| Partially verified | 5 — `S05`, `S06`, `S21`, `S22`, `S23` |
+
+**Verification results at this freeze:**
+
+| Check | Result |
+|---|---|
+| CSV parse (`csv.DictReader`) | 15 columns, 46 rows, 46 unique IDs, 0 duplicates, type totals exactly as tabled above |
+| Prose → manifest join | **46** distinct cited IDs; **0** missing from the manifest; **0** manifest rows uncited; 11 enumerated ranges, every member resolving |
+| Stale-claim sweep | 6 residual hits, **each explicitly marked withdrawn or `SUPERSEDED BY ROUND 2/3`**; no hit states current truth |
+| `git diff --check e15bbe9…..HEAD` | clean — no whitespace errors, no conflict markers |
+| Changed-path scope | exactly the ten permitted deliverables |
+| Encoding / structure | all ten files valid UTF-8; no replacement characters, no mojibake, no merge markers, no CR; all Markdown tables well-formed (the malformed `08` UD-9 row inherited from an earlier commit was repaired); CSV rows all 15 fields |
+| `npm run verify:ci` | **exit 0** |
+
+**`npm run verify:ci` detail (so the number is auditable).** The first invocation *failed* at preflight: this worktree had no `node_modules` and no materialized embedder artifacts. The repository's own preflight prescribes the fix sequence, which was followed exactly — `npm ci`, then `npm run fetch:embedder` (the repository's sole network-capable materializer, which byte-verifies every artifact against its pinned SHA-256), then `npm run verify:ci`, which exited **0**. **No product code, test, fixture, or verifier threshold was modified to obtain that pass.** Both installed trees are git-ignored and appear in no diff. The log contains 2,816 `PASS` lines and 40 `FAIL` lines; **every one of those `FAIL` lines is inside the QA-artifact verifier's deliberate negative fixture** — a known-bad artifact used to prove the verifier detects failure, immediately followed by `PASS bad artifact reports failure without throwing`. Component tests: 19 suites / 249 tests, all passing.
+
+**No post-fix independent verdict has been fabricated.** Codex/Sol has **not** reviewed, verified, or approved this freeze. No reviewer verdict on this state exists anywhere in the document set, and none has been invented, paraphrased, or implied. This is **executor remediation under owner-granted push authority**, awaiting independent re-review; the work order's §10 independent-review criterion remains **unsatisfied**.
+
+**Boundaries at this freeze.** Decision token unchanged: **RESEARCH PILOT ONLY — no prescription or athlete-facing estimate**, still provisional. **Pilot execution: NO-GO**, pending UD-1, UD-2, UD-7 and the `06` §11 qualified approvals (owner, domain expert, IRB/EC). **Merge and release: NOT PERFORMED** — this branch is pushed to GitHub under explicit owner authority as the terminal action of this pass, and nothing else; it is not merged, rebased, force-pushed, tagged, released, built, or opened as a pull request, and `master` is untouched. A reviewer should confirm the remote branch resolves to the same commit as local `HEAD` and that no other ref moved. UD-10 (the ProfileScreen copy defect) is deliberately **not** fixed here, because product-code changes are outside this work order.
+
 ## 1. What this run was (and was not)
 
-Executor: GLM 5.3 at high effort, per the owner's dispatch (the remediation sequence's "recommended lead" rows name Gemini models; per established practice the owner's model switch is the role assignment). Effort disclosure: high, as instructed — for both the original run and the audit remediation. Owner override honored: the two in-run independent reviewers described in WO §9 were NOT commissioned; instead the owner-assigned Codex/Sol audit reviewed the first freeze (verdict: REQUEST CHANGES) and this remediation responds to it. Documentation-only: no TypeScript/JavaScript, SQL/migrations, native code, dependencies, permissions, prescriptions, release configuration, or signing material was touched. No biometric RPE scanner was implemented. No push, merge, tag, release, sign, or build was performed.
+Executor: GLM 5.3 at high effort, per the owner's dispatch (the remediation sequence's "recommended lead" rows name Gemini models; per established practice the owner's model switch is the role assignment). Effort disclosure: high, as instructed — for both the original run and the audit remediation. Owner override honored: the two in-run independent reviewers described in WO §9 were NOT commissioned; instead the owner-assigned Codex/Sol audit reviewed the first freeze (verdict: REQUEST CHANGES) and this remediation responds to it. Documentation-only: no TypeScript/JavaScript, SQL/migrations, native code, dependencies, permissions, prescriptions, release configuration, or signing material was touched. No biometric RPE scanner was implemented. **Updated at the Round 3 closure freeze:** the owner granted explicit authority to push this branch to GitHub, and that push is the **terminal action** of this closure pass — it follows this commit, and the resulting remote ref is verified against local `HEAD` in the closure handback. **No merge, no rebase, no force-push, no pull request, no tag, no release, no signing, no build, and no pilot execution is performed**, and `master` is not modified.
 
 ## 2. Files changed (complete list)
 
