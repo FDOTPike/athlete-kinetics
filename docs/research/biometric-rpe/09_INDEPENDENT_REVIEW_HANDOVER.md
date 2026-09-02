@@ -12,8 +12,9 @@
   2. `f9eb6bd56aaf0abd9502348a33b35fd7c28db82a` — first freeze record (Freeze Log fill; touched only `09` §0).
   3. `3ddfd78692c1cb8c87033039fa1992491762e30e` — first remediation (five P1 findings + additional corrections; 10 files, 184 insertions / 103 deletions).
   4. `9388edb6d24c7fde4b379f486b1a3cac56923111` — first final freeze record (freeze-log fill; touched only `09` §0; tree `6a998c388b6bd473ebb8566540198f89be1a3dc5`). **This is the commit the second audit reviewed.**
-  5. **SECOND REMEDIATION COMMIT** = `<filled-by-final-freeze-commit>` — the second audit's fixes (six findings; touches only the ten files in §2).
+  5. `0f1d7be4b0442ff0c7ff0a4f2b8ee0779de809a3` — **SECOND REMEDIATION COMMIT** — the second audit's fixes (six findings; 10 files, 80 insertions / 53 deletions, all within the ten files in §2).
   6. **FINAL FREEZE COMMIT (audit target)** = the commit that wrote this freeze log (it cannot record its own SHA; it is `HEAD`). It touches only this file. Recompute everything with `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` — never trust a SHA written inside a commit's own text.
+- **Second audit verdict:** REQUEST CHANGES — freeze integrity, documentation-only scope, the two-arm split, the RIR leakage rules, and the SpO2 ruling passed; six substantive findings followed. Remediation record: §11 (Round 2 table).
 - **Deliverables tree:** exactly ten files, `docs/research/biometric-rpe/00…09` (§2 lists them). `git show --stat` for commits 1, 3, and 5 must list only these (commit 1: all ten new; commits 3 and 5: remediation edits within the same set); commits 2, 4, and 6 must touch only this file.
 - **First-freeze audit:** REQUEST CHANGES (five P1 findings + additional required corrections). Remediation record: §11. The audit's provisional acceptance of the decision token and SpO2 ruling is recorded there verbatim in substance.
 
