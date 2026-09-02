@@ -7,7 +7,7 @@ A bounded record of what this discovery decided, what it deliberately left open,
 | ID | Decision | Basis | Where |
 |---|---|---|---|
 | D-MADE-1 | Decision token: RESEARCH PILOT ONLY (no prescription, no athlete-facing estimate) | evidence synthesis 02; WO §8 tokens | 00 §1 |
-| D-MADE-2 | SpO2: do not collect, any configuration, any purpose | no effort evidence [S13/S18/S21 context]; policy burden [D01/D02/D04]; prior ruling [R02] | 00 §3; 05 §8; 04 §6 |
+| D-MADE-2 | SpO2: do not collect, any configuration, any purpose | no effort evidence [S13/S18/S24 context]; policy burden [D01/D02/D04]; prior ruling [R02] | 00 §3; 05 §8; 04 §6 |
 | D-MADE-3 | Constructs: six-class separation law (observed biometric / derived feature / readiness / advisory / actual RPE / target RPE) | Calibration Policy v1 [R01, R01b]; WO §7 | 01; 07 §1 |
 | D-MADE-4 | No biometric quantity may fill, grade, or sit inside the RPE entry flow | WO §3 boundaries; null law [R03] | 00 §4; 07 §9 |
 | D-MADE-5 | Manual/subjective constructs (cues, optional cue entry, post-session session-RPE) are the only forward product candidates | [S01–S03, S07, S08, S10, R05] | 07 O1–O3 |
@@ -27,9 +27,10 @@ A bounded record of what this discovery decided, what it deliberately left open,
 | UD-4 | Whether session RPE should become a direct athlete global rating (Foster-aligned) instead of / alongside the current mean-of-rated-sets derivation [R03] | touches existing behavior; WO scope excludes behavior change this run | Francis Pike |
 | UD-5 | iOS bridge path (HealthKit) — out of scope here; interacts with O4/O5 device support | separate platform work order | Francis Pike |
 | UD-6 | Whether the `spo2_component` column should be formally deprecated in a future migration vs left neutral-excluded | schema change is outside this discovery's authority | Francis Pike |
-| UD-7 | Pilot data governance sign-off (retention limit, export mechanics, ethics/consent text) if UD-1 = execute | 06 §9/§11; `05` §1 bounded pilot retention | Owner + ethics-literate reviewer |
+| UD-7 | Pilot data governance sign-off (retention limit, export mechanics, ethics/consent text) if UD-1 = execute — **including the IRB/EC requirement** (`06` §11, added per second audit) | 06 §9/§11; `05` §1 bounded pilot retention | Owner + IRB/Ethics Committee |
 | UD-8 | Disposition of this docket after the post-remediation Codex/Sol audit (accept token, re-open decisions, commission deeper evidence review) | audit outcome pending | Francis Pike |
 | UD-9 | Resting-heart-rate consuming-feature gap: drop the RHR request, give it a real consuming feature, or document an explicit justification — before any Health apps declaration is filed | per audit: RHR is requested and stored but feeds no computation [R01b, R08]; Google requires per-type consuming features [D02, D05] | Francis Pike |
+| UD-10 | **Product-copy defect (added per second audit):** the ProfileScreen connected-state copy claims resting heart rate "feeds your readiness score" (`apps/mobile/src/screens/ProfileScreen.tsx:415`), contradicting the live materialization [R01b]. Fix is a code change — outside this documentation-only work order — and must land before any consent/declaration copy repeats the claim | user-facing accuracy + Play policy accuracy requirement [D02] | Francis Pike (code remediation work order) |
 
 ## 3. Scientific disagreements the evidence leaves open (recorded, not resolved)
 

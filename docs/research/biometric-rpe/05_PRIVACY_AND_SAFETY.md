@@ -43,7 +43,7 @@ Google's Health apps declaration requires each requested data type to support a 
 
 - The readiness formula is small, deterministic, and disclosed (renormalized weighted mean of available inputs; neutral 50.0 when nothing exists) [R01b]. This is the transparency bar: **an athlete must be able to learn, in one screen, how a displayed number was computed from what inputs.**
 - If a future advisory estimate ever exists (post-06-validation), it must ship with: its input list; its per-athlete calibration basis; a visible uncertainty representation (e.g. an interval, not a point); and a one-tap "why am I seeing this?" disclosure. A bare number next to the athlete's own RPE fails this bar by construction.
-- Uncertainty display is not optional garnish: the evidence base shows coarse classification ceilings even in lab settings [S12] and unstable signal quality in the field [S09, S19]. Any displayed estimate must look as unsure as the science is.
+- Uncertainty display is not optional garnish: the evidence base shows only coarse exertion classification even in lab settings [S12] and unstable signal quality in the field [S09, S19]. Any displayed estimate must look as unsure as the science is.
 
 ## 6. Athlete correction
 

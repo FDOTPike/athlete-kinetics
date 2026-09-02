@@ -96,7 +96,7 @@ This document defines every candidate construct precisely enough that no future 
 - **Time window:** one night, read the following morning.
 - **Subjective or physiological:** physiological (device-estimated) — with the caveat below.
 - **Applies to:** the night/day.
-- **Evidence state:** sleep insufficiency/poor quality degrades physical and cognitive performance in athletes (review-level) [S20]; consumer wearables agree well with polysomnography on total sleep time and sleep/wake (MAPE ≈ 10–20% TST; accuracy ≈ 84–91% sleep/wake) but stage estimates are unreliable, with very poor Cohen's κ for deep and REM stages in an 11-device validation [S19]. The app's unstaged-sleep fallback (0.92 population-median efficiency, `UNSTAGED_SLEEP_EFFICIENCY` [R01]) is an explicit internal estimation constant, disclosed here — not an external scientific claim.
+- **Evidence state:** sleep insufficiency and poor quality degrade athletes' physical performance and recovery (review-level [S20]); consumer wearables validate only moderately against polysomnography for stage classification: across 11 devices in a 75-participant multicenter study (ages 19–70), four-stage epoch-by-epoch accuracy spanned 0.28–0.71 with macro F1 0.26–0.69 and Cohen's κ 0.07–0.56, the best wearables reaching only moderate agreement [S19]. The app's unstaged-sleep fallback (0.92 population-median efficiency, `UNSTAGED_SLEEP_EFFICIENCY` [R01]) is an explicit internal estimation constant, disclosed here — not an external scientific claim.
 - **Why it must not be conflated:** last night's sleep plausibly modulates today's *capacity*, which is a readiness story; it cannot know how hard a set felt.
 
 ## 11. SpO2 (peripheral oxygen saturation)
@@ -105,7 +105,7 @@ This document defines every candidate construct precisely enough that no future 
 - **Time window:** point-in-time or overnight trends.
 - **Subjective or physiological:** physiological.
 - **Applies to:** a measurement session.
-- **Evidence state:** one validated smartwatch detected short-time hypoxemia comparably to a medical-grade reference during controlled desaturation in 24 healthy adults [S13]; broader consumer data show underestimation bias against tabletop pulse oximetry [S18] and a cautionary comment in a respiratory-medicine journal on trusting consumer SpO2 [S21]. There is **no evidence** connecting SpO2 to resistance-training effort or proximity to failure.
+- **Evidence state:** one validated smartwatch detected short-time hypoxemia comparably to a medical-grade reference during controlled desaturation in 24 healthy adults [S13]; broader consumer-device data show systematic underestimation vs clinical references [S18] and an independent journal commentary cautions against trusting consumer smartwatch SpO2 [S24]. There is **no evidence** connecting SpO2 to resistance-training effort or proximity to failure.
 - **Disposition:** **do not collect** (ruling in `00` §3 and `05` §8).
 - **Why it must not be conflated:** oxygenation is a medical-adjacent vital sign; using it as an effort proxy would both be unsupported and imply medical monitoring the app must never claim.
 
@@ -133,4 +133,5 @@ The three critical conflation traps, stated as invariants for tomorrow's auditor
 
 1. **No fill:** an absent `set_record.rpe` or `session_rpe` stays `NULL` [R03]; no biometric quantity may write it.
 2. **No grading:** no biometric-derived value may be displayed as a correctness judgment of an athlete-entered RPE.
-3. **No channel mixing:** readiness inputs (HRV, sleep) flow only into the materialized readiness score [R01b]; a future biometric-context surface would be a separate channel with its own provenance, never merged into readiness or RPE paths.
+3. **No channel mixing:** readiness inputs flow only into the materialized readiness score and its downstream policy use [R01b, R07] — and **the flow is direct as well as composite** (corrected per second audit): `evaluatePolicy` reads `hrv_z` and `sleep_efficiency_pct` **directly** for the load modifier and the readiness-boost/set rules (`policyReference.ts:39,46,51`), in addition to their contribution through `readiness_score`. The accurate statement of the live flow is therefore `HRV/sleep → readiness_score → load/set/rpe_cap modifiers` **plus** `HRV z / sleep efficiency → direct rule conditions in evaluatePolicy`. A future biometric-context surface would be a separate channel with its own provenance, never merged into readiness, policy inputs, or RPE paths.
+4. **Athlete-facing copy must match the flow (UD-10).** The ProfileScreen's connected-state copy claims resting heart rate "feeds your readiness score" (`apps/mobile/src/screens/ProfileScreen.tsx:415`) — which the live materialization contradicts [R01b]. Because this work order is documentation-only, this product-copy defect is logged as **UD-10** in `08` for later code remediation; until fixed, privacy/consent documentation must not repeat its claim.
