@@ -60,8 +60,8 @@ Always available, zero permission burden, clean provenance (source = the athlete
 | Resting HR | via HC | yes | via vendor app | no | partially (morning pulse) | never | granted (R01) |
 | Sleep (duration/efficiency) | via HC | yes | no | no | yes (coarse) | never | granted (R01) |
 | Sleep stages (deep/REM) | via HC | yes (unreliable [S19]) | no | no | no | never | granted (R01) |
-| Exercise HR (per-set) | no | discrete pre/post agreement shown, continuous intra-set unvalidated; device-specific [S29, S09] | accurate but no BLE layer | no | no | only via strap (new code+permission) | none — would need new |
-| SpO2 | no | some devices | no | yes (clinical) | no | n/a | none — do-not-collect |
+| Exercise HR (per-set) | no | discrete pre/post agreement shown, continuous intra-set unvalidated; device-specific [S29, S09] | plausibly the best per-second option, but resistance-training accuracy **unverified** (§4) and no BLE layer | no | no | only via strap (new code+permission) | none — would need new |
+| SpO2 | no | some devices | no | device- and context-specific accuracy [S13, S18]; **do-not-collect** disposition regardless (§6) | no | n/a | none — do-not-collect |
 | Velocity/RIR kinematics | no | no | no | no | no | requires external hardware [S04] | n/a |
 | Subjective cues (breathing/form) | yes | yes | yes | yes | yes | yes (the athlete is present) | none |
 
