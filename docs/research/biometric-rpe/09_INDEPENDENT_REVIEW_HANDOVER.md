@@ -68,6 +68,52 @@ Recorded mechanically from the repository at that freeze. **The manifest and joi
 
 **Boundaries at this freeze.** Decision token unchanged: **RESEARCH PILOT ONLY — no prescription or athlete-facing estimate**, still provisional. **Pilot execution: NO-GO**, pending UD-1, UD-2, UD-7 and the `06` §11 qualified approvals (owner, domain expert, IRB/EC). **Merge and release: NOT PERFORMED** — this branch is pushed to GitHub under explicit owner authority as the terminal action of this pass, and nothing else; it is not merged, rebased, force-pushed, tagged, released, built, or opened as a pull request, and `master` is untouched. A reviewer should confirm the remote branch resolves to the same commit as local `HEAD` and that no other ref moved. UD-10 (the ProfileScreen copy defect) is deliberately **not** fixed here, because product-code changes are outside this work order.
 
+### Round 4 freeze (current state)
+
+Recorded mechanically after the actions completed; recompute everything yourself rather than trusting these strings.
+
+- **Round 4 remediation commit:** `dd7cf56e6d7e138d4830f45304f10efb69bd02e1` — tree `5baa51bd22136e5159c0817996ba4b370ae6ad09`. Parent: `39cbafd6ec9437aa78070b7b6ed6ecc00b0e608b` (the audited state). Message: `docs(research): current-evidence correction and handover integrity`.
+- **Files changed by that commit:** **7** — `01`, `02`, `03`, `04`, `05`, `06`, `09` (**68 insertions / 24 deletions**). `00`, `07` and `08` needed no change this round and remain inside the cumulative ten-file scope.
+- **Cumulative changed paths, `e15bbe9…` → this freeze:** exactly **10**, all under `docs/research/biometric-rpe/`. No product code, TypeScript, JavaScript, SQL/migration, dependency, permission, native or release-configuration file appears in the diff.
+- **Freeze commit:** the commit that wrote this block; it touches only this file and cannot record its own SHA. Resolve it with `git rev-parse HEAD`.
+- **Remote state, verified by `git ls-remote` after pushing:**
+  - `refs/heads/codex/program-quality-remediation` = `e15bbe9301fe756ecda9d8296877b19e425ac112` — **fast-forwarded from `965492e02184e07ddab20391740f10a694bd9149`, no force**; `965492e` was confirmed an ancestor of `e15bbe9` before the push.
+  - `refs/heads/codex/biometric-rpe-discovery` = `dd7cf56e6d7e138d4830f45304f10efb69bd02e1` at the time of that push, then advanced by this freeze commit.
+- **Pull request:** a **draft** stacked PR, base `codex/program-quality-remediation`, head `codex/biometric-rpe-discovery`, so its diff contains exactly the ten deliverables rather than unrelated prerequisite commits. It is **not** marked ready for review. **CodeRabbit** was asked for a review by manual comment (`@coderabbitai full review`), because a draft PR against a non-default base is not auto-reviewed.
+
+**Manifest totals (mechanically derived):**
+
+| Metric | Value |
+|---|---|
+| Columns | 15 |
+| Rows | **48** |
+| Unique IDs | 48 (no duplicates) |
+| `primary_research` | **20** (18 + [S29] + [S30]) |
+| `primary_research_review` | 6 |
+| `primary_research_meta` | 2 |
+| `journal_commentary` | 1 |
+| `official_documentation` | 8 |
+| `repository_control` | 10 |
+| `preprint_context` | 1 |
+| Partially verified | 5 — `S05`, `S06`, `S21`, `S22`, `S23` |
+
+**Verification results at this freeze:**
+
+| Check | Result |
+|---|---|
+| CSV parse | 15 columns, 48 rows, 48 unique IDs, 0 duplicates, every row exactly 15 fields, type totals as tabled |
+| Prose → manifest join | **48** distinct cited IDs; **0** missing from the manifest; **0** manifest rows uncited; 11 enumerated ranges, every member resolving |
+| Encoding / structure | all ten files valid UTF-8; no replacement characters, no mojibake, no conflict markers, no CR; all Markdown tables well-formed; CSV quoting valid |
+| `git diff --check e15bbe9..HEAD` | clean — no whitespace errors, no conflict markers |
+| Changed-path scope | exactly the ten permitted deliverables |
+| `npm run verify:ci` | **exit 0** — 2,816 `PASS` lines; component tests 19 suites / 249 tests passing |
+
+**On that `verify:ci` pass.** It required the repository's own prescribed preflight sequence first — `npm ci`, then `npm run fetch:embedder` (the sole network-capable materializer, which byte-verifies each artifact against its pinned SHA-256). **No verifier, product source, test, fixture, dependency, permission or release file was modified to obtain the pass.** Both installed trees are git-ignored and appear in no diff. The log's `FAIL` lines all sit inside the QA-artifact verifier's deliberate negative fixture, immediately followed by `PASS bad artifact reports failure without throwing`.
+
+**No independent verdict on this state exists.** Codex/Sol's Round 4 audit was returned against `39cbafd…`; everything after it — including this freeze — is **executor remediation awaiting independent re-review**. Reviewer A (evidence) and Reviewer B (engineering/privacy) are both **incomplete**. A CodeRabbit review has been requested, but CodeRabbit is an automated assistant and is **neither** work-order lens. The work order's §10 independent-review criterion remains **unsatisfied**, and no reviewer conclusion has been invented, paraphrased or implied anywhere in this document set.
+
+**Boundaries at this freeze.** Decision token: **RESEARCH PILOT ONLY — no prescription or athlete-facing estimate**, still provisional. **Pilot execution: NO-GO**, pending UD-1, UD-2, UD-7 and the `06` §11 qualified approvals. **UD-9** and **UD-10** both remain **open**; UD-10 is deliberately unfixed because product-code changes are out of scope. Not performed: merge, rebase, force-push, tag, release, APK build, permission change, schema change, product-code change, marking the PR ready, or pilot execution. `master` is untouched.
+
 ## 1. What this run was (and was not)
 
 Executor: GLM 5.3 at high effort, per the owner's dispatch (the remediation sequence's "recommended lead" rows name Gemini models; per established practice the owner's model switch is the role assignment). Effort disclosure: high, as instructed — for both the original run and the audit remediation. Owner override honored: the two in-run independent reviewers described in WO §9 were NOT commissioned; instead the owner-assigned Codex/Sol audit reviewed the first freeze (verdict: REQUEST CHANGES) and this remediation responds to it. Documentation-only: no TypeScript/JavaScript, SQL/migrations, native code, dependencies, permissions, prescriptions, release configuration, or signing material was touched. No biometric RPE scanner was implemented. **Updated at the Round 3 closure freeze:** the owner granted explicit authority to push this branch to GitHub, and that push is the **terminal action** of this closure pass — it follows this commit, and the resulting remote ref is verified against local `HEAD` in the closure handback. **No merge, no rebase, no force-push, no pull request, no tag, no release, no signing, no build, and no pilot execution is performed**, and `master` is not modified.
