@@ -123,7 +123,7 @@ Partially verified — identity/DOI confirmed, remaining fields flagged; **no nu
 - **[S23]** arXiv:2510.03197 inertial RPE preprint — non-peer-reviewed; landscape context only.
 - ([S26] was on this list after round 1 — its full text was bot-walled at the time; it is now fully extracted from the publisher page and moved out of this register per the second audit.)
 
-**RHR → set RPE** — no primary source located; UNRESOLVED; RHR's exact current handling: absorbed into existing `hrv_daily` rows only, no athlete-facing consumer, counted by diagnostics (`05` §0, `00` §6).
+**RHR → set RPE** — no primary source located; UNRESOLVED. RHR's exact current handling [R09]: requested and read; stored alongside an `hrv_daily` row when that day's rMSSD exists, otherwise only updating an already-existing row (and not persisted at all when none exists); contributing nothing to readiness, planned load, planned sets, or the RPE cap; exposed through `loadMeasuredHistory`; and counted toward the developer-facing `hrvDays` diagnostic availability window — with **no athlete-facing consuming feature** (`00` §6, `01` §8, `05` §0).
 **Talk test → resistance sets** — no primary source located for strength work; construct excluded from any quantitative role.
 
 ## 9. What this evidence base supports (and forbids)

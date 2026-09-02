@@ -1,6 +1,6 @@
 # 01 — Construct Map: Effort, Recovery, and Physiological Observations
 
-This document defines every candidate construct precisely enough that no future design, prompt, or code path can silently merge two of them. The governing repository law already exists in Calibration Policy v1 [R01]: missing values stay missing, descriptive signals have no prescription authority, and the four-concept split below mirrors the policy's own architecture.
+This document defines every candidate construct precisely enough that no future design, prompt, or code path can silently merge two of them. The governing repository law already exists in Calibration Policy v1 [R01]: missing values stay missing, every construct keeps its own provenance and its own named consumer, and the four-concept split below mirrors the policy's own architecture. **Corrected per Round 3 closure:** an earlier version of this line read "descriptive signals have no prescription authority." That is false as written, and the error mattered — live HRV and sleep signals *do* reach the planned prescription, both through `readiness_score` and as **direct rule conditions** in `evaluatePolicy` [R07] (§13.3). The accurate invariant is narrower and is the one this document enforces: no physiological signal may fill, grade, or substitute for an **athlete-reported RPE**; its only legitimate reach is the readiness/planning channel.
 
 ## 1. Set RPE (actual, athlete-reported)
 
@@ -77,8 +77,9 @@ This document defines every candidate construct precisely enough that no future 
 - **Intended measure:** morning/resting HR as a slow-moving fitness/recovery descriptor.
 - **Time window:** daily.
 - **Subjective or physiological:** physiological.
-- **Applies to:** the day (already ingested by the app alongside HRV [R01]).
-- **Evidence state:** no primary source located that maps RHR to next-day set RPE. Marked **UNRESOLVED** in `02_EVIDENCE_REVIEW.md` (§5): the app stores it, this discovery claims nothing causal or predictive about it, and any future use requires new primary evidence.
+- **Applies to:** the day (requested and read by the app alongside HRV [R01]).
+- **Evidence state:** no primary source located that maps RHR to next-day set RPE. Marked **UNRESOLVED** in `02_EVIDENCE_REVIEW.md` (§5): this discovery claims nothing causal or predictive about it, and any future use requires new primary evidence.
+- **Current handling in the live app (complete; per Round 3 closure) [R09]:** requested and read [R01]; stored **alongside** an `hrv_daily` row when that day's rMSSD exists, while an RHR-only day merely updates an already-existing row and is **not persisted at all** if none exists (`useStore.ts:4232-4243`); contributing **nothing** to readiness, planned load, planned sets, or the RPE cap [R01b]; **exposed** through `loadMeasuredHistory` as `restingHr` (`useStore.ts:4384-4405`); and **counted** toward the developer-facing `hrvDays` diagnostic availability window (`coachVerificationLab.ts:362-377`) — a diagnostic count, not readiness or prescription use. It nonetheless has **no athlete-facing consuming feature**, which is why UD-9 remains a live Play/declaration issue (`00` §6, `05` §1b, `08` UD-9). Statements like "RHR feeds nothing" or "RHR is always stored" are both inaccurate and are withdrawn wherever they appeared.
 - **Why it must not be conflated:** a day-scale resting metric cannot grade a 40-second set.
 
 ## 9. Heart-rate variability (HRV / rMSSD)
