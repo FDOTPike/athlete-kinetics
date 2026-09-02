@@ -11,7 +11,7 @@ A bounded record of what this discovery decided, what it deliberately left open,
 | D-MADE-3 | Constructs: six-class separation law (observed biometric / derived feature / readiness / advisory / actual RPE / target RPE) | Calibration Policy v1 [R01, R01b]; WO §7 | 01; 07 §1 |
 | D-MADE-4 | No biometric quantity may fill, grade, or sit inside the RPE entry flow | WO §3 boundaries; null law [R03] | 00 §4; 07 §9 |
 | D-MADE-5 | Manual/subjective constructs (cues, optional cue entry, post-session session-RPE) are the only forward product candidates | [S01–S03, S07, S08, S10, R05] | 07 O1–O3 |
-| D-MADE-6 | Biometric context display (O4), if ever built, lives on the readiness surface with provenance + dates — never beside set entry | anchoring-contamination risk; 05 §5 | 07 O4 |
+| D-MADE-6 | Biometric context display (O4) is a **hypothetical readiness-surface option only, never an effort-entry candidate** (consistency with D-MADE-5 clarified per Round 4 review); if ever built it lives on the readiness surface with whatever provenance the schema actually supports (`07` O5) — never beside set entry | anchoring-contamination risk; 05 §5 | 07 O4 |
 | D-MADE-7 | The validation pilot (06) is the only authorized forward artifact and requires separate owner ratification before execution | WO §5; decision token | 00 §1; 06 §0/§11 |
 | D-MADE-8 | No new Health Connect record type, no new permission, no schema change proposed by this discovery | minimization [D02]; 04 feasibility | 04 §1/§10 |
 | D-MADE-9 | Pilot thresholds in 06 §8 are unratified placeholders — explicitly owner/domain-expert decisions | WO §5 ("do not invent acceptance thresholds") | 06 §8/§11 |
@@ -22,7 +22,7 @@ A bounded record of what this discovery decided, what it deliberately left open,
 | ID | Unresolved decision | Why it is open | Suggested owner |
 |---|---|---|---|
 | UD-1 | Ratify or reject the pilot protocol itself (06): execute, amend, or shelve | owner gate per 06 §11 | Francis Pike + domain expert |
-| UD-2 | Adopt/reject/move candidate validation thresholds (MAE ≤ 0.5, high-effort miss ≤ 10%, band-superiority, no-harmful-subgroup) | WO forbids executor-invented thresholds | Owner + domain expert |
+| UD-2 | Adopt/reject/move candidate validation thresholds, **with the arm assignments from `06` §8 carried over so none is applied to the wrong arm** (per Round 4 review): within-athlete set-RPE **MAE ≤ 0.5 in Arm I**; high-effort miss rate **≤ 10% in either arm**; secondary-band superiority **within the same arm**; no harmful-direction subgroup bias | WO forbids executor-invented thresholds | Owner + domain expert |
 | UD-3 | Option ranking among O2 (cue entry), O3 (session-RPE prompt), O4 (biometric context) for any future product cycle | product judgment; friction trade-offs; not evidence-resolvable here | Francis Pike |
 | UD-4 | Whether session RPE should become a direct athlete global rating (Foster-aligned) instead of / alongside the current mean-of-rated-sets derivation [R03] | touches existing behavior; WO scope excludes behavior change this run | Francis Pike |
 | UD-5 | iOS bridge path (HealthKit) — out of scope here; interacts with O4/O5 device support | separate platform work order | Francis Pike |

@@ -6,7 +6,7 @@
 ## 0. Freeze record (four rounds; pushed)
 
 - **Base commit (verified before any write):** `e15bbe9301fe756ecda9d8296877b19e425ac112` — `git status --short` was empty at W0; `docs/WORKORDER_ADVANCED_BIOMETRIC_RPE_DISCOVERY.md` present at base.
-- **Branch / worktree:** `codex/biometric-rpe-discovery` at `C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\codex-biometric-rpe-discovery`. Deviation note: the work order names the path `...\worktrees\biometric-rpe-discovery` (without the `codex-` prefix); the existing worktree at the prefixed path already carried this exact branch at the exact base commit with a clean tree, so it was used rather than duplicated or overwritten, per the work order's own inspect-don't-overwrite rule.
+- **Branch / worktree:** `codex/biometric-rpe-discovery`, in a local worktree whose absolute path is **redacted** — it is not needed to reproduce this audit, and it exposed a developer username and directory layout (removed per Round 4 review). Deviation note: the work order names a worktree directory without the `codex-` prefix; the existing worktree at the prefixed directory already carried this exact branch at the exact base commit with a clean tree, so it was used rather than duplicated or overwritten, per the work order's own inspect-don't-overwrite rule.
 - **Historical commit chain (as built — this list is the *pre-push development history*, not the current remote state; see "Current remote state" below):**
   1. `9dd3ba9f3a489563bfb1c1340078c14f3d59d63a` — first deliverables commit (ten files; tree `caecdd3e23e2d4e2667734df2c928668ce0f94eb`).
   2. `f9eb6bd56aaf0abd9502348a33b35fd7c28db82a` — first freeze record (Freeze Log fill; touched only `09` §0).
@@ -114,7 +114,9 @@ Recorded mechanically after the actions completed; recompute everything yourself
 
 **Boundaries at this freeze.** Decision token: **RESEARCH PILOT ONLY — no prescription or athlete-facing estimate**, still provisional. **Pilot execution: NO-GO**, pending UD-1, UD-2, UD-7 and the `06` §11 qualified approvals. **UD-9** and **UD-10** both remain **open**; UD-10 is deliberately unfixed because product-code changes are out of scope. Not performed: merge, rebase, force-push, tag, release, APK build, permission change, schema change, product-code change, marking the PR ready, or pilot execution. `master` is untouched.
 
-## 1. What this run was (and was not)
+## 1. What the Round 3 closure run was (historical record — superseded on the push/PR points)
+
+> **Currency note (per Round 4 review):** this section records the **Round 3 closure** run. Its statement that no push, merge, tag, release or build was performed was true when written and is **no longer current** on the push point — the branch is published and a draft stacked PR is open (see §0, "Current remote state", and the Round 4 freeze). The executor attribution below describes the Round 3 run; **Round 4 was executed by Claude Opus 5**. Merge, rebase, force-push, tag, release and build remain not performed.
 
 Executor: GLM 5.3 at high effort, per the owner's dispatch (the remediation sequence's "recommended lead" rows name Gemini models; per established practice the owner's model switch is the role assignment). Effort disclosure: high, as instructed — for both the original run and the audit remediation. Owner override honored: the two in-run independent reviewers described in WO §9 were NOT commissioned; instead the owner-assigned Codex/Sol audit reviewed the first freeze (verdict: REQUEST CHANGES) and this remediation responds to it. Documentation-only: no TypeScript/JavaScript, SQL/migrations, native code, dependencies, permissions, prescriptions, release configuration, or signing material was touched. No biometric RPE scanner was implemented. **Updated at the Round 3 closure freeze:** the owner granted explicit authority to push this branch to GitHub, and that push is the **terminal action** of this closure pass — it follows this commit, and the resulting remote ref is verified against local `HEAD` in the closure handback. **No merge, no rebase, no force-push, no pull request, no tag, no release, no signing, no build, and no pilot execution is performed**, and `master` is not modified.
 
@@ -135,7 +137,7 @@ Nothing outside `docs/research/biometric-rpe/` was added, modified, or deleted. 
 
 ## 3. Source totals (03_SOURCE_MANIFEST.csv, **48 rows** after the Round 4 current-evidence remediation; counts mechanically derived and cross-checked against the CSV by script)
 
-- Primary research: **29** (**20** `primary_research` + 6 `primary_research_review` + 2 `primary_research_meta` + 1 `journal_commentary` [S24, classified as literature]) — `primary_research` rose from 18 with the Round 4 additions **[S29]** (smartwatch HR vs ECG in resistance exercise) and **[S30]** (workload/context predictors of set RPE)
+- **Literature records: 29** — of which **`primary_research`: 20**, plus 6 `primary_research_review`, 2 `primary_research_meta` and 1 `journal_commentary` [S24]. (**Label corrected per Round 4 review:** the aggregate was previously headed "Primary research: 29", which overstated the primary-evidence count by folding reviews, meta-analyses and a commentary into it.) — `primary_research` rose from 18 with the Round 4 additions **[S29]** (smartwatch HR vs ECG in resistance exercise) and **[S30]** (workload/context predictors of set RPE)
 - Official platform/policy documentation: **8** (`D01`–`D05`, `D08`, `D09`, `D10` — corrected per third audit; the round-2 handover said six)
 - Repository controls (live code/schema/policy inspection): 10 (`R01`, `R01b`, `R02`–`R05`, `R06`–`R08`, **`R09`** — RHR's actual code handling, added per third audit)
 - Non-peer-reviewed preprint (context only, supports no claim): 1 (`S23`)
@@ -150,7 +152,7 @@ Nothing outside `docs/research/biometric-rpe/` was added, modified, or deleted. 
 5. **The SpO2 ruling** (`00` §3; `05` §8) — arguments: no effort evidence [S13/S18 are non-effort validations; S24 is the independent trustworthiness caution]; accuracy limits and device dropout [S18]; medical semantics [S11 analogy]; Play per-data-type declaration burden [D01/D02/D05]. Attack this; it is the most consequential collect/do-not-collect call.
 6. **The validation protocol's two-arm design and its decision-critical ablation** (`06` §2/§7 — Arm P population athlete-disjoint, Arm I chronological individualisation, contemporaneous-RIR leakage rules, and the M0 workload/context vs M0+biometric incremental ablation with tuning contained inside training partitions) plus its safety properties (§1 five-band target per `effortCues.ts`, §8 unratified thresholds, §11 IRB/EC approval matrix) — stress-test whether any step could leak into product behavior without owner gates, whether Arm I's calibration-window design still leaks anywhere, and whether the ablation genuinely isolates the biometric increment.
 7. **The privacy/architecture reconciliation** (`05` §1b/§2; `01` §4/§13; `07` §1) — verify against the live repository that the described flows are accurate. Specifically: **both** HRV/sleep policy paths — the **composite** path (`HRV/sleep → readiness_score → planned load/set/rpe_cap modifiers`) **and** the **direct** path (`hrv_z` / `sleep_efficiency_pct` read as rule conditions inside `evaluatePolicy`, `policyReference.ts:39,46,51`) [R07]; the **complete RHR data map** [R09] — requested and read, stored only alongside an existing/incoming HRV row (`useStore.ts:4232-4243`), contributing nothing to readiness or prescription, **exposed** through `loadMeasuredHistory` (`useStore.ts:4384-4405`), **counted** by the `hrvDays` diagnostic (`coachVerificationLab.ts:362-377`), and still lacking any athlete-facing consuming feature [UD-9 gap]; any-granted bridge status [R08]; and the ProfileScreen copy defect logged as UD-10 (`01` §13.4).
-8. **Platform-documentation currency** [D01–D05, D08] — captured 2026-09-02 (D05's page footer-dated 2026-03-10); re-check the cited Android/Apple pages if policy changed.
+8. **Platform-documentation currency** [D01–D05, D08, **D09**, **D10**] — captured 2026-09-02 (D05's page footer-dated 2026-03-10); re-check the cited Android/Apple pages if policy changed. **D09 and D10 are included per Round 4 review**, because the `ExerciseSegment` set-structure claim and the `HeartRateRecord.Sample` / exercise-session-range claim in `04` §5 rest entirely on them; leaving them out put two load-bearing platform-capability claims outside the stated verification scope.
 
 ## 5. SpO2 disposition (as recorded — audit-accepted)
 
@@ -180,7 +182,7 @@ UD-1 ratify/amend/shelve the pilot protocol; UD-2 adopt/reject/move candidate th
 - Platform documentation (`D01`–`D05`, `D08`) is a point-in-time capture (2026-09-02; D05 page-dated 2026-03-10) and evolves.
 - All evidence is population-level; no individually validated model exists anywhere — which is precisely why the token is RESEARCH PILOT ONLY.
 
-## 9. Exact checks already performed (across both rounds)
+## 9. Exact checks already performed (across the four recorded rounds)
 
 1. Ten deliverables exist under `docs/research/biometric-rpe/` (count verified by file listing; re-verified after remediation).
 2. `03_SOURCE_MANIFEST.csv` parses (Python csv.DictReader): re-verified after regeneration — row count and 15-column header reported in §3.
@@ -203,8 +205,8 @@ Re-run everything yourself — this handover is an input to your audit, not a su
 
 **Round 1** (against the first deliverables commit): REQUEST CHANGES, five P1 findings + additional corrections — all dispositioned below.
 **Round 2** (against `9388edb6d24c7fde4b379f486b1a3cac56923111`): REQUEST CHANGES, six findings, three of them errors in the round-1 remediation itself — dispositioned below.
-**Round 4** (against `39cbafd6ec9437aa78070b7b6ed6ecc00b0e608b`, the pushed Round 3 closure freeze): REQUEST CHANGES — current-evidence correction, handover correction, PR-base correction, and independent reviews still pending. Dispositioned in the Round 4 table below.
 **Round 3** (against `1649c8ed45f539ae8b5e4a7f09ef0c965280cbe3`): REQUEST CHANGES as a final recheck — freeze integrity, docs-only scope, and all round-2 literature/platform fixes passed; four P1s + a P2 set of residual inconsistencies followed. All dispositioned below.
+**Round 4** (against `39cbafd6ec9437aa78070b7b6ed6ecc00b0e608b`, the pushed Round 3 closure freeze): REQUEST CHANGES — current-evidence correction, handover correction, PR-base correction, and independent reviews still pending. Dispositioned in the Round 4 table below.
 
 ### Round 1 (five P1 findings + additional required corrections)
 
