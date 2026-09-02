@@ -55,7 +55,7 @@ Recorded mechanically from the repository at that freeze. **The manifest and joi
 | Check | Result |
 |---|---|
 | CSV parse (`csv.DictReader`) | 15 columns, 46 rows, 46 unique IDs, 0 duplicates, type totals exactly as tabled above |
-| Prose → manifest join | **46** distinct cited IDs; **0** missing from the manifest; **0** manifest rows uncited; 11 enumerated ranges, every member resolving |
+| Prose → manifest join | **46** distinct cited IDs at that freeze; **0** missing from the manifest; **0** manifest rows uncited (range notation expanded before joining) |
 | Stale-claim sweep | 6 residual hits, **each explicitly marked withdrawn or `SUPERSEDED BY ROUND 2/3`**; no hit states current truth |
 | `git diff --check e15bbe9…..HEAD` | clean — no whitespace errors, no conflict markers |
 | Changed-path scope | exactly the ten permitted deliverables |
@@ -68,7 +68,7 @@ Recorded mechanically from the repository at that freeze. **The manifest and joi
 
 **Boundaries at this freeze.** Decision token unchanged: **RESEARCH PILOT ONLY — no prescription or athlete-facing estimate**, still provisional. **Pilot execution: NO-GO**, pending UD-1, UD-2, UD-7 and the `06` §11 qualified approvals (owner, domain expert, IRB/EC). **Merge and release: NOT PERFORMED** — this branch is pushed to GitHub under explicit owner authority as the terminal action of this pass, and nothing else; it is not merged, rebased, force-pushed, tagged, released, built, or opened as a pull request, and `master` is untouched. A reviewer should confirm the remote branch resolves to the same commit as local `HEAD` and that no other ref moved. UD-10 (the ProfileScreen copy defect) is deliberately **not** fixed here, because product-code changes are outside this work order.
 
-### Round 4 freeze (current state)
+### Round 4 freeze (historical — state at `1437f5c…`, superseded by the post-CodeRabbit block below)
 
 Recorded mechanically after the actions completed; recompute everything yourself rather than trusting these strings.
 
@@ -102,7 +102,7 @@ Recorded mechanically after the actions completed; recompute everything yourself
 | Check | Result |
 |---|---|
 | CSV parse | 15 columns, 48 rows, 48 unique IDs, 0 duplicates, every row exactly 15 fields, type totals as tabled |
-| Prose → manifest join | **48** distinct cited IDs; **0** missing from the manifest; **0** manifest rows uncited; 11 enumerated ranges, every member resolving |
+| Prose → manifest join | **48** distinct cited IDs; **0** missing from the manifest; **0** manifest rows uncited (range notation expanded before joining) |
 | Encoding / structure | all ten files valid UTF-8; no replacement characters, no mojibake, no conflict markers, no CR; all Markdown tables well-formed; CSV quoting valid |
 | `git diff --check e15bbe9..HEAD` | clean — no whitespace errors, no conflict markers |
 | Changed-path scope | exactly the ten permitted deliverables |
@@ -113,6 +113,59 @@ Recorded mechanically after the actions completed; recompute everything yourself
 **No independent verdict on this state exists.** Codex/Sol's Round 4 audit was returned against `39cbafd…`; everything after it — including this freeze — is **executor remediation awaiting independent re-review**. Reviewer A (evidence) and Reviewer B (engineering/privacy) are both **incomplete**. A CodeRabbit review has been requested, but CodeRabbit is an automated assistant and is **neither** work-order lens. The work order's §10 independent-review criterion remains **unsatisfied**, and no reviewer conclusion has been invented, paraphrased or implied anywhere in this document set.
 
 **Boundaries at this freeze.** Decision token: **RESEARCH PILOT ONLY — no prescription or athlete-facing estimate**, still provisional. **Pilot execution: NO-GO**, pending UD-1, UD-2, UD-7 and the `06` §11 qualified approvals. **UD-9** and **UD-10** both remain **open**; UD-10 is deliberately unfixed because product-code changes are out of scope. Not performed: merge, rebase, force-push, tag, release, APK build, permission change, schema change, product-code change, marking the PR ready, or pilot execution. `master` is untouched.
+
+### Post-CodeRabbit candidate (CURRENT STATE)
+
+This is the live state of the branch. It supersedes the freeze blocks above on every point where they differ; those are retained as history, not as current truth.
+
+- **Candidate commit at the start of this remediation:** `16ff5485a7653a8fb03cb2df9c7f5a9e5f18c870` — tree `8cba55fedf48a1cf45339836f72baffc9e03e2cc`.
+- **Base:** `e15bbe9301fe756ecda9d8296877b19e425ac112` (confirmed an ancestor of the candidate).
+- **Post-freeze remediation commits** (all documentation-only, all inside the ten deliverables):
+
+  | # | SHA | What it did |
+  |---|---|---|
+  | 1 | `cd2c4c2` | aligned `04` §10's feasibility verdict with the [S29] device/timing boundary |
+  | 2 | `640e613` | scoped [S30] to association strength; withdrew "already works" framing for M0 |
+  | 3 | `5409bdf` | addressed the CodeRabbit review: **excluded biometric-derived planned target RPE from M0**, added the `06` blinding gate and high-effort evaluability floor, OS-backup disclosure, `07` writer-contract and provenance limits, and removed a committed local filesystem path |
+  | 4 | `9e2ea55` | reconciled residual [S30] prediction wording in `02` and the manifest row |
+  | 5 | `16ff548` | reconciled the safety-care copy, `04` matrix qualifiers, Arm I calibration/holdout minima, and the O4 consent gate |
+
+- **Pull request:** <https://github.com/FDOTPike/athlete-kinetics/pull/7> — base `codex/program-quality-remediation`, head `codex/biometric-rpe-discovery`, **draft, stacked**. Not marked ready; not merged.
+
+**CodeRabbit status — stated precisely, because the two signals disagree.**
+
+- The **manual reviews** (each triggered by an explicit `@coderabbitai full review` comment) produced **30 review threads**. All **30 are resolved**; **26 are outdated** (superseded by later pushes) and **0 current unresolved threads** remain.
+- The **automatic status check** on the PR reports **"Review skipped: draft pull request"**, which GitHub renders as a green *pass*. **That green tick is not a review verdict** — it records that CodeRabbit declined to auto-review a draft. Do not read it as approval, and do not conflate it with the manual review results above.
+- **CodeRabbit is an automated assistant. It is not the work order's Reviewer A (evidence) or Reviewer B (engineering/privacy), and it cannot satisfy either.**
+
+**CI at this exact head (`16ff5485`)** — both GitHub jobs completed successfully:
+
+| Job | Result |
+|---|---|
+| Verification suite (21 gates + typecheck) | **success** |
+| Android QA + debug APKs (sideloadable, never for Play) | **success** |
+
+**Durable manifest/citation invariant (replaces the brittle range-count phrasing).** The check that matters, and the one to re-run:
+
+> **48 expanded cited IDs · 48 manifest IDs · 0 missing · 0 uncited.**
+
+Every `[S##]`/`[D##]`/`[R##]` reference in the prose, **with range notation expanded to its members**, resolves to a manifest row; and every manifest row is cited somewhere. Counting how many ranges happen to appear is an artifact of phrasing and was removed — the invariant above is what a reviewer should assert.
+
+**Independent review status — unchanged and unsatisfied.**
+
+- **Reviewer A (evidence): PENDING.** **Reviewer B (engineering/privacy): PENDING.**
+- Neither lens has been completed on any state of this branch. The work order's acceptance criterion requiring both independent reviews to be attached is **NOT met**.
+- **No APPROVE verdict exists.** None has been issued, self-issued, fabricated, paraphrased, or implied by this executor, and no CodeRabbit output may be presented as one. Every audit round to date returned **REQUEST CHANGES**.
+
+**On this commit's own SHA.** The commit that writes this block **cannot contain its own SHA** — the hash is computed over the content, so any SHA printed here would necessarily be a different, earlier commit. Reviewers must therefore resolve the live tip themselves rather than trusting a string in the text:
+
+```
+git rev-parse HEAD
+git rev-parse HEAD^{tree}
+git ls-remote --heads origin refs/heads/codex/biometric-rpe-discovery
+```
+
+The same caution applies to every SHA in this document: treat them as claims to verify, not as facts.
 
 ## 1. What the Round 3 closure run was (historical record — superseded on the push/PR points)
 

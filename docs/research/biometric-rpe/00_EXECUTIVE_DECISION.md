@@ -3,7 +3,7 @@
 - **Work order:** `docs/WORKORDER_ADVANCED_BIOMETRIC_RPE_DISCOVERY.md` (Phase C of `docs/PROGRAM_QUALITY_REMEDIATION_SEQUENCE.md`)
 - **Base commit (verified):** `e15bbe9301fe756ecda9d8296877b19e425ac112`
 - **Deliverable set:** documentation-only discovery, ten files under `docs/research/biometric-rpe/`
-- **Remediation status:** this document set has been through **three independent audit rounds** (all REQUEST CHANGES: five P1 findings in round 1; six in round 2, which found errors in the round-1 remediation itself; four P1s plus a P2 set in round 3) with a remediation pass after each, on the same branch; the full remediation record for all three rounds is `09` §11. Independent review of the current state remains **PENDING — OWNER ASSIGNED TO CODEX/SOL**.
+- **Remediation status:** this document set has been through **four independent audit rounds**, every one returning **REQUEST CHANGES** — five P1 findings in round 1; six in round 2, which found errors in the round-1 remediation itself; four P1s plus a P2 set in round 3; and four findings in round 4 (current-evidence correction, handover correction, PR-base correction, and independent reviews still pending). A remediation pass followed each, on the same branch; the full record for all four rounds is `09` §11. **No round has returned an approval.** Independent review of the current state remains **PENDING — OWNER ASSIGNED TO CODEX/SOL**, and nothing in this package should be read as approving the current tip.
 - **This run's executor:** GLM 5.3, high effort, per owner dispatch (the sequence's "recommended lead" rows name Gemini models; the owner's model switch is the role assignment)
 
 ## 1. Decision
