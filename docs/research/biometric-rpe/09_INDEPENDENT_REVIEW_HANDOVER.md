@@ -339,6 +339,10 @@ Third verdict: REQUEST CHANGES — freeze integrity, docs-only scope, and all ro
 
 **Boundaries unchanged by Round 4.** Decision token: **RESEARCH PILOT ONLY**. **Pilot execution: NO-GO**, pending UD-1, UD-2, UD-7 and the `06` §11 qualified approvals. **UD-9** (RHR consuming-feature gap) and **UD-10** (ProfileScreen copy defect) both remain **open**; UD-10 is deliberately unfixed because product-code changes are out of scope. No merge, rebase, force-push, tag, release, APK build, permission change, schema change, product-code change or pilot execution was performed.
 
+## 12. How to fail this work
+
+For clarity, the findings that would most change the outcome: any verified primary source demonstrating per-set biometric RPE estimation; any repository claim in `02` §7 that does not reproduce; any conflated construct in `01`; any missing manifest row behind a material claim; any place the deliverables promise a feature rather than a decision. If you find one, the token, the docket, or the document set needs revision — say which.
+
 ## 13. Reviewer A — independent evidence audit (COMPLETED; verdict REQUEST CHANGES)
 
 **This is the first completed independent review lens on this branch.** It is recorded here because the status changed: Reviewer A is no longer pending. It did **not** approve.
@@ -365,8 +369,4 @@ Recorded because a reviewer should know what has already been reproduced indepen
 
 ### Status after this remediation
 
-**Reviewer A: COMPLETED, verdict REQUEST CHANGES — findings remediated above, re-review NOT run.** A remediation is not an approval, and this executor has not sought, inferred, or recorded one. **Reviewer B (engineering/privacy): NOT STARTED.** Its handover scope is `09` §14. The work order's acceptance criterion requiring **both** independent reviews attached remains **NOT met**, and merge/release authority remains **not granted**.
-
-## 12. How to fail this work
-
-For clarity, the findings that would most change the outcome: any verified primary source demonstrating per-set biometric RPE estimation; any repository claim in `02` §7 that does not reproduce; any conflated construct in `01`; any missing manifest row behind a material claim; any place the deliverables promise a feature rather than a decision. If you find one, the token, the docket, or the document set needs revision — say which.
+**Reviewer A: COMPLETED, verdict REQUEST CHANGES — findings remediated above, re-review NOT run.** A remediation is not an approval, and this executor has not sought, inferred, or recorded one. **Reviewer B (engineering/privacy): NOT STARTED.** Its handover scope is `09` §6 (proposed architecture boundaries, written for Reviewer B's lens) together with §10 (review lenses). *(Corrected: an earlier draft of this line pointed at “§14”, a section that does not exist in this document — the number was carried over from the Reviewer A report's own section numbering.)* The work order's acceptance criterion requiring **both** independent reviews attached remains **NOT met**, and merge/release authority remains **not granted**.
