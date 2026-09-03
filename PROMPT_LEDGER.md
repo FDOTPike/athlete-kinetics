@@ -3565,4 +3565,61 @@ Return exactly one implementation token:
 
 ### Output F(G(x))
 
-*(In progress — Team Preview execution)*
+- **Status:** Complete & Approved under Antigravity Team Preview (Round 2). Ready for independent Codex/Sol audit.
+- **Identity & Tree SHAs:**
+  - Base Commit SHA (W0): `f8a0033717962f3492ff38e54681b20d54f82868`
+  - Required Product Ancestor SHA: `e15bbe9301fe756ecda9d8296877b19e425ac112`
+  - Final Candidate Product Freeze Commit SHA: `71ccc027275b080a42fea0ad67aff1e38d913740`
+    - Product Freeze Tree SHA: `7e12cfe16fae28135e940735b5292062c790480e`
+  - Candidate Freeze Head 2 SHA (Pre-Handover): `cedb24b54335493b4e752ea86c9de2fb2dee74d5`
+    - Freeze Head 2 Tree SHA: `b5dd11b99321fad3e0632c0c5ccc9bbe5e072785`
+  - Branch: `codex/rpe-familiarisation`
+  - Worktree: `C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation`
+  - Node: `v24.11.1`, npm: `11.18.0`
+- **Milestone Execution Summary (W0–W7):**
+  - **W0 (Identity & Setup):** Verified worktree cleanliness, branch, starting HEAD (`f8a0033`), required ancestor (`e15bbe9`). Recorded Entry 0061 in `PROMPT_LEDGER.md` preserving one open Output section (`commit da84cb2`).
+  - **W1 (Red-First Test Proofs):** Authored failing unit/component tests in `SessionScreen.test.js`, `Glossary.test.js`, `ProfileScreens.test.js`, and `verify_effort_cues.mjs` establishing baseline contract failures before any product modifications.
+  - **W2 (Pure Boundary & Inference):** Implemented pure `mapRirToRpe` helper, `RIR_CHOICES`, and safety stop cues (`EFFORT_STOP_GUIDANCE`, `EFFORT_BREATHING_NOTE`) in `packages/inference/src/effortCues.ts` and re-exported via `packages/inference/src/index.ts`. All 17 checks passing (`commit 4614c4f`).
+  - **W3 (Canonical Glossary & Hardened InfoTips):** Created offline canonical glossary data module in `apps/mobile/src/data/glossary.ts` containing all 46 beginner S&C terms, categories, and aliases. Hardened `apps/mobile/src/components/InfoTip.tsx` with fail-closed behavior on unknown keys (`throw` in development/test, `null` in production). Aligned loading method tip key in `apps/mobile/src/components/RoutineTemplateBuilder.tsx` (`WAVE` -> `'Undulating'`). Created searchable `apps/mobile/src/screens/GlossaryScreen.tsx` and integrated sub-view back navigation under `apps/mobile/src/screens/ProfileScreen.tsx` without expanding root tabs (`commit 450380e`).
+  - **W4 (Unanchored RIR/RPE Effort Entry in SessionScreen):** Excised target-anchored actual-RPE confirmation and preselection. Added clean-reps-left RIR selection chips (`0`, `1`, `2`, `3`, `4+`, `Not sure`) for rep-based sets. Implemented unanchored direct numeric half-step stepper (`5.0–10.0`). Preserved null semantics for unanswered sets and 'Not sure'. Implemented set-identity reset via `activeSetKey` and preserved rest-timer fallback separation (`commit 93d4877`, Candidate Product Freeze 1).
+  - **W5 (Negative Proof & Regression Verifications):** Verified negative proofs and invariants: target 8.0 + no answer logs null; target 8.0 + 2 RIR logs 8.0; 'Not sure' logs null; direct entry 8.5 logs 8.5; bodyweight actual reps reach `logSet` unmodified; timed sets omit RIR question; offline glossary search and empty states verified. Drafted executor handoff (`commit ce116d0`).
+  - **W6 (Full Verification Gates):** Executed and verified all 22 CI gates, 20 component suites (270 tests), TypeScript typecheck, diff check.
+  - **W7 (Team Preview Audit Loop & Remediation):**
+    - *Round 1 Audit:* Candidate Freeze 1 evaluated. Mechanical Sentinel flagged Defect F-01 (Severity P2: unauthorized edit to `packages/inference/test/verify_blocks.mjs`). Reviewer A and Reviewer B approved. Reconciled outcome: REJECT / REMEDIATION REQUIRED (`round-1/reconciliation.md`).
+    - *Round 1 Remediation:* Cleanly reverted `packages/inference/test/verify_blocks.mjs` to base commit `f8a0033717962f3492ff38e54681b20d54f82868` (0 diff against base; blob SHA `6a9abb78b18d6f24754419bf569d34df6ff5b37`). Hardened `apps/mobile/src/components/InfoTip.tsx` (an authorized write path) with static literal `WAVE` entry in `GLOSSARY` compatibility object. Produced Candidate Product Freeze 2 (`commit 71ccc02`) and Candidate Freeze Head 2 (`commit cedb24b`).
+    - *Round 2 Audit:* Fresh isolated evaluations returned unanimous approval: Mechanical Sentinel PASS, Reviewer A APPROVE, Reviewer B APPROVE. Reconciled outcome: APPROVED (`docs/audits/rpe-familiarisation/team-preview/round-2/reconciliation.md`).
+- **Reviewer Verdicts (Round 2 Team Preview):**
+  - **Mechanical Sentinel:** PASS (`docs/audits/rpe-familiarisation/team-preview/round-2/sentinel.md`)
+    - All 7 mechanical charter items passed clean.
+    - Finding F-01 verified fully remediated (byte-for-byte identical to base).
+    - Zero open P0, P1, or P2 findings. 2 non-defective P3 observations recorded.
+  - **Reviewer A (Product & Data Correctness):** APPROVE (`docs/audits/rpe-familiarisation/team-preview/round-2/reviewer-a.md`)
+    - All 10 product and data correctness charter items passed clean.
+    - Null semantics, absence of target copying, pure RIR mapping, and Coach evidence boundaries verified.
+    - Zero open P0, P1, or P2 findings. 1 non-defective P3 observation recorded.
+  - **Reviewer B (Beginner UX, Accessibility & Glossary):** APPROVE (`docs/audits/rpe-familiarisation/team-preview/round-2/reviewer-b.md`)
+    - All Beginner UX, accessibility, phone-width layout, and canonical glossary charter items passed clean.
+    - Zero onboarding friction, zero mandatory surveys, fail-closed unknown keys verified.
+    - Zero open P0, P1, or P2 findings. 2 non-defective P3 observations recorded.
+  - **Unanimous Verdict:** **APPROVED** (0 open P0/P1/P2 findings across all reviewers).
+- **Verification Gates Execution Summary:**
+  - `npm.cmd run verify:ci`: Clean exit 0 across all 22 CI gates.
+  - `npm.cmd run verify:components`: Clean exit 0 across all 20 component suites (270/270 tests passed).
+  - `npm.cmd run typecheck`: Clean exit 0 (0 errors under `apps/mobile/tsconfig.json`).
+  - `npm.cmd run verify:blocks`: ALL CHECKS PASSED against reverted base script.
+  - `node packages/inference/test/verify_effort_cues.mjs`: Clean exit 0 (17/17 checks passed).
+  - `node scripts/verify-preflight.mjs`: PREFLIGHT OK (all 13 checks passed).
+  - `git diff --check f8a0033717962f3492ff38e54681b20d54f82868 HEAD`: Clean exit 0 (0 whitespace/formatting errors).
+- **Invariants & Non-Goals Strictly Enforced:**
+  - Zero database migrations or schema alterations.
+  - Zero biometric imports, sensor permissions, or wearable tracking.
+  - Zero new npm dependencies; `package.json` and lockfiles untouched.
+  - Zero native project file changes (Android and iOS native directories untouched).
+  - Zero push, tag, release, merge, or production deployment operations.
+  - Preserved existing reps, bodyweight, load, rest, safety, session, and progression behavior.
+  - Only athlete-confirmed non-null values reach Coach/autopilot RPE evidence.
+- **Model Family Disclosure:**
+  - All in-run execution and audit roles operated using the Google Gemini 3.8 model family (`gemini-3.8`). Prompt isolation and fresh context windows ensured procedural independence; multi-model architectural diversity is externalized to the independent Codex/Sol audit boundary.
+- **Final Handoff Reference:**
+  - Comprehensive handover documentation and audit evidence are recorded in `docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md`.
+  - Required Final Token: `IMPLEMENTATION COMPLETE — TEAM PREVIEW APPROVED — READY FOR CODEX/SOL AUDIT`
