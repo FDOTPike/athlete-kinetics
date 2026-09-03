@@ -3867,3 +3867,30 @@ Return exactly one implementation token:
 - **Final Handoff Reference:**
   - Comprehensive handover documentation and audit evidence are recorded in `docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md`.
   - Required Final Token: `REMEDIATION COMPLETE — TEAM PREVIEW ROUND 3 APPROVED — READY FOR OPUS RE-AUDIT`
+
+## Entry 0065 — 2026-09-04 · Claude Opus independent re-audit of Round 3 remediation (F-01, F-02, F-03)
+
+### Input G(x)
+
+```
+REMEDIATION COMPLETE — TEAM PREVIEW ROUND 3 APPROVED — READY FOR OPUS RE-AUDIT
+```
+
+### Output F(G(x))
+
+- **Status:** COMPLETE — Claude Opus 5 independent re-audit of the Round 3 remediation, High effort, single audit context.
+- **Verdict:** `APPROVE` — readiness for Codex/Sol final review only. Not push, merge, release, signing, or device-safety authority.
+- **Re-audit report:** `docs/audits/rpe-familiarisation/opus/OPUS_REAUDIT_ROUND3.md`. The prior audit (`OPUS_INDEPENDENT_AUDIT.md`, commit `40da059`) is preserved unmodified as history.
+- **Audited target:** Candidate Product Freeze 3 `70481144700c16cc8f19400dfa3d46f7d2ab80b1` (tree `fdb29f0f108131f6b574883d21bf3ee8a016a19d`); handover HEAD `df08c5ee72fee83ab860677c4d75f63ffb8f3e0d`. Commit/tree pairing exact; product byte-identical from Freeze 3 to HEAD.
+- **Prior P2 findings — all three RESOLVED and independently verified:**
+  - **F-01 RESOLVED** — `draftRpe` deleted outright; stepper opens at `'—'`; increment/decrement base is a fixed target-independent `8.0`; `currentSlot.targetRpe` appears nowhere in the direct-entry value or base expressions. Two falsifying tests added at `targetRpe: 6.5` that would have failed against freeze 2, asserting at the real `logSet` boundary. Test `:171` re-expressed without weakening its layout assertions.
+  - **F-02 RESOLVED** — dead literal deleted from `InfoTip.tsx`; gate repointed to `glossary.ts`. Proven non-vacuous by independent replication: the gate captures the canonical `UNDULATING` definition, and injecting a "rises past" claim makes the assertion FAIL. `GLOSSARY.WAVE` still resolves via the `wave` alias and equals canonical; pre-existing `LearningLayer` gate still green and unedited.
+  - **F-03 RESOLVED** — `round-2/sentinel.md` re-encoded: 0 control bytes, no BOM, git treats it as text, all 7 cited SHAs resolve, no 39-char runs. Verdict content preserved, not rewritten — normalized comparison shows first divergence is exactly the restored `f`, delta +41 chars, and all verdict keyword counts identical. Ledger Entry 0061 blob SHA corrected to `a6a9abb78b18d6f24754419bf569d34df6ff5b37`.
+- **P3 documentation corrections:** both made honestly — the false direct-stepper claim is corrected, and red-first sequencing for Rounds 1–2 is now labelled narrative rather than durably evidenced.
+- **Owner authorization:** modification of `packages/inference/test/verify_blocks.mjs` is explicitly authorized and recorded verbatim in Entry 0064 `Input G(x)`. Satisfied.
+- **Gates reproduced by Opus:** `build:inference-test`, `verify_effort_cues.mjs` (17 checks), `verify:components` for SessionScreen (85), Glossary (6), ProfileScreens (25) and LearningLayer (5), `typecheck`, `verify:blocks`, `verify:components` (272/272 across 20 suites), `verify:ci`, `git diff --check` — all exit 0. Net test delta +2, entirely the F-01 falsifiers; no suite lost tests.
+- **Scope:** four product/test files changed (`0/1`, `3/8`, `41/1`, `4/3`); zero migrations, dependencies, native changes, permissions, biometrics, telemetry, onboarding questions, algorithm changes, or a sixth root tab. Round 1 records and the other Round 2 records byte-identical; only the authorized F-03 repair touched a prior record. My prior audit report unmodified.
+- **Round 3 provenance:** four separate records, clean UTF-8, 0 control bytes, all SHAs resolve, each naming Freeze 3 and its tree; unanimous PASS/APPROVE/APPROVE with an explicit statement that no Round 1 or Round 2 verdict was carried forward.
+- **P3 observations (non-blocking):** trailing whitespace stripped from five historical ledger lines; handoff cites untracked `ORIGINAL_REQUEST.md`; handoff miscounts effort cues as 18/18 (actual 17); unset stepper announces as "Actual RPE —"; hidden neutral base yields a 1.0 gap from unset. Carried forward unchanged: dead `rpeConfirmation` style, absent RIR/direct switch test, duplicate `RIR_OPTIONS[].rpe` literals.
+- **Posture:** product read-only. Only tracked writes were this ledger entry and the re-audit report, in one local documentation-only commit. Nothing merged, rebased, pushed, tagged, released, signed, distributed, or run as a biometric pilot. On-device owner verification still precedes any push.
+- **Required Final Token:** `OPUS INDEPENDENT AUDIT: APPROVE — READY FOR CODEX/SOL FINAL REVIEW`
