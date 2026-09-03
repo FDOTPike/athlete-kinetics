@@ -37,7 +37,7 @@ A bounded record of what this discovery decided, what it deliberately left open,
 - **Perceptual noise floor vs advisory resolution:** the ~1-RIR near-failure error [S03] suggests any advisory must be coarser than intuitive appeal; a domain expert may reasonably disagree about where the honesty floor sits.
 - **Individual HRV reactivity:** group-level stress associations [S15] with wide individual variability — whether *any* per-athlete HRV-based feature can beat simple baselines is exactly what the pilot tests; the evidence does not settle it.
 - **Session-RPE framing:** Foster-method global rating [S07] vs the app's mean-of-rated-sets [R03] measure related-but-different things; which the product wants is a construct decision, not an evidence one.
-- **Wearable HRV provenance heterogeneity** [04 S2]: whether vendor-normalization is required before any per-athlete feature work — an open engineering-science question the pilot design isolates but does not answer.
+- **Wearable HRV provenance heterogeneity** (`04` §3, Configuration S2): whether vendor-normalization is required before any per-athlete feature work — an open engineering-science question the pilot design isolates but does not answer.
 
 ## 4. Acceptance-criteria mapping (WO §10 → where satisfied)
 
@@ -53,9 +53,9 @@ A bounded record of what this discovery decided, what it deliberately left open,
 | validation prospective and athlete-separated | DONE | 06 §2/§7 |
 | privacy and deletion behavior specified | DONE | 05 §1–§4 |
 | manual RPE remains authoritative and optional | DONE | 00 §4; 05 §9/§10; 07 §9 |
-| **both independent reviews attached** | **PENDING — OWNER ASSIGNED TO CODEX/SOL** (owner override for this run; not claimed) | 09 |
+| **both independent reviews attached** | **BOTH COMPLETE — both returned REQUEST CHANGES** (Reviewer A vs `337778f1` + re-verification of `756b031`; Reviewer B vs `8c9c9a3`); all findings remediated, **no re-review run, no approval issued**. Whether that satisfies the criterion is the owner's call — not claimed here (swept per Reviewer B B-1) | 09 §§13–14 |
 | owner receives bounded go/no-go | DONE | 00 |
 
 ## 5. Reviewer instructions (for tomorrow)
 
-The two review lenses the WO describes (evidence review; engineering/privacy review) are handed over un-started in `09_INDEPENDENT_REVIEW_HANDOVER.md`. Neither has been commissioned, run, or fabricated by this executor.
+**Both review lenses have now been run** (swept per Reviewer B B-1; this section previously still said “un-started”). Reviewer A (evidence) returned **REQUEST CHANGES** against `337778f1`, with a targeted re-verification of the remediation `756b031` that opened one further finding; Reviewer B (engineering/privacy) returned **REQUEST CHANGES** against `8c9c9a3`. Both records are reproduced in `09` §§13–14. **Neither returned an approval, none was fabricated, and no reviewer has re-reviewed the post-remediation state.**

@@ -80,7 +80,7 @@ Identical to O1 plus nothing: the app ships today's honest subjective instrument
 |---|---|---|---|---|---|---|
 | Code surface | 0 | tiny | tiny | small | large | 0 |
 | New permission | no | no | no | no | no | no |
-| New schema | no | 1 column | none | none | 1 table | no |
+| New schema | no | 1 column | none † | none | 1 table | no |
 | Validation burden | none | copy | copy | comprehension | full 06 | none |
 | Privacy burden | none | minimal | none | declaration update | per-athlete params | none |
 | Offline | full | full | full | full | must | full |
@@ -88,6 +88,8 @@ Identical to O1 plus nothing: the app ships today's honest subjective instrument
 | Failure-safe | existing | null-stays-null | null-stays-null | not-available states | no-show rule | existing |
 | Evidence support | S01–S03, R05 | S10 (subjective only) | S07–S08 | R01b display | none yet | — |
 | Construct risk | none | low | low | medium (anchoring) | high unless gated | none |
+
+† **O3 only:** "none" holds solely under writer-option (b) — a single documented writer with an explicit precedence rule on the existing nullable `session.session_rpe`. Under option (a), a separate column for the athlete-entered rating, O3 **becomes a schema change** and this cell must be corrected before selection (§4 writer-contract prerequisite; noted per Reviewer B observation c).
 
 ## 9. Boundary statements (what no option may do)
 
