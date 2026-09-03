@@ -2,9 +2,9 @@
 
 ## 0. Control Record
 
-- **Status:** READY FOR HERMES DISPATCH.
+- **Status:** READY FOR ANTIGRAVITY DISPATCH.
 - **Executor role:** bounded mobile product and test executor.
-- **Recommended executor:** Hermes using GLM 5.3 at **High** effort.
+- **Recommended executor:** Antigravity using Gemini 3.1 Pro at **High** effort. If that model is unavailable, Gemini 3.7 Flash at **High** is an acceptable fallback, but the executor must disclose the substitution.
 - **Working directory:** `C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation`
 - **Branch:** `codex/rpe-familiarisation`
 - **Required product ancestor:** `e15bbe9301fe756ecda9d8296877b19e425ac112`
@@ -381,10 +381,10 @@ Return exactly one implementation token:
 
 Never return a release, merge, or push approval.
 
-## 11. Ready-to-Paste Hermes Prompt
+## 11. Ready-to-Paste Antigravity Prompt
 
 ```text
-Work at High effort as the bounded product and test executor.
+Use Gemini 3.1 Pro at High effort as the bounded product and test executor. If unavailable, use Gemini 3.7 Flash at High and disclose the substitution in the handover.
 
 Working directory:
 C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
