@@ -4201,3 +4201,24 @@ Use `PARTIAL` instead of `PASS` when any applicable non-writing case could not b
 - **Evidence:** report persisted at `docs/audits/rpe-familiarisation/opus/PIXEL9PRO_SMOKE_REPORT.md`; raw logs and screenshots under ignored `scratch/pixel9pro-smoke/2026-09-03T21-59-17Z/`.
 - **Required Final Token:** `PIXEL 9 PRO NON-WRITING SMOKE: PARTIAL — READY FOR CODEX/SOL REVIEW`
 - **Correction to the W0 note above:** the pre-install bullet anticipating "an in-place `adb install -r` update — no uninstall, no storage clear, no downgrade" was overtaken by events. The package was absent by installation time, so the install was a FRESH install; the executor performed no uninstall, storage clear or downgrade.
+
+## Entry 0068 — 2026-09-04 · Handover of residual Pixel 9 Pro device evidence to Antigravity (Opus 4.8, /goal mode)
+
+### Input G(x)
+
+```text
+can you please proceed to hand over this workorder for antigravity,  assume the model is for opus  4.8 and i will be running this in /goal mode which allows a single model to run continuously until complete , then get it to produce a separate handback for you to look over, im about to run out of my session limit here
+```
+
+### Output F(G(x))
+
+- **Status:** COMPLETE — handover work order authored and committed; no device or product action taken in this entry.
+- **Purpose:** Entry 0067 closed at `PARTIAL`. The residual gap is live-session device evidence for the RPE/RIR effort-cue anchoring fix (the core of the candidate), plus next-set reset and persistence across logged sets. This entry hands that residue to an Antigravity executor.
+- **Target executor:** Opus 4.8 running in `/goal` mode — a single model running continuously to completion with **no human in the loop mid-run**. The work order is therefore written to be self-contained, to carry explicit autonomous-run decision rules, and to fail closed rather than improvise.
+- **Artifact produced:** `docs/audits/rpe-familiarisation/antigravity/WORKORDER_LIVE_SESSION_EVIDENCE.md`
+- **Authorization change carried into the handover:** the handover **grants** authority to start one session and log sets on the QA package, which Entry 0067 withheld. Rationale recorded for the owner to override: `com.pikemethods.training.qa` was freshly installed on 2026-09-04 and contains only synthetic QA data created during Entry 0067 (profile and program); no real athlete data exists in it, so logging cannot destroy owner history. Production packages remain out of scope entirely.
+- **Boundaries preserved into the handover:** no push, PR, merge, tag, release or signing-key use; no uninstall, storage clear, downgrade or database reset; no product-code, schema, dependency or build-script changes; QA package only.
+- **Handback required from the executor:** `docs/audits/rpe-familiarisation/antigravity/HANDBACK_LIVE_SESSION_EVIDENCE.md`, including a section addressed to the reviewing model so this executor's successor can audit assumptions, deviations and confidence rather than accept a verdict at face value.
+- **Ledger numbering reserved:** the Antigravity executor opens **Entry 0069** on this branch lineage (`codex/rpe-familiarisation`). Note that `master` and release lineages carry separate ledgers with clashing entry numbers.
+- **State handed over:** final documentation HEAD `97230fb17a6beabeb60255142816e3b9078fd9c5`; `BUILD_HEAD` `e927d8ee5d7f01497e85d1a4c7f64c927c26dea4`; APK sha256 `b42c1be10167dc516f675de2331189d1e4025a8ecdf0ec5d300d92624d410c67` already built and installed on Pixel 9 Pro serial `49241FDAP001C7`; worktree dependencies and embedder cache materialized; model asset staged.
+- **Required Final Token:** `HANDOVER AUTHORED — AWAITING ANTIGRAVITY EXECUTION`
