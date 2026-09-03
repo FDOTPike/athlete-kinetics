@@ -4,11 +4,12 @@
 **Work Order:** `docs/WORKORDER_RPE_RIR_FAMILIARISATION.md`
 **Base Commit SHA (W0):** `f8a0033717962f3492ff38e54681b20d54f82868`
 **Required Product Ancestor:** `e15bbe9301fe756ecda9d8296877b19e425ac112`
-**Candidate Product Freeze Commit SHA:** `93d487782ef540f88adeda70fe8ef7853a491753`
-**Candidate Product Freeze Tree SHA:** `0a5991293ac871e4bac4d289d3e747d2d682b994`
+**Candidate Product Freeze 2 Commit SHA:** `71ccc027275b080a42fea0ad67aff1e38d913740`
+**Candidate Product Freeze 2 Tree SHA:** `7e12cfe16fae28135e940735b5292062c790480e`
+**Candidate Product Freeze 1 (Prior):** `93d487782ef540f88adeda70fe8ef7853a491753` (tree `0a5991293ac871e4bac4d289d3e747d2d682b994`)
 **Branch:** `codex/rpe-familiarisation`
 **Integrity Mode:** development
-**Status:** DRAFT CANDIDATE FREEZE (Awaiting W7 Team Preview Audit & Codex/Sol Independent Audit)
+**Status:** CANDIDATE FREEZE 2 (Ready for Round 2 Team Preview Audit)
 
 ---
 
@@ -22,12 +23,12 @@ FULL MOBILE COMPONENTS: PASS (verify:components 20 suites / 270 tests pass)
 TYPESCRIPT TYPECHECK: PASS (0 errors)
 FULL CI GATE PIPELINE: PASS (verify:ci all 22 gates exit 0)
 GIT DIFF HYGIENE: PASS (git diff --check clean, 0 whitespace errors)
-SCOPE INTEGRITY: PASS (only authorized files modified)
+SCOPE INTEGRITY: PASS (only authorized files modified; verify_blocks.mjs restored to base)
 BIOMETRIC / SENSOR CODE: ZERO (none added or imported)
 SCHEMA / MIGRATIONS: ZERO (no database or migration changes)
 DEPENDENCY / NATIVE: ZERO (package.json and native platforms untouched)
 PUSH / RELEASE / MERGE: NOT PERFORMED
-READY FOR W7 AUDIT LOOP: YES
+READY FOR W7 AUDIT LOOP: YES (Round 2)
 FINAL RELEASE AUTHORITY: PENDING CODEX / SOL
 ```
 
@@ -38,8 +39,32 @@ FINAL RELEASE AUTHORITY: PENDING CODEX / SOL
 1. `da84cb2` chore(ledger): record W0 prompt entry for RPE/RIR familiarisation
 2. `4614c4f` feat(inference): implement pure RIR-to-RPE mapping, stop guidance, and effort cues
 3. `450380e` feat(glossary): add offline canonical glossary, hardened InfoTips, and ProfileScreen sub-view
-4. `93d4877` feat(session): unanchored RIR and direct RPE effort entry for SessionScreen
-*(Candidate Handover Freeze Commit sits at the tip of this sequence).*
+4. `93d4877` feat(session): unanchored RIR and direct RPE effort entry for SessionScreen *(Candidate Freeze 1)*
+5. `ce116d0` docs(audit): draft executor handoff for RPE/RIR familiarisation candidate freeze
+6. `71ccc02` fix(infotip): preserve static WAVE glossary entry and restore verify_blocks.mjs to base *(Candidate Freeze 2 Product)*
+*(Candidate Freeze 2 Handover Commit sits at the tip of this sequence).*
+
+---
+
+## 2.1 Team Preview Audit History & Reconciliation
+
+### Round 1 Audit Summary (Candidate Freeze 1: commit `93d4877` / head `ce116d0`)
+- **Mechanical Sentinel:** `FAIL` (Report: `docs/audits/rpe-familiarisation/team-preview/round-1/sentinel.md`)
+  - Finding F-01 (Severity P2): `packages/inference/test/verify_blocks.mjs` modified without being in the §6.3 authorized write set and without a written stop report.
+  - Non-defective P3 observations recorded for RN 0.76 Animated test teardown warnings and embedder cache preflight.
+- **Reviewer A (Product & Data Correctness):** `APPROVE` (Report: `docs/audits/rpe-familiarisation/team-preview/round-1/reviewer-a.md`)
+  - 0 P0/P1/P2 findings. 1 non-defective P3 observation (inert legacy style `rpeConfirmation`).
+- **Reviewer B (Beginner UX, Accessibility & Glossary):** `APPROVE` (Report: `docs/audits/rpe-familiarisation/team-preview/round-1/reviewer-b.md`)
+  - 0 P0/P1/P2 findings. 2 non-defective P3 observations (InfoTip fallback mappings, category filter scrollview).
+- **Reconciliation Outcome:** `REJECT / REMEDIATION REQUIRED` (Report: `docs/audits/rpe-familiarisation/team-preview/round-1/reconciliation.md`).
+
+### Round 1 Remediation (Producing Candidate Freeze 2: commit `71ccc02`)
+1. Reverted `packages/inference/test/verify_blocks.mjs` to base commit `f8a0033717962f3492ff38e54681b20d54f82868` (verified 0 diff against base).
+2. Hardened `apps/mobile/src/components/InfoTip.tsx` (an authorized write path) by retaining the static literal line:
+   `WAVE: 'Load oscillates across weeks within a block, reducing accumulated fatigue while sustaining intensity.',`
+   in the exported `GLOSSARY` object, satisfying `verify_blocks.mjs` regex check without modifying any files outside the authorized scope.
+3. Verified all gates pass: `verify:blocks` (exit 0), `verify:components` (all 20 suites / 270 tests pass), `typecheck` (0 errors), `verify:ci` (all 22 gates pass), `git diff --check` (clean exit 0).
+4. Zero unauthorized paths in `git diff --name-status f8a0033717962f3492ff38e54681b20d54f82868`.
 
 ---
 
@@ -63,10 +88,10 @@ Every touched file strictly complies with the authorized write set defined in `W
 
 ### 3.3 Test Suites & Verification Wiring
 - `packages/inference/test/verify_effort_cues.mjs` — Added pure boundary tests for `RIR_CHOICES`, `mapRirToRpe`, malformed/out-of-domain inputs, and `RIR_OPTIONS`.
-- `packages/inference/test/verify_blocks.mjs` — Aligned R8 `WAVE`/`UNDULATING` verifier check to inspect canonical `glossary.ts` with fallback to `InfoTip.tsx`.
 - `apps/mobile/test/components/SessionScreen.test.js` — Added 11 red-first contract tests (§7.2 Items 1–11), verified null persistence, set reset, unanchored direct RPE, and bodyweight regressions.
 - `apps/mobile/test/components/ProfileScreens.test.js` — Added test for Glossary entry point and sub-view back navigation (§7.2 Item 15).
 - `apps/mobile/test/components/Glossary.test.js` — New test suite covering canonical glossary completeness, fail-closed unknown keys, resolution of all rendered tips, and case-insensitive offline search (§7.2 Items 12–14, 16).
+*(Note: `packages/inference/test/verify_blocks.mjs` was reverted to its exact base version at `f8a0033717962f3492ff38e54681b20d54f82868` in Candidate Freeze 2 and is zero diff against base).*
 
 ---
 
