@@ -193,4 +193,58 @@ describe('Learning Glossary & InfoTip Contracts (WO §7.2 Items 12–16)', () =>
       expect(entryIds).toContain(term);
     }
   });
+
+  // --- Beginner Glossary Semantics (Post-Audit Remediation) -------------------
+  describe('Beginner Glossary Semantics', () => {
+    const getDef = (id) => {
+      const entries = glossaryModule?.GLOSSARY_ENTRIES ?? [];
+      const entry = entries.find((e) => e.id?.toUpperCase() === id.toUpperCase());
+      return entry?.definition ?? '';
+    };
+
+    test('RPE explains perceived-effort rating without conflating with a cap or ceiling', () => {
+      const def = getDef('RPE');
+      expect(def).toMatch(/perceived[- ]effort|perceived physical effort|how hard/i);
+      expect(def).not.toMatch(/\bcap\b|\bceiling\b/i);
+    });
+
+    test('TARGET RPE describes what the program asks the athlete to aim for without ceiling conflation', () => {
+      const def = getDef('TARGET RPE');
+      expect(def).toMatch(/aim for/i);
+      expect(def).not.toMatch(/\bceiling\b|\bcap\b/i);
+    });
+
+    test('RPE CAP remains maximum permitted ceiling and clearly distinguishes from target RPE', () => {
+      const def = getDef('RPE CAP');
+      expect(def).toMatch(/ceiling|maximum permitted|upper boundary/i);
+      expect(def).toMatch(/target rpe/i);
+      expect(def).toMatch(/aim for/i);
+    });
+
+    test('LOAD defines exercise resistance first and identifies load multiplier as a separate adjustment', () => {
+      const def = getDef('LOAD');
+      const resistanceIdx = def.search(/weight|resistance/i);
+      const multiplierIdx = def.search(/multiplier/i);
+      expect(resistanceIdx).toBeGreaterThanOrEqual(0);
+      expect(multiplierIdx).toBeGreaterThan(resistanceIdx);
+      expect(def).toMatch(/separate|adjustment/i);
+    });
+
+    test('SETS defines group of repetitions followed by rest first and makes set-count adjustment secondary', () => {
+      const def = getDef('SETS');
+      const repsIdx = def.search(/group of (?:consecutive )?repetitions|group of reps/i);
+      const restIdx = def.search(/rest/i);
+      expect(repsIdx).toBeGreaterThanOrEqual(0);
+      expect(restIdx).toBeGreaterThan(repsIdx);
+      const adjustmentIdx = def.search(/adjustment|adjust/i);
+      expect(adjustmentIdx).toBeGreaterThan(repsIdx);
+    });
+
+    test('LINEAR removes universal "best" language and describes working-week progression and deload', () => {
+      const def = getDef('LINEAR');
+      expect(def).not.toMatch(/\bbest\b|\boptimal\b|\bsuperior\b|\bideal\b/i);
+      expect(def).toMatch(/working week|week to week|three working weeks/i);
+      expect(def).toMatch(/deload/i);
+    });
+  });
 });

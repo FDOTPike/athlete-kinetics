@@ -1029,7 +1029,9 @@ export default function SessionScreen(): React.JSX.Element {
                           </View>
 
                           <Text style={styles.effortCue} testID="rpe-cue">
-                            {effortCue(safeRpe ?? currentSlot?.targetRpe ?? 8) ?? 'RPE is optional evidence — leave it untouched to skip.'}
+                            {safeRpe !== null
+                              ? (effortCue(safeRpe) ?? 'RPE is optional evidence — leave it untouched to skip.')
+                              : 'RPE is optional evidence — leave it untouched to skip.'}
                           </Text>
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>

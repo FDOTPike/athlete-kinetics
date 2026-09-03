@@ -30,7 +30,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'RPE',
     category: 'effort',
     definition:
-      'Rate of Perceived Exertion, 1–10 scale. A 10 means no more reps could be completed; an 8 means about two clean reps remained in reserve. The cap is a ceiling, not a target.',
+      'Rate of Perceived Exertion on a 1–10 scale. A rating of how hard a set felt, where a 10 means no more clean reps could be completed and an 8 means about two clean reps remained in reserve.',
     aliases: ['rate of perceived exertion', 'effort rating', 'rpe scale'],
   },
   {
@@ -46,7 +46,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'TARGET RPE',
     category: 'effort',
     definition:
-      'The planned effort ceiling prescribed for a set. It guides intended intensity, but is never assumed to be your actual effort.',
+      'The planned effort the program asks you to aim for on a set. It guides intended intensity for the exercise, but is never assumed to be your actual reported effort.',
     aliases: ['target rpe', 'planned rpe', 'prescribed rpe'],
   },
   {
@@ -62,7 +62,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'RPE CAP',
     category: 'effort',
     definition:
-      'The maximum effort ceiling permitted for a session or block. Sets should stay at or below this number.',
+      'The maximum permitted effort ceiling for a session or block. Unlike a target RPE that you aim for, a cap is a strict upper boundary that sets should not exceed.',
     aliases: ['rpe cap', 'rpe ceiling', 'effort ceiling'],
   },
   {
@@ -96,7 +96,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'LOAD',
     category: 'metric',
     definition:
-      'Multiplier on your planned working weights. ×0.85 means take 15% off the bar today.',
+      'The amount of weight or resistance used for an exercise. In session planning, a separate load multiplier adjustment (such as ×0.85) can scale your working weight up or down for the day.',
     aliases: ['load multiplier', 'weight multiplier', 'intensity multiplier'],
   },
   {
@@ -104,7 +104,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'SETS',
     category: 'metric',
     definition:
-      'Adjustment to your planned set count per movement. −1 means drop one set across the board.',
+      'A group of consecutive repetitions of an exercise followed by a rest interval. In session planning, a separate set-count adjustment can modify your planned number of sets for the day.',
     aliases: ['set count', 'planned sets'],
   },
   {
@@ -162,7 +162,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'LINEAR',
     category: 'loading',
     definition:
-      'Load climbs steadily week to week. The simplest progression and the best starting point.',
+      'A structured loading method where planned load or effort increases steadily across the first three working weeks of a block, followed by a planned deload in week four.',
     aliases: ['linear loading', 'linear progression'],
   },
   {

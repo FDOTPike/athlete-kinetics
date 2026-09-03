@@ -629,6 +629,76 @@ test('F-01 falsifier 2: first increment from opened direct-entry stepper does no
   );
 });
 
+test('target-derived effort cue is not shown when actual effort is unanswered or Not sure', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { targetRpe: 8.0 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  const rpeCue = screen.getByTestId('rpe-cue');
+
+  // target RPE 8 plus no answer must not display "about two good reps left"
+  expect(rpeCue.props.children).not.toMatch(/about two good reps left/i);
+  expect(rpeCue.props.children).toBe('RPE is optional evidence — leave it untouched to skip.');
+
+  // target RPE 8 plus Not sure must remain neutral
+  fireEvent.press(screen.getByRole('button', { name: 'Not sure' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'RPE is optional evidence — leave it untouched to skip.',
+  );
+
+  // null persistence remains intact
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('explicit RIR or direct RPE answer derives cue from safeRpe only, restoring neutral guidance on Not sure', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { targetRpe: 6.5 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  // Before an explicit answer: neutral guidance
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'RPE is optional evidence — leave it untouched to skip.',
+  );
+
+  // selecting 2 RIR (safeRpe 8.0) displays the RPE-8 cue
+  fireEvent.press(screen.getByRole('button', { name: '2' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Hard but controlled; about two good reps left.',
+  );
+
+  // direct RPE 8.5 displays its corresponding cue
+  fireEvent.press(screen.getByText(/Enter RPE directly/i));
+  fireEvent.press(screen.getByRole('button', { name: 'RPE 8.5' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Very hard; about one good rep left.',
+  );
+
+  // selecting Not sure restores neutral guidance
+  fireEvent.press(screen.getByRole('button', { name: 'Not sure' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'RPE is optional evidence — leave it untouched to skip.',
+  );
+
+  // null persistence remains intact
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
 test('§7.2 Item 10: timed/non-rep work does not present an RIR conversion', () => {
   mockState = state({
     sessionPlan: [
@@ -849,6 +919,12 @@ test('untouched RPE stays null and shows its plain-language cue (PQ-13)', () => 
 test('effort cues render plain-language anchors with stop guidance and no biometric claim', () => {
   mockState.profile = { ...mockState.profile, training_age: 'beginner' };
   render(<SessionScreen />);
+  // Unanswered set shows neutral guidance, not target-derived cue
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'RPE is optional evidence — leave it untouched to skip.',
+  );
+  // Selecting an answer renders the plain-language cue derived from safeRpe
+  fireEvent.press(screen.getByRole('button', { name: '2' }));
   expect(screen.getByTestId('rpe-cue').props.children).toBe(
     'Hard but controlled; about two good reps left.',
   );
