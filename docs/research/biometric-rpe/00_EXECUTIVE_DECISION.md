@@ -51,7 +51,7 @@ Full ruling: `05_PRIVACY_AND_SAFETY.md` §8.
 These are restatements of the WO's non-negotiables, kept beside the decision so no future reader has to reopen the WO:
 
 - Unanswered actual RPE stays `NULL` — never imputed from biometrics, planned RPE, or population data [R03]. Existing null semantics are unchanged.
-- Set RPE, session RPE, readiness, and physiological observations remain distinct constructs on separate state paths (`01_CONSTRUCT_MAP.md` §12).
+- Set RPE, session RPE, readiness, and physiological observations remain distinct constructs on separate state paths (`01_CONSTRUCT_MAP.md` §13, the non-conflation matrix — corrected per Antigravity Round 2, P2-NEW-2; §12 is Perceived stress).
 - No medical, injury, oxygenation, fatigue, or recovery claims anywhere in athlete-facing copy.
 - Any future estimate proposal must clear the prospective validation protocol in `06` first — athlete-separated, pre-registered thresholds, owner/domain-expert sign-off.
 
