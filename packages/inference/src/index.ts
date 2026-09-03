@@ -90,7 +90,17 @@ export {
   type LoadSelectionInput,
   type LoadSource,
 } from './loadSelection';
-export { EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue } from './effortCues';
+export {
+  EFFORT_BREATHING_NOTE,
+  EFFORT_STOP_GUIDANCE,
+  effortCue,
+  mapRirToRpe,
+  RIR_CHOICES,
+  RIR_OPTIONS,
+  type EffortAnswer,
+  type RirChoice,
+  type RirOption,
+} from './effortCues';
 export {
   derivePrescription,
   type DeriveInput,

@@ -41,3 +41,87 @@ export function effortCue(rpe: number): string | null {
   const band = CUE_BANDS.find((b) => rpe >= b.lo && rpe <= b.hi);
   return band?.anchor ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// WO §2.2, §7.3 W2 & CANONICAL_CONTRACT §1 — Pure Effort Interpretation (RIR)
+// ---------------------------------------------------------------------------
+
+export const RIR_CHOICES = ['0', '1', '2', '3', '4+'] as const;
+export type RirChoice = typeof RIR_CHOICES[number];
+export type EffortAnswer = RirChoice | 'Not sure';
+
+export interface RirOption {
+  readonly choice: EffortAnswer;
+  readonly label: string;
+  readonly meaning: string;
+  readonly rpe: number | null;
+}
+
+/**
+ * Pure, deterministic mapping from athlete RIR/effort choice to actual RPE (§2.2).
+ *
+ * '0'        -> 10.0 ('No more clean reps')
+ * '1'        -> 9.0  ('About one clean rep left')
+ * '2'        -> 8.0  ('About two clean reps left')
+ * '3'        -> 7.0  ('About three clean reps left')
+ * '4+'       -> 6.0  ('At least four clean reps left')
+ * 'Not sure' -> null ('Athlete cannot give a reliable answer')
+ * Out-of-domain / malformed -> null (strict fail-safe)
+ */
+export function mapRirToRpe(choice?: unknown): number | null {
+  switch (choice) {
+    case '0':
+      return 10.0;
+    case '1':
+      return 9.0;
+    case '2':
+      return 8.0;
+    case '3':
+      return 7.0;
+    case '4+':
+      return 6.0;
+    case 'Not sure':
+      return null;
+    default:
+      return null;
+  }
+}
+
+export const RIR_OPTIONS: readonly RirOption[] = [
+  {
+    choice: '0',
+    label: '0',
+    meaning: 'No more clean reps',
+    rpe: 10.0,
+  },
+  {
+    choice: '1',
+    label: '1',
+    meaning: 'About one clean rep left',
+    rpe: 9.0,
+  },
+  {
+    choice: '2',
+    label: '2',
+    meaning: 'About two clean reps left',
+    rpe: 8.0,
+  },
+  {
+    choice: '3',
+    label: '3',
+    meaning: 'About three clean reps left',
+    rpe: 7.0,
+  },
+  {
+    choice: '4+',
+    label: '4+',
+    meaning: 'At least four clean reps left',
+    rpe: 6.0,
+  },
+  {
+    choice: 'Not sure',
+    label: 'Not sure',
+    meaning: 'Athlete cannot give a reliable answer',
+    rpe: null,
+  },
+];
