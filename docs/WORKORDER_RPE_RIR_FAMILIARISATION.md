@@ -2,14 +2,15 @@
 
 ## 0. Control Record
 
-- **Status:** READY FOR ANTIGRAVITY DISPATCH.
-- **Executor role:** bounded mobile product and test executor.
-- **Recommended executor:** Antigravity using Gemini 3.1 Pro at **High** effort. If that model is unavailable, Gemini 3.7 Flash at **High** is an acceptable fallback, but the executor must disclose the substitution.
+- **Status:** READY FOR ANTIGRAVITY TEAM PREVIEW DISPATCH.
+- **Executor role:** Team Preview lead orchestrator coordinating bounded implementers, a mechanical sentinel, and two fresh read-only reviewers.
+- **Required model:** use the owner's available **Gemini 3.8** option at **High** effort for the lead, both implementers, and both substantive reviewers. The mechanical sentinel may use Medium if Team Preview requires a resource trade-off. Do not silently substitute another model; stop and report if Gemini 3.8 is unavailable.
 - **Working directory:** `C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation`
 - **Branch:** `codex/rpe-familiarisation`
 - **Required product ancestor:** `e15bbe9301fe756ecda9d8296877b19e425ac112`
 - **Integrity mode:** development.
-- **Independent audit:** reserved for Codex/Sol after execution; do not self-approve and do not commission Team Preview.
+- **Team Preview audit:** required before handback, with SHA-bound verdicts and remediation/re-review as specified in W7.
+- **Final independent audit:** reserved for Codex/Sol after Team Preview. Team approval is not owner, merge, push, or release authority.
 - **Release boundary:** local implementation, verification, commits, and an audit handover only.
 - **Forbidden actions:** no merge, rebase, push, force-push, tag, signing, release, APK distribution, store action, or biometric pilot execution.
 
@@ -306,7 +307,7 @@ Run at minimum:
 
 Do not weaken, delete, skip, or rewrite unrelated tests to obtain a pass. Deliberate negative fixtures must remain distinguishable from real failures.
 
-Create logically scoped local commits. Then write `docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md` containing:
+Create logically scoped local commits and an exact candidate-freeze commit. Record its commit and tree SHA before starting Team Preview review. Draft, but do not yet close, `docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md` containing:
 
 - W0 identity and starting SHA;
 - commit and tree SHAs;
@@ -320,9 +321,87 @@ Create logically scoped local commits. Then write `docs/audits/rpe-familiarisati
 - confirmation that null semantics and existing progression inputs are preserved;
 - confirmation of zero biometric, permission, schema, migration, dependency, onboarding, release, or push changes;
 - known limitations and any stopped/deferred item; and
-- a clear statement that independent review and release authority remain pending Codex/Sol.
+- a clear statement that final independent review and release authority remain pending Codex/Sol.
 
-Close the ledger Output only after all hashes and claims are verified against disk.
+Do not close the ledger Output until W7 is complete.
+
+### 7.8 W7 — Team Preview self-audit, remediation, and final freeze
+
+Use Team Preview. If agent capacity prevents parallel execution, run the roles sequentially without collapsing executor and reviewer independence.
+
+#### Team roles and write ownership
+
+1. **Lead orchestrator — Gemini 3.8 High**
+   - owns W0, the ledger, task decomposition, integration, candidate freezes, remediation routing, and final handover;
+   - reads the entire work order before dispatching any agent;
+   - defines the canonical glossary API/IDs before parallel edits begin;
+   - ensures no two agents edit the same path concurrently; and
+   - may integrate verified work but may not issue either reviewer verdict.
+2. **Implementer E1, effort entry — Gemini 3.8 High**
+   - owns `SessionScreen.tsx`, the pure RIR/RPE helper/cues and exports, and the focused Session/effort tests;
+   - implements W1/W2/W4 only within those paths; and
+   - reports exact tests and unresolved integration needs to the lead.
+3. **Implementer E2, learning glossary — Gemini 3.8 High**
+   - owns the canonical glossary data, `InfoTip`, the glossary view, Athlete/Profile entry point, loading-method tip correction, and their focused tests;
+   - implements W1/W3 only within those paths; and
+   - reports its exported glossary contract to E1 and the lead.
+4. **Mechanical sentinel — Gemini 3.8 Medium or High, read-only after the candidate freeze**
+   - verifies branch/HEAD/tree, clean status, authorized paths, forbidden-path absence, diff hygiene, test commands, glossary completeness, and test-evidence authenticity;
+   - runs the full required verification rather than trusting the handover; and
+   - writes only its report under `docs/audits/rpe-familiarisation/team-preview/round-N/` when authorized by the lead after all observations are captured.
+5. **Reviewer A, product/data correctness — fresh Gemini 3.8 High context, read-only**
+   - checks the complete work order and exact candidate diff;
+   - verifies null semantics, absence of target copying, mapping correctness, set-identity resets, rest fallback separation, timed-work behavior, Coach/autopilot evidence boundaries, and regressions; and
+   - reproduces relevant tests and counterexamples independently.
+6. **Reviewer B, beginner UX/accessibility/glossary — fresh Gemini 3.8 High context, read-only**
+   - checks the complete work order and exact candidate diff;
+   - verifies burden, wording, accessibility roles/labels/states, phone-width behavior, glossary typing/content/search/empty state, inline-tip resolution, Athlete/Profile navigation and back behavior; and
+   - reproduces relevant tests and counterexamples independently.
+
+If Team Preview uses isolated worktrees, implementers commit on their assigned branches and the lead integrates them in a declared order. If it uses one shared worktree, serialize commits and never allow overlapping writes. Do not use destructive reset/checkout commands to resolve integration.
+
+#### Review dispatch contract
+
+- Dispatch the sentinel and both reviewers only after a clean candidate freeze exists.
+- Give each reviewer the work order, base SHA, exact candidate commit/tree SHA, and its review charter.
+- Do not give reviewers a desired verdict or ask them to confirm executor claims.
+- Reviewers must inspect files and execute checks themselves; the executor handover is untrusted context.
+- Each report must state the exact audited SHA and tree, commands run, evidence inspected, and one verdict: `APPROVE` or `REQUEST CHANGES`.
+- Findings use `P0`, `P1`, `P2`, or `P3`, with an exact file/line or command reproduction and a bounded remediation.
+- `APPROVE` is permitted only with zero open P0/P1/P2 findings. P3 observations may remain only when explicitly non-defective and recorded.
+- Persist verbatim reports separately as:
+  - `team-preview/round-N/sentinel.md`
+  - `team-preview/round-N/reviewer-a.md`
+  - `team-preview/round-N/reviewer-b.md`
+  - `team-preview/round-N/reconciliation.md`
+- The lead must disclose that all in-run agents used the Gemini 3.8 family; model/context isolation improves independence but does not provide model diversity. The later Codex/Sol audit supplies the external review boundary.
+
+#### Remediation loop
+
+1. If the sentinel fails any mechanical gate or either reviewer returns `REQUEST CHANGES`, the candidate is not approved.
+2. The lead converts every finding into a numbered remediation item without weakening the original work order.
+3. Add or strengthen a failing test for every behavioral defect before changing product code.
+4. Route fixes to the appropriate original ownership lane, integrate them, run all focused and full gates, and create a new freeze SHA.
+5. Dispatch a fresh Reviewer A and Reviewer B context against the new exact SHA. An earlier approval never carries forward to a changed tree.
+6. Repeat for at most three review rounds. If a third round still has an open P0/P1/P2 or a failing mechanical gate, stop with `PARTIAL — OPEN FINDINGS LISTED`; do not spend an unbounded session or declare success.
+7. Do not “fix” a finding by deleting coverage, loosening assertions, changing the work order, hiding a limitation, or editing a reviewer report.
+
+#### Completion and final handback
+
+Team Preview completion requires all of the following at one exact final freeze:
+
+- sentinel mechanical result `PASS`;
+- Reviewer A `APPROVE`;
+- Reviewer B `APPROVE`;
+- full `npm run verify:ci` exit `0` at the same tree;
+- `git diff --check` clean;
+- authorized-path check clean;
+- all review and reconciliation records committed; and
+- tracked worktree clean.
+
+After those conditions hold, finalize `EXECUTOR_HANDOFF.md`, close the single ledger Output, and create a final documentation-only handover commit. Recompute HEAD/tree and rerun the documentation/scope checks. The handover commit may sit above the product freeze, but it must touch only `PROMPT_LEDGER.md` and `docs/audits/rpe-familiarisation/**`; record both SHAs distinctly.
+
+Nothing in Team Preview may grant merge, push, release, signing, APK-distribution, or owner approval. Stop and return the complete package to Codex/Sol.
 
 ## 8. Acceptance Criteria
 
@@ -353,6 +432,9 @@ Close the ledger Output only after all hashes and claims are verified against di
 - [ ] Only athlete-confirmed non-null values reach Coach/autopilot RPE evidence.
 - [ ] Full CI passes without weakening gates.
 - [ ] Worktree is clean after the final local commit.
+- [ ] The final exact product freeze has sentinel PASS plus independent Reviewer A and Reviewer B APPROVE verdicts.
+- [ ] Every Team Preview report identifies the exact SHA/tree it reviewed and is preserved verbatim in a separate file.
+- [ ] Any remediation was reviewed again at its new SHA; no stale approval was carried forward.
 - [ ] Nothing was merged, rebased, pushed, tagged, released, signed, distributed, or run as a biometric pilot.
 
 ## 9. Explicit Non-Goals
@@ -375,7 +457,7 @@ Close the ledger Output only after all hashes and claims are verified against di
 
 Return exactly one implementation token:
 
-- `IMPLEMENTATION COMPLETE — READY FOR CODEX/SOL AUDIT`
+- `IMPLEMENTATION COMPLETE — TEAM PREVIEW APPROVED — READY FOR CODEX/SOL AUDIT`
 - `PARTIAL — OPEN FINDINGS LISTED`
 - `BLOCKED — STARTING STATE OR SCOPE DECISION REQUIRED`
 
@@ -384,7 +466,7 @@ Never return a release, merge, or push approval.
 ## 11. Ready-to-Paste Antigravity Prompt
 
 ```text
-Use Gemini 3.1 Pro at High effort as the bounded product and test executor. If unavailable, use Gemini 3.7 Flash at High and disclose the substitution in the handover.
+Run this as an Antigravity Team Preview using the owner's available Gemini 3.8 model. Use High effort for the lead orchestrator, both implementation agents, and both substantive reviewers. The mechanical sentinel may use Medium or High. If Gemini 3.8 is unavailable, stop and report that rather than silently substituting another model.
 
 Working directory:
 C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
@@ -394,7 +476,18 @@ codex/rpe-familiarisation
 
 Execute docs/WORKORDER_RPE_RIR_FAMILIARISATION.md exactly.
 
-At W0, verify the branch, clean state, current HEAD, and required ancestor before changing anything. Append the next sequential PROMPT_LEDGER entry as the first tracked write and preserve exactly one Input and one Output section.
+Read the entire work order first. At W0, verify the branch, clean state, exact starting HEAD, and required ancestor before changing anything. Append the next sequential PROMPT_LEDGER entry as the first tracked write and preserve exactly one Input and one Output section.
+
+Create and coordinate these Team Preview roles exactly as W7 specifies:
+
+- Lead orchestrator: identity, ledger, ownership, integration, freezes, reconciliation, and final handover.
+- Implementer E1: unanchored RIR/RPE effort entry and focused tests.
+- Implementer E2: canonical glossary, InfoTip, searchable Athlete/Profile glossary, and focused tests.
+- Mechanical sentinel: independent read-only scope/test/evidence verification.
+- Reviewer A: fresh read-only product/data-correctness review.
+- Reviewer B: fresh read-only beginner-UX/accessibility/glossary review.
+
+Do not let agents edit overlapping files concurrently. Use isolated contexts for both reviewers and do not tell them the desired verdict.
 
 Add red tests before product changes. Remove the target-anchored actual-RPE confirmation flow, make clean-reps-left RIR choices the primary optional entry for rep-based work, preserve a deliberately unanchored direct half-step RPE path, and keep unanswered or Not sure actual RPE as null. Preserve all existing actual-reps, load, rest, session, safety, and progression behavior.
 
@@ -402,7 +495,9 @@ Harden the existing InfoTip/glossary pattern: fix the blank RIR tip and Undulati
 
 Do not add a migration, schema field, onboarding question, confidence questionnaire, biometric input, sensor permission, dependency, remote wiki/network call, failure test, calibration score, or accuracy claim. Do not modify the biometric research branch.
 
-Run the focused tests, typecheck, verify:blocks, verify:components, full verify:ci, git diff --check, and the authorized-path check. Create local commits and the required executor handover. Do not commission Team Preview and do not self-approve.
+Run the focused tests, typecheck, verify:blocks, verify:components, full verify:ci, git diff --check, and the authorized-path check. Create a clean candidate freeze, then complete the W7 Team Preview audit. If either reviewer requests changes or the sentinel fails, remediate with red tests, create a new freeze, and commission fresh SHA-bound reviews. Continue for up to three review rounds. Never carry an approval across a changed tree.
+
+Finish only when the same final product freeze has sentinel PASS, Reviewer A APPROVE, Reviewer B APPROVE, full CI exit 0, clean scope/diff checks, and committed verbatim review records. Then close the ledger, finalize the executor handover, create the documentation-only handover commit, and stop for Codex/Sol.
 
 Do not merge, rebase, push, force-push, tag, sign, release, build/distribute an APK, or execute a biometric pilot. Stop after the local handover for Codex/Sol audit.
 ```
