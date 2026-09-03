@@ -3894,3 +3894,126 @@ REMEDIATION COMPLETE — TEAM PREVIEW ROUND 3 APPROVED — READY FOR OPUS RE-AUD
 - **P3 observations (non-blocking):** trailing whitespace stripped from five historical ledger lines; handoff cites untracked `ORIGINAL_REQUEST.md`; handoff miscounts effort cues as 18/18 (actual 17); unset stepper announces as "Actual RPE —"; hidden neutral base yields a 1.0 gap from unset. Carried forward unchanged: dead `rpeConfirmation` style, absent RIR/direct switch test, duplicate `RIR_OPTIONS[].rpe` literals.
 - **Posture:** product read-only. Only tracked writes were this ledger entry and the re-audit report, in one local documentation-only commit. Nothing merged, rebased, pushed, tagged, released, signed, distributed, or run as a biometric pilot. On-device owner verification still precedes any push.
 - **Required Final Token:** `OPUS INDEPENDENT AUDIT: APPROVE — READY FOR CODEX/SOL FINAL REVIEW`
+
+## Entry 0066 — 2026-09-04 · Post-audit focused remediation: SessionScreen cue unanchoring & beginner glossary semantics
+
+### Input G(x)
+
+```
+Working directory:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
+
+Branch:
+codex/rpe-familiarisation
+
+Required clean starting HEAD:
+2862a79d82a9b9ecbf2136ce0851569eb7d90352
+
+This is a focused post-audit remediation, not another Team Preview round.
+
+At W0 verify the exact branch, HEAD, clean status, and ancestry from product freeze 70481144700c16cc8f19400dfa3d46f7d2ab80b1. Append PROMPT_LEDGER Entry 0066 as the first tracked write, preserving the complete prompt verbatim and exactly one Input and Output section.
+
+Fix only these two findings:
+
+1. SessionScreen target-derived cue anchoring
+
+SessionScreen.tsx currently calls:
+
+effortCue(safeRpe ?? currentSlot?.targetRpe ?? 8)
+
+When actual effort is unanswered—or the athlete selects Not sure—this displays the planned target’s RIR-like answer underneath the post-set question. It therefore suggests the answer the athlete is meant to report independently.
+
+Required:
+- Show no target-derived effort cue inside the actual-effort response area.
+- Before an explicit non-null athlete answer, show neutral optional-entry guidance.
+- After an explicit RIR or direct-RPE answer, derive the cue only from safeRpe.
+- Selecting Not sure must restore neutral guidance and persist null.
+- Do not alter the separate rest-timer target fallback.
+
+Add genuine component tests:
+- target RPE 8 plus no answer must not display “about two good reps left” as actual-effort guidance;
+- target RPE 8 plus Not sure must remain neutral;
+- selecting 2 RIR may then display the RPE-8 cue;
+- direct RPE 8.5 may display its corresponding cue;
+- null persistence remains intact.
+
+2. Beginner glossary semantics
+
+Correct the canonical glossary without creating a second definition source:
+
+- RPE: explain the athlete’s perceived-effort rating without conflating it with a cap.
+- TARGET RPE: describe the effort the program asks the athlete to aim for.
+- RPE CAP: remain the maximum permitted ceiling; clearly distinguish it from target RPE.
+- LOAD: define exercise resistance first. If mentioning the app’s load multiplier, identify it as a separate adjustment.
+- SETS: define a group of repetitions followed by rest. If mentioning set-count adjustment, make it secondary.
+- LINEAR: remove “best starting point” and other universal claims. Describe this app’s actual working-week progression and deload accurately.
+
+Add canonical-data tests that fail on target/cap conflation, adjustment-only LOAD/SETS definitions, and universal “best” language. Do not merely test term presence.
+
+Authorized product/test files:
+- apps/mobile/src/screens/SessionScreen.tsx
+- apps/mobile/test/components/SessionScreen.test.js
+- apps/mobile/src/data/glossary.ts
+- apps/mobile/test/components/Glossary.test.js
+- PROMPT_LEDGER.md
+- docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md
+
+Do not modify verify_blocks.mjs, inference algorithms, migrations, schema, dependencies, native files, biometrics, progression, navigation, or prior audit reports.
+
+Run:
+- focused SessionScreen tests
+- focused Glossary tests
+- npm.cmd run typecheck
+- npm.cmd run verify:blocks
+- npm.cmd run verify:components
+- npm.cmd run verify:ci
+- git diff --check
+
+Create a new local product-freeze commit, append a clearly labelled remediation section to EXECUTOR_HANDOFF.md, close Entry 0066, and stop with the exact product commit/tree SHAs. Do not self-approve, merge, push, tag, release, or build an APK.
+
+Final token:
+REMEDIATION COMPLETE — READY FOR OPUS FOCUSED RE-AUDIT
+```
+
+### Output F(G(x))
+
+- **Status:** COMPLETE — Remediated, verified, frozen, and ready for Opus focused re-audit.
+- **W0 Baseline Verification:**
+  - Branch: `codex/rpe-familiarisation`
+  - Starting HEAD: `2862a79d82a9b9ecbf2136ce0851569eb7d90352`
+  - Ancestry from Product Freeze 3 (`70481144700c16cc8f19400dfa3d46f7d2ab80b1`): verified via `git merge-base --is-ancestor` (exit 0)
+  - Worktree state: clean (`nothing to commit, working tree clean`)
+- **Remediation Implementation:**
+  - **Finding 1 (SessionScreen target-derived cue anchoring):**
+    - Repointed effort cue in `apps/mobile/src/screens/SessionScreen.tsx:1031-1033` to derive strictly from `safeRpe` (`safeRpe !== null ? (effortCue(safeRpe) ?? 'RPE is optional evidence — leave it untouched to skip.') : 'RPE is optional evidence — leave it untouched to skip.'`).
+    - Unanswered sets and `Not sure` show neutral guidance (`'RPE is optional evidence — leave it untouched to skip.'`) and persist `null`.
+    - Explicit RIR choices and direct RPE entry derive cue from `safeRpe` only.
+    - Separate rest-timer target fallback at lines 368 and 612 left untouched.
+    - Added genuine component tests in `apps/mobile/test/components/SessionScreen.test.js` verifying neutral cue on unanswered set with target RPE 8.0, neutral cue on `Not sure`, cue display on 2 RIR, cue display on direct 8.5, and null persistence intact. Updated pre-existing cue test.
+  - **Finding 2 (Beginner glossary semantics):**
+    - Corrected canonical definitions in `apps/mobile/src/data/glossary.ts` without introducing a second definition source:
+      - `RPE`: Perceived-effort rating on 1–10 scale without cap/ceiling conflation.
+      - `TARGET RPE`: Effort the program asks the athlete to aim for, without ceiling conflation.
+      - `RPE CAP`: Maximum permitted ceiling, clearly distinguished from target RPE.
+      - `LOAD`: Exercise resistance/weight defined first; load multiplier identified as separate adjustment.
+      - `SETS`: Group of consecutive repetitions followed by rest defined first; set-count adjustment secondary.
+      - `LINEAR`: Removed "best starting point" and universal claims; describes 3 working weeks progression and deload week accurately.
+    - Added canonical-data tests in `apps/mobile/test/components/Glossary.test.js` asserting these exact semantic constraints (failing red against starting definitions, now green).
+- **Falsifying Red Tests Output:**
+  - `Glossary.test.js`: 6 failed, 6 passed, 12 total (all 6 semantic tests failed red before glossary updates).
+  - `SessionScreen.test.js`: 2 failed, 85 passed, 87 total (target cue unanchoring tests failed red before SessionScreen update).
+- **Product Freeze 4 Artifacts:**
+  - Commit SHA: `6dde126f058fdd3ec2c765dd4e3c4d9ed02d3e06`
+  - Tree SHA: `17eeb8c7cc6e32d09c6e316566f0759a60ff4ffb`
+- **Verification Gates Execution:**
+  - Focused SessionScreen tests: `npm.cmd run verify:components -- apps/mobile/test/components/SessionScreen.test.js` -> Exit 0 (87/87 passed)
+  - Focused Glossary tests: `npm.cmd run verify:components -- apps/mobile/test/components/Glossary.test.js` -> Exit 0 (12/12 passed)
+  - TypeScript typecheck: `npm.cmd run typecheck` -> Exit 0 (0 errors)
+  - Block generator & inference: `npm.cmd run verify:blocks` -> Exit 0 (ALL CHECKS PASSED)
+  - Full mobile component suite: `npm.cmd run verify:components` -> Exit 0 (280/280 passed across 20 suites)
+  - Full CI pipeline: `npm.cmd run verify:ci` -> Exit 0 (All 22 checks passed)
+  - Whitespace & diff check: `git diff --check` -> Exit 0 (clean)
+- **Scope Compliance:**
+  - Only authorized files touched (`apps/mobile/src/screens/SessionScreen.tsx`, `apps/mobile/test/components/SessionScreen.test.js`, `apps/mobile/src/data/glossary.ts`, `apps/mobile/test/components/Glossary.test.js`, `docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md`, `PROMPT_LEDGER.md`).
+  - No changes to `verify_blocks.mjs`, inference algorithms, migrations, schema, dependencies, native files, biometrics, progression, navigation, or prior audit reports.
+- **Required Final Token:** `REMEDIATION COMPLETE — READY FOR OPUS FOCUSED RE-AUDIT`

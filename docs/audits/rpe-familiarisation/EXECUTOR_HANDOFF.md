@@ -273,3 +273,52 @@ Team Preview approval serves as the internal peer review verification. Final ind
 ```text
 REMEDIATION COMPLETE — TEAM PREVIEW ROUND 3 APPROVED — READY FOR OPUS RE-AUDIT
 ```
+
+---
+
+## 11. Post-Audit Focused Remediation (Product Freeze 4)
+
+- **Product Freeze 4 Commit SHA:** `6dde126f058fdd3ec2c765dd4e3c4d9ed02d3e06`
+- **Product Freeze 4 Tree SHA:** `17eeb8c7cc6e32d09c6e316566f0759a60ff4ffb`
+- **Base Starting HEAD:** `2862a79d82a9b9ecbf2136ce0851569eb7d90352`
+- **Required Ancestor:** Descends directly from Product Freeze 3 (`70481144700c16cc8f19400dfa3d46f7d2ab80b1`)
+
+### 11.1 Finding 1 Resolution — SessionScreen Target-Derived Cue Anchoring
+- **Issue:** In `SessionScreen.tsx:1031-1033`, `effortCue(safeRpe ?? currentSlot?.targetRpe ?? 8)` rendered the target RPE's plain-language cue (e.g. "Hard but controlled; about two good reps left.") when actual effort was unanswered or when the athlete selected `Not sure`. This subtly suggested the prescribed answer underneath the question.
+- **Remediation:** In `apps/mobile/src/screens/SessionScreen.tsx`, updated the cue rendering to derive strictly from `safeRpe`:
+  ```tsx
+  <Text style={styles.effortCue} testID="rpe-cue">
+    {safeRpe !== null
+      ? (effortCue(safeRpe) ?? 'RPE is optional evidence — leave it untouched to skip.')
+      : 'RPE is optional evidence — leave it untouched to skip.'}
+  </Text>
+  ```
+  - Unanswered sets display neutral guidance: `'RPE is optional evidence — leave it untouched to skip.'`.
+  - Selecting `Not sure` restores neutral guidance and persists `null`.
+  - Selecting an explicit RIR choice (e.g. 2 RIR -> RPE 8.0) or entering direct RPE (e.g. 8.5) derives and displays the plain-language cue from `safeRpe` only.
+  - The rest-timer target fallback at lines 368 and 612 (`safeRpe ?? currentSlot?.targetRpe ?? 8`) remains untouched.
+- **Genuine Tests Added:** In `apps/mobile/test/components/SessionScreen.test.js`:
+  - `target-derived effort cue is not shown when actual effort is unanswered or Not sure`: verified target RPE 8.0 with no answer does not render "about two good reps left", and selecting "Not sure" stays neutral and logs null.
+  - `explicit RIR or direct RPE answer derives cue from safeRpe only, restoring neutral guidance on Not sure`: verified 2 RIR renders RPE-8 cue, direct 8.5 renders 8.5 cue, switching to "Not sure" restores neutral text and persists null.
+  - Updated pre-existing cue test to assert neutral guidance on initial mount and plain-language cue upon selection.
+
+### 11.2 Finding 2 Resolution — Beginner Glossary Semantics
+- **Issue:** Several canonical definitions in `apps/mobile/src/data/glossary.ts` exhibited semantic conflation, adjustment-only wording, or universal superiority claims.
+- **Remediation:** Updated canonical definitions in `apps/mobile/src/data/glossary.ts` without creating a secondary definition source:
+  - `RPE`: Explains athlete's perceived-effort rating on 1–10 scale without conflating it with a cap or ceiling.
+  - `TARGET RPE`: Explains the planned effort the program asks the athlete to aim for on a set, without calling it an effort ceiling.
+  - `RPE CAP`: Remains the maximum permitted effort ceiling, clearly distinguished from target RPE.
+  - `LOAD`: Defines exercise resistance/weight on the bar first; identifies load multiplier as a separate session adjustment.
+  - `SETS`: Defines a group of consecutive repetitions followed by rest first; identifies set-count adjustment as secondary.
+  - `LINEAR`: Removed universal claims ("best starting point"); accurately describes 3 working weeks of steady progression followed by a planned week 4 deload.
+- **Canonical Tests Added:** In `apps/mobile/test/components/Glossary.test.js`:
+  - Added `describe('Beginner Glossary Semantics')` covering RPE, TARGET RPE, RPE CAP, LOAD, SETS, and LINEAR semantic requirements. All 6 tests failed red against starting definitions and now pass green.
+
+### 11.3 Verification Gates Summary
+- SessionScreen tests: `npm.cmd run verify:components -- apps/mobile/test/components/SessionScreen.test.js` -> Exit 0 (87/87 passed)
+- Glossary tests: `npm.cmd run verify:components -- apps/mobile/test/components/Glossary.test.js` -> Exit 0 (12/12 passed)
+- TypeScript typecheck: `npm.cmd run typecheck` -> Exit 0 (0 errors)
+- Block generator verification: `npm.cmd run verify:blocks` -> Exit 0 (ALL CHECKS PASSED)
+- Full component suite: `npm.cmd run verify:components` -> Exit 0 (280/280 passed across 20 suites)
+- Full CI pipeline: `npm.cmd run verify:ci` -> Exit 0 (All 22 checks passed)
+- Git whitespace check: `git diff --check` -> Exit 0 (clean)
