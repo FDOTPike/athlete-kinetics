@@ -4171,3 +4171,33 @@ Use `PARTIAL` instead of `PASS` when any applicable non-writing case could not b
   - Pre-existing install of `com.pikemethods.training.qa` present (`versionName=1.0.0-beta.1-QA`, `versionCode=1`), so installation is an in-place `adb install -r` update — no uninstall, no storage clear, no downgrade.
 - **Evidence location:** raw logs and screenshots under ignored `scratch/pixel9pro-smoke/<UTC timestamp>/`; committed reports remain free of personal information.
 - **Execution-environment note:** this executor session was provisioned in a different Claude worktree (`.claude/worktrees/pixel9pro-qa-smoke-test-7b0d9d`). Per this work order's explicit "Work only in" instruction, all build, install, verification, and tracked writes are performed in `.worktrees/rpe-familiarisation` on `codex/rpe-familiarisation`. The provisioned worktree is left untouched.
+
+#### Closeout (supersedes the IN PROGRESS status above)
+
+- **Closeout status:** COMPLETE — `PARTIAL`. Build, artifact verification and installation succeeded; the non-writing device cases that could be exercised without creating training records all passed; the live-session effort cases were not run by owner decision.
+- **Artifact identity:**
+  - `BUILD_HEAD`: `e927d8ee5d7f01497e85d1a4c7f64c927c26dea4`
+  - APK SHA-256: `b42c1be10167dc516f675de2331189d1e4025a8ecdf0ec5d300d92624d410c67` (194,449,552 bytes, 537 entries)
+  - APK-embedded manifest: `head=e927d8ee5d7f`, `dirty=false`, branch `codex/rpe-familiarisation`, tracked-diff fingerprint `e3b0c44298fc…` (empty-diff SHA-256), 0 staged/new paths, package `com.pikemethods.training.qa`, variant `qa`.
+  - Installed-artifact hash pulled from `/data/app/…/base.apk` matches the built artifact byte-for-byte.
+- **Gate results:** `npm ci` 0 · `fetch:embedder` 0 · `verify:ci` 0 · `assembleQa` 0 · `verify:qa-candidate` 0 (`QA ARTIFACT VERIFIED`, real-candidate mode with mandatory external SDK build-tools 36.0.0) · `git diff --exit-code` 0 · `git diff --cached --exit-code` 0 · `adb install -r` 0 (`Success`).
+- **Build prerequisites required (gate-integrity relevant):**
+  1. `node_modules` was absent; the first `verify:ci` returned 0 only because Node resolution walked up to the MAIN repository's `node_modules` (master lineage `3358be6`). That result was discarded as invalid and the gate re-run after `npm ci`. A green `verify:ci` in a fresh worktree is not by itself trustworthy.
+  2. Embedder revision cache absent — `verify-preflight.mjs` failed closed; remedied with the documented `fetch:embedder`.
+  3. `assets/minilm.onnx` unstaged — the first `assembleQa` was correctly REJECTED by `verify:qa-candidate`; staged at the ratified pin `afdb6f1a…` per `docs/PRE_RELEASE_ANDROID.md:44` and rebuilt. A prior ledger entry records the identical trap.
+  All three touched gitignored paths only; the worktree was clean before and after, and `package.json` / `package-lock.json` are unmodified.
+- **Device:** Pixel 9 Pro `caiman`, Android 17 / API 37, page size 4096, `arm64-v8a`, fingerprint `google/caiman/caiman:17/CP2A.260805.005/15828068:user/release-keys`. Installed `1.0.0-beta.1-QA` (`versionCode=1`).
+- **Pre-existing install:** present at baseline (`lastUpdateTime=2026-09-01`) and already showing "No readiness yet"; by installation time the package was absent entirely, including from `pm list packages -u`. The executor did not uninstall it and is barred from doing so. Installation was therefore a FRESH install (`firstInstallTime == lastUpdateTime == 2026-09-04 08:23:35`) and no pre-existing athlete survived into the test. No database-integrity claim is made from screenshots.
+- **Matrix:** Launch `PASS` / upgrade-preservation `NOT RUN` · Navigation `PASS` · Inline information `PARTIAL` · Glossary `PASS` · Corrected meanings `PASS` · Offline `PASS` (owner-assisted) · Pixel layout `PASS` portrait, landscape observations recorded · Existing session only `NOT RUN` · Stability `PASS` (0 app crash entries, no new ANR).
+- **Corrected meanings verified on device:** TARGET RPE ("never assumed to be your actual reported effort") is distinct from RPE CAP ("a strict upper boundary"); RPE MAX reads "A ceiling, not a target"; LOAD and SETS both lead with the underlying concept before the planning adjustment; LINEAR carries no universal-best claim.
+- **Glossary search verified on device:** 46 terms; `RPE`→7, `RIR`→1, `target`→5, `cap`→3, `load`→12, `sets`→3, `undulating`→1, `linear`→1; alias `wave`→Undulating; mixed case `UnDuLaTiNg`→Undulating; no-results `zzqqxx`→`0 TERMS` with the correct empty state.
+- **Owner decisions during execution:**
+  - A demo reset was requested, then retracted before any action; `Load demo athlete` and `Reset and load demo` were NEVER pressed.
+  - Owner instructed "proceed with filling out the app yourself", overriding the no-questionnaire rule. Onboarding was completed with QA values (all-round fitness, new to this, 4 days ≤90 min, full gym, no limitations); the display name was entered by the owner on the device. A program was created (coach-build, 8-week horizon normalised to 2 × 4-week blocks, Linear).
+  - Owner was asked whether to start a session to reach the RPE/RIR effort controls and chose to uphold the work order's prohibition — live session cases marked `NOT RUN`.
+  - Owner switched Wi-Fi off on request, giving a genuine offline confirmation (`Active default network: none`), then restored it.
+- **Boundaries held:** no session started/finished/skipped, `Log set` never pressed, no training records written, no demo data seeded, no database reset, no uninstall/storage clear/downgrade/athlete wipe by the executor, no health permissions altered, no product bytes changed, no push/PR/merge/tag/release/signing-key use. Commits are local and documentation-only.
+- **Limitations:** live logging, next-set reset and persistence across logged sets remain untested on device; the RPE/RIR effort-cue anchoring fix has NO device evidence and rests on the committed component tests; the upgrade/migration path was not exercised; C6 NOT EVALUATED.
+- **Evidence:** report persisted at `docs/audits/rpe-familiarisation/opus/PIXEL9PRO_SMOKE_REPORT.md`; raw logs and screenshots under ignored `scratch/pixel9pro-smoke/2026-09-03T21-59-17Z/`.
+- **Required Final Token:** `PIXEL 9 PRO NON-WRITING SMOKE: PARTIAL — READY FOR CODEX/SOL REVIEW`
+- **Correction to the W0 note above:** the pre-install bullet anticipating "an in-place `adb install -r` update — no uninstall, no storage clear, no downgrade" was overtaken by events. The package was absent by installation time, so the install was a FRESH install; the executor performed no uninstall, storage clear or downgrade.
