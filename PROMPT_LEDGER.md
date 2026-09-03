@@ -3640,3 +3640,58 @@ Can you program Opus to be the auditor, i would like it to audit the work done b
 - **Audit posture:** product read-only; independently reproduce behavior, gates, scope, history, and Team Preview provenance; persist only a new ledger entry and `docs/audits/rpe-familiarisation/opus/OPUS_INDEPENDENT_AUDIT.md`.
 - **Verdicts:** APPROVE for Codex/Sol final review, REQUEST CHANGES with a bounded Gemini remediation prompt, or BLOCKED for invalid target/environment.
 - **Authority:** no product fixes, merge, push, tag, signing, release, APK distribution, or biometric-pilot authority was granted.
+
+## Entry 0063 — 2026-09-03 · Claude Opus independent audit of Gemini's RPE/RIR familiarisation and terminology glossary
+
+### Input G(x)
+
+```
+Act as the independent auditor for Gemini's completed RPE/RIR familiarisation and terminology-glossary implementation.
+
+Working directory:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
+
+Branch:
+codex/rpe-familiarisation
+
+Expected starting HEAD:
+bacd9b89589b3c3e3f650e75fc9326fb794483af
+
+Read and execute this work order completely:
+docs/WORKORDER_OPUS_INDEPENDENT_AUDIT_RPE_RIR_FAMILIARISATION.md
+
+Use the latest Claude Opus model available at High effort. Do not substitute another model.
+
+Audit these immutable Gemini targets:
+- Product freeze: 71ccc027275b080a42fea0ad67aff1e38d913740
+- Product tree: 7e12cfe16fae28135e940735b5292062c790480e
+- Evidence-package HEAD: ea668efd11c2c363ff65eb7a3fb1047d3046cb3a
+- Evidence tree: 9c39ab563a0bdc3b599c93be258003b229667332
+
+Treat Gemini's handoff, Team Preview approvals, test totals, and red-first claims as untrusted claims requiring independent verification. Inspect the actual implementation, tests, diffs, commit history, and persistence path.
+
+Remain product-read-only. Do not fix findings. Your only permitted tracked writes are:
+1. The required append-only PROMPT_LEDGER entry.
+2. docs/audits/rpe-familiarisation/opus/OPUS_INDEPENDENT_AUDIT.md
+
+If defects are found, return REQUEST CHANGES and include a precise, ready-to-paste Gemini remediation prompt. If everything passes, approve only for Codex/Sol final review.
+
+Create one local documentation-only audit commit, leave the tracked worktree clean, and stop. Do not merge, rebase, push, tag, release, sign, distribute an APK, or execute biometric work.
+```
+
+### Output F(G(x))
+
+- **Status:** COMPLETE — Claude Opus 5 independent audit executed at High effort in a single audit context.
+- **Verdict:** `REQUEST CHANGES` — Gemini remediation required before Codex/Sol final review.
+- **Audit report:** `docs/audits/rpe-familiarisation/opus/OPUS_INDEPENDENT_AUDIT.md`.
+- **W0 identity:** all §0 commit/tree pairs verified exact; full ancestry `e15bbe93 -> f8a00337 -> 71ccc027 -> ea668efd -> bacd9b89` confirmed; product paths byte-identical across product freeze, evidence HEAD, and dispatch-wrapper HEAD; worktree clean at W0. Node `v24.11.1`, npm `11.18.0`.
+- **Gates reproduced by Opus (not inherited):** `build:inference-test`, `verify_effort_cues.mjs` (17/17), `verify:components` for SessionScreen (83), Glossary (6) and ProfileScreens (25), `typecheck`, `verify:blocks`, `verify:components` (270/270 across 20 suites), `verify:ci`, and `git diff --check` — all exit 0.
+- **Open findings:**
+  - **F-01 (P2)** — direct numeric RPE entry is initialized from planned target RPE (`SessionScreen.tsx:393`, `:995`, `:997`, `:1004`), contradicting the "unanchored / without initializing from target RPE" acceptance criterion; the handoff claims this defect was fixed.
+  - **F-02 (P2)** — the pre-existing `verify_blocks.mjs:555-562` WAVE-copy gate is vacuous: the `UNDULATING` alias `wave` shadows the static seed at `InfoTip.tsx:44`, so the gate validates a dead literal while the live definition goes unchecked.
+  - **F-03 (P2)** — `team-preview/round-2/sentinel.md` carries 30 raw control bytes; it states a base commit SHA and a tree SHA that do not exist, renders six exit codes as NUL, and propagated a malformed blob SHA into Entry 0061.
+  - **F-04 to F-07 (P3)** — red-first sequencing UNVERIFIED; dead `rpeConfirmation` style; no RIR/direct-RPE switch test; duplicate `RIR_OPTIONS[].rpe` literals.
+- **Independently confirmed correct:** exact pure RIR-to-RPE mapping; null semantics at the real `logSet` boundary; `Confirm target RPE` genuinely excised; set-identity reset without rerender clobber; rest-timer fallback separated from persistence; reps/load untouched by the effort UI; all 22 rendered InfoTip terms resolve to non-empty canonical entries; 46 canonical entries with no duplicate or colliding aliases; five root tabs preserved; `verify_blocks.mjs` restored byte-identically to base (blob `a6a9abb78b18d6f24754419bf569d34df6ff5b37`).
+- **Provenance:** Round 1 FAIL and REJECT preserved as issued; Round 1 and Round 2 SHA sets disjoint, so no stale approval carried forward; every SHA cited across the eight reports resolves except the two corrupted values in F-03.
+- **Posture:** product read-only throughout. Only tracked writes were this ledger entry and the Opus audit report, in one local documentation-only commit. Nothing merged, rebased, pushed, tagged, released, signed, distributed, or run as a biometric pilot.
+- **Required Final Token:** `OPUS INDEPENDENT AUDIT: REQUEST CHANGES — GEMINI REMEDIATION REQUIRED`
