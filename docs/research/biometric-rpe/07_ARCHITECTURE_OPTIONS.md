@@ -11,7 +11,7 @@ Six value classes must remain distinct at the type, persistence, and UI levels �
 3. **Readiness** — the ratified HRV+sleep composite score [R01b]; **corrected per audit: it is a prescription input**, not a merely descriptive metric — the policy engine (`policyReference.ts:36-55` [R07]) maps it to planned load/set/rpe_cap modifiers. The separation law therefore distinguishes planned-side prescription authority (readiness → plan) from athlete-authored actual RPE, which no biometric path may touch.
 4. **Advisory effort estimate** (future, hypothetical) — a model output with explicit uncertainty; would live in its own type with its own provenance, never in `state_vector`.
 5. **Athlete-confirmed actual RPE** — `set_record.rpe` / `session_rpe`, nullable, athlete-authored only [R03, R04].
-6. **Planned target RPE** — prescription-side `target_rpe` [R04], untouched by all biometric paths.
+6. **Planned target RPE** — prescription-side `target_rpe` [R04]. **It is biometric-modulated on the planning side** (`evaluatePolicy` derives `rpe_cap` from `readiness_score`, `hrv_z` and `sleep_efficiency_pct`, `policyReference.ts:31-32,49,71` [R07]) and is **strictly separated from athlete-entered actual RPE**, which no biometric path may fill or grade. *(Corrected per Antigravity panel P1-2: this line previously read “untouched by all biometric paths”, contradicting both the live code and the `06` §7 rationale for excluding planned target RPE from the M0 baseline.)*
 
 Enforcement shape (already the repo's idiom): pure functions in `packages/inference` for any derived value; store actions as the only writers; SQL CHECKs and STRICT tables at rest [R04]; screens never re-derive. The separation law would extend this idiom: one value class, one source module, one writer path.
 
@@ -62,7 +62,7 @@ Enforcement shape (already the repo's idiom): pure functions in `packages/infere
 - **Prerequisite chain (all mandatory, in order):** pilot per `06` executed and reported → owner/domain-expert threshold ratification → privacy review refresh (05) → fresh independent audit → owner implementation authorization. Any unmet step = this option stays hypothetical.
 - **Architecture if ever:** pure per-athlete calibration module in `packages/inference` (closed-form, deterministic — e.g. per-athlete regression on day-scale features; no runtime ML per the project's closed-form-only posture [R01b]); per-athlete parameters in a new profile-scoped table (append-only migration, STRICT, provenance columns); output type carries `{estimate, interval, basis, staleness}`; UI renders interval + disclosure, never a bare point; hard runtime guard that it cannot write or display within the RPE entry flow; feature-flagged off-by-default with rollback = flag flip (no migration rollback).
 - **Benefit (conditional on validation):** the only candidate with any scientific pathway to usefulness.
-- **Risk (unconditional):** false reassurance at high effort; construct confusion; per-athlete data sparsity (needs ≥10 rated sessions per athlete per 06 §2); copy burden of expressing uncertainty honestly ([S12]'s coarse two-class result shows how little adjacent lab ML has demonstrated, and [S28] shows the HRV increment is real but lab-condition — the honest copy must carry both facts).
+- **Risk (unconditional):** false reassurance at high effort; construct confusion; per-athlete data sparsity (needs the **split** minima of `06` §2 — candidate ≥ 6 calibration **plus** ≥ 4 future holdout per athlete, both required; corrected per Antigravity panel P2-2); copy burden of expressing uncertainty honestly ([S12]'s coarse two-class result shows how little adjacent lab ML has demonstrated, and [S28] shows the HRV increment is real but lab-condition — the honest copy must carry both facts).
 - **Data:** existing three types + pilot capture. **Validation burden:** the entire 06 protocol. **Privacy:** per-athlete stored parameters are new personal data — deletion, export, and transparency duties (05 §4–5).
 - **Offline:** must be (on-device compute, no cloud inference).
 - **Accessibility:** interval + plain-language disclosure doubles as accessibility.
@@ -82,12 +82,14 @@ Identical to O1 plus nothing: the app ships today's honest subjective instrument
 | New permission | no | no | no | no | no | no |
 | New schema | no | 1 column | none † | none | 1 table | no |
 | Validation burden | none | copy | copy | comprehension | full 06 | none |
-| Privacy burden | none | minimal | none | declaration update | per-athlete params | none |
+| Privacy burden | none | minimal | none | **separate consent moment + purpose-specific copy + declaration update** ‡ | per-athlete params | none |
 | Offline | full | full | full | full | must | full |
 | 4 GB risk | none | none | none | none | contained | none |
 | Failure-safe | existing | null-stays-null | null-stays-null | not-available states | no-show rule | existing |
 | Evidence support | S01–S03, R05 | S10 (subjective only) | S07–S08 | R01b display | none yet | — |
 | Construct risk | none | low | low | medium (anchoring) | high unless gated | none |
+
+‡ **O4 only:** a biometric-context display is its own declared purpose under `05` §2 — it needs a **separate consent moment, purpose-specific copy, and its own Health apps declaration** before an athlete sees it. "No new permission" does not remove that gate (§5; corrected per Antigravity panel P2-4, which found this cell reduced to "declaration update").
 
 † **O3 only:** "none" holds solely under writer-option (b) — a single documented writer with an explicit precedence rule on the existing nullable `session.session_rpe`. Under option (a), a separate column for the athlete-entered rating, O3 **becomes a schema change** and this cell must be corrected before selection (§4 writer-contract prerequisite; noted per Reviewer B observation c).
 

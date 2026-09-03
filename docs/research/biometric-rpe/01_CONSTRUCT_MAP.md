@@ -129,7 +129,7 @@ This document defines every candidate construct precisely enough that no future 
 | **RIR** | anchor of RPE | — | — | — | — |
 | **Session RPE** | aggregation ≠ new perception | — | — | — | no conversion |
 | **Readiness** | never fills/grades athlete RPE; modulates **planned** load/sets/rpe_cap via the policy engine [R07] | — | never derived from set RPE | — | inputs: HRV, sleep only (RHR: no athlete-facing consumer [R01, R09]) |
-| **Biometric observations** | never fill, never grade | — | never fill | may feed readiness *only* | — |
+| **Biometric observations** | never fill, never grade | — | never fill | feeds the readiness composite **and** is read directly by `evaluatePolicy` rule conditions (`hrv_z`, `sleep_efficiency_pct`) [R07] — planning side only (§13.3) | — |
 
 The three critical conflation traps, stated as invariants for tomorrow's auditor:
 

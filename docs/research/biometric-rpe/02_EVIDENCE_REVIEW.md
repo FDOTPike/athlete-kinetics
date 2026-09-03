@@ -35,7 +35,7 @@ Tibana et al. 2018 (Sports 6(3):68; doi 10.3390/sports6030068; PMID 30041435): *
 ## 3. Subjective proxy cues
 
 **[S10] The talk test tracks aerobic intensity.**
-Review, J Exerc Rehabil 2023;19(3):163–169 (doi 10.12965/jer.2346.068; PMC10331140): talk test status aligns with ventilatory/lactate thresholds across healthy populations. Endurance-based; no resistance-set validity. Applicability: the app's existing copy ("rough guides, not targets" [R05]) is the correct strength framing; breathing/talk cues may be offered as subjective athlete-entered observations only.
+Kwon Y, Kang KW, Chang JS. *J Exerc Rehabil* 2023;19(3):163–169 (doi **10.12965/jer.2346170.085**; PMID 37435593; PMC10331140) — an **original validation study, not a review**: in **17 healthy young adults (12 M / 5 F, age 26.5 ± 2.7 y)**, talk test status aligns with ventilatory/lactate thresholds. *(Corrected per Antigravity panel P2-1: this entry previously opened “Review”, omitted its authors, and carried DOI `10.12965/jer.2346.068`, which does not resolve — the manifest row had the correct identifiers all along.)* Endurance-based; no resistance-set validity. Applicability: the app's existing copy ("rough guides, not targets" [R05]) is the correct strength framing; breathing/talk cues may be offered as subjective athlete-entered observations only.
 
 ## 4. The physiological signals (why they cannot grade set RPE)
 
