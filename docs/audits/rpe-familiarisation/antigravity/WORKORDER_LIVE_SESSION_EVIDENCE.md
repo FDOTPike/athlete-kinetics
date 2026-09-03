@@ -54,7 +54,8 @@ C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisatio
 | Item | Value |
 |---|---|
 | Branch | `codex/rpe-familiarisation` |
-| Required starting HEAD | `97230fb17a6beabeb60255142816e3b9078fd9c5` |
+| Required starting HEAD | the tip of `codex/rpe-familiarisation` at handover — the commit that added *this file*. Do not hard-compare against a literal SHA quoted elsewhere; see the verification rule below. |
+| Last commit of the predecessor run | `97230fb17a6beabeb60255142816e3b9078fd9c5` (Entry 0067 closeout) |
 | `BUILD_HEAD` (the artifact's provenance) | `e927d8ee5d7f01497e85d1a4c7f64c927c26dea4` |
 | Approved product commit | `6dde126f058fdd3ec2c765dd4e3c4d9ed02d3e06` |
 | Approved product tree | `17eeb8c7cc6e32d09c6e316566f0759a60ff4ffb` |
@@ -63,7 +64,23 @@ C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisatio
 | Device serial | `49241FDAP001C7` |
 | Package | `com.pikemethods.training.qa` (QA only — never touch any other package) |
 
-**Verify HEAD and a clean tree before your first write. Stop on unexplained drift.**
+**Verification rule — run this before your first write, and stop on unexplained drift.**
+
+Do not compare HEAD against a literal SHA: the handover commits are documentation and the tip moved
+as this file was written and corrected. Verify the *invariant* instead:
+
+```bash
+git rev-parse --abbrev-ref HEAD      # must be codex/rpe-familiarisation
+git status --porcelain               # must be empty
+git diff --name-status 6dde126f058fdd3ec2c765dd4e3c4d9ed02d3e06 HEAD
+```
+
+That last command must list **documentation paths only** — `PROMPT_LEDGER.md`, and files under
+`docs/`. If it lists anything under `apps/`, `packages/`, `tools/`, `scripts/`, or any
+`package.json` / `package-lock.json` / `*.gradle`, **stop**: product bytes have drifted from the
+approved freeze and this run must not proceed.
+
+Record the actual starting HEAD you observed in your ledger entry and handback.
 
 ### Device state as handed over
 
