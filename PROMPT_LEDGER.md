@@ -4017,3 +4017,157 @@ REMEDIATION COMPLETE — READY FOR OPUS FOCUSED RE-AUDIT
   - Only authorized files touched (`apps/mobile/src/screens/SessionScreen.tsx`, `apps/mobile/test/components/SessionScreen.test.js`, `apps/mobile/src/data/glossary.ts`, `apps/mobile/test/components/Glossary.test.js`, `docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md`, `PROMPT_LEDGER.md`).
   - No changes to `verify_blocks.mjs`, inference algorithms, migrations, schema, dependencies, native files, biometrics, progression, navigation, or prior audit reports.
 - **Required Final Token:** `REMEDIATION COMPLETE — READY FOR OPUS FOCUSED RE-AUDIT`
+
+## Entry 0067 — 2026-09-04 · Pixel 9 Pro QA build and non-writing device smoke test
+
+### Input G(x)
+
+`````text
+# Opus Work Order — Pixel 9 Pro QA Build and Non-Writing Smoke Test
+
+## 1. Objective and authority
+
+Build and install the approved RPE/RIR and glossary candidate on the owner’s connected Pixel 9 Pro, verify the available user flows, and return evidence to Codex/Sol.
+
+Owner decisions:
+
+- Use the existing real athlete.
+- Do not create training records or synthetic sessions.
+- Report and stop: no push, PR, merge, release, or next-feature implementation.
+- Use one Opus executor; no additional reviewer team.
+
+This is functional QA, not completion of the separate C6 low-memory/device gate. No public API, schema, dependency, or product-code changes are authorized.
+
+## 2. Validate and freeze the build inputs
+
+Work only in:
+
+```text
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
+```
+
+Required identity:
+
+```text
+Branch: codex/rpe-familiarisation
+Starting HEAD: 6984f95c56d8434a1f7bd15c76ba5b9726c6c64a
+Approved product commit: 6dde126f058fdd3ec2c765dd4e3c4d9ed02d3e06
+Approved product tree: 17eeb8c7cc6e32d09c6e316566f0759a60ff4ffb
+```
+
+- Confirm exact identity and clean status. Stop on unexplained drift.
+- Append the next sequential prompt-ledger entry as the first tracked write, preserving this work order and the owner’s choices. Commit this ledger-only initialization before building so the candidate has clean provenance.
+- Record the resulting `BUILD_HEAD`. Verify its changes from the required starting HEAD are documentation only and all product bytes remain unchanged.
+- Store raw logs and screenshots under ignored `scratch/pixel9pro-smoke/<UTC timestamp>/`. Keep personal information out of committed reports.
+
+## 3. Build, verify, and install safely
+
+Run once, capturing exit codes:
+
+```powershell
+npm.cmd run verify:ci
+```
+
+From `apps/mobile/android`:
+
+```powershell
+.\gradlew.bat assembleQa --no-daemon
+```
+
+Return to the worktree root:
+
+```powershell
+npm.cmd run verify:qa-candidate
+git diff --exit-code
+git diff --cached --exit-code
+```
+
+Requirements:
+
+- Use the repository-pinned toolchain and existing QA configuration. Do not change dependencies, signing configuration, versions, or build scripts.
+- Verify the real APK—not fixture mode. Confirm its embedded manifest names `BUILD_HEAD`, clean source state, and package `com.pikemethods.training.qa`.
+- Record the APK SHA-256 and verifier results. The artifact must remain standalone, with bundled JavaScript and no Metro requirement.
+- Re-identify the authorized Pixel before installation. Planning-time observations were Pixel 9 Pro, Android 17/API 37, 4096-byte pages; remeasure rather than assuming they remain current.
+- Confirm no workout is actively underway before replacing the installed app.
+- Update with serial-targeted `adb install -r` using `apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk`.
+- Never uninstall, clear storage, downgrade, wipe an athlete, or reset the database. On a signature/version conflict, stop.
+- Verify installation success and compare the installed APK’s hash with the built artifact where Android permits pulling it.
+- Observe the owner’s existing athlete and visible history before/after. Do not claim a complete database-integrity check from screenshots alone.
+
+## 4. Device smoke-test matrix
+
+Record each case as `PASS`, `FAIL`, or `NOT RUN`, with evidence and a reason.
+
+| Case | Required observation |
+|---|---|
+| Launch and upgrade | QA app opens without crash, migration-error screen, or Metro connection; existing athlete remains available. |
+| Navigation | Relevant screens open; Android Back dismisses glossary/tooltips correctly without a trap. |
+| Inline information | Available RPE/RIR and loading-method information buttons open readable explanations and close reliably. |
+| Glossary | Athlete → “Open terminology glossary” works; search finds RPE, RIR, target RPE, cap, load, sets, and undulating; mixed-case/alias search and no-results state work. |
+| Corrected meanings | Target versus cap remains distinct; load/sets explain the underlying concepts; linear no longer claims to be universally best. |
+| Offline operation | With the owner temporarily disabling connectivity, glossary and available local screens still work. Restore connectivity afterward. |
+| Pixel layout | At current display settings, controls and explanations are readable, tappable, and not clipped by screen edges, keyboard, or navigation bars. |
+| Existing session only | If a session is already available, inspect unanswered effort, RIR `2`, direct `8.5`, and “Not sure” using draft controls only. Confirm neutral → chosen cue → neutral behavior. Do not press “Log set.” |
+| Stability | Check available app-scoped logs for crashes/ANRs during the test; background/foreground and reopen only when safe for the existing session. |
+
+Data-protection boundaries:
+
+- Do not start, finish, skip, or fabricate a session merely to reach a test screen.
+- Do not save questionnaire changes, regenerate programs, switch athlete/profile slots, seed demo data, or alter health permissions.
+- Restore any temporary unlogged effort selection to its initial state.
+- If no suitable session exists, mark live session checks `NOT RUN`; automated tests do not become device evidence.
+- Device logging, next-set reset, and persistence across actual logged sets remain explicitly pending under the owner’s no-new-records decision.
+- If direct UI automation is unavailable, guide the owner through the taps and label observations as owner-reported.
+
+## 5. Evidence, verdict, and stop conditions
+
+Persist Opus’s supplied approval and a concise smoke report under the existing RPE-familiarisation audit directory. Close the ledger entry and make a documentation-only closeout commit.
+
+The report must include:
+
+- Approved product SHA/tree, `BUILD_HEAD`, final documentation HEAD, and APK SHA-256.
+- Device/runtime identity, installation result, commands and exit codes.
+- Per-case observed results, evidence references, limitations, and owner feedback.
+- Confirmation that no synthetic training records, product edits, push, merge, or release occurred.
+
+Verify the final documentation commit changes no product bytes. Preserve the artifact’s original `BUILD_HEAD`; do not relabel it as built from the later report commit.
+
+Stop immediately for a crash, apparent data loss, failed artifact gate, installation conflict, or required out-of-scope change. Report the failure and proposed remediation; do not fix product code in this work order.
+
+Successful handback:
+
+```text
+PIXEL 9 PRO NON-WRITING SMOKE: PASS
+LIVE LOGGING / NEXT-SET / PERSISTENCE: NOT TESTED ON DEVICE
+C6: NOT EVALUATED
+READY FOR CODEX/SOL REVIEW
+PUSH / MERGE / RELEASE: NOT PERFORMED
+```
+
+Use `PARTIAL` instead of `PASS` when any applicable non-writing case could not be exercised, and `FAIL` when an observed behavior is incorrect. Do not claim unrestricted release readiness.
+`````
+
+### Output F(G(x))
+
+- **Status:** IN PROGRESS — ledger-only initialization committed; build, install, and device smoke test to follow. Closed at closeout.
+- **Owner decisions carried into execution:**
+  - Use the existing real athlete on the connected Pixel 9 Pro.
+  - Create no training records and no synthetic sessions.
+  - Report and stop: no push, PR, merge, release, or next-feature implementation.
+  - One Opus executor; no additional reviewer team.
+- **W0 baseline verification (before any write):**
+  - Working directory: `C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation`
+  - Branch: `codex/rpe-familiarisation` — confirmed
+  - Starting HEAD: `6984f95c56d8434a1f7bd15c76ba5b9726c6c64a` — confirmed
+  - Working tree: clean (`git status --porcelain` empty) — confirmed
+  - Approved product commit `6dde126f058fdd3ec2c765dd4e3c4d9ed02d3e06` present; its tree resolves to `17eeb8c7cc6e32d09c6e316566f0759a60ff4ffb` — matches the approved product tree.
+  - `git diff --name-status 6dde126..6984f95` returns only `PROMPT_LEDGER.md` and `docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md` — documentation only; no product bytes changed between the approved product freeze and the required starting HEAD.
+- **Device re-identification (remeasured, not assumed):**
+  - Serial `49241FDAP001C7`, `ro.product.model=Pixel 9 Pro`, device/product `caiman`
+  - `ro.build.version.release=17`, `ro.build.version.sdk=37`
+  - `getconf PAGE_SIZE=4096`, `ro.product.cpu.abi=arm64-v8a`
+  - Build fingerprint `google/caiman/caiman:17/CP2A.260805.005/15828068:user/release-keys`
+  - Planning-time observations (Pixel 9 Pro, Android 17/API 37, 4096-byte pages) re-confirmed by measurement.
+  - Pre-existing install of `com.pikemethods.training.qa` present (`versionName=1.0.0-beta.1-QA`, `versionCode=1`), so installation is an in-place `adb install -r` update — no uninstall, no storage clear, no downgrade.
+- **Evidence location:** raw logs and screenshots under ignored `scratch/pixel9pro-smoke/<UTC timestamp>/`; committed reports remain free of personal information.
+- **Execution-environment note:** this executor session was provisioned in a different Claude worktree (`.claude/worktrees/pixel9pro-qa-smoke-test-7b0d9d`). Per this work order's explicit "Work only in" instruction, all build, install, verification, and tracked writes are performed in `.worktrees/rpe-familiarisation` on `codex/rpe-familiarisation`. The provisioned worktree is left untouched.
