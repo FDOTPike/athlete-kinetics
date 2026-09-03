@@ -1,10 +1,11 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue } from '@ak/inference';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
+import InfoTip from '../components/InfoTip';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -269,8 +270,11 @@ export default function SessionScreen(): React.JSX.Element {
   // evidence refreshes must never overwrite an athlete-entered draft.
   const [loadText, setLoadText] = useState('');
   const [loadInvalid, setLoadInvalid] = useState(false);
-  const [rpe, setRpe] = useState(8);
-  const [rpeTouched, setRpeTouched] = useState(false);
+  const [selectedChoice, setSelectedChoice] = useState<EffortAnswer | null>(null);
+  const [directRpe, setDirectRpe] = useState<number | null>(null);
+  const [draftRpe, setDraftRpe] = useState<number>(8);
+  const [directEntryOpen, setDirectEntryOpen] = useState(false);
+  const lastSetKeyRef = useRef<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
@@ -311,7 +315,7 @@ export default function SessionScreen(): React.JSX.Element {
   const fallback = selected !== null && loggedCount(selected) < selected.plannedSets ? selected : firstIncomplete;
   const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
-  const currentLogged = currentSlot === null ? 0 : loggedCount(currentSlot);
+  const currentLogged = currentSlot === null ? 0 : (runner !== null && (runner.slotIndex ?? -1) >= 0 && runner.slotSetCounts?.[runner.slotIndex] != null ? Math.max(loggedCount(currentSlot), runner.slotSetCounts[runner.slotIndex]) : loggedCount(currentSlot));
   const allDone = sessionPlan.length > 0 && sessionPlan.every((slot) => loggedCount(slot) >= slot.plannedSets);
   const triageHalted = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
   const runnerComplete = runnerPhase === 'complete';
@@ -353,9 +357,15 @@ export default function SessionScreen(): React.JSX.Element {
       );
   const loadLoggable = isLoadDraftLoggable(loadText) && !loadInvalid;
 
+  const safeRpe: number | null = selectedChoice !== null
+    ? mapRirToRpe(selectedChoice)
+    : directRpe !== null
+      ? clamp(Math.round(directRpe * 2) / 2, 5, 10)
+      : null;
+
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
-    seconds: runner?.restSecondsTarget ?? restSecondsFor(rpe, profile.training_age),
+    seconds: runner?.restSecondsTarget ?? restSecondsFor(safeRpe ?? currentSlot?.targetRpe ?? 8, profile.training_age),
     startedAtMs: runner?.restStartedAtMs ?? nowMs,
     slotId: currentSlot?.sessionPlanSlotId ?? -1,
   } : localRest;
@@ -368,13 +378,28 @@ export default function SessionScreen(): React.JSX.Element {
     return () => clearInterval(id);
   }, [resting]);
 
+  const runnerSetIndex = runner?.setIndex ?? 1;
+  const runnerSlotCompleted = runner?.slotSetCounts?.[runner?.slotIndex ?? 0] ?? 0;
+  const activeSetKey = currentSlot === null
+    ? null
+    : `${currentSlot.sessionPlanSlotId}:${currentLogged}:${runnerSetIndex}:${runnerSlotCompleted}:${currentMovement?.movement_id}`;
+
+  useEffect(() => {
+    if (activeSetKey === null) return;
+    if (lastSetKeyRef.current !== activeSetKey) {
+      lastSetKeyRef.current = activeSetKey;
+      setSelectedChoice(null);
+      setDirectRpe(null);
+      setDraftRpe(currentSlot?.targetRpe ?? 8);
+      setDirectEntryOpen(false);
+    }
+  }, [activeSetKey]);
+
   useEffect(() => {
     if (currentSlot === null || target === null) return;
     setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setBandLevel(null);
     setReps(target.kind === 'reps' ? target.reps : 1);
     setSeconds(target.kind === 'time' ? target.seconds : 30);
-    setRpe(currentSlot.targetRpe ?? 8);
-    setRpeTouched(false);
     // Initialize the load draft ONCE per set key from the resolver output.
     // null = blank (athlete must choose); 0 = identity/explicit zero. The
     // resolver's output is intentionally NOT a dependency: rerenders,
@@ -396,7 +421,6 @@ export default function SessionScreen(): React.JSX.Element {
     currentMovement?.movement_id,
     target?.kind,
     target?.kind === 'reps' ? target.reps : target?.seconds,
-    currentSlot?.targetRpe,
     currentSlot?.overrideLoadKg,
   ]);
 
@@ -580,7 +604,6 @@ export default function SessionScreen(): React.JSX.Element {
       return;
     }
     const safeLoad = parsed;
-    const safeRpe = rpeTouched ? clamp(Math.round(rpe * 2) / 2, 5, 10) : null;
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
     if (runner === null) {
@@ -827,7 +850,6 @@ export default function SessionScreen(): React.JSX.Element {
                             testID="current-reps-stepper"
                             repeatOnHold={target?.kind === 'time'}
                             label={target?.kind === 'time' ? 'Seconds' : 'Actual reps'}
-                            tip="RIR"
                             value={String(target?.kind === 'time' ? seconds : reps)}
                             onDecrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n - 5, 5, 3600)) : setReps((n) => clamp(n - 1, 1, 50))}
                             onIncrement={() => target?.kind === 'time' ? setSeconds((n) => clamp(n + 5, 5, 3600)) : setReps((n) => clamp(n + 1, 1, 50))}
@@ -902,41 +924,125 @@ export default function SessionScreen(): React.JSX.Element {
                               </Pressable>
                             </View>
                           </View>
-                          <Stepper
-                            testID="current-rpe-stepper"
-                            label="Actual RPE"
-                            tip="RPE"
-                            value={rpe.toFixed(1)}
-                            onDecrement={() => {
-                              setRpeTouched(true);
-                              setRpe((n) => clamp(n - 0.5, 5, 10));
-                            }}
-                            onIncrement={() => {
-                              setRpeTouched(true);
-                              setRpe((n) => clamp(n + 0.5, 5, 10));
-                            }}
-                            style={styles.sessionStepper}
-                          />
+
+                          {/* Primary Unanchored RIR Question for rep-based work */}
+                          {target?.kind !== 'time' && (
+                            <View style={styles.rirContainer} testID="rir-question-container">
+                              <View style={styles.rirHeaderRow}>
+                                <Text style={styles.rirQuestion}>
+                                  How many more clean reps could you have completed?
+                                </Text>
+                                <InfoTip term="RIR" />
+                              </View>
+                              <View style={styles.rirChoicesRow}>
+                                {RIR_OPTIONS.map((opt) => {
+                                  const isSelected = selectedChoice === opt.choice;
+                                  const accLabel = opt.choice === 'Not sure'
+                                    ? 'Not sure'
+                                    : opt.choice === '1'
+                                      ? '1 clean rep left'
+                                      : `${opt.choice} clean reps left`;
+                                  return (
+                                    <Chip
+                                      key={opt.choice}
+                                      label={opt.label}
+                                      selected={isSelected}
+                                      onPress={() => {
+                                        if (isSelected) {
+                                          setSelectedChoice(null);
+                                        } else {
+                                          setSelectedChoice(opt.choice);
+                                          setDirectRpe(null);
+                                        }
+                                      }}
+                                      accessibilityLabel={accLabel}
+                                      style={styles.rirChip}
+                                    />
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          )}
+
+                          {/* Derived Actual RPE Display (only after an athlete selection) */}
+                          {safeRpe !== null && (
+                            <View style={styles.derivedRpeContainer} testID="derived-rpe-display">
+                              <Text style={styles.derivedRpeLabel}>
+                                Reported actual RPE {safeRpe.toFixed(1)}
+                              </Text>
+                            </View>
+                          )}
+
+                          {/* Optional Unanchored Direct Numeric RPE Entry */}
+                          <View style={styles.directEntrySection}>
+                            <Pressable
+                              onPress={() => setDirectEntryOpen((prev) => !prev)}
+                              accessibilityRole="button"
+                              accessibilityLabel={directEntryOpen ? 'Hide direct RPE entry' : 'Enter RPE directly'}
+                              style={styles.directToggle}
+                            >
+                              <Text style={styles.directToggleText}>
+                                {directEntryOpen ? 'Hide direct RPE' : 'Enter RPE directly'}
+                              </Text>
+                            </Pressable>
+
+                            {directEntryOpen && (
+                              <View style={styles.directEntryBlock} testID="direct-rpe-block">
+                                <Stepper
+                                  testID="current-rpe-stepper"
+                                  label="Actual RPE"
+                                  tip="RPE"
+                                  value={directRpe !== null ? directRpe.toFixed(1) : (draftRpe ?? 8).toFixed(1)}
+                                  onDecrement={() => {
+                                    const base = directRpe ?? draftRpe ?? currentSlot?.targetRpe ?? 8;
+                                    const next = clamp(base - 0.5, 5, 10);
+                                    setDirectRpe(next);
+                                    setDraftRpe(next);
+                                    setSelectedChoice(null);
+                                  }}
+                                  onIncrement={() => {
+                                    const base = directRpe ?? draftRpe ?? currentSlot?.targetRpe ?? 8;
+                                    const next = clamp(base + 0.5, 5, 10);
+                                    setDirectRpe(next);
+                                    setDraftRpe(next);
+                                    setSelectedChoice(null);
+                                  }}
+                                  style={styles.sessionStepper}
+                                />
+                                <View style={styles.directChipsRow}>
+                                  {[5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0].map((val) => (
+                                    <Chip
+                                      key={val}
+                                      label={val.toFixed(1)}
+                                      selected={directRpe === val}
+                                      onPress={() => {
+                                        if (directRpe === val) {
+                                          setDirectRpe(null);
+                                        } else {
+                                          setDirectRpe(val);
+                                          setDraftRpe(val);
+                                          setSelectedChoice(null);
+                                        }
+                                      }}
+                                      accessibilityLabel={`RPE ${val.toFixed(1)}`}
+                                      style={styles.halfStepChip}
+                                    />
+                                  ))}
+                                </View>
+                              </View>
+                            )}
+                          </View>
+
                           <Text style={styles.effortCue} testID="rpe-cue">
-                            {effortCue(rpe) ?? 'RPE is optional evidence — leave it untouched to skip.'}
+                            {effortCue(safeRpe ?? currentSlot?.targetRpe ?? 8) ?? 'RPE is optional evidence — leave it untouched to skip.'}
                           </Text>
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
-                          <View style={styles.rpeConfirmation}>
-                            <Chip
-                              label={rpeTouched ? `RPE ${rpe.toFixed(1)} recorded` : `Confirm target RPE ${rpe.toFixed(1)}`}
-                              selected={rpeTouched}
-                              onPress={() => setRpeTouched(true)}
-                              accessibilityLabel={rpeTouched
-                                ? `Actual RPE ${rpe.toFixed(1)} confirmed`
-                                : `Confirm actual RPE ${rpe.toFixed(1)}`}
-                            />
-                            <Text style={styles.rpeEvidence}>
-                              {rpeTouched
-                                ? 'This actual RPE will be used as Coach evidence.'
-                                : 'Unanswered RPE is left out of Coach evidence.'}
-                            </Text>
-                          </View>
+                          <Text style={styles.rpeEvidence}>
+                            {safeRpe !== null
+                              ? 'This actual RPE will be used as Coach evidence.'
+                              : 'Unanswered RPE is left out of Coach evidence.'}
+                          </Text>
                         </View>
 
                         {supportsBands && (
@@ -1723,5 +1829,77 @@ const styles = StyleSheet.create({
     color: theme.color.textMid,
     fontWeight: '600',
     marginTop: theme.space[1],
+  },
+  rirContainer: {
+    marginTop: theme.space[3],
+    padding: theme.space[3],
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+  },
+  rirHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.space[2],
+  },
+  rirQuestion: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    fontWeight: '600',
+    flex: 1,
+  },
+  rirChoicesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+    marginTop: theme.space[3],
+  },
+  rirChip: {
+    minWidth: 48,
+  },
+  derivedRpeContainer: {
+    alignItems: 'center',
+    marginTop: theme.space[2],
+    paddingVertical: theme.space[1],
+  },
+  derivedRpeLabel: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+    fontWeight: '700',
+  },
+  directEntrySection: {
+    marginTop: theme.space[2],
+    alignItems: 'stretch',
+  },
+  directToggle: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: theme.space[2],
+  },
+  directToggleText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    textDecorationLine: 'underline',
+  },
+  directEntryBlock: {
+    marginTop: theme.space[2],
+    padding: theme.space[3],
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.color.ink1,
+  },
+  directChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+    marginTop: theme.space[3],
+    justifyContent: 'center',
+  },
+  halfStepChip: {
+    minWidth: 48,
   },
 });

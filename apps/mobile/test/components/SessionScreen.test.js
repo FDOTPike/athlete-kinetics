@@ -32,6 +32,9 @@ jest.mock('@ak/inference', () => {
     EFFORT_STOP_GUIDANCE: actual.EFFORT_STOP_GUIDANCE,
     EFFORT_BREATHING_NOTE: actual.EFFORT_BREATHING_NOTE,
     effortCue: actual.effortCue,
+    mapRirToRpe: actual.mapRirToRpe,
+    RIR_CHOICES: actual.RIR_CHOICES,
+    RIR_OPTIONS: actual.RIR_OPTIONS,
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
@@ -158,6 +161,9 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
   expect(StyleSheet.flatten(screen.getByTestId('current-set-steppers').props.style)).toMatchObject({
     flexDirection: 'column',
   });
+
+  // Open direct RPE entry to inspect both stepper widths in the phone-width stack
+  fireEvent.press(screen.getByText(/Enter RPE directly/i));
 
   const usablePhoneWidth = 411 - 40;
   [
@@ -404,28 +410,216 @@ test('untouched actual RPE logs null instead of fabricating target equality', ()
   );
 });
 
-test('explicit confirmation records a genuine exact-target RPE', () => {
-  render(<SessionScreen />);
-
-  fireEvent.press(screen.getByLabelText('Confirm actual RPE 8.0'));
-  expect(screen.getByText('This actual RPE will be used as Coach evidence.')).toBeOnTheScreen();
-  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
-
-  expect(mockState.logSet).toHaveBeenCalledWith(
-    1, 5, 0, 8,
-    undefined, undefined, undefined, undefined, 1,
-  );
-});
-
 test('adjusting actual RPE marks and records the changed answer', () => {
   render(<SessionScreen />);
 
+  fireEvent.press(screen.getByText(/Enter RPE directly/i));
   fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
   expect(screen.getByLabelText('Actual RPE 8.5')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
 
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, 8.5,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// §7.2 W1 — Unanchored RIR/RPE effort entry contract (Items 1–11)
+// ---------------------------------------------------------------------------
+
+test('§7.2 Item 1: a new rep-based set starts with no actual-effort answer selected (effort unanswered)', () => {
+  render(<SessionScreen />);
+
+  // Post-set clean-reps-remaining question must be visible for rep-based work
+  expect(screen.getByText('How many more clean reps could you have completed?')).toBeOnTheScreen();
+
+  // All 5 RIR choices ('0', '1', '2', '3', '4+') plus 'Not sure' must be present and unselected
+  const choices = [
+    { matcher: /^0 clean reps? left/i },
+    { matcher: /^1 clean reps? left/i },
+    { matcher: /^2 clean reps? left/i },
+    { matcher: /^3 clean reps? left/i },
+    { matcher: /^4\+ clean reps? left/i },
+    { matcher: /not sure/i },
+  ];
+
+  choices.forEach(({ matcher }) => {
+    const chip = screen.getByLabelText(matcher);
+    expect(chip).toBeOnTheScreen();
+    expect(chip.props.accessibilityState?.selected).toBeFalsy();
+  });
+
+  // Target RPE must remain visible as prescription guidance, never preselected as actual RPE
+  expect(screen.getByText(/Target.*RPE 8\.0/)).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/Actual RPE 8\.0/i)).toBeNull();
+});
+
+test('§7.2 Item 2: absence of Confirm target RPE action and target is not preselected', () => {
+  render(<SessionScreen />);
+
+  // Confirm target RPE chip/button and target-copy affordances must be absent
+  expect(screen.queryByText(/Confirm target RPE/i)).toBeNull();
+  expect(screen.queryByLabelText(/Confirm actual RPE/i)).toBeNull();
+  expect(screen.queryByTestId('confirm-target-rpe')).toBeNull();
+});
+
+test('§7.2 Item 3: logging without an answer persists null actual RPE (pre-existing passing)', () => {
+  render(<SessionScreen />);
+
+  // Logging without selecting an RIR or RPE answer must persist null RPE
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 4: selecting Not sure persists null actual RPE', () => {
+  render(<SessionScreen />);
+
+  const notSure = screen.getByLabelText(/not sure/i);
+  fireEvent.press(notSure);
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test.each([
+  ['0', 10.0, /^0 clean reps? left/i],
+  ['1', 9.0, /^1 clean reps? left/i],
+  ['2', 8.0, /^2 clean reps? left/i],
+  ['3', 7.0, /^3 clean reps? left/i],
+  ['4+', 6.0, /^4\+ clean reps? left/i],
+])('§7.2 Item 5: clean-reps-remaining choice %s maps to stored actual RPE %s', (choice, expectedRpe, matcher) => {
+  render(<SessionScreen />);
+
+  const option = screen.getByLabelText(matcher);
+  fireEvent.press(option);
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, expectedRpe,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 6: selecting an RIR answer, rerendering the same set, and logging preserves that selected answer', () => {
+  const { rerender } = render(<SessionScreen />);
+
+  const option = screen.getByLabelText(/^2 clean reps? left/i);
+  fireEvent.press(option);
+
+  // Rerender the screen with same set state
+  rerender(<SessionScreen />);
+
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, 8.0,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 7: advancing to the next set resets actual effort to unanswered', () => {
+  const { rerender } = render(<SessionScreen />);
+
+  // Set 1: athlete explicitly answers RIR '1' (actual RPE 9.0)
+  const option = screen.getByLabelText(/^1 clean reps? left/i);
+  fireEvent.press(option);
+
+  // Advance runner to set 2
+  mockState.runner = runner({
+    setIndex: 2,
+    slotSetCounts: [1, 0],
+    loggedSets: 1,
+  });
+  rerender(<SessionScreen />);
+
+  // Set 2 must start unanswered: choices unselected
+  const rir1 = screen.getByLabelText(/^1 clean reps? left/i);
+  expect(rir1.props.accessibilityState?.selected).toBeFalsy();
+
+  // Logging set 2 without answering persists null
+  fireEvent.press(screen.getByLabelText('Log set 2 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 8: changing the planned target does not silently change a selected actual answer', () => {
+  const { rerender } = render(<SessionScreen />);
+
+  // Athlete explicitly chose RIR '3' (RPE 7.0)
+  const option = screen.getByLabelText(/^3 clean reps? left/i);
+  fireEvent.press(option);
+
+  // Plan target changes from 8.0 to 9.0
+  mockState.sessionPlan = [
+    slot(1, 1, 5, { targetRpe: 9 }),
+    slot(2, 2, 8),
+  ];
+  rerender(<SessionScreen />);
+
+  // Logging must persist the athlete's chosen 7.0, not the new target (9.0)
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, 7.0,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 9: optional direct RPE entry supports half-step boundaries without initializing from target RPE', () => {
+  render(<SessionScreen />);
+
+  // Direct entry must be behind an explicit affordance, not exposed as prefilled primary input
+  const directToggle = screen.getByText(/Enter RPE directly/i);
+  fireEvent.press(directToggle);
+
+  // Opening direct entry must NOT prefill or confirm target RPE (8.0)
+  // Logging without an explicit selection persists null
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 10: timed/non-rep work does not present an RIR conversion', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7.5 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  // Non-rep / timed target must NOT show the clean reps remaining RIR question or choices
+  expect(screen.queryByText('How many more clean reps could you have completed?')).toBeNull();
+  expect(screen.queryByLabelText(/clean reps? left/i)).toBeNull();
+
+  // Target confirmation must be absent on timed work as well
+  expect(screen.queryByText(/Confirm target RPE/i)).toBeNull();
+  expect(screen.queryByLabelText(/Confirm actual RPE/i)).toBeNull();
+});
+
+test('§7.2 Item 11: existing bodyweight actual-reps behavior remains unchanged (invariant check)', () => {
+  render(<SessionScreen />);
+
+  // Initial draft comes from the planned target (5)
+  expect(screen.getByLabelText('Actual reps 5')).toBeOnTheScreen();
+
+  // Increment to 8 and log
+  for (let i = 0; i < 3; i += 1) fireEvent.press(screen.getByLabelText('Increase Actual reps'));
+  expect(screen.getByLabelText('Actual reps 8')).toBeOnTheScreen();
+
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 8, 0, null,
     undefined, undefined, undefined, undefined, 1,
   );
 });
@@ -980,6 +1174,7 @@ test('nullable target RPE uses the same fallback for display and initialization'
 
   const sourceBefore = screen.getByTestId('session-load-source-line').props.children;
   const draftBefore = screen.getByTestId('session-load-input').props.value;
+  fireEvent.press(screen.getByText(/Enter RPE directly/i));
   fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
   expect(screen.getByTestId('session-load-source-line').props.children).toBe(sourceBefore);
   expect(screen.getByTestId('session-load-input').props.value).toBe(draftBefore);
