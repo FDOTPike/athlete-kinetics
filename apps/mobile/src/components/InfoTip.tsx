@@ -41,8 +41,7 @@ export const GLOSSARY: Record<string, string> = Object.freeze(
       return acc;
     },
     {
-      WAVE:
-        GLOSSARY_ENTRIES.find((e) => e.id === 'UNDULATING')?.definition ?? '',
+      WAVE: 'Load oscillates across weeks within a block, reducing accumulated fatigue while sustaining intensity.',
       'MACRO-CYCLE':
         GLOSSARY_ENTRIES.find((e) => e.id === 'MACROCYCLE')?.definition ?? '',
     },
