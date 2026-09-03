@@ -3410,3 +3410,159 @@ separate until reconciliation.
   tree `9bc304e6c3e5f35c5bb6af97f8eb5ef623cbd3c3`, ancestor `965492e02184e07ddab20391740f10a694bd9149`
   verified, diff cfbcf67..HEAD docs-only confirmed before any Round 2 write, git diff --check clean.
   PROMPT_LEDGER.md at 3278 lines / 59 entries before this entry. Node v26.5.1, npm 12.0.2.
+
+---
+
+## Entry 0061 — 2026-09-03 · Beginner Learning UX: RPE/RIR Familiarisation and Terminology Glossary
+
+### Input G(x)
+
+```
+# Teamwork Project Prompt
+
+Run this as an Antigravity Team Preview using the owner's available Gemini 3.8 model. Use High effort for the lead orchestrator, both implementation agents, and both substantive reviewers. The mechanical sentinel may use Medium or High. If Gemini 3.8 is unavailable, stop and report that rather than silently substituting another model.
+
+Working directory:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
+
+Branch:
+codex/rpe-familiarisation
+
+Required exact starting HEAD:
+f8a0033717962f3492ff38e54681b20d54f82868
+
+Required product ancestor:
+e15bbe9301fe756ecda9d8296877b19e425ac112
+
+Integrity mode: development
+
+Execute:
+docs/WORKORDER_RPE_RIR_FAMILIARISATION.md
+
+Read the entire work order first. At W0, verify the branch, clean state, exact starting HEAD, and required ancestor before changing anything. Append the next sequential PROMPT_LEDGER entry as the first tracked write and preserve exactly one Input and one Output section. Note that on Windows PowerShell, npm invocations should use `npm.cmd`.
+
+Create and coordinate these Team Preview roles exactly as W7 specifies:
+
+- Lead orchestrator (Gemini 3.8 High): identity, PROMPT_LEDGER, task decomposition, non-overlapping file ownership, integration, freezes, reconciliation, and final handover. Cannot issue reviewer verdicts.
+- Implementer E1 (Gemini 3.8 High): unanchored RIR/RPE effort entry and focused tests (`SessionScreen.tsx`, `packages/inference/src/effortCues.ts`, pure helper, focused tests).
+- Implementer E2 (Gemini 3.8 High): canonical glossary, InfoTip hardening, searchable Athlete/Profile offline glossary, loading-method tip correction (`Undulating`/`WAVE`), and focused tests.
+- Mechanical sentinel (Gemini 3.8 Medium/High, read-only): independent scope, forbidden-path absence, diff hygiene, test execution, glossary completeness, and test-evidence authenticity.
+- Reviewer A (fresh Gemini 3.8 High context, read-only): product and data correctness, null semantics, absence of target copying, RIR mapping, set resets, rest fallback separation, timed-work behavior, Coach/autopilot evidence boundaries.
+- Reviewer B (fresh Gemini 3.8 High context, read-only): beginner UX, accessibility, wording, phone-width vertical layout, glossary typing/content/search/empty state, inline information-sign resolution, and Athlete/Profile navigation and back behavior.
+
+Do not let agents edit overlapping files concurrently. Serialize writes in the shared worktree. Use fresh isolated contexts for both reviewers and do not tell them the desired verdict.
+
+## Requirements
+
+### R1. Unanchored RIR/RPE Effort Entry (SessionScreen)
+- Remove target-anchored actual-RPE confirmation.
+- Make clean-reps-left RIR choices (`0`, `1`, `2`, `3`, `4+`) the primary optional answer for rep-based sets.
+- Map choices to actual RPE via a pure tested boundary: `0` -> `10.0`, `1` -> `9.0`, `2` -> `8.0`, `3` -> `7.0`, `4+` -> `6.0`.
+- Unanswered sets and `Not sure` persist as `NULL`.
+- Provide an explicit, unanchored direct half-step numeric RPE path (`5.0` to `10.0` in `0.5` steps) without initializing from target RPE.
+- Target RPE remains visible as prescription guidance but is never preselected, confirmed, or copied into actual RPE without an explicit athlete action.
+- Reset effort state to unanswered only when set identity changes, not on ordinary rerenders.
+- Preserve rest-timer fallback: athlete actual RPE determines rest; if null, rest timer falls back to target RPE while persisted evidence remains null.
+- Non-rep/timed sets do not present an RIR conversion.
+
+### R2. Canonical Learning Glossary and Hardened InfoTips
+- Create one typed offline canonical glossary data source shared by both inline `InfoTip` signs and the glossary view.
+- Fix blank RIR information sign and move it to the RIR question.
+- Fix the `Undulating`/`WAVE` mismatch so visible label and explanation title agree.
+- Provide a searchable offline Glossary sub-view under Athlete/Profile (no sixth root navigation tab).
+- Support case-insensitive search across term names, aliases, categories, and definitions, with an honest empty state.
+- Cover all required beginner terminology (RPE, RIR, target RPE, actual RPE, RPE cap, 1RM, load, sets, reps, tonnage, linear, undulating, step loading, autoregulated/APRE, deload, block, microcycle, macrocycle, strength, hypertrophy, power, endurance, GPP, hybrid, return to training, major, supplementary, accessory, conditional, readiness, HRV, and existing movement patterns).
+- Unknown tip keys must fail closed in development/tests and never render an empty card.
+
+### R3. Preservation of Invariants and Non-Goals
+- Do not add migrations, schema fields, onboarding questions, confidence surveys, biometric inputs, sensor permissions, dependencies, remote content/wiki, failure testing, calibration scores, or accuracy claims.
+- Preserve existing reps, bodyweight, load, rest, safety, session, and progression behavior.
+- Only athlete-confirmed non-null values reach Coach/autopilot RPE evidence.
+
+## Verification & Execution Sequence
+
+### Phase 1: W0 Identity & Red Tests (W1)
+- Verify worktree, branch, starting HEAD (`f8a0033717962f3492ff38e54681b20d54f82868`), required ancestor (`e15bbe9301fe756ecda9d8296877b19e425ac112`), and clean status.
+- Record Node (`v24.11.1`) and npm (`11.18.0`).
+- Append sequential entry to `PROMPT_LEDGER.md` preserving one open Output section.
+- Write failing red tests before any production code edits to demonstrate current contract violations.
+
+### Phase 2: Implementation (W2–W4)
+- E1: Pure effort mapping helper and SessionScreen unanchored RIR/RPE entry.
+- E2: Canonical glossary data module, InfoTip hardening, ProfileScreen glossary sub-view, and RoutineTemplateBuilder tip alignment.
+- Serialize writes; no concurrent overlapping file edits.
+
+### Phase 3: Regression & Negative Proof (W5)
+- Verify target `8.0` + no answer logs null.
+- Verify target `8.0` + `2` RIR logs `8.0` via explicit selection.
+- Verify `Not sure` produces null.
+- Verify direct entry `8.5` logs `8.5`.
+- Verify bodyweight actual reps reach `logSet` intact.
+- Verify timed work does not show RIR mapping.
+- Verify glossary offline search and empty state.
+
+### Phase 4: Full Verification Gates (W6)
+- Run `npm.cmd run typecheck`
+- Run `npm.cmd run verify:blocks`
+- Run `npm.cmd run verify:components`
+- Run `npm.cmd run verify:ci`
+- Run `git diff --check`
+- Verify clean authorized-path scope against W0 HEAD.
+- Create clean candidate freeze commit and record commit and tree SHA.
+- Draft `docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md`.
+
+### Phase 5: Team Preview Audit Loop (W7)
+- Dispatch Mechanical Sentinel, Reviewer A, and Reviewer B independently against the exact candidate SHA without desired verdicts.
+- Reviewers inspect code and execute checks independently in fresh isolated contexts.
+- Persist reports verbatim:
+  - `docs/audits/rpe-familiarisation/team-preview/round-N/sentinel.md`
+  - `docs/audits/rpe-familiarisation/team-preview/round-N/reviewer-a.md`
+  - `docs/audits/rpe-familiarisation/team-preview/round-N/reviewer-b.md`
+  - `docs/audits/rpe-familiarisation/team-preview/round-N/reconciliation.md`
+- Remediate if sentinel fails or either reviewer requests changes (up to 3 rounds). No stale approval carries across a changed tree.
+- When one exact freeze achieves Sentinel PASS, Reviewer A APPROVE, Reviewer B APPROVE, full CI exit 0, and clean diff/scope checks:
+  - Finalize `EXECUTOR_HANDOFF.md`.
+  - Close the single `PROMPT_LEDGER.md` Output section.
+  - Create documentation-only handover commit.
+  - Stop for Codex/Sol independent audit.
+
+## Acceptance Criteria
+
+### Product Behavior
+- [ ] Every new set begins with actual effort unanswered.
+- [ ] Rep-based work asks for clean reps remaining using the five RIR choices (`0`, `1`, `2`, `3`, `4+`) plus `Not sure`.
+- [ ] The exact mapping in section 2.2 is implemented by a pure tested boundary.
+- [ ] Planned target RPE is visible but never preselected or presented as the athlete's answer.
+- [ ] `Confirm target RPE` and equivalent target-copy shortcuts are absent.
+- [ ] No answer and `Not sure` both persist actual RPE as null.
+- [ ] Direct numeric entry is optional, explicit, half-step bounded (`5.0–10.0`), and unanchored.
+- [ ] Timed/non-rep work is not falsely converted through RIR.
+- [ ] No new mandatory question, modal, onboarding screen, or confidence survey exists.
+- [ ] No accuracy, grading, biometric, medical, or guaranteed-learning claim exists.
+- [ ] A searchable offline glossary is reachable from Athlete/Profile without adding a root tab.
+- [ ] Inline information signs and the glossary share one canonical definition source.
+- [ ] `RIR` opens a non-empty definition and `Undulating` opens an explanation bearing the same title.
+- [ ] The required initial vocabulary is present with beginner-readable definitions and useful aliases.
+- [ ] Unknown/dangling tip identifiers fail closed in tests and never render an empty card.
+
+### Integrity and Verification
+- [ ] Only authorized paths changed (`apps/mobile/src/screens/SessionScreen.tsx`, `apps/mobile/src/screens/ProfileScreen.tsx`, `apps/mobile/src/components/InfoTip.tsx`, `apps/mobile/src/components/RoutineTemplateBuilder.tsx`, new glossary screen/component, new glossary data module, `packages/inference/src/effortCues.ts`, `packages/inference/src/index.ts`, new pure helper if needed, authorized tests, `PROMPT_LEDGER.md`, `docs/audits/rpe-familiarisation/**`).
+- [ ] No migration or schema change exists.
+- [ ] Existing bodyweight actual-reps behavior remains passing.
+- [ ] Existing null semantics remain passing.
+- [ ] Only athlete-confirmed non-null values reach Coach/autopilot RPE evidence.
+- [ ] Full CI (`verify:ci`) passes without weakening gates.
+- [ ] Worktree is clean after final documentation-only commit.
+- [ ] The final exact product freeze has sentinel PASS plus independent Reviewer A and Reviewer B APPROVE verdicts.
+- [ ] Every Team Preview report identifies the exact SHA/tree it reviewed and is preserved verbatim in a separate file.
+- [ ] Any remediation was reviewed again at its new SHA; no stale approval carries forward.
+- [ ] Nothing was merged, rebased, pushed, tagged, released, signed, distributed, or run as a biometric pilot.
+
+## Required Final Token
+Return exactly one implementation token:
+`IMPLEMENTATION COMPLETE — TEAM PREVIEW APPROVED — READY FOR CODEX/SOL AUDIT`
+```
+
+### Output F(G(x))
+
+*(In progress — Team Preview execution)*
