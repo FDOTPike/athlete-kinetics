@@ -272,7 +272,6 @@ export default function SessionScreen(): React.JSX.Element {
   const [loadInvalid, setLoadInvalid] = useState(false);
   const [selectedChoice, setSelectedChoice] = useState<EffortAnswer | null>(null);
   const [directRpe, setDirectRpe] = useState<number | null>(null);
-  const [draftRpe, setDraftRpe] = useState<number>(8);
   const [directEntryOpen, setDirectEntryOpen] = useState(false);
   const lastSetKeyRef = useRef<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -390,7 +389,6 @@ export default function SessionScreen(): React.JSX.Element {
       lastSetKeyRef.current = activeSetKey;
       setSelectedChoice(null);
       setDirectRpe(null);
-      setDraftRpe(currentSlot?.targetRpe ?? 8);
       setDirectEntryOpen(false);
     }
   }, [activeSetKey]);
@@ -992,19 +990,17 @@ export default function SessionScreen(): React.JSX.Element {
                                   testID="current-rpe-stepper"
                                   label="Actual RPE"
                                   tip="RPE"
-                                  value={directRpe !== null ? directRpe.toFixed(1) : (draftRpe ?? 8).toFixed(1)}
+                                  value={directRpe !== null ? directRpe.toFixed(1) : '—'}
                                   onDecrement={() => {
-                                    const base = directRpe ?? draftRpe ?? currentSlot?.targetRpe ?? 8;
+                                    const base = directRpe ?? 8.0;
                                     const next = clamp(base - 0.5, 5, 10);
                                     setDirectRpe(next);
-                                    setDraftRpe(next);
                                     setSelectedChoice(null);
                                   }}
                                   onIncrement={() => {
-                                    const base = directRpe ?? draftRpe ?? currentSlot?.targetRpe ?? 8;
+                                    const base = directRpe ?? 8.0;
                                     const next = clamp(base + 0.5, 5, 10);
                                     setDirectRpe(next);
-                                    setDraftRpe(next);
                                     setSelectedChoice(null);
                                   }}
                                   style={styles.sessionStepper}
@@ -1020,7 +1016,6 @@ export default function SessionScreen(): React.JSX.Element {
                                           setDirectRpe(null);
                                         } else {
                                           setDirectRpe(val);
-                                          setDraftRpe(val);
                                           setSelectedChoice(null);
                                         }
                                       }}

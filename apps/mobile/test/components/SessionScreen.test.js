@@ -168,7 +168,7 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
   const usablePhoneWidth = 411 - 40;
   [
     ['current-reps-stepper', 'Actual reps', 'Actual reps 5', '5'],
-    ['current-rpe-stepper', 'Actual RPE', 'Actual RPE 8.0', '8.0'],
+    ['current-rpe-stepper', 'Actual RPE', 'Actual RPE —', '—'],
   ].forEach(([testID, label, accessibilityLabel, expectedValue]) => {
     expect(StyleSheet.flatten(screen.getByTestId(testID).props.style)).toMatchObject({
       flex: 0,
@@ -585,6 +585,46 @@ test('§7.2 Item 9: optional direct RPE entry supports half-step boundaries with
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('F-01 falsifier 1: direct RPE stepper opens from target-independent state, not planned target', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { targetRpe: 6.5 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByText(/Enter RPE directly/i));
+
+  // Must NOT display or pin the prescribed target RPE (6.5)
+  expect(screen.queryByLabelText('Actual RPE 6.5')).toBeNull();
+  expect(screen.getByLabelText('Actual RPE —')).toBeOnTheScreen();
+});
+
+test('F-01 falsifier 2: first increment from opened direct-entry stepper does not compute from target RPE', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { targetRpe: 6.5 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByText(/Enter RPE directly/i));
+  fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
+
+  // First increment must NOT equal targetRpe + 0.5 (6.5 + 0.5 = 7.0)
+  expect(screen.queryByLabelText('Actual RPE 7.0')).toBeNull();
+  // Instead, computes from neutral base (8.0 + 0.5 = 8.5)
+  expect(screen.getByLabelText('Actual RPE 8.5')).toBeOnTheScreen();
+
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, 8.5,
     undefined, undefined, undefined, undefined, 1,
   );
 });
