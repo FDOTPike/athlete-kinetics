@@ -552,11 +552,22 @@ console.log('[8c] R8 WAVE copy matches generated loading');
     waveLoads[1] > waveLoads[0] && waveLoads[2] <= waveLoads[1],
     waveLoads.join(' -> '));
 
-  const infoTipSrc = readFileSync(
-    join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'components', 'InfoTip.tsx'),
-    'utf-8',
-  );
-  const waveCopy = (infoTipSrc.match(/^\s*WAVE: '(.*)',$/m) ?? [])[1] ?? '';
+  let waveCopy = '';
+  const glossaryPath = join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'data', 'glossary.ts');
+  try {
+    const glossarySrc = readFileSync(glossaryPath, 'utf-8');
+    const m = glossarySrc.match(/id:\s*['"]UNDULATING['"][\s\S]*?definition:\s*['"`]([\s\S]*?)['"`]/m);
+    if (m) waveCopy = m[1];
+  } catch {
+    // fallback if glossary.ts is not present
+  }
+  if (!waveCopy) {
+    const infoTipSrc = readFileSync(
+      join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'components', 'InfoTip.tsx'),
+      'utf-8',
+    );
+    waveCopy = (infoTipSrc.match(/^\s*WAVE: '(.*)',$/m) ?? [])[1] ?? '';
+  }
   check('WAVE tip exists and makes no "rises past" claim the block never delivers',
     waveCopy.length > 0 && !/past where it was|past its former|rises past/i.test(waveCopy),
     waveCopy.slice(0, 70));

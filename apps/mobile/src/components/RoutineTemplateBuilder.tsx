@@ -768,7 +768,7 @@ export function RoutineTemplateBuilder({
                     {SCHEMA_LABELS[st]}
                   </Text>
                 </Pressable>
-                <InfoTip term={st} />
+                <InfoTip term={st === 'WAVE' ? 'Undulating' : st} />
               </View>
             );
           })}

@@ -34,6 +34,7 @@ import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
 import InfoTip from '../components/InfoTip';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
+import GlossaryScreen from './GlossaryScreen';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -228,6 +229,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [includeImportReadiness, setIncludeImportReadiness] = useState(false);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
   const [bodyweightText, setBodyweightText] = useState('');
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
   const buildTapCount = useRef(0);
   const buildTapReset = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -235,9 +237,16 @@ export default function ProfileScreen(): React.JSX.Element {
     if (buildTapReset.current !== null) clearTimeout(buildTapReset.current);
   }, []);
 
-  const hasSubView = labOpen || confirmingDeleteAthleteId !== null || confirmingWipeBlock || confirmingSwitchProfileId !== null || confirmingDeleteBandLevel !== null;
+  const hasSubView =
+    glossaryOpen ||
+    labOpen ||
+    confirmingDeleteAthleteId !== null ||
+    confirmingWipeBlock ||
+    confirmingSwitchProfileId !== null ||
+    confirmingDeleteBandLevel !== null;
   useSubViewBack(hasSubView, () => {
-    if (labOpen) setLabOpen(false);
+    if (glossaryOpen) setGlossaryOpen(false);
+    else if (labOpen) setLabOpen(false);
     else if (confirmingDeleteAthleteId !== null) setConfirmingDeleteAthleteId(null);
     else if (confirmingWipeBlock) setConfirmingWipeBlock(false);
     else if (confirmingSwitchProfileId !== null) setConfirmingSwitchProfileId(null);
@@ -289,6 +298,10 @@ export default function ProfileScreen(): React.JSX.Element {
     }
     buildTapReset.current = setTimeout(() => { buildTapCount.current = 0; }, 5000);
   };
+
+  if (glossaryOpen) {
+    return <GlossaryScreen onClose={() => setGlossaryOpen(false)} />;
+  }
 
   if (labOpen && advancedToolsUnlocked) {
     return <CoachVerificationLabScreen onClose={() => setLabOpen(false)} />;
@@ -788,6 +801,19 @@ export default function ProfileScreen(): React.JSX.Element {
             ))
           )}
         </Disclosure>
+      </View>
+
+      {/* ---- Learning & Terminology Glossary ---- */}
+      <View style={styles.mgmtSection} testID="learning-terminology-section">
+        <Text style={styles.mgmtHeading}>LEARNING &amp; TERMINOLOGY</Text>
+        <Text style={styles.fieldHint}>
+          Look up strength and conditioning concepts, loading methods, effort scales, and movement patterns offline anytime.
+        </Text>
+        <QuietAction
+          label="OPEN TERMINOLOGY GLOSSARY"
+          onPress={() => setGlossaryOpen(true)}
+          accessibilityLabel="Open terminology glossary"
+        />
       </View>
 
       {/* ---- Offline catalogue attribution ---- */}

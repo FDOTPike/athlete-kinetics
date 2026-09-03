@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
+import { NavigationProvider } from '../../src/navigation/navigation';
 
 let mockState;
 
@@ -462,5 +463,31 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(true);
     // Coach defaults are disclosed honestly with their later-editability.
     expect(screen.getByText(/EDIT ANYTIME IN ATHLETE \/ PROFILE/)).toBeOnTheScreen();
+  });
+
+  // --- W1 Red Test: Athlete/Profile Offline Glossary Sub-view (WO §7.2 Item 15) ---
+
+  test('[Item 15] Athlete/Profile contains an entry point to open offline Glossary sub-view without a sixth root tab, and sub-view back returns without tab change', () => {
+    const { getByRole, getByText } = render(
+      <NavigationProvider initialTab="athlete">
+        <ProfileScreen />
+      </NavigationProvider>,
+    );
+
+    // ProfileScreen must contain an accessible button/row to open Glossary
+    const glossaryButton = getByRole('button', { name: /glossary|terminology/i });
+    expect(glossaryButton).toBeOnTheScreen();
+
+    // Opening Glossary sub-view renders Glossary screen
+    fireEvent.press(glossaryButton);
+    expect(getByText(/GLOSSARY/i)).toBeOnTheScreen();
+
+    // Closing Glossary via back button returns to Athlete Profile without tab change
+    const backButton = getByRole('button', { name: /back to athlete/i });
+    expect(backButton).toBeOnTheScreen();
+    fireEvent.press(backButton);
+
+    // ProfileScreen content is restored
+    expect(getByText('ATHLETE PROFILE')).toBeOnTheScreen();
   });
 });
