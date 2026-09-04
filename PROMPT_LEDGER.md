@@ -4540,7 +4540,7 @@ incorrect. **C6 (low-memory/device gate) remains out of scope — do not attempt
     - State 3 (Direct RPE 8.5): `ui_caseb_state3_rpe85.xml` and `caseB_state3_rpe85_valid.png`. Stepper/chip shows 8.5, displays `"Reported actual RPE 8.5"`, and chosen cue `"Very hard; about one good rep left."`.
     - State 4 ("Not sure"): `ui_caseb_state4_notsure.xml` and `caseB_state4_notsure_valid.png`. Actual RPE reset to `—`, returns to neutral string `"RPE is optional evidence - leave it untouched to skip."`, target 6.5 cue completely absent.
   - **Case C (Next-Set Reset): PASS** — Logged Set 1 (RIR 2 / actual RPE 8.0). Dismissed rest timer. Set 2 presented cleanly reset: all RIR chips unselected, direct entry collapsed, neutral string displayed with no carryover from Set 1 and no target-derived cue. Evidence: `caseC_03_after_set1_logged.png`, `caseC_06_after_ready.png`, `caseC_07_set2_scrolled.png`.
-  - **Case D (Persistence Across Logged Sets): PASS** — Logged Set 2 untouched (null). Completed Exercise 1. Verified persistence across background/foreground (`caseD_02`, `caseD_03`) and cold termination/relaunch (`caseD_04`, `caseD_05`, `caseD_06`). Active session checkpoint restored cleanly with 1 of 4 exercises complete, Bodyweight Squat 2 sets complete, actual RPE 8.0 preserved for Set 1, null for Set 2, and target RPE 6.5 uncorrupted. Database SQL separation confirmed (`useStore.ts:5646`, actual effort in `set_record.rpe`, target in `set_target.target_rpe`).
+  - **Case D (Persistence Across Logged Sets): PARTIAL** — Session checkpoint and set-count persistence across background/foreground (`caseD_02`, `caseD_03`) and cold termination/relaunch (`caseD_04`, `caseD_05`, `caseD_06`) verified on device: active session checkpoint restored cleanly with `1 of 4 exercises complete`, `Bodyweight Squat: 2 sets complete`, and resumed on Exercise 2 (`Cable Pull-Through Set 1 of 2, Target 2 × 10 · RPE 6.5`). However, individual saved-RPE values (Set 1 actual RPE 8.0, Set 2 NULL) could not be verified on device because `debuggable=false` blocks `adb run-as` direct SQLite inspection and the in-progress session UI completed-exercise row does not render individual per-set RPE scores. While SQLite write mechanics and separation are audited from code (`useStore.ts:5646`), saved-RPE value verification on device is marked PARTIAL.
   - **Case E (Upgrade Preservation): PASS** — In-place reinstall executed via `adb install -r`. Dumpsys confirmed updated `lastUpdateTime` with identical `firstInstallTime`. Profile, program block, and in-flight session with 2 logged sets survived intact. Evidence: `caseE_01_upgrade_ready.png`, `caseE_02_upgrade_session.png`, `caseE_03_upgrade_athlete.png`.
   - **Case F (Narrow Regression Check): PASS** — Re-opened Glossary from Athlete tab. Verified TARGET RPE (distinct from cap; never assumed to be actual reported effort), RPE CAP (strict upper boundary), and LINEAR (no universal-best claim). Evidence: `caseF_05` to `caseF_11`.
   - **Case G (Stability): PASS** — 0 crashes, 0 ANRs attributable to `com.pikemethods.training.qa`. Radio state preserved (`airplane_mode_on=1`, `wifi_on=2`). Active session left open on Cable Pull-Through Set 1 of 2.
@@ -4552,7 +4552,7 @@ incorrect. **C6 (low-memory/device gate) remains out of scope — do not attempt
 ```text
 LIVE SESSION RPE/RIR DEVICE EVIDENCE: PASS
 NEXT-SET RESET: PASS
-PERSISTENCE ACROSS LOGGED SETS: PASS
+PERSISTENCE ACROSS LOGGED SETS: PARTIAL
 UPGRADE PRESERVATION: PASS
 C6: NOT EVALUATED
 PUSH / MERGE / RELEASE: NOT PERFORMED
