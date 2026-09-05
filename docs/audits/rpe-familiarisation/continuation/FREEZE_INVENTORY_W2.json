@@ -1,0 +1,266 @@
+{
+  "schema": "ak.continuation-freeze/1",
+  "stage": "W2_REMEDIATION_PATH_A_RECAPTURE",
+  "generatedAt": "2026-09-04T17:02:33.902Z",
+  "head": "0d24ebd7fc549ae6ecd2444856ec1386f5a5ec72",
+  "branch": "codex/rpe-familiarisation",
+  "trackedDiffFingerprint": {
+    "method": "sha256(git diff --full-index --binary HEAD)",
+    "value": "ad34457816be94342228adb8109fa43fbf0e8904511353218c6449ca6a07728c",
+    "diffBytes": 88149
+  },
+  "candidateBuildBoundary": {
+    "trackedDiffFingerprint": "0de694091f75b89541c3c8b1c290a8e0919bd0bddbaeafd732fe00b289717203",
+    "diffBytes": 73357
+  },
+  "qaCandidateApk": {
+    "path": "apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk",
+    "size": 194450340,
+    "sha256": "3777054f246a01e30bfc28a33181791e09de93be928f515959ebc2440d4b858d"
+  },
+  "round1ArchivedApk": {
+    "path": "scratch/continuation/w2_round1_apk/app-qa.apk",
+    "size": 194450148,
+    "sha256": "7d7f8846891e8be15771ed63f08cf519d4fcd9f66cd2272dc88fe72f97136aeb"
+  },
+  "baselineArchivedApk": {
+    "path": "scratch/continuation/baseline_apk/app-qa.apk",
+    "size": 194449552,
+    "sha256": "b42c1be10167dc516f675de2331189d1e4025a8ecdf0ec5d300d92624d410c67"
+  },
+  "trackedModified": [
+    {
+      "path": "PROMPT_LEDGER.md",
+      "size": 362033,
+      "sha256": "11ba356481d38c4c062f4eaf2532455080b8e834015105837d435c743284cdf3"
+    },
+    {
+      "path": "apps/mobile/src/components/RoutineTemplateBuilder.tsx",
+      "size": 68692,
+      "sha256": "98e8aef8d18a056b6fb4a47db4ac3e559bc8bc97bdfcd51ebc0dff31f4dacbc1"
+    },
+    {
+      "path": "apps/mobile/test/components/RoutineTemplateBuilder.test.js",
+      "size": 29219,
+      "sha256": "104e0cbd77741a16e3367673b95771e07e38e4142685d3d9978e4c66c6904343"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/antigravity/HANDBACK_LIVE_SESSION_EVIDENCE.md",
+      "size": 29057,
+      "sha256": "3bab3f48f8a4ece02cb88a310dc729060076b949d0e61341ee1cae08b31a6d79"
+    }
+  ],
+  "untrackedAuditFiles": [
+    {
+      "path": "docs/WORKORDER_GEMINI_OPUS_THREE_DAY_CONTINUATION.md",
+      "size": 20273,
+      "sha256": "6e37e00b0b8467870f8a14f7fb77d0d19e9293c16a0856950a1129f0856beacf"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/antigravity/HANDBACK_ISOLATED_QA.md",
+      "size": 25963,
+      "sha256": "96d9ff8c5cf22bb6196fa28f6ac5d184c151bfa03050c006cf0f102f90b39410"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/antigravity/WORKORDER_UNATTENDED_ISOLATED_QA.md",
+      "size": 13052,
+      "sha256": "81dc90bc34211a1b884e1dc4f8795aeb3bb08e01028a53b279716d9e1484eb33"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/codex/CLOSEOUT_AND_PR_PREPARATION.md",
+      "size": 15860,
+      "sha256": "8dc0584f8b229af66db5c0c2cdf5badc21c449895bb7d9a004a2643ad9ecd139"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/CODEX_REVIEW_AND_OPUS_NEXT_STEPS.md",
+      "size": 15081,
+      "sha256": "dddd8c8a5798c0f7029aba1e21dce1f64501a6ec15c557566a959314c9dee3ec"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/FREEZE_INVENTORY_W1.json",
+      "size": 2864,
+      "sha256": "7b49374146c2573c9d6ed539066fbc95ca7310f84c52a718b41768780018dede"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W1_EXECUTOR.md",
+      "size": 6319,
+      "sha256": "7948ee92fbdf59225d797c8edd99a097de3a5b8b10573d09b180432ffaa7adaf"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W1_OPUS_AUDIT.md",
+      "size": 21098,
+      "sha256": "cc75da5bd6e93736d29e1140678a876e00326dc5e9881fc0cc66f223d512f616"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W1_OPUS_AUDIT_R2.md",
+      "size": 10628,
+      "sha256": "a6cdd20844bc8c80a275e5db7acac633976f9f402caf775978e2cd4abc708442"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W2_EXECUTOR.md",
+      "size": 12634,
+      "sha256": "6d91bf6cb1215834d9884c75952fb4cd57e7158f73dac55aaa8298e69567a9a6"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W2_EXECUTOR_R1_SUPERSEDED.md",
+      "size": 10491,
+      "sha256": "78b150801c20623e70dd06ae8a18121350f33e99df930e56cd8f08023f8026fa"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W2_OPUS_AUDIT.md",
+      "size": 19191,
+      "sha256": "091f1a9d26bf64800b7ab3409790eca131128d7407b0e07abc10816c982138f6"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W2_OPUS_AUDIT_R2.md",
+      "size": 18446,
+      "sha256": "1c430695851cce9f86e97a22d9f7ef139e5ea8866c971a205a1f5ad1ced333b7"
+    }
+  ],
+  "continuationEvidenceFiles": [
+    {
+      "path": "scratch/continuation/baseline_apk/app-qa.apk",
+      "size": 194449552,
+      "sha256": "b42c1be10167dc516f675de2331189d1e4025a8ecdf0ec5d300d92624d410c67"
+    },
+    {
+      "path": "scratch/continuation/w2_round1_apk/app-qa.apk",
+      "size": 194450148,
+      "sha256": "7d7f8846891e8be15771ed63f08cf519d4fcd9f66cd2272dc88fe72f97136aeb"
+    },
+    {
+      "path": "scratch/continuation/evidence/01_standard_width_linear.png",
+      "size": 166271,
+      "sha256": "dba97211164dcf2ff8707920900c4f4691cc3aebbcd80678932b0f0c8821d890"
+    },
+    {
+      "path": "scratch/continuation/evidence/02_standard_width_undulating.png",
+      "size": 166452,
+      "sha256": "0c46b955ddc51d6fa001c249f1295877e335915633752d6e551358db74f2f75a"
+    },
+    {
+      "path": "scratch/continuation/evidence/03_standard_width_autoregulated.png",
+      "size": 166552,
+      "sha256": "3b7003b40d97a64ccba47005078e46a06ac9f1d6e447a9d646c5998641a3df86"
+    },
+    {
+      "path": "scratch/continuation/evidence/04_undulating_infotip_modal.png",
+      "size": 152615,
+      "sha256": "43c3572320365f8ffc3dfa228d0966b5155c31dd965675957cec3e101005d3fb"
+    },
+    {
+      "path": "scratch/continuation/evidence/05_undulating_dismissed_tapaway.png",
+      "size": 166552,
+      "sha256": "3b7003b40d97a64ccba47005078e46a06ac9f1d6e447a9d646c5998641a3df86"
+    },
+    {
+      "path": "scratch/continuation/evidence/06_undulating_reopened.png",
+      "size": 152615,
+      "sha256": "43c3572320365f8ffc3dfa228d0966b5155c31dd965675957cec3e101005d3fb"
+    },
+    {
+      "path": "scratch/continuation/evidence/07_undulating_dismissed_back.png",
+      "size": 166552,
+      "sha256": "3b7003b40d97a64ccba47005078e46a06ac9f1d6e447a9d646c5998641a3df86"
+    },
+    {
+      "path": "scratch/continuation/evidence/08_linear_infotip_modal.png",
+      "size": 158864,
+      "sha256": "dbb2128c2aafb78ad533c0b4703a70153d455e892d9f880c22465cb2741846b9"
+    },
+    {
+      "path": "scratch/continuation/evidence/09_apre_infotip_modal.png",
+      "size": 148233,
+      "sha256": "aa37de9a5967caa2a61a560ca26963aeb3767c4af0a06a77f3386e64594f4f1a"
+    },
+    {
+      "path": "scratch/continuation/evidence/10_narrow_width_linear.png",
+      "size": 161577,
+      "sha256": "147dd1fab98c5d96601418c079f5b95b00fb8f56852bb311fcb9f799b7e9b896"
+    },
+    {
+      "path": "scratch/continuation/evidence/11_narrow_width_undulating.png",
+      "size": 161541,
+      "sha256": "387f484720b8adef158c035725be0a47425e68e823aa8b33977916875ef2e1cc"
+    },
+    {
+      "path": "scratch/continuation/evidence/12_narrow_width_autoregulated.png",
+      "size": 161590,
+      "sha256": "55f5970fb831f98e3544bed1b331b53e11163cf384e43c0881247aadbc505451"
+    },
+    {
+      "path": "scratch/continuation/evidence/13_font13_linear.png",
+      "size": 184542,
+      "sha256": "22a4185404583f9bf33dc815e24dcaa7540db9ec1b7ba659798047031d2b4cd9"
+    },
+    {
+      "path": "scratch/continuation/evidence/14_font13_undulating.png",
+      "size": 184651,
+      "sha256": "99045bf7916321c211d895a119b5c6bdc7c0f41f28678a97845abef300d3b399"
+    },
+    {
+      "path": "scratch/continuation/evidence/15_font13_autoregulated.png",
+      "size": 184752,
+      "sha256": "177f361e4b36a425d4e3c2bdfec2fc05878100daf5062ca79460057aeb0c5517"
+    },
+    {
+      "path": "scratch/continuation/evidence/16_session_set_neutral.png",
+      "size": 158795,
+      "sha256": "85d9fa45edee5264b0b1a5803bd2a6de81754444b072596855c8295d3eff14ac"
+    },
+    {
+      "path": "scratch/continuation/evidence/17_session_set_effort_selected.png",
+      "size": 159068,
+      "sha256": "823ebf68ee3e019c662e6ec630e5b475cff303feb6f046a5a26ac8257d600b1d"
+    },
+    {
+      "path": "scratch/continuation/evidence/18_session_set_effort_after_tap2.png",
+      "size": 158795,
+      "sha256": "85d9fa45edee5264b0b1a5803bd2a6de81754444b072596855c8295d3eff14ac"
+    },
+    {
+      "path": "scratch/continuation/evidence/app_filtered_logcat.log",
+      "size": 18993,
+      "sha256": "24291f8f3e8e9869a8bb43e21adccce126d7d5c367755a31bf00d1c17f0fbe7a"
+    },
+    {
+      "path": "scratch/continuation/evidence/emulator_full_logcat.log",
+      "size": 2358524,
+      "sha256": "4d3a828229cb52f1ff32e4a82f9c3118c5877113d3e41391a927309ae634d506"
+    },
+    {
+      "path": "scratch/continuation/evidence/ui_builder.xml",
+      "size": 35002,
+      "sha256": "b9b9051bd9537de239143e2dfea302679647bafaf233f438350582f314655d77"
+    },
+    {
+      "path": "scratch/continuation/evidence/ui_font13_builder.xml",
+      "size": 29433,
+      "sha256": "e1bf31ced04de3649be86e0e4bf7eb53cff86891e3029ca562e9feb8f26d2046"
+    },
+    {
+      "path": "scratch/continuation/evidence/ui_narrow_builder.xml",
+      "size": 27679,
+      "sha256": "97e1df66d6b86c3452db555842b805482010c17a2de5690035abc820ba843c12"
+    },
+    {
+      "path": "scratch/continuation/evidence/ui_session.xml",
+      "size": 22775,
+      "sha256": "03c006ed96f62175ee14005e0ae5bc7157a67e827b37fab468c999ade13f3372"
+    },
+    {
+      "path": "scratch/continuation/generate_w2_deliverables.js",
+      "size": 21033,
+      "sha256": "2e751bfa544bdb629205d911e1e5371d7b71c759e50880f5d08a28a38631f498"
+    }
+  ],
+  "provenanceNotes": {
+    "CR_W2_01_resolution": "Path A evidence recapture completed directly from preserved QA candidate APK 3777054f… (194,450,340 B) installed on emulator-5554 at 11:52:18 UTC. All 18 PNG screenshots and 4 UI XML dumps captured 11:53:32–11:55:31 UTC.",
+    "R1_pre_build_baseline": "Pre-existing APKs archived to baseline_apk and w2_round1_apk before assembleQa rebuild.",
+    "R1_qa_candidate": "Built via gradlew assembleQa. Verified via npm.cmd run verify:qa-candidate (31/31 checks passed).",
+    "R2_layout_observation": "Screenshots captured across standard width (420 dpi), narrow width (480 dpi / 360dp), and enlarged font (font_scale 1.30). Vertical stacking expands chip width to 296-347 dp. Under font_scale 1.30, LINEAR, UNDULATING, and AUTOREGULATED render completely on a single line with zero clipping and zero ellipsis (resolving F4). ui_font13_builder.xml is genuinely distinct from ui_builder.xml with scaled 50 px line height (resolving F5). Touch target height is 56.00 dp (satisfying theme.touch.min = 56). InfoTip effective 41.9-42.0 dp touch area documented per F7.",
+    "R3_behavioral_lifecycle": "Linear, Undulating, Autoregulated selection states; tap-outside and Back dismissal routes; neutral -> selected -> neutral session regression confirmed with target header Target 3 × 10 · RPE 6.5 intact.",
+    "R4_evidence_retention": "Logcat dump confirms 0 crashes and 0 ANRs. All 18 PNG screenshots and 4 core XML dumps retained. Initial handback archived to W2_EXECUTOR_R1_SUPERSEDED.md per Opus R2.",
+    "R5_safety_guardrails": "Physical Pixel 49241FDAP001C7 untouched (0 commands, 0 writes). 0 git commits/stages/pushes/PRs/merges. Synthetic emulator cleanly killed via adb emu kill."
+  }
+}

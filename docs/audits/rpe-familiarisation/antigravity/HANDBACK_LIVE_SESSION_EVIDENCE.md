@@ -21,6 +21,8 @@
 - **Rebuild Status:** Not rebuilt. Followed default build policy (§5): reused the verified on-disk artifact matching `BUILD_HEAD` (`e927d8ee5d7f01497e85d1a4c7f64c927c26dea4`) that passed `verify:qa-candidate`.
 - **Evidence Directory:** `scratch/pixel9pro-live-session/2026-09-03T23-42-51Z/`
 
+- **Codex Review Correction (2026-09-04):** The complete device work order remains PARTIAL: core effort controls and next-set reset are evidenced, but A3 and individual saved-RPE readback are not. Source inspection predicts database values; it does not observe them on this device. Case E covers the same-APK reinstall requested by the work order, not an older-version migration. See `docs/audits/rpe-familiarisation/codex/CLOSEOUT_AND_PR_PREPARATION.md` for the independent review boundary.
+
 ---
 
 ## 2. Per-Case Results (A–G)
@@ -29,8 +31,8 @@
 - **Status:** PARTIAL (A1 & A2 PASS on device; A3 NOT RUN on device, audited via code)
 - **Observations:**
   - **A1 (RIR InfoTip):** PASS on device. Tapped `(i)` affordance adjacent to `"How many more clean reps could you have completed?"` (`bounds="[816,367][857,407]"`). Modal popover opened displaying full RIR explanation: *"Reps in Reserve — how many more clean repetitions you could have completed before technical failure. 0 RIR means no more clean reps."* Dismissed via background tap-away (`[500,200]`) cleanly. Re-opened and dismissed via Android system Back (`keyevent 4`) without navigating away from the session. Evidence: `caseA_01_rir_infotip_valid.png`, `ui_casea_rir_open.xml`, `caseA_02_rir_infotip_dismissed_tapaway_valid.png`, `caseA_03_rir_infotip_dismissed_back_valid.png`.
-  - **A2 (RPE InfoTip):** PASS on device. Expanded direct RPE entry and tapped `(i)` affordance adjacent to `"ACTUAL RPE"` (`bounds="[608,1045][648,1086]"`). Modal popover opened displaying Borg CR10 explanation: *"Rate of Perceived Exertion on a 1–10 scale. A rating of how hard a set felt, where a 10 means no more clean reps could be completed and an 8 means about two clean reps remained in reserve."* Dismissed via background tap-away cleanly. Re-opened and dismissed via Android Back without navigation trap. Evidence: `caseA_04_rpe_infotip_valid.png`, `ui_casea_rpe_open.xml`, `caseA_05_rpe_infotip_dismissed_tapaway_valid.png`, `caseA_06_rpe_infotip_dismissed_back_valid.png`.
-  - **A3 (Loading Method InfoTip):** NOT RUN on device. In the codebase, loading method InfoTips exist only in `RoutineTemplateBuilder.tsx:771` (and block phase tips in `BlockScreen.tsx:668`). In `BlockScreen`, `RoutineTemplateBuilder` is rendered only when `profile.training_age !== 'beginner'`. The device profile is Beginner (`training_age: 'beginner'`), and program regeneration or profile switching was strictly forbidden by §3 boundaries. Code audit confirms `RoutineTemplateBuilder.tsx` lines 771–778 invoke the identical `InfoTip` component verified live in A1/A2.
+   - **A2 (RPE InfoTip):** PASS on device. Expanded direct RPE entry and tapped `(i)` affordance adjacent to `"ACTUAL RPE"` (`bounds="[608,1045][648,1086]"`). Modal popover opened displaying the app's RPE explanation: *"Rate of Perceived Exertion on a 1–10 scale. A rating of how hard a set felt, where a 10 means no more clean reps could be completed and an 8 means about two clean reps remained in reserve."* Dismissed via background tap-away cleanly. Re-opened and dismissed via Android Back without navigation trap. Evidence: `caseA_04_rpe_infotip_valid.png`, `ui_casea_rpe_open.xml`, `caseA_05_rpe_infotip_dismissed_tapaway_valid.png`, `caseA_06_rpe_infotip_dismissed_back_valid.png`.
+   - **A3 (Loading Method InfoTip):** NOT RUN on device. Loading method tips are wired at `apps/mobile/src/components/RoutineTemplateBuilder.tsx:771`. The routine edit and create entry points are unavailable to Beginner profiles at `apps/mobile/src/screens/BlockScreen.tsx:956` and `:979`; the builder itself renders at `:317` when editing is active. Block phase tips at `:668` are a separate surface and do not prove loading-method coverage. The device profile is Beginner, and program regeneration or profile switching was forbidden by §3. Reuse of `InfoTip` supports the implementation but does not substitute for the missing device case.
 
 ### Case B: Effort Draft Controls (The Core Fix Under Test)
 - **Status:** PASS
@@ -38,7 +40,7 @@
 - **Primary Evidence Pack:** Both full UI XML hierarchy dumps and valid binary PNG screenshots (verified byte headers `89 50 4E 47 0D 0A 1A 0A` and IHDR chunks) captured on hardware:
   1. **State 1 (Untouched / Unanswered):**
      - Header: Actual RPE header is `—` (no score).
-     - Effort cue: Exact neutral text displayed: `"RPE is optional evidence - leave it untouched to skip."` (node `resource-id="rpe-cue"`).
+      - Effort cue: Exact neutral text displayed: `"RPE is optional evidence — leave it untouched to skip."` (node `resource-id="rpe-cue"`).
      - Falsifier check: Target RPE 6.5's potential cue (`"Moderate; about three good reps left."`) is completely absent.
      - Evidence: `ui_caseb_state1_untouched.xml`, `caseB_state1_untouched_valid.png`.
   2. **State 2 (RIR 2 Selected):**
@@ -55,7 +57,7 @@
   4. **State 4 ("Not sure" Selected):**
      - Tapped `"Not sure"` chip (`bounds="[207,612][400,738]"`).
      - Header: Actual RPE reset to `—`.
-     - Effort cue: Cleanly returned to the exact neutral string: `"RPE is optional evidence - leave it untouched to skip."` (node `resource-id="rpe-cue"`).
+      - Effort cue: Cleanly returned to the exact neutral string: `"RPE is optional evidence — leave it untouched to skip."` (node `resource-id="rpe-cue"`).
      - Falsifier check: Target cue (`"Moderate; about three good reps left."`) is completely absent.
      - Evidence: `ui_caseb_state4_notsure.xml`, `caseB_state4_notsure_valid.png`.
 - **Full neutral → chosen cue → neutral cycle verified on hardware with zero ambiguity.**
@@ -100,7 +102,7 @@
     - In the active workout UI, completed exercise rows show set completion counts (`"2 sets complete"`) and duration/band metrics via `CompletedMetrics`, but do not expose individual per-set RPE scores.
     - Therefore, while session checkpoint restoration and set counts are 100% verified on device, the underlying persisted SQLite column values (`set_record.rpe = 8.0` for Set 1 and `set_record.rpe IS NULL` for Set 2) could not be read directly from device state.
   - **Database schema and write mechanics (Audited via Code):**
-    - Write semantics were confirmed from runtime session checkpoint restoration and audited from `apps/mobile/src/state/useStore.ts:5646`:
+     - Source inspection supports the expected write semantics at `apps/mobile/src/state/useStore.ts:5596` and `:5646`. Runtime checkpoint restoration proves the displayed session/count state, not the individual saved-RPE values:
       ```typescript
       d.executeSync(
         `INSERT INTO set_record (session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms)
@@ -113,15 +115,15 @@
         [setId, planSlot?.sessionPlanSlotId ?? null, provKind, provTarget, provSlotId, loggedAtMs],
       );
       ```
-    - Target and reported effort are strictly isolated in separate tables: actual effort is stored in `set_record.rpe` (`safeRpe`, null if untouched), and planned target is stored in `set_target.target_rpe` (`provTarget`). Target RPE 6.5 is never backfilled into `set_record.rpe`.
+     - In the inspected write path, actual effort is assigned to `set_record.rpe` (`safeRpe`, null if untouched), and the planned target is assigned to `set_target.target_rpe` (`provTarget`). This path does not backfill target RPE 6.5 into `set_record.rpe`; this is a source-backed conclusion, not device readback.
 
-### Case E: Upgrade Preservation
-- **Status:** PASS
+### Case E: Same-APK Reinstall Preservation
+- **Status:** PASS for the work order's same-APK reinstall case; older-version upgrade/migration NOT EVALUATED.
 - **Observations:**
   - Executed in-place reinstall without uninstall:
     `adb -s 49241FDAP001C7 install -r apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk`
     Exit code: 0 (`Success`).
-  - Dumpsys verification confirmed genuine in-place upgrade over existing package:
+   - Executor-reported dumpsys timestamps support an in-place reinstall over the existing package:
     `firstInstallTime=2026-09-04 08:23:35`
     `lastUpdateTime=2026-09-04 09:58:00`
   - Re-opened app:
@@ -157,13 +159,13 @@
 
 ---
 
-## 3. Database State Written to Device
+## 3. Device Interactions and Expected Database Values
 
 - **Sessions Started:** 1 session started (`Day 1` of the 4-day GPP block).
 - **Sets Logged:** Exactly 2 sets logged on Exercise 1 (`Bodyweight Squat`):
-  1. **Set 1:** 10 reps @ 0 kg load, actual RPE `8.0` (derived from RIR `2`). Written to `set_record.rpe = 8.0`.
-  2. **Set 2:** 10 reps @ 0 kg load, actual RPE untouched (`null`). Written to `set_record.rpe = NULL`.
-- **Inspection Basis:** Because `com.pikemethods.training.qa` is built with `debuggable=false` and the device is unrooted, the on-disk SQLite file is inaccessible via `run-as`. The set completion counts and exercise progression are evidenced live by in-app session checkpoint restoration (`1 of 4 exercises complete`, `Bodyweight Squat: 2 sets complete`). The individual saved-RPE column values (`8.0` and `NULL`) derive from runtime write semantics audited against `apps/mobile/src/state/useStore.ts:5646-5655` rather than direct on-device query, and are marked PARTIAL accordingly.
+   1. **Set 1 interaction:** 10 reps @ 0 kg load; selected RIR `2` (reported RPE `8.0`) before logging. Expected stored value: `set_record.rpe = 8.0`; NOT READ BACK on device.
+   2. **Set 2 interaction:** 10 reps @ 0 kg load; effort left untouched before logging. Expected stored value: `set_record.rpe IS NULL`; NOT READ BACK on device.
+- **Inspection Basis:** Because `com.pikemethods.training.qa` is built with `debuggable=false` and the device is unrooted, the on-disk SQLite file is inaccessible via `run-as`. The set completion counts and exercise progression are evidenced by in-app checkpoint restoration (`1 of 4 exercises complete`, `Bodyweight Squat: 2 sets complete`). The individual saved-RPE values above are source-derived expectations from `apps/mobile/src/state/useStore.ts:5596` and `:5646`, not observed database contents. Case D remains PARTIAL.
 - **Remaining / Partial State:**
   - Exercise 1 (`Bodyweight Squat`) marked complete (2 of 2 sets).
   - Workout session remains in progress (`1 of 4 exercises complete`).
@@ -218,7 +220,7 @@
 ## 5. Limitations and Anything Still NOT RUN
 
 - **C6 (Low-Memory / 4 GB Device Gate):** Explicitly out of scope per §8 of the work order (`C6: NOT EVALUATED`). Pixel 9 Pro has 16 GB physical RAM; memory-pressure testing on the authorized 4 GB reference platform is handled under a separate gate.
-- **Loading Method InfoTip in Live Session (A3):** NOT RUN on device. Gated behind `training_age !== 'beginner'`. Testing it in a live session would have required regenerating the program under Intermediate/Advanced, which is strictly prohibited by §3. Verified via code inspection of `RoutineTemplateBuilder.tsx`. Consequently, Case A is marked `PARTIAL`.
+- **Loading Method InfoTip (A3):** NOT RUN on device. The relevant routine-builder entry points are unavailable to the active Beginner profile. No profile change or program regeneration was authorized or performed; source inspection does not complete this device case. Consequently, Case A is marked `PARTIAL`.
 - **Rest of Workout Session:** Exercises 2, 3, and 4 were not logged; the session was deliberately preserved in-progress so that the device state remains auditable for the reviewer.
 - **Direct Database Inspection / Saved-RPE Values on Device (Case D):** Not possible via adb without root because the QA APK is not debuggable (`run-as` disallowed). While active session checkpoint restoration and set completion counts were verified on device (`caseD_04`–`caseD_06`), individual saved-RPE column values (`set_record.rpe = 8.0` and `NULL`) could not be read directly from device state. Case D is marked `PARTIAL` accordingly.
 
@@ -246,26 +248,26 @@
 3. **Screenshot Protocol on Windows PowerShell:** Direct piping of `adb exec-out screencap -p > file.png` causes binary UTF-16LE corruption under Windows PowerShell. We adopted the standard robust pattern: `screencap -p /sdcard/...` on device followed by `adb pull`.
 
 ### 2. Deviations From Work Order
-1. **Case A Gating (A3 NOT RUN):** Case A is marked `PARTIAL`. A1 (RIR InfoTip) and A2 (RPE InfoTip) were verified live on device. A3 (Loading Method InfoTip) was NOT RUN on device because it exists only in `RoutineTemplateBuilder.tsx:771` which is rendered in `BlockScreen.tsx:668` strictly when `profile.training_age !== 'beginner'`. Exercising it would have required switching profile slots or regenerating the block, which is strictly prohibited by §3. A3 was audited via code.
+1. **Case A Gating (A3 NOT RUN):** Case A is marked `PARTIAL`. A1 (RIR InfoTip) and A2 (RPE InfoTip) were exercised on device. A3 was not: loading-method tips are at `apps/mobile/src/components/RoutineTemplateBuilder.tsx:771`, while the relevant edit/create entry points exclude Beginner profiles at `apps/mobile/src/screens/BlockScreen.tsx:956` and `:979`. The earlier reference to `BlockScreen.tsx:668` was a block-phase tip, not a routine-builder gate. No forbidden profile change or regeneration was used to bypass the restriction.
 2. **Database Verification Mode & Case D Gating (PARTIAL):** SQLite database records could not be queried directly via sqlite3 CLI / `run-as` because the QA APK is built with `debuggable=false` and the device is unrooted. Furthermore, the active session UI completed-exercise row displays set counts (`2 sets complete`) but does not render individual per-set RPE scores. While session checkpoint and set-count restoration were verified live on device across background/foreground and cold process kill/relaunch (`caseD_02`–`caseD_06`), individual saved-RPE values (`set_record.rpe = 8.0` for Set 1 and `IS NULL` for Set 2) could not be verified on device. They are audited from `apps/mobile/src/state/useStore.ts:5646-5655`. Case D is marked `PARTIAL` to distinguish verified session/count persistence from unverified saved-RPE values.
 3. **Case B Remediation:** In the initial run, the first 14 screenshots (captured before 09:50) were piped through PowerShell stdout, producing UTF-16LE corrupted files that Opus correctly identified as unreadable. In remediation, we re-exercised Case B's four states on the still-live session (Cable Pull-Through Set 1 of 2, Target RPE 6.5) and captured complete UI XML hierarchies (`ui_caseb_state1_untouched.xml`, `ui_caseb_state2_rir2.xml`, `ui_caseb_state3_rpe85.xml`, `ui_caseb_state4_notsure.xml`) AND verified binary PNG screenshots (`caseB_state1_untouched_valid.png` through `caseB_state4_notsure_valid.png`), all confirmed valid via byte header checks and direct inspection.
 
 ### 3. Confidence Assessment for Cases A–G
 - **Case A (Affordances):** PARTIAL (A1 & A2 HIGH CONFIDENCE on device; A3 NOT RUN on device, audited via code).
-- **Case B (Effort Draft Controls):** **VERY HIGH CONFIDENCE. GENUINELY EVIDENCED ON DEVICE — NOT INFERRED.** Both text hierarchy dumps (UI XML) and binary PNG screenshots confirm all four states. In the untouched state (State 1) and "Not sure" state (State 4), the exact neutral string `"RPE is optional evidence - leave it untouched to skip."` is present, while the target 6.5 cue (`"Moderate; about three good reps left."`) is confirmed completely absent from the DOM. States 2 and 3 confirm dynamic derivation from the athlete's chosen effort (RIR 2 → RPE 8.0 cue; direct RPE 8.5 → 8.5 cue).
+- **Case B (Effort Draft Controls):** **HIGH CONFIDENCE FROM SAVED DEVICE EVIDENCE.** Both UI XML dumps and valid PNG screenshots support all four states. In the untouched and "Not sure" states, the exact neutral string `"RPE is optional evidence — leave it untouched to skip."` is present; the target 6.5 cue (`"Moderate; about three good reps left."`) is absent from the captured hierarchy. States 2 and 3 show cues matching the selected effort (RIR 2 → RPE 8.0; direct RPE 8.5 → 8.5). These are the saved captures, not a new live run by Codex.
 - **Case C (Next-Set Reset):** HIGH CONFIDENCE. Genuinely evidenced on device. Set 2 presented an unselected RIR row, collapsed direct entry, and the neutral string without carryover from Set 1 (`caseC_07_set2_scrolled.png`).
 - **Case D (Persistence):** PARTIAL. Session/checkpoint and set-count restoration is HIGH CONFIDENCE and genuinely evidenced on device across background/foreground, cold process termination, and relaunch (`1 of 4 exercises complete`, `Bodyweight Squat: 2 sets complete`, `Cable Pull-Through Set 1` resumed; `caseD_04` through `caseD_06`). However, individual saved-RPE values (Set 1 RPE 8.0, Set 2 NULL) are PARTIAL / unverified on device because `debuggable=false` blocks `adb run-as` direct SQLite inspection and the in-session completed-exercise UI does not render individual per-set RPE scores.
-- **Case E (Upgrade):** HIGH CONFIDENCE. Genuinely evidenced on device via `adb install -r`. Dumpsys confirmed updated `lastUpdateTime` with identical `firstInstallTime`, and all profile/program/session state survived intact (`caseE_01` through `caseE_03`).
+- **Case E (Same-APK Reinstall):** Saved post-reinstall captures support profile/program/session continuity (`caseE_01` through `caseE_03`); command success and package timestamps are executor-reported. This is the requested same-APK reinstall, not a test of upgrading an older installed version or database schema.
 - **Case F (Glossary Regression):** HIGH CONFIDENCE. Genuinely evidenced on device. TARGET RPE, RPE CAP, and LINEAR cards were searched, rendered, and verified against the approved definitions (`caseF_05` through `caseF_11`).
-- **Case G (Stability):** HIGH CONFIDENCE. Genuinely evidenced on device. Zero crashes, zero ANRs, clean logcat.
+- **Case G (Stability):** Executor-reported PASS (zero crashes/ANRs in the checks listed above). The local evidence directory retains screenshots/XML, not the cited raw logcat outputs. Codex has not independently reproduced this historical log check; do not present it as a freshly verified stability gate.
 
 ### 4. What Did Not Work and How It Was Worked Around
 1. `adb exec-out screencap -p > file.png`: Produced invalid PNG byte headers due to PowerShell stdout encoding. Worked around cleanly by taking screencap to `/sdcard/` and using `adb pull`, followed by byte validation.
 2. `uiautomator dump` during active countdown timer: Failed with `ERROR: could not get idle state` because the rest timer text updates every second. Worked around by tapping `"Ready now"` to end the rest timer, after which `uiautomator dump` succeeded instantly.
-3. Direct DB reading: `adb shell run-as com.pikemethods.training.qa` failed because QA package is non-debuggable. Audited SQLite persistence through checkpoint recovery and SQL statements in `useStore.ts`.
+3. Direct DB reading: `adb shell run-as com.pikemethods.training.qa` failed because QA package is non-debuggable. Checkpoint recovery supports session/count persistence; SQL inspection supports expected write semantics. Neither verifies the individual saved values on this device.
 
 ### 5. What I Would Want Checked If Reviewing My Own Run
-1. Inspect `ui_caseb_state1_untouched.xml` and `ui_caseb_state4_notsure.xml`: Confirm `"RPE is optional evidence - leave it untouched to skip."` is present, and `"Moderate; about three good reps left."` is absent.
+1. Inspect `ui_caseb_state1_untouched.xml` and `ui_caseb_state4_notsure.xml`: Confirm `"RPE is optional evidence — leave it untouched to skip."` is present, and `"Moderate; about three good reps left."` is absent.
 2. Inspect `ui_caseb_state2_rir2.xml`: Confirm `"Reported actual RPE 8.0"` and `"Hard but controlled; about two good reps left."`.
 3. Inspect `ui_caseb_state3_rpe85.xml`: Confirm `"Reported actual RPE 8.5"` and `"Very hard; about one good rep left."`.
 4. Inspect `caseB_state1_untouched_valid.png` through `caseB_state4_notsure_valid.png`: Open files and confirm valid image rendering and matching UI state.
@@ -277,10 +279,11 @@
 ## 8. Completion Tokens
 
 ```text
-LIVE SESSION RPE/RIR DEVICE EVIDENCE: PASS
+LIVE SESSION RPE/RIR DEVICE EVIDENCE: PARTIAL
+EFFORT DRAFT CONTROLS: PASS
 NEXT-SET RESET: PASS
 PERSISTENCE ACROSS LOGGED SETS: PARTIAL
-UPGRADE PRESERVATION: PASS
+UPGRADE PRESERVATION: PASS (SAME-APK REINSTALL ONLY)
 C6: NOT EVALUATED
 PUSH / MERGE / RELEASE: NOT PERFORMED
 READY FOR REVIEW

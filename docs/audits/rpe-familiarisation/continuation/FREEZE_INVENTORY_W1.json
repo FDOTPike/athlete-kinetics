@@ -1,0 +1,71 @@
+{
+  "schema": "ak.continuation-freeze/1",
+  "stage": "W1_REMEDIATION",
+  "generatedAt": "2026-09-04T06:05:00Z",
+  "head": "0d24ebd7fc549ae6ecd2444856ec1386f5a5ec72",
+  "branch": "codex/rpe-familiarisation",
+  "trackedDiffFingerprint": {
+    "method": "sha256(git diff --full-index --binary HEAD)",
+    "value": "41f19f2aa87b062cefd570a0bc7f1e45e949ec4a068ece6444e65d1e6416c440",
+    "diffBytes": 67529
+  },
+  "trackedModified": [
+    {
+      "path": "PROMPT_LEDGER.md",
+      "size": 337147,
+      "sha256": "a312b35f45dc2ae4678fd5eb0494e5f680730abae5a60f634634384eb47bc43a"
+    },
+    {
+      "path": "apps/mobile/src/components/RoutineTemplateBuilder.tsx",
+      "size": 68588,
+      "sha256": "4f6531bb899ea5a2297bf2b265d67e244a0a39a825b5117260c340afd987acb6"
+    },
+    {
+      "path": "apps/mobile/test/components/RoutineTemplateBuilder.test.js",
+      "size": 29219,
+      "sha256": "104e0cbd77741a16e3367673b95771e07e38e4142685d3d9978e4c66c6904343"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/antigravity/HANDBACK_LIVE_SESSION_EVIDENCE.md",
+      "size": 29057,
+      "sha256": "3bab3f48f8a4ece02cb88a310dc729060076b949d0e61341ee1cae08b31a6d79"
+    }
+  ],
+  "untrackedAuditFiles": [
+    {
+      "path": "docs/WORKORDER_GEMINI_OPUS_THREE_DAY_CONTINUATION.md",
+      "size": 20273,
+      "sha256": "6e37e00b0b8467870f8a14f7fb77d0d19e9293c16a0856950a1129f0856beacf"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/antigravity/HANDBACK_ISOLATED_QA.md",
+      "size": 25963,
+      "sha256": "96d9ff8c5cf22bb6196fa28f6ac5d184c151bfa03050c006cf0f102f90b39410"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/antigravity/WORKORDER_UNATTENDED_ISOLATED_QA.md",
+      "size": 13052,
+      "sha256": "81dc90bc34211a1b884e1dc4f8795aeb3bb08e01028a53b279716d9e1484eb33"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/codex/CLOSEOUT_AND_PR_PREPARATION.md",
+      "size": 15860,
+      "sha256": "8dc0584f8b229af66db5c0c2cdf5badc21c449895bb7d9a004a2643ad9ecd139"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W1_OPUS_AUDIT.md",
+      "size": 21098,
+      "sha256": "cc75da5bd6e93736d29e1140678a876e00326dc5e9881fc0cc66f223d512f616"
+    },
+    {
+      "path": "docs/audits/rpe-familiarisation/continuation/W1_EXECUTOR.md",
+      "size": 6319,
+      "sha256": "7948ee92fbdf59225d797c8edd99a097de3a5b8b10573d09b180432ffaa7adaf"
+    }
+  ],
+  "provenanceNotes": {
+    "F1_remediation": "All digests computed dynamically via hashlib.sha256. Previous c88f34fe... was an uncomputed template string in generate_w1_deliverables.py.",
+    "F2_remediation": "HANDBACK_ISOLATED_QA.md updated additively with verified logcat categorization (4 PID 3764 / 1 PID 6208; 3 FrameTracker, 2 JDWP).",
+    "F3_remediation": "Continuation packet files (W1_EXECUTOR.md and W1_OPUS_AUDIT.md) included in inventory."
+  }
+}
