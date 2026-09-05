@@ -158,6 +158,25 @@ const importedReadiness = a.raw.prepare("SELECT acute_load_kg, chronic_load_kg F
 check('030 consumes only materialized eligible import load in readiness',
   importedReadiness !== undefined && importedReadiness.acute_load_kg === 400 && importedReadiness.chronic_load_kg === 100,
   JSON.stringify(importedReadiness));
+
+// W5 item 8: 004 is runtime SQL, not a version-gated migration. A latest-version
+// install with an old ACWR-derived row must converge when boot materializes it.
+const readRecovery = () => a.raw.prepare(
+  "SELECT readiness_score, acwr, load_component FROM state_vector WHERE date = '2030-01-01'",
+).get();
+const freshRecovery = readRecovery();
+check('runtime readiness keeps ACWR as context, with neutral recovery when HRV/sleep are absent',
+  freshRecovery.readiness_score === 50 && freshRecovery.acwr === 4 && freshRecovery.load_component === 0,
+  JSON.stringify(freshRecovery));
+a.raw.exec("UPDATE state_vector SET readiness_score = 0 WHERE date = '2030-01-01'");
+const versionBeforeRefresh = uv(a);
+runMigrations(a, MIGRATIONS); // already latest: no migration runs
+check('a no-op migration boot does not itself rewrite an old readiness snapshot',
+  uv(a) === versionBeforeRefresh && readRecovery().readiness_score === 0);
+a.raw.prepare(MATERIALIZE_SQL).run('2030-01-01'); // same runtime upsert as boot
+check('existing and fresh installs converge without advancing user_version',
+  uv(a) === versionBeforeRefresh && JSON.stringify(readRecovery()) === JSON.stringify(freshRecovery),
+  JSON.stringify(readRecovery()));
 a.raw.exec(`
   INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
   VALUES (31000, '2030-01-01', 'strength', 1);

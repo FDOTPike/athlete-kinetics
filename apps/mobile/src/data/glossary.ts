@@ -159,7 +159,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   // --- Loading Methods ---
   {
     id: 'LINEAR',
-    term: 'LINEAR',
+    term: 'Linear',
     category: 'loading',
     definition:
       'A structured loading method where planned load or effort increases steadily across the first three working weeks of a block, followed by a planned deload in week four.',
@@ -183,7 +183,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   },
   {
     id: 'APRE',
-    term: 'APRE',
+    term: 'Autoregulated',
     category: 'loading',
     definition:
       "Autoregulated. The set you actually perform decides the next set's load, so a bad day costs less.",

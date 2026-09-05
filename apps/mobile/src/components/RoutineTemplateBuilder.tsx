@@ -743,7 +743,11 @@ export function RoutineTemplateBuilder({
           {SCHEMAS.map((st) => {
             const selected = st === schemaType;
             return (
-              <View key={st} style={styles.schemaChipContainer}>
+              <View
+                key={st}
+                testID={`loading-method-option-${st}`}
+                style={styles.schemaChipContainer}
+              >
                 <Pressable
                   onPress={() => {
                     setSchemaType(st);
@@ -1331,7 +1335,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[3],
   },
   schemaRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: theme.space[2],
   },
   schemaChip: {
@@ -1343,6 +1347,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.ink1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
   },
   schemaChipSelected: {
     borderColor: theme.color.textHi,
@@ -1364,9 +1370,10 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   slotHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    // Give wrapped controls the full card width, including at large font scales.
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: theme.space[2],
   },
   slotIndexLabel: {
     ...theme.font.label,
@@ -1377,7 +1384,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.space[1],
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
   },
   orderButton: {
     minHeight: 36,
@@ -1596,8 +1603,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[1],
   },
   schemaChipContainer: {
+    // The container must flex: its child chip uses flex: 1, which resolves
+    // flexBasis to 0. Without a definite width to grow into, the chip collapsed
+    // to its border box (~5 px) while the intrinsically-sized InfoTip kept its
+    // width, leaving the loading-method labels invisible and untappable.
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: theme.space[2],
   },
   addSlotChipWrapper: {
     flexDirection: 'row',

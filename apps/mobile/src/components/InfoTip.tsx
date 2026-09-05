@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette } from '../state/useStore';
+import { theme } from '../theme/theme';
 
 const colors = palette ?? {
   bg: '#000',
@@ -73,12 +74,13 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
     <>
       <Pressable
         onPress={() => setOpen(true)}
-        hitSlop={12}
         accessibilityRole="button"
         accessibilityLabel={`What does ${title} mean?`}
-        style={styles.icon}
+        style={styles.trigger}
       >
-        <Text style={styles.iconText}>i</Text>
+        <View style={styles.icon}>
+          <Text style={styles.iconText}>i</Text>
+        </View>
       </Pressable>
       <Modal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
         <Pressable
@@ -99,6 +101,14 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
 }
 
 const styles = StyleSheet.create({
+  // Reserve the full touch target in layout; hitSlop can be clipped by parents.
+  trigger: {
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   icon: {
     width: 18,
     height: 18,
@@ -107,7 +117,6 @@ const styles = StyleSheet.create({
     borderColor: colors.dim,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 6,
   },
   iconText: { color: colors.dim, fontSize: 11, fontWeight: '800', fontStyle: 'italic' },
   backdrop: {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { RoutineTemplateBuilder } from '../../src/components/RoutineTemplateBuilder';
+import { SELECTABLE_SCHEMA_TYPES } from '@ak/inference';
 
 let mockState;
 
@@ -106,6 +107,75 @@ describe('RoutineTemplateBuilder', () => {
     expect(screen.queryByText('Step Loading')).toBeNull();
     expect(screen.queryByText(/Conjugate/i)).toBeNull();
     expect(screen.getByText('Day 1 Ordered Movements (3)')).toBeOnTheScreen();
+  });
+
+  const EXPECTED_LOADING_METHODS = [
+    { schema: 'LINEAR', label: 'Linear', tooltipTerm: 'Linear' },
+    { schema: 'WAVE', label: 'Undulating', tooltipTerm: 'Undulating' },
+    { schema: 'APRE', label: 'Autoregulated', tooltipTerm: 'Autoregulated' },
+  ];
+
+  // Device regression: each loading-method option collapsed to ~5 px wide on a
+  // Pixel 6 (Linear [42,607][47,754], Undulating [131,607][137,754],
+  // Autoregulated [221,607][226,754]) while the adjacent InfoTip kept its 47 px
+  // intrinsic width. The chip uses flex: 1, which resolves flexBasis to 0, so
+  // the row-direction container must itself flex to give the chip a definite
+  // width to grow into. Without container flex the labels are invisible and the
+  // control is untappable.
+  test('each loading-method option flexes so its label stays visible and tappable', () => {
+    // Assert against canonical selectable-schema contract from @ak/inference
+    expect(EXPECTED_LOADING_METHODS.map((m) => m.schema)).toEqual([...SELECTABLE_SCHEMA_TYPES]);
+
+    render(<RoutineTemplateBuilder />);
+
+    for (const { schema, label } of EXPECTED_LOADING_METHODS) {
+      // Must fail closed if the container is absent (no queryByTestId + continue)
+      const container = screen.getByTestId(`loading-method-option-${schema}`);
+      expect(StyleSheet.flatten(container.props.style)).toMatchObject({
+        flex: 1,
+        flexDirection: 'row',
+      });
+
+      // Every selectable option pressable must keep flex: 1 beside the InfoTip
+      const pressable = screen.getByLabelText(`${label} loading method`);
+      expect(StyleSheet.flatten(pressable.props.style)).toMatchObject({
+        flex: 1,
+      });
+
+      // Expected non-retired label must be visible inside the container
+      expect(within(container).getByText(label)).toBeOnTheScreen();
+    }
+  });
+
+  test('loading-method selector updates selection and renders interactive tooltips', () => {
+    render(<RoutineTemplateBuilder />);
+
+    // Initial state: LINEAR is default selected, WAVE and APRE are unselected
+    expect(screen.getByLabelText('Linear loading method').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByLabelText('Undulating loading method').props.accessibilityState).toEqual({ selected: false });
+    expect(screen.getByLabelText('Autoregulated loading method').props.accessibilityState).toEqual({ selected: false });
+
+    // Selecting Undulating updates accessibility state
+    fireEvent.press(screen.getByLabelText('Undulating loading method'));
+    expect(screen.getByLabelText('Undulating loading method').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByLabelText('Linear loading method').props.accessibilityState).toEqual({ selected: false });
+    expect(screen.getByLabelText('Autoregulated loading method').props.accessibilityState).toEqual({ selected: false });
+
+    // Selecting Autoregulated updates accessibility state
+    fireEvent.press(screen.getByLabelText('Autoregulated loading method'));
+    expect(screen.getByLabelText('Autoregulated loading method').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByLabelText('Undulating loading method').props.accessibilityState).toEqual({ selected: false });
+    expect(screen.getByLabelText('Linear loading method').props.accessibilityState).toEqual({ selected: false });
+
+    // InfoTip interactivity: each method explanation opens on press and closes on dismissal
+    for (const { tooltipTerm } of EXPECTED_LOADING_METHODS) {
+      const infoButton = screen.getByLabelText(`What does ${tooltipTerm} mean?`);
+      fireEvent.press(infoButton);
+      const explanation = screen.getByLabelText('Dismiss explanation');
+      expect(within(explanation).getByText(tooltipTerm, { exact: true })).toBeOnTheScreen();
+      fireEvent.press(screen.getByLabelText('Dismiss explanation'));
+      expect(screen.queryByLabelText('Dismiss explanation')).toBeNull();
+    }
   });
 
   test('filters by role before rendering and shows capability education in All / Learn', () => {
