@@ -5752,3 +5752,153 @@ is untouched and still OPEN (not draft, not closed). The dirty W8 worktree
 `.worktrees/rpe-familiarisation` was not modified. The Entry 0030-C1 correction
 remains uncommitted in the master-lineage ledger where the owner ruled it should
 stay, and local `master` remains at `3358be6`.
+
+---
+
+## Entry 0096 — 2026-09-09 · Merge-readiness ownership of PR #8
+
+### Input
+
+```text
+Act as merge-readiness owner for PR #8.
+
+Worktree:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\migration-061-034-convergence
+
+Head:
+claude/migration-061-034-convergence
+
+Current base:
+codex/rpe-familiarisation
+
+Do not merge immediately.
+
+1. Reconfirm the worktree is clean and PR #8 matches local HEAD.
+2. Re-run the complete verify:ci suite.
+3. Inspect all unresolved PR comments and request a real CodeRabbit review by taking the PR out of draft.
+4. Confirm PR #6's remaining unique changes are either deliberately rejected or already represented; do not merge PR #6.
+5. Preserve every uncommitted file in the rpe-familiarisation worktree. Do not reset, clean, stash, overwrite, or pull into that dirty worktree.
+6. If CI, CodeRabbit, and PR review are clean, merge PR #8 into codex/rpe-familiarisation only.
+7. Do not merge anything into master, tag, release, publish an APK, or claim release readiness.
+8. Return the PR URL, pre-merge HEAD, resulting base commit, merge method, checks, and exact remaining blockers.
+
+Authority granted only for merging PR #8 into codex/rpe-familiarisation after all checks pass.
+```
+
+### Output
+
+### 1. State reconfirmed
+
+Worktree `.worktrees/migration-061-034-convergence` clean (`git status --short`
+empty). Local HEAD, `origin/claude/migration-061-034-convergence` and PR #8's
+`headRefOid` all read `1ef45b0` at the start of this entry.
+`mergeable=MERGEABLE`, `mergeStateStatus=CLEAN`.
+
+### 2. verify:ci re-run
+
+Full suite re-run twice — once on `1ef45b0`, once after the review fixes below.
+Both **exit 0**. Second run: typecheck clean, `verify:store` **645/645**,
+`verify:migrations` ALL CHECKS PASSED, `verify:pipeline` 51 checks, 20 Jest
+suites / **284 tests**, 35 `[2aa]` 061 checks green.
+
+The 25 `FAIL` lines in the log were attributed before being dismissed: all 25
+are inside `verify:qa-artifact`, which runs in FIXTURE MODE with a passing
+positive control followed by deliberately malformed fixtures. They are
+negative-control self-tests proving the gate detects bad artifacts; the gate
+itself exits 0.
+
+### 3. PR comments and a real review
+
+At the start: 0 inline comments, 0 reviews, 0 review threads — the only comment
+was CodeRabbit's "draft PR not reviewed" boilerplate.
+
+`gh pr ready 8` took the PR out of draft. That changed CodeRabbit's skip reason
+from "draft pull request" to **"reviews are disabled for this base branch"** —
+so undrafting alone could not produce a review, and there is no `.coderabbit.yaml`
+in the repo, meaning that restriction lives in CodeRabbit's hosted settings and
+is not ours to edit. A manual `@coderabbitai review` request was accepted and a
+real review ran.
+
+Two reviewers reported, both `COMMENTED`, three inline comments. Each was
+verified against the code before being acted on:
+
+- **CodeRabbit — `BlockScreen.tsx:245`: VALID, fixed.** `continueTrainingProgram`
+  has two success paths; the non-terminal one clears `error` before generating,
+  the terminal one (archive final block, program to `review_due`) committed and
+  refreshed without clearing it. Because this branch made BlockScreen settle its
+  continuation confirmation on that shared field, a stale error from an earlier
+  unrelated failure would have been reported as a failed continuation. This
+  branch introduced the false-failure, so it was fixed here, not deferred.
+- **Copilot — `061_…sql:61` and the same wording in a check label: VALID,
+  corrected.** "user_version keeps pointing at 061" reads as the value 61. It is
+  an array INDEX: this entry is index 59 of 60, so a device reads 59 before the
+  attempt and still reads 59 after the rollback. The test already asserted the
+  right value; only the prose was misleading.
+- **Copilot — `PROMPT_LEDGER.md:5528`, same `user_version` wording: VALID, but
+  the ledger is append-only**, so Entry 0093 is left intact and corrected
+  forward here, as Entry 0030-C1 corrected Entry 0030.
+- **Copilot — "future-dated entries": NOT ACTED ON, false positive.** Entries
+  0093-0096 are dated 2026-09-09, which is today and matches every commit's
+  author date. Correct dates were not "corrected".
+
+New source contract pins the fix ordering (COMMIT -> clear -> refreshBlock) and
+was mutation-tested: removing the clear fails exactly that check. 643 -> 645.
+
+### 4. PR #6 disposition — every unique change accounted for
+
+All 26 files in `4c5056f...pr/6` classified; **PR #6 was not merged and was not
+modified.**
+
+- **Already represented (23 files).** The four feature commits' content was
+  re-implemented independently on this lineage and is superseded by 035-061:
+  `ProgramSetupScreen.tsx` + its test, `programTx.ts` (and its `verify:store`
+  build wiring in `package.json`), both `index.ts`, `types.ts`, `033`, `058`
+  (DDL byte-identical), `useStore.ts`, `blockGenerator.ts`,
+  `verify_routine_templates.mjs`, `migrationRunner.ts`, `migrations.ts`,
+  `export_movement_library.mjs` (033/034 already in FILES), `verify_pipeline.mjs`,
+  `verify_migrations.mjs`, `FocusScreens.test.js`, `jest.config.js`,
+  `verify_store_sql.mjs` (`sliceBetween` already present, 7 uses), and
+  `tools/inspect_elf_alignment.sh` (tracked here at blob `2539fcd`, a LATER
+  revision than PR #6's `af78627`). `034` is present as the relaxed variant and
+  is exactly what m061 reconciles.
+- **Ported earlier in this branch:** the App.tsx setup trap, the three
+  BlockScreen fixes plus a real touch target, the blockGenerator 034
+  conformance, the `verify_blocks` 034 predicate, and the migrations ordering
+  note.
+- **Deliberately rejected:** PR #6's `PROMPT_LEDGER.md` Entry 0023 (a
+  master-lineage entry; the two ledgers have clashing numbering);
+  `AUTOPILOT_BUDGET_NOTE` rewording and the a11y-label narrowing (this lineage
+  reworded independently and the label is pinned by `FocusScreens.test.js:290`);
+  the `slotAt()` refactor (still deferred). PR #6's `[3]`-banner move was checked
+  and **the defect does not exist here** — the banner sits directly above its
+  own body at `verify_migrations.mjs:518`.
+
+### 5. The dirty W8 worktree
+
+`.worktrees/rpe-familiarisation` was never written to: no reset, clean, stash,
+checkout, pull or merge was run against it. It remains at `d363d92` with all 16
+uncommitted files intact. All work happened in this worktree.
+
+### 6-8. Merge
+
+CI green, CodeRabbit review completed with its one actionable comment fixed,
+Copilot's valid items fixed and its false positive documented. Merging PR #8
+into `codex/rpe-familiarisation` only, per the granted authority. Nothing merged
+into `master`; no tag, release, APK publication, or release-readiness claim.
+
+The resulting base commit and merge method are recorded in the merge commit
+itself and in the handback report.
+
+### Remaining blockers (unchanged — inherited, not introduced)
+
+The three Entry 0029 P1s stay open: no per-slot athlete implement choice
+(`useStore.ts:1833`); suspension state surviving both reset paths
+(`useStore.ts:6098`, `:2076`); and migration 059's incomplete immutability
+(`suspension_episode_program` DELETE unguarded, no triggers at all on
+`block_suspension_origin` / `planned_slot_load_intent`) — 061 converges 034 only.
+W8 provenance also stands: the 2026-09-07 live-emulator audit of `d363d92`
+returned `REJECT … NO SEAL ISSUED` with `[G]` PENDING, and that audit plus the
+`tools/memory-audit/*` work it depends on remain uncommitted in the W8 worktree.
+C6 physical memory qualification remains mandatory for release, and
+`verify:release` cannot pass while `verify:memory-contract` exits 1 at
+`[A]`/`[D]`. **This merge is branch integration, not release readiness.**
