@@ -113,13 +113,6 @@ function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): strin
   }`;
 }
 
-/** Both attribution disclosures are a bare "·" glyph at theme.font.label, whose
- *  laid-out box is far under theme.touch.min (56). Growing the Pressable to 56
- *  would push a 56pt box into a text row that is otherwise label-height, so
- *  extend the touchable region instead: 20pt on every side takes a ~16pt glyph
- *  past the 56pt minimum without moving a single pixel of layout. */
-const ATTRIBUTION_HIT_SLOP = { top: 20, bottom: 20, left: 20, right: 20 } as const;
-
 const AUTOPILOT_BUDGET_NOTE = 'Held steady — effort only rises early in a cycle.';
 
 function autopilotExplanation(slot: TodaySlot): string | null {
@@ -146,7 +139,7 @@ function AutopilotAttribution({
     <View style={styles.attribution}>
       <Pressable
         onPress={onPress}
-        hitSlop={ATTRIBUTION_HIT_SLOP}
+        style={styles.attributionTouchTarget}
         accessibilityRole="button"
         accessibilityLabel={`Why ${slot.movementName} target changed`}
         accessibilityState={{ expanded }}
@@ -674,7 +667,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <View style={styles.blockAttribution}>
             <Pressable
               onPress={() => setMacroBudgetOpen((open) => !open)}
-              hitSlop={ATTRIBUTION_HIT_SLOP}
+              style={styles.attributionTouchTarget}
               accessibilityRole="button"
               accessibilityLabel="Why effort is held steady"
               accessibilityState={{ expanded: macroBudgetOpen }}
@@ -1471,6 +1464,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space[2],
+  },
+  /** Both attribution disclosures are a bare "·" glyph at theme.font.label,
+   *  whose laid-out box is far under theme.touch.min. hitSlop cannot fix that:
+   *  React Native clips a child's extended touch region to the bounds of its
+   *  ancestors, and these markers sit in label-height rows, so most of the slop
+   *  fell outside the parent and was never dispatched — worst on Android. The
+   *  target has to be REAL, so reserve a full theme.touch.min box and centre
+   *  the glyph inside it. The row grows to 56pt; that is the cost of a tappable
+   *  control, and it is paid deliberately rather than faked. */
+  attributionTouchTarget: {
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   attributionMarker: {
     ...theme.font.label,

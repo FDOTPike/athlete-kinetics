@@ -376,10 +376,15 @@ check(
     && blockSrc.includes('styles.errorText}>{continuationError}')
     && !/continueTrainingProgram\(\);\s*\n\s*setNextProgramPreview\(null\);/.test(blockSrc),
 );
+// hitSlop is NOT an acceptable fix here and the gate says so: React Native
+// clips a child's extended touch region to its ancestors' bounds, and these
+// markers sit in label-height rows, so the slop was never dispatched. The
+// negative clause keeps a future "fix" from regressing to it.
 check(
-  'both attribution markers extend their touch target past the glyph box',
-  (blockSrc.match(/hitSlop=\{ATTRIBUTION_HIT_SLOP\}/g) ?? []).length === 2
-    && blockSrc.includes('const ATTRIBUTION_HIT_SLOP = { top: 20, bottom: 20, left: 20, right: 20 }'),
+  'both attribution markers reserve a real theme.touch.min box, not a clipped hitSlop',
+  (blockSrc.match(/style=\{styles\.attributionTouchTarget\}/g) ?? []).length === 2
+    && /attributionTouchTarget:\s*\{[^}]*minWidth:\s*theme\.touch\.min[^}]*minHeight:\s*theme\.touch\.min/.test(blockSrc)
+    && !/hitSlop=/.test(blockSrc),
 );
 
 const previewProgramStart = src.indexOf('previewTrainingProgram: (input) => {');

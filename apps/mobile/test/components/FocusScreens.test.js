@@ -281,6 +281,49 @@ test('COACH discloses a held-safety autopilot attribution on demand', () => {
   expect(screen.getByText('Eased for safety — a recent safety signal lowered this target.')).toBeOnTheScreen();
 });
 
+// Both attribution markers are a bare "·" glyph sitting in a label-height row.
+// hitSlop cannot make them tappable: React Native clips a child's extended touch
+// region to its ancestors' bounds, so slop that reaches past a ~16pt row is
+// simply never dispatched. The target has to be a REAL reserved box. These two
+// tests assert the reserved dimensions AND that the disclosure still toggles —
+// they fail if the style is dropped, and they fail if it is "fixed" by putting
+// hitSlop back instead.
+test('COACH reserves a real touch target for the slot attribution marker', () => {
+  const raisedSlot = { ...todaySlot, autopilot: { rpeDelta: 0.5, setDelta: 1, reason: 'raised' } };
+  mockState = baseState({
+    todayPlan: { ...todayPlan, slots: [raisedSlot] },
+    loadSessionSlots: jest.fn(() => [raisedSlot]),
+  });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
+  const marker = screen.getByLabelText('Why Goblet Squat target changed');
+  expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+  });
+  expect(marker.props.hitSlop).toBeUndefined();
+  // Behaviour is unchanged: the marker still toggles its explanation.
+  expect(screen.queryByText('Nudged up — your recent sets felt easier than planned.')).toBeNull();
+  fireEvent.press(marker);
+  expect(screen.getByText('Nudged up — your recent sets felt easier than planned.')).toBeOnTheScreen();
+});
+
+test('COACH reserves a real touch target for the macro-budget marker', () => {
+  mockState = baseState({
+    blockMeta: { schemaType: 'LINEAR', macroBlockIndex: 6, macroPhase: 'peak', peakShifted: false },
+  });
+  render(<BlockScreen />);
+  const marker = screen.getByLabelText('Why effort is held steady');
+  expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+  });
+  expect(marker.props.hitSlop).toBeUndefined();
+  expect(screen.queryByText('Held steady — effort only rises early in a cycle.')).toBeNull();
+  fireEvent.press(marker);
+  expect(screen.getByText('Held steady — effort only rises early in a cycle.')).toBeOnTheScreen();
+});
+
 test('COACH explains the late-cycle upward-effort budget on demand', () => {
   mockState = baseState({
     blockMeta: { schemaType: 'LINEAR', macroBlockIndex: 6, macroPhase: 'peak', peakShifted: false },
