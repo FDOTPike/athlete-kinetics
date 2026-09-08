@@ -5578,3 +5578,86 @@ triggers at all on `block_suspension_origin` / `planned_slot_load_intent`. 061
 converges 034 only; it does not touch 059. Merging this lineage into local
 master remains BLOCKED on the reason/sign class of the 034 collision until a
 build carrying 061 has reached every device, and on the deferred PR #6 UI fixes.
+
+---
+
+## Entry 0094 — 2026-09-09 · Port the deferred PR #6 BlockScreen fixes
+
+### Input
+
+```text
+Leave the correction where it is; port the deferred BlockScreen fixes next
+```
+
+### Output
+
+The owner ruled that the Entry 0030-C1 correction stays in the master-lineage
+`PROMPT_LEDGER.md` working tree where Entry 0030 physically lives. It was not
+moved, not committed, and local `master` remains at `3358be6`.
+
+### Ported from PR #6 `32ab2a9`
+
+`BlockScreen.tsx` has diverged substantially on this lineage (1619 lines against
+PR #6's ~1050), so the patch does not apply — each fix was located by hand,
+confirmed missing here first, and then written in place.
+
+- **The ad-hoc session path was gated behind an active program.** The
+  `{program == null && (...)}` wrapper hides the whole "Manage block" section
+  while a program is active, and the "Start without a planned session"
+  Disclosure was nested inside it. `freezeRoutineTemplateToPlannedSession`
+  refuses to run while a program is active as well, so a program athlete on a
+  rest day had NO way to begin an ad-hoc session. Hoisted out of the gate;
+  only block regeneration stays program-gated.
+- **"Confirm next block" failed silently.** `continueTrainingProgram` reports
+  every refusal through the store's `error` and returns without creating a
+  block, but the handler cleared the preview card unconditionally — leaving the
+  athlete with no next block, no message and nothing to retry. The card now
+  settles in an effect: it closes only once the continuation actually landed,
+  and otherwise stays up with the reason inline. `storeError` is read through
+  the hook rather than `useStore.getState()` so the component tests' bare
+  selector mock still works.
+- **Both attribution markers were under the touch minimum.** Each is a bare
+  "·" glyph at `theme.font.label`, far under `theme.touch.min` (56). A 56pt box
+  would reflow the label-height rows they sit in, so a shared 20pt-per-side
+  `hitSlop` extends the touchable region without moving a pixel of layout.
+- Plus the `errorText` style the continuation card renders through.
+
+NOT ported: PR #6's `AUTOPILOT_BUDGET_NOTE` rewording and its a11y-label
+narrowing from "Why effort is held steady" to "Why RPE is held steady". This
+lineage already reworded that note independently to a different string, and the
+existing label is pinned by `FocusScreens.test.js:290`. That is a copy decision
+on diverged text, not a defect, so it is left to the owner. PR #6's `slotAt()`
+refactor of `verify_blocks.mjs` also remains deferred — it is test-robustness
+churn in a heavily diverged file and belongs in its own change.
+
+### Three new source contracts, each proven non-vacuous
+
+None of these three bugs had a gate, which is why they survived. Three checks
+were added to `verify_store_sql.mjs`, all anchored by INDEX so a rename yields
+`-1` and fails rather than silently matching nothing. Each was mutation-tested
+by reverting its fix and confirming the gate fails — and that only that gate
+fails:
+
+- drop one `hitSlop` -> only the touch-target check FAILs;
+- restore the old unconditional `setNextProgramPreview(null)` wiring -> only the
+  continuation check FAILs;
+- re-nest the ad-hoc Disclosure inside the program gate -> only the placement
+  check FAILs (`close=51734` now exceeds `unplanned=50649`, so the ordering
+  comparison catches it).
+
+The file was restored byte-identically after each mutation.
+
+### Verification
+
+`npm run typecheck` exit 0 · `npm run verify:store` exit 0, **643/643** (up from
+640) · `npm run verify:components` exit 0, 20 suites / 282 tests ·
+**`npm run verify:ci` exit 0**.
+
+### Remaining blockers (unchanged)
+
+The three Entry 0029 P1s are still open — no per-slot athlete implement choice,
+`resetTrainingData` / `PER_ATHLETE_RESET` still omit suspension state, and
+migration 059 leaves `suspension_episode_program` DELETE unguarded with no
+triggers at all on `block_suspension_origin` / `planned_slot_load_intent`.
+Nothing in this entry touches 059. The 034 reason/sign class stays live until a
+build carrying 061 has reached every device.
