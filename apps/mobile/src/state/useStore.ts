@@ -3660,6 +3660,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         set({ error: e instanceof Error ? e.message : String(e) });
         return;
       }
+      // The non-terminal path below clears `error` before generating; this one
+      // must too. `error` is shared store state, so a stale message from an
+      // EARLIER failure would otherwise survive a successful terminal
+      // continuation — and BlockScreen settles its confirmation on exactly that
+      // field, so it would keep the preview card open and report a failure that
+      // did not happen. Cleared after COMMIT and before the refreshes, so any
+      // error those raise is still reported.
+      set({ error: null });
       get().refreshBlock();
       get().refreshProgram();
       return;

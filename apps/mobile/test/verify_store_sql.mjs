@@ -1095,6 +1095,21 @@ if (resetTables.length >= 15) {
   const persistOutcomeBody = sliceBetween('const persistSessionOutcome =', 'const applyApreFinalization =');
   const applyApreBody = sliceBetween('const applyApreFinalization =', 'const runnerSelection =');
   const endSessionBody = sliceBetween('endSession: () => {', 'computePrescription: (_patterns) => {');
+  const continueProgramBody = sliceBetween('continueTrainingProgram: () => {', 'archiveTrainingProgram: () => {');
+
+  // `error` is SHARED store state and BlockScreen settles its continuation
+  // confirmation on it, so a terminal continuation that succeeds while a stale
+  // error is still set would be reported to the athlete as a failure. The
+  // non-terminal path clears it before generating; the terminal path must clear
+  // it after COMMIT and before the refreshes, so that an error raised BY a
+  // refresh still surfaces.
+  a('the terminal program-continuation body is located', continueProgramBody.length > 0);
+  a('a successful terminal continuation clears the shared error before refreshing',
+    ordered(continueProgramBody, [
+      "d.executeSync('COMMIT')",
+      'set({ error: null })',
+      'get().refreshBlock()',
+    ]));
 
   a('Phase 18 implementation bodies are located',
     [logSetBody, editSetBody, hydrateBody, persistOutcomeBody, applyApreBody, endSessionBody]

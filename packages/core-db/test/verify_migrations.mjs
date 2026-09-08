@@ -2296,7 +2296,9 @@ for (const violation of STRICT_ONLY_VIOLATIONS) {
   let poisonThrew = false;
   try { runMigrations(poison, MIGRATIONS); } catch { poisonThrew = true; }
   check(`061 fails closed on an unexplained row -- ${violation.label}`, poisonThrew);
-  check(`061 fail-closed leaves user_version at 061 -- ${violation.label}`,
+  // IDX_061 is the ARRAY INDEX of this migration (59 of 60), not the number
+  // 61: a rollback leaves user_version exactly where it was before the attempt.
+  check(`061 fail-closed leaves user_version unchanged at index ${IDX_061} -- ${violation.label}`,
     uv(poison) === IDX_061, String(uv(poison)));
   check(`061 fail-closed leaves the original rows untouched -- ${violation.label}`,
     JSON.stringify(autopilotRows(poison)) === JSON.stringify(beforePoison)

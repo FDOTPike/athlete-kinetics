@@ -58,11 +58,20 @@
 -- wrote to this table, so this migration must not guess. It deliberately has
 -- NO `WHERE` clause and NO `OR IGNORE`: the strict table's own CHECKs reject
 -- the row, the INSERT fails, the runner's per-migration transaction rolls
--- back, `user_version` keeps pointing at 061, and the original table is left
--- exactly as it was. That is the fail-closed outcome — the schema refuses to
--- converge rather than silently dropping, truncating, or rewriting athlete
--- attribution it cannot explain. The SQLite error names the violated CHECK,
--- which identifies the class of the offending row.
+-- back, and the original table is left exactly as it was.
+--
+-- `user_version` is UNCHANGED by that rollback. It is an INDEX into the
+-- MIGRATIONS array, not a migration's file number: this entry sits at index 59
+-- of 60, so a device that reaches it reads 59 before the attempt and still
+-- reads 59 after the failure. It does not advance to 60, and it never takes the
+-- value 61. Nothing has been applied, so the next boot simply retries this
+-- entry — which is what makes the failure recoverable by shipping a fix rather
+-- than by touching the device's data.
+--
+-- That is the fail-closed outcome — the schema refuses to converge rather than
+-- silently dropping, truncating, or rewriting athlete attribution it cannot
+-- explain. The SQLite error names the violated CHECK, which identifies the
+-- class of the offending row.
 --
 -- Idempotent: the staging table is created IF NOT EXISTS and renamed away on
 -- success, so a re-apply (including the sentinel self-heal path, which
