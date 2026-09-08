@@ -5452,3 +5452,129 @@ Self-initiated staging verification within the user's delegated local landing; n
 - Staged documentation whitespace check returned exit 2 with six pre-existing warnings: four trailing-space lines in captured SQL table output in HANDBACK_ISOLATED_QA.md (157, 158, 175, 176), plus blank EOF lines in CODEX_REVIEW_AND_OPUS_NEXT_STEPS.md (150) and W3_INTEGRATION_PACKET.md (718). All three documents still match their initial hashes. Codex accepts these historical formatting warnings to preserve frozen bytes; no functional gate or new-product whitespace check was waived.
 - Only the current decision, current W4/W5 review and this appended entry record the disposition. The historical documents themselves are unchanged.
 - Status: COMPLETE. The documentation commit containing this entry records the accepted formatting exceptions.
+
+---
+
+## Entry 0093 — 2026-09-09 · Migration 061 — converge the two shipped 034 schemas
+
+### Input
+
+```text
+Create a clean worktree/branch from codex/rpe-familiarisation@d363d92. Do not touch local master, the existing dirty RPE worktree, or GitHub state.
+
+Treat origin/master@4c5056f as the PR base. Audit PR #6 commit-by-commit against d363d92 and port only genuinely missing fixes; do not merge or cherry-pick the duplicate feature commits wholesale.
+
+Add append-only Migration 061 to converge both shipped Migration 034 schemas onto the strict contract. Add upgrade tests for relaxed 034, strict 034 with user_version 34, and fresh installation. Preserve valid rows exactly and fail closed on unexplained invalid rows. Do not edit 034 or 058.
+
+Correct Entry 0030 append-only: ±1.0 RPE output was not demonstrated, and the stack begins 6727cba → dc1d89a.
+
+Run targeted gates and verify:ci, commit locally, then stop with hashes, diff scope and remaining blockers. No push, merge, reset, release or device run.
+```
+
+### Output
+
+- **Worktree:** `.worktrees/migration-061-034-convergence`, new branch
+  `claude/migration-061-034-convergence` created from
+  `codex/rpe-familiarisation@d363d92`. Local `master`, the dirty
+  `.worktrees/rpe-familiarisation` checkout and all GitHub state were left
+  untouched; nothing was pushed, merged, reset, released or run on a device.
+- **PR base confirmed:** `origin/master` resolves to `4c5056f` exactly, so local
+  master's four commits were never pushed. `d363d92` descends from `4c5056f`,
+  `6727cba`, `dc1d89a`, `48719b0` and `e15bbe9`, and is 133 commits above the
+  base. Local `master` is NOT an ancestor, so this branch carries the RELAXED
+  034 only.
+
+### PR #6 audit (`origin/master..pr/6`, seven commits)
+
+| Commit | Disposition |
+|---|---|
+| `7bebc15`, `9e6012b`, `4ec5c18`, `3358be6` | NOT ported — the four local-master feature duplicates. Their work already exists on this lineage under different commits. |
+| `0c81f1d` docs(ledger) | NOT portable — it is a master-lineage Entry 0023; this lineage's ledger is a different file with clashing numbering. |
+| `b868c0a` restore `tools/inspect_elf_alignment.sh` | ALREADY PRESENT — tracked here at blob `2539fcd`, a later revision than PR #6's `af78627`. Its `jest.config.js` and `verify_migrations.mjs` hunks are also already present. |
+| `32ab2a9` CodeRabbit remediation | PARTIALLY PORTED — see below. |
+
+Ported from `32ab2a9` (verified missing here first, not assumed):
+
+- **`blockGenerator.ts` 034 conformance.** This lineage still asserted the pair
+  alongside the reason; the attributed pair is now DERIVED from the chosen
+  reason and an all-zero result emits no row. This is what makes the strict
+  contract structurally satisfiable, so it is a precondition for 061.
+- **`verify_blocks.mjs` 034/061 predicate gate.** Asserts the schema's own
+  predicate over every attribution the suite generates: **13 deltas, 0 invalid**.
+- **`migrations.ts` ordering note**, adapted — this lineage has no 035-057 gap,
+  so the general "append, never insert; `user_version` is the array INDEX" rule
+  is recorded, tied to why the convergence ships as m061 rather than an edit.
+- **`App.tsx` program-setup trap.** Confirmed present here verbatim:
+  `<ProgramSetupScreen />` with no `onCancel` (which hides its own Cancel
+  button, `ProgramSetupScreen.tsx:560`) plus a hidden tab bar. Setup is now
+  dismissible per visit. `verify_store_sql.mjs` pinned the buggy prop-less
+  element as a contract, so PR #6's gate update was ported with it.
+
+NOT ported and deferred: `32ab2a9`'s `slotAt()` refactor of `verify_blocks.mjs`
+and its `BlockScreen.tsx` hunks (ad-hoc session path, silent "Confirm next
+block" failure, `hitSlop`). `verify_store_sql.mjs`'s `sliceBetween` hardening is
+already present here (7 uses). The BlockScreen file has diverged substantially
+on this lineage and those are UI fixes unrelated to the migration mandate;
+porting them belongs in its own change with its own gates.
+
+### Migration 061
+
+`061_autopilot_attribution_convergence.sql`, appended after m060. 034 and 058
+were not edited. It creates a staging table carrying the STRICT contract
+verbatim, copies every row with a bare `INSERT ... SELECT` (no `WHERE`, no
+`OR IGNORE`, no coercion), drops the old table and renames. Valid rows therefore
+cross byte-identical; an unexplained row violates the strict CHECK, the INSERT
+fails, the runner's per-migration transaction rolls back, `user_version` stays
+at 061 and the original table is untouched — the schema refuses to converge
+rather than silently rewriting attribution it cannot explain.
+
+The header records why STRICT wins, and the claim is machine-checked rather than
+asserted: `kinematicAutopilot.ts:447` clamps `dRpe_p` to `[-0.5, 0.5]`, and
+`blockGenerator.ts:931-936` already clamps the base prescription to
+`[5.0, base_rpe_cap]`, rehab `<= 7.0`, on the 0.5 grid BEFORE the autopilot
+runs, so re-clamping can only cancel a step, never overshoot it.
+
+### Verification
+
+- `npm run verify:migrations` — ALL CHECKS PASSED, exit 0, including **38 new
+  `[2aa]` checks**: fresh install; relaxed-034 upgrade (all three valid rows
+  preserved byte-identically, `rpe_delta` still REAL); strict-034 device pinned
+  at `user_version = 34` via a fixture copy of master's DDL (converges, and the
+  positionally-skipped m035 still lands via the sentinel self-heal — asserted by
+  outcome, `profile_load_preference` = 4 rows); fail-closed on all four
+  strict-only violations (off-grid `0.25`, all-zero, mixed-sign `raised`,
+  positive `held_safety`), each asserting the throw, `user_version` unchanged,
+  rows untouched and no staging table left behind; and idempotent replay plus
+  sentinel self-heal landing on the STRICT contract.
+- `npm run verify:blocks` exit 0 · `npm run verify:store` exit 0, 640/640 ·
+  `npm run verify:pipeline` exit 0, 51 checks · `npm run typecheck` exit 0.
+- **`npm run verify:ci` exit 0** — 14 gate suites green, 20 Jest suites, 282
+  tests. First two runs failed and were fixed rather than worked around: the
+  App.tsx port broke a `verify_store_sql` gate that pinned the prop-less
+  element, and `verify_pipeline.mjs` pinned the chain tail at 060/59 files.
+- Two self-inflicted test defects were found and fixed before they could pass
+  vacuously: probe rows were landing on unseeded `planned_slot` ids (rejections
+  were FK failures, not CHECK failures — `strictRejections` now proves the probe
+  slot is insertable first and returns -1 otherwise), and `runMigrations` cannot
+  build a mid-chain device because its sentinel guard re-applies from zero, so
+  partial chains now go through a raw `applyRaw` helper.
+
+### Correction to Entry 0030
+
+Recorded in the master-lineage ledger as append-only **Entry 0030-C1** (Entry
+0030 left byte-for-byte intact), because Entry 0030 exists only in that file.
+Both owner-flagged errors confirmed: the `±1.0` RPE output was not merely
+undemonstrated but is false — `rpe_delta` is provably confined to
+`{-0.5, 0.0, +0.5}` — which narrows Entry 0030's blocker to the reason/sign and
+all-zero contracts and inverts the remedy toward converging UP to strict; and
+the stack begins `6727cba` -> `dc1d89a`, not the reverse.
+
+### Remaining blockers (unchanged by this work)
+
+The three Entry 0029 P1s are still open: no per-slot athlete implement choice,
+`resetTrainingData` / `PER_ATHLETE_RESET` still omit suspension state, and
+migration 059 leaves `suspension_episode_program` DELETE unguarded with no
+triggers at all on `block_suspension_origin` / `planned_slot_load_intent`. 061
+converges 034 only; it does not touch 059. Merging this lineage into local
+master remains BLOCKED on the reason/sign class of the 034 collision until a
+build carrying 061 has reached every device, and on the deferred PR #6 UI fixes.
