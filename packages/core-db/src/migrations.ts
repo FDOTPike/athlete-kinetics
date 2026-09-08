@@ -68,11 +68,26 @@ import m057 from './schema/057_block_meta_phase_invariant.sql';
 import m058 from './schema/058_suspension_episode.sql';
 import m059 from './schema/059_suspension_state_and_load_intent.sql';
 import m060 from './schema/060_program_goal_tier_alignment.sql';
+import m061 from './schema/061_autopilot_attribution_convergence.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
- *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035, m036, m037, m038, m039, m040, m041, m042, m043, m044, m045, m046, m047, m048, m049, m050, m051, m052, m053, m054, m055, m056, m057, m058, m059, m060];
+ *  shipped entry — add a new one.
+ *
+ *  APPEND, NEVER INSERT. `user_version` is this array's INDEX, not the
+ *  migration's file number: applyFrom() starts at `user_version` and sets it
+ *  to `v + 1` per entry. Splicing an entry in at its "numeric" home renumbers
+ *  every entry after it, and any device already past that index would skip the
+ *  spliced migration forever while believing the chain is complete. Its only
+ *  rescue would be the SENTINELS self-heal, which is a safety net, not a
+ *  migration strategy.
+ *
+ *  This is why the 034 convergence ships as m061 appended at the end rather
+ *  than as an edit to m034: 034 is shipped on two lineages with DIFFERENT
+ *  CHECK constraints (see 061's header), and editing it would neither reach an
+ *  installed device nor renumber safely. Order of application, not numeric
+ *  order, is the contract; idempotency is what makes that safe. */
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035, m036, m037, m038, m039, m040, m041, m042, m043, m044, m045, m046, m047, m048, m049, m050, m051, m052, m053, m054, m055, m056, m057, m058, m059, m060, m061];
 
 
 export function migrate(db: DB): void {

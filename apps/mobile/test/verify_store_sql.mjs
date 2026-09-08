@@ -343,7 +343,48 @@ check(
 );
 check(
   'fresh onboarded athletes route into explicit guided program setup',
-  appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen />'),
+  appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen'),
+);
+check(
+  'program setup is dismissible, so an archived-program athlete is never stranded',
+  appSrc.includes('const showProgramSetup = programSetupPending && !setupDismissed')
+    && appSrc.includes('onCancel={() => setSetupDismissed(true)}'),
+);
+
+// --- BlockScreen source contracts (ported with the PR #6 remediation) -------
+// None of the three bugs below had a gate, which is why they survived. Each
+// check pins the FIX, and every anchor is compared by index so that a rename
+// yields -1 and fails the check rather than silently matching nothing.
+const blockSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'screens', 'BlockScreen.tsx'), 'utf-8');
+
+const manageGateAt = blockSrc.indexOf('{program == null && (');
+const gateCloseAt = blockSrc.indexOf('\n        )}\n', manageGateAt);
+const unplannedAt = blockSrc.indexOf('<Disclosure label="Start without a planned session">');
+const feelsOffAt = blockSrc.indexOf('label="Something feels off"');
+check(
+  'the ad-hoc session path is never gated behind an active program',
+  manageGateAt >= 0
+    && gateCloseAt > manageGateAt
+    && unplannedAt > gateCloseAt
+    && feelsOffAt > unplannedAt,
+  `gate=${manageGateAt} close=${gateCloseAt} unplanned=${unplannedAt} feelsOff=${feelsOffAt}`,
+);
+check(
+  'confirming the next block settles on the store result instead of clearing the card outright',
+  blockSrc.includes('setContinuationPending(true)')
+    && blockSrc.includes('const storeError = useStore((s) => s.error)')
+    && blockSrc.includes('styles.errorText}>{continuationError}')
+    && !/continueTrainingProgram\(\);\s*\n\s*setNextProgramPreview\(null\);/.test(blockSrc),
+);
+// hitSlop is NOT an acceptable fix here and the gate says so: React Native
+// clips a child's extended touch region to its ancestors' bounds, and these
+// markers sit in label-height rows, so the slop was never dispatched. The
+// negative clause keeps a future "fix" from regressing to it.
+check(
+  'both attribution markers reserve a real theme.touch.min box, not a clipped hitSlop',
+  (blockSrc.match(/style=\{styles\.attributionTouchTarget\}/g) ?? []).length === 2
+    && /attributionTouchTarget:\s*\{[^}]*minWidth:\s*theme\.touch\.min[^}]*minHeight:\s*theme\.touch\.min/.test(blockSrc)
+    && !/hitSlop=/.test(blockSrc),
 );
 
 const previewProgramStart = src.indexOf('previewTrainingProgram: (input) => {');
@@ -1054,6 +1095,21 @@ if (resetTables.length >= 15) {
   const persistOutcomeBody = sliceBetween('const persistSessionOutcome =', 'const applyApreFinalization =');
   const applyApreBody = sliceBetween('const applyApreFinalization =', 'const runnerSelection =');
   const endSessionBody = sliceBetween('endSession: () => {', 'computePrescription: (_patterns) => {');
+  const continueProgramBody = sliceBetween('continueTrainingProgram: () => {', 'archiveTrainingProgram: () => {');
+
+  // `error` is SHARED store state and BlockScreen settles its continuation
+  // confirmation on it, so a terminal continuation that succeeds while a stale
+  // error is still set would be reported to the athlete as a failure. The
+  // non-terminal path clears it before generating; the terminal path must clear
+  // it after COMMIT and before the refreshes, so that an error raised BY a
+  // refresh still surfaces.
+  a('the terminal program-continuation body is located', continueProgramBody.length > 0);
+  a('a successful terminal continuation clears the shared error before refreshing',
+    ordered(continueProgramBody, [
+      "d.executeSync('COMMIT')",
+      'set({ error: null })',
+      'get().refreshBlock()',
+    ]));
 
   a('Phase 18 implementation bodies are located',
     [logSetBody, editSetBody, hydrateBody, persistOutcomeBody, applyApreBody, endSessionBody]

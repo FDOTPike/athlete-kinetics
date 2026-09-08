@@ -59,7 +59,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '056_movement_taxonomy_backfill.sql',
   '057_block_meta_phase_invariant.sql',
   '058_suspension_episode.sql', '059_suspension_state_and_load_intent.sql',
-  '060_program_goal_tier_alignment.sql'];
+  '060_program_goal_tier_alignment.sql',
+  '061_autopilot_attribution_convergence.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1733,16 +1734,16 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     db.raw.prepare('UPDATE block_meta SET macro_phase = ? WHERE block_id = ?').run(phase, blockId);
   };
 
-  // --- fresh install reaches user_version 59 with the invariant enforced ---
+  // --- fresh install reaches user_version 60 with the invariant enforced ---
   {
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 59 files (slots 001-060, no 004) -> user_version 59. This count is
+    // 60 files (slots 001-061, no 004) -> user_version 60. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 060 (program-goal tier alignment, WO §2.3).
-    check('fresh install reaches user_version 59 (59 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 59,
+    // silent one. Re-pinned for 061 (034 strict convergence).
+    check('fresh install reaches user_version 60 (60 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 60,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -2118,6 +2119,212 @@ const difficultyRows = (db) => db.raw.prepare(`
   check('060 alignment rows cascade on movement delete (FK surface)',
     c60.raw.prepare("SELECT COUNT(*) AS c FROM movement_tier_alignment WHERE movement_name = 'Deadlift'").get().c === 0);
 }
+
+// --- 2aa. 061 converges the two shipped 034 schemas onto the strict contract ---
+// 034 exists on two lineages with DIFFERENT CHECKs (relaxed: rpe_delta BETWEEN
+// -0.5 AND 0.5; strict: rpe_delta IN (-0.5,0.0,0.5) plus a no-all-zero and a
+// reason/sign CHECK). Because migrations are CREATE TABLE IF NOT EXISTS, a
+// device keeps whichever it first saw. 061 must land BOTH on the strict shape,
+// preserve every valid row byte-identically, and refuse to converge rather than
+// coerce a row it cannot explain.
+console.log('[2aa] 061 autopilot attribution convergence (two shipped 034 schemas)');
+
+const IDX_034 = FILES.indexOf('034_autopilot_attribution.sql');
+const IDX_058 = FILES.indexOf('058_suspension_episode.sql');
+const IDX_061 = FILES.indexOf('061_autopilot_attribution_convergence.sql');
+
+// The master lineage's 034, verbatim, as a FIXTURE. It is deliberately not a
+// file in src/schema: 034 is shipped and may never be edited or duplicated.
+const STRICT_034_FIXTURE = `
+CREATE TABLE IF NOT EXISTS planned_slot_autopilot (
+  planned_slot_id INTEGER PRIMARY KEY REFERENCES planned_slot ON DELETE CASCADE,
+  rpe_delta REAL NOT NULL CHECK (rpe_delta IN (-0.5, 0.0, 0.5)),
+  set_delta INTEGER NOT NULL CHECK (set_delta BETWEEN -1 AND 1),
+  reason TEXT NOT NULL CHECK (reason IN ('eased','raised','held_safety')),
+  CHECK (rpe_delta <> 0.0 OR set_delta <> 0),
+  CHECK (
+    (reason = 'raised' AND rpe_delta >= 0.0 AND set_delta >= 0)
+    OR
+    (reason IN ('eased','held_safety') AND rpe_delta <= 0.0 AND set_delta <= 0)
+  )
+) STRICT;`;
+
+// Minimal FK-satisfying parent chain for planned_slot rows.
+// Slots baseId+1..+3 carry attribution rows; baseId+9 is a permanently EMPTY
+// spare reserved for constraint probes, so a probe can never be rejected for a
+// missing FK parent or a PRIMARY KEY clash instead of the CHECK under test.
+const seedSlots = (db, baseId) => db.executeSync(`
+  INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
+  VALUES (${baseId}, '2030-05-01', 'strength', 1);
+  INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (${baseId + 1}, ${baseId}, 1, 1, 'lower', 'accumulation', '2030-05-01');
+  INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (${baseId + 1}, ${baseId + 1}, 1, 1, 3, 5, 8.0),
+         (${baseId + 2}, ${baseId + 1}, 2, 2, 3, 5, 8.0),
+         (${baseId + 3}, ${baseId + 1}, 3, 3, 3, 5, 8.0),
+         (${baseId + 9}, ${baseId + 1}, 9, 4, 3, 5, 8.0);
+`);
+const PROBE = (baseId) => baseId + 9;
+// Apply a PREFIX of the chain the way the runner would, WITHOUT runMigrations'
+// sentinel self-heal — that guard sees a short chain as a poisoned DB and
+// re-applies from zero, which cannot reproduce a mid-chain device.
+const applyRaw = (db, migrations, from, to) => {
+  for (let v = from; v < to; v++) db.executeSync(migrations[v]);
+  db.executeSync(`PRAGMA user_version = ${to};`);
+};
+const autopilotRows = (db) => db.raw.prepare(
+  'SELECT planned_slot_id, rpe_delta, set_delta, reason FROM planned_slot_autopilot ORDER BY planned_slot_id',
+).all();
+// The strict-only violations: each PASSES the relaxed CHECKs and FAILS the
+// strict ones, so each isolates exactly what convergence buys.
+const STRICT_ONLY_VIOLATIONS = [
+  { label: 'off-grid rpe_delta (0.25)', values: "0.25, 0, 'raised'" },
+  { label: 'all-zero attribution row', values: "0.0, 0, 'eased'" },
+  { label: "mixed-sign 'raised'", values: "0.5, -1, 'raised'" },
+  { label: "positive 'held_safety'", values: "0.5, 1, 'held_safety'" },
+];
+// Returns -1 unless the probe slot is genuinely insertable first: without that
+// guard every rejection below could be a missing FK parent rather than the
+// CHECK under test, and the assertion would pass for the wrong reason.
+const strictRejections = (db, baseId) => {
+  const slotId = PROBE(baseId);
+  try {
+    db.executeSync(`INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (${slotId}, -0.5, -1, 'eased')`);
+    db.executeSync(`DELETE FROM planned_slot_autopilot WHERE planned_slot_id = ${slotId}`);
+  } catch { return -1; }
+  let rejected = 0;
+  for (const v of STRICT_ONLY_VIOLATIONS) {
+    try {
+      db.executeSync(`INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (${slotId}, ${v.values})`);
+      db.executeSync(`DELETE FROM planned_slot_autopilot WHERE planned_slot_id = ${slotId}`);
+    } catch { rejected += 1; }
+  }
+  return rejected;
+};
+const ALL = STRICT_ONLY_VIOLATIONS.length;
+
+// (1) FRESH INSTALL -- the chain ends on the strict contract.
+const fresh61 = freshDb();
+runMigrations(fresh61, MIGRATIONS);
+check('061 fresh install completes the chain',
+  uv(fresh61) === MIGRATIONS.length && sentinelsMissing(fresh61).length === 0);
+seedSlots(fresh61, 6100);
+fresh61.executeSync("INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6101, -0.5, -1, 'eased')");
+check('061 fresh install still accepts a valid attribution row', autopilotRows(fresh61).length === 1);
+check('061 fresh install enforces all four strict-only contracts',
+  strictRejections(fresh61, 6100) === ALL);
+
+// (2) RELAXED 034 DEVICE -- upgrades and preserves every valid row EXACTLY.
+const relaxed61 = freshDb();
+applyRaw(relaxed61, MIGRATIONS, 0, IDX_061); // pre-061 device
+check('061 relaxed-034 precondition: device sits one migration short', uv(relaxed61) === IDX_061);
+seedSlots(relaxed61, 6200);
+relaxed61.executeSync(`
+  INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES
+    (6201, -0.5, -1, 'eased'),
+    (6202,  0.5,  1, 'raised'),
+    (6203, -0.5,  0, 'held_safety');
+`);
+const relaxedAcceptsOffGrid = (() => {
+  try {
+    relaxed61.executeSync("INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6209, 0.25, 0, 'raised')");
+    relaxed61.executeSync('DELETE FROM planned_slot_autopilot WHERE planned_slot_id = 6209');
+    return true;
+  } catch { return false; }
+})();
+check('061 relaxed-034 precondition: the old schema really did accept an off-grid delta', relaxedAcceptsOffGrid);
+const beforeRelaxed = autopilotRows(relaxed61);
+runMigrations(relaxed61, MIGRATIONS);
+const afterRelaxed = autopilotRows(relaxed61);
+check('061 relaxed-034 device reaches the end of the chain',
+  uv(relaxed61) === MIGRATIONS.length && sentinelsMissing(relaxed61).length === 0);
+check('061 relaxed-034 upgrade preserves all three valid rows EXACTLY',
+  JSON.stringify(beforeRelaxed) === JSON.stringify(afterRelaxed) && afterRelaxed.length === 3,
+  JSON.stringify(afterRelaxed));
+check('061 relaxed-034 upgrade keeps rpe_delta a REAL, uncoerced',
+  afterRelaxed.every((r) => typeof r.rpe_delta === 'number') && afterRelaxed[0].rpe_delta === -0.5);
+check('061 relaxed-034 upgrade now enforces all four strict-only contracts',
+  strictRejections(relaxed61, 6200) === ALL);
+relaxed61.executeSync('DELETE FROM planned_slot WHERE planned_slot_id = 6201');
+check('061 converged table keeps 034 FK cascade on parent delete',
+  autopilotRows(relaxed61).length === 2);
+
+// (3) STRICT 034 DEVICE AT user_version = 34 -- the master-lineage install.
+// That build shipped a 34-entry array (m001-m034 then m058), so the device sits
+// at 34 while THIS array has m035 at index 33. Resuming positionally would skip
+// m035; the sentinel self-heal is what rescues it.
+const strict61 = freshDb();
+applyRaw(strict61, MIGRATIONS, 0, IDX_034); // m001..m033
+strict61.executeSync(STRICT_034_FIXTURE);              // strict 034, not the relaxed file
+strict61.executeSync(MIGRATIONS[IDX_058]);             // master appended 058 straight after 034
+strict61.executeSync('PRAGMA user_version = 34;');
+check('061 strict-034 precondition: device reports the master-lineage user_version', uv(strict61) === 34);
+seedSlots(strict61, 6300);
+strict61.executeSync(`
+  INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES
+    (6301, -0.5, -1, 'eased'),
+    (6302,  0.5,  1, 'raised');
+`);
+const strictRejectsBefore = strictRejections(strict61, 6300);
+check('061 strict-034 precondition: the device already enforces the strict contract',
+  strictRejectsBefore === ALL, `${strictRejectsBefore}/${ALL}`);
+const beforeStrict = autopilotRows(strict61);
+runMigrations(strict61, MIGRATIONS);
+const afterStrict = autopilotRows(strict61);
+check('061 strict-034 device reaches the end of the chain',
+  uv(strict61) === MIGRATIONS.length && sentinelsMissing(strict61).length === 0,
+  `uv=${uv(strict61)} missing=${sentinelsMissing(strict61).join(',')}`);
+check('061 strict-034 upgrade preserves both valid rows EXACTLY',
+  JSON.stringify(beforeStrict) === JSON.stringify(afterStrict) && afterStrict.length === 2,
+  JSON.stringify(afterStrict));
+check('061 strict-034 upgrade still enforces all four strict-only contracts',
+  strictRejections(strict61, 6300) === ALL);
+// The positional skew is real: m035 sits at an index the device has already
+// passed, so only the self-heal re-apply lands it. Assert the OUTCOME.
+const loadPrefCount = () => Number(strict61.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference').get().c);
+check('061 strict-034 upgrade still lands the positionally-skipped m035',
+  loadPrefCount() === 4, String(loadPrefCount()));
+
+// (4) FAIL CLOSED -- an unexplained row stops convergence and changes nothing.
+for (const violation of STRICT_ONLY_VIOLATIONS) {
+  const poison = freshDb();
+  applyRaw(poison, MIGRATIONS, 0, IDX_061);
+  seedSlots(poison, 6400);
+  poison.executeSync("INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6401, -0.5, -1, 'eased')");
+  poison.executeSync(`INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6402, ${violation.values})`);
+  const beforePoison = autopilotRows(poison);
+  let poisonThrew = false;
+  try { runMigrations(poison, MIGRATIONS); } catch { poisonThrew = true; }
+  check(`061 fails closed on an unexplained row -- ${violation.label}`, poisonThrew);
+  // IDX_061 is the ARRAY INDEX of this migration (59 of 60), not the number
+  // 61: a rollback leaves user_version exactly where it was before the attempt.
+  check(`061 fail-closed leaves user_version unchanged at index ${IDX_061} -- ${violation.label}`,
+    uv(poison) === IDX_061, String(uv(poison)));
+  check(`061 fail-closed leaves the original rows untouched -- ${violation.label}`,
+    JSON.stringify(autopilotRows(poison)) === JSON.stringify(beforePoison)
+      && autopilotRows(poison).length === 2);
+  check(`061 fail-closed leaves no staging table behind -- ${violation.label}`,
+    poison.raw.prepare("SELECT 1 FROM sqlite_master WHERE name='planned_slot_autopilot_061'").get() === undefined);
+}
+
+// (5) IDEMPOTENCE -- re-applying 061 over an already-converged table is a no-op.
+const replay61 = freshDb();
+runMigrations(replay61, MIGRATIONS);
+seedSlots(replay61, 6500);
+replay61.executeSync("INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6501, -0.5, -1, 'eased')");
+const beforeReplay = autopilotRows(replay61);
+replay61.executeSync(`PRAGMA user_version = ${IDX_061};`);
+runMigrations(replay61, MIGRATIONS);
+check('061 replay over an already-strict table preserves the row exactly',
+  JSON.stringify(autopilotRows(replay61)) === JSON.stringify(beforeReplay) && autopilotRows(replay61).length === 1);
+replay61.executeSync('DROP TABLE planned_slot_autopilot');
+check('061 poison precondition marks the side-car sentinel missing',
+  sentinelsMissing(replay61).includes('planned_slot_autopilot'));
+runMigrations(replay61, MIGRATIONS);
+check('061 self-heal restores the side-car ON THE STRICT CONTRACT',
+  !sentinelsMissing(replay61).includes('planned_slot_autopilot')
+    && uv(replay61) === MIGRATIONS.length
+    && strictRejections(replay61, 6500) === ALL);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

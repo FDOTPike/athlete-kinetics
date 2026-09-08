@@ -1181,6 +1181,30 @@ check('held-safety attribution records the safety reason',
     && safetySlot.autopilotDelta.rpe_delta < 0
     && safetySlot.autopilotDelta.set_delta < 0,
   JSON.stringify(safetySlot?.autopilotDelta));
+// Every emitted attribution must satisfy the 034/061 STRICT CHECK predicate. If
+// it does not, the INSERT fails INSIDE the block-generation transaction and
+// costs the athlete the whole block — and on a device that has converged to 061
+// there is no looser schema left to absorb it. Assert the schema's own
+// predicate against every delta this file can generate, so a ladder change that
+// broke the grid or the sign invariant is caught here rather than in the field.
+const satisfies034 = (d) =>
+  [-0.5, 0.0, 0.5].includes(d.rpe_delta)
+  && Number.isInteger(d.set_delta) && d.set_delta >= -1 && d.set_delta <= 1
+  && ['eased', 'raised', 'held_safety'].includes(d.reason)
+  && (d.rpe_delta !== 0 || d.set_delta !== 0)
+  && (d.reason === 'raised'
+    ? d.rpe_delta >= 0 && d.set_delta >= 0
+    : d.rpe_delta <= 0 && d.set_delta <= 0);
+const everyDelta = [defPlan, upPlan, safetyPlan]
+  .flatMap((plan) => plan.sessions)
+  .flatMap((sess) => sess.slots)
+  .map((sl) => sl.autopilotDelta)
+  .filter((d) => d !== undefined);
+const bad034 = everyDelta.filter((d) => !satisfies034(d));
+check('every emitted autopilot attribution satisfies the 034/061 strict CHECKs',
+  everyDelta.length > 0 && bad034.length === 0,
+  `${everyDelta.length} deltas, ${bad034.length} invalid${bad034.length ? `: ${JSON.stringify(bad034[0])}` : ''}`);
+
 const clampPlan = genFR({ objective: 'hybrid', training_age: 'beginner', base_rpe_cap: 5, session_duration_cap_min: 90, weekly_frequency: 2 },
   makeFlawReport({ squat: { phi: 0.5 } }));
 const clampedSlot = clampPlan.sessions.filter((s) => s.week_index === 4)
