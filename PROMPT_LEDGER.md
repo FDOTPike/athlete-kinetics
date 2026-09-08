@@ -5661,3 +5661,94 @@ migration 059 leaves `suspension_episode_program` DELETE unguarded with no
 triggers at all on `block_suspension_origin` / `planned_slot_load_intent`.
 Nothing in this entry touches 059. The 034 reason/sign class stays live until a
 build carrying 061 has reached every device.
+
+---
+
+## Entry 0095 — 2026-09-09 · Real touch-target box, then push and open a draft PR
+
+### Input
+
+```text
+Fix only the remaining touch-target finding: both BlockScreen attribution Pressables must reserve a real theme.touch.min × theme.touch.min layout box; hitSlop alone is insufficient because parent bounds clip it. Preserve behavior and add a non-vacuous component test.
+
+Run typecheck, verify:store, verify:components and verify:ci, then commit. Push d363d92 as codex/rpe-familiarisation and push the current branch. Open a DRAFT PR from claude/migration-061-034-convergence into codex/rpe-familiarisation, explicitly listing the three Entry 0029 P1s and W8 provenance as inherited blockers. Do not merge, release, close PR #6 or modify the dirty W8 worktree.
+```
+
+### Output
+
+### The fix
+
+The previous entry's `hitSlop` was not a fix and is removed outright. React
+Native clips a child's extended touch region to its ancestors' bounds, and both
+attribution markers are a bare "·" glyph in a label-height row — so most of the
+slop fell outside the parent and was never dispatched, worst on Android. The
+source read as though the finding had been addressed while the control stayed
+effectively untappable.
+
+Both Pressables now carry `styles.attributionTouchTarget`, reserving a real
+`theme.touch.min` x `theme.touch.min` (56 x 56) box with the glyph centred.
+`hitSlop` is removed rather than kept alongside, so nothing suggests the clipped
+path is still load-bearing. The rows grow to 56pt — the honest cost of a
+tappable control. Behaviour is unchanged: same `onPress`, same
+`accessibilityRole` / `Label` / `State`, same disclosure content.
+
+### Non-vacuous evidence
+
+Two component tests in `FocusScreens.test.js` assert the reserved dimensions via
+`StyleSheet.flatten(...).toMatchObject`, assert `hitSlop` is absent, and assert
+the disclosure still toggles. Mutation-tested:
+
+- drop the style from the slot marker -> **1 failed, 1 passed** (selective);
+- "fix" it with `hitSlop` instead of a box -> **2 failed** (the tests reject the
+  inadequate fix, not merely its absence).
+
+`BlockScreen.tsx` was restored byte-identically after each mutation. The
+`verify_store_sql` contract is re-pinned to the reserved box and carries a
+negative `!/hitSlop=/` clause so a future change cannot regress to the clipped
+path.
+
+### Gates
+
+`npm run typecheck` exit 0 · `npm run verify:store` exit 0, **643/643** ·
+`npm run verify:components` exit 0, 20 suites / **284 tests** (282 -> 284) ·
+**`npm run verify:ci` exit 0**.
+
+### Commits
+
+- `67a84f3` fix(a11y): reserve a real touch target for both attribution markers
+- branch tip after this ledger commit is recorded by the commit that carries it.
+
+Full branch: `66cf931` -> `9708244` -> `05a8086` -> `8192ea9` -> `4b681f6` ->
+`9171631` -> `67a84f3`, ten files, +726 / -52 against `d363d92`.
+
+### Push and PR
+
+Destination was re-checked before pushing: `origin` carried no
+`codex/rpe-familiarisation`, and `origin/master` was `4c5056f`.
+
+- `git push origin d363d92:refs/heads/codex/rpe-familiarisation` -> new branch
+  at `d363d92`. This pushed the W8 worktree's already-committed tip; its 16
+  uncommitted files were not pushed and that worktree was not modified.
+- `git push -u origin claude/migration-061-034-convergence` -> new branch at
+  `67a84f3`.
+- **DRAFT PR #8** opened, `claude/migration-061-034-convergence` ->
+  `codex/rpe-familiarisation`:
+  https://github.com/FDOTPike/athlete-kinetics/pull/8
+
+The PR body lists the inherited blockers explicitly: the three Entry 0029 P1s
+(L1 implement choice, suspension state surviving both reset paths, migration
+059's incomplete immutability), and W8 provenance — the 2026-09-07 live-emulator
+qualification audit of **exactly this PR's base `d363d92`** returned
+`REJECT ... NO SEAL ISSUED`, with four journey PASS claims unsupported, the
+repository-invariance claim false, and `[G]` PENDING; that audit and the
+`tools/memory-audit/*` work it depends on are uncommitted in the W8 worktree and
+are therefore not on this branch. C6 physical memory qualification remains
+mandatory for release.
+
+### Not done
+
+No merge, rebase, reset, tag, signing, release, APK action or device run. PR #6
+is untouched and still OPEN (not draft, not closed). The dirty W8 worktree
+`.worktrees/rpe-familiarisation` was not modified. The Entry 0030-C1 correction
+remains uncommitted in the master-lineage ledger where the owner ruled it should
+stay, and local `master` remains at `3358be6`.
