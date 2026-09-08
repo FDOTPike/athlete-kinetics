@@ -351,6 +351,37 @@ check(
     && appSrc.includes('onCancel={() => setSetupDismissed(true)}'),
 );
 
+// --- BlockScreen source contracts (ported with the PR #6 remediation) -------
+// None of the three bugs below had a gate, which is why they survived. Each
+// check pins the FIX, and every anchor is compared by index so that a rename
+// yields -1 and fails the check rather than silently matching nothing.
+const blockSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'screens', 'BlockScreen.tsx'), 'utf-8');
+
+const manageGateAt = blockSrc.indexOf('{program == null && (');
+const gateCloseAt = blockSrc.indexOf('\n        )}\n', manageGateAt);
+const unplannedAt = blockSrc.indexOf('<Disclosure label="Start without a planned session">');
+const feelsOffAt = blockSrc.indexOf('label="Something feels off"');
+check(
+  'the ad-hoc session path is never gated behind an active program',
+  manageGateAt >= 0
+    && gateCloseAt > manageGateAt
+    && unplannedAt > gateCloseAt
+    && feelsOffAt > unplannedAt,
+  `gate=${manageGateAt} close=${gateCloseAt} unplanned=${unplannedAt} feelsOff=${feelsOffAt}`,
+);
+check(
+  'confirming the next block settles on the store result instead of clearing the card outright',
+  blockSrc.includes('setContinuationPending(true)')
+    && blockSrc.includes('const storeError = useStore((s) => s.error)')
+    && blockSrc.includes('styles.errorText}>{continuationError}')
+    && !/continueTrainingProgram\(\);\s*\n\s*setNextProgramPreview\(null\);/.test(blockSrc),
+);
+check(
+  'both attribution markers extend their touch target past the glyph box',
+  (blockSrc.match(/hitSlop=\{ATTRIBUTION_HIT_SLOP\}/g) ?? []).length === 2
+    && blockSrc.includes('const ATTRIBUTION_HIT_SLOP = { top: 20, bottom: 20, left: 20, right: 20 }'),
+);
+
 const previewProgramStart = src.indexOf('previewTrainingProgram: (input) => {');
 const previewProgramEnd = src.indexOf('createTrainingProgram: (input) => {', previewProgramStart);
 const previewProgramBody = src.slice(previewProgramStart, previewProgramEnd);
