@@ -343,7 +343,12 @@ check(
 );
 check(
   'fresh onboarded athletes route into explicit guided program setup',
-  appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen />'),
+  appSrc.includes('showProgramSetup') && appSrc.includes('<ProgramSetupScreen'),
+);
+check(
+  'program setup is dismissible, so an archived-program athlete is never stranded',
+  appSrc.includes('const showProgramSetup = programSetupPending && !setupDismissed')
+    && appSrc.includes('onCancel={() => setSetupDismissed(true)}'),
 );
 
 const previewProgramStart = src.indexOf('previewTrainingProgram: (input) => {');
