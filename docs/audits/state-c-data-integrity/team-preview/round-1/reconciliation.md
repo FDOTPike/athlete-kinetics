@@ -115,7 +115,24 @@ truncated-corpus trap described above.
 | O1 / F1 | New register row, deferred to the active session runner work order, carrying the `loadSelection.ts:123` consequence. |
 | F3 | No register row. Refuted. |
 
-## 5. Outstanding, unchanged by this round
+## 5. A new instance of OW-033, raised not resolved
+
+Recording the reviewer's report verbatim introduces **14 trailing-whitespace lines** — all
+Markdown hard breaks the reviewer authored. `git diff --check 1a79077..HEAD` consequently exits
+**2**, with 15 hits across two files: 1 in `PROMPT_LEDGER.md` (the verbatim prompt's trailing
+space) and 14 in `reviewer-gemini.md`. The working-tree form still exits 0 — exactly the
+distinction the C1 docket §7 drew when it noted that "committing makes them vanish" is true only
+of the working-tree form and false for a base-to-HEAD check.
+
+Neither was normalized. Normalizing the ledger line would violate the byte-fidelity `OW-033` is
+held at; normalizing the reviewer's report would alter an independent third-party record and
+break the SHA-256 recorded beside it.
+
+`OW-033` is annotated accordingly. The ruling now sought is narrower than before: does option
+(i)'s standing exception cover **verbatim third-party records** as well as ledger entries? This
+is raised, not decided.
+
+## 6. Outstanding, unchanged by this round
 
 `RG-01` (C6 device memory evidence) remains the sole release blocker; `verify:release` exits 1
 via `verify:memory-contract`, as disclosed to the reviewer in advance. `OW-006` reachability
