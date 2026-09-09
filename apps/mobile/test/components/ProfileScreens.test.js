@@ -491,3 +491,118 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(getByText('ATHLETE PROFILE')).toBeOnTheScreen();
   });
 });
+
+// ---------------------------------------------------------------------------
+// OW-001 load-intent declaration surface (audit W3/W4)
+//
+// Three defects this covers, all found by the stacked-PR audit against the
+// first implementation of this section:
+//   * it offered choices for movements the athlete cannot currently do, while
+//     an authoritative athlete-facing availability contract already existed;
+//   * it labelled the options with the internal vocabulary (DB / BB / KB);
+//   * a failed save was completely silent, because ProfileScreen mounts no
+//     error surface of its own — the same defect class as OW-007's resume path.
+// ---------------------------------------------------------------------------
+describe('OW-001 load-intent declaration surface', () => {
+  const PUSH_UP = { movement_id: 41, name: 'Push-up', supportedPrefixes: ['Bodyweight', 'Banded'] };
+  const SPLIT_SQUAT = { movement_id: 42, name: 'Bulgarian Split Squat', supportedPrefixes: ['Bodyweight', 'DB', 'BB'] };
+  const BENCH = { movement_id: 43, name: 'Bench Press', supportedPrefixes: ['BB'] };
+  const LOCKED = { movement_id: 44, name: 'Nordic Curl', supportedPrefixes: ['Bodyweight', 'Banded'] };
+
+  let saveIntent;
+
+  const setup = (overrides = {}) => {
+    saveIntent = overrides.saveMovementLoadIntent ?? jest.fn(() => true);
+    mockState = {
+      ...mockState,
+      movements: [PUSH_UP, SPLIT_SQUAT, BENCH, LOCKED],
+      loadIntents: overrides.loadIntents ?? {},
+      saveMovementLoadIntent: saveIntent,
+      movementAvailabilityRevision: 0,
+      niggles: [],
+      // LOCKED is deliberately absent: the athlete cannot currently do it.
+      getMovementAvailabilityVerdicts: jest.fn(() => [
+        { movementId: PUSH_UP.movement_id, state: 'available' },
+        { movementId: SPLIT_SQUAT.movement_id, state: 'available' },
+        { movementId: BENCH.movement_id, state: 'available' },
+        { movementId: LOCKED.movement_id, state: 'blocked' },
+      ]),
+    };
+    render(<ProfileScreen />);
+  };
+
+  test('offers a choice only for AVAILABLE movements that genuinely have one', () => {
+    setup();
+    // Ambiguous and available.
+    expect(screen.getByTestId(`load-intent-row-${PUSH_UP.movement_id}`)).toBeOnTheScreen();
+    expect(screen.getByTestId(`load-intent-row-${SPLIT_SQUAT.movement_id}`)).toBeOnTheScreen();
+    // Only one way to load it: nothing to choose.
+    expect(screen.queryByTestId(`load-intent-row-${BENCH.movement_id}`)).toBeNull();
+    // Ambiguous but the athlete cannot currently do it — offering it would ask
+    // for a decision they cannot act on.
+    expect(screen.queryByTestId(`load-intent-row-${LOCKED.movement_id}`)).toBeNull();
+  });
+
+  test('labels the options in words, never the internal DB/BB/KB vocabulary', () => {
+    setup();
+    expect(screen.getByTestId(`load-intent-${SPLIT_SQUAT.movement_id}-DB`)).toHaveTextContent('DUMBBELL');
+    expect(screen.getByTestId(`load-intent-${SPLIT_SQUAT.movement_id}-BB`)).toHaveTextContent('BARBELL');
+    expect(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Banded`)).toHaveTextContent('BAND');
+    // The stored value is still the canonical token — the testID proves the
+    // mapping is presentation-only.
+    expect(screen.queryByText('DB')).toBeNull();
+    expect(screen.queryByText('BB')).toBeNull();
+  });
+
+  test('selected, unselected and NOT SET are distinguishable to a screen reader', () => {
+    setup({ loadIntents: { [PUSH_UP.movement_id]: 'Bodyweight' } });
+    // Read the prop directly: this RNTL build has no toHaveAccessibilityState.
+    const stateOf = (id) => screen.getByTestId(id).props.accessibilityState;
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-Bodyweight`).selected).toBe(true);
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-Banded`).selected).toBe(false);
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-unset`).selected).toBe(false);
+    // Every chip carries the role too, so the state is announced against one.
+    expect(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Bodyweight`).props.accessibilityRole)
+      .toBe('button');
+    // An undeclared movement reads as NOT SET, not as a silent bodyweight pick.
+    expect(stateOf(`load-intent-${SPLIT_SQUAT.movement_id}-unset`).selected).toBe(true);
+  });
+
+  test('accessibility labels name the movement and the readable implement', () => {
+    setup();
+    expect(screen.getByLabelText('Plan Push-up with Bodyweight only')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Plan Bulgarian Split Squat with Dumbbell')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
+  });
+
+  test('copy says the choice applies to FUTURE programming and what unset means', () => {
+    setup();
+    expect(screen.getByText(/planned as the loaded version/i)).toBeOnTheScreen();
+    expect(screen.getByText(/from now on/i)).toBeOnTheScreen();
+  });
+
+  test('a failed save is visible and actionable, and a later success clears it', () => {
+    const failing = jest.fn(() => false);
+    setup({ saveMovementLoadIntent: failing });
+    expect(screen.queryByTestId('load-intent-error')).toBeNull();
+
+    fireEvent.press(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Bodyweight`));
+    expect(failing).toHaveBeenCalledWith(PUSH_UP.movement_id, 'Bodyweight');
+    // Before the audit fix this rendered nothing at all: the chip did not move
+    // and the athlete was told nothing.
+    expect(screen.getByTestId('load-intent-error'))
+      .toHaveTextContent('Could not save your choice for Push-up. Try again.');
+
+    failing.mockReturnValue(true);
+    fireEvent.press(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Banded`));
+    expect(screen.queryByTestId('load-intent-error')).toBeNull();
+  });
+
+  test('choosing and clearing both reach the store with the canonical token', () => {
+    setup();
+    fireEvent.press(screen.getByTestId(`load-intent-${SPLIT_SQUAT.movement_id}-BB`));
+    expect(saveIntent).toHaveBeenCalledWith(SPLIT_SQUAT.movement_id, 'BB');
+    fireEvent.press(screen.getByTestId(`load-intent-${SPLIT_SQUAT.movement_id}-unset`));
+    expect(saveIntent).toHaveBeenCalledWith(SPLIT_SQUAT.movement_id, null);
+  });
+});

@@ -230,3 +230,46 @@ test('declarations survive a training-data reset, like every other preference', 
   expect(store().loadIntents[m.movement_id]).toBe('Bodyweight');
   expect(declarations()).toHaveLength(1);
 });
+
+// ---------------------------------------------------------------------------
+// W2.3 (audit) — the declaration must reach RANKING, and deterministically.
+// The original suite proved the per-slot row was written but never that
+// generation stays deterministic under declarations, nor that a declaration is
+// anything other than inert. Both are asserted here.
+// ---------------------------------------------------------------------------
+
+const planSnapshot = () => raw().prepare(`
+  SELECT ps.planned_slot_id, ps.movement_id, ps.sets, ps.reps, ps.target_rpe,
+         li.planned_implement AS declared
+    FROM planned_slot ps
+    LEFT JOIN planned_slot_load_intent li ON li.planned_slot_id = ps.planned_slot_id
+   ORDER BY ps.planned_slot_id
+`).all();
+
+const generateWith = async (declare) => {
+  mockDriver = makeNodeSqliteDriver();
+  await bootRealStore();
+  if (declare) {
+    for (const m of ambiguous().filter((x) => x.supportedPrefixes.includes('Bodyweight'))) {
+      expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+    }
+  }
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+  return planSnapshot();
+};
+
+test('generation is deterministic with declarations, and a declaration is not inert', async () => {
+  const plainA = await generateWith(false);
+  const plainB = await generateWith(false);
+  expect(plainB).toEqual(plainA);
+
+  const declaredA = await generateWith(true);
+  const declaredB = await generateWith(true);
+  // Same declarations, same inputs, same plan: no clock, no randomness.
+  expect(declaredB).toEqual(declaredA);
+
+  // And the declaration actually reaches the engine. If this ever stops being
+  // true the feature is decorative, so it is asserted rather than assumed.
+  expect(JSON.stringify(declaredA)).not.toBe(JSON.stringify(plainA));
+});

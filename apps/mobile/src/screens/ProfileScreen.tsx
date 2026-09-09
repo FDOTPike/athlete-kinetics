@@ -182,6 +182,14 @@ export default function ProfileScreen(): React.JSX.Element {
   const loadPreference = useStore((s) => s.loadPreference);
   const saveLoadPreference = useStore((s) => s.saveLoadPreference);
   const loadIntents = useStore((s) => s.loadIntents);
+  const getMovementAvailabilityVerdicts = useStore((s) => s.getMovementAvailabilityVerdicts);
+  const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
+  const niggles = useStore((s) => s.niggles);
+  // AUDIT W4: action-scoped, like the suspension controls on BlockScreen. The
+  // save can fail (unknown movement, unsupported implement, a database error)
+  // and ProfileScreen mounts NO error surface of its own, so without this the
+  // athlete taps a chip, nothing changes, and nothing says why.
+  const [intentError, setIntentError] = useState<string | null>(null);
   const saveMovementLoadIntent = useStore((s) => s.saveMovementLoadIntent);
   const bandLadder = useStore((s) => s.bandLadder);
   const saveBandLevel = useStore((s) => s.saveBandLevel);
@@ -191,11 +199,24 @@ export default function ProfileScreen(): React.JSX.Element {
   // supported implement is not a choice, so those never appear — which is also
   // why nothing here can be read as taking element zero of a dropdown.
   const ambiguousMovements = useMemo(
-    () => movements
-      .filter((m) => m.supportedPrefixes.length > 1)
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name)),
-    [movements],
+    () => {
+      // AUDIT W3.5-3.7: offer a choice only for movements this athlete can
+      // actually do. `library` is the authoritative athlete-facing availability
+      // context — LibraryScreenV2 gates its browse list on exactly this — so
+      // this reuses an existing contract rather than inventing an eligibility
+      // policy. It constrains which movements are OFFERED; it never touches
+      // what the answer is, which is what L1(a) forbids inferring.
+      const available = new Set(
+        getMovementAvailabilityVerdicts('library')
+          .filter((v) => v.state === 'available')
+          .map((v) => v.movementId),
+      );
+      return movements
+        .filter((m) => m.supportedPrefixes.length > 1 && available.has(m.movement_id))
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+    [movements, getMovementAvailabilityVerdicts, movementAvailabilityRevision, niggles, profile],
   );
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const saveOneRepMax = useStore((s) => s.saveOneRepMax);
@@ -596,22 +617,37 @@ export default function ProfileScreen(): React.JSX.Element {
                   <Chip
                     key={prefix}
                     testID={`load-intent-${m.movement_id}-${prefix}`}
-                    label={prefix.toUpperCase()}
+                    label={implementLabel(prefix).toUpperCase()}
                     selected={loadIntents[m.movement_id] === prefix}
-                    onPress={() => saveMovementLoadIntent(m.movement_id, prefix)}
-                    accessibilityLabel={`Plan ${m.name} as ${prefix}`}
+                    onPress={() => {
+                      setIntentError(
+                        saveMovementLoadIntent(m.movement_id, prefix)
+                          ? null
+                          : `Could not save your choice for ${m.name}. Try again.`,
+                      );
+                    }}
+                    accessibilityLabel={`Plan ${m.name} with ${implementLabel(prefix)}`}
                   />
                 ))}
                 <Chip
                   testID={`load-intent-${m.movement_id}-unset`}
                   label="NOT SET"
                   selected={loadIntents[m.movement_id] === undefined}
-                  onPress={() => saveMovementLoadIntent(m.movement_id, null)}
-                  accessibilityLabel={`Leave ${m.name} unset, planned as the loaded version`}
+                  onPress={() => {
+                    setIntentError(
+                      saveMovementLoadIntent(m.movement_id, null)
+                        ? null
+                        : `Could not clear your choice for ${m.name}. Try again.`,
+                    );
+                  }}
+                  accessibilityLabel={`Leave ${m.name} unset, so it is planned with added weight`}
                 />
               </View>
             </View>
           ))}
+          {intentError !== null && (
+            <Text style={styles.fieldHint} testID="load-intent-error">{intentError}</Text>
+          )}
         </View>
       )}
 
@@ -1126,6 +1162,24 @@ export default function ProfileScreen(): React.JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
+/** AUDIT W4: athlete-readable names for the canonical implement vocabulary.
+ *  DB / BB / KB are internal shorthand and must not be the only thing an athlete
+ *  is asked to choose between. Presentation only — the stored value is always
+ *  the canonical MOVEMENT_PREFIXES token, never this string. */
+const IMPLEMENT_LABEL: Record<string, string> = {
+  DB: 'Dumbbell',
+  BB: 'Barbell',
+  KB: 'Kettlebell',
+  'Free Weight': 'Free weight',
+  Banded: 'Band',
+  Bodyweight: 'Bodyweight only',
+  Cable: 'Cable',
+  'Earthquake Bar': 'Earthquake bar',
+  Chains: 'Chains',
+  'Bottom-Up': 'Bottom-up',
+};
+const implementLabel = (prefix: string): string => IMPLEMENT_LABEL[prefix] ?? prefix;
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.color.ink0 },
   content: { padding: theme.space[4], paddingBottom: theme.space[6] }, // 32 — matches other screens
