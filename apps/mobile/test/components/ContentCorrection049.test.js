@@ -176,6 +176,16 @@ describe('049 specialist equipment is explicit opt-in only', () => {
       loadPreference: 'auto',
       loadPreferenceExplicit: false,
       saveLoadPreference: jest.fn(),
+      // OW-001: ProfileScreen's load-intent section asks the authoritative
+      // availability contract which movements to offer a choice for, the same
+      // way LibraryScreenV2 gates its browse list. This screen-level mock has
+      // to provide it. Empty verdicts mean the section renders nothing, which
+      // is what these equipment tests want.
+      loadIntents: {},
+      saveMovementLoadIntent: jest.fn(() => true),
+      getMovementAvailabilityVerdicts: jest.fn(() => []),
+      movementAvailabilityRevision: 0,
+      niggles: [],
       bandLadder: [],
       saveBandLevel: jest.fn(),
       deleteBandLevel: jest.fn(),
