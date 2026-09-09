@@ -821,7 +821,13 @@ console.log('[9d] ladder reconciliation — bodyweight reps reach the advancemen
       });
     loadedRepsByBlock.push(Math.min(...loadedSlots.map((sl) => sl.reps)));
   }
-  check('EVERY macro block now prescribes bodyweight work at or above the ladder bar',
+  // "EVERY macro block" is scoped to this fixture, in which every movement is
+  // declared a chain member (see the progressionGroup note above). It tests
+  // FLOOR MECHANICS, not chain scoping; on the shipped corpus most bodyweight
+  // movements are off-chain and correctly keep their lower phase reps, which is
+  // L2(b) and is tested in [28]. Round-2 finding 1 read the old label as a
+  // product-wide claim, which is how it was worded.
+  check('[fixture 001-015] every macro block floors chain-member bodyweight work at the ladder bar',
     totalBlocks > 0 && reachableBlocks === totalBlocks, `${reachableBlocks}/${totalBlocks}`);
   check('loaded chain members retain the advancement floor in every macro block',
     loadedRepsByBlock.length === MACRO_BLOCKS
@@ -923,7 +929,11 @@ for (const r of detailRows) {
     if (!prefixSet.has(p)) prefixOk = false;
   }
 }
-check('every seeded supported_prefixes token is a MOVEMENT_PREFIXES member',
+// Scope is the 001-015 fixture, which is why detailRows.length === 30 is part
+// of the predicate. The SHIPPED corpus is covered separately by
+// [F2-corpus] — round-2 finding 1 was that this label read as if it covered
+// both, leaving the 270 later-migration movements silently unchecked.
+check('[fixture 001-015] every seeded supported_prefixes token is a MOVEMENT_PREFIXES member',
   prefixOk, `${seenPrefixes.size} distinct tokens over ${detailRows.length} rows`);
 check('movement_detail seeded for all 30 movements (base stored once per pattern)',
   Number(db.prepare('SELECT count(*) c FROM movement_detail').get().c) === 30 &&
@@ -2009,26 +2019,33 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
 
   /** Build a generator pool carrying an EXPLICIT prospective load intent.
    *  `intent` maps movement name -> the implement selected for its planned
-   *  slot. Anything unnamed carries no intent at all. */
-  const poolWithIntent = (intent = {}) => corpus.map((r) => ({
-    movement_id: Number(r.movement_id),
-    name: r.name,
-    pattern: r.pattern,
-    is_compound: Number(r.is_compound) === 1,
-    required: JSON.parse(r.required_json ?? '[]'),
-    difficulty: 'Beginner',
-    beginner_ok: false,
-    sportTracking: false,
-    capability_available_weight_room: true,
-    capability_available_sport_conditioning: true,
-    // L1(a): the implement ACTUALLY selected for the planned slot. Absent means
-    // unknown, which must fail closed to the loaded path.
-    plannedImplement: Object.prototype.hasOwnProperty.call(intent, r.name)
-      ? intent[r.name] : undefined,
-    // Chain membership + applicable policy arrive as typed planning inputs
-    // (work order §7.3): the engine never queries the database.
-    progressionGroup: r.progression_group ?? undefined,
-  }));
+   *  slot. For unmapped movements, the store's L1(a) rule applies:
+   *  a singleton supported_prefixes stands; multi-implement stays undeclared
+   *  and fails closed. Dropdown ordering is never consulted. */
+  const poolWithIntent = (intent = {}, c = corpus) => c.map((r) => {
+    const p = JSON.parse(r.prefixes_json ?? '[]');
+    return {
+      movement_id: Number(r.movement_id),
+      name: r.name,
+      pattern: r.pattern,
+      is_compound: Number(r.is_compound) === 1,
+      required: JSON.parse(r.required_json ?? '[]'),
+      difficulty: 'Beginner',
+      beginner_ok: false,
+      sportTracking: false,
+      capability_available_weight_room: true,
+      capability_available_sport_conditioning: true,
+      // L1(a): the implement ACTUALLY selected for the planned slot. If declared,
+      // the athlete's selection wins. If absent, a singleton supported set stands;
+      // multi-element lists stay undeclared and fail closed to the loaded path.
+      plannedImplement: Object.prototype.hasOwnProperty.call(intent, r.name)
+        ? intent[r.name]
+        : (p.length === 1 ? p[0] : undefined),
+      // Chain membership + applicable policy arrive as typed planning inputs
+      // (work order §7.3): the engine never queries the database.
+      progressionGroup: r.progression_group ?? undefined,
+    };
+  });
 
   const planFor = (pool, over = {}) =>
     generateBlock({ profile: prof(over), movements: pool, startDate: START });
@@ -2070,14 +2087,20 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     const p = JSON.parse(r.prefixes_json ?? '[]');
     return { ...r, prefixes_json: JSON.stringify([...p].reverse()) };
   });
-  const reorderedPool = reorderedCorpus.map((r, i) => ({
-    ...poolWithIntent()[i],
-  }));
+  const reorderedPool = poolWithIntent({}, reorderedCorpus);
+  const reversedPrefixesCount = reorderedCorpus.filter((r, i) => {
+    const pOrig = JSON.parse(corpus[i].prefixes_json ?? '[]');
+    const pRev = JSON.parse(r.prefixes_json ?? '[]');
+    return pOrig.length > 1 && pRev[0] !== pOrig[0];
+  }).length;
   check('[28] reversing every supported_prefixes list cannot change the plan',
-    JSON.stringify(planFor(reorderedPool)) === JSON.stringify(baseline));
+    reversedPrefixesCount === 17
+    && JSON.stringify(planFor(reorderedPool)) === JSON.stringify(baseline),
+    `${reversedPrefixesCount} multi-prefix movements inverted`);
 
   // --- explicit intent routes, both directions ------------------------------
   const pushUp = byName.get('Push-up');
+  check('[28] Push-up probe movement exists in corpus', pushUp !== undefined);
   if (pushUp !== undefined) {
     const id = Number(pushUp.movement_id);
     const atPeak = (pool) => generateBlock({
@@ -2112,12 +2135,14 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
         === JSON.stringify(deloadRepsForMovement(loaded, id))
       && JSON.stringify(deloadRepsForMovement(unknown, id))
         === JSON.stringify(deloadRepsForMovement(loaded, id))
+      && deloadRepsForMovement(loaded, id).length > 0
       && deloadRepsForMovement(loaded, id).every((reps) => reps < floor),
       `deload=${JSON.stringify(deloadRepsForMovement(loaded, id))}`);
   }
 
   // --- weighted calisthenics is loaded --------------------------------------
   const weightedPullUp = byName.get('Weighted Pull-up');
+  check('[28] Weighted Pull-up probe movement exists in corpus', weightedPullUp !== undefined);
   if (weightedPullUp !== undefined) {
     const id = Number(weightedPullUp.movement_id);
     const asLoaded = shapeForMovement(planFor(focusedOn('Weighted Pull-up', { 'Weighted Pull-up': 'Banded' })), id);
@@ -2130,6 +2155,7 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // --- the named dropdown-order victims -------------------------------------
   for (const name of ['Bulgarian Split Squat', 'Walking Lunge']) {
     const row = byName.get(name);
+    check(`[28] ${name} probe movement exists in corpus`, row !== undefined);
     if (row === undefined) continue;
     const id = Number(row.movement_id);
     const loadedSelection = shapeForMovement(planFor(focusedOn(name, { [name]: 'DB' })), id);
@@ -2148,6 +2174,9 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     && JSON.parse(r.prefixes_json ?? '[]').some((prefix) => prefix !== 'Bodyweight'));
   const onChain = dropdownBodyweight.find((r) => chainMembers.has(Number(r.movement_id))
     && r.pattern !== 'locomotion');
+  check('[28] on-chain and off-chain probe movements exist in corpus',
+    offChain !== undefined && onChain !== undefined,
+    `on=${onChain?.name} off=${offChain?.name}`);
   if (offChain !== undefined && onChain !== undefined) {
     const repsAtPeak = (row, intent) => routedSlotsForMovement(generateBlock({
       profile: prof(),
@@ -2159,17 +2188,18 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
       JSON.parse(offChain.prefixes_json ?? '[]').find((prefix) => prefix !== 'Bodyweight'));
     const offUnknown = repsAtPeak(offChain, undefined);
     const onReps = repsAtPeak(onChain, 'Bodyweight').filter((slot) => slot.phase !== 'deload');
+    const offNonDeload = offBodyweight.filter((slot) => slot.phase !== 'deload');
     // The pair is the point: L2(b) says the floor is chain-scoped, so exactly
     // one of these two is lifted to the bar.
     check(`[28] L2(b) the ladder floor is chain-scoped (on=${onChain.name}, off=${offChain.name})`,
-      onReps.length > 0 && offBodyweight.length > 0
+      onReps.length > 0 && offNonDeload.length > 0
       && onReps.every((slot) => slot.reps >= DEFAULT_ADVANCEMENT_POLICY.requiredReps)
-      && offBodyweight.filter((slot) => slot.phase !== 'deload')
-        .every((slot) => slot.reps < DEFAULT_ADVANCEMENT_POLICY.requiredReps),
+      && offNonDeload.every((slot) => slot.reps < DEFAULT_ADVANCEMENT_POLICY.requiredReps),
       `on-chain=${JSON.stringify(onReps.map((slot) => slot.reps))}`
       + ` off-chain=${JSON.stringify(offBodyweight.map((slot) => slot.reps))}`);
     check(`[28] off-chain phase reps are intent-independent (${offChain.name})`,
-      JSON.stringify(offBodyweight.map((slot) => slot.reps))
+      offBodyweight.length > 0
+      && JSON.stringify(offBodyweight.map((slot) => slot.reps))
         === JSON.stringify(offLoaded.map((slot) => slot.reps))
       && JSON.stringify(offUnknown.map((slot) => slot.reps))
         === JSON.stringify(offLoaded.map((slot) => slot.reps)),
@@ -2183,31 +2213,38 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   fullDb.prepare(
     'INSERT INTO progression_policy (progression_group, required_sets, required_value) VALUES (?, ?, ?)',
   ).run('pull-up', 3, 12);
+  const customPolicyRow = fullDb.prepare(
+    'SELECT required_value FROM progression_policy WHERE progression_group = ?',
+  ).get('pull-up');
+  const customPolicyBar = Number(customPolicyRow.required_value);
   const chainMember = corpus.find((r) => r.progression_group === 'pull-up'
     && JSON.parse(r.prefixes_json ?? '[]').includes('Bodyweight')
     && JSON.parse(r.prefixes_json ?? '[]').some((prefix) => prefix !== 'Bodyweight'));
+  check('[28] pull-up chain member with multi-prefix exists for custom policy probe',
+    chainMember !== undefined, chainMember?.name ?? 'none');
   if (chainMember !== undefined) {
     const id = Number(chainMember.movement_id);
     const external = JSON.parse(chainMember.prefixes_json ?? '[]')
       .find((prefix) => prefix !== 'Bodyweight');
     const withPolicy = (intent) => focusedOn(chainMember.name,
       intent === undefined ? {} : { [chainMember.name]: intent }).map((m) => (
-      m.movement_id === id ? { ...m, chainAdvancementReps: 12 } : m));
+      m.movement_id === id ? { ...m, chainAdvancementReps: customPolicyBar } : m));
     const bodyweightPlan = planFor(withPolicy('Bodyweight'));
     const loadedPlan = planFor(withPolicy(external));
     const unknownPlan = planFor(withPolicy(undefined));
     const bodyweightSlots = nonDeloadSlotsForMovement(bodyweightPlan, id);
     const loadedSlots = nonDeloadSlotsForMovement(loadedPlan, id);
     const unknownSlots = nonDeloadSlotsForMovement(unknownPlan, id);
-    check(`[28] custom per-chain policy floors Bodyweight, loaded, and undeclared routes (${chainMember.name}, bar 12)`,
+    check(`[28] custom per-chain policy floors Bodyweight, loaded, and undeclared routes (${chainMember.name}, bar ${customPolicyBar})`,
       bodyweightSlots.length > 0
       && [bodyweightSlots, loadedSlots, unknownSlots]
-        .every((slots) => slots.every((slot) => slot.reps >= 12)),
+        .every((slots) => slots.every((slot) => slot.reps >= customPolicyBar)),
       `BW=${JSON.stringify(bodyweightSlots.map((slot) => slot.reps))}`
       + ` loaded=${JSON.stringify(loadedSlots.map((slot) => slot.reps))}`
       + ` unknown=${JSON.stringify(unknownSlots.map((slot) => slot.reps))}`);
     check('[28] custom policy preserves loaded fail-closed set routing',
-      JSON.stringify(loadedSlots.map((slot) => slot.sets))
+      loadedSlots.length > 0
+      && JSON.stringify(loadedSlots.map((slot) => slot.sets))
         === JSON.stringify(unknownSlots.map((slot) => slot.sets))
       && JSON.stringify(bodyweightSlots.map((slot) => slot.sets))
         !== JSON.stringify(loadedSlots.map((slot) => slot.sets)));
@@ -2216,7 +2253,8 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
         === JSON.stringify(deloadRepsForMovement(loadedPlan, id))
       && JSON.stringify(deloadRepsForMovement(unknownPlan, id))
         === JSON.stringify(deloadRepsForMovement(loadedPlan, id))
-      && deloadRepsForMovement(loadedPlan, id).every((reps) => reps < 12),
+      && deloadRepsForMovement(loadedPlan, id).length > 0
+      && deloadRepsForMovement(loadedPlan, id).every((reps) => reps < customPolicyBar),
       JSON.stringify(deloadRepsForMovement(loadedPlan, id)));
   }
 
@@ -2228,7 +2266,9 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   const loadedRepsWithIntent = slotsOf(planFor(poolWithIntent({ 'Push-up': 'Bodyweight' })))
     .filter((s) => loadedIds.has(s.movement_id)).map((s) => `${s.movement_id}:${s.reps}:${s.sets}`);
   check('[28] declaring one bodyweight intent leaves every loaded prescription unchanged',
-    JSON.stringify(loadedRepsBaseline) === JSON.stringify(loadedRepsWithIntent));
+    loadedRepsBaseline.length > 0
+    && JSON.stringify(loadedRepsBaseline) === JSON.stringify(loadedRepsWithIntent),
+    `${loadedRepsBaseline.length} loaded slots compared`);
 
   // --- [29] W4 bodyweight rep law: working-week reps never fall while target
   // RPE rises on a slot with NO external-load channel (owner's device finding:
@@ -2334,6 +2374,110 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
       && implementAvailable('DB', ['dumbbells']) === true
       && implementAvailable('BB', ['dumbbells']) === false
       && implementAvailable('BB', ['barbell']) === true);
+}
+
+// --- F2: the corpus divergence figure quoted in types.ts is MEASURED ----------
+// types.ts justifies IMPLEMENT_REQUIREMENT's existence with a number. That
+// number was wrong once already: it read "15 of 17" until Gemini 3.8's round-1
+// audit refuted it (F2) and a re-derivation returned 17 of 17 — the two missed
+// were Chin-up and Weighted Pull-up, which require a pull-up bar yet offer
+// Banded, and Banded needs bands. A prose number nobody recomputes is a claim,
+// not evidence, so it is derived from the live corpus here instead.
+//
+// [OW-017] rides along on the same query, and guards a CORPUS invariant rather
+// than the code defect it was written for. HISTORICALLY, plannedImplementFor's
+// sole-supported-prefix fallback did not consult implementAvailable, so a
+// movement whose only implement needs equipment its own movement_equipment rows
+// never require would have been planned with a tool the athlete may not own.
+// That check now exists (useStore.ts, the `sole` branch), so the code hole is
+// closed. What this gate preserves is the separate, still-useful fact that the
+// shipped corpus contains no such movement at all — defence in depth from the
+// other side. A library correction that introduces one fails here, which is the
+// signal that the guard has stopped being theoretical and started firing.
+{
+  const { IMPLEMENT_REQUIREMENT } = require('./.build/types.js');
+  // NOT the module-level `db`: that one stops at migration 015, so it holds the
+  // old 010-era library rather than the shipped corpus. Migration 049 narrows
+  // several supported_prefixes lists, and the truncated DB reports 19
+  // multi-implement movements where the shipped one has 17. The claim in
+  // types.ts is about what reaches an athlete's device, so this gate applies the
+  // WHOLE chain to its own database.
+  const corpus = new DatabaseSync(':memory:');
+  corpus.exec('PRAGMA foreign_keys = ON;');
+  // 004 is NOT a migration — migrations.ts:4 records it as the parameterized
+  // daily upsert the DAO executes, so it carries unbound parameters. Section
+  // [28] already excludes it; this block counted it and reported "63
+  // migrations" where the chain has 62. Round-2 finding 3.
+  const chain = readdirSync(SCHEMA_DIR)
+    .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
+    .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
+  for (const f of chain) corpus.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+
+  const rows = corpus.prepare(`
+    SELECT m.movement_id AS id, m.name AS name, d.supported_prefixes AS prefixes
+      FROM movement m JOIN movement_detail d ON d.movement_id = m.movement_id
+  `).all();
+  // Pin the corpus itself, so a library change cannot move the figures below
+  // without announcing itself.
+  check('[F2-corpus] the shipped catalogue is the one being measured',
+    rows.length === 300 && chain.length === 62,
+    `${rows.length} movements from ${chain.length} migrations`);
+
+  // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against
+  // MOVEMENT_PREFIXES, but it reads the module-level `db` and pins
+  // detailRows.length === 30, so it sees only the 001-015 fixture. An invalid
+  // token introduced by a LATER migration — the 270 movements added by 016,
+  // 037-048 and 049 — is invisible to it. Nothing else enforces membership:
+  // 010's CHECK is json_valid() only, and the membership rule lives in a
+  // comment. So the full-corpus check belongs here, where the whole chain is
+  // already applied.
+  const badTokens = [];
+  const seen = new Set();
+  for (const r of rows) {
+    for (const token of JSON.parse(r.prefixes)) {
+      seen.add(token);
+      if (!MOVEMENT_PREFIXES.includes(token)) badTokens.push(`${r.name}:${token}`);
+    }
+  }
+  check('[F2-corpus] every supported_prefixes token in the SHIPPED corpus is a MOVEMENT_PREFIX',
+    badTokens.length === 0,
+    badTokens.join(',') || `${seen.size} distinct tokens over ${rows.length} movements`);
+  const equipOf = new Map();
+  for (const r of corpus.prepare('SELECT movement_id, item FROM movement_equipment').all()) {
+    if (!equipOf.has(r.movement_id)) equipOf.set(r.movement_id, new Set());
+    equipOf.get(r.movement_id).add(r.item);
+  }
+  // UNIMPLIED: nothing the movement itself requires guarantees the equipment
+  // this implement needs. 'unverifiable' is never implied by anything.
+  const unimplied = (prefix, owned) => {
+    const req = IMPLEMENT_REQUIREMENT[prefix];
+    if (req === undefined || req.kind === 'unverifiable') return true;
+    if (req.kind === 'none') return false;
+    return !req.items.some((item) => owned.has(item));
+  };
+
+  const multi = rows.filter((r) => JSON.parse(r.prefixes).length > 1);
+  const diverging = multi.filter((r) =>
+    JSON.parse(r.prefixes).some((p) => unimplied(p, equipOf.get(r.id) ?? new Set())));
+  check('[F2-corpus] every multi-implement movement offers an unimplied implement (17 of 17)',
+    multi.length === 17 && diverging.length === multi.length,
+    `${diverging.length} of ${multi.length}`);
+
+  // The DENOMINATOR is pinned too, not just the violation count. "0 of 235" is
+  // the figure the register quotes, and a migration could hold violations at
+  // zero while moving the candidate set — leaving the register's number stale
+  // with every gate still green. Same principle as chain.length above: a number
+  // that only gets printed is decoration.
+  const soleCandidates = rows.filter((r) => {
+    const p = JSON.parse(r.prefixes);
+    return p.length === 1 && p[0] !== 'Bodyweight';
+  });
+  const soleHole = soleCandidates.filter((r) =>
+    unimplied(JSON.parse(r.prefixes)[0], equipOf.get(r.id) ?? new Set()));
+  check('[OW-017] no sole-prefix movement needs equipment its own requirement omits (0 of 235)',
+    soleHole.length === 0 && soleCandidates.length === 235,
+    soleHole.map((r) => `${r.name}:${JSON.parse(r.prefixes)[0]}`).join(',')
+      || `${soleHole.length} of ${soleCandidates.length}`);
 }
 
 // --- OW-006: the bodyweight fatigue branch is DEAD, and this is the tripwire ---
