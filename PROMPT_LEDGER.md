@@ -6322,3 +6322,106 @@ open items spanning State A and State C, five of them `OWNER_ONLY` decisions an
 executor may not make, plus the new `planned_implement` immutability question
 raised by 062. Picking among them is an owner call, not an executor's, so the
 choice was surfaced rather than guessed at.
+
+---
+
+## Entry 0099 — 2026-09-09 · State C close-out: OW-007, OW-006, OW-011
+
+### Input G(x)
+
+```
+[Owner track selection, given as answers to a two-part question after Entry 0098
+delivered the register correction and the replay-rule fix.]
+
+Q: The register has 26 further open items across State A and State C. Which
+   track should I take next?
+A: State C close-out (Recommended) — OW-007 (suspension resume has no error
+   handling — a failed resume shows the athlete nothing), OW-006
+   (bodyweightDominant branch is unreachable in production), OW-011
+   (verify_store_sql still omits migration 057). All executor-doable, no owner
+   ruling needed, and they finish the State C audit findings I already have full
+   context on.
+
+Q: Migration 062 left a declared planned_implement revisable on its own slot.
+   Should it freeze once that slot has been trained? This is the owner decision
+   I raised during PR #9 — it shapes OW-001's design.
+A: Decide when OW-001 lands (Recommended) — Keep it revisable for now. Nothing
+   today writes a second time, so there is no live defect, and the right answer
+   depends on the selection UI you actually want. Costs nothing to defer; I will
+   raise it again with a concrete design.
+```
+
+### Output F(G(x))
+
+Commit `6e132db` on `claude/state-c-followups-register-and-replay-rule` (PR #10),
+plus the register and this entry. Two of the three items CLOSED; the third is
+RE-SCOPED rather than claimed closed, and the reason is the point of the entry.
+
+**OW-007 — CLOSED.** A failed resume told the athlete nothing, for two
+independent reasons, and both are fixed. The press handler called
+`endSuspension` bare while the pause controls one branch away already used an
+action-scoped `try/catch`; and the only `suspension-error` node was mounted in
+the NOT-suspended branch — the one state in which the resume button does not
+exist, so even a caught error had nowhere to render. `endSuspension` now wraps
+its write in the same explicit transaction `beginSuspension` uses and RETHROWS,
+so the failure reaches the handler that can show it instead of dying inside the
+store. Five tests: a failing resume renders the message and leaves the card
+intact, a successful one renders nothing, an unrelated global store error does
+NOT populate the action-scoped surface, and at store level the write rolls back,
+rethrows, and the retry then succeeds.
+
+**OW-011 — CLOSED.** `057_block_meta_phase_invariant.sql` was absent from
+`verify_store_sql.mjs`'s `SCHEMA_FILES`, deferred earlier for "its own blast
+radius". Measured: there is none. The chain applies clean and every existing
+seed already used matched (index, phase) pairs. Listing the file alone would
+have been cosmetic, so three checks prove the triggers are genuinely enforcing
+in this verifier — the captured field drift (index 3, `volume`) is refused on
+INSERT, drifting an existing row by UPDATE is refused, and a matched pair is
+still accepted.
+
+**OW-006 — RE-SCOPED to reachability only, NOT closed.** The truthfulness half
+is closed: `bodyweightDominant` is computed from the athlete's entire movement
+catalogue rather than the block's slots, so it is always false on the shipped
+300-movement corpus and the branch never evaluates. The 2026-08-29 claim that
+this made future bodyweight pricing "only a table edit" is therefore false and
+is withdrawn in `blockGenerator.ts`.
+
+Reachability was deliberately NOT fixed, and the reason is recorded rather than
+buried: closing it needs either a two-pass restructure so the classification
+comes from the movements actually placed in the slots — possible, since
+`accessoryCut` only trims set counts and never affects movement choice, but it
+touches the generator's load-bearing determinism — or `OW-026` ratifying or
+declining a bodyweight CNS coefficient, which is the OWNER_ONLY decision that
+would give the branch any purpose at all. Picking either unilaterally would
+pre-empt an owner ruling for a change that alters no athlete's dose.
+
+What was added instead is a TRIPWIRE, which converts a silent trap into a loud
+one: `verify:blocks` now pins both branches of `schemaFatigueCost` as identical
+across all 4x4 (schema, phase) pairs. If a real bodyweight coefficient is ever
+ratified, that gate FAILS and forces reachability to be fixed in the same
+change, rather than letting ratified numbers sit in code that cannot be reached.
+Mutation-tested with a divergent table, which the gate caught.
+
+**Mutation testing — 5 mutations, 5 caught, 0 escaped.**
+
+| Mutation | Gate | Result |
+|---|---|---|
+| resume handler's `try/catch` removed | `FocusScreens` | CAUGHT |
+| `suspension-error` node moved back to the not-suspended branch | `FocusScreens` | CAUGHT |
+| `endSuspension` swallows instead of rethrowing | `SuspensionResetAndSwitch` | CAUGHT |
+| a divergent bodyweight fatigue table ratified | `verify:blocks` | CAUGHT |
+| 057 removed from the `verify:store` chain again | `verify:store` | CAUGHT |
+
+**Verification.** `verify:ci` exit 0 — 21 suites / **298 tests** (from 293),
+`verify:store` **661/661** (from 655), 17 gates `ALL CHECKS PASSED`,
+`git diff --check` clean.
+
+**Register.** `OW-007` and `OW-011` set to `CLOSED` with commit evidence;
+`OW-006` kept `OPEN` with its statement re-scoped to reachability and pointed at
+`OW-026`. State C now stands at `OW-001` and `OW-006` open, both for reasons
+that are owner decisions rather than executor work.
+
+**Deferred by owner ruling this turn.** Whether a declared `planned_implement`
+becomes immutable once its slot has been trained is left open until `OW-001`
+lands, on the grounds that nothing writes it twice today so there is no live
+defect, and the right answer depends on the selection UI actually chosen.
