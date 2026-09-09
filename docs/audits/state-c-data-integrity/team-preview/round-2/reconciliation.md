@@ -6,8 +6,22 @@
 **Reviewer verdict:** APPROVE WITH FINDINGS
 **Candidate:** `5aad482465c41d4c9819b706b57541db79631f53`, tree
 `5d6254d2c7928fe9cf16653261fd0285a083d40c`, branch `claude/state-a-register-closeout` (PR #12)
-**Reviewer report:** [`reviewer-gemini.md`](reviewer-gemini.md), SHA-256
-`497519993d8d1e5d8c6bcddb6eb10da0ce4e36d04e153d32b7b78c63c8c22ca9`, recorded verbatim.
+**Reviewer report:** [`reviewer-gemini.md`](reviewer-gemini.md), recorded verbatim. **Two hashes,
+because they are two different byte sequences and quoting one alone would be false:**
+
+| Artifact | SHA-256 |
+|---|---|
+| As delivered by the reviewer (CRLF line endings, UTF-8 BOM) | `497519993d8d1e5d8c6bcddb6eb10da0ce4e36d04e153d32b7b78c63c8c22ca9` |
+| As stored in git (LF, BOM preserved) | `64126b41000d0c425b190007c2b9bf884a1663a4ad60ca9ebce1ce6b1444526f` |
+
+`.gitattributes` carries `* text=auto eol=lf` for a multi-agent, multi-OS repository, so committing
+the file rewrote its line endings. Nothing else changed — the BOM survives and the text is
+identical. Round 1's report was already LF, which is why its single recorded hash still resolves.
+
+This is a **third instance of the `OW-033` class**: byte-fidelity of a verbatim third-party record
+against a repository-wide normalization policy. It is not resolved here. The normalization is
+deliberate and correct for the repo, so the honest response is to record both hashes rather than
+disable it for this path or quote a hash that does not match what is stored.
 
 ---
 
