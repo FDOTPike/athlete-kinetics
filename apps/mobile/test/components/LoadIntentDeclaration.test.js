@@ -194,6 +194,12 @@ test('an implement the movement does not support is refused at the store AND by 
 
   expect(store().saveMovementLoadIntent(m.movement_id, 'Cable')).toBe(false);
   expect(declarations()).toHaveLength(0);
+  // WHICH layer refused matters. Both guards return false, so asserting only
+  // the boolean cannot tell them apart — mutation testing caught exactly that.
+  // The store must reject it in athlete-readable words BEFORE the write, so the
+  // message is the store's, not the trigger's raw abort text.
+  expect(store().error).toBe('That is not one of the loading options this movement supports.');
+  expect(store().error).not.toMatch(/movement_load_intent:/);
 
   // The store guard is not the only guard: 063's trigger refuses it too, so a
   // future writer that skips the store cannot plant an unsupported declaration.
