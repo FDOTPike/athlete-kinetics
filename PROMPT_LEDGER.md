@@ -6259,3 +6259,66 @@ disclosed, not fixed. W8 live-emulator qualification is NOT STARTED and the
 `[A]`/`[D]`. Nothing merged, tagged, published or released; `master` and the
 release lineage are NOT AUTHORIZED and untouched. This branch is data-integrity
 remediation, not release readiness.
+
+---
+
+## Entry 0098 — 2026-09-09 · Start the post-merge follow-up orders
+
+### Input G(x)
+
+```
+can you please start the follow up orders
+```
+
+### Output F(G(x))
+
+Branch `claude/state-c-followups-register-and-replay-rule`, based on `5f1cb6a`
+(the PR #9 merge commit). Two follow-ups that are direct consequences of that
+merge; the larger backlog is NOT started and is put to the owner instead.
+
+**1. A claim shipped in PR #9 was WRONG, and is corrected.** That PR's
+`migrationRunner.ts`, the 062 header and the handback all asserted that 026's
+`trg_set_dose_target_bd` and `trg_session_outcome_bd` shared the replay
+exposure, "because they have the same cross-table shape". Probed directly:
+they do not. Dropping `set_record`, `session`, `planned_slot`, `training_block`
+or `training_program` and replaying completes cleanly every time.
+
+Shape is not the criterion — POSITION is. A self-heal replays from chain
+position 0, and the earliest `ALTER TABLE ... RENAME` is at position 48 (049).
+A trigger is only exposed when the table it names is recreated AFTER that:
+
+| Referenced table | Created by | Position | Exposed |
+|---|---|---|---|
+| `set_record`, `session` | 001 | 1 | no |
+| `planned_slot`, `training_block` | 007 | 7 | no |
+| `training_program` | 033 | 33 | no |
+| `suspension_episode` | 058 | 57 | YES |
+
+`REPLAY_BLOCKING_TRIGGERS` was already correct — both entries name
+`suspension_episode` — so no behaviour changed; what was wrong was the stated
+reason, in three places. All three corrected. The 062 edit is COMMENT-ONLY and
+was verified byte-identical after comment stripping: zero SQL delta, and no
+migration file content is hashed by any gate.
+
+Both sides of the rule are now pinned behaviourally in `verify_migrations`
+`[2ab]` rather than asserted in prose: dropping `suspension_episode` needs the
+list, and dropping `set_record` / `session` does not — the replay completes and
+026's own refusals come back. Four new checks.
+
+**2. The register was stale in the direction that costs the most.**
+`MASTER_AUDIT_SYNTHESIS.md` still carried `OW-002`, `OW-003`, `OW-005` as
+`OPEN` and `OW-004` as `OWNER_ONLY` after PR #9 closed all four. Left alone,
+the next agent re-does closed work or believes the State C P1s are still
+live. All four rows are now `CLOSED` with commit-level evidence, in place, ids
+never reused per the register's own rule. `OW-001` correctly stays `OPEN`.
+Also confirmed while reading: `OW-036`, which I had described as coupled to
+`OW-001`, is already closed by `88f5b5c`.
+
+**Verification.** `verify:ci` exit 0 — 21 suites / 293 tests, `verify:store`
+655/655, 17 gates `ALL CHECKS PASSED`, `git diff --check` clean.
+
+**NOT started, and put to the owner instead.** The register carries 26 further
+open items spanning State A and State C, five of them `OWNER_ONLY` decisions an
+executor may not make, plus the new `planned_implement` immutability question
+raised by 062. Picking among them is an owner call, not an executor's, so the
+choice was surfaced rather than guessed at.

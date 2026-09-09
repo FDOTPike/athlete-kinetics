@@ -2587,6 +2587,33 @@ const PROHIBITED_062 = (b) => [
       PROHIBITED_062(B + 100).every(([, sql]) => refused(heal, sql)));
   }
 
+  // (3d-ii) THE OTHER SIDE OF THE RULE, so the distinction is proven and not
+  // just asserted in a comment. 026's trg_set_dose_target_bd and
+  // trg_session_outcome_bd have exactly the same cross-table WHEN EXISTS shape,
+  // and they are NOT replay-blocking, because set_record and session are created
+  // by 001 -- position 1, long before the earliest rename at position 48. The
+  // replay has recreated them by the time 049 rewrites the schema. If that ever
+  // stops being true, this fails and the runner's list needs a new entry.
+  for (const parent of ['set_record', 'session']) {
+    const early = freshDb();
+    runMigrations(early, MIGRATIONS);
+    early.raw.exec(`DROP TABLE ${parent}`);
+    check(`062 precondition: dropped ${parent} is seen as a missing sentinel`,
+      sentinelsMissing(early).includes(parent));
+    let threw = null;
+    try { runMigrations(early, MIGRATIONS); } catch (e) { threw = String(e.message).split('\n')[0]; }
+    check(`062 rule: a 026 trigger naming ${parent} (001) needs no replay-blocking entry`,
+      threw === null && sentinelsMissing(early).length === 0 && uv(early) === MIGRATIONS.length,
+      threw ?? `missing=${sentinelsMissing(early).join(',')}`);
+    // Recovery must restore 026's refusal too, not merely the table.
+    early.executeSync("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (7701, '2030-06-01', 1)");
+    early.executeSync('INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (7701, 7701, 1, 1, 5, 100, 8, 2)');
+    early.executeSync("INSERT INTO set_dose_target (set_id, target_kind, target_reps) VALUES (7701, 'reps', 5)");
+    check(`062 rule: 026's own immutability is restored after losing ${parent}`,
+      refused(early, 'DELETE FROM set_dose_target WHERE set_id = 7701')
+        && refused(early, 'UPDATE set_dose_target SET target_reps = 9 WHERE set_id = 7701'));
+  }
+
   // (3e) The structural rule, asserted against migrationRunner's own list so a
   // future cross-table trigger cannot be added without joining it. Comments are
   // stripped first: prose says "from" too.

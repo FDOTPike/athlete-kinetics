@@ -156,13 +156,34 @@ implementation:
    now drops `REPLAY_BLOCKING_TRIGGERS` before a full re-apply, and the replay
    recreates them from 062. The round trip is asserted for all three parents.
 
-### Pre-existing exposure disclosed, not fixed
+### Correction: 026 is NOT exposed — the rule is positional
 
-026's `trg_set_dose_target_bd` and `trg_session_outcome_bd` have the same
-cross-table shape and therefore the same latent exposure via `set_record` and
-`session`, both sentinels. Nothing in this branch makes that worse and nothing
-here fixes it; changing 026's recovery behaviour is outside this work order.
-It is recorded in `migrationRunner.ts` beside the list.
+The first version of this document, and the comments shipped in `062` and
+`migrationRunner.ts`, claimed that 026's `trg_set_dose_target_bd` and
+`trg_session_outcome_bd` shared this exposure because they have the same
+cross-table shape. **That was wrong**, and it was corrected in the follow-up
+branch after being measured rather than reasoned about.
+
+The exposure is decided by ONE thing: whether a self-heal replay — which starts
+at chain position 0 — recreates the referenced table **before** it reaches the
+earliest `ALTER TABLE ... RENAME` at position 48.
+
+| Referenced table | Created by | Position | Exposed? |
+|---|---|---|---|
+| `set_record`, `session` | 001 | 1 | No — recreated long before the rename |
+| `planned_slot`, `training_block` | 007 | 7 | No |
+| `training_program` | 033 | 33 | No |
+| `suspension_episode` | 058 | **57** | **Yes — after the rename** |
+
+So only the two 062 triggers naming `suspension_episode` are replay-blocking,
+and `REPLAY_BLOCKING_TRIGGERS` was already correct; what was wrong was the
+stated reason. Shape is not the criterion — position is. Both sides are now
+pinned behaviourally in `verify:migrations` `[2ab]`: dropping
+`suspension_episode` requires the list, and dropping `set_record` or `session`
+does not (the replay completes and 026's own refusals come back).
+
+A future cross-table trigger belongs on that list only if the table it names is
+created after position 48.
 
 ---
 
@@ -216,7 +237,9 @@ negative controls; the enclosing gate exits 0.
   `OWNER_ONLY`, unanswered.
 - Whether a declared `planned_implement` becomes immutable once trained (new,
   raised by §3 above). `OWNER_ONLY`.
-- 026's cross-table trigger exposure (§3), disclosed not fixed.
+- ~~026's cross-table trigger exposure~~ — **withdrawn**: measured and shown not
+  to exist. See the correction in §3; the criterion is chain position, not
+  trigger shape.
 - C6 physical-device memory qualification and the W8 live-emulator
   qualification remain mandatory for release and are untouched here.
   `verify:release` still cannot pass while `verify:memory-contract` exits 1.
