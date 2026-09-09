@@ -620,11 +620,19 @@ export default function ProfileScreen(): React.JSX.Element {
                     label={implementLabel(prefix).toUpperCase()}
                     selected={loadIntents[m.movement_id] === prefix}
                     onPress={() => {
-                      setIntentError(
-                        saveMovementLoadIntent(m.movement_id, prefix)
-                          ? null
-                          : `Could not save your choice for ${m.name}. Try again.`,
-                      );
+                      // The store returns false for a refusal, but an unexpected
+                      // throw must not escape the handler either — that is the
+                      // OW-007 failure mode, and it would leave the athlete with
+                      // a chip that did not move and no explanation.
+                      try {
+                        setIntentError(
+                          saveMovementLoadIntent(m.movement_id, prefix)
+                            ? null
+                            : `Could not save your choice for ${m.name}. Try again.`,
+                        );
+                      } catch {
+                        setIntentError(`Could not save your choice for ${m.name}. Try again.`);
+                      }
                     }}
                     accessibilityLabel={`Plan ${m.name} with ${implementLabel(prefix)}`}
                   />
@@ -634,11 +642,15 @@ export default function ProfileScreen(): React.JSX.Element {
                   label="NOT SET"
                   selected={loadIntents[m.movement_id] === undefined}
                   onPress={() => {
-                    setIntentError(
-                      saveMovementLoadIntent(m.movement_id, null)
-                        ? null
-                        : `Could not clear your choice for ${m.name}. Try again.`,
-                    );
+                    try {
+                      setIntentError(
+                        saveMovementLoadIntent(m.movement_id, null)
+                          ? null
+                          : `Could not clear your choice for ${m.name}. Try again.`,
+                      );
+                    } catch {
+                      setIntentError(`Could not clear your choice for ${m.name}. Try again.`);
+                    }
                   }}
                   accessibilityLabel={`Leave ${m.name} unset, so it is planned with added weight`}
                 />

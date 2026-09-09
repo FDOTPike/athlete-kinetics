@@ -2591,7 +2591,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
       d.executeSync('COMMIT');
     } catch (e) {
-      d.executeSync('ROLLBACK');
+      // A connection-level failure can make ROLLBACK throw too. Unguarded, that
+      // exception escapes before this action returns its promised boolean or
+      // records the error, so the caller gets neither. Matches the guarded shape
+      // confirmMovementPriorExperience and revokeMovementPriorExperience use.
+      try { d.executeSync('ROLLBACK'); } catch { /* no partial declaration */ }
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }

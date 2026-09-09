@@ -273,3 +273,35 @@ test('generation is deterministic with declarations, and a declaration is not in
   // true the feature is decorative, so it is asserted rather than assumed.
   expect(JSON.stringify(declaredA)).not.toBe(JSON.stringify(plainA));
 });
+
+test('a failed save whose ROLLBACK also fails still returns false, never throws', async () => {
+  await bootRealStore();
+  const m = ambiguousWithBodyweight();
+
+  // The connection-level failure CodeRabbit flagged: the write fails AND the
+  // recovery fails. Unguarded, the rollback exception escaped before the action
+  // could return its promised boolean or record the error, so the ProfileScreen
+  // handler got neither a false nor a message.
+  const real = mockDriver.executeSync.bind(mockDriver);
+  mockDriver.executeSync = (sql, params) => {
+    const text = String(sql);
+    if (/INSERT INTO movement_load_intent/.test(text)) throw new Error('database is locked');
+    if (/^\s*ROLLBACK/i.test(text)) throw new Error('cannot rollback - no transaction is active');
+    return real(sql, params);
+  };
+
+  let returned;
+  expect(() => { returned = store().saveMovementLoadIntent(m.movement_id, 'Bodyweight'); }).not.toThrow();
+  expect(returned).toBe(false);
+  expect(store().error).not.toBeNull();
+
+  mockDriver.executeSync = real;
+  // Nothing was half-written.
+  expect(declarations()).toHaveLength(0);
+  // The suppressed ROLLBACK left a real transaction open on the driver, which
+  // is exactly what a connection-level failure does in the field. Clear it the
+  // way a reconnect would before asserting the athlete can retry.
+  try { mockDriver.raw.exec('ROLLBACK'); } catch { /* already closed */ }
+  expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+  expect(declarations()).toHaveLength(1);
+});
