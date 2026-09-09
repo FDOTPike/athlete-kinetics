@@ -2009,26 +2009,33 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
 
   /** Build a generator pool carrying an EXPLICIT prospective load intent.
    *  `intent` maps movement name -> the implement selected for its planned
-   *  slot. Anything unnamed carries no intent at all. */
-  const poolWithIntent = (intent = {}) => corpus.map((r) => ({
-    movement_id: Number(r.movement_id),
-    name: r.name,
-    pattern: r.pattern,
-    is_compound: Number(r.is_compound) === 1,
-    required: JSON.parse(r.required_json ?? '[]'),
-    difficulty: 'Beginner',
-    beginner_ok: false,
-    sportTracking: false,
-    capability_available_weight_room: true,
-    capability_available_sport_conditioning: true,
-    // L1(a): the implement ACTUALLY selected for the planned slot. Absent means
-    // unknown, which must fail closed to the loaded path.
-    plannedImplement: Object.prototype.hasOwnProperty.call(intent, r.name)
-      ? intent[r.name] : undefined,
-    // Chain membership + applicable policy arrive as typed planning inputs
-    // (work order §7.3): the engine never queries the database.
-    progressionGroup: r.progression_group ?? undefined,
-  }));
+   *  slot. For unmapped movements, the store's L1(a) rule applies:
+   *  a singleton supported_prefixes stands; multi-implement stays undeclared
+   *  and fails closed. Dropdown ordering is never consulted. */
+  const poolWithIntent = (intent = {}, c = corpus) => c.map((r) => {
+    const p = JSON.parse(r.prefixes_json ?? '[]');
+    return {
+      movement_id: Number(r.movement_id),
+      name: r.name,
+      pattern: r.pattern,
+      is_compound: Number(r.is_compound) === 1,
+      required: JSON.parse(r.required_json ?? '[]'),
+      difficulty: 'Beginner',
+      beginner_ok: false,
+      sportTracking: false,
+      capability_available_weight_room: true,
+      capability_available_sport_conditioning: true,
+      // L1(a): the implement ACTUALLY selected for the planned slot. If declared,
+      // the athlete's selection wins. If absent, a singleton supported set stands;
+      // multi-element lists stay undeclared and fail closed to the loaded path.
+      plannedImplement: Object.prototype.hasOwnProperty.call(intent, r.name)
+        ? intent[r.name]
+        : (p.length === 1 ? p[0] : undefined),
+      // Chain membership + applicable policy arrive as typed planning inputs
+      // (work order §7.3): the engine never queries the database.
+      progressionGroup: r.progression_group ?? undefined,
+    };
+  });
 
   const planFor = (pool, over = {}) =>
     generateBlock({ profile: prof(over), movements: pool, startDate: START });
@@ -2070,14 +2077,20 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     const p = JSON.parse(r.prefixes_json ?? '[]');
     return { ...r, prefixes_json: JSON.stringify([...p].reverse()) };
   });
-  const reorderedPool = reorderedCorpus.map((r, i) => ({
-    ...poolWithIntent()[i],
-  }));
+  const reorderedPool = poolWithIntent({}, reorderedCorpus);
+  const reversedPrefixesCount = reorderedCorpus.filter((r, i) => {
+    const pOrig = JSON.parse(corpus[i].prefixes_json ?? '[]');
+    const pRev = JSON.parse(r.prefixes_json ?? '[]');
+    return pOrig.length > 1 && pRev[0] !== pOrig[0];
+  }).length;
   check('[28] reversing every supported_prefixes list cannot change the plan',
-    JSON.stringify(planFor(reorderedPool)) === JSON.stringify(baseline));
+    reversedPrefixesCount === 17
+    && JSON.stringify(planFor(reorderedPool)) === JSON.stringify(baseline),
+    `${reversedPrefixesCount} multi-prefix movements inverted`);
 
   // --- explicit intent routes, both directions ------------------------------
   const pushUp = byName.get('Push-up');
+  check('[28] Push-up probe movement exists in corpus', pushUp !== undefined);
   if (pushUp !== undefined) {
     const id = Number(pushUp.movement_id);
     const atPeak = (pool) => generateBlock({
@@ -2112,12 +2125,14 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
         === JSON.stringify(deloadRepsForMovement(loaded, id))
       && JSON.stringify(deloadRepsForMovement(unknown, id))
         === JSON.stringify(deloadRepsForMovement(loaded, id))
+      && deloadRepsForMovement(loaded, id).length > 0
       && deloadRepsForMovement(loaded, id).every((reps) => reps < floor),
       `deload=${JSON.stringify(deloadRepsForMovement(loaded, id))}`);
   }
 
   // --- weighted calisthenics is loaded --------------------------------------
   const weightedPullUp = byName.get('Weighted Pull-up');
+  check('[28] Weighted Pull-up probe movement exists in corpus', weightedPullUp !== undefined);
   if (weightedPullUp !== undefined) {
     const id = Number(weightedPullUp.movement_id);
     const asLoaded = shapeForMovement(planFor(focusedOn('Weighted Pull-up', { 'Weighted Pull-up': 'Banded' })), id);
@@ -2130,6 +2145,7 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // --- the named dropdown-order victims -------------------------------------
   for (const name of ['Bulgarian Split Squat', 'Walking Lunge']) {
     const row = byName.get(name);
+    check(`[28] ${name} probe movement exists in corpus`, row !== undefined);
     if (row === undefined) continue;
     const id = Number(row.movement_id);
     const loadedSelection = shapeForMovement(planFor(focusedOn(name, { [name]: 'DB' })), id);
@@ -2148,6 +2164,9 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     && JSON.parse(r.prefixes_json ?? '[]').some((prefix) => prefix !== 'Bodyweight'));
   const onChain = dropdownBodyweight.find((r) => chainMembers.has(Number(r.movement_id))
     && r.pattern !== 'locomotion');
+  check('[28] on-chain and off-chain probe movements exist in corpus',
+    offChain !== undefined && onChain !== undefined,
+    `on=${onChain?.name} off=${offChain?.name}`);
   if (offChain !== undefined && onChain !== undefined) {
     const repsAtPeak = (row, intent) => routedSlotsForMovement(generateBlock({
       profile: prof(),
@@ -2159,17 +2178,18 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
       JSON.parse(offChain.prefixes_json ?? '[]').find((prefix) => prefix !== 'Bodyweight'));
     const offUnknown = repsAtPeak(offChain, undefined);
     const onReps = repsAtPeak(onChain, 'Bodyweight').filter((slot) => slot.phase !== 'deload');
+    const offNonDeload = offBodyweight.filter((slot) => slot.phase !== 'deload');
     // The pair is the point: L2(b) says the floor is chain-scoped, so exactly
     // one of these two is lifted to the bar.
     check(`[28] L2(b) the ladder floor is chain-scoped (on=${onChain.name}, off=${offChain.name})`,
-      onReps.length > 0 && offBodyweight.length > 0
+      onReps.length > 0 && offNonDeload.length > 0
       && onReps.every((slot) => slot.reps >= DEFAULT_ADVANCEMENT_POLICY.requiredReps)
-      && offBodyweight.filter((slot) => slot.phase !== 'deload')
-        .every((slot) => slot.reps < DEFAULT_ADVANCEMENT_POLICY.requiredReps),
+      && offNonDeload.every((slot) => slot.reps < DEFAULT_ADVANCEMENT_POLICY.requiredReps),
       `on-chain=${JSON.stringify(onReps.map((slot) => slot.reps))}`
       + ` off-chain=${JSON.stringify(offBodyweight.map((slot) => slot.reps))}`);
     check(`[28] off-chain phase reps are intent-independent (${offChain.name})`,
-      JSON.stringify(offBodyweight.map((slot) => slot.reps))
+      offBodyweight.length > 0
+      && JSON.stringify(offBodyweight.map((slot) => slot.reps))
         === JSON.stringify(offLoaded.map((slot) => slot.reps))
       && JSON.stringify(offUnknown.map((slot) => slot.reps))
         === JSON.stringify(offLoaded.map((slot) => slot.reps)),
@@ -2183,31 +2203,38 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   fullDb.prepare(
     'INSERT INTO progression_policy (progression_group, required_sets, required_value) VALUES (?, ?, ?)',
   ).run('pull-up', 3, 12);
+  const customPolicyRow = fullDb.prepare(
+    'SELECT required_value FROM progression_policy WHERE progression_group = ?',
+  ).get('pull-up');
+  const customPolicyBar = Number(customPolicyRow.required_value);
   const chainMember = corpus.find((r) => r.progression_group === 'pull-up'
     && JSON.parse(r.prefixes_json ?? '[]').includes('Bodyweight')
     && JSON.parse(r.prefixes_json ?? '[]').some((prefix) => prefix !== 'Bodyweight'));
+  check('[28] pull-up chain member with multi-prefix exists for custom policy probe',
+    chainMember !== undefined, chainMember?.name ?? 'none');
   if (chainMember !== undefined) {
     const id = Number(chainMember.movement_id);
     const external = JSON.parse(chainMember.prefixes_json ?? '[]')
       .find((prefix) => prefix !== 'Bodyweight');
     const withPolicy = (intent) => focusedOn(chainMember.name,
       intent === undefined ? {} : { [chainMember.name]: intent }).map((m) => (
-      m.movement_id === id ? { ...m, chainAdvancementReps: 12 } : m));
+      m.movement_id === id ? { ...m, chainAdvancementReps: customPolicyBar } : m));
     const bodyweightPlan = planFor(withPolicy('Bodyweight'));
     const loadedPlan = planFor(withPolicy(external));
     const unknownPlan = planFor(withPolicy(undefined));
     const bodyweightSlots = nonDeloadSlotsForMovement(bodyweightPlan, id);
     const loadedSlots = nonDeloadSlotsForMovement(loadedPlan, id);
     const unknownSlots = nonDeloadSlotsForMovement(unknownPlan, id);
-    check(`[28] custom per-chain policy floors Bodyweight, loaded, and undeclared routes (${chainMember.name}, bar 12)`,
+    check(`[28] custom per-chain policy floors Bodyweight, loaded, and undeclared routes (${chainMember.name}, bar ${customPolicyBar})`,
       bodyweightSlots.length > 0
       && [bodyweightSlots, loadedSlots, unknownSlots]
-        .every((slots) => slots.every((slot) => slot.reps >= 12)),
+        .every((slots) => slots.every((slot) => slot.reps >= customPolicyBar)),
       `BW=${JSON.stringify(bodyweightSlots.map((slot) => slot.reps))}`
       + ` loaded=${JSON.stringify(loadedSlots.map((slot) => slot.reps))}`
       + ` unknown=${JSON.stringify(unknownSlots.map((slot) => slot.reps))}`);
     check('[28] custom policy preserves loaded fail-closed set routing',
-      JSON.stringify(loadedSlots.map((slot) => slot.sets))
+      loadedSlots.length > 0
+      && JSON.stringify(loadedSlots.map((slot) => slot.sets))
         === JSON.stringify(unknownSlots.map((slot) => slot.sets))
       && JSON.stringify(bodyweightSlots.map((slot) => slot.sets))
         !== JSON.stringify(loadedSlots.map((slot) => slot.sets)));
@@ -2216,7 +2243,8 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
         === JSON.stringify(deloadRepsForMovement(loadedPlan, id))
       && JSON.stringify(deloadRepsForMovement(unknownPlan, id))
         === JSON.stringify(deloadRepsForMovement(loadedPlan, id))
-      && deloadRepsForMovement(loadedPlan, id).every((reps) => reps < 12),
+      && deloadRepsForMovement(loadedPlan, id).length > 0
+      && deloadRepsForMovement(loadedPlan, id).every((reps) => reps < customPolicyBar),
       JSON.stringify(deloadRepsForMovement(loadedPlan, id)));
   }
 
@@ -2228,7 +2256,9 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   const loadedRepsWithIntent = slotsOf(planFor(poolWithIntent({ 'Push-up': 'Bodyweight' })))
     .filter((s) => loadedIds.has(s.movement_id)).map((s) => `${s.movement_id}:${s.reps}:${s.sets}`);
   check('[28] declaring one bodyweight intent leaves every loaded prescription unchanged',
-    JSON.stringify(loadedRepsBaseline) === JSON.stringify(loadedRepsWithIntent));
+    loadedRepsBaseline.length > 0
+    && JSON.stringify(loadedRepsBaseline) === JSON.stringify(loadedRepsWithIntent),
+    `${loadedRepsBaseline.length} loaded slots compared`);
 
   // --- [29] W4 bodyweight rep law: working-week reps never fall while target
   // RPE rises on a slot with NO external-load channel (owner's device finding:
