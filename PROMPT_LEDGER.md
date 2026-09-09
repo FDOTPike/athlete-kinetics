@@ -7070,3 +7070,320 @@ no migration. `OW-006` not started, `OW-026` not decided, no fatigue coefficient
 or athlete dose changed, migrations 059-063 unmodified. `OW-037` still deferred
 to the session runner work order. `OW-038` opened, not started. Still open from
 the approved plan: `OW-008` and the six document-only corrections.
+
+## Entry 0106 — 2026-09-10 · Astra UX Phase 1: athlete-first core journey
+
+### Input G(x)
+
+The CLI invocation split a multi-word argument and delivered only the first
+word. Both the truncated invocation and the complete continuation instruction
+that replaced it are recorded, in the order received — the truncation is part of
+the intent→output record, not noise to be tidied away.
+
+**G(x) part 1 — as received (transport defect, verbatim):**
+
+````
+Execute
+````
+
+**G(x) part 2 — the complete continuation instruction (verbatim):**
+
+````
+This is the complete continuation instruction. The earlier CLI invocation accidentally delivered only the word "Execute" because its multi-word argument was split. That was a transport defect, not a scope ambiguity. Do not execute OW-037, OW-038, OW-008, or the six historical document corrections in this branch.
+
+Execute the authorized work order at:
+C:\Users\fpike\.codex\workorders\WORKORDER_OPUS_ASTRA_UX_PHASE_1.md
+
+Read that file completely before acting. It is intentionally outside the repository. The target is Astra UX Phase 1, not an outstanding-work register item.
+
+Work only in:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\astra-athlete-first-ux
+
+The clean branch is claude/astra-athlete-first-ux at the required PR #12 merge commit 4c1e508e3dfe0ffc72b6ddb993cbb1155dcb4ff7. Confirm that identity, then continue autonomously through W0, W1, W2, W3, W4, and W5. Do not pause for routine progress reports or optional design choices. Make conservative in-scope choices, test them, and document them. Obey the repository ledger protocol; the first repository write must open the new ledger entry with this complete continuation instruction and the full work order content or an exact, auditable inclusion of it as required by the current ledger rules.
+
+Make focused local commits. Do not push, merge, rebase, tag, publish, release, modify PR #12, or touch the two stale .claude worktrees. Do not absorb unrelated owner-only or register work. Stop only at the final independent Codex/Sol audit checkpoint after all achievable W0-W5 acceptance criteria and verification are complete, or at a genuine scope/authority blocker that cannot be safely isolated. The final handback must use the exact token required by the work order.
+````
+
+**G(x) part 3 — the referenced work order, reproduced in full.**
+
+The work order is deliberately OUTSIDE the repository, so the ledger cannot cite
+a tracked path for it. It is therefore inlined verbatim below and pinned by hash
+so a future reader can prove the bytes executed against are the bytes recorded.
+
+`[External source: C:\Users\fpike\.codex\workorders\WORKORDER_OPUS_ASTRA_UX_PHASE_1.md; SHA-256 1161bafc2921f27a1c91b1fe14da4d752a319a6c7c8bf3655a34aa24dbf5f1f1; 11735 bytes; 174 LF-terminated lines; no CR bytes present; captured 2026-09-10]`
+
+The `no CR bytes present` clause is deliberate and is an `OW-033` precaution: the
+inlined copy below passes through this repository's `.gitattributes`
+`* text=auto eol=lf` normalization, and recording that the source was already
+LF-only establishes that normalization is a no-op here, so the inlined bytes and
+the external file remain the same byte sequence.
+
+````
+# OPUS WORK ORDER — Astra UX Phase 1: Athlete-First Core Journey
+
+## 0. Execution identity and start gate
+
+- Executor: Claude Code using the `opus` model at `high` effort.
+- Status: `AUTHORIZED — PR #12 MERGED; EXECUTE UNTIL THE INDEPENDENT-AUDIT CHECKPOINT`.
+- Repository: `C:\Users\fpike\Documents\Claude Coding\Athlete App`.
+- Dependency: <https://github.com/FDOTPike/athlete-kinetics/pull/12>.
+- Base after the dependency lands: the freshly fetched `origin/codex/rpe-familiarisation` containing PR #12's merge commit.
+- Required merge commit: `4c1e508e3dfe0ffc72b6ddb993cbb1155dcb4ff7`.
+- Isolated branch: `claude/astra-athlete-first-ux`.
+- Isolated worktree: `C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\astra-athlete-first-ux`.
+
+At W0, query PR #12 from GitHub. If it is open, draft, or closed without merge, make no repository changes and return `WAITING FOR PR 12`. Never infer completion from green CI alone. If it is merged, fetch the remote base, verify the merge commit is an ancestor of the selected base, verify the target branch/worktree do not already contain another run, and only then begin.
+
+Do not use either automatically-created stale worktree at `.claude/worktrees/astra-athlete-first-ux-905b55` or `.claude/worktrees/state-c-data-integrity-ffaf27`: both were inspected clean at `3358be64bd328827eb9239b525ae96ddd264a06e`, which predates PR #12. Execute only in the isolated worktree named above, whose starting HEAD must equal or descend from `4c1e508e3dfe0ffc72b6ddb993cbb1155dcb4ff7`.
+
+Continue autonomously through W0–W5. Do not pause merely to report intermediate progress. Stop only for (a) a genuine scope/authority blocker that cannot be conservatively isolated, or (b) the final independent Codex/Sol audit checkpoint after all achievable acceptance criteria and verification are complete.
+
+Read `CLAUDE.md`, `AGENTS.md` if present, `AGENT_WORKFLOW.md`, the current ledger rules, and the changed navigation/screen/state tests before editing. Preserve dirty or unrelated user work. Do not operate in the root checkout.
+
+## 1. Product objective
+
+Reorganise the application around one athlete-facing promise:
+
+> Open the app, know today's work, do it, and understand what comes next.
+
+This is an experience-layer remediation. Preserve the existing deterministic training engines, prescriptions, progression, suspension behaviour, history, migrations, and offline architecture. Do not silently alter program quality or dose to make the interface easier to implement.
+
+## 2. Scope boundary
+
+This work order implements Astra's recommended **first implementation only**:
+
+1. combine the home and start/resume flow into an athlete-first Today experience;
+2. shorten first-run setup so it ends in a usable recommended workout/week; and
+3. make workout completion show a useful summary and the next session.
+
+Also simplify top-level navigation to `Today · Plan · Progress` where this can be achieved by reusing existing routes and screens without deleting capabilities. Profile/settings belongs in the header. Keep the exercise library reachable from Plan and the workout flow.
+
+Defer the following to a separately audited Phase 2 unless a tiny prerequisite is unavoidable:
+
+- full implementations of `Less time`, `Different equipment`, and `Move session`;
+- comprehensive previous-performance redesign during set entry;
+- new progress analytics;
+- advanced biometric/RPE estimation;
+- training-engine, progression, ranking, or prescription changes;
+- database schema or migration changes;
+- Firebase, cloud runtime, telemetry, accounts, or sync.
+
+Do not delete the Coach or Library capabilities. Reposition them behind athlete tasks instead of making them prerequisites for starting training.
+
+## 3. Functional requirements
+
+### 3.1 Today is the default home
+
+- Make the default landing experience athlete-facing `Today`, not a system-management dashboard.
+- For a planned training day, lead with today's workout name/type, an honest duration estimate or existing duration value, a compact preview, and a primary `Start workout` action.
+- For an active session, replace that action with `Resume workout` and return to the same persisted session.
+- Starting must use the existing production start path and must not require a detour through Coach.
+- Present readiness and any **actual** adjustment below the workout. State what changed in ordinary language. If nothing changed, do not manufacture an adjustment message.
+- Distinguish at least these states rather than calling all missing plans a rest day:
+  - scheduled rest day;
+  - unscheduled day/no session planned;
+  - missed or overdue planned session;
+  - active session available to resume.
+- Each state must offer the safest existing next action without inventing new schedule mutation rules.
+
+### 3.2 First run ends with a useful recommendation
+
+- Keep only inputs required to generate a defensible first program in the required path: goal, experience/training age, availability, available equipment, and relevant limitations.
+- Reuse already-entered answers. Do not ask the same fact twice under different terminology.
+- Move review horizon, training method, detailed movement selection, and other programming controls into optional/advanced setup unless the engine genuinely cannot produce a program without them.
+- Present a recommended week/session derived by the existing engine, let the athlete review it, and make the next reward a usable Today screen.
+- Existing athletes and partially completed onboarding must migrate through this UI change without data loss or forced reset. Prefer route/state compatibility over a database migration.
+- Record the required-step count before and after. The new path must materially reduce required decisions; do not claim improvement only because screens were relabelled or combined visually.
+
+### 3.3 Completion has a payoff
+
+- On normal completion, show a compact summary derived from persisted session facts: exercises, completed sets/reps/load where available, duration where reliably available, and completion/adaptation status.
+- Show a comparison only when a correctly matched prior session/set exists. Missing history stays unknown; never fabricate a personal best or improvement.
+- Show the next planned session or an honest fallback when none is currently scheduled.
+- Explain any real plan adjustment in plain athlete language, with technical detail available secondarily.
+- Treat completed-as-planned, adapted, and stopped sessions neutrally and respectfully.
+- Preserve the existing transaction and recovery semantics: the summary must not cause a second completion write or create a new plan.
+
+### 3.4 Navigation and language
+
+- Target primary navigation: `Today · Plan · Progress`.
+- Keep route identity/back behaviour compatible where practical, especially for active sessions, deep links, and test fixtures.
+- Put profile/settings access in the header rather than a primary training tab.
+- Remove internal phrases such as `used as Coach evidence` from athlete-facing core-flow copy. Do not remove provenance or audit facts from the data model.
+- Prefer beginner-readable labels; retain info tips/glossary access for technical terms.
+
+## 4. Design constraints
+
+- Use the existing design system and components before introducing new primitives.
+- Preserve the 56 dp touch-target contract.
+- Validate 360 dp and approximately 411 dp widths at font scales 1.0 and 1.30.
+- No clipped actions, inaccessible horizontal content, mid-word truncation, or colour-only state distinctions.
+- The workout and its action must remain visually dominant over readiness explanation and coaching metadata.
+- Do not copy another application's trade dress. Hevy may be used only as an interaction reference for showing prior performance beside today's target.
+
+## 5. Implementation sequence
+
+### W0 — Boundary and baseline
+
+- Prove PR #12 is merged and the worktree is based on its receiving branch.
+- Record HEAD, merge base, clean/dirty state, current route map, current first-run step count, and existing focused-test baseline.
+- Identify the authoritative start/resume, completion, next-session, and onboarding state functions before changing UI.
+
+### W1 — Today shell and direct start/resume
+
+- Implement state shaping as pure selectors/helpers where practical.
+- Reuse the production session-start and resume paths.
+- Add focused tests for every Today state and for route/action identity.
+
+### W2 — Progressive onboarding
+
+- Reduce required decisions and reuse the existing generator.
+- Preserve advanced controls through optional setup.
+- Add fresh, partially completed, and existing-athlete regression tests.
+
+### W3 — Completion summary and next session
+
+- Derive the summary from persisted facts.
+- Add matched-history, no-history, adapted, stopped, and no-next-session tests.
+
+### W4 — Navigation and accessibility integration
+
+- Land the three-label navigation without making existing capabilities unreachable.
+- Exercise back navigation, cold start, active-session resume, font scaling, narrow width, and screen-reader labels.
+
+### W5 — Verification and local handback
+
+- Run formatting/diff checks, typecheck, all focused component/store/navigation gates, `verify:ci`, and the appropriate QA artifact build/check.
+- Run a deterministic emulator journey: fresh install → onboarding → recommended Today session → start → log at least two sets → background/resume → finish → identify next session.
+- Retain screenshots/UI dumps for the four width/font configurations outside the repository, and cite hashes/paths in the handback.
+- Mutation-test the critical new contracts so the focused tests are proven non-vacuous.
+
+## 6. Acceptance criteria
+
+- A returning athlete with a planned session can start it from app launch with one primary tap.
+- An athlete with an active session can resume that same session with one primary tap.
+- Scheduled rest, unscheduled, missed/overdue, and active-session states are not conflated.
+- A fresh athlete reaches a generated, reviewable week and then a usable Today screen with materially fewer required decisions than the baseline.
+- Existing athlete/program/session data survives the UI change without reset.
+- Completion displays only recorded facts, handles missing comparison data honestly, and identifies what comes next.
+- Today, Plan, Progress, settings, Coach capability, and Library capability remain reachable with tested navigation/back behaviour.
+- No training dose, progression, movement ranking, suspension, migration, memory budget, or offline-runtime invariant changes.
+- Required automated gates and the end-to-end emulator journey pass at the frozen candidate.
+
+## 7. Git and authority
+
+- Make small local commits separated by W1/W2/W3/W4 concerns.
+- Do not merge, rebase, force-push, tag, sign, publish, release, or alter PR #12.
+- Do not push or open the Phase 1 PR. Codex/Sol will independently audit the local commits first.
+- Do not edit closed historical ledger entries. If the active lineage requires a ledger record, append according to its current rules.
+- If a requirement would need a schema, migration, or training-engine change, stop that portion and record a bounded blocker instead of expanding scope.
+
+## 8. Required handback
+
+Return:
+
+- base, branch, HEAD, commits, and exact changed paths;
+- before/after required onboarding step counts;
+- route and state-transition summary;
+- tests and exact exit codes;
+- emulator journey result and evidence locations/hashes;
+- known limitations and deferred Phase 2 items;
+- confirmation that PR #12 was not modified and nothing was pushed/merged/released.
+
+Final token:
+
+`ASTRA UX PHASE 1 IMPLEMENTED LOCALLY — READY FOR CODEX/SOL AUDIT`
+````
+
+### W0 — boundary and baseline (recorded before the first source edit)
+
+**Start gate.** `gh pr view 12` returns `state: MERGED`, `mergedAt
+2026-09-09T23:36:15Z`, `mergeCommit.oid
+4c1e508e3dfe0ffc72b6ddb993cbb1155dcb4ff7`, base `codex/rpe-familiarisation`,
+head `claude/state-a-register-closeout`. Merged status came from the PR object,
+not from CI colour, as the work order §0 requires.
+
+| Fact | Value |
+|---|---|
+| Worktree | `.worktrees/astra-athlete-first-ux` |
+| Branch | `claude/astra-athlete-first-ux` |
+| HEAD | `4c1e508e3dfe0ffc72b6ddb993cbb1155dcb4ff7` (EQUALS the required merge commit) |
+| Merge base vs `origin/codex/rpe-familiarisation` | `4c1e508e…` — the base contains the merge |
+| Merge parents | `1a79077…` (base side), `5bc2770…` (PR #12 head side) |
+| `git write-tree` at start | `000a2bf3d01c6ed7676c5122df2fe563a4512919` |
+| `git status --porcelain` | empty |
+| Prior run present on branch? | No — HEAD is the merge commit itself, zero commits ahead |
+
+The two stale `.claude/worktrees/` checkouts named in §0 were not entered, not
+read and not modified. `.worktrees/state-c-data-integrity-remediation` WAS read
+— read-only, to copy the gitignored embedder assets described below.
+
+**Environment preparation (no tracked file touched).** A fresh worktree carries
+no `node_modules` and no embedder assets. `npm ci` exit `0`. The pinned embedder
+artifacts were copied from `.worktrees/state-c-data-integrity-remediation`,
+which sits on this same lineage, rather than downloaded; identity is established
+by hash, not path, and `node scripts/verify-preflight.mjs` re-derived every byte:
+`PREFLIGHT OK`, including `revision cache artifact verified … [sha256 ok]` for
+all four cache files. Both copied device outputs are gitignored
+(`.gitignore:10`, `.gitignore:11`), and `git status --porcelain` stayed empty
+across the whole preparation.
+
+**Focused-test baseline at the untouched candidate.**
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm run typecheck` | `0` | clean |
+| `node scripts/verify-preflight.mjs` | `0` | `PREFLIGHT OK` |
+| `npm run verify:components` | `0` | 22 suites / **327 tests** passed |
+
+327 is the same figure entry 0105 recorded for the merged candidate, so the
+baseline reproduces in a clean checkout.
+
+**Current route map (before).** Five tabs in `App.tsx:31-37`, root `readiness`:
+
+| Tab id | Label | Screen | In tab bar |
+|---|---|---|---|
+| `readiness` | READY | `ReadinessScreen` | yes (root) |
+| `session` | SESSION | `SessionScreen` | yes |
+| `coach` | COACH | `BlockScreen` | yes |
+| `library` | LIBRARY | `LibraryScreen` → `LibraryScreenV2` | yes |
+| `athlete` | ATHLETE | `ProfileScreen` | yes |
+
+**Authoritative state functions identified before editing any UI.**
+
+| Concern | Authority |
+|---|---|
+| Start / resume | `useStore.ts:4725 startSession(repeatPlanned?)`. Guards double-start at `:4727`, honours the safety halt at `:4730`, and consumes `todayPlan` only when it has not already been consumed (`:4736-4742`). |
+| Today's plan | `useStore.ts:3567 refreshBlock()` derives `todayPlan` at `:3642` from `blockSessions.find(s => s.sessionDate === today)`; `null` is the documented rest-day fallback (`:3630-3631`). |
+| Completion | `useStore.ts:5982 endSession()`. Single transaction; sets `lastEndedSessionId` at `:6099` ONLY when an outcome was persisted; `dismissOutcome` (`:6434`) clears it. |
+| Next session | `blockSessions` ordered by `(week_index, day_index)`; `BlockScreen.tsx:374` already derives `nextPlanned` as the first entry with `sessionDate > today`. |
+| Onboarding | `OnboardingScreen.tsx` local draft committed by a single `completeOnboarding()`; program creation is a SEPARATE explicit step (`ProgramSetupScreen`) reached through `App.tsx:80-94`. |
+
+**Baseline required first-run decisions (the §3.2 "before" count).** A *required
+decision* is counted as a control the athlete cannot get past without supplying
+an explicit value — the flow refuses to advance until they do. Pre-filled
+defaults are NOT counted, which is the conservative direction: it makes the
+"after" number harder to improve, not easier.
+
+| # | Required decision | Enforced at |
+|---|---|---|
+| 1 | Limitations: explicit yes/no | `OnboardingScreen.tsx:173` `limitsGateOpen` disables NEXT |
+| 2 | Who chooses movements (`buildMode`) | `ProgramSetupScreen.tsx:307` |
+| 3 | Review horizon kind | `ProgramSetupScreen.tsx:308` |
+| 4 | Program duration or review date | `ProgramSetupScreen.tsx:309-310` |
+| 5 | Training method (`schemaType`) | `ProgramSetupScreen.tsx:311` — pre-set to `LINEAR` for beginners only |
+
+**Baseline = 5 required decisions** for a non-beginner, **4** for a beginner.
+Nine question-bearing steps are presented on the way (five onboarding decision
+screens plus four numbered `ProgramSetupScreen` sections).
+
+**The two §3.1 defects confirmed in code, not inferred.**
+
+1. Starting requires a detour through Coach. `ReadinessScreen.tsx:230` sets
+   `primaryHandler = hasLiveSession ? onOpenSession : onOpenCoach`, so the
+   landing screen's primary action NEVER starts a workout — it navigates to
+   BlockScreen, and the athlete presses start there.
+2. Every missing plan is called a rest day. `ReadinessScreen.tsx:219` is
+   `isRestDay = todayPlan === null && !halted && !hasLiveSession`, which renders
+   the "Rest day. That's the work." display for a scheduled rest day, an athlete
+   with no program at all, and an athlete who missed yesterday's session alike.
