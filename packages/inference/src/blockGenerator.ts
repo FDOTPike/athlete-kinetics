@@ -796,16 +796,34 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // The Hybrid Tax: high-fatigue schemas (cost matrix) are paid for by
   // stripping 1-2 working sets from accessory/secondary slots — concurrent
   // grappling load leaves no CNS budget for both.
-  // Routed through the loading-class accessor so a ratified bodyweight
-  // coefficient becomes a table edit. Until 2026-08-29 this passed a hardcoded
-  // `false`, which made the bodyweight branch unreachable and the claim that
-  // future pricing is "only a table edit" untrue. It now carries the real
-  // classification: a block whose entire available pool is planned bodyweight.
+  // OW-006, corrected 2026-09-09. Read this before trusting the branch below.
   //
-  // This is provably DOSE-NEUTRAL today. SCHEMA_FATIGUE_COST_BODYWEIGHT is an
-  // exact alias of SCHEMA_FATIGUE_COST, so both branches return the same number
-  // for every (schema, phase). No fatigue coefficient is ratified and none is
-  // introduced here — only the branch is made reachable.
+  // `input.movements` is the athlete's ENTIRE movement catalogue, not this
+  // block's slots: both production call sites map the store's hydrated
+  // catalogue (useStore MOVEMENT_LIBRARY_SQL, no selection filter). On the
+  // shipped 300-movement corpus `every(isPurelyBodyweight)` is therefore false
+  // in every real generation, so `bodyweightDominant` is ALWAYS false and the
+  // bodyweight branch never evaluates in production.
+  //
+  // The 2026-08-29 change that introduced this replaced a hardcoded `false` and
+  // claimed it made future bodyweight pricing "only a table edit". That claim is
+  // NOT true and is withdrawn here: the branch selecting the table cannot become
+  // true, so populating the table would change nothing.
+  //
+  // It stays DOSE-NEUTRAL either way, which is why this is a truthfulness defect
+  // and not a dose defect: SCHEMA_FATIGUE_COST_BODYWEIGHT is an exact alias of
+  // SCHEMA_FATIGUE_COST, so both branches return the same number for every
+  // (schema, phase). verify:blocks pins that alias as a TRIPWIRE — the moment a
+  // real bodyweight coefficient is ratified it fails, forcing reachability to be
+  // fixed in the same change rather than silently populating dead code.
+  //
+  // Closing reachability needs one of two things, neither of which an executor
+  // may pick unilaterally: a two-pass restructure so the classification is taken
+  // from the movements actually placed in the slots (they are chosen inside the
+  // slot loop below, AFTER this line, and `accessoryCut` only trims set counts,
+  // so it is possible but touches the generator's load-bearing determinism), or
+  // OW-026 ratifying/declining a bodyweight CNS coefficient, which is what would
+  // give the branch any purpose. Recorded, not guessed at.
   const bodyweightDominant = input.movements.length > 0 && input.movements.every(isPurelyBodyweight);
   const fatigueCost = schemaFatigueCost(schemaType, macroPhase, bodyweightDominant);
   const accessoryCut =

@@ -2735,10 +2735,23 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const d = getDb();
     const open = openSuspension(d);
     if (open === null) return;
-    d.executeSync(
-      'UPDATE suspension_episode SET ended_at_ms = ? WHERE episode_id = ?',
-      [atMs, open.episode_id],
-    );
+    // Same transactional shape as beginSuspension above, and it RETHROWS for the
+    // same reason: resume is an athlete-owned control in a flow whose whole
+    // point is athlete ownership in BOTH directions, so a database failure has
+    // to reach the press handler that can say so. An unguarded executeSync here
+    // escaped the handler and the athlete saw the suspension card unchanged with
+    // no explanation.
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        'UPDATE suspension_episode SET ended_at_ms = ? WHERE episode_id = ?',
+        [atMs, open.episode_id],
+      );
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      throw e;
+    }
     get().refreshSuspension();
   },
 

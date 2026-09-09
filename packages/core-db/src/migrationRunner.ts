@@ -222,31 +222,40 @@ export const DURABLE_TABLE_EXEMPTIONS: readonly { readonly name: string; readonl
 ];
 
 /**
- * Triggers whose WHEN clause names a table OTHER than the one they fire on.
+ * Triggers whose WHEN clause names a table that the chain creates LATER than
+ * its last `ALTER TABLE ... RENAME`.
  *
  * A full re-apply is, by definition, run against a database that has lost
- * something — and `ALTER TABLE ... RENAME` (performed by 049, 052 and 061)
- * re-parses and rewrites the ENTIRE schema, aborting with "error in trigger
- * <name>: no such table" if any trigger references a table that is currently
- * absent. Because 049 sits at array index 47 and the suspension tables are not
- * created until 058/059, a poisoned DB missing `suspension_episode` could never
- * replay far enough to restore it: the self-heal would abort at 049 every time,
- * turning a recoverable database into an unrecoverable one. Reproduced
- * directly, and pinned by verify:migrations [2ab].
+ * something, and it replays from index 0. `ALTER TABLE ... RENAME` re-parses
+ * and rewrites the ENTIRE schema, aborting with "error in trigger <name>: no
+ * such table" if any surviving trigger references a table that is absent AT
+ * THAT MOMENT. 049, 052 and 061 each rename, the earliest at chain position 48.
  *
- * Dropping them here is safe and self-closing: the replay recreates each one
- * from its own migration (CREATE TRIGGER IF NOT EXISTS), and if the replay does
- * not complete, the sentinel check below reports them missing and throws. The
- * only window in which the guard is absent is inside the recovery itself.
+ * That position is the whole rule. A trigger referencing a table created BEFORE
+ * position 48 is safe, because the replay has already recreated it by the time
+ * the rename runs: `set_record` and `session` (001), `planned_slot` and
+ * `training_block` (007) and `training_program` (033) all qualify, and 026's
+ * `trg_set_dose_target_bd` / `trg_session_outcome_bd` are therefore NOT exposed
+ * — measured, not assumed. `suspension_episode` is created by 058 at position
+ * 57, AFTER the rename, so a trigger naming it can never be reached by a replay
+ * that has to pass 049 first. Dropping that one table would otherwise abort the
+ * self-heal every time and leave the database permanently unrecoverable.
  *
- * 062's are listed. 026's `trg_set_dose_target_bd` and `trg_session_outcome_bd`
- * have the same shape and therefore the same latent exposure via `set_record`
- * and `session`; that is a pre-existing defect disclosed rather than fixed
- * here, because changing 026's recovery behaviour is outside this change.
+ * Dropping the affected triggers here is safe and self-closing: the replay
+ * recreates each from its own migration (CREATE TRIGGER IF NOT EXISTS), and if
+ * the replay does not complete, the sentinel check reports them missing and
+ * throws. The guard is absent only inside the recovery itself.
+ *
+ * A new cross-table trigger belongs on this list only if its referenced table
+ * is created after chain position 48. verify:migrations [2ab] pins both sides
+ * of that distinction behaviourally.
  */
 const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
-  'trg_suspension_episode_program_no_delete_bd', // 062 -> suspension_episode, training_program
-  'trg_block_suspension_origin_no_delete_bd',    // 062 -> training_block, suspension_episode
+  // Both name suspension_episode (058, position 57 > 48). Their other parents —
+  // training_program (033) and training_block (007) — are recreated before the
+  // rename and are not what puts them here.
+  'trg_suspension_episode_program_no_delete_bd', // 062 -> suspension_episode
+  'trg_block_suspension_origin_no_delete_bd',    // 062 -> suspension_episode
 ];
 
 function dropReplayBlockingTriggers(db: MigrationDb): void {

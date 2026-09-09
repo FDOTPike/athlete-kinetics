@@ -502,10 +502,28 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           </Text>
           <PrimaryButton
             label="Resume my programme"
-            onPress={() => { setSuspendError(null); endSuspension(Date.now()); }}
+            onPress={() => {
+              // Same action-scoped try/catch the pause controls use below. The
+              // resume path had none, so a database failure escaped the handler
+              // and the athlete saw this card unchanged with no explanation —
+              // in the one flow that is athlete-owned in BOTH directions.
+              try {
+                setSuspendError(null);
+                endSuspension(Date.now());
+              } catch (e) {
+                setSuspendError(e instanceof Error ? e.message : String(e));
+              }
+            }}
             accessibilityLabel={`Resume the programme and return to block ${suspension.frozen_macro_index} of 8`}
             testID="suspension-resume"
           />
+          {/* Mounted INSIDE the suspended branch. The resume button exists only
+              here, so an error node living only in the other branch could never
+              be seen by the athlete whose resume just failed — the second,
+              independent reason the message was invisible. */}
+          {suspendError !== null && (
+            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
+          )}
         </View>
       ) : (
         <View style={styles.card}>

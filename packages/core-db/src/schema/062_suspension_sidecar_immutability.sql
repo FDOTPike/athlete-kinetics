@@ -41,14 +41,25 @@
 -- THE COST, AND THE THING THAT MAKES IT SAFE. Naming another table in a trigger
 -- makes `ALTER TABLE ... RENAME` fail with "error in trigger <name>: no such
 -- table" whenever that table is absent, because a rename re-parses and rewrites
--- the whole schema. 049, 052 and 061 each rename, and every parent here is a
--- SENTINEL — so "absent" is precisely the poisoned-DB state the self-heal
--- exists to repair. Left unhandled, dropping `suspension_episode` would abort
--- the replay at 049, nine migrations before 058 could recreate it, and the
--- database would be permanently unrecoverable. migrationRunner's
--- REPLAY_BLOCKING_TRIGGERS drops these two before a full re-apply and the
--- replay recreates them here; verify:migrations [2ab] proves the round trip.
--- If a future migration adds a cross-table trigger, it belongs on that list.
+-- the whole schema. 049, 052 and 061 each rename, the earliest at chain
+-- position 48, and a self-heal replays from position 0.
+--
+-- So the exposure is decided by ONE thing: whether the replay recreates the
+-- referenced table BEFORE it reaches position 48. `suspension_episode` is
+-- created by 058 at position 57 — after the rename — so a trigger naming it can
+-- never be reached by a replay that must pass 049 first: dropping that one
+-- table would abort the self-heal every time and leave the database permanently
+-- unrecoverable. The other parents named here are recreated in time
+-- (`training_block` 007, `training_program` 033) and are not what makes these
+-- triggers replay-blocking. migrationRunner's REPLAY_BLOCKING_TRIGGERS drops
+-- them before a full re-apply and the replay recreates them here;
+-- verify:migrations [2ab] proves the round trip.
+--
+-- A future cross-table trigger belongs on that list ONLY if the table it names
+-- is created after position 48. 026's `trg_set_dose_target_bd` and
+-- `trg_session_outcome_bd` have this same shape and are NOT exposed, because
+-- `set_record` and `session` are created by 001 — measured, not assumed, and
+-- pinned behaviourally in [2ab].
 --
 -- SCOPE — WHAT THIS MIGRATION DELIBERATELY DOES NOT DO:
 --

@@ -2295,5 +2295,30 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   }
 }
 
+// --- OW-006: the bodyweight fatigue branch is DEAD, and this is the tripwire ---
+// blockGenerator computes bodyweightDominant from the whole movement catalogue,
+// not the block's slots, so it is always false in production and the branch
+// never evaluates. That is harmless ONLY because both branches resolve to the
+// same table. This pins that alias deliberately, as a signpost rather than a
+// contract: if it ever fails, a real bodyweight coefficient has been ratified
+// (OW-026) and blockGenerator's reachability must be fixed in the SAME change,
+// or the ratified numbers will sit in code that cannot be reached.
+{
+  const { schemaFatigueCost } = require('./.build/blockGenerator.js');
+  const schemas = Object.keys(SCHEMA_FATIGUE_COST);
+  const phases = Object.keys(SCHEMA_FATIGUE_COST[schemas[0]]);
+  const divergent = [];
+  for (const schema of schemas) {
+    for (const phase of phases) {
+      const loaded = schemaFatigueCost(schema, phase, false);
+      const bodyweight = schemaFatigueCost(schema, phase, true);
+      if (loaded !== bodyweight) divergent.push(`${schema}/${phase}: ${loaded} vs ${bodyweight}`);
+    }
+  }
+  check('[OW-006] no bodyweight fatigue coefficient is ratified yet - if this FAILS, OW-026 landed and bodyweightDominant must be made reachable in the same change',
+    divergent.length === 0 && schemas.length > 0 && phases.length > 0,
+    divergent.join('; ') || `${schemas.length} schemas x ${phases.length} phases identical`);
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

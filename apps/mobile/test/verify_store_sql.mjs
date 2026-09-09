@@ -44,14 +44,18 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '054_contract_cutoff_provenance.sql',
   '055_return_checkin_ack.sql',
   '056_movement_taxonomy_backfill.sql',
-  // NOTE: 057_block_meta_phase_invariant.sql is deliberately absent here and
-  // was already absent before 058 — this list predates it. 058 does not
-  // depend on 057, so it is added on its own; closing the 057 gap is a
-  // separate change with its own blast radius.
+  // 057 closes OW-011. It was deliberately absent while 058 was added, because
+  // it installs fail-closed block_meta triggers requiring macro_phase to match
+  // macro_block_index on every INSERT and UPDATE — so any seed in this file that
+  // planted a mismatched pair would start aborting. That is exactly why it
+  // belongs here: the store writes block_meta, and without 057 this verifier
+  // could not have caught a phase/index drift the real device would reject.
+  '057_block_meta_phase_invariant.sql',
   '058_suspension_episode.sql',
   // 059 adds suspension_episode_program, block_suspension_origin and
-  // planned_slot_load_intent, which the store now reads and writes. 057 stays
-  // deliberately absent (see the note above); 059 does not depend on it.
+  // planned_slot_load_intent, which the store now reads and writes. It does not
+  // depend on 057, which is why 058 and 059 could be added while 057 was still
+  // absent; 057 is present above now that OW-011 closed that gap.
   '059_suspension_state_and_load_intent.sql',
   // 062 closes the 059 side-car mutation surface. It is included because the
   // reset probe below EXECUTES the store's exact delete sequence: with 062
@@ -750,6 +754,27 @@ a('the unbounded e1RM store getter is not reintroduced without a ratified window
 // --- resetTrainingData: EXECUTE the store's wipe on seeded data -----------------
 // Proves the reset clears ALL history (so the demo can re-load) while KEEPING the
 // athlete_profile + movement library (the user's settings survive).
+// --- OW-011: 057 is in the chain, and it is actually ENFORCING ------------------
+// Adding the file to SCHEMA_FILES would be cosmetic if nothing proved the
+// triggers are live. The store writes block_meta on every generated block, so
+// this verifier must reject the exact phase/index drift the device rejects.
+{
+  const phaseOf = (i) => (i <= 2 ? 'gpp' : i <= 4 ? 'hypertrophy' : i <= 6 ? 'volume' : 'peak');
+  const refusedHere = (sql) => { try { db.exec(sql); return false; } catch { return true; } };
+  db.exec("INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms) VALUES (911, '2030-06-01', 'strength', 4, 'archived', 1)");
+  a('057 in chain: a matched block_meta pair is accepted',
+    !refusedHere(`INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (911, 3, '${phaseOf(3)}', 'WAVE', 0)`));
+  // The captured field row was (macro_block_index=3, macro_phase='volume'); the
+  // production mapping requires index 3 -> hypertrophy.
+  db.exec("INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms) VALUES (912, '2030-06-01', 'strength', 4, 'archived', 1)");
+  a('057 in chain: the captured drift (index 3, volume) is REFUSED on insert',
+    refusedHere("INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (912, 3, 'volume', 'WAVE', 0)"));
+  a('057 in chain: drifting an existing row by UPDATE is REFUSED',
+    refusedHere("UPDATE block_meta SET macro_phase = 'volume' WHERE block_id = 911"));
+  db.exec('DELETE FROM block_meta WHERE block_id IN (911, 912)');
+  db.exec('DELETE FROM training_block WHERE block_id IN (911, 912)');
+}
+
 console.log('[resetTrainingData — executed against seeded rows]');
 const resetBody = (() => {
   const i = src.indexOf('resetTrainingData: () => {');

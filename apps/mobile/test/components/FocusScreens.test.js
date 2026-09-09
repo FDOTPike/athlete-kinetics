@@ -649,3 +649,53 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
   });
 });
+
+// ---------------------------------------------------------------------------
+// OW-007 — the resume path's error surface (audit Finding 5)
+//
+// Two independent reasons a failed resume told the athlete nothing: the press
+// handler called endSuspension bare, with no try/catch, and the only
+// suspension-error node was mounted in the NOT-suspended branch — the one state
+// in which the resume button does not exist. Both are asserted here.
+// ---------------------------------------------------------------------------
+
+const OPEN_EPISODE = { episode_id: 4, started_at_ms: 1_756_000_000_000, ended_at_ms: null, reason: 'injury', frozen_macro_index: 3 };
+
+test('OW-007 a failed resume surfaces an action-scoped message on the suspended card', () => {
+  const endSuspension = jest.fn(() => { throw new Error('database is locked'); });
+  mockState = baseState({ suspension: OPEN_EPISODE, endSuspension });
+  render(<BlockScreen />);
+
+  // Precondition: we are on the suspended card, so the pause controls (and the
+  // error node that used to live only beside them) are not mounted at all.
+  expect(screen.getByTestId('suspension-resume')).toBeOnTheScreen();
+  expect(screen.queryByTestId('suspension-begin-injury')).toBeNull();
+  expect(screen.queryByTestId('suspension-error')).toBeNull();
+
+  fireEvent.press(screen.getByTestId('suspension-resume'));
+
+  expect(endSuspension).toHaveBeenCalledTimes(1);
+  // Before the fix this threw out of the handler and nothing rendered.
+  expect(screen.getByTestId('suspension-error')).toHaveTextContent('database is locked');
+  // The card itself is unchanged, which is correct: the episode is still open.
+  expect(screen.getByTestId('suspension-resume')).toBeOnTheScreen();
+});
+
+test('OW-007 a successful resume shows no error and leaves the global channel alone', () => {
+  const endSuspension = jest.fn();
+  mockState = baseState({ suspension: OPEN_EPISODE, endSuspension });
+  render(<BlockScreen />);
+
+  fireEvent.press(screen.getByTestId('suspension-resume'));
+
+  expect(endSuspension).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId('suspension-error')).toBeNull();
+});
+
+test('OW-007 the resume error is action-scoped: an unrelated store error does not populate it', () => {
+  mockState = baseState({ suspension: OPEN_EPISODE, error: 'some unrelated store failure', endSuspension: jest.fn() });
+  render(<BlockScreen />);
+
+  // The global error channel must never read as a refusal of this control.
+  expect(screen.queryByTestId('suspension-error')).toBeNull();
+});
