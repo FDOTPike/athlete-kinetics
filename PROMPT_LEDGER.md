@@ -6826,3 +6826,39 @@ an empty inventory can perform Bodyweight and nothing else.
 **Not done.** PR #11 not merged. Nothing pushed to `master`, no tag, no release.
 OW-006 not started, OW-026 not decided, no fatigue coefficient or athlete dose
 changed, migrations 059-063 unmodified.
+
+---
+
+## Entry 0103 — 2026-09-09 · Owner ruling: Free Weight mapping stands; merge PR #11
+
+### Input G(x)
+
+```
+Keep Free Weight as-is and merge PR #11.
+```
+
+### Output F(G(x))
+
+**Owner ruling, recorded because it settles a question Entry 0102 deliberately
+left open.** `Free Weight` keeps the PERMISSIVE mapping introduced with the
+implement-to-equipment resolver: `{ kind: 'anyOf', items: ['barbell',
+'dumbbells', 'kettlebell'] }` — owning any one loadable free weight satisfies it.
+
+This was the single interpretive call in that resolver and the only part of it
+not derivable from the canonical vocabularies, which is why it was flagged rather
+than settled quietly. It is now ratified rather than assumed. Its practical reach
+today is nil: `Free Weight` appears in the `supported_prefixes` of NO
+multi-implement movement in the shipped 300-movement corpus, so no athlete's
+options or dose change either way. It becomes live only if a future library
+correction puts `Free Weight` on a movement that also offers another implement.
+
+Unchanged by this ruling: `Earthquake Bar` and `Chains` remain `unverifiable`,
+because no `EQUIPMENT_ITEMS` entry represents them and ownership therefore cannot
+be confirmed. Callers still fail closed on both.
+
+**PR #11 merged** into `codex/rpe-familiarisation`. Completes OW-001, the last
+State C implementation item, and carries with it the stacked-PR audit (Entry
+0101) and the reviewer P1 remediation (Entry 0102).
+
+State C now has NO open executor work. `OW-006` reachability remains, gated on
+`OW-026`, and is dose-neutral.
