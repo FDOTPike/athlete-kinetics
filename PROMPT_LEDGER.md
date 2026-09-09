@@ -6827,6 +6827,24 @@ an empty inventory can perform Bodyweight and nothing else.
 OW-006 not started, OW-026 not decided, no fatigue coefficient or athlete dose
 changed, migrations 059-063 unmodified.
 
+> **CORRECTION appended 2026-09-09 (Entry 0104).** The figure "**15 of the 17**
+> multi-implement movements" stated above is WRONG. Gemini 3.8's round-1
+> independent audit refuted it (finding F2) and re-derivation from the shipped
+> corpus confirms **17 of 17** — the divergence is total, not occasional. The two
+> missed were `Chin-up` and `Weighted Pull-up`, which require `pullup_bar` yet
+> offer `Banded`, and `Banded` requires `bands`.
+>
+> WHY the original said 15 is NOT established. The reviewer proposed that
+> `Banded` had not been treated as equipment-requiring; mutating the resolver
+> that way yields **12 of 17**, not 15, so that explanation does not hold. The
+> original script is gone and the figure is not reconstructible, so no cause is
+> recorded rather than a plausible one invented.
+>
+> The number is no longer prose. It is derived from the live corpus by the
+> `[F2-corpus]` gate in `verify_blocks.mjs` (commit `9ecc5a8`). The original text
+> above is left exactly as written: this ledger records what was claimed at the
+> time, and corrections are appended, never substituted.
+
 ---
 
 ## Entry 0103 — 2026-09-09 · Owner ruling: Free Weight mapping stands; merge PR #11
@@ -6877,4 +6895,74 @@ The State C data integrity stack is verified and ready for review close-out. Pro
 
 ### Output F(G(x))
 
-_pending_
+**Round-1 audit closed out. The reviewer was right about the number, and wrong
+about why.**
+
+**Audit quality first, because it determines what the verdict is worth.** Gemini
+built its own worktree at the correct candidate SHA with a real `npm ci`,
+reproduced every gate rather than quoting mine, mutated five gates and confirmed
+all five bit, and probed SQLite's cascade/trigger behaviour directly instead of
+taking my premise on trust. It also located the 026 retraction more precisely
+than I had: `fbbd9a3`, not `6e132db`. Eight of nine claims CONFIRMED.
+
+**F2 — UPHELD. The corpus figure was wrong in shipped source.** "15 of the 17
+multi-implement movements" is **17 of 17**: the divergence is total, not
+occasional. The two I missed are `Chin-up` and `Weighted Pull-up`, which require
+`pullup_bar` yet offer `Banded`, and `Banded` needs `bands`.
+
+The reviewer graded this "Minor / Documentation". That understates it. The number
+was not only in the ledger — it was the comment in `types.ts` justifying why
+`IMPLEMENT_REQUIREMENT` exists at all. A justification nobody recomputes is a
+claim, not evidence, so the figure is now DERIVED from the live corpus by a
+`[F2-corpus]` gate instead of asserted in prose.
+
+**But the reviewer's root cause does not survive.** It proposed I had not treated
+`Banded` as equipment-requiring. Mutating the resolver that way yields **12 of
+17**, not 15 — five corpus movements depend on `Banded`, not two. The original
+script is gone and the figure is not reconstructible, so **no cause is recorded**.
+Adopting a tidy story I could not verify would repeat the exact error being
+corrected.
+
+**A trap found while fixing it.** The gate could not use `verify_blocks.mjs`'s
+module-level `db`: it applies migrations **001-015 only** and holds the old
+010-era library. Migration 049 narrows several `supported_prefixes` lists, so the
+truncated database reports **19 multi-implement movements across 30**, where the
+shipped corpus has **17 across 300**. My first version of the gate measured the
+wrong corpus and would have enshrined 19. It now builds its own full-chain
+database and pins `rows.length === 300`.
+
+**F1 — UPHELD, and it is the finding of the round.** `loadSelection.ts:123` gates
+1RM-derived target load on `!bodyweightMode`, so an athlete who declares DB for a
+movement whose element zero is `Bodyweight` receives no computed target load at
+all — not merely a wrong input label. I had characterised O1 as presentation and
+attribution; the reviewer went a layer deeper and was right. Recorded as
+`OW-037`, deferred to the active session runner work order by owner direction.
+
+**F3 — REFUTED.** It reports that the prompt cited
+`packages/inference/src/seed/movementLibrary.ts`. `grep -rn "seed/movementLibrary"`
+returns **zero hits** repo-wide, and the prompt does not name that path. The
+citation being criticised exists in neither. Recorded as refuted so a later round
+does not rediscover it as open.
+
+**`OW-017` CLOSED as latent, not fixed.** The per-prefix-equipment design it was
+waiting for landed in PR #11. Measured: **0 of 235** sole-prefix loaded movements
+can be planned with an implement their own `movement_equipment` rows omit, so the
+condition is not reachable today. The code hole is real —
+`plannedImplementFor`'s sole-prefix fallback does not consult
+`implementAvailable` — so it is closed as latent and held closed by a gate that
+fails if a library correction opens it.
+
+**Mutations - 3 applied, 3 caught.**
+
+| Mutation | Gate | Result |
+|---|---|---|
+| `Banded` requires nothing | `[F2-corpus]` | CAUGHT [12 of 17] |
+| `DB` resolves to `boards` | `[OW-017]` | CAUGHT [67 movements] |
+| gate reads the truncated 001-015 chain | `[F2-corpus]` | CAUGHT [30 movements, 19 of 19] |
+
+**Not done.** Nothing merged, nothing pushed to `master`, no tag, no release. No
+migration written. `OW-006` not started, `OW-026` not decided, no fatigue
+coefficient or athlete dose changed, migrations 059-063 unmodified. `OW-037`
+measured and recorded but deliberately NOT remediated - it moves recorded
+`set_prefix` and therefore Effective volume, which is an owner ruling. Still open
+from the approved plan: `OW-008` and the six document-only corrections.
