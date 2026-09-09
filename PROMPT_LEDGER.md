@@ -6425,3 +6425,133 @@ that are owner decisions rather than executor work.
 becomes immutable once its slot has been trained is left open until `OW-001`
 lands, on the grounds that nothing writes it twice today so there is no live
 defect, and the right answer depends on the selection UI actually chosen.
+
+---
+
+## Entry 0100 — 2026-09-09 · OW-001: athlete-facing prospective load-intent selection
+
+### Input G(x)
+
+```
+OWNER DECISION CONFIRMATION
+
+The existing C1 owner ratification remains in force:
+
+S1a S2a S3a S4a S5c S6b
+L1a(constrained) L2b M1a A1a
+
+Do not reopen or reinterpret these rulings. Implement remaining work against the binding content in RELEASE_CANDIDATE_C1_DOCKET.md §6. In particular, complete OW-001 as an athlete-facing prospective per-slot implement/load-intent selection without deriving intent from dropdown order, taxonomy, equipment ownership, or retrospective set data.
+```
+
+Followed by the owner's answer to the one design fork the ratified text does not
+resolve — where the athlete declares:
+
+```
+Q: OW-001's selection surface. A declaration changes which movement the ranker
+   picks (isStrictlyBodyweight orders the loaded/anchor pools), not just that
+   slot's dose — so a post-generation per-slot editor can replace the very slot
+   being edited, and makes a block irreproducible from its inputs (determinism
+   law [1]) unless it regenerates. Where should the athlete declare?
+A: Before generation, per movement (Recommended) — The athlete declares
+   loaded-vs-bodyweight for the 17 ambiguous movements once (gated to ones they
+   can actually train, so typically far fewer). Generation then writes the
+   declaration into planned_slot_load_intent per slot. Matches 'prospective ...
+   at block generation' exactly, feeds ranking and dose consistently, stays
+   deterministic, no circularity. The per-slot ROW is still written as L1(a)
+   requires; the choice itself is per movement.
+```
+
+### Output F(G(x))
+
+Branch `claude/ow-001-athlete-load-intent-selection` (PR #11), stacked on PR #10.
+Commits `e44140c` and the test-strengthening follow-up. **OW-001 CLOSED** — the
+last open State C implementation item.
+
+**The gap.** 059 gave the per-slot RECORD and the fail-closed read. It never gave
+the athlete a way to declare anything: the store wrote a row only when a movement
+had exactly ONE supported prefix, so the 17 genuinely ambiguous movements on the
+shipped 300-movement corpus (7 of them listed Bodyweight-first) were permanently
+undeclared and permanently routed as loaded. L1(a)'s "ambiguous mixed movements
+require athlete selection" had no implementation at all.
+
+**Migration 063, array index 61, `user_version` 62.** `movement_load_intent` —
+one row per movement the athlete has declared, plus two triggers refusing a
+declaration that names an implement the movement does not support. Appended;
+059, 061 and 062 untouched. No threshold, coefficient, dose or default enters
+the engine.
+
+**Why the declaration is per movement while the record stays per slot.** Owner-
+selected from the one fork the ratified text does not resolve, and the constraint
+is in the engine rather than in taste: `isStrictlyBodyweight` orders the loaded
+and anchor pools in `movementRanking`, so a declaration changes WHICH movement
+the ranker picks, not merely how a slot is dosed. A post-generation per-slot
+editor could therefore replace the very slot being edited, and would make a block
+irreproducible from its recorded inputs. Slots also do not exist before
+generation, so a literal per-slot choice has nothing to attach to at the only
+moment the ruling names. The athlete declares per movement, before generation;
+generation resolves that into the per-slot row. Both halves of L1(a) hold.
+
+A consequence worth recording: `planned_slot_load_intent` is now written exactly
+once per slot and never revised, because revision happens in 063 and reaches only
+FUTURE blocks. Changing your mind never rewrites what you already trained — which
+is why the deferred owner question about freezing `planned_implement` once its
+slot is trained stays deferred without blocking anything. A test asserts the
+prospectiveness directly.
+
+**Nothing prohibited is used.** The sole-supported-prefix rule is untouched and
+applies only where there is no choice to make, so element zero of a multi-member
+list is still never taken; `movement_taxonomy` is not read; equipment ownership
+still declares nothing (the equipment filter decides which movements are
+OFFERED, never what the answer is); `set_record` and `set_prefix` are not read,
+and a declaration is written before the training it describes. An undeclared
+ambiguous movement stays undeclared and fails closed to the loaded path.
+
+**Surface.** A `HOW YOU LOAD THESE` section in `ProfileScreen`, beside the
+existing load selection, listing only movements that genuinely have a choice —
+each with its supported implements plus `NOT SET`. Copy states that anything left
+unset is planned as the loaded version and that the choice applies to future
+blocks only. Deviation to note: the owner's chosen option said "gated to ones
+they can actually train"; this lists all ambiguous movements in the library
+rather than filtering by current equipment or tier, because over-showing is
+conservative — it can never hide a choice — while a gate could silently withhold
+one. Cheap to add later if wanted.
+
+**Applied the rule from Entry 0098.** 063's two triggers name `movement_detail`
+(010, chain position 10), which a self-heal replay recreates long before the
+earliest `ALTER TABLE ... RENAME` at position 48, so neither belongs on
+`REPLAY_BLOCKING_TRIGGERS`. Stated in the migration header and in the runner.
+
+**Coverage.** 8 store/engine tests against the real chain
+(`LoadIntentDeclaration.test.js`): the corpus really carries ambiguous movements
+and they start undeclared; a declaration is recorded, reflected and withdrawable;
+a declaration routes the generated slot while undeclared movements still fail
+closed and unambiguous ones are unaffected; a declaration is PROSPECTIVE and
+rewrites nothing already planned; all three refusals; and declarations survive a
+training-data reset like every other preference. Plus 27 migration checks
+(`[2ac]`): fresh install declaring nothing, upgrade preserving unrelated
+preferences and declaring nothing retroactively, both trigger refusals, the
+vocabulary CHECK, the stamp CHECK, cascade with the movement, replay, per-trigger
+and table self-heal, array index.
+
+**Mutation testing — 5 mutations, 5 caught, 0 escaped (after a fix).**
+
+| Mutation | Gate | Result |
+|---|---|---|
+| the declaration is ignored (pre-OW-001 behaviour) | `LoadIntentDeclaration` | CAUGHT |
+| take element zero of the dropdown (the prohibited derivation) | `LoadIntentDeclaration` | CAUGHT |
+| store-side supported-implement guard removed | `LoadIntentDeclaration` | **ESCAPED, then CAUGHT** |
+| 063's INSERT pairing trigger removed | `verify:migrations` | CAUGHT |
+| a movement with nothing to choose becomes declarable | `LoadIntentDeclaration` | CAUGHT |
+
+The escape was real and is worth recording: both guards return `false`, so
+asserting only the boolean could not tell the store's pre-write rejection apart
+from 063's trigger catching the write. The test now pins the store's
+athlete-readable message, and the mutation is caught.
+
+**Verification.** `verify:ci` exit 0 — **22 suites / 306 tests** (from 21/298),
+`verify:store` **667/667** (from 661), 17 gates `ALL CHECKS PASSED`,
+`git diff --check` clean.
+
+**State C after this.** `OW-001` CLOSED. The only State C item still open is
+`OW-006` reachability, which is gated on `OW-026` — an OWNER_ONLY decision — and
+is dose-neutral. No executor work remains in State C.
