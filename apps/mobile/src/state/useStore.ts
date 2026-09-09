@@ -2079,6 +2079,13 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
   activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
   block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [], pendingAutopilotAdjustments: [],
+  // Suspension is per-athlete DURABLE state living in that athlete's own DB
+  // file, so it belongs here with every other per-athlete surface. boot() ends
+  // with refreshSuspension(), but the window between this set() and that call
+  // is real, and a boot that fails before reaching it leaves the PREVIOUS
+  // athlete resident. Clearing here makes the failure mode "no suspension"
+  // rather than "athlete B wearing athlete A's episode".
+  suspension: null,
   oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), loadPreference: 'auto', loadPreferenceExplicit: false, bandLadder: [], onboarded: true,
 };
 
@@ -6143,6 +6150,24 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM planned_slot');
       d.executeSync('DELETE FROM planned_session');
       d.executeSync('DELETE FROM block_meta');
+      // The OPEN episode, and only it, before its program/block parents.
+      //
+      // Leaving it behind is the defect this line closes: nextMacroPosition
+      // returns the frozen index for as long as an episode is open, so a wipe
+      // that keeps one leaves the athlete pinned at a position whose entire
+      // block history no longer exists, and every block generated afterwards
+      // is minted at that same frozen index. A BLANKET delete cannot be used —
+      // 059's trg_suspension_episode_no_delete_closed_bd aborts on the first
+      // CLOSED row and, inside this single transaction, that abort rolls the
+      // whole reset back. Closed episodes are history; whether a training-data
+      // wipe should keep them is an owner question (M1(a) forbids blocking
+      // whole-athlete erasure, which deletes the DB FILE, not rows), so this
+      // does not answer it.
+      //
+      // Order: before training_program/training_block so the open episode's
+      // 059 side-cars cascade from their OWN episode rather than being carried
+      // off by a program or block parent.
+      d.executeSync('DELETE FROM suspension_episode WHERE ended_at_ms IS NULL');
       d.executeSync('DELETE FROM training_program_movement_preference');
       d.executeSync('DELETE FROM training_program_day');
       d.executeSync('DELETE FROM training_block_program');
@@ -6153,6 +6178,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM micro_cycle');
       d.executeSync('DELETE FROM macro_cycle');
       d.executeSync('DELETE FROM training_block');
+      // The 059 side-cars, AFTER every one of their parents is gone — the same
+      // parent-first rule set_dose_target and session_outcome follow above.
+      // With FKs ON the cascades already emptied both; with FKs OFF this pass
+      // removes the now-parentless rows rather than orphaning them, which
+      // matters more here than elsewhere: training_block reuses rowids once the
+      // table is empty, so a surviving block_suspension_origin row would
+      // attribute a BRAND NEW post-reset block to a deleted episode and hide it
+      // from nextMacroPosition forever. 062 permits exactly this delete and no
+      // more — it refuses one only while a row's parents are still present, so
+      // moving these two lines above their parents fails the reset closed
+      // instead of silently erasing live attribution.
+      d.executeSync('DELETE FROM suspension_episode_program');
+      d.executeSync('DELETE FROM block_suspension_origin');
       d.executeSync('DELETE FROM subjective_report');
       d.executeSync('DELETE FROM niggle');
       d.executeSync('DELETE FROM one_rep_max');
@@ -6183,12 +6221,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       returnCheckin: null,
       block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
       lastEndedSessionId: null,
+      // The open episode was just deleted above; leaving the field set would
+      // keep the UI showing a suspension card the database no longer backs.
+      suspension: null,
     });
     get().refreshVector();
     get().refreshBlock();
     get().refreshProgram();
     get().refreshNiggles();
     get().refreshReturnCheckin();
+    // Re-read from the wiped file rather than trusting the set() above: this is
+    // the same read every other surface here gets, and it is what makes the
+    // in-memory value and the database agree after the wipe.
+    get().refreshSuspension();
     return (had?.c ?? 0) > 0;
   },
 

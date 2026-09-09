@@ -770,6 +770,35 @@ a('reset removes each immutable side-car only after its parent',
     && resetTables.indexOf('set_dose_target') > resetTables.indexOf('set_record')
     && resetTables.indexOf('session') >= 0
     && resetTables.indexOf('session_outcome') > resetTables.indexOf('session'));
+// 062 applies the same rule to the 059 side-cars, and here it is enforced by
+// the database rather than by convention: both are undeletable while a parent
+// survives, so naming either one before training_program / training_block
+// aborts the reset instead of wiping live suspension attribution. With FKs ON
+// the parent cascades have already emptied them and these two statements are
+// no-ops; they exist for the FK-OFF path, where a surviving
+// block_suspension_origin row would attribute a BRAND NEW post-reset block
+// (training_block reuses rowids once emptied) and hide it from
+// nextMacroPosition for good.
+a('reset clears both 059 suspension side-cars',
+  ['suspension_episode_program', 'block_suspension_origin'].every((t) => resetTables.includes(t)),
+  resetTables.filter((t) => t.startsWith('suspension_') || t.startsWith('block_susp')).join(',') || 'neither named');
+a('reset clears the 059 side-cars only AFTER training_program and training_block',
+  resetTables.indexOf('training_program') >= 0
+    && resetTables.indexOf('training_block') >= 0
+    && resetTables.indexOf('suspension_episode_program') > resetTables.indexOf('training_program')
+    && resetTables.indexOf('block_suspension_origin') > resetTables.indexOf('training_block'));
+// The open episode is deleted CONDITIONALLY (059 refuses a closed one, and that
+// abort would roll the whole reset back), so it never appears in resetTables —
+// which is why it is asserted against the body text instead.
+a('reset deletes the OPEN suspension episode, and only the open one',
+  /DELETE FROM suspension_episode WHERE ended_at_ms IS NULL/.test(resetBody)
+    && !/DELETE FROM suspension_episode'/.test(resetBody));
+a('the open-episode delete precedes training_program and training_block',
+  resetBody.indexOf('DELETE FROM suspension_episode WHERE') >= 0
+    && resetBody.indexOf('DELETE FROM suspension_episode WHERE') < resetBody.indexOf("DELETE FROM training_program'")
+    && resetBody.indexOf('DELETE FROM suspension_episode WHERE') < resetBody.indexOf("DELETE FROM training_block'"));
+a('reset re-reads suspension into memory after the wipe',
+  /refreshSuspension\(\)/.test(resetBody));
 if (resetTables.length >= 15) {
   const MAT = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8').replace(/^--.*$/gm, '');
   db.exec('BEGIN');
