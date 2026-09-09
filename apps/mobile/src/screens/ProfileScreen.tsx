@@ -20,6 +20,7 @@ import {
   SPECIALIST_EQUIPMENT_ITEMS,
   EQUIPMENT_PRESETS,
   HISTORY_IMPORT_AI_PROMPT,
+  implementAvailable,
   HISTORY_IMPORT_EXAMPLE,
   OBJECTIVES,
   parseHistoryImport,
@@ -211,9 +212,20 @@ export default function ProfileScreen(): React.JSX.Element {
           .filter((v) => v.state === 'available')
           .map((v) => v.movementId),
       );
+      // A movement's own equipment requirement gates the MOVEMENT, never the
+      // implement, and the two diverge constantly: Walking Lunge requires
+      // nothing yet offers BB, Overhead Press requires a barbell yet offers KB.
+      // So each option is filtered by what the athlete can actually equip, and
+      // a movement is only worth showing when at least two options survive —
+      // otherwise there is nothing left to choose between.
       return movements
-        .filter((m) => m.supportedPrefixes.length > 1 && available.has(m.movement_id))
-        .slice()
+        .filter((m) => available.has(m.movement_id))
+        .map((m) => ({
+          ...m,
+          offerablePrefixes: m.supportedPrefixes
+            .filter((p) => implementAvailable(p, profile.equipment_inventory)),
+        }))
+        .filter((m) => m.offerablePrefixes.length > 1)
         .sort((a, b) => a.name.localeCompare(b.name));
     },
     [movements, getMovementAvailabilityVerdicts, movementAvailabilityRevision, niggles, profile],
@@ -613,7 +625,7 @@ export default function ProfileScreen(): React.JSX.Element {
             <View key={m.movement_id} testID={`load-intent-row-${m.movement_id}`}>
               <Text style={[styles.fieldLabel, styles.preferenceLabel]}>{m.name.toUpperCase()}</Text>
               <View style={styles.chipWrap}>
-                {m.supportedPrefixes.map((prefix) => (
+                {m.offerablePrefixes.map((prefix) => (
                   <Chip
                     key={prefix}
                     testID={`load-intent-${m.movement_id}-${prefix}`}

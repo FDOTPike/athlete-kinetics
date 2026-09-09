@@ -305,3 +305,122 @@ test('a failed save whose ROLLBACK also fails still returns false, never throws'
   expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
   expect(declarations()).toHaveLength(1);
 });
+
+// ---------------------------------------------------------------------------
+// P1 (reviewer) — a declaration may never commit the athlete to equipment they
+// do not own. A movement equipment requirement gates the MOVEMENT, never the
+// implement, and the two diverge constantly: on the shipped corpus 15 of the 17
+// multi-implement movements offer at least one implement their base requirement
+// never implies. Walking Lunge requires NOTHING and offers Bodyweight/DB/BB.
+// ---------------------------------------------------------------------------
+
+const MINIMAL = [];
+const HOME = ['dumbbells', 'bands', 'mats'];
+const FULL_GYM = ['barbell', 'squat_rack', 'bench', 'dumbbells', 'kettlebell',
+  'pullup_bar', 'nordic_bench', 'bands', 'cable_machine', 'mats'];
+
+const setInventory = (items) => {
+  store().saveProfile({ equipment_inventory: items });
+  expect(store().error).toBeNull();
+};
+const walkingLunge = () => store().movements.find((m) => m.name === 'Walking Lunge');
+
+const intentRowsFor = (movementId) => raw().prepare(`
+  SELECT li.planned_implement AS declared
+    FROM planned_slot ps
+    LEFT JOIN planned_slot_load_intent li ON li.planned_slot_id = ps.planned_slot_id
+   WHERE ps.movement_id = ?
+`).all(movementId);
+
+test('P1 Walking Lunge really is the counterexample: no equipment required, three implements', async () => {
+  await bootRealStore();
+  const wl = walkingLunge();
+  expect(wl).toBeDefined();
+  expect(wl.supportedPrefixes).toEqual(['Bodyweight', 'DB', 'BB']);
+  const required = raw().prepare('SELECT item FROM movement_equipment WHERE movement_id = ?').all(wl.movement_id);
+  // The movement-level gate can never constrain the implement here.
+  expect(required).toHaveLength(0);
+});
+
+test('P1 minimal inventory: the store refuses DB and BB, and still accepts Bodyweight', async () => {
+  await bootRealStore();
+  setInventory(MINIMAL);
+  const wl = walkingLunge();
+
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'BB')).toBe(false);
+  expect(store().error).toBe('You have not told the coach you own the equipment for that option.');
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'DB')).toBe(false);
+  expect(declarations()).toHaveLength(0);
+
+  // Bodyweight needs nothing, so it stays available to everyone.
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'Bodyweight')).toBe(true);
+  expect(store().loadIntents[wl.movement_id]).toBe('Bodyweight');
+});
+
+test('P1 home inventory: dumbbells accepted, barbell still refused', async () => {
+  await bootRealStore();
+  setInventory(HOME);
+  const wl = walkingLunge();
+
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'DB')).toBe(true);
+  expect(store().loadIntents[wl.movement_id]).toBe('DB');
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'BB')).toBe(false);
+  // The refused choice did not overwrite the good one.
+  expect(store().loadIntents[wl.movement_id]).toBe('DB');
+});
+
+test('P1 full gym: every supported implement is accepted', async () => {
+  await bootRealStore();
+  setInventory(FULL_GYM);
+  const wl = walkingLunge();
+  for (const prefix of wl.supportedPrefixes) {
+    expect(store().saveMovementLoadIntent(wl.movement_id, prefix)).toBe(true);
+    expect(store().loadIntents[wl.movement_id]).toBe(prefix);
+  }
+});
+
+test('P1 GENERATION never plans an implement the athlete no longer owns', async () => {
+  await bootRealStore();
+  setInventory(FULL_GYM);
+  const wl = walkingLunge();
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'BB')).toBe(true);
+
+  // The athlete sells the barbell. The declaration is now stale, and nothing
+  // rewrites it -- declarations are durable and prospective. The generation
+  // boundary is what must refuse to honour it.
+  setInventory(HOME);
+  expect(store().loadIntents[wl.movement_id]).toBe('BB');
+
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+
+  // Any Walking Lunge slot must be UNDECLARED, not barbell: dropping to
+  // undeclared fails closed to the conservative loaded path rather than
+  // asserting a tool the athlete does not have.
+  for (const row of intentRowsFor(wl.movement_id)) expect(row.declared).toBeNull();
+
+  // And no slot anywhere carries an implement this athlete cannot equip.
+  const planned = raw().prepare(`
+    SELECT m.name, li.planned_implement AS declared
+      FROM planned_slot ps
+      JOIN movement m ON m.movement_id = ps.movement_id
+      JOIN planned_slot_load_intent li ON li.planned_slot_id = ps.planned_slot_id
+  `).all();
+  const ownable = new Set(['Bodyweight', 'DB', 'Banded']); // what HOME can equip
+  for (const row of planned) expect(ownable.has(row.declared)).toBe(true);
+});
+
+test('P1 with the equipment present, generation DOES honour the declaration', async () => {
+  await bootRealStore();
+  setInventory(FULL_GYM);
+  const wl = walkingLunge();
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'BB')).toBe(true);
+
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+
+  // Not a vacuous mirror of the test above: when the barbell IS owned the same
+  // declaration reaches the slot.
+  const rows = intentRowsFor(wl.movement_id);
+  for (const row of rows) expect(row.declared).toBe('BB');
+});

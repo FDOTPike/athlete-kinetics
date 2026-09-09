@@ -127,6 +127,8 @@ import {
   type MacroPhase,
   type MovementPattern,
   type MovementPrefix,
+  type EquipmentItem,
+  implementAvailable,
   type MovementPrefixCondition,
   type MovementPreference,
   type NiggleInput,
@@ -1847,6 +1849,7 @@ const persistSessionOutcome = (
 const plannedImplementFor = (
   m: { movement_id: number; supportedPrefixes: MovementPrefix[] },
   declared: ReadonlyMap<number, MovementPrefix>,
+  inventory: readonly EquipmentItem[],
 ): MovementPrefix | undefined => {
   // OW-001 / L1(a): the athlete's EXPLICIT declaration wins, and it is the only
   // thing that can resolve an ambiguous movement. Re-checked against the
@@ -1855,7 +1858,16 @@ const plannedImplementFor = (
   // to the loaded path — rather than routing on an implement the movement no
   // longer supports.
   const choice = declared.get(m.movement_id);
-  if (choice !== undefined && m.supportedPrefixes.includes(choice)) return choice;
+  // The declaration is honoured only if the athlete can still EQUIP it. A
+  // movement's own equipment requirement gates the movement, never the
+  // implement: Walking Lunge requires nothing yet offers BB, so without this
+  // check a stale or unequippable declaration would have the generator plan a
+  // barbell lunge for someone with no barbell. Dropping to undeclared fails
+  // closed to the conservative loaded path rather than asserting a tool the
+  // athlete does not own.
+  if (choice !== undefined
+    && m.supportedPrefixes.includes(choice)
+    && implementAvailable(choice, inventory)) return choice;
   // No declaration. A SOLE supported implement is not a choice and not dropdown
   // order — there is nothing to choose between — so it stands as the selection.
   // Anything else stays undeclared and fails closed.
@@ -2577,6 +2589,13 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: 'That is not one of the loading options this movement supports.' });
       return false;
     }
+    // Owning the movement is not owning the implement. Refuse a choice the
+    // athlete's inventory cannot perform, so a declaration can never commit
+    // them to equipment they do not have.
+    if (implement !== null && !implementAvailable(implement, get().profile.equipment_inventory)) {
+      set({ error: 'You have not told the coach you own the equipment for that option.' });
+      return false;
+    }
     d.executeSync('BEGIN');
     try {
       if (implement === null) {
@@ -3192,7 +3211,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       scope: m.scope ?? undefined,
       // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
       // order. Ambiguous movements stay undeclared and fail closed to loaded.
-      plannedImplement: plannedImplementFor(m, declaredIntents),
+      plannedImplement: plannedImplementFor(m, declaredIntents, profile.equipment_inventory),
       // L2(b): chain membership and the chain's own bar, as typed inputs.
       progressionGroup: chainInputs.get(m.movement_id)?.group,
       chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
@@ -3323,7 +3342,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       scope: m.scope ?? undefined,
       // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
       // order. Ambiguous movements stay undeclared and fail closed to loaded.
-      plannedImplement: plannedImplementFor(m, declaredIntents),
+      plannedImplement: plannedImplementFor(m, declaredIntents, profile.equipment_inventory),
       // L2(b): chain membership and the chain's own bar, as typed inputs.
       progressionGroup: chainInputs.get(m.movement_id)?.group,
       chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
@@ -3493,7 +3512,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           // when it is actually declared — an absent row means "undeclared" and
           // is read as the conservative loaded path, which is why nothing is
           // written for an ambiguous movement.
-          const slotImplement = movement === undefined ? undefined : plannedImplementFor(movement, declaredIntents);
+          const slotImplement = movement === undefined ? undefined : plannedImplementFor(movement, declaredIntents, profile.equipment_inventory);
           if (slotImplement !== undefined) {
             d.executeSync(
               'INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (?, ?)',
