@@ -5902,3 +5902,360 @@ returned `REJECT … NO SEAL ISSUED` with `[G]` PENDING, and that audit plus the
 C6 physical memory qualification remains mandatory for release, and
 `verify:release` cannot pass while `verify:memory-contract` exits 1 at
 `[A]`/`[D]`. **This merge is branch integration, not release readiness.**
+
+---
+
+## Entry 0097 — 2026-09-09 · Post-merge State C data-integrity remediation
+
+### Input G(x)
+
+```
+# Opus Work Order — Post-Merge State C Data-Integrity Remediation
+
+Effort: HIGH
+Decision scope: implementation and draft PR only
+Do not merge to master, release, tag, publish, or modify existing dirty worktrees.
+
+## Verified starting state
+
+PR #8 has been merged into codex/rpe-familiarisation.
+
+Merge commit:
+3ec532d6082e4ad96470c413a3365dc7f531a765
+
+The existing worktree below is dirty and must remain completely untouched:
+
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
+
+Do not pull, switch, stash, reset, clean, commit, or write anything in that
+worktree. Its 16 modified/untracked files are preserved W8 work.
+
+## W0 — Establish an isolated workspace
+
+From the repository root, verify:
+
+- origin/codex/rpe-familiarisation resolves to 3ec532d.
+- PR #8 is merged.
+- The proposed worktree and branch do not already exist.
+
+Create:
+
+Worktree:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\state-c-data-integrity-remediation
+
+Branch:
+claude/state-c-data-integrity-remediation
+
+Base it directly on origin/codex/rpe-familiarisation.
+
+Append this complete work order to PROMPT_LEDGER.md as the first repository
+write. Follow the repository's append-only ledger rules.
+
+## W1 — Verify the merged baseline
+
+Run the complete verify:ci suite against the exact merge commit before changing
+product code.
+
+The GitHub merge commit currently has no independent post-merge check run.
+Record the baseline command, exit code, gate totals, test totals and HEAD.
+
+If the clean baseline fails, stop and report the failure without beginning the
+remediation.
+
+## W2 — Fix suspension state across reset and athlete switching
+
+Verify the Entry 0029 finding against current code before editing.
+
+Required behaviour:
+
+1. resetTrainingData must remove/reset the applicable suspension state and must
+   not leave the in-memory athlete marked as suspended.
+2. Database cleanup must use a foreign-key-safe order.
+3. Switching athletes must immediately clear the previous athlete's suspension
+   from memory and then load the selected athlete's actual suspension state.
+4. Returning to the original athlete must restore only that athlete's legitimate
+   persisted state.
+5. A reset followed by block generation must not remain frozen because of stale
+   suspension state.
+
+Add focused tests covering:
+
+- Suspended athlete -> confirmed training-data reset.
+- Suspended athlete A -> unsuspended athlete B.
+- Athlete A -> B -> A.
+- Reset followed by program/block progression.
+- Database state and in-memory state agree after every operation.
+
+Tests must exercise the real store path and fail against the pre-fix code.
+
+## W3 — Complete Migration 059 immutability with a new migration
+
+Do not edit shipped migrations 059 or 061.
+
+Inspect Migration 059, its decision documents, runtime writers and existing
+tests to determine the exact intended immutable-table contract.
+
+Use the next append-only migration after verifying the live migration tail
+(expected filename number: 062).
+
+At minimum, close the verified gaps:
+
+- suspension_episode_program currently permits DELETE.
+- block_suspension_origin has no immutability triggers.
+- planned_slot_load_intent has no immutability triggers.
+
+Apply only the UPDATE/DELETE protections supported by the documented contract.
+Do not prohibit INSERT unless the source contract explicitly requires it.
+
+Required migration verification:
+
+- Fresh installation.
+- Upgrade from the currently shipped pre-062 state.
+- UPDATE rejection for every table covered by the immutable contract.
+- DELETE rejection for every table covered by the immutable contract.
+- Legitimate INSERT behaviour remains available where required.
+- Failed prohibited operations preserve the original rows.
+- Idempotent/self-heal behaviour.
+- Correct migration-array index and user_version behaviour.
+- Existing relaxed-034 and strict-034 upgrade fixtures remain green.
+
+Mutation-test the new gates by temporarily removing each protection and proving
+that its corresponding test fails. Restore exact intended files afterward.
+
+## W4 — Verification
+
+Run:
+
+- Focused store/reset tests.
+- Focused migration tests.
+- Typecheck.
+- verify:store.
+- verify:migrations.
+- verify:components.
+- Full verify:ci.
+- git diff --check.
+
+Inspect the complete output; do not treat an exit code alone as evidence.
+Separate expected negative-control FAIL lines from real failures.
+
+## W5 — Commit and draft PR
+
+Keep the work in reviewable commits:
+
+1. Suspension reset and athlete-switch correction with tests.
+2. Append-only immutability migration with tests.
+3. Ledger/handover documentation.
+
+Push claude/state-c-data-integrity-remediation and open a DRAFT PR into:
+
+codex/rpe-familiarisation
+
+Do not merge it.
+
+Do not modify or close PR #6 during this work order.
+
+## Stop conditions
+
+Stop without implementation if:
+
+- The base is not exactly the expected PR #8 merge lineage.
+- The clean baseline fails.
+- Source documents disagree materially about whether one of the affected tables
+  is immutable.
+- Correcting the reset requires deleting athlete data outside the documented
+  training-reset boundary.
+- Existing dirty worktree files would need to be touched.
+
+## Final handback
+
+Return:
+
+- Starting and ending commit hashes.
+- Worktree and branch.
+- Exact changed files.
+- Root cause and fix for each P1.
+- Migration number and array index.
+- Mutation-test results.
+- Full verification totals.
+- Draft PR URL.
+- Remaining blockers.
+
+Use these final verdict lines:
+
+POST-MERGE BASELINE: PASS | FAIL
+SUSPENSION RESET P1: RESOLVED | OPEN
+MIGRATION 059 IMMUTABILITY P1: RESOLVED | OPEN
+PER-SLOT IMPLEMENT P1: NOT STARTED
+W8 QUALIFICATION: NOT STARTED
+MASTER / RELEASE: NOT AUTHORIZED
+```
+
+### Output F(G(x))
+
+**Worktree** `.worktrees/state-c-data-integrity-remediation`, **branch**
+`claude/state-c-data-integrity-remediation`, based directly on
+`origin/codex/rpe-familiarisation` = `3ec532d` (the PR #8 merge commit,
+confirmed `MERGED` with that exact `mergeCommit.oid`). The existing dirty
+worktree `.worktrees/rpe-familiarisation` was never written to: no pull,
+switch, stash, reset, clean, commit or file write. It remains at `d363d92`
+with all 16 uncommitted files intact.
+
+**W1 — post-merge baseline, `npm run verify:ci` at `3ec532d`: exit 0.**
+20 jest suites / 284 tests, `verify:store` 645/645, `verify:coach` 14,
+`verify:progression` 17, `verify:runner` 17, `verify:outcomes` 22,
+coaching-content 10, library-v2 5, library-correction 40, and 15 further gates
+reporting `ALL CHECKS PASSED`. The `N QA ARTIFACT CHECK(S) FAILED` lines are
+negative controls inside `tools/test_verify_qa_artifact.mjs`, which feeds
+deliberately broken fixtures to the artifact verifier and asserts rejection;
+the enclosing gate exits 0. This was the merge commit's first independent
+post-merge check run.
+
+**Commit `a67e6d1` — `fix(store): clear suspension state on reset and athlete
+switch`.** Closes audit Finding 2 / `OW-002` on both halves.
+
+- *Root cause (b).* `resetTrainingData`'s 49 `DELETE`s named none of the three
+  suspension tables and its five post-reset refresh calls did not include
+  `refreshSuspension()`. Because `nextMacroPosition` short-circuits to the
+  frozen index while an episode is open, a wipe left the athlete suspended at a
+  frozen macro index whose entire block history no longer existed, and every
+  block minted afterwards was pinned there — frozen permanently, in the database
+  and in memory.
+- *Fix.* `DELETE FROM suspension_episode WHERE ended_at_ms IS NULL` — the OPEN
+  episode only, placed before the `training_program` / `training_block` deletes
+  so its 059 side-cars cascade from their own episode. A blanket delete is not
+  available: 059's `trg_suspension_episode_no_delete_closed_bd` aborts on the
+  first closed row and, inside the reset's single transaction, rolls the whole
+  wipe back. The side-cars are then cleared after their parents, the same
+  parent-first rule `set_dose_target` and `session_outcome` already follow;
+  with FKs ON those are no-ops, and with FKs OFF they prevent a surviving
+  `block_suspension_origin` row from attributing a brand new post-reset block
+  (`training_block` reuses rowids once emptied) and hiding it from
+  `nextMacroPosition` for good. `suspension: null` in the post-reset `set()`,
+  and `refreshSuspension()` added to the refresh list.
+- *Root cause (a).* `PER_ATHLETE_RESET` cleared every per-athlete surface except
+  `suspension`. `boot()` ends with `refreshSuspension()`, so a completed swap
+  looked correct; the exposure was the interval before that call and any boot
+  that failed first, either of which leaves athlete B wearing athlete A's
+  episode. `suspension: null` added.
+- *Not decided here.* Whether a training-data wipe should keep closed episodes
+  at all is `OW-034`, still `OWNER_ONLY`. Closed episodes survive, and a test
+  asserts it.
+- *Tests.* `apps/mobile/test/components/SuspensionResetAndSwitch.test.js`, 9
+  tests, real store against the real chain, extending the existing harness by
+  keying the DB seam **on file name** so Coach Mode's one-database-per-athlete
+  model is genuinely exercised. Covers: suspended athlete → confirmed reset;
+  only the open episode removed; no 059 side-car rows left; reset then block
+  progression advancing rather than staying frozen; reset mid-program then a
+  real continuation; A(suspended) → B; a failed boot after a switch; A → B → A;
+  and a reset on A leaving B untouched. Every case asserts that memory and the
+  database agree.
+- *Harness defect found and fixed in passing.* `useStore` takes a STATIC
+  `import { loadRegistry, saveRegistry } from './athleteRegistry'`, so the
+  `jest.mock` that the existing component tests issue from inside `beforeEach`
+  binds after the real module has resolved and is **silently inert**. Those
+  tests pass anyway because the real loader falls back to a default
+  single-athlete registry. Any multi-athlete test needs the mock hoisted to
+  module scope; the new file does that and records why.
+
+**Commit `5b2c613` — `feat(db): migration 062 completes the 059 side-car
+immutability contract`.** Closes audit Finding 3 / `OW-004`.
+**Migration number 062, array index 60, `user_version` 61**, appended never
+spliced; 059 and 061 untouched. Four triggers, no table, no column, no number.
+
+- `trg_suspension_episode_program_no_delete_bd`, `trg_block_suspension_origin_immutable_bu`,
+  `trg_block_suspension_origin_no_delete_bd`, `trg_planned_slot_load_intent_no_repoint_bu`,
+  all registered as SENTINELS.
+- *`planned_slot_load_intent` is deliberately NOT made immutable.* `OW-004`
+  names exactly two tables, and no source document states that a declared load
+  intent is immutable — the opposite is closer to true, since `OW-001` is still
+  open and its remedy writes to this very table. Only the protection L1(a)
+  supports directly is applied: an intent may not be MOVED to a slot it was
+  never declared for, because re-pointing a primary key manufactures a
+  declaration out of nothing and L1(a)'s rule is that only explicit declaration
+  counts. Revising or clearing an intent on its own slot stays open; deletion is
+  safe by construction because absence IS the conservative loaded path. **New
+  owner item:** whether `planned_implement` becomes immutable once its slot has
+  been trained — live the moment `OW-001` lands, unanswered here.
+- *Two measured facts that changed the implementation.* (1) An FK
+  `ON DELETE CASCADE` action DOES fire the child's `BEFORE DELETE` trigger,
+  independently of `PRAGMA recursive_triggers` — probed both ways. An
+  unconditional guard would have made every parent undeletable and aborted the
+  reset, so the guards use 026's `WHEN EXISTS (<parent>)` shape, naming BOTH
+  parents because either legitimately carries the row away. (2) Naming another
+  table in a trigger makes `ALTER TABLE ... RENAME` fail with
+  `error in trigger <name>: no such table` while that table is absent, because a
+  rename rewrites the whole schema. 049, 052 and 061 each rename and every
+  parent here is a SENTINEL, so "absent" is exactly the poisoned-DB state the
+  self-heal repairs. Reproduced directly: dropping `suspension_episode` aborted
+  the replay at 049 — nine migrations before 058 could recreate it — turning a
+  recoverable database into a permanently unrecoverable one. `migrationRunner`
+  now drops `REPLAY_BLOCKING_TRIGGERS` before a full re-apply and the replay
+  recreates them; the round trip is asserted for all three parents. 026's
+  `trg_set_dose_target_bd` and `trg_session_outcome_bd` share the shape and the
+  latent exposure; disclosed beside the list, not fixed here.
+- *Tests.* `verify_migrations.mjs` `[2ab]`: fresh install; upgrade from the
+  shipped pre-062 state including a precondition proving the gap was real;
+  refusal of every prohibited mutation and permission of every required one;
+  refused mutations leaving rows byte-identical; cascade from either parent;
+  the reset's open-episode cascade; the FK-OFF parentless cleanup; self-heal per
+  trigger asserted through behaviour, not presence; the three-parent replay
+  round trip; and the array index. It also carries the FIRST behavioural
+  coverage of 059's own four triggers — nothing had asserted any 059 refusal.
+  `verify_store_sql.mjs` now applies 062 in its chain, so the reset's delete
+  ordering is enforced by the database rather than by convention.
+- Migration counts re-pinned 60 → 61 in `verify_migrations.mjs` and
+  `verify_pipeline.mjs`.
+
+**Mutation testing — 10 mutations, 10 caught, 0 escaped.** Each protection was
+removed in turn, the gate that should catch it was run, and the exact intended
+file was restored from git afterwards (`git status` clean at the end).
+
+| Mutation | Gate | Result |
+|---|---|---|
+| `PER_ATHLETE_RESET` no longer clears `suspension` | new jest suite | CAUGHT |
+| open-episode `DELETE` removed | new jest suite | CAUGHT |
+| post-reset `suspension: null` + `refreshSuspension()` removed | new jest suite | CAUGHT |
+| `refreshSuspension()` alone removed | `verify:store` | CAUGHT |
+| side-car deletes moved above their parents | `verify:store` | CAUGHT |
+| `trg_suspension_episode_program_no_delete_bd` removed | `verify:migrations` | CAUGHT |
+| `trg_block_suspension_origin_immutable_bu` removed | `verify:migrations` | CAUGHT |
+| `trg_block_suspension_origin_no_delete_bd` removed | `verify:migrations` | CAUGHT |
+| `trg_planned_slot_load_intent_no_repoint_bu` removed | `verify:migrations` | CAUGHT |
+| `dropReplayBlockingTriggers()` call removed | `verify:migrations` | CAUGHT |
+
+**W4 — verification at `HEAD`.**
+
+- `npm run verify:ci`: exit 0. **21 jest suites / 293 tests** (baseline 20 / 284: one new suite, nine new
+  tests), `verify:store` **653/653** (baseline 645/645), `verify:coach` 14,
+  `verify:progression` 17, `verify:runner` 17, `verify:outcomes` 22,
+  coaching-content 10, library-v2 5, library-correction 40, and 17 gates
+  reporting `ALL CHECKS PASSED` — the same 17 as the baseline.
+  Every `FAIL` line in the transcript falls inside `verify:qa-artifact`'s
+  meta-tests (lines 1743-2096 of the run), the negative controls that feed
+  deliberately broken fixtures to the artifact verifier and assert rejection.
+  There are no real failures.
+- `git diff --check` clean both against the working tree and across
+  `3ec532d..HEAD`.
+
+**Files changed vs `3ec532d`** (8 files, +961 / −10):
+`apps/mobile/src/state/useStore.ts`,
+`apps/mobile/test/components/SuspensionResetAndSwitch.test.js` (new),
+`apps/mobile/test/verify_store_sql.mjs`,
+`packages/core-db/src/migrationRunner.ts`,
+`packages/core-db/src/migrations.ts`,
+`packages/core-db/src/schema/062_suspension_sidecar_immutability.sql` (new),
+`packages/core-db/test/verify_migrations.mjs`,
+`packages/inference/test/verify_pipeline.mjs`,
+plus this ledger entry and
+`docs/audits/rpe-familiarisation/continuation/POST_MERGE_STATE_C_DATA_INTEGRITY_HANDBACK.md`.
+
+**Remaining blockers, unchanged and inherited.** `OW-001` per-slot implement
+selection is NOT STARTED. `OW-034` and the new `planned_implement` mutability
+question are `OWNER_ONLY` and unanswered. 026's cross-table trigger exposure is
+disclosed, not fixed. W8 live-emulator qualification is NOT STARTED and the
+2026-09-07 audit of `d363d92` still stands at `REJECT … NO SEAL ISSUED` with
+`[G]` PENDING. C6 physical memory qualification remains mandatory and
+`verify:release` cannot pass while `verify:memory-contract` exits 1 at
+`[A]`/`[D]`. Nothing merged, tagged, published or released; `master` and the
+release lineage are NOT AUTHORIZED and untouched. This branch is data-integrity
+remediation, not release readiness.

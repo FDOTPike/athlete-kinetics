@@ -52,7 +52,13 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 059 adds suspension_episode_program, block_suspension_origin and
   // planned_slot_load_intent, which the store now reads and writes. 057 stays
   // deliberately absent (see the note above); 059 does not depend on it.
-  '059_suspension_state_and_load_intent.sql'];
+  '059_suspension_state_and_load_intent.sql',
+  // 062 closes the 059 side-car mutation surface. It is included because the
+  // reset probe below EXECUTES the store's exact delete sequence: with 062
+  // present, an ordering regression that named a side-car before its parents
+  // aborts here instead of passing quietly. It depends only on tables 007/033/
+  // 058/059 already create, so it applies cleanly without 060/061.
+  '062_suspension_sidecar_immutability.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -770,6 +776,51 @@ a('reset removes each immutable side-car only after its parent',
     && resetTables.indexOf('set_dose_target') > resetTables.indexOf('set_record')
     && resetTables.indexOf('session') >= 0
     && resetTables.indexOf('session_outcome') > resetTables.indexOf('session'));
+// 062 applies the same rule to the 059 side-cars, and here it is enforced by
+// the database rather than by convention: both are undeletable while a parent
+// survives, so naming either one before training_program / training_block
+// aborts the reset instead of wiping live suspension attribution. With FKs ON
+// the parent cascades have already emptied them and these two statements are
+// no-ops; they exist for the FK-OFF path, where a surviving
+// block_suspension_origin row would attribute a BRAND NEW post-reset block
+// (training_block reuses rowids once emptied) and hide it from
+// nextMacroPosition for good.
+a('reset clears all three 059 side-cars',
+  ['suspension_episode_program', 'block_suspension_origin', 'planned_slot_load_intent']
+    .every((t) => resetTables.includes(t)),
+  resetTables.filter((t) => t.startsWith('suspension_') || t.startsWith('block_susp') || t === 'planned_slot_load_intent').join(',') || 'none named');
+// planned_slot_id is INTEGER PRIMARY KEY with no AUTOINCREMENT, so ids are
+// REUSED once planned_slot is emptied. An intent row orphaned by an FK-OFF reset
+// would re-attach a declared implement to a brand new slot the athlete never
+// chose it for. Deleted with the other planned_slot children, before the parent.
+a('reset clears the L1(a) load intent before its planned_slot parent',
+  resetTables.indexOf('planned_slot_load_intent') >= 0
+    && resetTables.indexOf('planned_slot') >= 0
+    && resetTables.indexOf('planned_slot_load_intent') < resetTables.indexOf('planned_slot'));
+a('reset clears the 059 side-cars only AFTER training_program and training_block',
+  resetTables.indexOf('training_program') >= 0
+    && resetTables.indexOf('training_block') >= 0
+    && resetTables.indexOf('suspension_episode_program') > resetTables.indexOf('training_program')
+    && resetTables.indexOf('block_suspension_origin') > resetTables.indexOf('training_block'));
+// The open episode is deleted CONDITIONALLY (059 refuses a closed one, and that
+// abort would roll the whole reset back), so it never appears in resetTables —
+// which is why it is asserted against the body text instead.
+// Exactly ONE suspension_episode delete, and it is the conditional one. Counting
+// is what makes this future-proof: a later unconditional or IS NOT NULL delete
+// would satisfy a presence-plus-absence pair while aborting the whole reset at
+// 059's no-delete-closed trigger. `\b` does not match inside
+// suspension_episode_program, because `_` is a word character.
+const episodeDeletes = [...resetBody.matchAll(/DELETE FROM suspension_episode\b[^']*/g)].map((m) => m[0]);
+a('reset issues exactly ONE suspension_episode delete, and it is the open-episode one',
+  episodeDeletes.length === 1
+    && episodeDeletes[0] === 'DELETE FROM suspension_episode WHERE ended_at_ms IS NULL',
+  episodeDeletes.join(' | ') || 'none');
+a('the open-episode delete precedes training_program and training_block',
+  resetBody.indexOf('DELETE FROM suspension_episode WHERE') >= 0
+    && resetBody.indexOf('DELETE FROM suspension_episode WHERE') < resetBody.indexOf("DELETE FROM training_program'")
+    && resetBody.indexOf('DELETE FROM suspension_episode WHERE') < resetBody.indexOf("DELETE FROM training_block'"));
+a('reset re-reads suspension into memory after the wipe',
+  /refreshSuspension\(\)/.test(resetBody));
 if (resetTables.length >= 15) {
   const MAT = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8').replace(/^--.*$/gm, '');
   db.exec('BEGIN');
