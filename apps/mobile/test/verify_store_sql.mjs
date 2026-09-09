@@ -61,7 +61,11 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // present, an ordering regression that named a side-car before its parents
   // aborts here instead of passing quietly. It depends only on tables 007/033/
   // 058/059 already create, so it applies cleanly without 060/061.
-  '062_suspension_sidecar_immutability.sql'];
+  '062_suspension_sidecar_immutability.sql',
+  // 063 adds movement_load_intent, which the store now reads on boot and writes
+  // from the athlete's declaration (OW-001), so its statements are validated
+  // against the real table here.
+  '063_movement_load_intent.sql'];
 
 
 const db = new DatabaseSync(':memory:');

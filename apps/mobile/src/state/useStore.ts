@@ -732,6 +732,20 @@ interface KineticsStore {
    *  Persisted per profile so same-as-default choices survive restart and
    *  non-beginner tier changes. */
   loadPreferenceExplicit: boolean;
+  /** OW-001 / L1(a): the athlete's EXPLICIT declared implement per movement
+   *  (063), keyed by movement_id. Only genuinely ambiguous movements (more than
+   *  one supported prefix) can appear here; an absent entry means UNDECLARED and
+   *  still fails closed to the loaded path. Never inferred from equipment,
+   *  taxonomy, dropdown order or logged sets. */
+  loadIntents: Readonly<Record<number, MovementPrefix>>;
+  /** Re-read the declarations for this athlete's database. */
+  refreshLoadIntents: () => void;
+  /** Declare (or, with null, withdraw) how this athlete loads a movement.
+   *  PROSPECTIVE: it changes what future blocks are generated with and never
+   *  rewrites a slot already planned or trained. Refused for movements that
+   *  have nothing to choose between, and for an implement the movement does not
+   *  support. */
+  saveMovementLoadIntent: (movementId: number, implement: MovementPrefix | null) => boolean;
   /** Re-read the load preference for the active profile slot. Malformed or
    *  missing rows fail safely to the tier default. */
   refreshLoadPreference: () => void;
@@ -1830,8 +1844,39 @@ const persistSessionOutcome = (
  *  choice, so that member IS the selection. Anything ambiguous stays undeclared
  *  and fails CLOSED to the loaded path until the athlete declares it. Absence is
  *  never bodyweight evidence. */
-const plannedImplementFor = (m: { supportedPrefixes: MovementPrefix[] }): MovementPrefix | undefined =>
-  (m.supportedPrefixes.length === 1 ? m.supportedPrefixes[0] : undefined);
+const plannedImplementFor = (
+  m: { movement_id: number; supportedPrefixes: MovementPrefix[] },
+  declared: ReadonlyMap<number, MovementPrefix>,
+): MovementPrefix | undefined => {
+  // OW-001 / L1(a): the athlete's EXPLICIT declaration wins, and it is the only
+  // thing that can resolve an ambiguous movement. Re-checked against the
+  // movement's own supported set on read as well as on write, so a declaration
+  // orphaned by a library correction degrades to undeclared — which fails closed
+  // to the loaded path — rather than routing on an implement the movement no
+  // longer supports.
+  const choice = declared.get(m.movement_id);
+  if (choice !== undefined && m.supportedPrefixes.includes(choice)) return choice;
+  // No declaration. A SOLE supported implement is not a choice and not dropdown
+  // order — there is nothing to choose between — so it stands as the selection.
+  // Anything else stays undeclared and fails closed.
+  return m.supportedPrefixes.length === 1 ? m.supportedPrefixes[0] : undefined;
+};
+
+/** OW-001: the athlete's declared implement per movement (063). Read once per
+ *  generation and handed in as typed input, the same shape as chainPlanningInputs.
+ *  Rows whose implement is no longer supported are dropped here, not trusted. */
+const readMovementLoadIntents = (d: DB): Map<number, MovementPrefix> => {
+  const rows = rowsOf<{ movement_id: number; planned_implement: string }>(
+    d.executeSync('SELECT movement_id, planned_implement FROM movement_load_intent'),
+  );
+  const out = new Map<number, MovementPrefix>();
+  for (const r of rows) {
+    if (PREFIX_SET.has(r.planned_implement)) {
+      out.set(Number(r.movement_id), r.planned_implement as MovementPrefix);
+    }
+  }
+  return out;
+};
 
 /** L2(b): capability-chain membership and the applicable advancement bar, read
  *  ONCE per generation and handed to the pure engine as typed planning input —
@@ -2086,7 +2131,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   // athlete resident. Clearing here makes the failure mode "no suspension"
   // rather than "athlete B wearing athlete A's episode".
   suspension: null,
-  oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), loadPreference: 'auto', loadPreferenceExplicit: false, bandLadder: [], onboarded: true,
+  oneRepMaxes: {}, lastLoggedLoads: {}, lastEndedSessionId: null, profileSlots: [], uiPreferences: defaultUiPreferences(DEFAULT_PROFILE), loadPreference: 'auto', loadPreferenceExplicit: false, loadIntents: {}, bandLadder: [], onboarded: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -2134,6 +2179,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   uiPreferences: defaultUiPreferences(DEFAULT_PROFILE),
   loadPreference: 'auto',
   loadPreferenceExplicit: false,
+  loadIntents: {},
   bandLadder: [],
   movementPrefixes: [],
   athletes: [],
@@ -2218,6 +2264,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().refreshProfileSlots();
       get().refreshUiPreferences();
       get().refreshLoadPreference();
+      get().refreshLoadIntents();
       get().refreshBandLadder();
       // The block lives only in SQLite; the store is a read surface over it.
       get().refreshBlock();
@@ -2505,6 +2552,52 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       ],
     );
     set({ uiPreferences: next });
+  },
+
+  refreshLoadIntents: () => {
+    set({ loadIntents: Object.fromEntries(readMovementLoadIntents(getDb())) });
+  },
+
+  saveMovementLoadIntent: (movementId, implement) => {
+    const d = getDb();
+    const movement = get().movements.find((m) => m.movement_id === movementId);
+    if (movement === undefined) {
+      set({ error: 'That movement is not in your library.' });
+      return false;
+    }
+    // Only genuinely ambiguous movements are declarable. Where there is exactly
+    // one supported implement there is no choice to record, and storing one
+    // would create a second source of truth that could later disagree with the
+    // library after a content correction.
+    if (movement.supportedPrefixes.length < 2) {
+      set({ error: 'There is only one way to load this movement, so there is nothing to choose.' });
+      return false;
+    }
+    if (implement !== null && !movement.supportedPrefixes.includes(implement)) {
+      set({ error: 'That is not one of the loading options this movement supports.' });
+      return false;
+    }
+    d.executeSync('BEGIN');
+    try {
+      if (implement === null) {
+        // Withdrawing returns the movement to UNDECLARED, which is the
+        // conservative loaded path — never a silent switch to bodyweight.
+        d.executeSync('DELETE FROM movement_load_intent WHERE movement_id = ?', [movementId]);
+      } else {
+        d.executeSync(
+          'INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (?, ?, ?) ON CONFLICT(movement_id) DO UPDATE SET planned_implement = excluded.planned_implement, declared_at_ms = excluded.declared_at_ms',
+          [movementId, implement, Date.now()],
+        );
+      }
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    get().refreshLoadIntents();
+    set({ error: null });
+    return true;
   },
 
   refreshLoadPreference: () => {
@@ -3081,6 +3174,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
     }
     const chainInputs = chainPlanningInputs(d);
+    // OW-001: the athlete's own declarations, read once and threaded in.
+    const declaredIntents = readMovementLoadIntents(d);
     const powerNames = powerPreferredMovementNames(d);
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id, name: m.name, pattern: m.pattern as MovementPattern,
@@ -3093,7 +3188,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       scope: m.scope ?? undefined,
       // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
       // order. Ambiguous movements stay undeclared and fail closed to loaded.
-      plannedImplement: plannedImplementFor(m),
+      plannedImplement: plannedImplementFor(m, declaredIntents),
       // L2(b): chain membership and the chain's own bar, as typed inputs.
       progressionGroup: chainInputs.get(m.movement_id)?.group,
       chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
@@ -3205,6 +3300,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
     );
     const chainInputs = chainPlanningInputs(d);
+    // OW-001: the athlete's own declarations, read once and threaded in.
+    const declaredIntents = readMovementLoadIntents(d);
     const powerNamesGenerate = powerPreferredMovementNames(d);
     const genMovements: GeneratorMovement[] = movements.map((m) => ({
       movement_id: m.movement_id,
@@ -3222,7 +3319,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       scope: m.scope ?? undefined,
       // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
       // order. Ambiguous movements stay undeclared and fail closed to loaded.
-      plannedImplement: plannedImplementFor(m),
+      plannedImplement: plannedImplementFor(m, declaredIntents),
       // L2(b): chain membership and the chain's own bar, as typed inputs.
       progressionGroup: chainInputs.get(m.movement_id)?.group,
       chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
@@ -3392,7 +3489,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           // when it is actually declared — an absent row means "undeclared" and
           // is read as the conservative loaded path, which is why nothing is
           // written for an ambiguous movement.
-          const slotImplement = movement === undefined ? undefined : plannedImplementFor(movement);
+          const slotImplement = movement === undefined ? undefined : plannedImplementFor(movement, declaredIntents);
           if (slotImplement !== undefined) {
             d.executeSync(
               'INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (?, ?)',

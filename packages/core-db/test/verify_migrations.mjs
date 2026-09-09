@@ -61,7 +61,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '058_suspension_episode.sql', '059_suspension_state_and_load_intent.sql',
   '060_program_goal_tier_alignment.sql',
   '061_autopilot_attribution_convergence.sql',
-  '062_suspension_sidecar_immutability.sql'];
+  '062_suspension_sidecar_immutability.sql',
+  '063_movement_load_intent.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1740,11 +1741,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 61 files (slots 001-062, no 004) -> user_version 61. This count is
+    // 62 files (slots 001-063, no 004) -> user_version 62. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 062 (059 side-car immutability).
-    check('fresh install reaches user_version 61 (61 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 61,
+    // silent one. Re-pinned for 063 (OW-001 athlete load-intent declaration).
+    check('fresh install reaches user_version 62 (62 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 62,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -2660,8 +2661,145 @@ const PROHIBITED_062 = (b) => [
 // index 60 and leaves user_version 61 -- the file number and the array index
 // are not the same thing, and the runner uses the index.
 check(`062 is appended at array index ${IDX_062}, never spliced`,
-  IDX_062 === MIGRATIONS.length - 1 && IDX_062 === 60, `index=${IDX_062} length=${MIGRATIONS.length}`);
+  IDX_062 === 60, `index=${IDX_062} length=${MIGRATIONS.length}`);
 
+
+// --- 2ac. 063 the athlete's own load-intent declaration (OW-001) -------------
+// 059 gave the per-slot RECORD and the fail-closed read; it never gave the
+// athlete a way to declare anything, so the 17 ambiguous movements on the
+// shipped corpus were permanently undeclared and permanently loaded. 063 is the
+// declaration. It adds no number and defaults nothing on the athlete's behalf.
+console.log('[2ac] 063 movement load intent (OW-001)');
+
+const IDX_063 = FILES.indexOf('063_movement_load_intent.sql');
+const TRG_063 = [
+  'trg_movement_load_intent_supported_bi',
+  'trg_movement_load_intent_supported_bu',
+];
+// A real ambiguous movement from the shipped library, and a real unambiguous
+// one, both looked up rather than assumed so a library correction cannot make
+// this pass for the wrong reason.
+const pickMovements = (db) => {
+  const rows = db.raw.prepare(`
+    SELECT m.movement_id AS id, m.name, d.supported_prefixes AS p
+      FROM movement m JOIN movement_detail d USING(movement_id)
+     ORDER BY m.movement_id
+  `).all().map((r) => ({ id: Number(r.id), name: r.name, prefixes: JSON.parse(r.p ?? '[]') }));
+  return {
+    ambiguous: rows.find((r) => r.prefixes.length > 1 && r.prefixes.includes('Bodyweight')),
+    sole: rows.find((r) => r.prefixes.length === 1),
+  };
+};
+const intents = (db) => db.raw
+  .prepare('SELECT movement_id, planned_implement FROM movement_load_intent ORDER BY movement_id')
+  .all();
+
+// (1) FRESH INSTALL.
+{
+  const fresh63 = freshDb();
+  runMigrations(fresh63, MIGRATIONS);
+  check('063 fresh install completes the chain',
+    uv(fresh63) === MIGRATIONS.length && sentinelsMissing(fresh63).length === 0,
+    `uv=${uv(fresh63)} missing=${sentinelsMissing(fresh63).join(',')}`);
+  check('063 installs the table and both supported-implement triggers',
+    fresh63.raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name='movement_load_intent'").get() !== undefined
+      && TRG_063.every((t) => triggerPresent(fresh63, t)));
+  check('063 declares NOTHING on a fresh install — every movement starts undeclared',
+    intents(fresh63).length === 0);
+
+  const { ambiguous, sole } = pickMovements(fresh63);
+  check('063 precondition: the shipped library really carries an ambiguous movement',
+    ambiguous !== undefined && sole !== undefined,
+    ambiguous ? `${ambiguous.name} ${JSON.stringify(ambiguous.prefixes)}` : 'none found');
+
+  check('063 accepts a declaration the movement actually supports',
+    !refused(fresh63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Bodyweight', 1000)`)
+      && intents(fresh63).length === 1);
+  // The pairing guard: vocabulary alone cannot catch this, only the trigger can.
+  const unsupported = ['DB', 'BB', 'KB', 'Cable', 'Chains'].find((p) => !ambiguous.prefixes.includes(p));
+  check(`063 REFUSES an implement the movement does not support (${unsupported})`,
+    refused(fresh63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${sole.id}, '${unsupported}', 1000)`));
+  check('063 REFUSES revising a declaration onto an unsupported implement',
+    refused(fresh63, `UPDATE movement_load_intent SET planned_implement = '${unsupported}' WHERE movement_id = ${ambiguous.id}`));
+  check('063 the refused mutations left the declaration untouched',
+    JSON.stringify(intents(fresh63)) === JSON.stringify([{ movement_id: ambiguous.id, planned_implement: 'Bodyweight' }]),
+    JSON.stringify(intents(fresh63)));
+  // Revising to another SUPPORTED implement is allowed: a declaration is
+  // prospective, so changing your mind rewrites nothing already planned.
+  const otherSupported = ambiguous.prefixes.find((p) => p !== 'Bodyweight');
+  check(`063 PERMITS revising onto another supported implement (${otherSupported})`,
+    !refused(fresh63, `UPDATE movement_load_intent SET planned_implement = '${otherSupported}' WHERE movement_id = ${ambiguous.id}`));
+  check('063 PERMITS withdrawing a declaration entirely (back to undeclared)',
+    !refused(fresh63, `DELETE FROM movement_load_intent WHERE movement_id = ${ambiguous.id}`)
+      && intents(fresh63).length === 0);
+  check('063 the vocabulary CHECK still rejects a non-canonical implement',
+    refused(fresh63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Kettlebell', 1000)`));
+  check('063 declared_at_ms must be a real stamp',
+    refused(fresh63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Bodyweight', 0)`));
+  // A declaration belongs to its movement and goes when the movement goes.
+  fresh63.executeSync(`INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Bodyweight', 1000)`);
+  fresh63.executeSync(`DELETE FROM movement WHERE movement_id = ${ambiguous.id}`);
+  check('063 a declaration cascades away with its movement', intents(fresh63).length === 0);
+}
+
+// (2) UPGRADE FROM THE SHIPPED PRE-063 STATE, preserving existing rows.
+{
+  const up63 = freshDb();
+  applyRaw(up63, MIGRATIONS, 0, IDX_063);
+  check('063 upgrade precondition: device sits one migration short',
+    uv(up63) === IDX_063, String(uv(up63)));
+  check('063 upgrade precondition: the table does not exist yet',
+    up63.raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name='movement_load_intent'").get() === undefined);
+  const { ambiguous } = pickMovements(up63);
+  // Real athlete data that must survive the upgrade untouched.
+  up63.executeSync(`INSERT INTO movement_preference (movement_id, preference, updated_at_ms) VALUES (${ambiguous.id}, 1, 5) ON CONFLICT(movement_id) DO UPDATE SET preference = 1`);
+  runMigrations(up63, MIGRATIONS);
+  check('063 upgraded device reaches the end of the chain',
+    uv(up63) === MIGRATIONS.length && sentinelsMissing(up63).length === 0,
+    `uv=${uv(up63)} missing=${sentinelsMissing(up63).join(',')}`);
+  check('063 upgrade declares nothing retroactively — an upgraded athlete is still undeclared',
+    intents(up63).length === 0);
+  check('063 upgrade leaves unrelated athlete preferences intact',
+    Number(up63.raw.prepare(`SELECT preference FROM movement_preference WHERE movement_id = ${ambiguous.id}`).get().preference) === 1);
+  check('063 upgraded device now enforces the pairing guard',
+    refused(up63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Cable', 1000)`)
+      || ambiguous.prefixes.includes('Cable'));
+}
+
+// (3) IDEMPOTENCE AND SELF-HEAL, asserted through behaviour.
+{
+  const heal63 = freshDb();
+  runMigrations(heal63, MIGRATIONS);
+  const { ambiguous, sole } = pickMovements(heal63);
+  heal63.executeSync(`INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Bodyweight', 1000)`);
+  const before = JSON.stringify(intents(heal63));
+  heal63.executeSync(`PRAGMA user_version = ${IDX_063};`);
+  runMigrations(heal63, MIGRATIONS);
+  check('063 replay preserves the athlete declaration exactly',
+    JSON.stringify(intents(heal63)) === before && uv(heal63) === MIGRATIONS.length);
+
+  const unsupported = ['DB', 'BB', 'KB', 'Cable', 'Chains'].find((p) => !ambiguous.prefixes.includes(p));
+  for (const name of TRG_063) {
+    heal63.raw.exec(`DROP TRIGGER ${name}`);
+    check(`063 a dropped ${name} is detected as a missing sentinel`,
+      sentinelsMissing(heal63).includes(name), sentinelsMissing(heal63).join(',') || 'none');
+    runMigrations(heal63, MIGRATIONS);
+    check(`063 self-heal restores ${name} AND its refusal`,
+      !sentinelsMissing(heal63).includes(name)
+        && uv(heal63) === MIGRATIONS.length
+        && refused(heal63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${sole.id}, '${unsupported}', 1)`));
+  }
+  heal63.raw.exec('DROP TABLE movement_load_intent');
+  check('063 a dropped declaration TABLE is detected as a missing sentinel',
+    sentinelsMissing(heal63).includes('movement_load_intent'));
+  runMigrations(heal63, MIGRATIONS);
+  check('063 self-heal restores the table (declarations are athlete data, not derivable)',
+    !sentinelsMissing(heal63).includes('movement_load_intent') && uv(heal63) === MIGRATIONS.length);
+}
+
+// (4) ARRAY INDEX AND user_version.
+check(`063 is appended at array index ${IDX_063}, never spliced`,
+  IDX_063 === MIGRATIONS.length - 1 && IDX_063 === 61, `index=${IDX_063} length=${MIGRATIONS.length}`);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

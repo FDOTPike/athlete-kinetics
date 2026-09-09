@@ -205,6 +205,14 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'trigger', name: 'trg_block_suspension_origin_immutable_bu' },      // 062
   { type: 'trigger', name: 'trg_block_suspension_origin_no_delete_bd' },      // 062
   { type: 'trigger', name: 'trg_planned_slot_load_intent_no_repoint_bu' },    // 062
+  // 063 the athlete's own declaration (OW-001). Durable athlete state, and the
+  // two triggers are fail-closed: losing them would let a declaration name an
+  // implement the movement does not support. Both reference movement_detail
+  // (010, chain position 10), which a replay recreates long before the earliest
+  // rename at position 48, so neither belongs on REPLAY_BLOCKING_TRIGGERS.
+  { type: 'table', name: 'movement_load_intent' },                            // 063
+  { type: 'trigger', name: 'trg_movement_load_intent_supported_bi' },         // 063
+  { type: 'trigger', name: 'trg_movement_load_intent_supported_bu' },         // 063
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it

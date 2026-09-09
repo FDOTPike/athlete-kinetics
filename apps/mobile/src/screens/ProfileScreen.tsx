@@ -11,7 +11,7 @@
  * Law 3: Zero red/amber/green anywhere.
  * Law 4: Touch targets >= 56pt.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
@@ -181,10 +181,22 @@ export default function ProfileScreen(): React.JSX.Element {
   const saveUiPreferences = useStore((s) => s.saveUiPreferences);
   const loadPreference = useStore((s) => s.loadPreference);
   const saveLoadPreference = useStore((s) => s.saveLoadPreference);
+  const loadIntents = useStore((s) => s.loadIntents);
+  const saveMovementLoadIntent = useStore((s) => s.saveMovementLoadIntent);
   const bandLadder = useStore((s) => s.bandLadder);
   const saveBandLevel = useStore((s) => s.saveBandLevel);
   const deleteBandLevel = useStore((s) => s.deleteBandLevel);
   const movements = useStore((s) => s.movements);
+  // OW-001: exactly the movements that have a choice to make. A single
+  // supported implement is not a choice, so those never appear — which is also
+  // why nothing here can be read as taking element zero of a dropdown.
+  const ambiguousMovements = useMemo(
+    () => movements
+      .filter((m) => m.supportedPrefixes.length > 1)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [movements],
+  );
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const saveOneRepMax = useStore((s) => s.saveOneRepMax);
   const biometricsStatus = useStore((s) => s.biometricsStatus);
@@ -560,6 +572,48 @@ export default function ProfileScreen(): React.JSX.Element {
           Your device accessibility text size is always respected; this adds an optional app preference on top.
         </Text>
       </View>
+
+      {/* OW-001 / L1(a). Some movements can be trained with or without external
+          load, and loading is NOT a property of the movement — it is this
+          athlete's choice. Nothing infers it: not the dropdown order, not the
+          taxonomy, not the equipment you own, not what you lifted last time.
+          Until you say, the coach assumes the loaded version, which is the
+          conservative read. Declarations are PROSPECTIVE: they change what the
+          coach plans next and never rewrite a block you already have. */}
+      {ambiguousMovements.length > 0 && (
+        <View style={styles.mgmtSection} testID="profile-load-intent-section">
+          <Text style={styles.mgmtHeading}>HOW YOU LOAD THESE</Text>
+          <Text style={styles.fieldHint}>
+            These movements work with or without added weight, and only you know which you do.
+            Anything you leave unset is planned as the loaded version. Your choice applies to
+            blocks the coach plans from now on.
+          </Text>
+          {ambiguousMovements.map((m) => (
+            <View key={m.movement_id} testID={`load-intent-row-${m.movement_id}`}>
+              <Text style={[styles.fieldLabel, styles.preferenceLabel]}>{m.name.toUpperCase()}</Text>
+              <View style={styles.chipWrap}>
+                {m.supportedPrefixes.map((prefix) => (
+                  <Chip
+                    key={prefix}
+                    testID={`load-intent-${m.movement_id}-${prefix}`}
+                    label={prefix.toUpperCase()}
+                    selected={loadIntents[m.movement_id] === prefix}
+                    onPress={() => saveMovementLoadIntent(m.movement_id, prefix)}
+                    accessibilityLabel={`Plan ${m.name} as ${prefix}`}
+                  />
+                ))}
+                <Chip
+                  testID={`load-intent-${m.movement_id}-unset`}
+                  label="NOT SET"
+                  selected={loadIntents[m.movement_id] === undefined}
+                  onPress={() => saveMovementLoadIntent(m.movement_id, null)}
+                  accessibilityLabel={`Leave ${m.name} unset, planned as the loaded version`}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.mgmtSection}>
         <Text style={styles.mgmtHeading}>BAND LADDER</Text>
