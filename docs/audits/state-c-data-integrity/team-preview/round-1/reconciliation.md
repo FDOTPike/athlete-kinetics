@@ -85,10 +85,17 @@ carrying this consequence.
 
 ### F3 — "the audit prompt cited `packages/inference/src/seed/movementLibrary.ts`" · **REFUTED**
 
-`grep -rn "seed/movementLibrary"` across the repository returns **zero hits** in any `.md`,
-`.ts`, `.tsx` or `.mjs` file. The audit prompt does not name that path either; it cites
-`types.ts`, `SessionScreen.tsx`, `useStore.ts` and `blockGenerator.ts`. The citation being
-criticised does not exist in the prompt or in the repository.
+`grep -rn "seed/movementLibrary"` returns **zero hits in source** — no `.ts`, `.tsx`, `.mjs` or
+schema file names that path, and no non-audit `.md` does either. The audit prompt does not name it;
+it cites `types.ts`, `SessionScreen.tsx`, `useStore.ts` and `blockGenerator.ts`.
+
+**Scope, stated so the search is reproducible.** The claim excludes the audit records themselves.
+The literal string now appears in `reviewer-gemini.md` (round 1 and round 2) and in this
+reconciliation, because those documents quote and discuss the finding — so an unscoped grep today
+returns those matches and the original wording, written before the reviewer's report was committed
+into the repository, no longer reproduces. Excluding audit records is the correct scope regardless:
+the question F3 raises is whether the path exists in the codebase or the prompt, and it does not.
+Raised by CodeRabbit on PR #12.
 
 **Not carried forward as a live finding.** Recorded here so a later round does not rediscover it
 as open. The reviewer's underlying point — that the movement catalogue's source of truth is the

@@ -2,7 +2,7 @@
 
 **Author:** Claude Opus 5 (implementer under audit)
 **Reviewer:** Gemini 3.8 / Antigravity auditor team
-**Date:** 2026-09-10
+**Date:** 2026-09-10 (Australia/Sydney) = 2026-09-09 UTC
 **Reviewer verdict:** APPROVE WITH FINDINGS
 **Candidate:** `5aad482465c41d4c9819b706b57541db79631f53`, tree
 `5d6254d2c7928fe9cf16653261fd0285a083d40c`, branch `claude/state-a-register-closeout` (PR #12)

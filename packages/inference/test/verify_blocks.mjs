@@ -2384,13 +2384,16 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
 // Banded, and Banded needs bands. A prose number nobody recomputes is a claim,
 // not evidence, so it is derived from the live corpus here instead.
 //
-// [OW-017] rides along on the same query. plannedImplementFor's sole-supported-
-// prefix fallback does not consult implementAvailable, so a movement whose only
-// implement needs equipment its own movement_equipment rows never require would
-// be planned with a tool the athlete may not own. On the shipped corpus that set
-// is EMPTY, which is what makes the hole latent rather than live. This gate is
-// what keeps it empty: a library correction that introduces such a movement
-// fails here and must close the fallback in the same change.
+// [OW-017] rides along on the same query, and guards a CORPUS invariant rather
+// than the code defect it was written for. HISTORICALLY, plannedImplementFor's
+// sole-supported-prefix fallback did not consult implementAvailable, so a
+// movement whose only implement needs equipment its own movement_equipment rows
+// never require would have been planned with a tool the athlete may not own.
+// That check now exists (useStore.ts, the `sole` branch), so the code hole is
+// closed. What this gate preserves is the separate, still-useful fact that the
+// shipped corpus contains no such movement at all — defence in depth from the
+// other side. A library correction that introduces one fails here, which is the
+// signal that the guard has stopped being theoretical and started firing.
 {
   const { IMPLEMENT_REQUIREMENT } = require('./.build/types.js');
   // NOT the module-level `db`: that one stops at migration 015, so it holds the
@@ -2460,14 +2463,21 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     multi.length === 17 && diverging.length === multi.length,
     `${diverging.length} of ${multi.length}`);
 
-  const soleHole = rows.filter((r) => {
+  // The DENOMINATOR is pinned too, not just the violation count. "0 of 235" is
+  // the figure the register quotes, and a migration could hold violations at
+  // zero while moving the candidate set — leaving the register's number stale
+  // with every gate still green. Same principle as chain.length above: a number
+  // that only gets printed is decoration.
+  const soleCandidates = rows.filter((r) => {
     const p = JSON.parse(r.prefixes);
-    return p.length === 1 && p[0] !== 'Bodyweight'
-      && unimplied(p[0], equipOf.get(r.id) ?? new Set());
+    return p.length === 1 && p[0] !== 'Bodyweight';
   });
-  check('[OW-017] no sole-prefix movement needs equipment its own requirement omits',
-    soleHole.length === 0,
-    soleHole.map((r) => `${r.name}:${JSON.parse(r.prefixes)[0]}`).join(',') || 'corpus clean');
+  const soleHole = soleCandidates.filter((r) =>
+    unimplied(JSON.parse(r.prefixes)[0], equipOf.get(r.id) ?? new Set()));
+  check('[OW-017] no sole-prefix movement needs equipment its own requirement omits (0 of 235)',
+    soleHole.length === 0 && soleCandidates.length === 235,
+    soleHole.map((r) => `${r.name}:${JSON.parse(r.prefixes)[0]}`).join(',')
+      || `${soleHole.length} of ${soleCandidates.length}`);
 }
 
 // --- OW-006: the bodyweight fatigue branch is DEAD, and this is the tripwire ---
