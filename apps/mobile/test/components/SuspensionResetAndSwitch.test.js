@@ -442,3 +442,54 @@ test('OW-007 a successful resume still closes the episode exactly once', async (
   expect(episodes(DB_A)[0].ended_at_ms).toBe(1_756_900_000_000);
   expectMemoryAndDbAgree(DB_A);
 });
+
+// ---------------------------------------------------------------------------
+// OW-001 (audit W2.8) — declarations are per-athlete DATABASE state, so Coach
+// Mode must not leak them. loadIntents is in PER_ATHLETE_RESET and boot()
+// re-reads it, but nothing proved either, and a leak here would route ANOTHER
+// athlete's dose from this athlete's choice.
+// ---------------------------------------------------------------------------
+
+const declarable = () => store().movements
+  .find((m) => m.supportedPrefixes.length > 1 && m.supportedPrefixes.includes('Bodyweight'));
+
+test('OW-001 a load-intent declaration never leaks between athlete databases', async () => {
+  await bootRealStore();
+  const m = declarable();
+  expect(m).toBeDefined();
+  const alternative = m.supportedPrefixes.find((p) => p !== 'Bodyweight');
+
+  expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+  expect(store().loadIntents[m.movement_id]).toBe('Bodyweight');
+
+  await switchTo(ATHLETE_B);
+  // B is a different person with a different file: they inherit nothing.
+  expect(store().loadIntents).toEqual({});
+  expect(countIn(DB_B, 'movement_load_intent')).toBe(0);
+
+  expect(store().saveMovementLoadIntent(m.movement_id, alternative)).toBe(true);
+  expect(store().loadIntents[m.movement_id]).toBe(alternative);
+
+  await switchTo(ATHLETE_A);
+  // A gets A's answer back, not B's, and neither file gained the other's row.
+  expect(store().loadIntents[m.movement_id]).toBe('Bodyweight');
+  expect(countIn(DB_A, 'movement_load_intent')).toBe(1);
+  expect(countIn(DB_B, 'movement_load_intent')).toBe(1);
+  expect(raw(DB_A).prepare('SELECT planned_implement AS p FROM movement_load_intent').get().p).toBe('Bodyweight');
+  expect(raw(DB_B).prepare('SELECT planned_implement AS p FROM movement_load_intent').get().p).toBe(alternative);
+});
+
+test('OW-001 a failed boot after a switch does not leave the previous declarations resident', async () => {
+  await bootRealStore();
+  const m = declarable();
+  expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+  expect(store().loadIntents[m.movement_id]).toBe('Bodyweight');
+
+  openFails.add(DB_B); // boot throws before it can reach refreshLoadIntents()
+  await switchTo(ATHLETE_B);
+
+  expect(store().status).toBe('error');
+  // Same exposure window PER_ATHLETE_RESET closes for suspension: whatever it
+  // leaves is what the athlete is stuck with when nothing re-reads.
+  expect(store().loadIntents).toEqual({});
+});

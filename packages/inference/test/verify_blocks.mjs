@@ -2295,6 +2295,47 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   }
 }
 
+// --- P1: the implement-to-equipment resolver is TOTAL and fail-closed --------
+// A movement equipment requirement gates the MOVEMENT, never the implement, so
+// this resolver is the only thing standing between a declaration and planning
+// an implement the athlete does not own. It must cover every prefix in the
+// canonical vocabulary, and every item it names must be a real equipment item.
+{
+  const { MOVEMENT_PREFIXES, EQUIPMENT_ITEMS, IMPLEMENT_REQUIREMENT, implementAvailable } =
+    require('./.build/types.js');
+  const missing = MOVEMENT_PREFIXES.filter((p) => IMPLEMENT_REQUIREMENT[p] === undefined);
+  check('[P1-equip] every MOVEMENT_PREFIX has an equipment requirement (resolver is total)',
+    missing.length === 0, missing.join(',') || `${MOVEMENT_PREFIXES.length} prefixes covered`);
+
+  const bogus = [];
+  for (const prefix of MOVEMENT_PREFIXES) {
+    const req = IMPLEMENT_REQUIREMENT[prefix];
+    if (req.kind !== 'anyOf') continue;
+    for (const item of req.items) if (!EQUIPMENT_ITEMS.includes(item)) bogus.push(`${prefix}->${item}`);
+  }
+  check('[P1-equip] every named requirement is a real EQUIPMENT_ITEMS entry',
+    bogus.length === 0, bogus.join(',') || 'all canonical');
+
+  // Bodyweight is the only implement an empty inventory can perform, and an
+  // unverifiable implement is never assumed available.
+  const emptyOk = MOVEMENT_PREFIXES.filter((p) => implementAvailable(p, []));
+  check('[P1-equip] an empty inventory can perform Bodyweight and nothing else',
+    emptyOk.length === 1 && emptyOk[0] === 'Bodyweight', emptyOk.join(','));
+  const unverifiable = MOVEMENT_PREFIXES.filter((p) => IMPLEMENT_REQUIREMENT[p].kind === 'unverifiable');
+  check('[P1-equip] an unverifiable implement is never available, on any inventory',
+    unverifiable.every((p) => !implementAvailable(p, [...EQUIPMENT_ITEMS])),
+    unverifiable.join(',') || 'none');
+
+  // The reviewer counterexample, at the resolver level.
+  check('[P1-equip] Walking Lunge implements resolve against inventory, not the movement',
+    implementAvailable('Bodyweight', []) === true
+      && implementAvailable('DB', []) === false
+      && implementAvailable('BB', []) === false
+      && implementAvailable('DB', ['dumbbells']) === true
+      && implementAvailable('BB', ['dumbbells']) === false
+      && implementAvailable('BB', ['barbell']) === true);
+}
+
 // --- OW-006: the bodyweight fatigue branch is DEAD, and this is the tripwire ---
 // blockGenerator computes bodyweightDominant from the whole movement catalogue,
 // not the block's slots, so it is always false in production and the branch

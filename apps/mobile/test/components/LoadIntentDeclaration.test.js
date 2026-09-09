@@ -1,0 +1,426 @@
+/**
+ * LoadIntentDeclaration.test.js — OW-001, the unimplemented half of L1(a).
+ *
+ * Boots the REAL zustand store against the REAL complete migration chain, in
+ * the shape SuspensionLifecycle.test.js established: only the native op-sqlite
+ * handle and the registry IO shell are replaced. `saveMovementLoadIntent`,
+ * `generateNewBlock` and the store's own `plannedImplementFor` all run
+ * unmodified.
+ *
+ * The ruling under test, owner-ratified 2026-08-29 and re-confirmed 2026-09-09
+ * (RELEASE_CANDIDATE_C1_DOCKET.md §6):
+ *
+ *   L1(a) constrained — persist explicit PROSPECTIVE per-slot load intent at
+ *   block generation. Ambiguous mixed movements REQUIRE ATHLETE SELECTION.
+ *   Missing legacy state fails closed toward the conservative loaded path.
+ *   Intent may NOT be derived from dropdown order, taxonomy, equipment
+ *   ownership, or retrospective set data.
+ *
+ * Before 063 the athlete had no way to select anything: the store declared an
+ * implement only when a movement had exactly ONE supported prefix, so the 17
+ * genuinely ambiguous movements on the shipped corpus were permanently
+ * undeclared and permanently loaded. These tests are the selection.
+ *
+ * Expected to FAIL against 5f1cb6a.
+ */
+import { useStore } from '../../src/state/useStore';
+import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
+
+let mockDriver;
+let mockRegistry;
+
+function mockOpenDb() { return mockDriver; }
+
+jest.mock('@op-engineering/op-sqlite', () => ({ open: () => mockOpenDb() }));
+jest.mock('../../src/state/athleteRegistry', () => ({
+  loadRegistry: async () => mockRegistry,
+  saveRegistry: async (next) => { mockRegistry = next; return true; },
+}));
+
+const store = () => useStore.getState();
+const raw = () => mockDriver.raw;
+
+const bootRealStore = async () => {
+  useStore.setState({ status: 'booting', error: null });
+  store().boot();
+  await new Promise((resolve) => setImmediate(resolve));
+  expect(store().status).toBe('ready');
+};
+
+/** Every movement the library says can be trained more than one way. */
+const ambiguous = () => store().movements.filter((m) => m.supportedPrefixes.length > 1);
+/** An ambiguous movement that genuinely offers bodyweight — not every one
+ *  does (several are BB/DB only), so tests must pick rather than assume. */
+const ambiguousWithBodyweight = () => ambiguous().find((m) => m.supportedPrefixes.includes('Bodyweight'));
+
+/** The per-slot record L1(a) requires, joined back to its movement. */
+const slotIntents = () => raw().prepare(`
+  SELECT m.name, m.movement_id, li.planned_implement AS declared
+    FROM planned_slot ps
+    JOIN movement m ON m.movement_id = ps.movement_id
+    LEFT JOIN planned_slot_load_intent li ON li.planned_slot_id = ps.planned_slot_id
+`).all();
+
+const declarations = () => raw()
+  .prepare('SELECT movement_id, planned_implement FROM movement_load_intent ORDER BY movement_id')
+  .all();
+
+beforeEach(() => {
+  mockDriver = makeNodeSqliteDriver();
+  mockRegistry = {
+    version: 1,
+    activeId: 'default',
+    advancedToolsUnlocked: false,
+    athletes: [{ id: 'default', name: 'Athlete 1', dbName: 'athlete_kinetics.db', createdAtMs: 0 }],
+  };
+});
+
+// ---------------------------------------------------------------------------
+// The gap OW-001 exists to close
+// ---------------------------------------------------------------------------
+
+test('the shipped corpus really does carry ambiguous movements, and they start undeclared', async () => {
+  await bootRealStore();
+
+  // Not a vacuous suite: the defect only exists because these movements exist.
+  expect(ambiguous().length).toBeGreaterThan(0);
+  expect(declarations()).toHaveLength(0);
+  expect(store().loadIntents).toEqual({});
+
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+
+  // Fail closed: every ambiguous slot is undeclared, and element zero of the
+  // supported list is never taken even when that element is 'Bodyweight'.
+  const ambiguousIds = new Set(ambiguous().map((m) => m.movement_id));
+  const ambiguousSlots = slotIntents().filter((r) => ambiguousIds.has(Number(r.movement_id)));
+  for (const slot of ambiguousSlots) expect(slot.declared).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// The selection itself
+// ---------------------------------------------------------------------------
+
+test('a declaration is recorded, reflected in the store, and withdrawable', async () => {
+  await bootRealStore();
+  const m = ambiguousWithBodyweight();
+  expect(m).toBeDefined();
+
+  expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+  expect(store().error).toBeNull();
+  expect(store().loadIntents[m.movement_id]).toBe('Bodyweight');
+  expect(declarations()).toEqual([{ movement_id: m.movement_id, planned_implement: 'Bodyweight' }]);
+
+  // Changing your mind is allowed — it is prospective, so it rewrites nothing.
+  const other = m.supportedPrefixes.find((p) => p !== 'Bodyweight');
+  expect(store().saveMovementLoadIntent(m.movement_id, other)).toBe(true);
+  expect(store().loadIntents[m.movement_id]).toBe(other);
+
+  // Withdrawing returns the movement to UNDECLARED, not to bodyweight.
+  expect(store().saveMovementLoadIntent(m.movement_id, null)).toBe(true);
+  expect(store().loadIntents[m.movement_id]).toBeUndefined();
+  expect(declarations()).toHaveLength(0);
+});
+
+test('a declaration routes the generated slot, and undeclared movements still fail closed', async () => {
+  await bootRealStore();
+
+  // Declare bodyweight for every ambiguous movement that offers it, so the
+  // assertion does not depend on which movements the ranker happens to pick.
+  const declared = ambiguous().filter((m) => m.supportedPrefixes.includes('Bodyweight'));
+  expect(declared.length).toBeGreaterThan(0);
+  for (const m of declared) {
+    expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+  }
+
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+
+  const declaredIds = new Set(declared.map((m) => m.movement_id));
+  const rows = slotIntents();
+  const declaredSlots = rows.filter((r) => declaredIds.has(Number(r.movement_id)));
+  // Every slot for a declared movement carries the athlete's choice...
+  for (const slot of declaredSlots) expect(slot.declared).toBe('Bodyweight');
+  // ...and an ambiguous movement they did NOT declare still carries nothing.
+  const undeclaredAmbiguousIds = new Set(
+    ambiguous().filter((m) => !declaredIds.has(m.movement_id)).map((m) => m.movement_id),
+  );
+  for (const slot of rows.filter((r) => undeclaredAmbiguousIds.has(Number(r.movement_id)))) {
+    expect(slot.declared).toBeNull();
+  }
+  // Unambiguous movements are unaffected: their sole implement is still theirs.
+  const soleById = new Map(store().movements
+    .filter((m) => m.supportedPrefixes.length === 1)
+    .map((m) => [m.movement_id, m.supportedPrefixes[0]]));
+  for (const slot of rows.filter((r) => soleById.has(Number(r.movement_id)))) {
+    expect(slot.declared).toBe(soleById.get(Number(slot.movement_id)));
+  }
+});
+
+test('a declaration is PROSPECTIVE: it never rewrites a block that already exists', async () => {
+  await bootRealStore();
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+  const before = JSON.stringify(slotIntents());
+
+  for (const m of ambiguous().filter((x) => x.supportedPrefixes.includes('Bodyweight'))) {
+    expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+  }
+
+  // The already-planned slots are untouched. This is what makes the deferred
+  // "does planned_implement freeze once trained" question moot: nothing here
+  // writes that row a second time.
+  expect(JSON.stringify(slotIntents())).toBe(before);
+});
+
+// ---------------------------------------------------------------------------
+// What a declaration may NOT be
+// ---------------------------------------------------------------------------
+
+test('nothing may be declared for a movement with only one way to load it', async () => {
+  await bootRealStore();
+  const sole = store().movements.find((m) => m.supportedPrefixes.length === 1);
+  expect(sole).toBeDefined();
+
+  expect(store().saveMovementLoadIntent(sole.movement_id, sole.supportedPrefixes[0])).toBe(false);
+  expect(store().error).not.toBeNull();
+  expect(declarations()).toHaveLength(0);
+});
+
+test('an implement the movement does not support is refused at the store AND by 063', async () => {
+  await bootRealStore();
+  const m = ambiguous().find((x) => !x.supportedPrefixes.includes('Cable'));
+  expect(m).toBeDefined();
+
+  expect(store().saveMovementLoadIntent(m.movement_id, 'Cable')).toBe(false);
+  expect(declarations()).toHaveLength(0);
+  // WHICH layer refused matters. Both guards return false, so asserting only
+  // the boolean cannot tell them apart — mutation testing caught exactly that.
+  // The store must reject it in athlete-readable words BEFORE the write, so the
+  // message is the store's, not the trigger's raw abort text.
+  expect(store().error).toBe('That is not one of the loading options this movement supports.');
+  expect(store().error).not.toMatch(/movement_load_intent:/);
+
+  // The store guard is not the only guard: 063's trigger refuses it too, so a
+  // future writer that skips the store cannot plant an unsupported declaration.
+  expect(() => raw()
+    .prepare('INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (?, ?, ?)')
+    .run(m.movement_id, 'Cable', 1)).toThrow(/not supported by this movement/);
+});
+
+test('an unknown movement is refused', async () => {
+  await bootRealStore();
+  expect(store().saveMovementLoadIntent(999999, 'Bodyweight')).toBe(false);
+  expect(store().error).not.toBeNull();
+  expect(declarations()).toHaveLength(0);
+});
+
+test('declarations survive a training-data reset, like every other preference', async () => {
+  await bootRealStore();
+  const m = ambiguousWithBodyweight();
+  expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+  store().generateNewBlock('LINEAR');
+
+  store().resetTrainingData();
+  expect(store().error).toBeNull();
+
+  // The wipe clears training history, never the athlete's settings. The
+  // per-slot records went with their slots; the declaration itself remains.
+  expect(raw().prepare('SELECT COUNT(*) AS c FROM planned_slot_load_intent').get().c).toBe(0);
+  expect(store().loadIntents[m.movement_id]).toBe('Bodyweight');
+  expect(declarations()).toHaveLength(1);
+});
+
+// ---------------------------------------------------------------------------
+// W2.3 (audit) — the declaration must reach RANKING, and deterministically.
+// The original suite proved the per-slot row was written but never that
+// generation stays deterministic under declarations, nor that a declaration is
+// anything other than inert. Both are asserted here.
+// ---------------------------------------------------------------------------
+
+const planSnapshot = () => raw().prepare(`
+  SELECT ps.planned_slot_id, ps.movement_id, ps.sets, ps.reps, ps.target_rpe,
+         li.planned_implement AS declared
+    FROM planned_slot ps
+    LEFT JOIN planned_slot_load_intent li ON li.planned_slot_id = ps.planned_slot_id
+   ORDER BY ps.planned_slot_id
+`).all();
+
+const generateWith = async (declare) => {
+  mockDriver = makeNodeSqliteDriver();
+  await bootRealStore();
+  if (declare) {
+    for (const m of ambiguous().filter((x) => x.supportedPrefixes.includes('Bodyweight'))) {
+      expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+    }
+  }
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+  return planSnapshot();
+};
+
+test('generation is deterministic with declarations, and a declaration is not inert', async () => {
+  const plainA = await generateWith(false);
+  const plainB = await generateWith(false);
+  expect(plainB).toEqual(plainA);
+
+  const declaredA = await generateWith(true);
+  const declaredB = await generateWith(true);
+  // Same declarations, same inputs, same plan: no clock, no randomness.
+  expect(declaredB).toEqual(declaredA);
+
+  // And the declaration actually reaches the engine. If this ever stops being
+  // true the feature is decorative, so it is asserted rather than assumed.
+  expect(JSON.stringify(declaredA)).not.toBe(JSON.stringify(plainA));
+});
+
+test('a failed save whose ROLLBACK also fails still returns false, never throws', async () => {
+  await bootRealStore();
+  const m = ambiguousWithBodyweight();
+
+  // The connection-level failure CodeRabbit flagged: the write fails AND the
+  // recovery fails. Unguarded, the rollback exception escaped before the action
+  // could return its promised boolean or record the error, so the ProfileScreen
+  // handler got neither a false nor a message.
+  const real = mockDriver.executeSync.bind(mockDriver);
+  mockDriver.executeSync = (sql, params) => {
+    const text = String(sql);
+    if (/INSERT INTO movement_load_intent/.test(text)) throw new Error('database is locked');
+    if (/^\s*ROLLBACK/i.test(text)) throw new Error('cannot rollback - no transaction is active');
+    return real(sql, params);
+  };
+
+  let returned;
+  expect(() => { returned = store().saveMovementLoadIntent(m.movement_id, 'Bodyweight'); }).not.toThrow();
+  expect(returned).toBe(false);
+  expect(store().error).not.toBeNull();
+
+  mockDriver.executeSync = real;
+  // Nothing was half-written.
+  expect(declarations()).toHaveLength(0);
+  // The suppressed ROLLBACK left a real transaction open on the driver, which
+  // is exactly what a connection-level failure does in the field. Clear it the
+  // way a reconnect would before asserting the athlete can retry.
+  try { mockDriver.raw.exec('ROLLBACK'); } catch { /* already closed */ }
+  expect(store().saveMovementLoadIntent(m.movement_id, 'Bodyweight')).toBe(true);
+  expect(declarations()).toHaveLength(1);
+});
+
+// ---------------------------------------------------------------------------
+// P1 (reviewer) — a declaration may never commit the athlete to equipment they
+// do not own. A movement equipment requirement gates the MOVEMENT, never the
+// implement, and the two diverge constantly: on the shipped corpus 15 of the 17
+// multi-implement movements offer at least one implement their base requirement
+// never implies. Walking Lunge requires NOTHING and offers Bodyweight/DB/BB.
+// ---------------------------------------------------------------------------
+
+const MINIMAL = [];
+const HOME = ['dumbbells', 'bands', 'mats'];
+const FULL_GYM = ['barbell', 'squat_rack', 'bench', 'dumbbells', 'kettlebell',
+  'pullup_bar', 'nordic_bench', 'bands', 'cable_machine', 'mats'];
+
+const setInventory = (items) => {
+  store().saveProfile({ equipment_inventory: items });
+  expect(store().error).toBeNull();
+};
+const walkingLunge = () => store().movements.find((m) => m.name === 'Walking Lunge');
+
+const intentRowsFor = (movementId) => raw().prepare(`
+  SELECT li.planned_implement AS declared
+    FROM planned_slot ps
+    LEFT JOIN planned_slot_load_intent li ON li.planned_slot_id = ps.planned_slot_id
+   WHERE ps.movement_id = ?
+`).all(movementId);
+
+test('P1 Walking Lunge really is the counterexample: no equipment required, three implements', async () => {
+  await bootRealStore();
+  const wl = walkingLunge();
+  expect(wl).toBeDefined();
+  expect(wl.supportedPrefixes).toEqual(['Bodyweight', 'DB', 'BB']);
+  const required = raw().prepare('SELECT item FROM movement_equipment WHERE movement_id = ?').all(wl.movement_id);
+  // The movement-level gate can never constrain the implement here.
+  expect(required).toHaveLength(0);
+});
+
+test('P1 minimal inventory: the store refuses DB and BB, and still accepts Bodyweight', async () => {
+  await bootRealStore();
+  setInventory(MINIMAL);
+  const wl = walkingLunge();
+
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'BB')).toBe(false);
+  expect(store().error).toBe('You have not told the coach you own the equipment for that option.');
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'DB')).toBe(false);
+  expect(declarations()).toHaveLength(0);
+
+  // Bodyweight needs nothing, so it stays available to everyone.
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'Bodyweight')).toBe(true);
+  expect(store().loadIntents[wl.movement_id]).toBe('Bodyweight');
+});
+
+test('P1 home inventory: dumbbells accepted, barbell still refused', async () => {
+  await bootRealStore();
+  setInventory(HOME);
+  const wl = walkingLunge();
+
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'DB')).toBe(true);
+  expect(store().loadIntents[wl.movement_id]).toBe('DB');
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'BB')).toBe(false);
+  // The refused choice did not overwrite the good one.
+  expect(store().loadIntents[wl.movement_id]).toBe('DB');
+});
+
+test('P1 full gym: every supported implement is accepted', async () => {
+  await bootRealStore();
+  setInventory(FULL_GYM);
+  const wl = walkingLunge();
+  for (const prefix of wl.supportedPrefixes) {
+    expect(store().saveMovementLoadIntent(wl.movement_id, prefix)).toBe(true);
+    expect(store().loadIntents[wl.movement_id]).toBe(prefix);
+  }
+});
+
+test('P1 GENERATION never plans an implement the athlete no longer owns', async () => {
+  await bootRealStore();
+  setInventory(FULL_GYM);
+  const wl = walkingLunge();
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'BB')).toBe(true);
+
+  // The athlete sells the barbell. The declaration is now stale, and nothing
+  // rewrites it -- declarations are durable and prospective. The generation
+  // boundary is what must refuse to honour it.
+  setInventory(HOME);
+  expect(store().loadIntents[wl.movement_id]).toBe('BB');
+
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+
+  // Any Walking Lunge slot must be UNDECLARED, not barbell: dropping to
+  // undeclared fails closed to the conservative loaded path rather than
+  // asserting a tool the athlete does not have.
+  for (const row of intentRowsFor(wl.movement_id)) expect(row.declared).toBeNull();
+
+  // And no slot anywhere carries an implement this athlete cannot equip.
+  const planned = raw().prepare(`
+    SELECT m.name, li.planned_implement AS declared
+      FROM planned_slot ps
+      JOIN movement m ON m.movement_id = ps.movement_id
+      JOIN planned_slot_load_intent li ON li.planned_slot_id = ps.planned_slot_id
+  `).all();
+  const ownable = new Set(['Bodyweight', 'DB', 'Banded']); // what HOME can equip
+  for (const row of planned) expect(ownable.has(row.declared)).toBe(true);
+});
+
+test('P1 with the equipment present, generation DOES honour the declaration', async () => {
+  await bootRealStore();
+  setInventory(FULL_GYM);
+  const wl = walkingLunge();
+  expect(store().saveMovementLoadIntent(wl.movement_id, 'BB')).toBe(true);
+
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+
+  // Not a vacuous mirror of the test above: when the barbell IS owned the same
+  // declaration reaches the slot.
+  const rows = intentRowsFor(wl.movement_id);
+  for (const row of rows) expect(row.declared).toBe('BB');
+});

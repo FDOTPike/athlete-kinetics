@@ -107,6 +107,67 @@ export const EQUIPMENT_ITEMS = [
 ] as const;
 export type EquipmentItem = (typeof EQUIPMENT_ITEMS)[number];
 
+/**
+ * What an IMPLEMENT requires from the athlete's inventory. The single
+ * authoritative join between MOVEMENT_PREFIXES and EQUIPMENT_ITEMS.
+ *
+ * WHY THIS EXISTS. A movement's own equipment requirement gates whether the
+ * movement can be trained at all; it says nothing about which IMPLEMENT the
+ * athlete can load it with, and the two diverge constantly. Measured on the
+ * shipped corpus: 15 of the 17 multi-implement movements offer at least one
+ * implement their base requirement never implies. Walking Lunge and Glute
+ * Bridge require NOTHING yet offer BB; Overhead Press requires a barbell yet
+ * offers KB; Suitcase Carry requires a kettlebell yet offers DB; Face Pull
+ * requires a cable machine yet offers Banded. Without this resolver an athlete
+ * could declare — and the generator would honour — an implement they do not own.
+ *
+ * `anyOf` is satisfied by owning ANY listed item, not all of them.
+ */
+export type ImplementRequirement =
+  /** Needs nothing. Bodyweight is always performable. */
+  | { readonly kind: 'none' }
+  /** Performable if the inventory contains at least one of these. */
+  | { readonly kind: 'anyOf'; readonly items: readonly EquipmentItem[] }
+  /** The canonical equipment vocabulary cannot express this implement, so
+   *  ownership CANNOT be confirmed. Callers must fail closed rather than assume
+   *  it is available — inventing an equipment item to represent it would be
+   *  inventing policy, which this resolver deliberately does not do. */
+  | { readonly kind: 'unverifiable' };
+
+export const IMPLEMENT_REQUIREMENT: Readonly<Record<MovementPrefix, ImplementRequirement>> = {
+  Bodyweight: { kind: 'none' },
+  DB: { kind: 'anyOf', items: ['dumbbells'] },
+  BB: { kind: 'anyOf', items: ['barbell'] },
+  KB: { kind: 'anyOf', items: ['kettlebell'] },
+  Banded: { kind: 'anyOf', items: ['bands'] },
+  Cable: { kind: 'anyOf', items: ['cable_machine'] },
+  // A bottom-up carry/press is a kettlebell technique; it needs the bell.
+  'Bottom-Up': { kind: 'anyOf', items: ['kettlebell'] },
+  // The one interpretive call here, and it is deliberately PERMISSIVE: "free
+  // weight" is a category rather than a specific tool, so any loadable free
+  // weight satisfies it. It appears on no multi-implement movement in the
+  // shipped corpus, so it changes nothing today; flagged for the owner rather
+  // than settled quietly.
+  'Free Weight': { kind: 'anyOf', items: ['barbell', 'dumbbells', 'kettlebell'] },
+  // No canonical EQUIPMENT_ITEMS entry represents either of these. Neither
+  // appears on a multi-implement movement in the shipped corpus.
+  'Earthquake Bar': { kind: 'unverifiable' },
+  Chains: { kind: 'unverifiable' },
+};
+
+/** True when this athlete's inventory can actually perform the implement.
+ *  Fail-closed: an implement the vocabulary cannot express is never assumed
+ *  available. */
+export const implementAvailable = (
+  implement: MovementPrefix,
+  inventory: readonly EquipmentItem[],
+): boolean => {
+  const requirement = IMPLEMENT_REQUIREMENT[implement];
+  if (requirement === undefined || requirement.kind === 'unverifiable') return false;
+  if (requirement.kind === 'none') return true;
+  return requirement.items.some((item) => inventory.includes(item));
+};
+
 /** UI presets; bundles MUST mirror 007's legacy equipment_access CASE map.
  *  `full_gym` is deliberately the STANDARD set, not the full union — a preset
  *  never grants specialist equipment. */

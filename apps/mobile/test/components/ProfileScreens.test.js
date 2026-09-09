@@ -491,3 +491,166 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(getByText('ATHLETE PROFILE')).toBeOnTheScreen();
   });
 });
+
+// ---------------------------------------------------------------------------
+// OW-001 load-intent declaration surface (audit W3/W4)
+//
+// Three defects this covers, all found by the stacked-PR audit against the
+// first implementation of this section:
+//   * it offered choices for movements the athlete cannot currently do, while
+//     an authoritative athlete-facing availability contract already existed;
+//   * it labelled the options with the internal vocabulary (DB / BB / KB);
+//   * a failed save was completely silent, because ProfileScreen mounts no
+//     error surface of its own — the same defect class as OW-007's resume path.
+// ---------------------------------------------------------------------------
+describe('OW-001 load-intent declaration surface', () => {
+  // Real shipped-corpus shapes. WALKING_LUNGE is the reviewer counterexample:
+  // it requires NO equipment, so the movement-level availability gate always
+  // says "available", yet it offers BB and DB.
+  const WALKING_LUNGE = { movement_id: 40, name: 'Walking Lunge', supportedPrefixes: ['Bodyweight', 'DB', 'BB'] };
+  const PUSH_UP = { movement_id: 41, name: 'Push-up', supportedPrefixes: ['Bodyweight', 'Banded'] };
+  const OVERHEAD_PRESS = { movement_id: 42, name: 'Overhead Press', supportedPrefixes: ['BB', 'DB', 'KB'] };
+  const BENCH = { movement_id: 43, name: 'Bench Press', supportedPrefixes: ['BB'] };
+  const LOCKED = { movement_id: 44, name: 'Nordic Curl', supportedPrefixes: ['Bodyweight', 'Banded'] };
+
+  // The three inventories the reviewer named.
+  const MINIMAL = [];
+  const HOME = ['dumbbells', 'bands', 'mats'];
+  const FULL_GYM = ['barbell', 'squat_rack', 'bench', 'dumbbells', 'kettlebell', 'pullup_bar', 'nordic_bench', 'bands', 'cable_machine', 'mats'];
+
+  let saveIntent;
+
+  const setup = (overrides = {}) => {
+    saveIntent = overrides.saveMovementLoadIntent ?? jest.fn(() => true);
+    mockState = {
+      ...mockState,
+      profile: { ...baseProfile, equipment_inventory: overrides.inventory ?? FULL_GYM },
+      movements: [WALKING_LUNGE, PUSH_UP, OVERHEAD_PRESS, BENCH, LOCKED],
+      loadIntents: overrides.loadIntents ?? {},
+      saveMovementLoadIntent: saveIntent,
+      movementAvailabilityRevision: 0,
+      niggles: [],
+      // LOCKED is deliberately unavailable at movement level.
+      getMovementAvailabilityVerdicts: jest.fn(() => [
+        { movementId: WALKING_LUNGE.movement_id, state: 'available' },
+        { movementId: PUSH_UP.movement_id, state: 'available' },
+        { movementId: OVERHEAD_PRESS.movement_id, state: 'available' },
+        { movementId: BENCH.movement_id, state: 'available' },
+        { movementId: LOCKED.movement_id, state: 'blocked' },
+      ]),
+    };
+    render(<ProfileScreen />);
+  };
+
+  const offered = (m) => ['Bodyweight', 'DB', 'BB', 'KB', 'Banded', 'Cable']
+    .filter((p) => screen.queryByTestId(`load-intent-${m.movement_id}-${p}`) !== null);
+
+  // --- P1: implement options must respect the inventory ---------------------
+  // A movement equipment requirement gates the MOVEMENT, never the implement.
+  // Walking Lunge requires nothing, so the availability gate alone let an
+  // athlete with no barbell see, and save, a barbell lunge.
+
+  test('P1 minimal inventory: Walking Lunge offers no loaded option, so it is not shown at all', () => {
+    setup({ inventory: MINIMAL });
+    // Only Bodyweight survives, and one option is not a choice.
+    expect(screen.queryByTestId(`load-intent-row-${WALKING_LUNGE.movement_id}`)).toBeNull();
+    // Nothing at all is offered: no equipment means no implement decisions.
+    expect(screen.queryByTestId('profile-load-intent-section')).toBeNull();
+  });
+
+  test('P1 home inventory: Walking Lunge offers Bodyweight and Dumbbell, never Barbell', () => {
+    setup({ inventory: HOME });
+    expect(screen.getByTestId(`load-intent-row-${WALKING_LUNGE.movement_id}`)).toBeOnTheScreen();
+    expect(offered(WALKING_LUNGE)).toEqual(['Bodyweight', 'DB']);
+    expect(screen.queryByTestId(`load-intent-${WALKING_LUNGE.movement_id}-BB`)).toBeNull();
+    // Overhead Press supports BB/DB/KB but this athlete owns only dumbbells,
+    // so a single survivor means nothing to choose and no row.
+    expect(screen.queryByTestId(`load-intent-row-${OVERHEAD_PRESS.movement_id}`)).toBeNull();
+  });
+
+  test('P1 full gym: every supported implement is offered', () => {
+    setup({ inventory: FULL_GYM });
+    expect(offered(WALKING_LUNGE)).toEqual(['Bodyweight', 'DB', 'BB']);
+    expect(offered(OVERHEAD_PRESS)).toEqual(['DB', 'BB', 'KB']);
+    expect(offered(PUSH_UP)).toEqual(['Bodyweight', 'Banded']);
+  });
+
+  test('P1 a bandless athlete is never offered the Banded option', () => {
+    setup({ inventory: ['barbell', 'dumbbells', 'bench'] });
+    // Push-up is Bodyweight/Banded; without bands only one survives.
+    expect(screen.queryByTestId(`load-intent-row-${PUSH_UP.movement_id}`)).toBeNull();
+    expect(screen.queryByTestId(`load-intent-${PUSH_UP.movement_id}-Banded`)).toBeNull();
+    // Walking Lunge still has a real choice for this athlete.
+    expect(offered(WALKING_LUNGE)).toEqual(['Bodyweight', 'DB', 'BB']);
+  });
+
+  // --- the surface itself ---------------------------------------------------
+
+  test('offers a choice only for AVAILABLE movements that genuinely have one', () => {
+    setup();
+    expect(screen.getByTestId(`load-intent-row-${WALKING_LUNGE.movement_id}`)).toBeOnTheScreen();
+    expect(screen.getByTestId(`load-intent-row-${PUSH_UP.movement_id}`)).toBeOnTheScreen();
+    // Only one way to load it: nothing to choose.
+    expect(screen.queryByTestId(`load-intent-row-${BENCH.movement_id}`)).toBeNull();
+    // Ambiguous but the athlete cannot currently do the movement at all.
+    expect(screen.queryByTestId(`load-intent-row-${LOCKED.movement_id}`)).toBeNull();
+  });
+
+  test('labels the options in words, never the internal DB/BB/KB vocabulary', () => {
+    setup();
+    expect(screen.getByTestId(`load-intent-${WALKING_LUNGE.movement_id}-DB`)).toHaveTextContent('DUMBBELL');
+    expect(screen.getByTestId(`load-intent-${WALKING_LUNGE.movement_id}-BB`)).toHaveTextContent('BARBELL');
+    expect(screen.getByTestId(`load-intent-${OVERHEAD_PRESS.movement_id}-KB`)).toHaveTextContent('KETTLEBELL');
+    expect(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Banded`)).toHaveTextContent('BAND');
+    expect(screen.queryByText('DB')).toBeNull();
+    expect(screen.queryByText('BB')).toBeNull();
+  });
+
+  test('selected, unselected and NOT SET are distinguishable to a screen reader', () => {
+    setup({ loadIntents: { [PUSH_UP.movement_id]: 'Bodyweight' } });
+    const stateOf = (id) => screen.getByTestId(id).props.accessibilityState;
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-Bodyweight`).selected).toBe(true);
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-Banded`).selected).toBe(false);
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-unset`).selected).toBe(false);
+    expect(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Bodyweight`).props.accessibilityRole)
+      .toBe('button');
+    // An undeclared movement reads as NOT SET, not as a silent bodyweight pick.
+    expect(stateOf(`load-intent-${WALKING_LUNGE.movement_id}-unset`).selected).toBe(true);
+  });
+
+  test('accessibility labels name the movement and the readable implement', () => {
+    setup();
+    expect(screen.getByLabelText('Plan Push-up with Bodyweight only')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Plan Walking Lunge with Dumbbell')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
+  });
+
+  test('copy says the choice applies to FUTURE programming and what unset means', () => {
+    setup();
+    expect(screen.getByText(/planned as the loaded version/i)).toBeOnTheScreen();
+    expect(screen.getByText(/from now on/i)).toBeOnTheScreen();
+  });
+
+  test('a failed save is visible and actionable, and a later success clears it', () => {
+    const failing = jest.fn(() => false);
+    setup({ saveMovementLoadIntent: failing });
+    expect(screen.queryByTestId('load-intent-error')).toBeNull();
+
+    fireEvent.press(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Bodyweight`));
+    expect(failing).toHaveBeenCalledWith(PUSH_UP.movement_id, 'Bodyweight');
+    expect(screen.getByTestId('load-intent-error'))
+      .toHaveTextContent('Could not save your choice for Push-up. Try again.');
+
+    failing.mockReturnValue(true);
+    fireEvent.press(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Banded`));
+    expect(screen.queryByTestId('load-intent-error')).toBeNull();
+  });
+
+  test('choosing and clearing both reach the store with the canonical token', () => {
+    setup();
+    fireEvent.press(screen.getByTestId(`load-intent-${WALKING_LUNGE.movement_id}-BB`));
+    expect(saveIntent).toHaveBeenCalledWith(WALKING_LUNGE.movement_id, 'BB');
+    fireEvent.press(screen.getByTestId(`load-intent-${WALKING_LUNGE.movement_id}-unset`));
+    expect(saveIntent).toHaveBeenCalledWith(WALKING_LUNGE.movement_id, null);
+  });
+});

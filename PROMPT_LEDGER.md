@@ -6425,3 +6425,440 @@ that are owner decisions rather than executor work.
 becomes immutable once its slot has been trained is left open until `OW-001`
 lands, on the grounds that nothing writes it twice today so there is no live
 defect, and the right answer depends on the selection UI actually chosen.
+
+---
+
+## Entry 0100 — 2026-09-09 · OW-001: athlete-facing prospective load-intent selection
+
+### Input G(x)
+
+```
+OWNER DECISION CONFIRMATION
+
+The existing C1 owner ratification remains in force:
+
+S1a S2a S3a S4a S5c S6b
+L1a(constrained) L2b M1a A1a
+
+Do not reopen or reinterpret these rulings. Implement remaining work against the binding content in RELEASE_CANDIDATE_C1_DOCKET.md §6. In particular, complete OW-001 as an athlete-facing prospective per-slot implement/load-intent selection without deriving intent from dropdown order, taxonomy, equipment ownership, or retrospective set data.
+```
+
+Followed by the owner's answer to the one design fork the ratified text does not
+resolve — where the athlete declares:
+
+```
+Q: OW-001's selection surface. A declaration changes which movement the ranker
+   picks (isStrictlyBodyweight orders the loaded/anchor pools), not just that
+   slot's dose — so a post-generation per-slot editor can replace the very slot
+   being edited, and makes a block irreproducible from its inputs (determinism
+   law [1]) unless it regenerates. Where should the athlete declare?
+A: Before generation, per movement (Recommended) — The athlete declares
+   loaded-vs-bodyweight for the 17 ambiguous movements once (gated to ones they
+   can actually train, so typically far fewer). Generation then writes the
+   declaration into planned_slot_load_intent per slot. Matches 'prospective ...
+   at block generation' exactly, feeds ranking and dose consistently, stays
+   deterministic, no circularity. The per-slot ROW is still written as L1(a)
+   requires; the choice itself is per movement.
+```
+
+### Output F(G(x))
+
+Branch `claude/ow-001-athlete-load-intent-selection` (PR #11), stacked on PR #10.
+Commits `e44140c` and the test-strengthening follow-up. **OW-001 CLOSED** — the
+last open State C implementation item.
+
+**The gap.** 059 gave the per-slot RECORD and the fail-closed read. It never gave
+the athlete a way to declare anything: the store wrote a row only when a movement
+had exactly ONE supported prefix, so the 17 genuinely ambiguous movements on the
+shipped 300-movement corpus (7 of them listed Bodyweight-first) were permanently
+undeclared and permanently routed as loaded. L1(a)'s "ambiguous mixed movements
+require athlete selection" had no implementation at all.
+
+**Migration 063, array index 61, `user_version` 62.** `movement_load_intent` —
+one row per movement the athlete has declared, plus two triggers refusing a
+declaration that names an implement the movement does not support. Appended;
+059, 061 and 062 untouched. No threshold, coefficient, dose or default enters
+the engine.
+
+**Why the declaration is per movement while the record stays per slot.** Owner-
+selected from the one fork the ratified text does not resolve, and the constraint
+is in the engine rather than in taste: `isStrictlyBodyweight` orders the loaded
+and anchor pools in `movementRanking`, so a declaration changes WHICH movement
+the ranker picks, not merely how a slot is dosed. A post-generation per-slot
+editor could therefore replace the very slot being edited, and would make a block
+irreproducible from its recorded inputs. Slots also do not exist before
+generation, so a literal per-slot choice has nothing to attach to at the only
+moment the ruling names. The athlete declares per movement, before generation;
+generation resolves that into the per-slot row. Both halves of L1(a) hold.
+
+A consequence worth recording: `planned_slot_load_intent` is now written exactly
+once per slot and never revised, because revision happens in 063 and reaches only
+FUTURE blocks. Changing your mind never rewrites what you already trained — which
+is why the deferred owner question about freezing `planned_implement` once its
+slot is trained stays deferred without blocking anything. A test asserts the
+prospectiveness directly.
+
+**Nothing prohibited is used.** The sole-supported-prefix rule is untouched and
+applies only where there is no choice to make, so element zero of a multi-member
+list is still never taken; `movement_taxonomy` is not read; equipment ownership
+still declares nothing (the equipment filter decides which movements are
+OFFERED, never what the answer is); `set_record` and `set_prefix` are not read,
+and a declaration is written before the training it describes. An undeclared
+ambiguous movement stays undeclared and fails closed to the loaded path.
+
+**Surface.** A `HOW YOU LOAD THESE` section in `ProfileScreen`, beside the
+existing load selection, listing only movements that genuinely have a choice —
+each with its supported implements plus `NOT SET`. Copy states that anything left
+unset is planned as the loaded version and that the choice applies to future
+blocks only. Deviation to note: the owner's chosen option said "gated to ones
+they can actually train"; this lists all ambiguous movements in the library
+rather than filtering by current equipment or tier, because over-showing is
+conservative — it can never hide a choice — while a gate could silently withhold
+one. Cheap to add later if wanted.
+
+**Applied the rule from Entry 0098.** 063's two triggers name `movement_detail`
+(010, chain position 10), which a self-heal replay recreates long before the
+earliest `ALTER TABLE ... RENAME` at position 48, so neither belongs on
+`REPLAY_BLOCKING_TRIGGERS`. Stated in the migration header and in the runner.
+
+**Coverage.** 8 store/engine tests against the real chain
+(`LoadIntentDeclaration.test.js`): the corpus really carries ambiguous movements
+and they start undeclared; a declaration is recorded, reflected and withdrawable;
+a declaration routes the generated slot while undeclared movements still fail
+closed and unambiguous ones are unaffected; a declaration is PROSPECTIVE and
+rewrites nothing already planned; all three refusals; and declarations survive a
+training-data reset like every other preference. Plus 27 migration checks
+(`[2ac]`): fresh install declaring nothing, upgrade preserving unrelated
+preferences and declaring nothing retroactively, both trigger refusals, the
+vocabulary CHECK, the stamp CHECK, cascade with the movement, replay, per-trigger
+and table self-heal, array index.
+
+**Mutation testing — 5 mutations, 5 caught, 0 escaped (after a fix).**
+
+| Mutation | Gate | Result |
+|---|---|---|
+| the declaration is ignored (pre-OW-001 behaviour) | `LoadIntentDeclaration` | CAUGHT |
+| take element zero of the dropdown (the prohibited derivation) | `LoadIntentDeclaration` | CAUGHT |
+| store-side supported-implement guard removed | `LoadIntentDeclaration` | **ESCAPED, then CAUGHT** |
+| 063's INSERT pairing trigger removed | `verify:migrations` | CAUGHT |
+| a movement with nothing to choose becomes declarable | `LoadIntentDeclaration` | CAUGHT |
+
+The escape was real and is worth recording: both guards return `false`, so
+asserting only the boolean could not tell the store's pre-write rejection apart
+from 063's trigger catching the write. The test now pins the store's
+athlete-readable message, and the mutation is caught.
+
+**Verification.** `verify:ci` exit 0 — **22 suites / 306 tests** (from 21/298),
+`verify:store` **667/667** (from 661), 17 gates `ALL CHECKS PASSED`,
+`git diff --check` clean.
+
+**State C after this.** `OW-001` CLOSED. The only State C item still open is
+`OW-006` reachability, which is gated on `OW-026` — an OWNER_ONLY decision — and
+is dose-neutral. No executor work remains in State C.
+
+---
+
+## Entry 0101 — 2026-09-09 · State C stacked PR audit (AUDIT_AND_PREPARE_ONLY)
+
+### Input G(x)
+
+```
+# OPUS WORK ORDER — STATE C STACKED PR AUDIT AND REMEDIATION
+
+ROLE
+You are Opus 5, the verification and remediation agent for the State C stacked pull requests.
+
+EFFORT
+High.
+
+DECISION TOKEN
+AUDIT_AND_PREPARE_ONLY
+
+PULL REQUESTS
+- PR #10 head claude/state-c-followups-register-and-replay-rule, expected f17a3494d39bd0caab0c76023c4ad3a2b27a5c02, base codex/rpe-familiarisation
+- PR #11 head claude/ow-001-athlete-load-intent-selection, expected 973b881b6874df850a890fe7113a516f3730d267, base claude/state-c-followups-register-and-replay-rule
+
+BOUNDARIES
+Do not merge either PR. Do not push to master. Do not tag, release, publish, or
+build a production artifact. Do not start OW-006. Do not decide OW-026. Do not
+change fatigue coefficients or athlete dose. Do not edit migrations 059-062.
+Migration 063 may be corrected only if this audit finds a demonstrated defect.
+Preserve unrelated and untracked files. Append to the ledger before the first
+repository write.
+
+W0 identity and stack validation; W1 audit PR #10 (OW-007, OW-011, the
+replay-exposure correction, OW-006, register accuracy); W2 audit PR #11 as a
+stacked delta against the complete L1(a) path, points 1-10; W3 architectural
+fork review; W4 UI and accessibility; W5 migration 063; W6 required
+verification; W7 review activation. Final handoff with the stated verdict lines.
+Stop with READY FOR CODEX/SOL REVIEW.
+```
+
+### Output F(G(x))
+
+Self-audit: both PRs under review were authored by this agent, so the audit was
+run adversarially and every finding below is against its own work.
+
+**W0 identity — PASS.** PR #10 head `f17a349` base `codex/rpe-familiarisation`;
+PR #11 head `973b881` base `claude/state-c-followups-register-and-replay-rule`;
+both exactly as specified. Worktree clean and synchronized. The
+`f17a349..973b881` range contains only the three OW-001 commits and touches only
+OW-001 files — no PR #10 change is re-attributed to PR #11.
+
+**W1 PR #10 — APPROVE, all five areas independently reproduced.**
+
+- OW-007: try/catch present on the resume, the error node mounted INSIDE the
+  suspended branch, and `endSuspension` BEGIN/COMMIT/ROLLBACK + rethrow. Three
+  mutations re-run at `f17a349`, all caught.
+- OW-011: 057 in the chain and genuinely enforcing; removing it fails
+  `verify:store`.
+- Replay-exposure correction: reproduced from scratch. Dropping `set_record`,
+  `session` or `planned_slot` and replaying COMPLETES; only the
+  `suspension_episode`-naming pair needs removal, and removing
+  `dropReplayBlockingTriggers` fails `verify:migrations`. The 062 edit has ZERO
+  non-comment lines in the PR #10 range — comment-only confirmed by diff.
+- OW-006: the `blockGenerator` diff also has zero non-comment lines, so no dose
+  changed; `bodyweightDominant` is still pool-derived, so reachability is
+  genuinely still OPEN; the equality tripwire fails on a divergent table.
+- Register accurate for PR #10's state.
+- `verify:ci` at `f17a349`: exit 0, 22 suites / 307 tests, `verify:store`
+  667/667. `git diff --check` clean over `5f1cb6a..f17a349`.
+
+**W2 PR #11 — REQUEST CHANGES, then remediated. Two coverage gaps found in its
+own work.**
+
+- W2.3 required the declaration to influence ranking DETERMINISTICALLY. The
+  original suite proved the per-slot row was written but never that generation
+  stays deterministic under declarations, nor that a declaration is anything but
+  inert. Added: same declarations replay to an identical plan, and the declared
+  plan differs from the undeclared one. Both hold — the declaration does reach
+  ranking.
+- W2.8 required that athlete switching cannot leak declarations. `loadIntents`
+  was in `PER_ATHLETE_RESET`, but NOTHING proved it and nothing would catch a
+  regression — a leak would route another athlete's dose from this athlete's
+  choice. Added two tests: A declares, B inherits nothing and declares
+  differently, A gets A's answer back and neither file gains the other's row;
+  and a failed boot after a switch leaves no declarations resident.
+- W2.4 wording check: `planned_slot_load_intent` is NOT database-immutable. 062
+  blocks only re-pointing; `planned_implement` on its own slot remains
+  updatable. It is de facto write-once because nothing writes it twice, and a
+  test asserts that. Reported precisely rather than claimed as immutability —
+  the DB-level freeze is the deferred owner question.
+
+**W3/W4 — REQUEST CHANGES, three real defects in the athlete-facing surface,
+all fixed in `c90aa92`.**
+
+1. The section offered a choice for every ambiguous movement in the library,
+   including ones the athlete cannot currently do. An authoritative
+   athlete-facing availability contract already existed and was already used for
+   exactly this purpose — `LibraryScreenV2` gates its browse list on
+   `getMovementAvailabilityVerdicts('library')`. Reused rather than inventing an
+   eligibility policy, per W3's instruction. It constrains which movements are
+   OFFERED and never what the answer is, so L1(a) is untouched. It also cuts the
+   setup burden from all 17 ambiguous movements to the athlete's actual set,
+   answering W3.4.
+2. The options were labelled `DB` / `BB` / `KB` — engine tokens, not words an
+   athlete is owed. A presentation-only map now renders Dumbbell / Barbell /
+   Kettlebell / Band / Bodyweight only; the stored value is still the canonical
+   token, which the testIDs pin.
+3. A failed save was COMPLETELY SILENT. `saveMovementLoadIntent` returns false
+   and sets the global error, but ProfileScreen mounts no error surface of its
+   own, so the athlete tapped a chip, nothing moved, and nothing said why. This
+   is the same defect class as OW-007's resume path, reintroduced in a new
+   surface one commit later.
+
+Touch target and screen-reader state needed no change: the section reuses the
+existing `Chip` primitive, which already carries `theme.touch.min`,
+`accessibilityRole="button"` and `accessibilityState`. Seven component tests now
+cover the gate, the labelling, selected/unselected/NOT SET as announced state,
+truthful labels, the future-programming copy, the failure surface and its
+clearing, and that both choose and clear reach the store with the canonical
+token.
+
+**A defect the FULL suite caught that focused runs hid.** After the W3/W4 fix,
+`verify:ci` failed with three errors in `ContentCorrection049.test.js`:
+ProfileScreen now calls `getMovementAvailabilityVerdicts` unconditionally, and
+that screen-level mock did not provide it. Fixed by completing the mock to match
+the convention every other ProfileScreen mock already follows, rather than
+making the screen defensive, which would have masked a genuinely missing
+dependency. Recorded because a focused-run-only workflow would have shipped it.
+
+**W5 migration 063 — PASS.** All 27 `[2ac]` checks reproduce: fresh install
+declaring nothing, upgrade from the complete 001-062 chain preserving unrelated
+preferences and declaring nothing retroactively, valid insert/update/withdrawal,
+unsupported-implement refusal on both INSERT and UPDATE, unknown-movement
+refusal, cascade with the movement, replay, per-trigger and table self-heal,
+array index 61 and `user_version` 62. Compatible with the PR #10 replay rule:
+063's triggers name `movement_detail` (010, position 10), recreated long before
+the earliest rename at position 48, so they correctly do NOT join
+`REPLAY_BLOCKING_TRIGGERS`.
+
+**Mutations — 18 applied across the audit, 18 caught, 0 escaped.**
+Six re-run against PR #10 (`N1`-`N5`, `M9`), six new against PR #11's surface
+(`Q1` availability gate, `Q2` internal labels, `Q3` error node, `Q4` ignored save
+result, `Q5` cross-athlete leak, `Q6` generation ignores the declaration), plus
+the six from Entry 0100 confirmed still catching.
+
+**Verification.** PR #10 `verify:ci` exit 0 (22 suites / 307 tests). PR #11
+`verify:ci` exit 0 (22 suites / **316 tests**), `verify:store` 667/667, 17 gates
+`ALL CHECKS PASSED`. `git diff --check` clean over both exact ranges.
+
+**Boundaries honoured.** Nothing merged, pushed to master, tagged, released or
+built. OW-006 not started, OW-026 not decided, no fatigue coefficient or dose
+changed, migrations 059-062 untouched. 063 was NOT corrected — the audit found
+no defect in it. Untracked and unrelated files preserved.
+
+---
+
+## Entry 0102 — 2026-09-09 · PR #10 merged; PR #11 P1 — implement options bypass equipment inventory
+
+### Input G(x)
+
+```
+PR #10 is ready to merge. PR #11 is not yet ready.
+PR #10 — APPROVE
+PR #10 can merge first into codex/rpe-familiarisation.
+
+* HEAD 65d62e5
+* GitHub: clean and mergeable
+* Verification and Android builds passed
+* No unresolved review threads
+* OW-006 remains intentionally open and dose-neutral
+
+PR #11 — REQUEST CHANGES
+PR #11 has one substantive equipment-compatibility gap.
+ProfileScreen.tsx (line 616) renders every supported implement after checking
+only whether the overall movement is available. For example, Walking Lunge
+requires no equipment and supports Bodyweight, DB, and BB; an athlete without
+dumbbells or a barbell therefore still sees—and can save—those loaded options.
+The store validates only that the movement supports the implement, while the
+generator checks only the movement's base equipment requirements. Consequently,
+it can generate an explicitly barbell-planned movement for an athlete whose
+inventory contains no barbell.
+This is not caught by the green suite. I independently reproduced the full
+verification result:
+
+* verify:ci: passed
+* 22 suites, 317 tests
+* GitHub verification and Android builds: passed
+* Worktree: clean
+* CodeRabbit thread: resolved
+
+Recommended sequence:
+
+1. Merge PR #10.
+2. Retarget PR #11 to codex/rpe-familiarisation if GitHub does not do so automatically.
+3. Add one authoritative implement-to-equipment eligibility resolver.
+4. Use it in the Profile options and generation boundary.
+5. Add counterexamples for Bodyweight/DB/BB Walking Lunge with minimal, home and full-gym inventories.
+6. Rerun CI and Android builds, then merge PR #11.
+
+1 comment
+P1 Implement options bypass equipment inventory. ProfileScreen.tsx:616
+```
+
+### Output F(G(x))
+
+**PR #10 MERGED** into `codex/rpe-familiarisation` as `200b75c`, a real two-parent
+merge (`5f1cb6a` + `65d62e5`) preserving the migration and audit-ledger history.
+PR #11 retargeted to `codex/rpe-familiarisation` — GitHub did not do it
+automatically. `master` untouched at `4c5056f`.
+
+**The P1 was real, and broader than the example given.** A movement's own
+equipment requirement gates the MOVEMENT, never the IMPLEMENT, and the two
+diverge constantly. Measured against the shipped corpus: **15 of the 17**
+multi-implement movements offer at least one implement their base requirement
+never implies.
+
+| Movement | Requires | Offers |
+|---|---|---|
+| Walking Lunge | nothing | Bodyweight, DB, **BB** |
+| Glute Bridge | nothing | Bodyweight, **BB** |
+| Overhead Press | barbell | BB, DB, **KB** |
+| Suitcase Carry | kettlebell | KB, **DB** |
+| Face Pull | cable_machine | Cable, **Banded** |
+
+So the movement-level availability gate could never constrain the choice. An
+athlete with no barbell could see a barbell Walking Lunge, save it, and have
+generation plan it.
+
+**One authoritative resolver.** `IMPLEMENT_REQUIREMENT` + `implementAvailable`
+in `types.ts`, beside the two vocabularies it joins. It is explicit about what it
+cannot know: `unverifiable` covers `Earthquake Bar` and `Chains`, which no
+`EQUIPMENT_ITEMS` entry represents, and callers fail closed rather than assume
+ownership. Inventing an item for them would have been inventing policy. The one
+interpretive call is `Free Weight` resolving to any of
+barbell/dumbbells/kettlebell — it appears on no multi-implement movement in the
+shipped corpus, so it changes nothing today, and it is flagged for the owner
+rather than settled quietly.
+
+**Applied at all three boundaries**, not just the reported one:
+
+- Profile offers only implements the inventory can perform, and drops a movement
+  entirely when fewer than two survive — one option is not a choice.
+- The store refuses a declaration the athlete cannot equip, in athlete-readable
+  words.
+- **Generation** honours a declaration only while it remains equippable, so a
+  stale declaration (the athlete sold the barbell) drops to undeclared and fails
+  closed to the conservative loaded path rather than asserting a tool they do
+  not own.
+
+**Counterexamples, as requested.** Walking Lunge across minimal, home and
+full-gym inventories at both the UI and store boundaries, plus the generation
+case in BOTH directions: with the barbell absent the declaration is dropped, and
+with it present the same declaration is honoured — so the pair cannot pass
+vacuously. `verify:blocks` additionally machine-checks that the resolver is
+TOTAL over `MOVEMENT_PREFIXES` and names only real `EQUIPMENT_ITEMS`, and that
+an empty inventory can perform Bodyweight and nothing else.
+
+**Mutations — 4 applied, 4 caught.**
+
+| Mutation | Gate | Result |
+|---|---|---|
+| generation ignores inventory (the reported defect exactly) | `LoadIntentDeclaration` | CAUGHT |
+| store ignores inventory | `LoadIntentDeclaration` | CAUGHT |
+| UI offers every supported implement again | `ProfileScreens` | CAUGHT |
+| an unverifiable implement is assumed available | `verify:blocks` | CAUGHT |
+
+**Verification.** `verify:ci` exit 0 — 22 suites / **327 tests** (from 317),
+`verify:store` 667/667, 17 gates `ALL CHECKS PASSED`, `git diff --check` clean.
+
+**Not done.** PR #11 not merged. Nothing pushed to `master`, no tag, no release.
+OW-006 not started, OW-026 not decided, no fatigue coefficient or athlete dose
+changed, migrations 059-063 unmodified.
+
+---
+
+## Entry 0103 — 2026-09-09 · Owner ruling: Free Weight mapping stands; merge PR #11
+
+### Input G(x)
+
+```
+Keep Free Weight as-is and merge PR #11.
+```
+
+### Output F(G(x))
+
+**Owner ruling, recorded because it settles a question Entry 0102 deliberately
+left open.** `Free Weight` keeps the PERMISSIVE mapping introduced with the
+implement-to-equipment resolver: `{ kind: 'anyOf', items: ['barbell',
+'dumbbells', 'kettlebell'] }` — owning any one loadable free weight satisfies it.
+
+This was the single interpretive call in that resolver and the only part of it
+not derivable from the canonical vocabularies, which is why it was flagged rather
+than settled quietly. It is now ratified rather than assumed. Its practical reach
+today is nil: `Free Weight` appears in the `supported_prefixes` of NO
+multi-implement movement in the shipped 300-movement corpus, so no athlete's
+options or dose change either way. It becomes live only if a future library
+correction puts `Free Weight` on a movement that also offers another implement.
+
+Unchanged by this ruling: `Earthquake Bar` and `Chains` remain `unverifiable`,
+because no `EQUIPMENT_ITEMS` entry represents them and ownership therefore cannot
+be confirmed. Callers still fail closed on both.
+
+**PR #11 merged** into `codex/rpe-familiarisation`. Completes OW-001, the last
+State C implementation item, and carries with it the stacked-PR audit (Entry
+0101) and the reviewer P1 remediation (Entry 0102).
+
+State C now has NO open executor work. `OW-006` reachability remains, gated on
+`OW-026`, and is dose-neutral.
