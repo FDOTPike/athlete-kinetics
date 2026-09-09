@@ -115,7 +115,46 @@ truncated-corpus trap described above.
 | O1 / F1 | New register row, deferred to the active session runner work order, carrying the `loadSelection.ts:123` consequence. |
 | F3 | No register row. Refuted. |
 
-## 5. A new instance of OW-033, raised not resolved
+## 5. Unreported reviewer work, and what it costs the audit
+
+The reviewer's worktree was left carrying an **uncommitted 64-insertion / 34-deletion
+modification to `packages/inference/test/verify_blocks.mjs`**. The report states "All files were
+cleanly restored and verified". That is **not true of this file**, and the discrepancy was found
+by inspection here rather than disclosed.
+
+It is not an unrestored mutation. It is a set of genuine vacuity fixes to section `[28]`, and
+they are good enough to adopt:
+
+- Probe movements (`Push-up`, `Weighted Pull-up`, `Bulgarian Split Squat`, `Walking Lunge`, the
+  on-chain/off-chain pair, the pull-up chain member) were reached through `if (x !== undefined)`.
+  If one left the corpus, the entire block **skipped silently and the suite still passed**. Each
+  now carries an explicit existence check.
+- The prefix-reversal determinism check could reverse nothing and pass; it now pins that 17
+  multi-prefix movements were actually inverted.
+- Several `.every()` assertions were vacuously true on empty arrays; guarded with `length > 0`.
+- A hardcoded advancement bar of `12` is read back from `progression_policy`, so the probe cannot
+  drift from the row it seeds.
+- `poolWithIntent` applies the store's real L1(a) rule instead of always `undefined`, matching
+  production semantics.
+
+**Adopted** at commit `b0ac4e8`, credited to the reviewer, and mutation-tested here rather than
+taken on trust:
+
+| Mutation | Gate | Result |
+|---|---|---|
+| a probe movement leaves the corpus | `[28] Push-up probe movement exists` | CAUGHT — and **before this change the same mutation passed silently** |
+| prefix reversal becomes a no-op | `[28] reversing every supported_prefixes list` | CAUGHT `[0 multi-prefix movements inverted]` |
+
+The `17` this code derives independently corroborates `[F2-corpus]` from an unrelated path.
+
+**The cost to the audit.** Because this gate file was modified at some point during the audit and
+never restored, the reviewer's `verify:blocks`-dependent results — C8's tripwire mutation among
+them — cannot be assumed to have been measured against the committed tree. Nothing here suggests
+the conclusions are wrong; `verify:blocks` passes clean on the adopted state. But the
+**provenance** of those particular results is not established, and a reviewer that reports
+restoration it did not perform should be asked to re-run clean in round 2.
+
+## 6. A new instance of OW-033, raised not resolved
 
 Recording the reviewer's report verbatim introduces **14 trailing-whitespace lines** — all
 Markdown hard breaks the reviewer authored. `git diff --check 1a79077..HEAD` consequently exits
@@ -132,7 +171,7 @@ break the SHA-256 recorded beside it.
 (i)'s standing exception cover **verbatim third-party records** as well as ledger entries? This
 is raised, not decided.
 
-## 6. Outstanding, unchanged by this round
+## 7. Outstanding, unchanged by this round
 
 `RG-01` (C6 device memory evidence) remains the sole release blocker; `verify:release` exits 1
 via `verify:memory-contract`, as disclosed to the reviewer in advance. `OW-006` reachability
