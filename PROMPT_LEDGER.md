@@ -6707,3 +6707,122 @@ the six from Entry 0100 confirmed still catching.
 built. OW-006 not started, OW-026 not decided, no fatigue coefficient or dose
 changed, migrations 059-062 untouched. 063 was NOT corrected — the audit found
 no defect in it. Untracked and unrelated files preserved.
+
+---
+
+## Entry 0102 — 2026-09-09 · PR #10 merged; PR #11 P1 — implement options bypass equipment inventory
+
+### Input G(x)
+
+```
+PR #10 is ready to merge. PR #11 is not yet ready.
+PR #10 — APPROVE
+PR #10 can merge first into codex/rpe-familiarisation.
+
+* HEAD 65d62e5
+* GitHub: clean and mergeable
+* Verification and Android builds passed
+* No unresolved review threads
+* OW-006 remains intentionally open and dose-neutral
+
+PR #11 — REQUEST CHANGES
+PR #11 has one substantive equipment-compatibility gap.
+ProfileScreen.tsx (line 616) renders every supported implement after checking
+only whether the overall movement is available. For example, Walking Lunge
+requires no equipment and supports Bodyweight, DB, and BB; an athlete without
+dumbbells or a barbell therefore still sees—and can save—those loaded options.
+The store validates only that the movement supports the implement, while the
+generator checks only the movement's base equipment requirements. Consequently,
+it can generate an explicitly barbell-planned movement for an athlete whose
+inventory contains no barbell.
+This is not caught by the green suite. I independently reproduced the full
+verification result:
+
+* verify:ci: passed
+* 22 suites, 317 tests
+* GitHub verification and Android builds: passed
+* Worktree: clean
+* CodeRabbit thread: resolved
+
+Recommended sequence:
+
+1. Merge PR #10.
+2. Retarget PR #11 to codex/rpe-familiarisation if GitHub does not do so automatically.
+3. Add one authoritative implement-to-equipment eligibility resolver.
+4. Use it in the Profile options and generation boundary.
+5. Add counterexamples for Bodyweight/DB/BB Walking Lunge with minimal, home and full-gym inventories.
+6. Rerun CI and Android builds, then merge PR #11.
+
+1 comment
+P1 Implement options bypass equipment inventory. ProfileScreen.tsx:616
+```
+
+### Output F(G(x))
+
+**PR #10 MERGED** into `codex/rpe-familiarisation` as `200b75c`, a real two-parent
+merge (`5f1cb6a` + `65d62e5`) preserving the migration and audit-ledger history.
+PR #11 retargeted to `codex/rpe-familiarisation` — GitHub did not do it
+automatically. `master` untouched at `4c5056f`.
+
+**The P1 was real, and broader than the example given.** A movement's own
+equipment requirement gates the MOVEMENT, never the IMPLEMENT, and the two
+diverge constantly. Measured against the shipped corpus: **15 of the 17**
+multi-implement movements offer at least one implement their base requirement
+never implies.
+
+| Movement | Requires | Offers |
+|---|---|---|
+| Walking Lunge | nothing | Bodyweight, DB, **BB** |
+| Glute Bridge | nothing | Bodyweight, **BB** |
+| Overhead Press | barbell | BB, DB, **KB** |
+| Suitcase Carry | kettlebell | KB, **DB** |
+| Face Pull | cable_machine | Cable, **Banded** |
+
+So the movement-level availability gate could never constrain the choice. An
+athlete with no barbell could see a barbell Walking Lunge, save it, and have
+generation plan it.
+
+**One authoritative resolver.** `IMPLEMENT_REQUIREMENT` + `implementAvailable`
+in `types.ts`, beside the two vocabularies it joins. It is explicit about what it
+cannot know: `unverifiable` covers `Earthquake Bar` and `Chains`, which no
+`EQUIPMENT_ITEMS` entry represents, and callers fail closed rather than assume
+ownership. Inventing an item for them would have been inventing policy. The one
+interpretive call is `Free Weight` resolving to any of
+barbell/dumbbells/kettlebell — it appears on no multi-implement movement in the
+shipped corpus, so it changes nothing today, and it is flagged for the owner
+rather than settled quietly.
+
+**Applied at all three boundaries**, not just the reported one:
+
+- Profile offers only implements the inventory can perform, and drops a movement
+  entirely when fewer than two survive — one option is not a choice.
+- The store refuses a declaration the athlete cannot equip, in athlete-readable
+  words.
+- **Generation** honours a declaration only while it remains equippable, so a
+  stale declaration (the athlete sold the barbell) drops to undeclared and fails
+  closed to the conservative loaded path rather than asserting a tool they do
+  not own.
+
+**Counterexamples, as requested.** Walking Lunge across minimal, home and
+full-gym inventories at both the UI and store boundaries, plus the generation
+case in BOTH directions: with the barbell absent the declaration is dropped, and
+with it present the same declaration is honoured — so the pair cannot pass
+vacuously. `verify:blocks` additionally machine-checks that the resolver is
+TOTAL over `MOVEMENT_PREFIXES` and names only real `EQUIPMENT_ITEMS`, and that
+an empty inventory can perform Bodyweight and nothing else.
+
+**Mutations — 4 applied, 4 caught.**
+
+| Mutation | Gate | Result |
+|---|---|---|
+| generation ignores inventory (the reported defect exactly) | `LoadIntentDeclaration` | CAUGHT |
+| store ignores inventory | `LoadIntentDeclaration` | CAUGHT |
+| UI offers every supported implement again | `ProfileScreens` | CAUGHT |
+| an unverifiable implement is assumed available | `verify:blocks` | CAUGHT |
+
+**Verification.** `verify:ci` exit 0 — 22 suites / **327 tests** (from 317),
+`verify:store` 667/667, 17 gates `ALL CHECKS PASSED`, `git diff --check` clean.
+
+**Not done.** PR #11 not merged. Nothing pushed to `master`, no tag, no release.
+OW-006 not started, OW-026 not decided, no fatigue coefficient or athlete dose
+changed, migrations 059-063 unmodified.
