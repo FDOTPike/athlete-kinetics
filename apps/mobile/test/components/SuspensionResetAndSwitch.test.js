@@ -387,3 +387,58 @@ test('a reset on A leaves B untouched, and each athlete keeps its own suspension
   expect(store().suspension.frozen_macro_index).toBe(bFrozen);
   expectMemoryAndDbAgree(DB_B);
 });
+
+// ---------------------------------------------------------------------------
+// OW-007 (store half) — endSuspension is transactional and reports failure
+// ---------------------------------------------------------------------------
+
+test('OW-007 endSuspension rolls back and RETHROWS when its write fails', async () => {
+  await bootRealStore();
+  const frozen = store().beginSuspension('injury', 1_756_000_000_000);
+  expect(openEpisodes(DB_A)).toHaveLength(1);
+
+  // Fail exactly the close write, nothing else. beginSuspension already
+  // committed, so this isolates the resume path.
+  const driver = drivers.get(DB_A);
+  const realExecuteSync = driver.executeSync.bind(driver);
+  driver.executeSync = (sql, params) => {
+    if (/UPDATE suspension_episode SET ended_at_ms/.test(String(sql))) {
+      throw new Error('database is locked');
+    }
+    return realExecuteSync(sql, params);
+  };
+
+  // Before the fix this was an unguarded executeSync: it threw from inside the
+  // store with no transaction to unwind and nothing to catch it.
+  expect(() => store().endSuspension(1_756_900_000_000)).toThrow('database is locked');
+
+  driver.executeSync = realExecuteSync;
+
+  // Rolled back: the episode is still open, in the database AND in memory, so
+  // the athlete can retry rather than being left in a half-resumed state.
+  expect(openEpisodes(DB_A)).toHaveLength(1);
+  expect(openEpisodes(DB_A)[0].ended_at_ms).toBeNull();
+  store().refreshSuspension();
+  expect(store().suspension).not.toBeNull();
+  expect(store().suspension.frozen_macro_index).toBe(frozen);
+  expectMemoryAndDbAgree(DB_A);
+
+  // And the retry succeeds, which is the point of failing cleanly.
+  store().endSuspension(1_757_000_000_000);
+  expect(openEpisodes(DB_A)).toHaveLength(0);
+  expectMemoryAndDbAgree(DB_A);
+});
+
+test('OW-007 a successful resume still closes the episode exactly once', async () => {
+  await bootRealStore();
+  store().beginSuspension('illness', 1_756_000_000_000);
+  store().endSuspension(1_756_900_000_000);
+
+  const all = episodes(DB_A);
+  expect(all).toHaveLength(1);
+  expect(all[0].ended_at_ms).toBe(1_756_900_000_000);
+  // 059 refuses a second close, and endSuspension no-ops with no open episode.
+  expect(() => store().endSuspension(1_757_000_000_000)).not.toThrow();
+  expect(episodes(DB_A)[0].ended_at_ms).toBe(1_756_900_000_000);
+  expectMemoryAndDbAgree(DB_A);
+});
