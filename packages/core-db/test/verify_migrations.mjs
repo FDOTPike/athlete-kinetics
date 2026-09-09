@@ -60,7 +60,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '057_block_meta_phase_invariant.sql',
   '058_suspension_episode.sql', '059_suspension_state_and_load_intent.sql',
   '060_program_goal_tier_alignment.sql',
-  '061_autopilot_attribution_convergence.sql'];
+  '061_autopilot_attribution_convergence.sql',
+  '062_suspension_sidecar_immutability.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1739,11 +1740,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 60 files (slots 001-061, no 004) -> user_version 60. This count is
+    // 61 files (slots 001-062, no 004) -> user_version 61. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 061 (034 strict convergence).
-    check('fresh install reaches user_version 60 (60 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 60,
+    // silent one. Re-pinned for 062 (059 side-car immutability).
+    check('fresh install reaches user_version 61 (61 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 61,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -2325,6 +2326,301 @@ check('061 self-heal restores the side-car ON THE STRICT CONTRACT',
   !sentinelsMissing(replay61).includes('planned_slot_autopilot')
     && uv(replay61) === MIGRATIONS.length
     && strictRejections(replay61, 6500) === ALL);
+
+
+// --- 2ab. 062 completes the 059 side-car immutability contract --------------
+// 059 protected the base episode fully, and its own frozen-program side-car
+// against UPDATE only. Probed against the real chain, three mutations were
+// still ALLOWED: DELETE suspension_episode_program, and BOTH update and delete
+// of block_suspension_origin. block_suspension_origin is the sharp one: the
+// position readers work by ABSENCE, excluding attributed blocks rather than
+// storing a second copy of the position, so removing or re-pointing one row
+// silently returns a suspension-era block to consuming a macro position — the
+// exact S6(b) defect the ruling was raised to close.
+//
+// This section also carries the FIRST behavioural coverage of 059's own four
+// triggers. Sentinel registration proves an object is present and restorable,
+// not that it refuses anything, and nothing asserted a refusal before.
+console.log('[2ab] 062 suspension side-car immutability (completes 059)');
+
+const IDX_062 = FILES.indexOf('062_suspension_sidecar_immutability.sql');
+const TRG_062 = [
+  'trg_suspension_episode_program_no_delete_bd',
+  'trg_block_suspension_origin_immutable_bu',
+  'trg_block_suspension_origin_no_delete_bd',
+  'trg_planned_slot_load_intent_no_repoint_bu',
+];
+const triggerPresent = (db, name) => db.raw
+  .prepare("SELECT 1 AS x FROM sqlite_master WHERE type='trigger' AND name=?").get(name) !== undefined;
+
+// One CLOSED episode carrying a full set of 059 side-cars, plus a SPARE block
+// and a SPARE slot that carry none. The spares exist so an INSERT probe can
+// never be rejected for a missing FK parent or a PRIMARY KEY clash instead of
+// the trigger under test. training_program.status is 'archived' because 033's
+// idx_training_program_one_current allows only one active/review_due row.
+const seed062 = (db, b) => db.executeSync(`
+  INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
+  VALUES (${b}, '2030-06-01', 'strength', 1), (${b + 9}, '2030-07-01', 'strength', 2);
+  INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (${b}, ${b}, 1, 1, 'lower', 'accumulation', '2030-06-01');
+  INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (${b}, ${b}, 1, 1, 3, 5, 8.0), (${b + 9}, ${b}, 9, 2, 3, 5, 8.0);
+  INSERT INTO training_program (program_id, objective, start_date, horizon_kind, planned_end_date,
+                                planned_block_count, starting_macro_block_index, schema_type, status,
+                                created_at_ms, updated_at_ms)
+  VALUES (${b}, 'strength', '2030-06-01', 'weeks', '2030-08-01', 4, 1, 'LINEAR', 'archived', 1, 1);
+  INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index)
+  VALUES (${b}, 1000, 2000, 'injury', 3);
+  INSERT INTO suspension_episode_program (episode_id, program_id, frozen_sequence_index)
+  VALUES (${b}, ${b}, 2);
+  INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${b}, ${b});
+  INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (${b}, 'BB');
+`);
+// true when the statement was REFUSED. A trigger RAISE(ABORT) surfaces as a
+// throw, and nothing else in these probes should throw.
+const refused = (db, sql) => { try { db.executeSync(sql); return false; } catch { return true; } };
+const sidecars = (db) => JSON.stringify({
+  program: db.raw.prepare('SELECT episode_id, program_id, frozen_sequence_index FROM suspension_episode_program ORDER BY episode_id').all(),
+  origin: db.raw.prepare('SELECT block_id, episode_id FROM block_suspension_origin ORDER BY block_id').all(),
+  intent: db.raw.prepare('SELECT planned_slot_id, planned_implement FROM planned_slot_load_intent ORDER BY planned_slot_id').all(),
+});
+// The mutations 062 must refuse, plus the one 059 already refused. The same
+// list drives the fresh-install assertions, the post-upgrade assertions and the
+// per-trigger self-heal assertions, so a gate cannot hold in one place and be
+// quietly missing in another.
+const PROHIBITED_062 = (b) => [
+  ['059 UPDATE suspension_episode_program.frozen_sequence_index',
+    `UPDATE suspension_episode_program SET frozen_sequence_index = 7 WHERE episode_id = ${b}`],
+  ['062 direct DELETE suspension_episode_program',
+    `DELETE FROM suspension_episode_program WHERE episode_id = ${b}`],
+  ['062 UPDATE block_suspension_origin.episode_id (re-point the attribution)',
+    `UPDATE block_suspension_origin SET episode_id = ${b} WHERE block_id = ${b}`],
+  ['062 direct DELETE block_suspension_origin',
+    `DELETE FROM block_suspension_origin WHERE block_id = ${b}`],
+  ['062 UPDATE planned_slot_load_intent.planned_slot_id (move a declared intent)',
+    `UPDATE planned_slot_load_intent SET planned_slot_id = ${b + 9} WHERE planned_slot_id = ${b}`],
+];
+
+// (1) FRESH INSTALL -- the chain ends with the contract enforced.
+{
+  const B = 6600;
+  const fresh62 = freshDb();
+  runMigrations(fresh62, MIGRATIONS);
+  check('062 fresh install completes the chain',
+    uv(fresh62) === MIGRATIONS.length && sentinelsMissing(fresh62).length === 0,
+    `uv=${uv(fresh62)} missing=${sentinelsMissing(fresh62).join(',')}`);
+  check('062 installs all four triggers on a fresh install',
+    TRG_062.every((t) => triggerPresent(fresh62, t)),
+    TRG_062.filter((t) => !triggerPresent(fresh62, t)).join(',') || 'all present');
+  seed062(fresh62, B);
+  const before = sidecars(fresh62);
+  for (const [label, sql] of PROHIBITED_062(B)) {
+    check(`062 fresh install REFUSES ${label}`, refused(fresh62, sql));
+  }
+  // A refused statement must change nothing -- an ABORT that had already
+  // written would be worse than no trigger at all.
+  check('062 every refused mutation left the original rows byte-identical',
+    sidecars(fresh62) === before, sidecars(fresh62));
+
+  // Legitimate INSERTs stay available: none of these tables is insert-gated,
+  // and the spare block/slot exist precisely so this cannot pass vacuously.
+  check('062 INSERT block_suspension_origin remains available',
+    !refused(fresh62, `INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${B + 9}, ${B})`));
+  check('062 INSERT planned_slot_load_intent remains available',
+    !refused(fresh62, `INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (${B + 9}, 'DB')`));
+  // planned_implement revision on its OWN slot is deliberately still open:
+  // OW-001's athlete-facing implement selection is unimplemented, and no source
+  // document makes a declared intent immutable. Only re-pointing is refused.
+  check('062 revising planned_implement on its OWN slot stays permitted (OW-001 is still open)',
+    !refused(fresh62, `UPDATE planned_slot_load_intent SET planned_implement = 'KB' WHERE planned_slot_id = ${B}`));
+  check('062 deleting a load intent stays permitted (absence is the conservative loaded path)',
+    !refused(fresh62, `DELETE FROM planned_slot_load_intent WHERE planned_slot_id = ${B + 9}`));
+
+  // 059's own four triggers -- the refusal surface nothing exercised before.
+  check('059 REFUSES UPDATE suspension_episode.frozen_macro_index',
+    refused(fresh62, `UPDATE suspension_episode SET frozen_macro_index = 5 WHERE episode_id = ${B}`));
+  check('059 REFUSES UPDATE suspension_episode.started_at_ms',
+    refused(fresh62, `UPDATE suspension_episode SET started_at_ms = 900 WHERE episode_id = ${B}`));
+  check('059 REFUSES UPDATE suspension_episode.reason',
+    refused(fresh62, `UPDATE suspension_episode SET reason = 'life' WHERE episode_id = ${B}`));
+  check('059 REFUSES moving a recorded close time',
+    refused(fresh62, `UPDATE suspension_episode SET ended_at_ms = 3000 WHERE episode_id = ${B}`));
+  check('059 REFUSES deleting a CLOSED episode',
+    refused(fresh62, `DELETE FROM suspension_episode WHERE episode_id = ${B}`));
+  // The two deliberate permissions. The open-episode delete is what
+  // resetTrainingData depends on, so it is asserted, never assumed.
+  fresh62.executeSync(`INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (${B + 1}, 4000, NULL, 'illness', 4)`);
+  check('059 PERMITS the athlete resume (ended_at_ms NULL -> non-NULL, once)',
+    !refused(fresh62, `UPDATE suspension_episode SET ended_at_ms = 5000 WHERE episode_id = ${B + 1}`));
+  fresh62.executeSync(`INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (${B + 2}, 6000, NULL, 'life', 2)`);
+  check('059 PERMITS deleting an OPEN episode (the reset path depends on this)',
+    !refused(fresh62, `DELETE FROM suspension_episode WHERE episode_id = ${B + 2}`));
+}
+
+// (2) UPGRADE FROM THE CURRENTLY SHIPPED PRE-062 STATE.
+// The precondition half matters as much as the outcome: it proves the gap was
+// real on the shipped chain rather than taking the audit's word for it.
+{
+  const B = 6700;
+  const up62 = freshDb();
+  applyRaw(up62, MIGRATIONS, 0, IDX_062);
+  check('062 upgrade precondition: device sits one migration short',
+    uv(up62) === IDX_062, String(uv(up62)));
+  seed062(up62, B);
+  // Every 062-prohibited mutation succeeds at pre-062 -- then the rows are put
+  // back, so the upgrade below runs against exactly what the seed created.
+  const gapWasReal = PROHIBITED_062(B)
+    .filter(([label]) => label.startsWith('062'))
+    .every(([, sql]) => !refused(up62, sql));
+  check('062 upgrade precondition: the pre-062 chain really did permit all four', gapWasReal);
+  up62.executeSync(`DELETE FROM suspension_episode_program WHERE episode_id = ${B}`);
+  up62.executeSync(`DELETE FROM block_suspension_origin WHERE block_id = ${B}`);
+  up62.executeSync(`DELETE FROM planned_slot_load_intent WHERE planned_slot_id IN (${B}, ${B + 9})`);
+  up62.executeSync(`
+    INSERT INTO suspension_episode_program (episode_id, program_id, frozen_sequence_index) VALUES (${B}, ${B}, 2);
+    INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${B}, ${B});
+    INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (${B}, 'BB');
+  `);
+  const beforeUpgrade = sidecars(up62);
+  runMigrations(up62, MIGRATIONS);
+  check('062 upgraded device reaches the end of the chain',
+    uv(up62) === MIGRATIONS.length && sentinelsMissing(up62).length === 0,
+    `uv=${uv(up62)} missing=${sentinelsMissing(up62).join(',')}`);
+  check('062 upgrade preserves every existing side-car row EXACTLY',
+    sidecars(up62) === beforeUpgrade, sidecars(up62));
+  for (const [label, sql] of PROHIBITED_062(B)) {
+    check(`062 upgraded device now REFUSES ${label}`, refused(up62, sql));
+  }
+  check('062 upgrade: the refused mutations left the rows byte-identical',
+    sidecars(up62) === beforeUpgrade, sidecars(up62));
+}
+
+// (3) THE DELETE GUARDS ARE PARENT-SCOPED, AND THE REPLAY SURVIVES THEM.
+//
+// Measured, not assumed: an FK ON DELETE CASCADE action DOES fire the child's
+// BEFORE DELETE trigger, whatever recursive_triggers says. An unconditional
+// guard would therefore make every parent undeletable and abort the reset, so
+// the guard must be `WHEN EXISTS (<parent>)` -- 026's shape. The price is that
+// naming another table makes ALTER TABLE ... RENAME fail while that table is
+// absent, and 049/052/061 each rename. migrationRunner drops these two
+// triggers before a full re-apply for exactly that reason; both halves are
+// asserted here, because either one alone is a broken database.
+{
+  const B = 6800;
+
+  // (3a) A direct delete is refused while the parents live; a cascade from
+  // EITHER parent still carries the row away.
+  const casc = freshDb();
+  runMigrations(casc, MIGRATIONS);
+  seed062(casc, B);
+  check('062 a direct delete is refused while both parents are present',
+    refused(casc, `DELETE FROM block_suspension_origin WHERE block_id = ${B}`)
+      && casc.raw.prepare('SELECT COUNT(*) AS c FROM block_suspension_origin').get().c === 1);
+  casc.executeSync(`DELETE FROM training_block WHERE block_id = ${B}`);
+  check('062 block deletion still CASCADES its attribution away',
+    casc.raw.prepare('SELECT COUNT(*) AS c FROM block_suspension_origin').get().c === 0);
+  casc.executeSync(`DELETE FROM training_program WHERE program_id = ${B}`);
+  check('062 program deletion still CASCADES the frozen program state away',
+    casc.raw.prepare('SELECT COUNT(*) AS c FROM suspension_episode_program').get().c === 0);
+
+  // (3b) The OTHER parent: the reset deletes the open episode first, so that
+  // episode's attribution must leave with it and no other episode's may.
+  const epi = freshDb();
+  runMigrations(epi, MIGRATIONS);
+  seed062(epi, B);
+  epi.executeSync(`INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (${B + 1}, 8000, NULL, 'injury', 5)`);
+  epi.executeSync(`INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${B + 9}, ${B + 1})`);
+  check("062 the reset's open-episode delete CASCADES only THAT episode's attribution",
+    !refused(epi, 'DELETE FROM suspension_episode WHERE ended_at_ms IS NULL')
+      && epi.raw.prepare(`SELECT COUNT(*) AS c FROM block_suspension_origin WHERE episode_id = ${B + 1}`).get().c === 0
+      && epi.raw.prepare(`SELECT COUNT(*) AS c FROM block_suspension_origin WHERE episode_id = ${B}`).get().c === 1);
+
+  // (3c) resetTrainingData's parentless cleanup, FKs OFF: the rows survive
+  // their parents and must then be deletable, or a reused block rowid would
+  // inherit a stale attribution and vanish from nextMacroPosition.
+  const off = freshDb();
+  off.raw.exec('PRAGMA foreign_keys = OFF;');
+  runMigrations(off, MIGRATIONS);
+  seed062(off, B);
+  off.executeSync(`DELETE FROM training_program WHERE program_id = ${B}`);
+  off.executeSync(`DELETE FROM training_block WHERE block_id = ${B}`);
+  check('062 FK-OFF precondition: the side-car rows are parentless, not cascaded',
+    off.raw.prepare('SELECT COUNT(*) AS c FROM suspension_episode_program').get().c === 1
+      && off.raw.prepare('SELECT COUNT(*) AS c FROM block_suspension_origin').get().c === 1);
+  check("062 PERMITS the reset's parentless cleanup once the parents are gone",
+    !refused(off, 'DELETE FROM suspension_episode_program')
+      && !refused(off, 'DELETE FROM block_suspension_origin'));
+
+  // (3d) THE TRAP. Drop a named parent and prove the poisoned DB still heals.
+  // Without REPLAY_BLOCKING_TRIGGERS this aborts inside 049's ALTER TABLE
+  // RENAME -- nine migrations before 058 could recreate suspension_episode --
+  // and the database is unrecoverable. Reproduced before the guard was added.
+  for (const parent of ['suspension_episode', 'training_block', 'training_program']) {
+    const heal = freshDb();
+    runMigrations(heal, MIGRATIONS);
+    seed062(heal, B);
+    heal.raw.exec(`DROP TABLE ${parent}`);
+    check(`062 precondition: dropped ${parent} is seen as a missing sentinel`,
+      sentinelsMissing(heal).includes(parent));
+    let threw = null;
+    try { runMigrations(heal, MIGRATIONS); } catch (e) { threw = String(e.message).split('\n')[0]; }
+    check(`062 self-heal replays the whole chain with ${parent} missing`,
+      threw === null && sentinelsMissing(heal).length === 0 && uv(heal) === MIGRATIONS.length,
+      threw ?? `missing=${sentinelsMissing(heal).join(',')}`);
+    // Recovery must restore the CONTRACT, not merely the objects.
+    seed062(heal, B + 100);
+    check(`062 self-heal after losing ${parent} restores the refusals too`,
+      PROHIBITED_062(B + 100).every(([, sql]) => refused(heal, sql)));
+  }
+
+  // (3e) The structural rule, asserted against migrationRunner's own list so a
+  // future cross-table trigger cannot be added without joining it. Comments are
+  // stripped first: prose says "from" too.
+  const sql062Bare = MIGRATIONS[IDX_062].replace(/^\s*--.*$/gm, '');
+  const named = [...sql062Bare.matchAll(/\bFROM\s+(\w+)/gi)].map((m) => m[1]);
+  const runnerSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'migrationRunner.ts'), 'utf-8');
+  check('062 every cross-table trigger it adds is on REPLAY_BLOCKING_TRIGGERS',
+    named.length > 0
+      && TRG_062.filter((t) => runnerSrc.includes(`'${t}',`) && runnerSrc.indexOf(`'${t}',`) > runnerSrc.indexOf('REPLAY_BLOCKING_TRIGGERS'))
+        .length === 2,
+    `tables named: ${[...new Set(named)].join(',')}`);
+}
+
+// (4) IDEMPOTENCE AND SELF-HEAL, PER TRIGGER.
+// Restoration is asserted through BEHAVIOUR, not presence: a trigger that is
+// back in sqlite_master but semantically wrong would pass a presence check.
+{
+  const B = 6900;
+  const heal = freshDb();
+  runMigrations(heal, MIGRATIONS);
+  seed062(heal, B);
+  const beforeHeal = sidecars(heal);
+  heal.executeSync(`PRAGMA user_version = ${IDX_062};`);
+  runMigrations(heal, MIGRATIONS);
+  check('062 replay over an already-protected chain is a no-op',
+    sidecars(heal) === beforeHeal && uv(heal) === MIGRATIONS.length);
+
+  const prohibited = PROHIBITED_062(B);
+  for (const name of TRG_062) {
+    heal.raw.exec(`DROP TRIGGER ${name}`);
+    check(`062 a dropped ${name} is detected as a missing sentinel`,
+      sentinelsMissing(heal).includes(name), sentinelsMissing(heal).join(',') || 'none');
+    runMigrations(heal, MIGRATIONS);
+    check(`062 self-heal restores ${name} AND its refusal`,
+      !sentinelsMissing(heal).includes(name)
+        && uv(heal) === MIGRATIONS.length
+        && prohibited.every(([, sql]) => refused(heal, sql)));
+  }
+  check('062 self-heal left every side-car row untouched',
+    sidecars(heal) === beforeHeal, sidecars(heal));
+}
+
+// (5) ARRAY INDEX AND user_version. 062 is the 61st entry, so it APPLIES at
+// index 60 and leaves user_version 61 -- the file number and the array index
+// are not the same thing, and the runner uses the index.
+check(`062 is appended at array index ${IDX_062}, never spliced`,
+  IDX_062 === MIGRATIONS.length - 1 && IDX_062 === 60, `index=${IDX_062} length=${MIGRATIONS.length}`);
+
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

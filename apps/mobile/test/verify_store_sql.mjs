@@ -52,7 +52,13 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 059 adds suspension_episode_program, block_suspension_origin and
   // planned_slot_load_intent, which the store now reads and writes. 057 stays
   // deliberately absent (see the note above); 059 does not depend on it.
-  '059_suspension_state_and_load_intent.sql'];
+  '059_suspension_state_and_load_intent.sql',
+  // 062 closes the 059 side-car mutation surface. It is included because the
+  // reset probe below EXECUTES the store's exact delete sequence: with 062
+  // present, an ordering regression that named a side-car before its parents
+  // aborts here instead of passing quietly. It depends only on tables 007/033/
+  // 058/059 already create, so it applies cleanly without 060/061.
+  '062_suspension_sidecar_immutability.sql'];
 
 
 const db = new DatabaseSync(':memory:');

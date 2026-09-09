@@ -195,6 +195,16 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'trigger', name: 'trg_suspension_episode_close_once_bu' },          // 059
   { type: 'trigger', name: 'trg_suspension_episode_no_delete_closed_bd' },    // 059
   { type: 'trigger', name: 'trg_suspension_episode_program_immutable_bu' },   // 059
+  // 062 completes the 059 side-car immutability contract. These four are
+  // fail-closed invariants of the same kind: losing the block_suspension_origin
+  // pair lets a suspension-era block's attribution be deleted or re-pointed,
+  // and the position readers work by ABSENCE, so that block silently starts
+  // consuming a macro position again — the exact S6(b) defect. 062 adds no
+  // table, so nothing is owed to DURABLE_TABLE_EXEMPTIONS below.
+  { type: 'trigger', name: 'trg_suspension_episode_program_no_delete_bd' },   // 062
+  { type: 'trigger', name: 'trg_block_suspension_origin_immutable_bu' },      // 062
+  { type: 'trigger', name: 'trg_block_suspension_origin_no_delete_bd' },      // 062
+  { type: 'trigger', name: 'trg_planned_slot_load_intent_no_repoint_bu' },    // 062
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -210,6 +220,40 @@ export const DURABLE_TABLE_EXEMPTIONS: readonly { readonly name: string; readonl
       + 'It does not exist at latest user_version, so it can never be missing.',
   },
 ];
+
+/**
+ * Triggers whose WHEN clause names a table OTHER than the one they fire on.
+ *
+ * A full re-apply is, by definition, run against a database that has lost
+ * something — and `ALTER TABLE ... RENAME` (performed by 049, 052 and 061)
+ * re-parses and rewrites the ENTIRE schema, aborting with "error in trigger
+ * <name>: no such table" if any trigger references a table that is currently
+ * absent. Because 049 sits at array index 47 and the suspension tables are not
+ * created until 058/059, a poisoned DB missing `suspension_episode` could never
+ * replay far enough to restore it: the self-heal would abort at 049 every time,
+ * turning a recoverable database into an unrecoverable one. Reproduced
+ * directly, and pinned by verify:migrations [2ab].
+ *
+ * Dropping them here is safe and self-closing: the replay recreates each one
+ * from its own migration (CREATE TRIGGER IF NOT EXISTS), and if the replay does
+ * not complete, the sentinel check below reports them missing and throws. The
+ * only window in which the guard is absent is inside the recovery itself.
+ *
+ * 062's are listed. 026's `trg_set_dose_target_bd` and `trg_session_outcome_bd`
+ * have the same shape and therefore the same latent exposure via `set_record`
+ * and `session`; that is a pre-existing defect disclosed rather than fixed
+ * here, because changing 026's recovery behaviour is outside this change.
+ */
+const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
+  'trg_suspension_episode_program_no_delete_bd', // 062 -> suspension_episode, training_program
+  'trg_block_suspension_origin_no_delete_bd',    // 062 -> training_block, suspension_episode
+];
+
+function dropReplayBlockingTriggers(db: MigrationDb): void {
+  for (const name of REPLAY_BLOCKING_TRIGGERS) {
+    db.executeSync(`DROP TRIGGER IF EXISTS ${name};`);
+  }
+}
 
 function userVersion(db: MigrationDb): number {
   return Number(db.executeSync('PRAGMA user_version;').rows[0]?.user_version ?? 0);
@@ -274,6 +318,7 @@ export function runMigrations(db: MigrationDb, migrations: readonly string[]): v
     // migrations are idempotent by contract. Any irrecoverable provenance is
     // first persisted in its conservative state so replay can never widen it.
     applyFailClosedRepairs(db, missing);
+    dropReplayBlockingTriggers(db);
     db.executeSync('PRAGMA user_version = 0;');
     applyFrom(db, migrations, 0);
     const still = sentinelsMissing(db);
