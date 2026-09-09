@@ -6979,4 +6979,94 @@ can we get pr 12 ready to merge
 
 ### Output F(G(x))
 
-_pending_
+**Round-2 audit closed out and PR #12 readied. APPROVE WITH FINDINGS, three
+findings: one of them mine and wrong, one a real coverage hole, one partially
+refuted.**
+
+**The cleanliness mandate worked.** Round 1's failure was leaving a modified gate
+file while reporting it restored. Round 2 was required to PROVE restoration:
+`git write-tree` before and after, both `5d6254d2...`, matching the candidate
+tree byte for byte, with `git status --porcelain` empty. Zero tracked files
+touched. Converting the previous round's failure into a mechanical control is
+what made this round's results usable.
+
+**A2 disclosed something round 1 never did.** An adversarial subagent authored
+the section `[28]` hardening at 00:22 as an intended in-place remediation of a
+"Finding F4", and wrote a `section-28-gate-verification.md` — neither reached the
+round-1 report, whose restoration sentence was copied from a mutation checklist
+without a final `git status`. Round 2 names it "an operational failure that
+breached Rule 2" and scopes the damage precisely. A1 re-ran the affected results
+clean. Provenance restored.
+
+**A3 is better than a concession.** Round 1's stated cause for the "15 of 17"
+error was arithmetically impossible (it yields 12). Round 2 did not stop there —
+it reconstructed a hypothesis giving EXACTLY 15: assume a `pullup_bar` implies
+`bands`, and precisely `Chin-up` and `Weighted Pull-up` stop diverging while
+`Push-up`, `Nordic Curl` and `Face Pull` still do. 17 - 2 = 15, and those are the
+two originally missed. Adopted in `types.ts` as the LEADING explanation, not as
+established cause: the original script is gone and nothing proves this was the
+reasoning.
+
+**Finding 3 - UPHELD, FIXED. Mine, in a gate I wrote to stop exactly this.**
+`[F2-corpus]` swept in `004_state_vector_materialize.sql`, which `migrations.ts:4`
+records as the DAO's parameterized daily upsert rather than a migration, and
+reported "63 migrations" against a chain of 62. Excluded. `chain.length === 62`
+is now part of the PREDICATE rather than only printed - a number in an output
+string is decoration, a number in the assertion is a gate.
+
+**Finding 2 - UPHELD, FIXED.** `plannedImplementFor` checked `implementAvailable`
+on the declared branch but not the sole-prefix fallback. `OW-017` moves from
+closed-as-latent to closed-and-FIXED: unreachability held by database shape alone
+is weaker than unreachability plus a guard, and the reviewer was right to press
+it.
+
+**Finding 1 - PARTIALLY UPHELD. The three sections named are not one defect.**
+
+| Section | Disposition |
+|---|---|
+| `[11]` | UPHELD. Reads the module-level `db`, pins 30 rows, so the 270 movements from 016/037-048/049 are invisible. Nothing else enforces membership - 010's CHECK is `json_valid()` only. Closed by a full-corpus token check in `[F2-corpus]`. |
+| `[9d]` | UPHELD ON THE LABEL ONLY. `fixture-chain` is documented at lines 95-101 as deliberate: the fixture tests FLOOR MECHANICS while chain SCOPING is tested in `[28]` against the real corpus. A declared division of labour, not masking. The label overclaimed. No behaviour changed. |
+| `[12]` | ACKNOWLEDGED, recorded as `OW-038`. Widening substitution coverage is its own change. |
+
+**Mutations - 3 applied, 3 caught. Mutation 8 is the one that matters.**
+
+| Mutation | Result |
+|---|---|
+| 6. `004_` swept back in | `[F2-corpus]` FAIL [300 movements from 63 migrations] |
+| 7. bad token inside the 001-015 fixture | BOTH gates FAIL |
+| 8. bad token in migration 037, OUTSIDE the fixture | `[fixture 001-015]` **PASS** (blind, as predicted); `[F2-corpus]` FAIL [Alternate Hammer Curl:Kettlebell] |
+
+Mutation 8 reproduces finding 1's concrete failure scenario exactly and shows it
+closed. Mutation 7 alone would have proved nothing, because both gates see the
+fixture.
+
+**On finding 2, no mutation is offered, and that is the honest position.** The
+guard is a no-op on the shipped corpus by construction - 0 of 235 - and
+`availableMovements` filters such a movement out before `plannedImplementFor`
+ever sees it, so no behavioural test can currently distinguish the guard's
+presence from its absence. That indistinguishability IS the dose-neutrality
+evidence: `verify:ci` is identical either side of the change at 22 suites / 327
+tests. Manufacturing a mutation that appeared to prove otherwise would be
+overclaiming. `[OW-017]` is what will announce the day it becomes reachable.
+
+**A third `OW-033` instance, raised not resolved.** Committing the reviewer's
+report rewrote CRLF to LF under `.gitattributes` `* text=auto eol=lf`, so the
+as-delivered hash (`497519993d...`) and the as-stored hash (`64126b41...`) are
+different byte sequences. Both are recorded with the reason. The normalization is
+correct for a multi-agent multi-OS repo, so this is not resolved by disabling it.
+
+**The scheduled cloud run was blocked and wrote nothing.** The Claude GitHub App
+holds READ-ONLY access to this repository: `git push`, `update_pull_request` and
+`add_issue_comment` all returned 403. Its ledger commit `ddef065` was never
+pushable and is gone. It did leave one useful result - on a fresh cloud checkout
+with its own `npm ci`, `[F2-corpus]` reproduced independently at 17 of 17 across
+300 movements.
+
+**Verification.** `verify:ci` exit 0 - 22 suites / **327 tests**, `verify:store`
+667/667.
+
+**Not done.** PR #12 not merged. Nothing pushed to `master`, no tag, no release,
+no migration. `OW-006` not started, `OW-026` not decided, no fatigue coefficient
+or athlete dose changed, migrations 059-063 unmodified. `OW-037` still deferred
+to the session runner work order. `OW-038` opened, not started. Still open from
+the approved plan: `OW-008` and the six document-only corrections.
