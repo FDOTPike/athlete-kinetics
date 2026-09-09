@@ -6555,3 +6555,155 @@ athlete-readable message, and the mutation is caught.
 **State C after this.** `OW-001` CLOSED. The only State C item still open is
 `OW-006` reachability, which is gated on `OW-026` — an OWNER_ONLY decision — and
 is dose-neutral. No executor work remains in State C.
+
+---
+
+## Entry 0101 — 2026-09-09 · State C stacked PR audit (AUDIT_AND_PREPARE_ONLY)
+
+### Input G(x)
+
+```
+# OPUS WORK ORDER — STATE C STACKED PR AUDIT AND REMEDIATION
+
+ROLE
+You are Opus 5, the verification and remediation agent for the State C stacked pull requests.
+
+EFFORT
+High.
+
+DECISION TOKEN
+AUDIT_AND_PREPARE_ONLY
+
+PULL REQUESTS
+- PR #10 head claude/state-c-followups-register-and-replay-rule, expected f17a3494d39bd0caab0c76023c4ad3a2b27a5c02, base codex/rpe-familiarisation
+- PR #11 head claude/ow-001-athlete-load-intent-selection, expected 973b881b6874df850a890fe7113a516f3730d267, base claude/state-c-followups-register-and-replay-rule
+
+BOUNDARIES
+Do not merge either PR. Do not push to master. Do not tag, release, publish, or
+build a production artifact. Do not start OW-006. Do not decide OW-026. Do not
+change fatigue coefficients or athlete dose. Do not edit migrations 059-062.
+Migration 063 may be corrected only if this audit finds a demonstrated defect.
+Preserve unrelated and untracked files. Append to the ledger before the first
+repository write.
+
+W0 identity and stack validation; W1 audit PR #10 (OW-007, OW-011, the
+replay-exposure correction, OW-006, register accuracy); W2 audit PR #11 as a
+stacked delta against the complete L1(a) path, points 1-10; W3 architectural
+fork review; W4 UI and accessibility; W5 migration 063; W6 required
+verification; W7 review activation. Final handoff with the stated verdict lines.
+Stop with READY FOR CODEX/SOL REVIEW.
+```
+
+### Output F(G(x))
+
+Self-audit: both PRs under review were authored by this agent, so the audit was
+run adversarially and every finding below is against its own work.
+
+**W0 identity — PASS.** PR #10 head `f17a349` base `codex/rpe-familiarisation`;
+PR #11 head `973b881` base `claude/state-c-followups-register-and-replay-rule`;
+both exactly as specified. Worktree clean and synchronized. The
+`f17a349..973b881` range contains only the three OW-001 commits and touches only
+OW-001 files — no PR #10 change is re-attributed to PR #11.
+
+**W1 PR #10 — APPROVE, all five areas independently reproduced.**
+
+- OW-007: try/catch present on the resume, the error node mounted INSIDE the
+  suspended branch, and `endSuspension` BEGIN/COMMIT/ROLLBACK + rethrow. Three
+  mutations re-run at `f17a349`, all caught.
+- OW-011: 057 in the chain and genuinely enforcing; removing it fails
+  `verify:store`.
+- Replay-exposure correction: reproduced from scratch. Dropping `set_record`,
+  `session` or `planned_slot` and replaying COMPLETES; only the
+  `suspension_episode`-naming pair needs removal, and removing
+  `dropReplayBlockingTriggers` fails `verify:migrations`. The 062 edit has ZERO
+  non-comment lines in the PR #10 range — comment-only confirmed by diff.
+- OW-006: the `blockGenerator` diff also has zero non-comment lines, so no dose
+  changed; `bodyweightDominant` is still pool-derived, so reachability is
+  genuinely still OPEN; the equality tripwire fails on a divergent table.
+- Register accurate for PR #10's state.
+- `verify:ci` at `f17a349`: exit 0, 22 suites / 307 tests, `verify:store`
+  667/667. `git diff --check` clean over `5f1cb6a..f17a349`.
+
+**W2 PR #11 — REQUEST CHANGES, then remediated. Two coverage gaps found in its
+own work.**
+
+- W2.3 required the declaration to influence ranking DETERMINISTICALLY. The
+  original suite proved the per-slot row was written but never that generation
+  stays deterministic under declarations, nor that a declaration is anything but
+  inert. Added: same declarations replay to an identical plan, and the declared
+  plan differs from the undeclared one. Both hold — the declaration does reach
+  ranking.
+- W2.8 required that athlete switching cannot leak declarations. `loadIntents`
+  was in `PER_ATHLETE_RESET`, but NOTHING proved it and nothing would catch a
+  regression — a leak would route another athlete's dose from this athlete's
+  choice. Added two tests: A declares, B inherits nothing and declares
+  differently, A gets A's answer back and neither file gains the other's row;
+  and a failed boot after a switch leaves no declarations resident.
+- W2.4 wording check: `planned_slot_load_intent` is NOT database-immutable. 062
+  blocks only re-pointing; `planned_implement` on its own slot remains
+  updatable. It is de facto write-once because nothing writes it twice, and a
+  test asserts that. Reported precisely rather than claimed as immutability —
+  the DB-level freeze is the deferred owner question.
+
+**W3/W4 — REQUEST CHANGES, three real defects in the athlete-facing surface,
+all fixed in `c90aa92`.**
+
+1. The section offered a choice for every ambiguous movement in the library,
+   including ones the athlete cannot currently do. An authoritative
+   athlete-facing availability contract already existed and was already used for
+   exactly this purpose — `LibraryScreenV2` gates its browse list on
+   `getMovementAvailabilityVerdicts('library')`. Reused rather than inventing an
+   eligibility policy, per W3's instruction. It constrains which movements are
+   OFFERED and never what the answer is, so L1(a) is untouched. It also cuts the
+   setup burden from all 17 ambiguous movements to the athlete's actual set,
+   answering W3.4.
+2. The options were labelled `DB` / `BB` / `KB` — engine tokens, not words an
+   athlete is owed. A presentation-only map now renders Dumbbell / Barbell /
+   Kettlebell / Band / Bodyweight only; the stored value is still the canonical
+   token, which the testIDs pin.
+3. A failed save was COMPLETELY SILENT. `saveMovementLoadIntent` returns false
+   and sets the global error, but ProfileScreen mounts no error surface of its
+   own, so the athlete tapped a chip, nothing moved, and nothing said why. This
+   is the same defect class as OW-007's resume path, reintroduced in a new
+   surface one commit later.
+
+Touch target and screen-reader state needed no change: the section reuses the
+existing `Chip` primitive, which already carries `theme.touch.min`,
+`accessibilityRole="button"` and `accessibilityState`. Seven component tests now
+cover the gate, the labelling, selected/unselected/NOT SET as announced state,
+truthful labels, the future-programming copy, the failure surface and its
+clearing, and that both choose and clear reach the store with the canonical
+token.
+
+**A defect the FULL suite caught that focused runs hid.** After the W3/W4 fix,
+`verify:ci` failed with three errors in `ContentCorrection049.test.js`:
+ProfileScreen now calls `getMovementAvailabilityVerdicts` unconditionally, and
+that screen-level mock did not provide it. Fixed by completing the mock to match
+the convention every other ProfileScreen mock already follows, rather than
+making the screen defensive, which would have masked a genuinely missing
+dependency. Recorded because a focused-run-only workflow would have shipped it.
+
+**W5 migration 063 — PASS.** All 27 `[2ac]` checks reproduce: fresh install
+declaring nothing, upgrade from the complete 001-062 chain preserving unrelated
+preferences and declaring nothing retroactively, valid insert/update/withdrawal,
+unsupported-implement refusal on both INSERT and UPDATE, unknown-movement
+refusal, cascade with the movement, replay, per-trigger and table self-heal,
+array index 61 and `user_version` 62. Compatible with the PR #10 replay rule:
+063's triggers name `movement_detail` (010, position 10), recreated long before
+the earliest rename at position 48, so they correctly do NOT join
+`REPLAY_BLOCKING_TRIGGERS`.
+
+**Mutations — 18 applied across the audit, 18 caught, 0 escaped.**
+Six re-run against PR #10 (`N1`-`N5`, `M9`), six new against PR #11's surface
+(`Q1` availability gate, `Q2` internal labels, `Q3` error node, `Q4` ignored save
+result, `Q5` cross-athlete leak, `Q6` generation ignores the declaration), plus
+the six from Entry 0100 confirmed still catching.
+
+**Verification.** PR #10 `verify:ci` exit 0 (22 suites / 307 tests). PR #11
+`verify:ci` exit 0 (22 suites / **316 tests**), `verify:store` 667/667, 17 gates
+`ALL CHECKS PASSED`. `git diff --check` clean over both exact ranges.
+
+**Boundaries honoured.** Nothing merged, pushed to master, tagged, released or
+built. OW-006 not started, OW-026 not decided, no fatigue coefficient or dose
+changed, migrations 059-062 untouched. 063 was NOT corrected — the audit found
+no defect in it. Untracked and unrelated files preserved.
