@@ -1869,9 +1869,24 @@ const plannedImplementFor = (
     && m.supportedPrefixes.includes(choice)
     && implementAvailable(choice, inventory)) return choice;
   // No declaration. A SOLE supported implement is not a choice and not dropdown
-  // order — there is nothing to choose between — so it stands as the selection.
-  // Anything else stays undeclared and fails closed.
-  return m.supportedPrefixes.length === 1 ? m.supportedPrefixes[0] : undefined;
+  // order — there is nothing to choose between — so it stands as the selection,
+  // but ONLY if the athlete can equip it. The declared branch above has always
+  // checked that; this branch did not, which made the contract asymmetric: a
+  // movement supporting only BB, whose own movement_equipment rows omit the
+  // barbell, would be planned as barbell for an athlete with none. That is
+  // OW-017, and the shipped corpus does not currently contain such a movement
+  // (0 of 235, pinned by [OW-017] in verify:blocks) — so this is defence in
+  // depth against a future library correction, not a live fix.
+  //
+  // DOSE-NEUTRAL BY CONSTRUCTION, which is why it needs no ratification:
+  // isStrictlyBodyweight tests `plannedImplement === 'Bodyweight'`, so for a
+  // sole-prefix LOADED movement this only ever moves the value from one
+  // non-'Bodyweight' value to another (the implement, or undefined). Ranking,
+  // set schedule and dose cannot observe the difference. Bodyweight itself
+  // satisfies implementAvailable on an empty inventory, so bodyweight movements
+  // are untouched. Round-2 finding 2.
+  const sole = m.supportedPrefixes.length === 1 ? m.supportedPrefixes[0] : undefined;
+  return sole !== undefined && implementAvailable(sole, inventory) ? sole : undefined;
 };
 
 /** OW-001: the athlete's declared implement per movement (063). Read once per

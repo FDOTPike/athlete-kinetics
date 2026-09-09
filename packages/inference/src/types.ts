@@ -125,13 +125,19 @@ export type EquipmentItem = (typeof EQUIPMENT_ITEMS)[number];
  *
  * The figure read "15 of 17" until 2026-09-09, when Gemini 3.8's round-1
  * independent audit refuted it (finding F2) and a re-derivation confirmed 17 of
- * 17. WHY the original said 15 is not known: the reviewer proposed that `Banded`
- * had not been treated as needing equipment, but mutating the resolver that way
- * yields 12 of 17, not 15, so that explanation does not hold. The original
- * measurement is not reproducible and is not reconstructed here. That is the
- * point of the gate: this figure is now DERIVED from the live corpus by
- * `verify:blocks` `[F2-corpus]` rather than asserted in prose, because prose
- * nobody recomputes is how it was wrong for a fortnight.
+ * 17. Round 1 attributed the error to not treating `Banded` as needing
+ * equipment; that cannot be right, because mutating the resolver that way yields
+ * 12 of 17, not 15. Round 2 then reconstructed a hypothesis that yields exactly
+ * 15: assume a `pullup_bar` implies `bands` — an assisted-pull-up-station
+ * assumption — and precisely `Chin-up` and `Weighted Pull-up` stop diverging
+ * while `Push-up`, `Nordic Curl` and `Face Pull` still do. That arithmetic is
+ * exact, and it is still only a reconstruction: the original script is gone and
+ * nothing proves this was the reasoning. It is recorded as the leading
+ * explanation, not as the established cause.
+ *
+ * Which is the point of the gate. This figure is now DERIVED from the live
+ * corpus by `verify:blocks` `[F2-corpus]` rather than asserted in prose, because
+ * prose nobody recomputes is how it stayed wrong for a fortnight.
  *
  * `anyOf` is satisfied by owning ANY listed item, not all of them.
  */

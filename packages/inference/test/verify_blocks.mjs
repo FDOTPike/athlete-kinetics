@@ -821,7 +821,13 @@ console.log('[9d] ladder reconciliation — bodyweight reps reach the advancemen
       });
     loadedRepsByBlock.push(Math.min(...loadedSlots.map((sl) => sl.reps)));
   }
-  check('EVERY macro block now prescribes bodyweight work at or above the ladder bar',
+  // "EVERY macro block" is scoped to this fixture, in which every movement is
+  // declared a chain member (see the progressionGroup note above). It tests
+  // FLOOR MECHANICS, not chain scoping; on the shipped corpus most bodyweight
+  // movements are off-chain and correctly keep their lower phase reps, which is
+  // L2(b) and is tested in [28]. Round-2 finding 1 read the old label as a
+  // product-wide claim, which is how it was worded.
+  check('[fixture 001-015] every macro block floors chain-member bodyweight work at the ladder bar',
     totalBlocks > 0 && reachableBlocks === totalBlocks, `${reachableBlocks}/${totalBlocks}`);
   check('loaded chain members retain the advancement floor in every macro block',
     loadedRepsByBlock.length === MACRO_BLOCKS
@@ -923,7 +929,11 @@ for (const r of detailRows) {
     if (!prefixSet.has(p)) prefixOk = false;
   }
 }
-check('every seeded supported_prefixes token is a MOVEMENT_PREFIXES member',
+// Scope is the 001-015 fixture, which is why detailRows.length === 30 is part
+// of the predicate. The SHIPPED corpus is covered separately by
+// [F2-corpus] — round-2 finding 1 was that this label read as if it covered
+// both, leaving the 270 later-migration movements silently unchecked.
+check('[fixture 001-015] every seeded supported_prefixes token is a MOVEMENT_PREFIXES member',
   prefixOk, `${seenPrefixes.size} distinct tokens over ${detailRows.length} rows`);
 check('movement_detail seeded for all 30 movements (base stored once per pattern)',
   Number(db.prepare('SELECT count(*) c FROM movement_detail').get().c) === 30 &&
@@ -2391,7 +2401,12 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // WHOLE chain to its own database.
   const corpus = new DatabaseSync(':memory:');
   corpus.exec('PRAGMA foreign_keys = ON;');
-  const chain = readdirSync(SCHEMA_DIR).filter((f) => f.endsWith('.sql'))
+  // 004 is NOT a migration — migrations.ts:4 records it as the parameterized
+  // daily upsert the DAO executes, so it carries unbound parameters. Section
+  // [28] already excludes it; this block counted it and reported "63
+  // migrations" where the chain has 62. Round-2 finding 3.
+  const chain = readdirSync(SCHEMA_DIR)
+    .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
     .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
   for (const f of chain) corpus.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
@@ -2402,7 +2417,28 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // Pin the corpus itself, so a library change cannot move the figures below
   // without announcing itself.
   check('[F2-corpus] the shipped catalogue is the one being measured',
-    rows.length === 300, `${rows.length} movements from ${chain.length} migrations`);
+    rows.length === 300 && chain.length === 62,
+    `${rows.length} movements from ${chain.length} migrations`);
+
+  // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against
+  // MOVEMENT_PREFIXES, but it reads the module-level `db` and pins
+  // detailRows.length === 30, so it sees only the 001-015 fixture. An invalid
+  // token introduced by a LATER migration — the 270 movements added by 016,
+  // 037-048 and 049 — is invisible to it. Nothing else enforces membership:
+  // 010's CHECK is json_valid() only, and the membership rule lives in a
+  // comment. So the full-corpus check belongs here, where the whole chain is
+  // already applied.
+  const badTokens = [];
+  const seen = new Set();
+  for (const r of rows) {
+    for (const token of JSON.parse(r.prefixes)) {
+      seen.add(token);
+      if (!MOVEMENT_PREFIXES.includes(token)) badTokens.push(`${r.name}:${token}`);
+    }
+  }
+  check('[F2-corpus] every supported_prefixes token in the SHIPPED corpus is a MOVEMENT_PREFIX',
+    badTokens.length === 0,
+    badTokens.join(',') || `${seen.size} distinct tokens over ${rows.length} movements`);
   const equipOf = new Map();
   for (const r of corpus.prepare('SELECT movement_id, item FROM movement_equipment').all()) {
     if (!equipOf.has(r.movement_id)) equipOf.set(r.movement_id, new Set());
