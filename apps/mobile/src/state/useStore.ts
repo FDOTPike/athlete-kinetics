@@ -6134,6 +6134,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM planned_slot_legacy_role_allowance');
       d.executeSync('DELETE FROM planned_slot_routine_decision');
       d.executeSync('DELETE FROM planned_slot_target');
+      // L1(a) load intent. Named explicitly rather than left to the cascade for
+      // the same reason as the two suspension side-cars below, and the
+      // consequence here is sharper: planned_slot.planned_slot_id is INTEGER
+      // PRIMARY KEY with no AUTOINCREMENT, so ids are REUSED once the table is
+      // emptied. An orphan surviving an FK-OFF reset would silently re-attach a
+      // declared implement to a brand new slot the athlete never chose it for —
+      // intent arriving by a route other than explicit declaration, which is
+      // exactly what L1(a) forbids. 062 puts no delete guard on this table (only
+      // the re-pointing guard), so this needs no parent-first ordering.
+      d.executeSync('DELETE FROM planned_slot_load_intent');
       d.executeSync('DELETE FROM planned_session_routine_context');
       d.executeSync('DELETE FROM planned_session_method');
       d.executeSync('DELETE FROM session_plan_slot');

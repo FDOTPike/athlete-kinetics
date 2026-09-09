@@ -785,9 +785,18 @@ a('reset removes each immutable side-car only after its parent',
 // block_suspension_origin row would attribute a BRAND NEW post-reset block
 // (training_block reuses rowids once emptied) and hide it from
 // nextMacroPosition for good.
-a('reset clears both 059 suspension side-cars',
-  ['suspension_episode_program', 'block_suspension_origin'].every((t) => resetTables.includes(t)),
-  resetTables.filter((t) => t.startsWith('suspension_') || t.startsWith('block_susp')).join(',') || 'neither named');
+a('reset clears all three 059 side-cars',
+  ['suspension_episode_program', 'block_suspension_origin', 'planned_slot_load_intent']
+    .every((t) => resetTables.includes(t)),
+  resetTables.filter((t) => t.startsWith('suspension_') || t.startsWith('block_susp') || t === 'planned_slot_load_intent').join(',') || 'none named');
+// planned_slot_id is INTEGER PRIMARY KEY with no AUTOINCREMENT, so ids are
+// REUSED once planned_slot is emptied. An intent row orphaned by an FK-OFF reset
+// would re-attach a declared implement to a brand new slot the athlete never
+// chose it for. Deleted with the other planned_slot children, before the parent.
+a('reset clears the L1(a) load intent before its planned_slot parent',
+  resetTables.indexOf('planned_slot_load_intent') >= 0
+    && resetTables.indexOf('planned_slot') >= 0
+    && resetTables.indexOf('planned_slot_load_intent') < resetTables.indexOf('planned_slot'));
 a('reset clears the 059 side-cars only AFTER training_program and training_block',
   resetTables.indexOf('training_program') >= 0
     && resetTables.indexOf('training_block') >= 0
@@ -796,9 +805,16 @@ a('reset clears the 059 side-cars only AFTER training_program and training_block
 // The open episode is deleted CONDITIONALLY (059 refuses a closed one, and that
 // abort would roll the whole reset back), so it never appears in resetTables —
 // which is why it is asserted against the body text instead.
-a('reset deletes the OPEN suspension episode, and only the open one',
-  /DELETE FROM suspension_episode WHERE ended_at_ms IS NULL/.test(resetBody)
-    && !/DELETE FROM suspension_episode'/.test(resetBody));
+// Exactly ONE suspension_episode delete, and it is the conditional one. Counting
+// is what makes this future-proof: a later unconditional or IS NOT NULL delete
+// would satisfy a presence-plus-absence pair while aborting the whole reset at
+// 059's no-delete-closed trigger. `\b` does not match inside
+// suspension_episode_program, because `_` is a word character.
+const episodeDeletes = [...resetBody.matchAll(/DELETE FROM suspension_episode\b[^']*/g)].map((m) => m[0]);
+a('reset issues exactly ONE suspension_episode delete, and it is the open-episode one',
+  episodeDeletes.length === 1
+    && episodeDeletes[0] === 'DELETE FROM suspension_episode WHERE ended_at_ms IS NULL',
+  episodeDeletes.join(' | ') || 'none');
 a('the open-episode delete precedes training_program and training_block',
   resetBody.indexOf('DELETE FROM suspension_episode WHERE') >= 0
     && resetBody.indexOf('DELETE FROM suspension_episode WHERE') < resetBody.indexOf("DELETE FROM training_program'")
