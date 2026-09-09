@@ -114,12 +114,24 @@ export type EquipmentItem = (typeof EQUIPMENT_ITEMS)[number];
  * WHY THIS EXISTS. A movement's own equipment requirement gates whether the
  * movement can be trained at all; it says nothing about which IMPLEMENT the
  * athlete can load it with, and the two diverge constantly. Measured on the
- * shipped corpus: 15 of the 17 multi-implement movements offer at least one
- * implement their base requirement never implies. Walking Lunge and Glute
- * Bridge require NOTHING yet offer BB; Overhead Press requires a barbell yet
- * offers KB; Suitcase Carry requires a kettlebell yet offers DB; Face Pull
- * requires a cable machine yet offers Banded. Without this resolver an athlete
- * could declare — and the generator would honour — an implement they do not own.
+ * shipped corpus: ALL 17 of the 17 multi-implement movements offer at least one
+ * implement their base requirement never implies — the divergence is total, not
+ * occasional. Walking Lunge and Glute Bridge require NOTHING yet offer BB;
+ * Overhead Press requires a barbell yet offers KB; Suitcase Carry requires a
+ * kettlebell yet offers DB; Face Pull requires a cable machine yet offers
+ * Banded; Chin-up and Weighted Pull-up require a pull-up bar yet offer Banded,
+ * which needs bands. Without this resolver an athlete could declare — and the
+ * generator would honour — an implement they do not own.
+ *
+ * The figure read "15 of 17" until 2026-09-09, when Gemini 3.8's round-1
+ * independent audit refuted it (finding F2) and a re-derivation confirmed 17 of
+ * 17. WHY the original said 15 is not known: the reviewer proposed that `Banded`
+ * had not been treated as needing equipment, but mutating the resolver that way
+ * yields 12 of 17, not 15, so that explanation does not hold. The original
+ * measurement is not reproducible and is not reconstructed here. That is the
+ * point of the gate: this figure is now DERIVED from the live corpus by
+ * `verify:blocks` `[F2-corpus]` rather than asserted in prose, because prose
+ * nobody recomputes is how it was wrong for a fortnight.
  *
  * `anyOf` is satisfied by owning ANY listed item, not all of them.
  */

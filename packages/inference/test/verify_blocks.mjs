@@ -2336,6 +2336,74 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
       && implementAvailable('BB', ['barbell']) === true);
 }
 
+// --- F2: the corpus divergence figure quoted in types.ts is MEASURED ----------
+// types.ts justifies IMPLEMENT_REQUIREMENT's existence with a number. That
+// number was wrong once already: it read "15 of 17" until Gemini 3.8's round-1
+// audit refuted it (F2) and a re-derivation returned 17 of 17 — the two missed
+// were Chin-up and Weighted Pull-up, which require a pull-up bar yet offer
+// Banded, and Banded needs bands. A prose number nobody recomputes is a claim,
+// not evidence, so it is derived from the live corpus here instead.
+//
+// [OW-017] rides along on the same query. plannedImplementFor's sole-supported-
+// prefix fallback does not consult implementAvailable, so a movement whose only
+// implement needs equipment its own movement_equipment rows never require would
+// be planned with a tool the athlete may not own. On the shipped corpus that set
+// is EMPTY, which is what makes the hole latent rather than live. This gate is
+// what keeps it empty: a library correction that introduces such a movement
+// fails here and must close the fallback in the same change.
+{
+  const { IMPLEMENT_REQUIREMENT } = require('./.build/types.js');
+  // NOT the module-level `db`: that one stops at migration 015, so it holds the
+  // old 010-era library rather than the shipped corpus. Migration 049 narrows
+  // several supported_prefixes lists, and the truncated DB reports 19
+  // multi-implement movements where the shipped one has 17. The claim in
+  // types.ts is about what reaches an athlete's device, so this gate applies the
+  // WHOLE chain to its own database.
+  const corpus = new DatabaseSync(':memory:');
+  corpus.exec('PRAGMA foreign_keys = ON;');
+  const chain = readdirSync(SCHEMA_DIR).filter((f) => f.endsWith('.sql'))
+    .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
+  for (const f of chain) corpus.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+
+  const rows = corpus.prepare(`
+    SELECT m.movement_id AS id, m.name AS name, d.supported_prefixes AS prefixes
+      FROM movement m JOIN movement_detail d ON d.movement_id = m.movement_id
+  `).all();
+  // Pin the corpus itself, so a library change cannot move the figures below
+  // without announcing itself.
+  check('[F2-corpus] the shipped catalogue is the one being measured',
+    rows.length === 300, `${rows.length} movements from ${chain.length} migrations`);
+  const equipOf = new Map();
+  for (const r of corpus.prepare('SELECT movement_id, item FROM movement_equipment').all()) {
+    if (!equipOf.has(r.movement_id)) equipOf.set(r.movement_id, new Set());
+    equipOf.get(r.movement_id).add(r.item);
+  }
+  // UNIMPLIED: nothing the movement itself requires guarantees the equipment
+  // this implement needs. 'unverifiable' is never implied by anything.
+  const unimplied = (prefix, owned) => {
+    const req = IMPLEMENT_REQUIREMENT[prefix];
+    if (req === undefined || req.kind === 'unverifiable') return true;
+    if (req.kind === 'none') return false;
+    return !req.items.some((item) => owned.has(item));
+  };
+
+  const multi = rows.filter((r) => JSON.parse(r.prefixes).length > 1);
+  const diverging = multi.filter((r) =>
+    JSON.parse(r.prefixes).some((p) => unimplied(p, equipOf.get(r.id) ?? new Set())));
+  check('[F2-corpus] every multi-implement movement offers an unimplied implement (17 of 17)',
+    multi.length === 17 && diverging.length === multi.length,
+    `${diverging.length} of ${multi.length}`);
+
+  const soleHole = rows.filter((r) => {
+    const p = JSON.parse(r.prefixes);
+    return p.length === 1 && p[0] !== 'Bodyweight'
+      && unimplied(p[0], equipOf.get(r.id) ?? new Set());
+  });
+  check('[OW-017] no sole-prefix movement needs equipment its own requirement omits',
+    soleHole.length === 0,
+    soleHole.map((r) => `${r.name}:${JSON.parse(r.prefixes)[0]}`).join(',') || 'corpus clean');
+}
+
 // --- OW-006: the bodyweight fatigue branch is DEAD, and this is the tripwire ---
 // blockGenerator computes bodyweightDominant from the whole movement catalogue,
 // not the block's slots, so it is always false in production and the branch
