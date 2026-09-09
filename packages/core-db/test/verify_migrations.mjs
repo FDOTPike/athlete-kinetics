@@ -2370,7 +2370,7 @@ const seed062 = (db, b) => db.executeSync(`
                                 created_at_ms, updated_at_ms)
   VALUES (${b}, 'strength', '2030-06-01', 'weeks', '2030-08-01', 4, 1, 'LINEAR', 'archived', 1, 1);
   INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index)
-  VALUES (${b}, 1000, 2000, 'injury', 3);
+  VALUES (${b}, 1000, 2000, 'injury', 3), (${b + 8}, 3000, 4000, 'illness', 5);
   INSERT INTO suspension_episode_program (episode_id, program_id, frozen_sequence_index)
   VALUES (${b}, ${b}, 2);
   INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${b}, ${b});
@@ -2393,8 +2393,8 @@ const PROHIBITED_062 = (b) => [
     `UPDATE suspension_episode_program SET frozen_sequence_index = 7 WHERE episode_id = ${b}`],
   ['062 direct DELETE suspension_episode_program',
     `DELETE FROM suspension_episode_program WHERE episode_id = ${b}`],
-  ['062 UPDATE block_suspension_origin.episode_id (re-point the attribution)',
-    `UPDATE block_suspension_origin SET episode_id = ${b} WHERE block_id = ${b}`],
+  ['062 UPDATE block_suspension_origin.episode_id (re-point onto the other episode)',
+    `UPDATE block_suspension_origin SET episode_id = ${b + 8} WHERE block_id = ${b}`],
   ['062 direct DELETE block_suspension_origin',
     `DELETE FROM block_suspension_origin WHERE block_id = ${b}`],
   ['062 UPDATE planned_slot_load_intent.planned_slot_id (move a declared intent)',
@@ -2469,10 +2469,24 @@ const PROHIBITED_062 = (b) => [
   seed062(up62, B);
   // Every 062-prohibited mutation succeeds at pre-062 -- then the rows are put
   // back, so the upgrade below runs against exactly what the seed created.
+  //
+  // The re-point is checked separately and by its EFFECT. A statement that
+  // assigns a column the value it already holds is accepted on ANY schema, so
+  // "not refused" would prove nothing about the S6(b) hole; the row has to
+  // actually land on the other episode. This is why seed062 creates two.
+  const repointSql = PROHIBITED_062(B).find(([label]) => label.includes('re-point'))[1];
+  const repointAccepted = !refused(up62, repointSql);
+  const landedOn = up62.raw
+    .prepare(`SELECT episode_id FROM block_suspension_origin WHERE block_id = ${B}`).get();
+  check('062 upgrade precondition: the pre-062 chain really did permit MOVING the attribution',
+    repointAccepted && Number(landedOn?.episode_id) === B + 8,
+    `accepted=${repointAccepted} episode_id=${landedOn?.episode_id ?? 'row gone'}`);
+  up62.executeSync(`UPDATE block_suspension_origin SET episode_id = ${B} WHERE block_id = ${B}`);
+
   const gapWasReal = PROHIBITED_062(B)
-    .filter(([label]) => label.startsWith('062'))
+    .filter(([label]) => label.startsWith('062') && !label.includes('re-point'))
     .every(([, sql]) => !refused(up62, sql));
-  check('062 upgrade precondition: the pre-062 chain really did permit all four', gapWasReal);
+  check('062 upgrade precondition: the pre-062 chain permitted the other three too', gapWasReal);
   up62.executeSync(`DELETE FROM suspension_episode_program WHERE episode_id = ${B}`);
   up62.executeSync(`DELETE FROM block_suspension_origin WHERE block_id = ${B}`);
   up62.executeSync(`DELETE FROM planned_slot_load_intent WHERE planned_slot_id IN (${B}, ${B + 9})`);
