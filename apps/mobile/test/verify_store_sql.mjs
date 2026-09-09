@@ -53,8 +53,9 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '057_block_meta_phase_invariant.sql',
   '058_suspension_episode.sql',
   // 059 adds suspension_episode_program, block_suspension_origin and
-  // planned_slot_load_intent, which the store now reads and writes. 057 stays
-  // deliberately absent (see the note above); 059 does not depend on it.
+  // planned_slot_load_intent, which the store now reads and writes. It does not
+  // depend on 057, which is why 058 and 059 could be added while 057 was still
+  // absent; 057 is present above now that OW-011 closed that gap.
   '059_suspension_state_and_load_intent.sql',
   // 062 closes the 059 side-car mutation surface. It is included because the
   // reset probe below EXECUTES the store's exact delete sequence: with 062
