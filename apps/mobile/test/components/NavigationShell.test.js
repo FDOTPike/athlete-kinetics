@@ -190,7 +190,12 @@ describe('Readiness, Session, Library and Profile remain reachable', () => {
 
   test('the live-workout marker is absent when no session is open', () => {
     render(<AppShellTestHarness />);
-    expect(screen.queryByTestId('header-session-live-dot')).toBeNull();
+    // includeHiddenElements is REQUIRED: the dot is deliberately hidden from
+    // the accessibility tree, so a default query cannot see it whether or not
+    // it rendered — the assertion would be unfalsifiable without this.
+    expect(
+      screen.queryByTestId('header-session-live-dot', { includeHiddenElements: true }),
+    ).toBeNull();
   });
 });
 
@@ -246,6 +251,18 @@ describe('cold start and back behaviour stay deterministic under the new shell',
     expect(tabsIdx).toBeGreaterThan(bodyIdx);
   });
 
+  test('R3: the shell root is a SafeAreaView, so iOS keeps its notch/home-indicator insets', () => {
+    render(<AppShellTestHarness />);
+    // `styles.root.paddingTop` uses statusBarPaddingTop, which returns 0 on any
+    // non-Android platform (see UIComponents.test.js). SafeAreaView is therefore
+    // the ONLY thing insetting the shell on iOS: without it the top header
+    // renders under the status bar/notch and the primary tab bar under the home
+    // indicator. This pins the element type so the root cannot be downgraded to
+    // a plain View for test convenience — the sibling-order test above walks
+    // HOST ancestors and passes either way, so nothing else would catch it.
+    expect(screen.getByTestId('shell-root').type).toBe('RCTSafeAreaView');
+  });
+
   test('R1: the workout header control states its accessibility name and transitions live', () => {
     // Inactive (no open session): plain descriptive label.
     mockState = state({ session: null });
@@ -270,7 +287,10 @@ describe('cold start and back behaviour stay deterministic under the new shell',
     mockState = state({ session: null });
     rerender(<AppShellTestHarness />);
     expect(screen.getByLabelText('Open the workout')).toBeOnTheScreen();
-    expect(screen.queryByTestId('header-session-live-dot')).toBeNull();
+    // Hidden-inclusive, for the same reason as above.
+    expect(
+      screen.queryByTestId('header-session-live-dot', { includeHiddenElements: true }),
+    ).toBeNull();
   });
 
   test('after visiting Plan, the back stack holds [today, coach] — one pop to the root', () => {

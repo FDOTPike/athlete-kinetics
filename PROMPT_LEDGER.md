@@ -8581,3 +8581,150 @@ one line, distinct active/inactive accessibility, header above body,
 completion-date year, installed APK matching final HEAD) is governed by the
 same ordering rule: it is captured against the post-final-commit APK and
 recorded outside the repository, or reported `DEVICE EVIDENCE PENDING`.
+
+---
+
+## Entry 0113 — 2026-09-11 · Opus 5 audit R3 of the R2 remediation, then owner-directed remediation
+
+### Ledger-order deviation, disclosed
+
+This turn opened as a READ-ONLY audit, so no ledger entry was written first. The
+owner then redirected mid-turn ("Please remediate any finding to the workorder
+yourself"), which converted the turn into a code change. This entry is therefore
+appended AFTER the edits rather than before them. Stating it rather than
+back-dating it.
+
+Independence note: having edited `App.tsx` and `NavigationShell.test.js`, this
+auditor is no longer independent of those two files. A later independent pass
+should re-verify them.
+
+### Input G(x)
+
+````text
+ASTRA UX PHASE 1 AUDIT R2 REMEDIATION COMPLETE — READY FOR INDEPENDENT RE-AUDIT
+[Hermes handback: R0 freeze + Entry 0112; R1/R2/R3 code as d24fe39, 7 files,
++325/-22; accessible labels restored, dot as a11y-hidden badge, vacuous D7 test
+replaced, completion date year, dead NO_NEXT removed; mutations M-R2a/M-R2b
+watched failing and restored from hashed backups 2a16aaa5...27ba0; gates all
+exit 0; APK efe388d9...b7cc built post-final-commit, verify:qa-candidate
+VERIFIED; device evidence at 360 dp; limitations: ~411 dp not re-captured for
+this APK, no explicit HOME-cycle resume capture.]
+````
+
+````text
+Please remediate any finding to the workorder yourself
+````
+
+### Output F(G(x)) — audit R3
+
+Frozen HEAD `d24fe39e51535e49ad5422476f61b38ad8688d06`, tree
+`fbf893a448d8ca76030fb5a68fef5b6e9869b131`; tracked tree clean; untracked
+exactly `AGENTS.md` and `HANDOVER_RELAY_TO_SUCCESSOR.md`, neither staged;
+Entries 0109-0111 unedited (append-only confirmed by diff).
+
+All four R2 findings independently confirmed FIXED:
+
+- **R2-P1-A** (a11y state) — device-confirmed across `r2_evidence`: `l1.xml`
+  `'Open the workout'` -> `l2..o1.xml` `'Open the workout — workout in progress'`
+  -> `o2/p1.xml` reverted. Mutation F (label forced constant) fails 2 tests.
+- **R2-P1-B** (stale APK gate) — `verify:qa-candidate` exit 0, QA ARTIFACT
+  VERIFIED at HEAD; measured APK sha256
+  `efe388d99b9b58ab61548242925a14e1fdb06738ee1d8f40f097043d4227b7cc` matches the
+  handback exactly. Ledger + code + tests in ONE commit is what makes this hold.
+- **R2-P2-A** (vacuous D7 test) — Mutation E (header moved below the body) now
+  fails the order test. Previously 12/12 passed.
+- **R2-P2-B** (two-line wrap) — device-confirmed: at 360 dp / font scale 1.30
+  `WORKOUT` is 53 px in BOTH states, identical to READY/LIBRARY/PROFILE. The
+  `● WORKOUT` string is gone.
+
+Two NEW findings, both since remediated in this same turn:
+
+- **R3-P1 — `SafeAreaView` -> `View` dropped the iOS safe-area insets.**
+  `d24fe39` replaced the shell root element. `styles.root.paddingTop` uses
+  `statusBarPaddingTop`, which returns 0 off-Android (pinned by
+  `UIComponents.test.js:100`), so SafeAreaView was the ONLY source of iOS notch
+  and home-indicator insets: the top header would render under the status bar
+  and the primary tab bar under the home indicator. `apps/mobile/ios/` and the
+  `npm run ios` script make iOS a supported target. Entry 0112 disclosed the
+  swap but assessed it as "no behavioral impact in the shell", which is wrong
+  off-Android; the commit message did not mention it at all. Android is
+  unaffected (RN's SafeAreaView pads only on iOS), which is why the device
+  evidence looked clean.
+- **R3-P2 — the live-dot absence assertions could not fail.** The dot is
+  correctly `accessibilityElementsHidden`, so `queryByTestId` WITHOUT
+  `includeHiddenElements` cannot see it whether or not it rendered. Mutation D
+  (dot rendered unconditionally — a permanent false "workout in progress"
+  indicator) passed 13/13.
+
+### Remediation applied by this session (uncommitted)
+
+`apps/mobile/src/App.tsx`
+- Shell root restored to `SafeAreaView` (testID `shell-root` kept on it), with a
+  comment recording why the plain `View` is not an option.
+
+`apps/mobile/test/components/NavigationShell.test.js`
+- Both live-dot ABSENCE assertions now pass `{ includeHiddenElements: true }`.
+- New test `R3: the shell root is a SafeAreaView, so iOS keeps its
+  notch/home-indicator insets` pins the host type (`RCTSafeAreaView`).
+
+The sibling-order test passes unchanged with `SafeAreaView` restored, so the
+plain-`View` swap was never required by the test it was made to serve.
+
+Mutations run, observed failing, and reverted (App.tsx sha256
+`5eda0eb41f67bda59bfd80c8025af1b95f5a985e5eec23444252510974bfcd69` before and
+after each):
+- **D** dot rendered unconditionally -> 2 fails (was 0 before the fix).
+- **E** header moved below the body -> 1 fail (order test).
+- **G** root downgraded to plain `View` -> 1 fail (new R3 test).
+
+### Gates re-run after remediation
+
+| Command | Exit | Result |
+|---|---|---|
+| `git diff --check` | 0 | clean |
+| `npm run typecheck` | 0 | clean |
+| `NavigationShell.test.js` | 0 | 14 tests |
+| `npm run verify:components` | 0 | 26 suites / 415 tests |
+| `npm run verify:store` | 0 | ALL CHECKS PASSED |
+| `npm run verify:ci` | 0 | all gates, 26 suites / 415 tests |
+| `npm run verify:qa-candidate` | **1** | STALE, as expected — see below |
+
+### Commit and rebuild — owner-authorised
+
+After the audit was reported, the owner instructed: "commit these and rebuild the
+APK". This entry is committed TOGETHER with the two source/test files in a single
+commit, so the APK built immediately afterwards has matching provenance. The
+resulting APK SHA-256 and the `verify:qa-candidate` result are recorded OUTSIDE
+the repository and reported to the owner, because any further ledger write after
+the build would re-break the tracked-diff fingerprint — the same trap that made
+Entry 0111's APK claim stale.
+
+Before the build, `verify:qa-candidate` correctly REJECTED the previous artifact
+("tracked-diff fingerprint mismatch ... this artifact is STALE"): the gate
+behaving exactly as intended against this turn's edits.
+
+Device re-capture at 360 dp / 1.30 is NOT required for a change that only
+restores an ancestor element and edits tests. The iOS inset behaviour has never
+been verified on an iOS device or simulator, by any session, and remains
+unverified here — it is a structural finding from the code and from
+`UIComponents.test.js:100`, not a device observation.
+
+Carried forward, unaddressed and unchanged by this turn: the handback's own
+stated limitations (~411 dp not re-captured for APK `efe388d9`; no explicit
+HOME-cycle resume capture), and the standing owner/future items from Entry 0111
+(LOG SET below-the-fold, ProfileScreen D5 consistency, session_id-vs-chronology).
+
+### Boundaries
+
+No schema, migration, engine, progression, prescription, ranking, suspension,
+biometric, network, Firebase, account, or sync change. Committed on owner
+instruction (three tracked files: this ledger, `apps/mobile/src/App.tsx`,
+`apps/mobile/test/components/NavigationShell.test.js`). Nothing pushed, merged,
+rebased, tagged, signed, or released. `AGENTS.md` and
+`HANDOVER_RELAY_TO_SUCCESSOR.md` untouched, untracked, and never staged.
+Historical ledger entries unedited; this entry appends only.
+
+ASTRA UX PHASE 1 AUDIT R3: REQUEST CHANGES (two findings, both remediated in
+this turn; candidate needs commit + APK rebuild before re-verification)
+
+PUSH / MERGE / RELEASE: NOT AUTHORIZED

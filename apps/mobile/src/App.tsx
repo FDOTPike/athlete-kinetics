@@ -152,8 +152,14 @@ export function AppShell(): React.JSX.Element {
     return () => sub.remove();
   }, [boot]);
 
+  // The shell root stays a SafeAreaView. `styles.root.paddingTop` only covers
+  // Android (statusBarPaddingTop returns 0 off-Android), so SafeAreaView is the
+  // ONLY source of the iOS notch and home-indicator insets; replacing it with a
+  // plain View put the top header under the status bar and the primary tab bar
+  // under the home indicator. The `shell-root` testID belongs on it directly —
+  // the shell-order test walks HOST ancestors and does not require a plain View.
   return (
-    <View style={styles.root} testID="shell-root">
+    <SafeAreaView style={styles.root} testID="shell-root">
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
       {/* D7: the secondary control bar is a real TOP HEADER, above the body.
           Visible labels are the beginner-readable short forms; accessibility
@@ -260,7 +266,7 @@ export function AppShell(): React.JSX.Element {
           })}
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
