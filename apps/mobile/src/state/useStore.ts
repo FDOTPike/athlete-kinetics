@@ -695,6 +695,12 @@ interface KineticsStore {
    *  focus, newest first. Read-only evidence for the Today duration line —
    *  the app measures durations, it never estimates them from set counts. */
   recordedDurationsForFocus: (focus: string, limit?: number) => number[];
+  /** Read-only persisted facts for one ended session (W3 summary). No writes. */
+  loadSessionSummaryFacts: (sessionId: number) => {
+    durationMin: number | null;
+    exercises: { movementId: number; movementName: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null }[] }[];
+    previousSets: { movementId: number; reps: number; loadKg: number; sessionId: number }[];
+  };
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
@@ -4728,6 +4734,59 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       [focus, limit],
     ));
     return rows.map((r) => r.duration_min).filter((d) => Number.isFinite(d) && d > 0);
+  },
+
+  loadSessionSummaryFacts: (sessionId: number) => {
+    const d = getDb();
+    const sessionRow = rowsOf<{ duration_min: number | null }>(d.executeSync(
+      'SELECT duration_min FROM session WHERE session_id = ?',
+      [sessionId],
+    ))[0];
+    const setRows = rowsOf<{
+      movement_id: number; movement_name: string; reps: number; load_kg: number;
+      time_s: number | null; planned_sets: number | null;
+    }>(d.executeSync(
+      `SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,
+              tm.value AS time_s, sps.planned_sets
+         FROM set_record sr
+         JOIN movement m ON m.movement_id = sr.movement_id
+         LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
+         LEFT JOIN set_target st ON st.set_id = sr.set_id
+         LEFT JOIN session_plan_slot sps
+              ON sps.session_id = st.session_id
+             AND sps.movement_id = sr.movement_id
+        WHERE sr.session_id = ?
+        ORDER BY sr.movement_id, sr.set_index`,
+      [sessionId],
+    ));
+    const previousRows = rowsOf<{
+      movement_id: number; reps: number; load_kg: number; session_id: number;
+    }>(d.executeSync(
+      `SELECT sr.movement_id, sr.reps, sr.load_kg, sr.session_id
+         FROM set_record sr
+        WHERE sr.session_id < ?
+          AND sr.movement_id IN (SELECT movement_id FROM set_record WHERE session_id = ?)
+        ORDER BY sr.session_id, sr.set_index`,
+      [sessionId, sessionId],
+    ));
+    const byMovement = new Map<number, { name: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null }[] }>();
+    for (const row of setRows) {
+      let entry = byMovement.get(row.movement_id);
+      if (entry === undefined) {
+        entry = { name: row.movement_name, plannedSets: row.planned_sets, sets: [] };
+        byMovement.set(row.movement_id, entry);
+      }
+      entry.sets.push({ reps: row.reps, loadKg: row.load_kg, timeS: row.time_s });
+    }
+    return {
+      durationMin: sessionRow?.duration_min ?? null,
+      exercises: [...byMovement.entries()].map(([movementId, e]) => ({
+        movementId, movementName: e.name, plannedSets: e.plannedSets, sets: e.sets,
+      })),
+      previousSets: previousRows.map((r) => ({
+        movementId: r.movement_id, reps: r.reps, loadKg: r.load_kg, sessionId: r.session_id,
+      })),
+    };
   },
 
   refreshVector: () => {
