@@ -4753,8 +4753,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
          LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
          LEFT JOIN set_target st ON st.set_id = sr.set_id
          LEFT JOIN session_plan_slot sps
-              ON sps.session_id = st.session_id
-             AND sps.movement_id = sr.movement_id
+              ON sps.session_plan_slot_id = st.session_plan_slot_id
         WHERE sr.session_id = ?
         ORDER BY sr.movement_id, sr.set_index`,
       [sessionId],
