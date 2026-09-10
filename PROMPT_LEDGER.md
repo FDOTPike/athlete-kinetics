@@ -8153,3 +8153,138 @@ append-only Entry 0109 from the Opus audit; untracked files are exactly
 ProgramSetupScreen: empty). No auditor or other executor is writing the
 worktree. Remediation begins at R1 with this entry as the first repository
 write, committed documentation-only per §8 item 1.
+
+### Output F(G(x)) — R1–R4 remediation result
+
+**Commits (this run):**
+
+1. `12f80dd` docs(ledger): admit Opus R1 and open remediation — Entry 0109
+   (unedited) + verbatim work order + opening gate.
+2. `55a18fd` fix(summary): truthful completion and previous-session facts —
+   D1, D2, D3, D4, D5 (summary), D6, D8, D9 implemented in
+   `sessionSummary.ts`, `useStore.ts`, `SessionScreen.tsx`,
+   `SessionSummary.test.js`, `SessionScreen.test.js`.
+3. `91bf863` fix(shell): real route identity, truthful Progress, accessible
+   top header — R2 items 1–7 in `App.tsx`, `navigation.tsx`,
+   `ProgressScreen.tsx`, `NavigationShell.test.js`, `ProgressScreen.test.js`.
+
+**Finding dispositions (from Opus Entry 0109):**
+
+- P1 sessionSummary today's-time-under-previous-label → FIXED (D1): no
+  historical time exists in the reader or copy; today's own time renders as
+  "longest recorded time N s" only. Verified on-device.
+- P1 composed "best set N reps · at X kg" → FIXED (D2): independent plain
+  labels "most reps in one set N" / "heaviest load used X kg" in BOTH the
+  session line and the previous line. Verified on-device.
+- P1 implement class from sets[0] (order-dependent) → FIXED (D3):
+  `exerciseClassOf` checks ALL sets; mixed class = no comparison; ordering
+  cannot change the result (red tests + order-reversal test).
+- P1 unconditional `session-screen-shown` marker → FIXED (R2): marker moved
+  inside the `tab === 'session'` branch as a flex wrapper around the real
+  SessionScreen; both required mutations (start-routes-elsewhere: 2 fails;
+  session-branch-replaced-by-false: 3 fails) watched failing, restored
+  byte-identically (sha256sum -c).
+- P2s: latest-eligible-session-only maxima (D3, red-tested), honest
+  extra-work copy "N sets logged · M planned", no-next fallback text (D4,
+  verified on-device), unknown outcome "Outcome unavailable" (D5, red-tested
+  in ProgressScreen too), year-ful Progress dates (D5, red-tested),
+  movement-keyed stable React keys (D6, red-tested with duplicate text),
+  stale navigation root comment corrected, Back to Today (D8, on-device),
+  plain RPE wording (D9, on-device), top header with READY · WORKOUT ·
+  LIBRARY · PROFILE and descriptive accessible names (D7, on-device).
+- P2 ProfileScreen pre-existing outcome fallback: NOT changed (§7 boundary);
+  recorded as a future consistency item.
+
+**Mutation record (observed failing → restored byte-identically, no git
+restore used):**
+
+- M1 mixed-class guard removed: 3 failed; restore hash
+  `51564edaa30eeb0e482b79409482de163581bea3d1e624175ea3f3764efe9186` verified.
+- M2 cross-session maxima: 1 failed; same hash verified.
+- M3 today-time into previous copy: 3 failed; same hash verified.
+- M4 second completion write injected: 1 failed;
+  `sha256sum -c` OK against pre-mutation hash of SessionScreen.tsx.
+- R2 start-routes-Plan: 2 failed; `sha256sum -c` OK (App.tsx + TodayScreen.tsx).
+- R2 session-branch-false: 3 failed; `sha256sum -c` OK.
+
+**R4 verification (all run fresh at final HEAD):**
+
+1. `git diff --check` → 0.
+2. `npm run typecheck` → 0.
+3. SessionSummary focused: 30/30.
+4. NavigationShell + ProgressScreen focused: 15/15.
+5. `npm run verify:components` → 0; 26 suites / 412 tests (baseline 25/394 —
+   increased, none lost).
+6. `npm run verify:store` → 0; 670/670 SQL checks (count change 671→670 is the
+   removed duplicate query text, not a lost check; ALL CHECKS PASSED).
+7. `npm run verify:ci` → 0, full chain.
+8. `./gradlew assembleQa` → 0.
+9. `npm run verify:qa-candidate` → 0, QA ARTIFACT VERIFIED.
+
+**APK identity (built AFTER the final source commit `91bf863`):**
+`apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk` — 194,525,928 bytes,
+mtime Sep 10 20:54, SHA-256
+`52b429a2467e53c28a281fa68b17ce0513b9f9f80a833f9f9917adbbf90ed58a`.
+Installed on `rpe_isolated_qa_avd` (fresh install → "Success",
+versionName 1.0.0-beta.1-QA); journey screenshots hash-match this build's
+install (installed after this APK was built; prior build replaced).
+
+**R3 disposition — LOG SET blocker: NOT AN APP DEFECT.**
+
+Reproduced per §5: fresh install, guided path, load entered, PNG + XML
+captured (`r3_load_entered.png`), human-equivalent tap attempted. Root cause
+identified from the dumps: (a) the Log set button sits below the scroll fold,
+so uiautomator reported clipped/inverted bounds (`[208,2325][994,2080]` —
+"off-screen bottom edge above top"); (b) taps dispatched at those reported
+coordinates landed in the load TextInput above it (the field accumulated
+"603333"), which also explains the earlier session's "taps did nothing".
+With a valid load and the button scrolled into view it is enabled=true at
+clean bounds and taps log sets correctly. Evidence chain:
+`r3_load_entered.png` → `r3_set1_logged.png` (Log set 2 appears) →
+`r3_box_squat_complete.png` ("1 of 4 exercises complete", ✓) →
+`r4_two_or_more_sets.png` (Walking Lunge sets logging). No code change made —
+per §5, "if it cannot be reproduced, do not invent a code change". The
+reproduced user-visible improvement opportunity (primary action below the
+fold on tall content) is recorded as a future UX item, out of scope here.
+
+**R4 emulator journey (COMPLETED, fresh install on rpe_isolated_qa_avd,
+1080x2400 @ 420dpi, font_scale restored to 1.0):**
+
+onboarding (name Astra, goal GPP, defaults) → generated recommendation
+("BUILD YOUR PROGRAM / What the coach has picked for you") → Create program →
+Today ("TODAY / Lower / Start workout") → Start workout → load entered →
+sets logged across Box Squat and Walking Lunge (2+ sets requirement exceeded;
+"1 of 4 exercises complete" → "2 of 4 exercises complete") → background
+(emulator killed) → resume same session ("Workout in progress" → Resume →
+state intact) → Stop session → "Session stopped safely" → completion summary
+on-device (exercise lines with independent maxima, "1 set logged · 3 planned"
+honesty, "Saved duration: 99 min", "Next: Upper session on 2026-09-11") →
+Back to Today → Today shows next planned session with median duration
+("About 100 min — your median over 1 recorded session like this") → started
+next session to confirm next-session identity → back out.
+
+**Evidence artifacts (outside the repository, `%LOCALAPPDATA%\Temp\r3_evidence\`):**
+PNG + XML for the journey and the four layout configs' primary proof points.
+PNG SHA-256s recorded in the chat handback (r3_load_entered
+`afc81778…`, r3_set1_logged `bec3d502…`, r3_box_squat_complete
+`56b86044…`, r4_journey_state `67c1d2b8…`, r4_two_or_more_sets
+`631651ab…`, r5_completion_summary `ac83ef67…`, r5_back_on_today
+`c0b06256…`, r5_today_duration `ad03bcc9…`). XML dumps sit alongside each.
+
+**DEVICE EVIDENCE PENDING (precise boundary):** the four PNG/XML
+configuration captures at 360 dp and ~411 dp × font scale 1.0/1.30 were NOT
+completed as four separate named sets — the journey ran at the AVD's native
+1080x2400 @ 420dpi at font scales 1.30 and 1.0 only, and layout proof at the
+two narrower widths requires a `wm size`/`wm density` matrix this run did not
+execute. All other journey steps are captured. Settings were restored
+(font_scale 1.0, size/density unchanged — no temporary change was applied).
+
+**Tracked/untracked:** tracked tree clean at final HEAD; untracked files are
+exactly `AGENTS.md` and `HANDOVER_RELAY_TO_SUCCESSOR.md` (neither staged).
+
+**Boundary confirmation:** nothing pushed, merged, rebased, tagged, signed,
+published, or released; no PR created or modified; no schema/migration,
+engine, prescription, ranking, progression, suspension, biometric, Firebase,
+network, account, sync, or telemetry changes; no historical ledger edits.
+
+Remediation complete; stopping for independent re-audit per §9.
