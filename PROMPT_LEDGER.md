@@ -8288,3 +8288,90 @@ engine, prescription, ranking, progression, suspension, biometric, Firebase,
 network, account, sync, or telemetry changes; no historical ledger edits.
 
 Remediation complete; stopping for independent re-audit per §9.
+
+## Entry 0111 — 2026-09-10 · Hermes Relay (GLM-5.3) completes the pending R4 four-configuration layout matrix
+
+**Prompt (as received, condensed by the system context window):** "Could you
+see the required work outstanding in the worktree. here is it handback. Please
+complete the incomplete tasks" — delivered with the R1 remediation handback
+(Entry 0110 close-out) naming four outstanding items, of which item 1 (the
+four-configuration layout matrix) was the sole in-scope actionable task;
+items 2–4 are recorded owner/future items outside remediation scope.
+
+### Scope decision
+
+Entry 0110 closed remediation with one honest gap: "the four PNG/XML
+configuration captures at 360 dp and ~411 dp × font scale 1.0/1.30 were NOT
+completed as four separate named sets". This run completed exactly that gap
+against the SAME verified APK (no rebuild): `app-qa.apk` SHA-256
+`52b429a2467e53c28a281fa68b17ce0513b9f9f80a833f9f9917adbbf90ed58a`
+re-verified byte-identical before install. No source file was touched; no
+gate rerun was required (candidate HEAD `0dfb365` unchanged, tracked tree
+clean throughout). Items 2–4 of the handback (LOG SET below-the-fold UX
+item, ProfileScreen D5 consistency item, W3 session_id-vs-chronology note)
+remain owner/future items per their recorded dispositions.
+
+### Configurations captured (AVD rpe_isolated_qa_avd, 1080×2400 physical)
+
+- **A: ~411 dp (420 dpi native) · font_scale 1.0**
+- **B: ~411 dp (420 dpi native) · font_scale 1.30**
+- **C: 360 dp (wm density 480) · font_scale 1.0**
+- **D: 360 dp (wm density 480) · font_scale 1.30**
+
+Per configuration, named PNG+XML pairs captured for: Today root (top header
+READY·WORKOUT·LIBRARY·PROFILE, three primaries TODAY·PLAN·PROGRESS, workout
+action), active session (CURRENT slot, steppers, LOG SET reachable at clean
+bounds with a valid load + RIR), and the completion summary (independent
+maxima lines, last-time facts, persisted duration, strict-future next
+session, Back to Today). Config A additionally captured the full 3-exercise
+completion path; config B additionally captured the halted (Stop session →
+"Session stopped safely.") path; configs C and D completed their sessions
+fully.
+
+### Layout verdict (W4 §5 contract)
+
+Across all four configurations: no clipped actions, no mid-word truncation,
+no horizontal overflow, no color-only state. Header tabs and three primaries
+fully visible and labeled at 1.30 font on both widths; Back to Today button
+fully inside the viewport at the most constrained config (360/1.30). The
+known LOG SET below-the-fold position on tall content (Entry 0110 R3
+disposition) was again observed — reachable by scroll, enabled at clean
+bounds, no code change (consistent with the recorded future UX item).
+
+### Evidence (outside the repository)
+
+`%LOCALAPPDATA%\Temp\r4_matrix\` — 4 named capture sets (A_411_100_*,
+B_411_130_*, C_360_100_*, D_360_130_*) plus journey intermediates.
+Representative PNG SHA-256s:
+
+- A today `e35c7fe5…91be2d`, A session `c3217c94…781bd5`, A summary
+  `0c92bb5a…6a912fa` (A logset_bandpull `013f5031…20fc9`)
+- B today `86ceaa8f…910816d`, B session `54864659…344eb0`, B summary
+  `8b9b619d…940a5`, B halted `7db57562…3610e15`
+- C today `1bcbe78b…b932`, C session `0f4e9f45…e88741`, C summary
+  `869443c1…484fb03b`, C logset `7d6082b6…b03b`
+- D today `42aac1c1…e440`, D session `674d1f98…78fa0`, D summary
+  `206eb9f1…6136899`, D logset `a9ade8d5…11587d`
+
+XML dumps sit alongside each PNG (full hash list in the run transcript).
+Settings restored after capture: density 420 (reset), font_scale 1.0,
+wm size unchanged; emulator killed; `adb devices` empty.
+
+### Gate status
+
+No code changed, so Entry 0110's gate table remains the evidence of record
+for HEAD `0dfb365` (typecheck 0, components 26 suites/412 tests, store
+670/670, verify:ci 0, assembleQa 0, verify:qa-candidate VERIFIED). This
+entry adds device evidence only.
+
+### Boundaries
+
+No source, test, schema, migration, engine, progression, or telemetry
+changes; nothing pushed, merged, rebased, tagged, signed, published, or
+released; no historical ledger edits (this entry appends only); untracked
+files remain exactly `AGENTS.md` and `HANDOVER_RELAY_TO_SUCCESSOR.md`
+(neither staged).
+
+R4 layout-matrix gap closed; remediation candidate `0dfb365` now carries
+complete journey + four-configuration device evidence. Ready for
+independent re-audit.
