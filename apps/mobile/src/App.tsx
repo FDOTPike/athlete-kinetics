@@ -45,11 +45,22 @@ const PRIMARY_TABS: readonly { key: Tab; label: string }[] = [
 
 /** Header controls: every non-primary surface keeps one stable way back. */
 const HEADER_CONTROLS: readonly { key: Tab; label: string }[] = [
-  { key: 'readiness', label: 'READINESS' },
-  { key: 'session', label: 'SESSION' },
+  { key: 'readiness', label: 'READY' },
+  { key: 'session', label: 'WORKOUT' },
   { key: 'library', label: 'LIBRARY' },
-  { key: 'athlete', label: 'ATHLETE' },
+  { key: 'athlete', label: 'PROFILE' },
 ];
+
+/** D7: descriptive accessible names for the header controls. */
+const HEADER_ACCESS: Record<Tab, string> = {
+  readiness: 'Open readiness details',
+  session: 'Open the live workout',
+  library: 'Open the exercise library',
+  athlete: 'Open profile and settings',
+  today: 'Today',
+  coach: 'Plan',
+  progress: 'Progress',
+};
 
 /** Root boundary: a render-time throw becomes a readable screen with the
  *  actual error message — release builds otherwise die silently. */
@@ -144,6 +155,31 @@ export function AppShell(): React.JSX.Element {
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
+      {/* D7: the secondary control bar is a real TOP HEADER, above the body.
+          Visible labels are the beginner-readable short forms; accessibility
+          labels stay descriptive. No truncation, no font-scale capping. */}
+      {!showOnboarding && !showProgramSetup && (
+        <View style={styles.headerBar} accessibilityRole="toolbar">
+          {HEADER_CONTROLS.map((t) => {
+            const active = t.key === tab;
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => setTab(t.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={HEADER_ACCESS[t.key]}
+                testID={`header-${t.key}`}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.tabBtnPressed]}
+              >
+                <Text style={[styles.headerText, active && styles.headerTextActive]}>
+                  {t.key === 'session' && session !== null ? '● WORKOUT' : t.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
       <KeyboardAvoidingView
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -154,9 +190,8 @@ export function AppShell(): React.JSX.Element {
           <ProgramSetupScreen onCancel={() => setSetupDismissed(true)} />
         ) : (
           <>
-            {/* Shell-level route markers: assert WHICH route is active without
-                depending on the inner screens' own internals. */}
-            <View testID="session-screen-shown" style={styles.routeMarker} />
+            {/* R2: the route marker lives INSIDE the session branch, so a test
+                that finds it proves the real Session surface rendered. */}
             {tab === 'today' && (
               <TodayScreen
                 onOpenSession={() => setTab('session')}
@@ -169,7 +204,11 @@ export function AppShell(): React.JSX.Element {
                 onOpenCoach={() => setTab('coach')}
               />
             )}
-            {tab === 'session' && <SessionScreen />}
+            {tab === 'session' && (
+              <View style={{ flex: 1 }} testID="session-screen-shown">
+                <SessionScreen />
+              </View>
+            )}
             {tab === 'progress' && <ProgressScreen />}
             {tab === 'coach' && status === 'ready' && (
               <BlockScreen onSessionStarted={() => setTab('session')} />
@@ -184,53 +223,25 @@ export function AppShell(): React.JSX.Element {
         )}
       </KeyboardAvoidingView>
       {!showOnboarding && !showProgramSetup && (
-        <>
-          {/* W4 header controls: the non-primary surfaces stay one tap away.
-              The SESSION control carries a live-workout marker so an active
-              workout is findable from anywhere without becoming a tab. */}
-          <View style={styles.headerBar} accessibilityRole="toolbar">
-            {HEADER_CONTROLS.map((t) => {
-              const active = t.key === tab;
-              return (
-                <Pressable
-                  key={t.key}
-                  onPress={() => setTab(t.key)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={`${t.label}${t.key === 'session' && session !== null ? ' — workout in progress' : ''}`}
-                  testID={`header-${t.key}`}
-                  style={({ pressed }) => [styles.headerBtn, pressed && styles.tabBtnPressed]}
-                >
-                  <Text
-                    style={[styles.headerText, active && styles.headerTextActive]}
-                    accessibilityLiveRegion={t.key === 'session' ? 'polite' : undefined}
-                  >
-                    {t.key === 'session' && session !== null ? '● SESSION' : t.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.tabBar} accessibilityRole="tablist">
-            {PRIMARY_TABS.map((t) => {
-              const active = t.key === tab;
-              return (
-                <Pressable
-                  key={t.key}
-                  onPress={() => setTab(t.key)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={`${t.label} tab`}
-                  testID={`tab-${t.key}`}
-                  style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
-                >
-                  <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
-                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
+        <View style={styles.tabBar} accessibilityRole="tablist">
+          {PRIMARY_TABS.map((t) => {
+            const active = t.key === tab;
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => setTab(t.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${t.label} tab`}
+                testID={`tab-${t.key}`}
+                style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
+              >
+                <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       )}
     </SafeAreaView>
   );
@@ -262,6 +273,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   headerText: {
     color: palette.faint,
@@ -272,7 +284,6 @@ const styles = StyleSheet.create({
   headerTextActive: {
     color: palette.text,
   },
-  routeMarker: { height: 0, opacity: 0 },
   tabBtn: {
     flex: 1,
     minHeight: 64,

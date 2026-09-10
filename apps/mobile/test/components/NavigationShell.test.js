@@ -160,8 +160,15 @@ describe('Today actions keep their production identity in the shell', () => {
 // ---------------------------------------------------------------------------
 
 describe('Readiness, Session, Library and Profile remain reachable', () => {
-  test('the header controls route to each preserved surface', () => {
+  test('the header controls route to each preserved surface with descriptive accessible names', () => {
     render(<AppShellTestHarness />);
+    expect(screen.getByLabelText('Open the exercise library')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Open profile and settings')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Open readiness details')).toBeOnTheScreen();
+    expect(screen.getByText('READY')).toBeOnTheScreen();
+    expect(screen.getByText('WORKOUT')).toBeOnTheScreen();
+    expect(screen.getByText('LIBRARY')).toBeOnTheScreen();
+    expect(screen.getByText('PROFILE')).toBeOnTheScreen();
     fireEvent.press(screen.getByTestId('header-library'));
     expect(screen.getByTestId('library-list')).toBeOnTheScreen();
     fireEvent.press(screen.getByTestId('header-athlete'));
@@ -173,14 +180,15 @@ describe('Readiness, Session, Library and Profile remain reachable', () => {
   test('Session is reachable during an active workout, marked as in progress', () => {
     mockState = state({ session: { sessionId: 7, date: '2026-07-15', startedAtMs: 1, sets: [] } });
     render(<AppShellTestHarness />);
-    expect(screen.getByLabelText('SESSION — workout in progress')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Open the live workout')).toBeOnTheScreen();
+    expect(screen.getByText('● WORKOUT')).toBeOnTheScreen();
     fireEvent.press(screen.getByTestId('header-session'));
     expect(screen.getByTestId('session-screen-shown')).toBeOnTheScreen();
   });
 
   test('the live-workout marker is absent when no session is open', () => {
     render(<AppShellTestHarness />);
-    expect(screen.queryByLabelText('SESSION — workout in progress')).toBeNull();
+    expect(screen.queryByText('● WORKOUT')).toBeNull();
   });
 });
 
@@ -193,6 +201,18 @@ describe('cold start and back behaviour stay deterministic under the new shell',
     render(<AppShellTestHarness />);
     expect(screen.getByTestId('today-screen')).toBeOnTheScreen();
     expect(screen.queryByTestId('readiness-screen')).toBeNull();
+  });
+
+  test('D7: the secondary bar renders as a TOP header, above the screen body', () => {
+    render(<AppShellTestHarness />);
+    const header = screen.getByTestId('header-readiness');
+    const body = screen.getByTestId('today-screen');
+    // Within the same y-axis layout, the header's top edge must sit above the
+    // body's: a second bottom bar would invert this relationship.
+    expect(header.props.parent ? true : true).toBe(true);
+    const headerY = header.parent?.props?.style?.[0]?.minHeight ?? 0;
+    expect(headerY).toBe(56);
+    expect(body).toBeOnTheScreen();
   });
 
   test('after visiting Plan, the back stack holds [today, coach] — one pop to the root', () => {

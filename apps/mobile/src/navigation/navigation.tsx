@@ -5,7 +5,7 @@
  * Android hardware BackHandler and iOS left-edge swipe call `goBack()`, which:
  * 1. Checks if an active sub-view handler consumes the back event (e.g. closes a modal/card/step).
  * 2. If no sub-view handles it, pops the tab history stack to switch to the previous tab.
- * 3. Only exits the app (returns false to Android BackHandler) when on the root tab ('readiness') with no sub-views open.
+ * 3. Only exits the app (returns false to Android BackHandler) when on the root tab ('today') with no sub-views open.
  *
  * State safety: navigation only alters UI visibility/stack; logged training history and store state are untouched.
  */

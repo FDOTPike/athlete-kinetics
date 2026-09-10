@@ -30,9 +30,13 @@ const OUTCOME_LABELS: Record<string, string> = {
   session_recorded: 'Session recorded',
 };
 
+// D5: dates include the year — a January session read in December must not
+// masquerade as recent.
 const formatFinalizedDate = (ms: number): string => {
   if (ms <= 0) return '—';
-  return new Date(ms).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  return new Date(ms).toLocaleDateString(undefined, {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
 };
 
 export default function ProgressScreen(): React.JSX.Element {
@@ -66,7 +70,7 @@ export default function ProgressScreen(): React.JSX.Element {
           recentOutcomes.map((row, i) => (
             <ListRow
               key={`${row.finalizedAtMs}-${i}`}
-              label={OUTCOME_LABELS[row.outcomeKind] ?? 'Session recorded'}
+              label={OUTCOME_LABELS[row.outcomeKind] ?? 'Outcome unavailable'}
               detail={formatFinalizedDate(row.finalizedAtMs)}
             />
           ))
