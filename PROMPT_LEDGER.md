@@ -7387,3 +7387,35 @@ screens plus four numbered `ProgramSetupScreen` sections).
    `isRestDay = todayPlan === null && !halted && !hasLiveSession`, which renders
    the "Rest day. That's the work." display for a scheduled rest day, an athlete
    with no program at all, and an athlete who missed yesterday's session alike.
+
+---
+
+## Entry 0107 — 2026-09-10 · GLM 5.3 Flash continuation handover
+
+### Input G(x)
+
+````text
+actually scratch that previous request, lets give a handover for GLM 5.3 flash to execute this task via hermes desktop app, i will open the worktree and project space with your choosen agent (if one doesnt suit the current task please create your own by giving me a soul md in chat to copy paste into hermes with a name for this agent , optimize its task via agent.md in the projects workspace
+````
+
+### Output F(G(x))
+
+Prepared the bounded Hermes continuation package without changing product code.
+
+- Verified `claude/astra-athlete-first-ux` was clean at `5608100`, three commits
+  ahead of PR #12's merge tip `4c1e508`: W0 `2251f49`, W1 `9a654fb`, and W2
+  `5608100`.
+- Selected a new executor persona, `Relay`, because no Hermes persona inventory
+  was available to prove an existing role had the required continuation and
+  evidence discipline.
+- Selected `GLM-5.3-Flash` at `high` effort, single-agent. The remaining W3/W4
+  work crosses persisted completion facts, navigation, accessibility, and
+  lifecycle state; `max` would add cost without an unresolved architecture task.
+- Created root `AGENTS.md` as an intentionally untracked, owner-supplied local
+  control artifact. It freezes W0-W2, starts execution at W3, bounds W3-W5,
+  defines targeted-before-full verification, prohibits unrelated OW work and
+  release actions, and requires an honest device-evidence boundary.
+- The courier prompt and task-free `SOUL.md` are returned to the owner in chat
+  for manual use in Hermes. No executor was launched or summoned.
+- No source, test, schema, migration, engine, build artifact, remote branch, PR,
+  release, or historical ledger entry was changed.
