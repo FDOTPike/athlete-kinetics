@@ -7547,3 +7547,609 @@ is pinned to the action, not the label.
 
 Gates at the W4 candidate: typecheck 0; full component suite 25 suites /
 394 tests green.
+
+---
+
+## Entry 0109 — 2026-09-10 · Opus 5 independent audit of Astra UX Phase 1 W3–W5 (R1)
+
+### Input G(x)
+
+````text
+You are the independent auditor for Astra UX Phase 1.
+Work alone: no subagents, teams, executor role, or self-remediation.
+
+Work only in:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\astra-athlete-first-ux
+
+This is an independent review, not permission to modify product code.
+
+OPENING GATE
+
+1. Read:
+   - AGENT_WORKFLOW.md §§1–3, §8, and §9
+   - PROMPT_LEDGER.md from Entry 0106 onward
+   - AGENTS.md as the executor contract being audited, not as your runtime identity
+   - the complete diffs and commit messages from 4c1e508 through HEAD
+
+2. Verify:
+   - branch is claude/astra-athlete-first-ux;
+   - 10b2cca323736cdc51e5e7d37fb8e591b4010593 is an ancestor of HEAD;
+   - Hermes closed Entry 0108;
+   - the handback ends with:
+     ASTRA UX PHASE 1 CONTINUATION COMPLETE — READY FOR CODEX/SOL AUDIT
+   - distinct W3 and W4 implementation commits exist;
+   - the tracked tree is clean before audit writes;
+   - untracked AGENTS.md is preserved and not staged;
+   - no executor is still writing the worktree.
+
+If any condition is false, make no repository write and return:
+
+HERMES EXECUTION INCOMPLETE — NOT READY FOR INDEPENDENT AUDIT
+
+3. Freeze and report:
+   - HEAD SHA;
+   - tree SHA;
+   - ordered commits since 4c1e508;
+   - exact changed paths;
+   - tracked and untracked status.
+
+AUDIT SCOPE
+
+Independently inspect the complete diff from 4c1e508 to frozen HEAD. Do not rely on
+Hermes's handback or reported test results as proof.
+
+A. Scope and preservation
+
+- Confirm W1 and W2 remain intact unless a documented, tested integration fix was necessary.
+- Confirm there are no schema, migration, training-engine, ranking, progression,
+  prescription, suspension, biometric, network, Firebase, account, or sync changes.
+- Confirm no existing Coach, Library, Profile/settings, history, or recovery capability
+  became unreachable.
+- Identify every out-of-scope or unexplained file.
+
+B. W3 completion summary
+
+Verify from code and focused tests that:
+
+- every displayed exercise, set, repetition, load, duration and outcome comes from
+  persisted facts;
+- missing or ambiguous data remains unknown;
+- prior-performance comparisons require the correct movement, implement/load class,
+  and relevant session/set identity;
+- no false personal best or improvement can be inferred;
+- followed, adapted and stopped outcomes are neutral and truthful;
+- the next session is selected from the correct future planned-session ordering;
+- the no-next-session state is honest;
+- rendering or dismissing the summary cannot call endSession(), create a plan, advance
+  progression, or persist completion a second time.
+
+Inspect any pure summary helper and its call sites. Prove the history-match and
+no-second-write tests are non-vacuous with bounded mutations or equivalent negative
+probes, restoring all bytes afterward.
+
+C. W4 navigation and accessibility
+
+Verify that:
+
+- Today is the cold-start/default athlete surface;
+- exactly Today, Plan and Progress are presented as primary destinations;
+- a planned session can start directly and an active session resumes the same
+  persisted session;
+- Session remains reachable during an active workout;
+- Coach/program management, Library and Profile/settings remain reachable;
+- onboarding and program-setup transitions still work;
+- route/action identity and Android back behaviour are tested, not merely tab labels;
+- existing deep-link and fixture route identities are preserved where required;
+- accessible names are meaningful and touch targets meet the 56 dp contract;
+- 360 dp and approximately 411 dp layouts at font scales 1.0 and 1.30 have no clipping,
+  inaccessible horizontal content, mid-word truncation, or colour-only state.
+
+D. W5 evidence and verification
+
+Run fresh commands yourself:
+
+1. git diff --check
+2. npm run typecheck
+3. the focused W3 tests
+4. the focused W4/navigation tests
+5. npm run verify:components
+6. npm run verify:store if store code changed
+7. npm run verify:ci
+8. the appropriate QA APK build/check
+
+Record every exact command, exit code and test count.
+
+Do not accept screenshots, UI dumps, APK identity or emulator claims from prose alone.
+Resolve the cited files, hash them, inspect representative screenshots directly, and
+check dump geometry. If device evidence is missing or cannot be tied to the frozen APK,
+state DEVICE EVIDENCE PENDING rather than upgrading the claim.
+
+FINDINGS AND VERDICT
+
+Report findings first, ordered P0, P1, P2, then informational observations. Every
+actionable finding must include:
+
+- exact file and line;
+- violated requirement;
+- concrete failure scenario;
+- reproduced evidence;
+- smallest acceptable remediation boundary.
+
+Do not repair product code, rewrite tests, or broaden scope. An audit that discovers
+defects must return REQUEST CHANGES.
+
+After the read-only audit is complete, the only permitted repository writes are:
+
+1. append a new PROMPT_LEDGER.md entry containing this exact prompt as the first write;
+2. create:
+   docs/audits/astra-ux-phase-1/OPUS_INDEPENDENT_AUDIT_R1.md
+3. close the new ledger output with the report hash and exact verdict.
+
+Leave those audit-only writes uncommitted for owner inspection. Do not stage, commit,
+push, merge, rebase, create or modify a PR, tag, sign, build a release, or alter
+AGENTS.md.
+
+Finish with exactly one applicable verdict:
+
+ASTRA UX PHASE 1 AUDIT: APPROVE
+ASTRA UX PHASE 1 AUDIT: REQUEST CHANGES
+ASTRA UX PHASE 1 AUDIT: BLOCKED — DEVICE EVIDENCE PENDING
+
+Then state:
+
+PUSH / MERGE / RELEASE: NOT AUTHORIZED
+````
+
+Owner follow-up, verbatim, after the first opening-gate run returned
+`HERMES EXECUTION INCOMPLETE — NOT READY FOR INDEPENDENT AUDIT`:
+
+````text
+Could you Audit the Work done in the worktree, currently W3 and W4 have been commited and W5 is underway, can you check on what its done
+````
+
+### Output F(G(x))
+
+Audit performed read-only against frozen HEAD `3974b02`. At the owner's explicit
+follow-up instruction ("please just write the audit here in chat, i can send it to
+the executor to run"), the full report was delivered in chat rather than written to
+`docs/audits/astra-ux-phase-1/OPUS_INDEPENDENT_AUDIT_R1.md`; that file was NOT
+created. This ledger entry is the only repository write made by the audit, and it is
+left uncommitted.
+
+Product code was not modified. Two bounded mutations were applied to
+`apps/mobile/src/App.tsx` to test assertion non-vacuity, then reverted;
+`sha256(apps/mobile/src/App.tsx)` =
+`496eaeca75dbc96a3bb74b3acc970b363af62f0dd11547b4b9d58bd3ca145702` before the first
+and after the last, and the tracked tree returned to clean.
+
+Gates re-run independently, all exit 0: `git diff --check`; `npm run typecheck`;
+SessionSummary.test.js 16/16; NavigationShell.test.js 11/11; `npm run verify:components`
+25 suites / 394 tests; `npm run verify:store` ALL CHECKS PASSED; `npm run verify:ci`
+full chain green; `npm run verify:qa-candidate` QA ARTIFACT VERIFIED. QA APK sha256
+`905f30c0d35616daa6088756a11bc24b92162893f923d6ddf871f760e466a35e` matches the
+handover claim and postdates HEAD.
+
+Findings: 0 × P0; 4 × P1 (sessionSummary.ts:147-152 renders today's time under the
+"previous:" label; sessionSummary.ts:119-140 composes a set that was never performed;
+sessionSummary.ts:79-82 derives implement class from sets[0], making comparisons
+order-dependent; App.tsx:159 renders the `session-screen-shown` route marker
+unconditionally, making NavigationShell.test.js:145/:154/:178 incapable of failing);
+6 × P2. DEVICE EVIDENCE PENDING for the entire W3 on-device surface, session resume,
+and all 360 dp / font-scale-1.30 layout claims.
+
+ASTRA UX PHASE 1 AUDIT: REQUEST CHANGES
+
+PUSH / MERGE / RELEASE: NOT AUTHORIZED
+
+---
+
+## Entry 0110 — 2026-09-10 · Hermes Relay (GLM-5.3-Flash) executes Audit R1 remediation
+
+### Input G(x)
+
+````text
+# WORK ORDER — Astra UX Phase 1 Audit R1 Remediation
+
+## 0. Authority and identity
+
+Executor: Hermes Relay using GLM-5.3-Flash at high effort.
+Role: executor only. Do not create an auditor, team, subagent, or self-reviewer.
+
+Work only in:
+
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\astra-athlete-first-ux
+
+Branch:
+
+claude/astra-athlete-first-ux
+
+Frozen audited starting target:
+
+HEAD: 3974b020a093ef6f9d05b3e9a96e6b855a662aa6
+Tree: 55dc04be0fa9b51ecab4af3cd21bf14c9d0c17f4
+
+This order authorizes remediation of Opus Independent Audit R1. It supersedes
+the previous AGENTS.md stop condition only for the work explicitly listed
+below. All previous architecture, safety, evidence, and release prohibitions
+remain binding.
+
+Do not push, merge, rebase, create or modify a PR, tag, sign, publish, release,
+or evaluate C6.
+
+## 1. Opening gate and ledger preservation
+
+Before any source edit, verify:
+
+1. Branch and HEAD exactly match the values above.
+2. 4c1e508 is an ancestor of HEAD.
+3. Tracked status contains only the existing PROMPT_LEDGER.md modification.
+4. That modification contains only append-only Entry 0109 from the Opus audit.
+5. The only expected untracked control/handover files are:
+   - AGENTS.md
+   - HANDOVER_RELAY_TO_SUCCESSOR.md
+6. No auditor or other executor is still writing the worktree.
+7. W1 and W2 files remain byte-identical to commit 10b2cca.
+
+If any condition fails, stop without editing and report the exact discrepancy.
+Do not reset, stash, checkout, discard, overwrite, or "clean" anything.
+
+Your first repository write must append a new ledger entry containing this
+entire prompt verbatim. Do not edit Entry 0109. Make an initial documentation-only
+commit containing the existing Entry 0109 plus the new remediation input.
+Do not stage either untracked control/handover file.
+
+## 2. Ratified product decisions
+
+These decisions are final for this remediation. Do not reopen them.
+
+### D1 — No historical time comparison yet
+
+The database reader does not load prior time values. Remove all previous-session
+time claims. Never use today's time under a "previous" label.
+
+Current-session persisted time may be shown, but call it "longest recorded time,"
+not "best," because a larger time is not universally better.
+
+Do not add historical time ingestion in this work order.
+
+### D2 — Never compose a set that did not occur
+
+Independent maxima must be presented as independent facts.
+
+Allowed example:
+
+Pull-Up — 4 sets logged · most reps in one set 8 · heaviest load used 20 kg
+
+Forbidden example:
+
+best set 8 reps · at 20 kg
+
+Use plain labels such as:
+
+- most reps in one set;
+- heaviest load used;
+- longest recorded time.
+
+Apply this law to both the completed-session line and historical comparison line.
+
+### D3 — Historical comparison identity
+
+A comparison is allowed only when:
+
+1. movement identity matches;
+2. all current sets belong to exactly one implement class;
+3. historical sets match that same implement class;
+4. the facts come from one identifiable prior session.
+
+If today contains both bodyweight and loaded sets, the comparison must be absent.
+Set ordering must never change the result.
+
+Select the latest eligible prior session and calculate its metrics only from that
+session. Do not combine maxima across multiple sessions. Use persisted session
+chronology where available; session_id may only be a deterministic tiebreaker.
+
+If no useful metric exists—for example a timed bodyweight movement with zero reps
+and no historical time—omit the comparison.
+
+### D4 — Honest no-next-session wording
+
+Use this universal fallback:
+
+No next session is scheduled yet.
+
+Do not assert that a block exists merely because blockSessions is empty.
+
+### D5 — Outcome and date truth
+
+An unknown outcome kind must render:
+
+Outcome unavailable
+
+It must not be relabelled "Session recorded."
+
+Recent-session dates must include the year.
+
+### D6 — Stable render identity
+
+Summary lines must carry stable movement-based identifiers. Do not use rendered
+text as a React key and do not use an array index when movement identity is
+available.
+
+### D7 — Navigation layout
+
+The primary navigation remains exactly:
+
+TODAY · PLAN · PROGRESS
+
+The secondary control bar must render as an actual top header, above the screen
+body—not as a second bottom bar.
+
+Use beginner-readable, width-safe visible labels:
+
+READY · WORKOUT · LIBRARY · PROFILE
+
+Retain descriptive accessibility labels such as "Open readiness details" and
+"Open profile and settings." Keep the active-workout indicator factual.
+
+Do not solve font scaling by truncating, ellipsizing, capping the user's font
+scale, or using adjustsFontSizeToFit. The labels must genuinely fit at 360 dp and
+approximately 411 dp with font scales 1.0 and 1.30.
+
+### D8 — Completion returns to Today
+
+Change "Back to Ready" to:
+
+Back to Today
+
+Dismissing the persisted outcome must navigate to Today while performing no
+second completion write, plan mutation, or progression action.
+
+### D9 — Beginner-facing RPE copy
+
+Remove these internal phrases from the workout surface:
+
+- "used as Coach evidence"
+- "left out of Coach evidence"
+
+Use:
+
+- selected: "This effort rating will be saved with the set."
+- unanswered: "Effort rating is optional; leave it blank if you are unsure."
+
+Do not change RPE persistence or coaching logic.
+
+## 3. R1 — Repair completion-summary truthfulness
+
+Primary files:
+
+- apps/mobile/src/state/sessionSummary.ts
+- apps/mobile/src/state/useStore.ts
+- apps/mobile/src/screens/SessionScreen.tsx
+- apps/mobile/test/components/SessionSummary.test.js
+
+Implement D1-D6 and D8-D9.
+
+Prefer a typed summary-line structure containing movementId and text rather than
+parallel string arrays.
+
+Add red-first tests covering at least:
+
+1. Prior 40-second hold and today 60 seconds: no historical 60-second claim.
+2. Prior 40 seconds and today 25 seconds: no historical 25-second claim.
+3. Eight bodyweight reps plus five reps at 20 kg: never claim 8 reps at 20 kg.
+4. Reversing that set order produces identical output.
+5. Mixed bodyweight/loaded current sets produce no previous comparison.
+6. Uniform loaded sets compare only with the latest eligible prior session.
+7. Maxima from two prior sessions are not combined.
+8. A timed zero-rep movement does not render "best set 0 reps."
+9. Extra work renders honestly-for example "5 sets logged · 4 planned," not
+   "5 of 4 sets."
+10. No-plan/ad-hoc completion renders "No next session is scheduled yet."
+11. Duplicate visible text cannot create duplicate React keys.
+12. "Back to Today" dismisses exactly once and navigates to Today.
+13. Rendering still performs no completion, plan, progression, or other write.
+14. The new plain RPE wording appears and the old Coach-evidence wording does not.
+
+Mutation-test:
+
+- removing the mixed-class guard;
+- allowing cross-session maxima;
+- reintroducing today's time into previous copy;
+- injecting a second completion write.
+
+Restore every mutation byte-identically and record before/after hashes. Do not
+use reset or checkout as the restoration mechanism.
+
+Make one focused implementation commit after typecheck and targeted tests pass.
+
+## 4. R2 — Repair route validity, Progress truth, and header layout
+
+Primary files:
+
+- apps/mobile/src/App.tsx
+- apps/mobile/src/navigation/navigation.tsx
+- apps/mobile/src/screens/ProgressScreen.tsx
+- apps/mobile/test/components/NavigationShell.test.js
+- the existing Progress-focused test or a new focused component test
+
+Required changes:
+
+1. Move `session-screen-shown` inside the actual `tab === 'session'` render
+   branch. Prefer a flex wrapper around SessionScreen. Remove the unconditional
+   zero-height marker.
+2. Make route tests prove that the real Session surface rendered.
+3. Confirm both of these mutations fail:
+   - Start workout routes to Library.
+   - The SessionScreen branch is replaced by false.
+4. Apply D5 to ProgressScreen and test an unknown outcome plus a date from a
+   prior year.
+5. Apply D7 and validate header placement, visible labels, accessible names,
+   route identity and touch targets.
+6. Correct navigation.tsx's stale root comment from readiness to today.
+7. Preserve Today cold start, Android back behavior, active-session resume,
+   Coach/Plan, Library, Profile/settings and all legacy internal route keys.
+
+Do not alter navigation state merely to satisfy text assertions. Tests must
+exercise the real action and destination.
+
+Make one focused implementation commit after typecheck and targeted tests pass.
+
+## 5. R3 — Resolve the LOG SET device blocker
+
+Treat the prior inverted UIAutomator bounds as a reported symptom, not a proven
+root cause.
+
+Before changing layout:
+
+1. Build/install the current remediation candidate.
+2. Reproduce the guided-session path on `rpe_isolated_qa_avd`.
+3. Enter a valid load.
+4. Scroll until Log set is visually present.
+5. Capture both a PNG screenshot and UI XML.
+6. Attempt the action through a human-equivalent visible/accessibility tap.
+7. Distinguish:
+   - button disabled by state;
+   - button visually clipped or outside the scroll extent;
+   - touch rectangle/layout defect;
+   - ADB coordinate error.
+
+If the app defect is reproduced, make the smallest layout/touch correction in
+SessionScreen or its direct container. Do not change the shared PrimaryButton
+unless evidence proves the primitive itself is defective across callers.
+
+Add a focused regression test that fails under the reproduced defect. Preserve
+the 56 dp minimum and keyboard behavior.
+
+Make a separate commit for this fix. If it cannot be reproduced, do not invent a
+code change; retain the evidence and state the exact result.
+
+Limit the same failing-device repair loop to two evidence-led attempts before
+reporting a bounded blocker.
+
+## 6. R4 — Verification and real device evidence
+
+Use targeted tests while editing. At the frozen candidate run, in order:
+
+1. git diff --check
+2. npm run typecheck
+3. focused SessionSummary tests
+4. focused NavigationShell/Progress tests
+5. npm run verify:components
+6. npm run verify:store
+7. npm run verify:ci
+8. Android QA assemble
+9. npm run verify:qa-candidate
+
+The previous baseline was 25 suites / 394 component tests and 671 store checks.
+Counts may increase but must not silently decrease.
+
+If the model asset is needed, stage the gitignored asset using the documented
+procedure and verify SHA-256:
+
+afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1
+
+The new APK must be built after the final source commit. Record its path, size,
+mtime and SHA-256, and verify the installed package matches it. Never reuse the
+old APK hash as evidence for changed code.
+
+Complete this emulator journey:
+
+fresh install - onboarding - generated recommendation - Today - start workout
+- enter load - log at least two sets - background - resume same session -
+finish or stop safely - inspect completion summary - identify next session or
+honest absence - Back to Today
+
+Capture both PNG screenshots and UI XML outside the repository for:
+
+- 360 dp / font scale 1.0
+- 360 dp / font scale 1.30
+- approximately 411 dp / font scale 1.0
+- approximately 411 dp / font scale 1.30
+
+At minimum, each configuration must prove the top header, three primary
+destinations, workout action, Log set reachability and completion summary.
+Record exact wm size, density and font-scale commands plus artifact hashes.
+
+Restore emulator display/font settings afterward.
+
+Do not substitute XML geometry for the required screenshots. If any evidence is
+unavailable, report DEVICE EVIDENCE PENDING precisely; do not relabel it PASS.
+
+## 7. Scope boundaries
+
+Do not change:
+
+- database schema or migrations;
+- training engine, prescription, dose, ranking or progression;
+- suspension behavior;
+- biometric estimator or Health Connect behavior;
+- Firebase, networking, accounts, cloud, sync or telemetry;
+- program-quality decisions;
+- C6 policy.
+
+Do not implement Less time, Different equipment or Move session.
+
+Do not modify W1/W2 except where a new integration test proves a direct
+incompatibility, in which case disclose the minimal change.
+
+Do not fix ProfileScreen's pre-existing outcome fallback in this work order.
+ProgressScreen is the audited W4 boundary. Record the Profile behavior as a
+future consistency item without changing it.
+
+Do not broaden the history query beyond what is needed to retrieve the latest
+eligible prior session. Do not add previous-time ingestion.
+
+## 8. Commit structure
+
+Use separate local commits:
+
+1. docs(ledger): admit Opus R1 and open remediation
+2. fix(summary): truthful completion and previous-session facts
+3. fix(shell): real route identity, truthful Progress, accessible top header
+4. fix(session): Log set layout/touch remediation - only if reproduced
+5. docs(ledger): close Astra UX Audit R1 remediation
+
+Run typecheck before every implementation commit.
+
+Do not amend, squash, rebase, push or open a PR.
+
+## 9. Handback
+
+Return:
+
+- branch, starting HEAD, final HEAD and tree SHA;
+- ordered commits and exact changed paths;
+- disposition of every P1 and P2 finding;
+- disposition of the additional Back to Today and RPE-copy corrections;
+- mutation commands, observed failures and restoration hashes;
+- every verification command with exit code and final test count;
+- APK identity;
+- emulator journey result;
+- PNG/XML evidence paths and hashes;
+- tracked/untracked status;
+- explicit remaining limitations;
+- confirmation that nothing was pushed, merged, rebased, tagged or released.
+
+Do not self-audit or declare the branch merge-ready. Stop for independent review.
+
+Finish with exactly:
+
+ASTRA UX PHASE 1 AUDIT R1 REMEDIATION COMPLETE - READY FOR INDEPENDENT RE-AUDIT
+
+Then state:
+
+PUSH / MERGE / RELEASE: NOT PERFORMED
+````
+
+### Output F(G(x))
+
+Opening gate verified before any edit: branch `claude/astra-athlete-first-ux`;
+HEAD `3974b020a093ef6f9d05b3e9a96e6b855a662aa6`; tree
+`55dc04be0fa9b51ecab4af3cd21bf14c9d0c17f4`; `4c1e508` an ancestor of HEAD
+(`git merge-base --is-ancestor` exit 0); tracked status contains only the
+append-only Entry 0109 from the Opus audit; untracked files are exactly
+`AGENTS.md` and `HANDOVER_RELAY_TO_SUCCESSOR.md`; W1/W2 files byte-identical to
+`10b2cca` (git diff 10b2cca over TodayScreen/todayState/programDefaults/
+ProgramSetupScreen: empty). No auditor or other executor is writing the
+worktree. Remediation begins at R1 with this entry as the first repository
+write, committed documentation-only per §8 item 1.
