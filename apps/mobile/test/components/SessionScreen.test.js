@@ -1121,7 +1121,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 
     const { unmount } = render(<SessionScreen />);
     expect(screen.getByText(expected)).toBeOnTheScreen();
-    expect(screen.getByText('Session saved · Tuesday 21 July')).toBeOnTheScreen();
+    expect(screen.getByText('Session saved · Tuesday 21 July 2026')).toBeOnTheScreen();
     unmount();
   }
 

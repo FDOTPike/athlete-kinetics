@@ -144,7 +144,9 @@ const formatFinalizedDate = (ms: number): string => {
   const day = date.getDate();
   const dayName = weekdays[date.getDay()];
   const monthName = months[date.getMonth()];
-  return `${dayName} ${day} ${monthName}`;
+  // R3: the year is included so a prior-year completion cannot read as recent.
+  const year = date.getFullYear();
+  return `${dayName} ${day} ${monthName} ${year}`;
 };
 
 function CompletedMetrics({

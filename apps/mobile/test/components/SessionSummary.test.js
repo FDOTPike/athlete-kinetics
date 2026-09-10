@@ -476,6 +476,18 @@ describe('screen laws: D5, D6, D8, D9', () => {
     expect(screen.getByText("You followed today's plan. Recover well.")).toBeOnTheScreen();
   });
 
+  test('R3: the completion date includes the year, including a prior year', () => {
+    // A completion from November 2024 must render its year, not masquerade as
+    // recent. new Date(ms) is local-time, so assert on the year fragment only.
+    const priorYear = new Date('2024-11-03T12:00:00Z').getTime();
+    mockState = baseState({
+      loadSessionOutcome: jest.fn(() => ({ outcomeKind: 'followed_plan', finalizedAtMs: priorYear })),
+    });
+    render(<SessionScreen />);
+    expect(screen.getByText(/2024/)).toBeOnTheScreen();
+    expect(screen.getByText(/Session saved · .*2024/)).toBeOnTheScreen();
+  });
+
   test('D9: the plain RPE wording appears and the Coach-evidence wording does not', () => {
     mockState = baseState({
       session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },

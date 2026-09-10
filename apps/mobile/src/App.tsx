@@ -54,7 +54,7 @@ const HEADER_CONTROLS: readonly { key: Tab; label: string }[] = [
 /** D7: descriptive accessible names for the header controls. */
 const HEADER_ACCESS: Record<Tab, string> = {
   readiness: 'Open readiness details',
-  session: 'Open the live workout',
+  session: 'Open the workout',
   library: 'Open the exercise library',
   athlete: 'Open profile and settings',
   today: 'Today',
@@ -153,27 +153,43 @@ export function AppShell(): React.JSX.Element {
   }, [boot]);
 
   return (
-    <SafeAreaView style={styles.root}>
+    <View style={styles.root} testID="shell-root">
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
       {/* D7: the secondary control bar is a real TOP HEADER, above the body.
           Visible labels are the beginner-readable short forms; accessibility
           labels stay descriptive. No truncation, no font-scale capping. */}
       {!showOnboarding && !showProgramSetup && (
-        <View style={styles.headerBar} accessibilityRole="toolbar">
+        <View style={styles.headerBar} accessibilityRole="toolbar" testID="shell-top-header">
           {HEADER_CONTROLS.map((t) => {
             const active = t.key === tab;
+            const sessionLive = t.key === 'session' && session !== null;
             return (
               <Pressable
                 key={t.key}
                 onPress={() => setTab(t.key)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                accessibilityLabel={HEADER_ACCESS[t.key]}
+                accessibilityLabel={sessionLive
+                  ? 'Open the workout — workout in progress'
+                  : HEADER_ACCESS[t.key]}
+                accessibilityLiveRegion={t.key === 'session' ? 'polite' : undefined}
                 testID={`header-${t.key}`}
                 style={({ pressed }) => [styles.headerBtn, pressed && styles.tabBtnPressed]}
               >
+                {/* R1: the active dot is a separate badge beside the label, not
+                    part of the accessible text. It is decorative, so it is
+                    hidden from accessibility and consumes no label width the
+                    screen reader would announce. */}
+                {sessionLive && (
+                  <View
+                    testID="header-session-live-dot"
+                    style={styles.liveDot}
+                    accessibilityElementsHidden={true}
+                    importantForAccessibility="no-hide-descendants"
+                  />
+                )}
                 <Text style={[styles.headerText, active && styles.headerTextActive]}>
-                  {t.key === 'session' && session !== null ? '● WORKOUT' : t.label}
+                  {t.label}
                 </Text>
               </Pressable>
             );
@@ -183,6 +199,7 @@ export function AppShell(): React.JSX.Element {
       <KeyboardAvoidingView
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        testID="shell-body"
       >
         {showOnboarding ? (
           <OnboardingScreen />
@@ -223,7 +240,7 @@ export function AppShell(): React.JSX.Element {
         )}
       </KeyboardAvoidingView>
       {!showOnboarding && !showProgramSetup && (
-        <View style={styles.tabBar} accessibilityRole="tablist">
+        <View style={styles.tabBar} accessibilityRole="tablist" testID="shell-primary-tabs">
           {PRIMARY_TABS.map((t) => {
             const active = t.key === tab;
             return (
@@ -243,7 +260,7 @@ export function AppShell(): React.JSX.Element {
           })}
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -267,6 +284,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: palette.line,
     backgroundColor: palette.bg,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.text,
+    marginRight: 4,
   },
   headerBtn: {
     flex: 1,

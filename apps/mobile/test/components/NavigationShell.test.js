@@ -165,6 +165,7 @@ describe('Readiness, Session, Library and Profile remain reachable', () => {
     expect(screen.getByLabelText('Open the exercise library')).toBeOnTheScreen();
     expect(screen.getByLabelText('Open profile and settings')).toBeOnTheScreen();
     expect(screen.getByLabelText('Open readiness details')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Open the workout')).toBeOnTheScreen();
     expect(screen.getByText('READY')).toBeOnTheScreen();
     expect(screen.getByText('WORKOUT')).toBeOnTheScreen();
     expect(screen.getByText('LIBRARY')).toBeOnTheScreen();
@@ -180,15 +181,16 @@ describe('Readiness, Session, Library and Profile remain reachable', () => {
   test('Session is reachable during an active workout, marked as in progress', () => {
     mockState = state({ session: { sessionId: 7, date: '2026-07-15', startedAtMs: 1, sets: [] } });
     render(<AppShellTestHarness />);
-    expect(screen.getByLabelText('Open the live workout')).toBeOnTheScreen();
-    expect(screen.getByText('● WORKOUT')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Open the workout — workout in progress')).toBeOnTheScreen();
+    expect(screen.getByTestId('header-session-live-dot', { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(screen.getByText('WORKOUT')).toBeOnTheScreen();
     fireEvent.press(screen.getByTestId('header-session'));
     expect(screen.getByTestId('session-screen-shown')).toBeOnTheScreen();
   });
 
   test('the live-workout marker is absent when no session is open', () => {
     render(<AppShellTestHarness />);
-    expect(screen.queryByText('● WORKOUT')).toBeNull();
+    expect(screen.queryByTestId('header-session-live-dot')).toBeNull();
   });
 });
 
@@ -203,16 +205,72 @@ describe('cold start and back behaviour stay deterministic under the new shell',
     expect(screen.queryByTestId('readiness-screen')).toBeNull();
   });
 
-  test('D7: the secondary bar renders as a TOP header, above the screen body', () => {
+  test('R2: the top header precedes the body among real siblings of the shell root', () => {
     render(<AppShellTestHarness />);
-    const header = screen.getByTestId('header-readiness');
-    const body = screen.getByTestId('today-screen');
-    // Within the same y-axis layout, the header's top edge must sit above the
-    // body's: a second bottom bar would invert this relationship.
-    expect(header.props.parent ? true : true).toBe(true);
-    const headerY = header.parent?.props?.style?.[0]?.minHeight ?? 0;
-    expect(headerY).toBe(56);
+    const root = screen.getByTestId('shell-root');
+    const header = screen.getByTestId('shell-top-header');
+    const body = screen.getByTestId('shell-body');
+    const tabs = screen.getByTestId('shell-primary-tabs');
+
+    // All four regions are on the screen.
+    expect(header).toBeOnTheScreen();
     expect(body).toBeOnTheScreen();
+    expect(tabs).toBeOnTheScreen();
+
+    // Header, body and primary tab bar share the SAME host parent (the shell
+    // root View). Queries return host elements whose direct .parent is a
+    // composite wrapper, so walk to the nearest HOST ancestor and compare —
+    // via failure-safe booleans, because a failing instance-identity
+    // expectation makes Jest print a subtree dump (observed to exhaust the
+    // heap on this tree size).
+    const hostAncestorOf = (el) => {
+      let cur = el.parent;
+      while (cur && typeof cur.type !== 'string') cur = cur.parent;
+      return cur;
+    };
+    const headerHost = hostAncestorOf(header);
+    expect(headerHost?.props?.testID).toBe('shell-root');
+    expect(hostAncestorOf(body) === headerHost && hostAncestorOf(tabs) === headerHost).toBe(true);
+
+    // Sibling ORDER: the header must come BEFORE the body (a second bottom
+    // bar would place it after). root.children order is render order.
+    const childIds = root.children.map((c) => (typeof c === 'object' ? c?.props?.testID : null));
+    const headerIdx = childIds.indexOf('shell-top-header');
+    const bodyIdx = childIds.indexOf('shell-body');
+    const tabsIdx = childIds.indexOf('shell-primary-tabs');
+    expect(headerIdx).toBeGreaterThan(-1);
+    expect(bodyIdx).toBeGreaterThan(-1);
+    expect(tabsIdx).toBeGreaterThan(-1);
+    expect(headerIdx).toBeLessThan(bodyIdx);
+    // The primary tab bar is a bottom bar: it comes AFTER the body.
+    expect(tabsIdx).toBeGreaterThan(bodyIdx);
+  });
+
+  test('R1: the workout header control states its accessibility name and transitions live', () => {
+    // Inactive (no open session): plain descriptive label.
+    mockState = state({ session: null });
+    const { rerender } = render(<AppShellTestHarness />);
+    expect(screen.getByLabelText('Open the workout')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('Open the workout — workout in progress')).toBeNull();
+    expect(screen.queryByText('● WORKOUT')).toBeNull();
+
+    // Active (persisted session open): state-ful label + live region + badge.
+    mockState = state({ session: { sessionId: 7, date: '2026-07-15', startedAtMs: 1, sets: [] } });
+    rerender(<AppShellTestHarness />);
+    expect(screen.getByLabelText('Open the workout — workout in progress')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('Open the workout')).toBeNull();
+    // The decorative dot exists but is hidden from accessibility (R1: it must
+    // not be part of the accessible text or the a11y tree).
+    expect(
+      screen.getByTestId('header-session-live-dot', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('WORKOUT')).toBeOnTheScreen();
+
+    // Back to inactive: the label reverts and the badge disappears.
+    mockState = state({ session: null });
+    rerender(<AppShellTestHarness />);
+    expect(screen.getByLabelText('Open the workout')).toBeOnTheScreen();
+    expect(screen.queryByTestId('header-session-live-dot')).toBeNull();
   });
 
   test('after visiting Plan, the back stack holds [today, coach] — one pop to the root', () => {

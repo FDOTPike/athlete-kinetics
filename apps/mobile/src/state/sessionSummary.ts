@@ -228,8 +228,9 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
     ? `Saved duration: ${Math.max(1, Math.round(input.durationMin))} min`
     : null;
   // D4: the absence copy is the universal fallback — never an assertion that
-  // a block exists merely because the collection is empty.
-  const NO_NEXT = 'No next session is scheduled yet.';
+  // a block exists merely because the collection is empty. The ratified text
+  // is exported as NO_NEXT_SESSION_TEXT (the single source of truth; the
+  // screen renders it directly).
   const next: SessionRef | null = nextSessionAfter(input.blockSessions, input.today);
   return {
     exerciseLines,
