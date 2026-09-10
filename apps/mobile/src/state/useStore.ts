@@ -4761,6 +4761,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const previousRows = rowsOf<{
       movement_id: number; reps: number; load_kg: number; session_id: number;
     }>(d.executeSync(
+      // R1/D3: candidates from strictly earlier sessions only. The store's
+      // session_id is the persisted insert order and the deterministic
+      // tiebreaker; the summary picks the LATEST eligible session from these
+      // rows and never combines maxima across sessions.
       `SELECT sr.movement_id, sr.reps, sr.load_kg, sr.session_id
          FROM set_record sr
         WHERE sr.session_id < ?

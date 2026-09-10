@@ -4,7 +4,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fro
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
-import { buildSessionSummary } from '../state/sessionSummary';
+import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
 import {
@@ -482,7 +482,10 @@ export default function SessionScreen(): React.JSX.Element {
           session_recorded: "Session recorded.",
         };
 
-    const displayMsg = outcomeCopy[outcome.kind] ?? outcomeCopy.session_recorded;
+    // R1/D5: an unknown outcome kind must render "Outcome unavailable" — it
+    // must not be relabelled as a recorded session. The known kinds keep
+    // their existing honest copy.
+    const displayMsg = outcomeCopy[outcome.kind] ?? 'Outcome unavailable';
 
     return (
       <View style={styles.outcomeContainer}>
@@ -496,15 +499,16 @@ export default function SessionScreen(): React.JSX.Element {
           <View style={styles.outcomeDash} />
           <Text style={styles.outcomeText}>{displayMsg}</Text>
           <Text style={styles.outcomeDate}>{outcome.dateStr}</Text>
-          {/* W3: persisted facts only, below the status. A missing fact renders
-              no line; a summary that cannot be read renders nothing here. */}
+          {/* W3/R1: persisted facts only, below the status. Typed lines carry
+              stable movement-based keys (D6); the no-next case renders the
+              ratified fallback text (D4). */}
           {summary !== null && (
             <View style={styles.summaryBlock} testID="session-summary">
               {summary.exerciseLines.map((line) => (
-                <Text key={line} style={styles.summaryLine}>{line}</Text>
+                <Text key={line.key} style={styles.summaryLine}>{line.text}</Text>
               ))}
               {summary.comparisonLines.map((line) => (
-                <Text key={line} style={styles.summaryComparison}>{line}</Text>
+                <Text key={line.key} style={styles.summaryComparison}>{line.text}</Text>
               ))}
               {summary.durationLine !== null && (
                 <Text style={styles.summaryLine}>{summary.durationLine}</Text>
@@ -514,7 +518,7 @@ export default function SessionScreen(): React.JSX.Element {
               )}
               {summary.nextLine === null && (
                 <Text style={styles.summaryNext} testID="summary-next-none">
-                  No further sessions are scheduled in this block.
+                  {NO_NEXT_SESSION_TEXT}
                 </Text>
               )}
             </View>
@@ -523,9 +527,9 @@ export default function SessionScreen(): React.JSX.Element {
 
         <View style={styles.outcomeFooter}>
           <SecondaryButton
-            label="Back to Ready"
+            label="Back to Today"
             onPress={dismissOutcome}
-            accessibilityLabel="Back to Ready"
+            accessibilityLabel="Back to Today"
             style={{ alignSelf: 'stretch' }}
           />
         </View>
@@ -1085,8 +1089,8 @@ export default function SessionScreen(): React.JSX.Element {
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
                           <Text style={styles.rpeEvidence}>
                             {safeRpe !== null
-                              ? 'This actual RPE will be used as Coach evidence.'
-                              : 'Unanswered RPE is left out of Coach evidence.'}
+                              ? 'This effort rating will be saved with the set.'
+                              : 'Effort rating is optional; leave it blank if you are unsure.'}
                           </Text>
                         </View>
 
