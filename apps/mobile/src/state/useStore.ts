@@ -691,6 +691,10 @@ interface KineticsStore {
   /** Re-read the open episode into state. Called on boot and after entry/exit. */
   refreshSuspension: () => void;
   getPendingAutopilotAdjustments: () => PendingAutopilotAdjustment[];
+  /** Recorded `session.duration_min` values for finalized sessions of this
+   *  focus, newest first. Read-only evidence for the Today duration line —
+   *  the app measures durations, it never estimates them from set counts. */
+  recordedDurationsForFocus: (focus: string, limit?: number) => number[];
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
@@ -4703,6 +4707,28 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }));
   },
 
+  recordedDurationsForFocus: (focus, limit = 5): number[] => {
+    if (db === null) return [];
+    // Only FINALIZED sessions carry a duration: endSession stamps
+    // session.duration_min inside the same transaction that persists the
+    // outcome, so a NOT NULL duration is proof the session actually ended.
+    // Joining through session_origin keeps this to sessions that really came
+    // from a planned session of this focus — an ad-hoc session has no
+    // source_planned_session_id and is correctly excluded, because it is not
+    // evidence about how long THIS kind of planned session takes.
+    const rows = rowsOf<{ duration_min: number }>(db.executeSync(
+      `SELECT s.duration_min
+         FROM session s
+         JOIN session_origin so ON so.session_id = s.session_id
+         JOIN planned_session ps ON ps.planned_session_id = so.source_planned_session_id
+        WHERE ps.focus = ?
+          AND s.duration_min IS NOT NULL
+        ORDER BY s.session_id DESC
+        LIMIT ?`,
+      [focus, limit],
+    ));
+    return rows.map((r) => r.duration_min).filter((d) => Number.isFinite(d) && d > 0);
+  },
 
   refreshVector: () => {
     if (get().status !== 'ready') return;
