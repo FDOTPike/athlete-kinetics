@@ -155,6 +155,15 @@ describe('Round 2 R6: the review screen discloses progression methodology', () =
   });
 });
 
+/**
+ * W2 (Astra UX Phase 1): the programming controls now live in an optional
+ * disclosure, because the required first-run path no longer asks for them.
+ * The controls are unchanged — these tests just have to open the drawer that
+ * now holds them.
+ */
+const openProgramControls = () =>
+  fireEvent.press(screen.getByLabelText('Fine-tune your program (optional)'));
+
 // ---------------------------------------------------------------------------
 // [R1-UI] power-specific explanation + [R4-UI] capacity + [R3-UI] summary
 // ---------------------------------------------------------------------------
@@ -201,6 +210,7 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     // distinct roles are squat+hinge only (2 < 3), so the warning MUST
     // appear — even though the persisted 4-day profile claims 3 roles.
     render(<ProgramSetupScreen />);
+    openProgramControls();
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
@@ -243,6 +253,7 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     mockState.profile.objective = 'strength';
     mockState.profile.session_duration_cap_min = 60;
     render(<ProgramSetupScreen />);
+    openProgramControls();
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
@@ -261,6 +272,7 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     mockState.profile.objective = 'strength';
     mockState.profile.session_duration_cap_min = 15;
     render(<ProgramSetupScreen />);
+    openProgramControls();
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
@@ -293,6 +305,7 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     }));
     mockState.movements = [{ movement_id: 1, name: 'Competition Squat', pattern: 'squat', movement_id_is_bodyweight: undefined }];
     render(<ProgramSetupScreen />);
+    openProgramControls();
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
