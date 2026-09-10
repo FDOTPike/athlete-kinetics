@@ -12,7 +12,15 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { BackHandler, PanResponder, Platform, View, StyleSheet, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
 
-export type Tab = 'readiness' | 'session' | 'coach' | 'library' | 'athlete';
+/**
+ * Tab keys. W4 (Astra UX Phase 1): the PRIMARY destinations are exactly
+ * 'today', 'coach' (presented as Plan), and 'progress'. The remaining keys are
+ * preserved internal route identities — 'readiness' (Readiness detail),
+ * 'session' (the live workout), 'library', and 'athlete' (Profile/settings) —
+ * reachable from header controls rather than the primary bar, so no capability
+ * is lost and existing deterministic back behaviour is unchanged.
+ */
+export type Tab = 'readiness' | 'session' | 'coach' | 'library' | 'athlete' | 'today' | 'progress';
 
 export type BackHandlerFn = () => boolean;
 
@@ -27,11 +35,11 @@ interface NavigationContextValue {
 const NavigationContext = createContext<NavigationContextValue | null>(null);
 
 const fallbackContext: NavigationContextValue = {
-  tab: 'readiness',
+  tab: 'today',
   setTab: () => {},
   goBack: () => false,
   registerSubViewBack: () => () => {},
-  tabHistory: ['readiness'],
+  tabHistory: ['today'],
 };
 
 export interface NavigationProviderProps {
@@ -39,7 +47,7 @@ export interface NavigationProviderProps {
   initialTab?: Tab;
 }
 
-export function NavigationProvider({ children, initialTab = 'readiness' }: NavigationProviderProps): React.JSX.Element {
+export function NavigationProvider({ children, initialTab = 'today' }: NavigationProviderProps): React.JSX.Element {
   const [tabHistory, setTabHistory] = useState<Tab[]>([initialTab]);
   const subViewHandlersRef = useRef<Set<BackHandlerFn>>(new Set());
 

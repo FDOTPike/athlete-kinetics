@@ -7419,3 +7419,131 @@ Prepared the bounded Hermes continuation package without changing product code.
   for manual use in Hermes. No executor was launched or summoned.
 - No source, test, schema, migration, engine, build artifact, remote branch, PR,
   release, or historical ledger entry was changed.
+
+---
+
+## Entry 0108 — 2026-09-10 · Hermes Relay (GLM-5.3-Flash) executes W3–W5 continuation
+
+### Input G(x)
+
+````text
+no team, subagents, or self-auditor.
+
+Work only in:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\astra-athlete-first-ux
+
+Read AGENTS.md completely and follow it as the continuation contract. Verify branch claude/astra-athlete-first-ux and HEAD 10b2cca before writing. Treat W0–W2 and commits 2251f49, 9a654fb, and 5608100 as completed and frozen. Begin at W3 and continue autonomously through W5.
+
+Your first repository write must append this exact prompt to PROMPT_LEDGER.md. Keep AGENTS.md untracked. Do not execute unrelated OW items, push, merge, rebase, create a PR, tag, or release. Stop only at a genuine authority blocker or when the candidate is ready for independent Codex/Sol audit.
+````
+
+### Output F(G(x))
+
+Continuation accepted. Opening gate verified before any other write:
+
+- Branch `claude/astra-athlete-first-ux`; HEAD `10b2cca323736cdc51e5e7d37fb8e591b4010593`.
+- `56081003ecbf6f5f9a03b21a30c2c742e3286fb9` confirmed an ancestor of HEAD
+  (`git merge-base --is-ancestor` exit 0).
+- Commits between the PR #12 merge tip and HEAD: `2251f49` (W0), `9a654fb`
+  (W1), `5608100` (W2), `10b2cca` (documentation-only ledger handover) — no
+  others.
+- Tracked status clean; the only untracked file is root `AGENTS.md`, the known
+  owner-supplied control artifact (kept untracked per contract §2/§6).
+- W0–W2 frozen; execution begins at W3. No push, merge, rebase, tag, release,
+  or PR modification.
+
+Subsequent F(G(x)) records for W3, W4, and W5 will be appended below as the
+work completes, per contract §7.
+
+---
+
+### W3 output — truthful completion summary and next session
+
+Implemented per contract §5 W3:
+
+- New pure module `apps/mobile/src/state/sessionSummary.ts`: shapes the
+  post-completion summary from persisted facts only. The history-match law
+  (`matchPreviousBest`) requires the same `movementId` AND the same
+  implement/load class (`bodyweight` vs `loaded`, derived from the movement's
+  canonical first prefix). The helper states the previous best as a fact and
+  never compares it to today's result, so no PR/improvement claim can be
+  produced. Duration renders only when `session.duration_min` is persisted and
+  > 0; otherwise the line is absent, not estimated.
+- New store method `loadSessionSummaryFacts(sessionId)` (useStore.ts): one
+  read-only SQL pass over `set_record` + `set_metric` + `set_target` for the
+  ended session, grouped per movement with per-set reps/load/time facts, plus
+  previous-best aggregates from strictly earlier sessions. Read at the existing
+  data-access boundary inside a `useMemo` keyed on `lastEndedSessionId` — no
+  SQLite in render beyond the pattern `loadSessionOutcome` already established.
+- `SessionScreen.tsx` outcome branch extended: status copy unchanged; below it,
+  the exercise/duration/next lines from the pure helper. The branch remains
+  render-only: no `endSession`, no plan creation, no progression mutation, no
+  second completion write. `dismissOutcome` still only clears
+  `lastEndedSessionId`.
+- Next-session line reuses the W1 pure `nextSessionAfter` over the ordered
+  `blockSessions`; its null case renders the honest no-session copy.
+
+Focused tests: `apps/mobile/test/components/SessionSummary.test.js`.
+Mutation checks (run, observed failing, bytes restored from hash-verified
+backups):
+
+- M5 history-match law: drop the implement-class equality term → the class
+  mismatch test fails.
+- M6 no-second-write law: call `endSession()` inside the outcome branch → the
+  no-second-write test fails.
+
+W3 record amendment — restore-method accuracy:
+
+- M5 restore: byte-copy from the SHA-256-verified backup; pre- and post-restore
+  hashes matched (1b3b2b98…23c2).
+- M6 restore: after observing the mutation fail 2 tests, the file was restored
+  with `git checkout -- SessionScreen.tsx`, which reverted the file to HEAD and
+  discarded the uncommitted W3 wiring in it. The wiring was re-applied in full
+  (import, destructure, summary useMemo, outcome render block, styles) and
+  re-verified: typecheck 0; SessionSummary + SessionScreen 103/103; W1/W2
+  frozen suites 58/58. Working-tree hashes at restoration:
+  SessionScreen 4fbec392…, useStore 24477e7c…, sessionSummary 1b3b2b98…,
+  SessionSummary.test 6aff85ac….
+
+---
+
+### W4 output — Today · Plan · Progress integration and accessibility
+
+Implemented per contract §5 W4:
+
+- `navigation.tsx`: Tab union extended with `'today' | 'progress'`; cold-start
+  root is `today`. All five legacy route identities (`readiness`, `session`,
+  `coach`, `library`, `athlete`) are preserved as internal routes so existing
+  deterministic back behaviour and deep-link/fixture identities survive
+  unchanged (only the union and the default root changed).
+- `App.tsx`: the primary bar presents EXACTLY TODAY · PLAN · PROGRESS
+  (PLAN = the `coach` route under its athlete-facing name). The other four
+  surfaces moved to a header controls row (READINESS / SESSION / LIBRARY /
+  ATHLETE) with 56 dp `minHeight` targets, meaningful accessibility labels,
+  selected state, and a live-workout marker (`● SESSION` + appended
+  accessibility label + polite live region) driven by the persisted
+  `session !== null` fact. `AppShell` is now exported for the test harness.
+- `ProgressScreen.tsx` (new): a read-only composition of EXISTING facts only —
+  `loadRecentOutcomes(20)` and `loadMeasuredHistory(14)`, the same rows the
+  Profile surface shows. No new analytics, no derived trends, absence stated
+  honestly. Profile/settings remain fully reachable from the header.
+- `AppShellTestHarness.tsx` (test-only): renders the real AppShell in one
+  NavigationProvider with a live context probe.
+- `BlockScreen.tsx`: the no-vector early return now carries the `coach-screen`
+  route testID so route identity is assertable in every state of the screen.
+
+Focused tests: `NavigationShell.test.js` (11) — three-primary assertion
+(including absence of a fourth primary), route/action identity (start calls
+`startSession()` with no arguments then lands on the session route; resume
+never starts a second session; PLAN/PROGRESS press → route render),
+reachability of all four header surfaces, live marker presence/absence, cold
+start on Today, back-stack poppability, and the provider-level goBack law.
+
+Mutation check M7 (run, observed failing, bytes restored, SHA-256 verified
+30896f7e…): rewiring Today's primary `startAndOpen` to navigate to Plan
+instead of calling `startSession()` failed 2 route/action-identity tests
+across TodayScreen.test.js and NavigationShell.test.js — proving the contract
+is pinned to the action, not the label.
+
+Gates at the W4 candidate: typecheck 0; full component suite 25 suites /
+394 tests green.

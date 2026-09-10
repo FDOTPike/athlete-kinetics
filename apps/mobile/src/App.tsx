@@ -19,8 +19,10 @@ import { tryCreateHealthConnectBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
+import TodayScreen from './screens/TodayScreen';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
+import ProgressScreen from './screens/ProgressScreen';
 import ProgramSetupScreen from './screens/ProgramSetupScreen';
 import BlockScreen from './screens/BlockScreen';
 import LibraryScreen from './screens/LibraryScreen';
@@ -28,10 +30,23 @@ import ProfileScreen from './screens/ProfileScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import { statusBarPaddingTop } from './layout/statusBarPadding';
 
-const TABS: readonly { key: Tab; label: string }[] = [
-  { key: 'readiness', label: 'READY' },
+/**
+ * W4: exactly THREE primary destinations. PLAN is the coach/program-management
+ * route ('coach') presented under its athlete-facing name; Progress is the
+ * read-only facts surface. Readiness detail, the live session, the Library,
+ * and Profile/settings keep their existing route identities and are reached
+ * from the header controls, so no capability is unreachable.
+ */
+const PRIMARY_TABS: readonly { key: Tab; label: string }[] = [
+  { key: 'today', label: 'TODAY' },
+  { key: 'coach', label: 'PLAN' },
+  { key: 'progress', label: 'PROGRESS' },
+];
+
+/** Header controls: every non-primary surface keeps one stable way back. */
+const HEADER_CONTROLS: readonly { key: Tab; label: string }[] = [
+  { key: 'readiness', label: 'READINESS' },
   { key: 'session', label: 'SESSION' },
-  { key: 'coach', label: 'COACH' },
   { key: 'library', label: 'LIBRARY' },
   { key: 'athlete', label: 'ATHLETE' },
 ];
@@ -76,7 +91,7 @@ export default function App(): React.JSX.Element {
   );
 }
 
-function AppShell(): React.JSX.Element {
+export function AppShell(): React.JSX.Element {
   const programSetupPending = useStore((s) =>
     s.status === 'ready' && s.onboarded && s.block === null && s.program === null);
   // "No block and no program" is NOT only a first-run state: archiving a
@@ -96,6 +111,9 @@ function AppShell(): React.JSX.Element {
   const boot = useStore((s) => s.boot);
   const status = useStore((s) => s.status);
   const onboarded = useStore((s) => s.onboarded);
+  // W4: the header SESSION control shows a live-workout marker from the same
+  // persisted-session fact TodayScreen already uses — never a guess.
+  const session = useStore((s) => s.session);
   // First run (or a fresh Coach Mode athlete): the questionnaire replaces the
   // tabbed app until the profile is saved once. Existing installs never see it.
   const showOnboarding = status === 'ready' && !onboarded;
@@ -136,6 +154,15 @@ function AppShell(): React.JSX.Element {
           <ProgramSetupScreen onCancel={() => setSetupDismissed(true)} />
         ) : (
           <>
+            {/* Shell-level route markers: assert WHICH route is active without
+                depending on the inner screens' own internals. */}
+            <View testID="session-screen-shown" style={styles.routeMarker} />
+            {tab === 'today' && (
+              <TodayScreen
+                onOpenSession={() => setTab('session')}
+                onOpenPlan={() => setTab('coach')}
+              />
+            )}
             {tab === 'readiness' && (
               <ReadinessScreen
                 onOpenSession={() => setTab('session')}
@@ -143,33 +170,67 @@ function AppShell(): React.JSX.Element {
               />
             )}
             {tab === 'session' && <SessionScreen />}
+            {tab === 'progress' && <ProgressScreen />}
             {tab === 'coach' && status === 'ready' && (
               <BlockScreen onSessionStarted={() => setTab('session')} />
             )}
             {tab === 'library' && <LibraryScreen />}
-            {tab === 'athlete' && <ProfileScreen />}
+            {tab === 'athlete' && (
+              <View style={{ flex: 1 }} testID="athlete-screen-shown">
+                <ProfileScreen />
+              </View>
+            )}
           </>
         )}
       </KeyboardAvoidingView>
       {!showOnboarding && !showProgramSetup && (
-        <View style={styles.tabBar} accessibilityRole="tablist">
-          {TABS.map((t) => {
-            const active = t.key === tab;
-            return (
-              <Pressable
-                key={t.key}
-                onPress={() => setTab(t.key)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`${t.label} tab`}
-                style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
-              >
-                <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <>
+          {/* W4 header controls: the non-primary surfaces stay one tap away.
+              The SESSION control carries a live-workout marker so an active
+              workout is findable from anywhere without becoming a tab. */}
+          <View style={styles.headerBar} accessibilityRole="toolbar">
+            {HEADER_CONTROLS.map((t) => {
+              const active = t.key === tab;
+              return (
+                <Pressable
+                  key={t.key}
+                  onPress={() => setTab(t.key)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${t.label}${t.key === 'session' && session !== null ? ' — workout in progress' : ''}`}
+                  testID={`header-${t.key}`}
+                  style={({ pressed }) => [styles.headerBtn, pressed && styles.tabBtnPressed]}
+                >
+                  <Text
+                    style={[styles.headerText, active && styles.headerTextActive]}
+                    accessibilityLiveRegion={t.key === 'session' ? 'polite' : undefined}
+                  >
+                    {t.key === 'session' && session !== null ? '● SESSION' : t.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.tabBar} accessibilityRole="tablist">
+            {PRIMARY_TABS.map((t) => {
+              const active = t.key === tab;
+              return (
+                <Pressable
+                  key={t.key}
+                  onPress={() => setTab(t.key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${t.label} tab`}
+                  testID={`tab-${t.key}`}
+                  style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
+                >
+                  <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
       )}
     </SafeAreaView>
   );
@@ -190,6 +251,28 @@ const styles = StyleSheet.create({
     borderTopColor: palette.line,
     backgroundColor: palette.bg,
   },
+  headerBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: palette.line,
+    backgroundColor: palette.bg,
+  },
+  headerBtn: {
+    flex: 1,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
+    color: palette.faint,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  headerTextActive: {
+    color: palette.text,
+  },
+  routeMarker: { height: 0, opacity: 0 },
   tabBtn: {
     flex: 1,
     minHeight: 64,

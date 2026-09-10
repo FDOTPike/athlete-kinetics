@@ -347,7 +347,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
   if (vector === null) {
     return (
-      <View style={styles.center}>
+      // The no-vector gate is an early return INSIDE the real screen, so the
+      // route identity (coach-screen) is still asserted by tests even when
+      // readiness data has not arrived yet.
+      <View style={styles.center} testID="coach-screen">
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
