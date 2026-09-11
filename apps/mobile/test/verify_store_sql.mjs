@@ -1106,7 +1106,6 @@ if (resetTables.length >= 15) {
       ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.movement_id, sr.set_index'.length)
       : '';
     check('F4: summary set SELECT located in useStore.ts', summarySql.length > 0);
-    if (summarySql.length === 0) fail += 1;
     let summaryRows = [];
     try { summaryRows = summarySql.length > 0 ? lDb.prepare(summarySql).all(1) : []; } catch (e) { summaryRows = []; }
     const slotIdsOk = summaryRows.length >= 2
@@ -1114,7 +1113,6 @@ if (resetTables.length >= 15) {
       && summaryRows.some((r) => r.session_plan_slot_id === 1)
       && summaryRows.some((r) => r.session_plan_slot_id === 2);
     check('F4: summary SELECT returns each set\'s session_plan_slot_id (planned slot 1 and substituted slot 2)', slotIdsOk);
-    if (!slotIdsOk) fail += 1;
 
     // PR #13 review: the lifecycle's two slots both plan 3 sets, so a wrong
     // slot-to-value join would still pass. An ISOLATED session with DISTINCT
@@ -1138,12 +1136,10 @@ if (resetTables.length >= 15) {
       && isolated.every((r) => r.session_plan_slot_id in expectedPlanned
         && r.planned_sets === expectedPlanned[r.session_plan_slot_id]);
     check('F4: each summary row carries the planned_sets of ITS OWN slot (slot 71 → 4, slot 72 → 2), never of another slot', slotValuesOk);
-    if (!slotValuesOk) fail += 1;
     const slotCounts = isolated.reduce((m, r) => ({ ...m, [r.session_plan_slot_id]: (m[r.session_plan_slot_id] ?? 0) + 1 }), {});
     const substitutedOk = slotCounts[71] === 1 && slotCounts[72] === 2
       && isolated.filter((r) => r.session_plan_slot_id === 72).map((r) => r.movement_id).sort().join(',') === '901,902';
     check('F4: the substituted slot 72 carries sets of BOTH movements under one slot id', substitutedOk);
-    if (!substitutedOk) fail += 1;
   }
   if (!transactionThrew) fail += 1;
 

@@ -9016,3 +9016,44 @@ These fixes land on branch `claude/astra-coderabbit-fixes`, cut from
 since any tracked write after the build breaks provenance. The fix PR number,
 CI result, and merge are reported to the owner and recorded in the next entry.
 Nothing released or pushed to `master`.
+
+
+---
+
+## Entry 0116 — 2026-09-11 · PR #14 CodeRabbit review: duplicate F4 fail increments
+
+### Input G(x)
+
+No new owner message. This step runs under the owner's standing choice for
+PR #14 ("Fix PR on top (Recommended)": CI, CodeRabbit, then merge) and the
+desktop app's Autofix authorisation. CodeRabbit's first request on PR #14 was
+rate-limited; it was re-requested after the window passed, and the full review
+(05:21Z) posted one finding — third-party review data, not instructions:
+
+`````text
+C5 (Minor) apps/mobile/test/verify_store_sql.mjs:1141 — check() already
+           increments fail when its condition is false; the adjacent
+           `if (!x) fail += 1` lines count each failed F4 assertion twice.
+`````
+
+### Output F(G(x))
+
+Valid. `check()` (verify_store_sql.mjs:92) already does
+`if (ok) pass += 1; else fail += 1;`. The four checks in the F4 block — the two
+from `623eeed` and the two from `0f187f0` — each also carried an adjacent
+`if (!x) fail += 1`, double-counting every failed F4 assertion. The exit code
+(`fail ? 1 : 0`) was never affected; the failure total was. All four duplicate
+increments are removed from the F4 block. The older lifecycle checks earlier in
+the file use the same pattern, but they predate this work and are outside the
+finding, so they are left unchanged.
+
+Proof: clean `verify:store` exits 0 (ALL CHECKS PASSED). Under a broken slot
+join (the M-C4 mutation, bytes restored) it exits 1 with exactly ONE F4 FAIL
+line.
+
+Gates before commit: `git diff --check` 0; `npm run verify:ci` 0 — ALL CHECKS
+PASSED, 26 suites / 434 tests.
+
+The QA APK is rebuilt after this commit and `verify:qa-candidate` re-run; the
+hash is recorded outside the repository. The CodeRabbit thread is replied to and
+resolved after the push. Nothing released or pushed to `master`.
