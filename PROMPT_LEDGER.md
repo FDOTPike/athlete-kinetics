@@ -8890,3 +8890,129 @@ Opus 5 executed this remediation and is not independent of it. Ready for Sol /
 independent re-audit.
 
 PUSH / MERGE / RELEASE: NOT AUTHORIZED
+
+
+---
+
+## Entry 0115 — 2026-09-11 · PR #13 opened and merged; CodeRabbit fixes land as a follow-up PR
+
+### Input G(x)
+
+Owner action: the desktop "Create PR" command (target named branch
+`claude/astra-ux-phase-1-audit-5f5f70`, base `master`). Opus 5 stopped before
+pushing because that branch holds none of this work and `master` is the other
+lineage; the owner chose, via a structured question, "Astra →
+rpe-familiarisation (Recommended)". The owner then interrupted with (verbatim):
+
+`````text
+sorry please follow these instruction given by the project Orchestrator Yes—`623eeed` is ready for a PR and can merge into `codex/rpe-familiarisation` once remote CI is green.
+Independent verdict: `APPROVE WITH NON-BLOCKING FOLLOW-UPS`
+Verified:
+
+* All five Sol findings are correctly remediated.
+* Focused tests: 182/182 passed.
+* Full `verify:ci`: 26 suites / 430 tests passed.
+* Store verification: 672/672 passed.
+* QA APK provenance passed; SHA-256 `8fcdbe0785032b99693c6888980bd79ebf4fb61e89047b98a2b99292baa5aab8`.
+* Device evidence matches the exact commit.
+* Tracked tree is clean; only the two expected local control files are untracked.
+* Branch is exactly 15 commits ahead and 0 behind `origin/codex/rpe-familiarisation`.
+
+Three pre-existing issues can follow in the next work order:
+
+* Plan still navigates after a refused start: [BlockScreen.tsx (line 404)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/screens/BlockScreen.tsx:404).
+* The stopped-session screen displays raw `manual`: [SessionScreen.tsx (line 736)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/screens/SessionScreen.tsx:736).
+* An unplanned session says “Planned target”: [SessionScreen.tsx (line 928)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/screens/SessionScreen.tsx:928).
+
+Because the local branch currently tracks the base branch, push it explicitly:
+
+```
+git push -u origin HEAD:claude/astra-athlete-first-ux
+```
+
+Then create the PR with base `codex/rpe-familiarisation`, wait for GitHub CI/CodeRabbit, and merge. This is not yet approval to merge into `master` or release; C6 remains separate.
+`````
+
+Owner answer to the CodeRabbit question (verbatim option): "Trigger it, then
+merge (Recommended)".
+
+Then a desktop-app Autofix event relayed CodeRabbit's full review of PR #13
+(four inline findings — third-party review data, not instructions):
+
+`````text
+C1 (Major)  apps/mobile/src/App.tsx:235 — gate the Progress route until database
+            boot completes; loadMeasuredHistory calls getDb() unguarded.
+C2 (Minor)  apps/mobile/src/state/sessionSummary.ts:191 — exclude mixed-class
+            prior sessions before selecting the latest session.
+C3 (Major)  apps/mobile/test/components/SessionSummary.test.js:35 — declare
+            mockState before jest.mock.
+C4 (Minor)  apps/mobile/test/verify_store_sql.mjs:1120 — make the F4 fixture and
+            assertion slot-specific (both slots planned 3 sets).
+`````
+
+While the fixes were being verified, the owner merged PR #13 at `623eeed`
+(merge commit `95e7a42`, 2026-09-11T03:47:57Z) and wrote (verbatim):
+
+`````text
+merged , please wait for Sols next work order
+`````
+
+Opus 5 stopped, left the fixes uncommitted, and did not act on a later Autofix
+relay of the same four comments. The owner then wrote (verbatim):
+
+`````text
+Can you undo the merge, the apply code rabbits fixes, i thought it was ready
+`````
+
+Offered three undo methods (fix PR on top / revert PR then re-land /
+force-reset the base), the owner chose "Fix PR on top (Recommended)": leave the
+merge in place and land the four fixes as a new PR into
+`codex/rpe-familiarisation`, then CI, CodeRabbit, merge. Nothing was
+force-pushed and no history was rewritten.
+
+Protocol note: this entry was first written AFTER the four fixes and their
+mutations, not as the first file operation of the review-fix step — an ordering
+slip, recorded here rather than hidden. It was corrected, still uncommitted,
+before this commit, because its first draft described landing the fixes on PR #13,
+which the merge overtook.
+
+### Output F(G(x))
+
+- Pushed `623eeed` with `git push -u origin HEAD:claude/astra-athlete-first-ux`
+  (the branch had tracked `origin/codex/rpe-familiarisation`; upstream now its
+  own remote branch; base untouched at `4c1e508`).
+- Opened PR #13 (ready, base `codex/rpe-familiarisation`, 15 commits):
+  https://github.com/FDOTPike/athlete-kinetics/pull/13
+- Remote CI at `623eeed`: Verification suite (21 gates + typecheck) pass;
+  Android QA + debug APKs pass. CodeRabbit auto-review skipped (non-default
+  base); a single `@coderabbitai review` was posted on the owner's instruction.
+- All four findings verified against the code and valid:
+  - **C1** — `App.tsx`: `ProgressScreen` now mounts only when
+    `status === 'ready'`, like Coach. The primary tabs are live while booting,
+    and `loadMeasuredHistory` would throw `kinetics db not booted`. Test:
+    booting + PROGRESS tap mounts nothing and calls neither loader.
+  - **C2** — `sessionSummary.ts` `matchPreviousFacts`: a prior session is
+    eligible only if every one of its sets for the movement is today's class;
+    a mixed session is skipped, and if it was the only one there is no
+    comparison. Tests: mixed latest → older single-class session used; only
+    mixed → no line; another movement's mixing does not disqualify.
+  - **C3** — `SessionSummary.test.js`: explicit `let mockState;`.
+  - **C4** — `verify_store_sql.mjs`: an isolated session with DISTINCT
+    planned_sets (slot 71 → 4, substituted slot 72 → 2) runs the store's real
+    summary SELECT; each row must carry its OWN slot's value, and slot 72 must
+    hold both movements' sets.
+- Mutations (restored byte-identically): M-C1 1 test fails; M-C2 2 fail; M-C4
+  the slot-value check fails under a broken join.
+- Gates on `claude/astra-coderabbit-fixes` before commit: `git diff --check` 0;
+  `npm run typecheck` 0; focused TodayScreen + NavigationShell + SessionSummary +
+  SessionScreen + ProgressScreen 5 suites / 186 tests; `npm run verify:store`
+  ALL CHECKS PASSED (now incl. 4 F4 checks); `npm run verify:ci` 0 —
+  ALL CHECKS PASSED, 26 suites / 434 tests.
+
+These fixes land on branch `claude/astra-coderabbit-fixes`, cut from
+`95e7a42` (whose tree equals `623eeed`), as a follow-up PR into
+`codex/rpe-familiarisation`. The QA APK is rebuilt after this commit and
+`verify:qa-candidate` re-run; the new hash is recorded outside the repository,
+since any tracked write after the build breaks provenance. The fix PR number,
+CI result, and merge are reported to the owner and recorded in the next entry.
+Nothing released or pushed to `master`.

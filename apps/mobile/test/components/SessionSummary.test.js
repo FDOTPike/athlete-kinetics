@@ -31,6 +31,10 @@ import {
   NO_NEXT_SESSION_TEXT,
 } from '../../src/state/sessionSummary';
 
+// Explicit binding (PR #13 review): without it every assignment below created an
+// implicit global that leaked across suites sharing a worker.
+let mockState;
+
 jest.mock('../../src/state/useStore', () => {
   const useStoreImpl = (selector) => selector(mockState);
   useStoreImpl.getState = () => mockState;
@@ -575,5 +579,53 @@ describe('F4: groupSummaryExercises never duplicates a slot denominator', () => 
     ]);
     expect(exercises.find((e) => e.movementId === 1).plannedSets).toBeNull();
     expect(exercises.find((e) => e.movementId === 2).plannedSets).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PR #13 review — a mixed-class PRIOR session is never "last time"
+// ---------------------------------------------------------------------------
+
+describe('matchPreviousFacts skips prior sessions that mix implement classes', () => {
+  const today = {
+    movementId: 7, movementName: 'Pull-Up', plannedSets: 3,
+    sets: [{ reps: 8, loadKg: 0, timeS: null }, { reps: 7, loadKg: 0, timeS: null }],
+  };
+
+  test('the latest session mixed bodyweight + loaded sets: it is skipped for the latest single-class one', () => {
+    const facts = matchPreviousFacts(today, [
+      { movementId: 7, reps: 10, loadKg: 0, sessionId: 3 },
+      { movementId: 7, reps: 12, loadKg: 0, sessionId: 4 },
+      { movementId: 7, reps: 5, loadKg: 10, sessionId: 4 },
+    ]);
+    expect(facts).not.toBeNull();
+    expect(facts.sourceSessionId).toBe(3);
+    expect(facts.mostRepsInOneSet).toBe(10);
+  });
+
+  test('when the only prior session is mixed, no comparison is made at all', () => {
+    const facts = matchPreviousFacts(today, [
+      { movementId: 7, reps: 12, loadKg: 0, sessionId: 4 },
+      { movementId: 7, reps: 5, loadKg: 10, sessionId: 4 },
+    ]);
+    expect(facts).toBeNull();
+    const view = buildSessionSummary({
+      exercises: [today],
+      previousSets: [
+        { movementId: 7, reps: 12, loadKg: 0, sessionId: 4 },
+        { movementId: 7, reps: 5, loadKg: 10, sessionId: 4 },
+      ],
+      durationMin: null, blockSessions: [], today: '2026-09-11',
+    });
+    expect(view.comparisonLines).toEqual([]);
+  });
+
+  test('another movement mixing classes in the same session does not disqualify this one', () => {
+    const facts = matchPreviousFacts(today, [
+      { movementId: 7, reps: 11, loadKg: 0, sessionId: 4 },
+      { movementId: 9, reps: 5, loadKg: 40, sessionId: 4 },
+    ]);
+    expect(facts.sourceSessionId).toBe(4);
+    expect(facts.mostRepsInOneSet).toBe(11);
   });
 });
