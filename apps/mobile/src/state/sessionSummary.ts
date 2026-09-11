@@ -16,7 +16,10 @@
  *   1. the same movement identity (`movementId`);
  *   2. ALL of today's sets for that movement belong to exactly ONE implement
  *      class (a logged load > 0 kg is `loaded`, otherwise `bodyweight`);
- *   3. the historical sets belong to that SAME class;
+ *   3. the historical sets belong to that SAME class, and the prior session
+ *      holds ONLY that class for this movement — a session mixing loaded and
+ *      bodyweight sets is as ambiguous as a mixed session today, so it is
+ *      never used (PR #13 review);
  *   4. the facts come from ONE identifiable prior session — the LATEST
  *      eligible one. Maxima are never combined across sessions, and set
  *      ordering can never change the result.
@@ -182,11 +185,16 @@ export const matchPreviousFacts = (
 ): PreviousFacts | null => {
   const todayClass = exerciseClassOf(exercise);
   if (todayClass === null) return null;
-  const matched = previousSets.filter(
-    (p) => p.movementId === exercise.movementId && implementClassOf(p.loadKg) === todayClass,
+  const forMovement = previousSets.filter((p) => p.movementId === exercise.movementId);
+  // A prior session is eligible only if EVERY one of its sets for this movement
+  // is today's class. Reporting just the matching half of a mixed session would
+  // present a partial session as "last time".
+  const mixedSessions = new Set(
+    forMovement.filter((p) => implementClassOf(p.loadKg) !== todayClass).map((p) => p.sessionId),
   );
+  const matched = forMovement.filter((p) => !mixedSessions.has(p.sessionId));
   if (matched.length === 0) return null;
-  // One identifiable prior session: the latest that has ANY set of this class.
+  // One identifiable prior session: the latest single-class eligible session.
   const sourceSessionId = Math.max(...matched.map((p) => p.sessionId));
   const fromSource = matched.filter((p) => p.sessionId === sourceSessionId);
   let mostRepsInOneSet: number | null = null;

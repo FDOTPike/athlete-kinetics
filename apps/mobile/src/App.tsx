@@ -232,7 +232,10 @@ export function AppShell(): React.JSX.Element {
                 <SessionScreen onReturnToToday={() => setTab('today')} />
               </View>
             )}
-            {tab === 'progress' && <ProgressScreen />}
+            {/* PR #13 review: ProgressScreen's loaders read the database on
+                mount, and the primary tabs are live while status is 'booting'
+                — so, like Coach, it mounts only once the database is ready. */}
+            {tab === 'progress' && status === 'ready' && <ProgressScreen />}
             {tab === 'coach' && status === 'ready' && (
               <BlockScreen onSessionStarted={() => setTab('session')} />
             )}

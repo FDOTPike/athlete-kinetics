@@ -117,6 +117,19 @@ describe('exactly Today, Plan and Progress are the primary destinations', () => 
     expect(screen.getByTestId('coach-screen')).toBeOnTheScreen();
   });
 
+  test('PR #13 review: PROGRESS never reads the database while it is still booting', () => {
+    mockState = state({
+      status: 'booting',
+      loadMeasuredHistory: jest.fn(() => { throw new Error('kinetics db not booted'); }),
+      loadRecentOutcomes: jest.fn(() => []),
+    });
+    render(<AppShellTestHarness />);
+    fireEvent.press(screen.getByTestId('tab-progress'));
+    expect(screen.queryByTestId('progress-screen')).toBeNull();
+    expect(mockState.loadMeasuredHistory).not.toHaveBeenCalled();
+    expect(mockState.loadRecentOutcomes).not.toHaveBeenCalled();
+  });
+
   test('pressing the PROGRESS tab renders the read-only progress surface', () => {
     render(<AppShellTestHarness />);
     fireEvent.press(screen.getByTestId('tab-progress'));

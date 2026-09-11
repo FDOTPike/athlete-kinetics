@@ -1106,19 +1106,40 @@ if (resetTables.length >= 15) {
       ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.movement_id, sr.set_index'.length)
       : '';
     check('F4: summary set SELECT located in useStore.ts', summarySql.length > 0);
-    if (summarySql.length === 0) fail += 1;
     let summaryRows = [];
     try { summaryRows = summarySql.length > 0 ? lDb.prepare(summarySql).all(1) : []; } catch (e) { summaryRows = []; }
-    const bySet = new Map(summaryRows.map((r) => [r.movement_id, r]));
     const slotIdsOk = summaryRows.length >= 2
       && summaryRows.every((r) => 'session_plan_slot_id' in r)
       && summaryRows.some((r) => r.session_plan_slot_id === 1)
       && summaryRows.some((r) => r.session_plan_slot_id === 2);
     check('F4: summary SELECT returns each set\'s session_plan_slot_id (planned slot 1 and substituted slot 2)', slotIdsOk);
-    if (!slotIdsOk) fail += 1;
-    const plannedOk = summaryRows.length >= 2 && summaryRows.every((r) => r.planned_sets !== undefined);
-    check('F4: summary SELECT still returns the slot planned_sets alongside the slot id', plannedOk && bySet.size >= 1);
-    if (!(plannedOk && bySet.size >= 1)) fail += 1;
+
+    // PR #13 review: the lifecycle's two slots both plan 3 sets, so a wrong
+    // slot-to-value join would still pass. An ISOLATED session with DISTINCT
+    // planned_sets (4 vs 2) proves each set is joined to its OWN slot's value.
+    // Slot 72 was substituted from 901 to 902 mid-slot, so it holds sets of
+    // both movements — the exact F4 shape.
+    lDb.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (7, '2026-07-16', 2000000);");
+    lDb.exec(`INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date)
+              VALUES (71, 7, 0, 901, 4, 5, 'planned', 8.0, 101, null, '2026-07-16');`);
+    lDb.exec(`INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date)
+              VALUES (72, 7, 1, 902, 2, 5, 'substituted', 8.0, 102, 901, '2026-07-16');`);
+    const seed = [[701, 901, 1, 71], [702, 901, 2, 72], [703, 902, 3, 72]];
+    for (const [setId, movementId, setIndex, slotId] of seed) {
+      lDb.exec(`INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (${setId}, 7, ${movementId}, ${setIndex}, 5, 60.0, 8.0, ${2000000 + setIndex});`);
+      lDb.exec(`INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (${setId}, ${slotId}, 'planned', 8.0, ${slotId === 71 ? 101 : 102}, ${2000000 + setIndex});`);
+    }
+    let isolated = [];
+    try { isolated = summarySql.length > 0 ? lDb.prepare(summarySql).all(7) : []; } catch (e) { isolated = []; }
+    const expectedPlanned = { 71: 4, 72: 2 };
+    const slotValuesOk = isolated.length === 3
+      && isolated.every((r) => r.session_plan_slot_id in expectedPlanned
+        && r.planned_sets === expectedPlanned[r.session_plan_slot_id]);
+    check('F4: each summary row carries the planned_sets of ITS OWN slot (slot 71 → 4, slot 72 → 2), never of another slot', slotValuesOk);
+    const slotCounts = isolated.reduce((m, r) => ({ ...m, [r.session_plan_slot_id]: (m[r.session_plan_slot_id] ?? 0) + 1 }), {});
+    const substitutedOk = slotCounts[71] === 1 && slotCounts[72] === 2
+      && isolated.filter((r) => r.session_plan_slot_id === 72).map((r) => r.movement_id).sort().join(',') === '901,902';
+    check('F4: the substituted slot 72 carries sets of BOTH movements under one slot id', substitutedOk);
   }
   if (!transactionThrew) fail += 1;
 
