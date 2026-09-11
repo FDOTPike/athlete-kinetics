@@ -193,6 +193,7 @@ export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefin
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
 import type { BiometricsBridge } from '@ak/biometrics';
+import { groupSummaryExercises } from './sessionSummary';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 
@@ -691,6 +692,16 @@ interface KineticsStore {
   /** Re-read the open episode into state. Called on boot and after entry/exit. */
   refreshSuspension: () => void;
   getPendingAutopilotAdjustments: () => PendingAutopilotAdjustment[];
+  /** Recorded `session.duration_min` values for finalized sessions of this
+   *  focus, newest first. Read-only evidence for the Today duration line —
+   *  the app measures durations, it never estimates them from set counts. */
+  recordedDurationsForFocus: (focus: string, limit?: number) => number[];
+  /** Read-only persisted facts for one ended session (W3 summary). No writes. */
+  loadSessionSummaryFacts: (sessionId: number) => {
+    durationMin: number | null;
+    exercises: { movementId: number; movementName: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null }[] }[];
+    previousSets: { movementId: number; reps: number; loadKg: number; sessionId: number }[];
+  };
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
   /** Parse, validate, deduplicate, and commit a complete staged import atomically. */
@@ -4703,6 +4714,83 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }));
   },
 
+  recordedDurationsForFocus: (focus, limit = 5): number[] => {
+    if (db === null) return [];
+    // Only FINALIZED sessions carry a duration: endSession stamps
+    // session.duration_min inside the same transaction that persists the
+    // outcome, so a NOT NULL duration is proof the session actually ended.
+    // Joining through session_origin keeps this to sessions that really came
+    // from a planned session of this focus — an ad-hoc session has no
+    // source_planned_session_id and is correctly excluded, because it is not
+    // evidence about how long THIS kind of planned session takes.
+    const rows = rowsOf<{ duration_min: number }>(db.executeSync(
+      `SELECT s.duration_min
+         FROM session s
+         JOIN session_origin so ON so.session_id = s.session_id
+         JOIN planned_session ps ON ps.planned_session_id = so.source_planned_session_id
+        WHERE ps.focus = ?
+          AND s.duration_min IS NOT NULL
+        ORDER BY s.session_id DESC
+        LIMIT ?`,
+      [focus, limit],
+    ));
+    return rows.map((r) => r.duration_min).filter((d) => Number.isFinite(d) && d > 0);
+  },
+
+  loadSessionSummaryFacts: (sessionId: number) => {
+    const d = getDb();
+    const sessionRow = rowsOf<{ duration_min: number | null }>(d.executeSync(
+      'SELECT duration_min FROM session WHERE session_id = ?',
+      [sessionId],
+    ))[0];
+    const setRows = rowsOf<{
+      movement_id: number; movement_name: string; reps: number; load_kg: number;
+      time_s: number | null; session_plan_slot_id: number | null; planned_sets: number | null;
+    }>(d.executeSync(
+      // Sol R4 F4: the slot identity is read so the planned-set denominator is
+      // attributed per SLOT, never copied onto every movement a slot held.
+      `SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,
+              tm.value AS time_s, st.session_plan_slot_id, sps.planned_sets
+         FROM set_record sr
+         JOIN movement m ON m.movement_id = sr.movement_id
+         LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
+         LEFT JOIN set_target st ON st.set_id = sr.set_id
+         LEFT JOIN session_plan_slot sps
+              ON sps.session_plan_slot_id = st.session_plan_slot_id
+        WHERE sr.session_id = ?
+        ORDER BY sr.movement_id, sr.set_index`,
+      [sessionId],
+    ));
+    const previousRows = rowsOf<{
+      movement_id: number; reps: number; load_kg: number; session_id: number;
+    }>(d.executeSync(
+      // R1/D3: candidates from strictly earlier sessions only. The store's
+      // session_id is the persisted insert order and the deterministic
+      // tiebreaker; the summary picks the LATEST eligible session from these
+      // rows and never combines maxima across sessions.
+      `SELECT sr.movement_id, sr.reps, sr.load_kg, sr.session_id
+         FROM set_record sr
+        WHERE sr.session_id < ?
+          AND sr.movement_id IN (SELECT movement_id FROM set_record WHERE session_id = ?)
+        ORDER BY sr.session_id, sr.set_index`,
+      [sessionId, sessionId],
+    ));
+    return {
+      durationMin: sessionRow?.duration_min ?? null,
+      exercises: groupSummaryExercises(setRows.map((row) => ({
+        movementId: row.movement_id,
+        movementName: row.movement_name,
+        reps: row.reps,
+        loadKg: row.load_kg,
+        timeS: row.time_s,
+        sessionPlanSlotId: row.session_plan_slot_id,
+        plannedSets: row.planned_sets,
+      }))),
+      previousSets: previousRows.map((r) => ({
+        movementId: r.movement_id, reps: r.reps, loadKg: r.load_kg, sessionId: r.session_id,
+      })),
+    };
+  },
 
   refreshVector: () => {
     if (get().status !== 'ready') return;

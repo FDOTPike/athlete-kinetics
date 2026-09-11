@@ -19,6 +19,7 @@ import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
 import { theme } from '../theme/theme';
+import { autopilotReasonCopy } from '../state/autopilotCopy';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -116,12 +117,8 @@ function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): strin
 const AUTOPILOT_BUDGET_NOTE = 'Held steady — effort only rises early in a cycle.';
 
 function autopilotExplanation(slot: TodaySlot): string | null {
-  switch (slot.autopilot?.reason) {
-    case 'eased': return 'Eased off — your recent sets felt harder than planned.';
-    case 'raised': return 'Nudged up — your recent sets felt easier than planned.';
-    case 'held_safety': return 'Eased for safety — a recent safety signal lowered this target.';
-    default: return null;
-  }
+  // Shared with Today (Sol R4 F2) so both surfaces read the same fact the same way.
+  return autopilotReasonCopy(slot.autopilot?.reason);
 }
 
 function AutopilotAttribution({
@@ -347,7 +344,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
   if (vector === null) {
     return (
-      <View style={styles.center}>
+      // The no-vector gate is an early return INSIDE the real screen, so the
+      // route identity (coach-screen) is still asserted by tests even when
+      // readiness data has not arrived yet.
+      <View style={styles.center} testID="coach-screen">
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>

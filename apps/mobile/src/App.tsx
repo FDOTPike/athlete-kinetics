@@ -19,8 +19,10 @@ import { tryCreateHealthConnectBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
+import TodayScreen from './screens/TodayScreen';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
+import ProgressScreen from './screens/ProgressScreen';
 import ProgramSetupScreen from './screens/ProgramSetupScreen';
 import BlockScreen from './screens/BlockScreen';
 import LibraryScreen from './screens/LibraryScreen';
@@ -28,13 +30,37 @@ import ProfileScreen from './screens/ProfileScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import { statusBarPaddingTop } from './layout/statusBarPadding';
 
-const TABS: readonly { key: Tab; label: string }[] = [
-  { key: 'readiness', label: 'READY' },
-  { key: 'session', label: 'SESSION' },
-  { key: 'coach', label: 'COACH' },
-  { key: 'library', label: 'LIBRARY' },
-  { key: 'athlete', label: 'ATHLETE' },
+/**
+ * W4: exactly THREE primary destinations. PLAN is the coach/program-management
+ * route ('coach') presented under its athlete-facing name; Progress is the
+ * read-only facts surface. Readiness detail, the live session, the Library,
+ * and Profile/settings keep their existing route identities and are reached
+ * from the header controls, so no capability is unreachable.
+ */
+const PRIMARY_TABS: readonly { key: Tab; label: string }[] = [
+  { key: 'today', label: 'TODAY' },
+  { key: 'coach', label: 'PLAN' },
+  { key: 'progress', label: 'PROGRESS' },
 ];
+
+/** Header controls: every non-primary surface keeps one stable way back. */
+const HEADER_CONTROLS: readonly { key: Tab; label: string }[] = [
+  { key: 'readiness', label: 'READY' },
+  { key: 'session', label: 'WORKOUT' },
+  { key: 'library', label: 'LIBRARY' },
+  { key: 'athlete', label: 'PROFILE' },
+];
+
+/** D7: descriptive accessible names for the header controls. */
+const HEADER_ACCESS: Record<Tab, string> = {
+  readiness: 'Open readiness details',
+  session: 'Open the workout',
+  library: 'Open the exercise library',
+  athlete: 'Open profile and settings',
+  today: 'Today',
+  coach: 'Plan',
+  progress: 'Progress',
+};
 
 /** Root boundary: a render-time throw becomes a readable screen with the
  *  actual error message — release builds otherwise die silently. */
@@ -76,7 +102,7 @@ export default function App(): React.JSX.Element {
   );
 }
 
-function AppShell(): React.JSX.Element {
+export function AppShell(): React.JSX.Element {
   const programSetupPending = useStore((s) =>
     s.status === 'ready' && s.onboarded && s.block === null && s.program === null);
   // "No block and no program" is NOT only a first-run state: archiving a
@@ -96,6 +122,9 @@ function AppShell(): React.JSX.Element {
   const boot = useStore((s) => s.boot);
   const status = useStore((s) => s.status);
   const onboarded = useStore((s) => s.onboarded);
+  // W4: the header SESSION control shows a live-workout marker from the same
+  // persisted-session fact TodayScreen already uses — never a guess.
+  const session = useStore((s) => s.session);
   // First run (or a fresh Coach Mode athlete): the questionnaire replaces the
   // tabbed app until the profile is saved once. Existing installs never see it.
   const showOnboarding = status === 'ready' && !onboarded;
@@ -123,12 +152,60 @@ function AppShell(): React.JSX.Element {
     return () => sub.remove();
   }, [boot]);
 
+  // The shell root stays a SafeAreaView. `styles.root.paddingTop` only covers
+  // Android (statusBarPaddingTop returns 0 off-Android), so SafeAreaView is the
+  // ONLY source of the iOS notch and home-indicator insets; replacing it with a
+  // plain View put the top header under the status bar and the primary tab bar
+  // under the home indicator. The `shell-root` testID belongs on it directly —
+  // the shell-order test walks HOST ancestors and does not require a plain View.
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={styles.root} testID="shell-root">
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
+      {/* D7: the secondary control bar is a real TOP HEADER, above the body.
+          Visible labels are the beginner-readable short forms; accessibility
+          labels stay descriptive. No truncation, no font-scale capping. */}
+      {!showOnboarding && !showProgramSetup && (
+        <View style={styles.headerBar} accessibilityRole="toolbar" testID="shell-top-header">
+          {HEADER_CONTROLS.map((t) => {
+            const active = t.key === tab;
+            const sessionLive = t.key === 'session' && session !== null;
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => setTab(t.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={sessionLive
+                  ? 'Open the workout — workout in progress'
+                  : HEADER_ACCESS[t.key]}
+                accessibilityLiveRegion={t.key === 'session' ? 'polite' : undefined}
+                testID={`header-${t.key}`}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.tabBtnPressed]}
+              >
+                {/* R1: the active dot is a separate badge beside the label, not
+                    part of the accessible text. It is decorative, so it is
+                    hidden from accessibility and consumes no label width the
+                    screen reader would announce. */}
+                {sessionLive && (
+                  <View
+                    testID="header-session-live-dot"
+                    style={styles.liveDot}
+                    accessibilityElementsHidden={true}
+                    importantForAccessibility="no-hide-descendants"
+                  />
+                )}
+                <Text style={[styles.headerText, active && styles.headerTextActive]}>
+                  {t.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
       <KeyboardAvoidingView
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        testID="shell-body"
       >
         {showOnboarding ? (
           <OnboardingScreen />
@@ -136,24 +213,41 @@ function AppShell(): React.JSX.Element {
           <ProgramSetupScreen onCancel={() => setSetupDismissed(true)} />
         ) : (
           <>
+            {/* R2: the route marker lives INSIDE the session branch, so a test
+                that finds it proves the real Session surface rendered. */}
+            {tab === 'today' && (
+              <TodayScreen
+                onOpenSession={() => setTab('session')}
+                onOpenPlan={() => setTab('coach')}
+              />
+            )}
             {tab === 'readiness' && (
               <ReadinessScreen
                 onOpenSession={() => setTab('session')}
                 onOpenCoach={() => setTab('coach')}
               />
             )}
-            {tab === 'session' && <SessionScreen />}
+            {tab === 'session' && (
+              <View style={{ flex: 1 }} testID="session-screen-shown">
+                <SessionScreen onReturnToToday={() => setTab('today')} />
+              </View>
+            )}
+            {tab === 'progress' && <ProgressScreen />}
             {tab === 'coach' && status === 'ready' && (
               <BlockScreen onSessionStarted={() => setTab('session')} />
             )}
             {tab === 'library' && <LibraryScreen />}
-            {tab === 'athlete' && <ProfileScreen />}
+            {tab === 'athlete' && (
+              <View style={{ flex: 1 }} testID="athlete-screen-shown">
+                <ProfileScreen />
+              </View>
+            )}
           </>
         )}
       </KeyboardAvoidingView>
       {!showOnboarding && !showProgramSetup && (
-        <View style={styles.tabBar} accessibilityRole="tablist">
-          {TABS.map((t) => {
+        <View style={styles.tabBar} accessibilityRole="tablist" testID="shell-primary-tabs">
+          {PRIMARY_TABS.map((t) => {
             const active = t.key === tab;
             return (
               <Pressable
@@ -162,6 +256,7 @@ function AppShell(): React.JSX.Element {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`${t.label} tab`}
+                testID={`tab-${t.key}`}
                 style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
               >
                 <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
@@ -189,6 +284,35 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: palette.line,
     backgroundColor: palette.bg,
+  },
+  headerBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: palette.line,
+    backgroundColor: palette.bg,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.text,
+    marginRight: 4,
+  },
+  headerBtn: {
+    flex: 1,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  headerText: {
+    color: palette.faint,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  headerTextActive: {
+    color: palette.text,
   },
   tabBtn: {
     flex: 1,

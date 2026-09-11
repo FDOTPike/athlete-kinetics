@@ -4,6 +4,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fro
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
+import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
 import {
@@ -143,7 +144,9 @@ const formatFinalizedDate = (ms: number): string => {
   const day = date.getDate();
   const dayName = weekdays[date.getDay()];
   const monthName = months[date.getMonth()];
-  return `${dayName} ${day} ${monthName}`;
+  // R3: the year is included so a prior-year completion cannot read as recent.
+  const year = date.getFullYear();
+  return `${dayName} ${day} ${monthName} ${year}`;
 };
 
 function CompletedMetrics({
@@ -235,7 +238,18 @@ function rowsOf<T>(res: unknown): T[] {
   return Array.isArray(arr) ? (arr as T[]) : [];
 }
 
-export default function SessionScreen(): React.JSX.Element {
+export interface SessionScreenProps {
+  /**
+   * Shell-supplied: return the athlete to Today after the post-session outcome
+   * is dismissed. Sol R4 F1: the button is labelled "Back to Today", so it must
+   * actually navigate there — dismissing alone left the athlete on the idle
+   * WORKOUT surface ("Ready when you are."). Optional so the screen still
+   * renders standalone in component tests.
+   */
+  onReturnToToday?: () => void;
+}
+
+export default function SessionScreen({ onReturnToToday }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
   const {
     movements, session, sessionPlan, activeSessionPlanSlotId, profile, oneRepMaxes,
@@ -245,6 +259,9 @@ export default function SessionScreen(): React.JSX.Element {
     advanceRunnerRest, skipRunnerRest, setRunnerRestOverride, runnerThumbsDown, runnerHalt, lastEndedSessionId,
     loadSessionOutcome, dismissOutcome,
   } = state;
+  // W3 summary inputs, read at the data-access boundary; the summary itself is
+  // shaped by the pure `buildSessionSummary` and renders without side effects.
+  const { blockSessions: summaryBlockSessions, today: summaryToday, loadSessionSummaryFacts } = state;
 
   const defaultMode: SessionMode = uiPreferences.sessionModeOverride ?? (profile.training_age === 'beginner' ? 'guided' : 'self_directed');
   const mode: SessionMode = sessionMode ?? defaultMode;
@@ -304,6 +321,27 @@ export default function SessionScreen(): React.JSX.Element {
       dateStr: 'Session saved',
     };
   }, [lastEndedSessionId, loadSessionOutcome]);
+
+  // W3: persisted-fact summary of the just-ended session. Same access pattern
+  // as `outcome` above: a read-only loader inside a useMemo keyed on the ended
+  // session id. Rendered below; never written to.
+  const summary = useMemo(() => {
+    if (lastEndedSessionId == null) return null;
+    try {
+      const facts = loadSessionSummaryFacts(lastEndedSessionId);
+      return buildSessionSummary({
+        exercises: facts.exercises,
+        previousSets: facts.previousSets,
+        durationMin: facts.durationMin,
+        blockSessions: summaryBlockSessions,
+        today: summaryToday,
+      });
+    } catch {
+      // A summary must never block the completion screen. Facts that cannot be
+      // read stay unknown — the status line above is already persisted truth.
+      return null;
+    }
+  }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday]);
 
   const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
   const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
@@ -457,7 +495,10 @@ export default function SessionScreen(): React.JSX.Element {
           session_recorded: "Session recorded.",
         };
 
-    const displayMsg = outcomeCopy[outcome.kind] ?? outcomeCopy.session_recorded;
+    // R1/D5: an unknown outcome kind must render "Outcome unavailable" — it
+    // must not be relabelled as a recorded session. The known kinds keep
+    // their existing honest copy.
+    const displayMsg = outcomeCopy[outcome.kind] ?? 'Outcome unavailable';
 
     return (
       <View style={styles.outcomeContainer}>
@@ -471,13 +512,42 @@ export default function SessionScreen(): React.JSX.Element {
           <View style={styles.outcomeDash} />
           <Text style={styles.outcomeText}>{displayMsg}</Text>
           <Text style={styles.outcomeDate}>{outcome.dateStr}</Text>
+          {/* W3/R1: persisted facts only, below the status. Typed lines carry
+              stable movement-based keys (D6); the no-next case renders the
+              ratified fallback text (D4). */}
+          {summary !== null && (
+            <View style={styles.summaryBlock} testID="session-summary">
+              {summary.exerciseLines.map((line) => (
+                <Text key={line.key} style={styles.summaryLine}>{line.text}</Text>
+              ))}
+              {summary.comparisonLines.map((line) => (
+                <Text key={line.key} style={styles.summaryComparison}>{line.text}</Text>
+              ))}
+              {summary.durationLine !== null && (
+                <Text style={styles.summaryLine}>{summary.durationLine}</Text>
+              )}
+              {summary.nextLine !== null && (
+                <Text style={styles.summaryNext}>{summary.nextLine}</Text>
+              )}
+              {summary.nextLine === null && (
+                <Text style={styles.summaryNext} testID="summary-next-none">
+                  {NO_NEXT_SESSION_TEXT}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
         <View style={styles.outcomeFooter}>
           <SecondaryButton
-            label="Back to Ready"
-            onPress={dismissOutcome}
-            accessibilityLabel="Back to Ready"
+            label="Back to Today"
+            onPress={() => {
+              // dismissOutcome is the ONLY store call here: it clears the
+              // outcome view and performs no second completion write.
+              dismissOutcome();
+              onReturnToToday?.();
+            }}
+            accessibilityLabel="Back to Today"
             style={{ alignSelf: 'stretch' }}
           />
         </View>
@@ -1037,8 +1107,8 @@ export default function SessionScreen(): React.JSX.Element {
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
                           <Text style={styles.rpeEvidence}>
                             {safeRpe !== null
-                              ? 'This actual RPE will be used as Coach evidence.'
-                              : 'Unanswered RPE is left out of Coach evidence.'}
+                              ? 'This effort rating will be saved with the set.'
+                              : 'Effort rating is optional; leave it blank if you are unsure.'}
                           </Text>
                         </View>
 
@@ -1807,6 +1877,27 @@ const styles = StyleSheet.create({
     color: theme.color.textLow,
     marginTop: 20,
     textAlign: 'center',
+  },
+  summaryBlock: {
+    marginTop: theme.space[5],
+    alignSelf: 'stretch',
+    gap: theme.space[2],
+  },
+  summaryLine: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+    textAlign: 'left',
+  },
+  summaryComparison: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    textAlign: 'left',
+  },
+  summaryNext: {
+    ...theme.font.label,
+    color: theme.color.textLow,
+    marginTop: theme.space[2],
+    textAlign: 'left',
   },
   outcomeFooter: {
     paddingBottom: theme.space[4],
