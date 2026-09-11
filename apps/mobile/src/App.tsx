@@ -229,7 +229,7 @@ export function AppShell(): React.JSX.Element {
             )}
             {tab === 'session' && (
               <View style={{ flex: 1 }} testID="session-screen-shown">
-                <SessionScreen />
+                <SessionScreen onReturnToToday={() => setTab('today')} />
               </View>
             )}
             {tab === 'progress' && <ProgressScreen />}

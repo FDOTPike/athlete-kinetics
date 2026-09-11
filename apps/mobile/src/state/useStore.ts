@@ -193,6 +193,7 @@ export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefin
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
 import type { BiometricsBridge } from '@ak/biometrics';
+import { groupSummaryExercises } from './sessionSummary';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 
@@ -4744,10 +4745,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     ))[0];
     const setRows = rowsOf<{
       movement_id: number; movement_name: string; reps: number; load_kg: number;
-      time_s: number | null; planned_sets: number | null;
+      time_s: number | null; session_plan_slot_id: number | null; planned_sets: number | null;
     }>(d.executeSync(
+      // Sol R4 F4: the slot identity is read so the planned-set denominator is
+      // attributed per SLOT, never copied onto every movement a slot held.
       `SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,
-              tm.value AS time_s, sps.planned_sets
+              tm.value AS time_s, st.session_plan_slot_id, sps.planned_sets
          FROM set_record sr
          JOIN movement m ON m.movement_id = sr.movement_id
          LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
@@ -4772,20 +4775,17 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         ORDER BY sr.session_id, sr.set_index`,
       [sessionId, sessionId],
     ));
-    const byMovement = new Map<number, { name: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null }[] }>();
-    for (const row of setRows) {
-      let entry = byMovement.get(row.movement_id);
-      if (entry === undefined) {
-        entry = { name: row.movement_name, plannedSets: row.planned_sets, sets: [] };
-        byMovement.set(row.movement_id, entry);
-      }
-      entry.sets.push({ reps: row.reps, loadKg: row.load_kg, timeS: row.time_s });
-    }
     return {
       durationMin: sessionRow?.duration_min ?? null,
-      exercises: [...byMovement.entries()].map(([movementId, e]) => ({
-        movementId, movementName: e.name, plannedSets: e.plannedSets, sets: e.sets,
-      })),
+      exercises: groupSummaryExercises(setRows.map((row) => ({
+        movementId: row.movement_id,
+        movementName: row.movement_name,
+        reps: row.reps,
+        loadKg: row.load_kg,
+        timeS: row.time_s,
+        sessionPlanSlotId: row.session_plan_slot_id,
+        plannedSets: row.planned_sets,
+      }))),
       previousSets: previousRows.map((r) => ({
         movementId: r.movement_id, reps: r.reps, loadKg: r.load_kg, sessionId: r.session_id,
       })),

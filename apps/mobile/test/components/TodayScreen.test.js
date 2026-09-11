@@ -242,13 +242,39 @@ describe('deriveTodayState priority order', () => {
     expect(state.kind).toBe('completed_today');
   });
 
-  test('a session today that was STOPPED still counts as today\'s work, not as done', () => {
-    // Only 'complete' closes the day. A halted session may legitimately be
-    // resumed as a fresh attempt, and calling it "done" would hide that.
+  // Sol R4 F3 — INTENTIONAL REVERSAL. This test previously asserted that a
+  // session stopped today still derived as 'planned'. The product ruling is
+  // that a safe stop closes the planned attempt for the day, and the store
+  // already starts any further session as free_form — so previewing the
+  // planned workout again was untrue.
+  test('F3: a session today that was STOPPED safely closes the planned attempt (stopped_today)', () => {
     const state = deriveTodayState(pureInput({
-      blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'halted' })],
+      blockSessions: [
+        blockSession({ sessionDate: TODAY, completionStatus: 'halted' }),
+        blockSession({ plannedSessionId: 2, sessionDate: '2026-07-17', focus: 'upper', slotCount: 4 }),
+      ],
     }));
-    expect(state.kind).toBe('planned');
+    expect(state).toEqual({
+      kind: 'stopped_today',
+      focus: 'lower',
+      next: { plannedSessionId: 2, focus: 'upper', sessionDate: '2026-07-17', slotCount: 4 },
+    });
+  });
+
+  test('F3: the three finalization states of today stay distinct', () => {
+    const kindFor = (completionStatus) => deriveTodayState(pureInput({
+      blockSessions: [blockSession({ sessionDate: TODAY, completionStatus })],
+    })).kind;
+    expect(kindFor(null)).toBe('planned');
+    expect(kindFor('halted')).toBe('stopped_today');
+    expect(kindFor('complete')).toBe('completed_today');
+  });
+
+  test('F3: a safety halt and an open session still outrank a stopped day', () => {
+    const stopped = [blockSession({ sessionDate: TODAY, completionStatus: 'halted' })];
+    expect(deriveTodayState(pureInput({ blockSessions: stopped, halted: true })).kind).toBe('halted');
+    expect(deriveTodayState(pureInput({ blockSessions: stopped, hasActiveSession: true })).kind)
+      .toBe('active_session');
   });
 
   test('nextSessionAfter is strict: a session dated today is never "next"', () => {
@@ -312,6 +338,11 @@ describe('adjustments read as English and never overstate', () => {
 
 describe('Today starts the workout directly — no Coach detour', () => {
   test('a planned day offers ONE primary action that calls the production start path', () => {
+    // Sol R4 F5: the mock now does what the real store does on success —
+    // create the session — because Today navigates only once one exists.
+    mockState.startSession = jest.fn(() => {
+      mockState.session = { sessionId: 8, date: TODAY, startedAtMs: 1, sets: [] };
+    });
     const onOpenSession = jest.fn();
     const onOpenPlan = jest.fn();
     render(<TodayScreen onOpenSession={onOpenSession} onOpenPlan={onOpenPlan} />);
@@ -449,23 +480,59 @@ describe('Today never manufactures a coaching message', () => {
     expect(screen.queryByText(/unchanged/i)).toBeNull();
   });
 
-  test('a real adjustment is shown in plain language beside its recorded reason', () => {
+  // Sol R4 F2. The previous fixture here used a free-text reason that the
+  // persisted enum ('eased' | 'raised' | 'held_safety') cannot hold, so it never
+  // exercised the real copy path. These cases use the real shapes.
+
+  test('F2(a): a block-wide adjustment for ANOTHER day never appears under "what changed today"', () => {
     mockState = baseState({
+      // A real row from the block-wide query — but for tomorrow's slot 99.
       pendingAutopilotAdjustments: [{
-        plannedSlotId: 10,
-        movementId: 11,
-        movementName: 'Back Squat',
-        rpeDelta: -0.5,
-        setDelta: -1,
-        reason: 'Readiness below the planned band for two days.',
+        plannedSlotId: 99, movementId: 12, movementName: 'Romanian Deadlift',
+        rpeDelta: -0.5, setDelta: -1, reason: 'held_safety',
       }],
+      // Today's own slot carries no autopilot provenance.
+    });
+    render(<TodayScreen />);
+    expect(screen.queryByTestId('today-adjustments')).toBeNull();
+    expect(screen.queryByText(/Romanian Deadlift/)).toBeNull();
+    expect(screen.queryByText(/held_safety/)).toBeNull();
+  });
+
+  test('F2(b): an adjusted slot in TODAY’s plan is shown in plain language, never as a raw token', () => {
+    mockState = baseState({
+      todayPlan: {
+        plannedSessionId: 1, focus: 'lower', phase: 'accumulation',
+        slots: [slot({
+          plannedSlotId: 10, movementName: 'Back Squat',
+          autopilot: { rpeDelta: -0.5, setDelta: -1, reason: 'held_safety' },
+        })],
+      },
     });
     render(<TodayScreen />);
     expect(screen.getByTestId('today-adjustments')).toBeOnTheScreen();
+    expect(screen.getByTestId('adjust-10')).toBeOnTheScreen();
     expect(screen.getByText('Back Squat — 1 set fewer, effort target eased by 0.5'))
       .toBeOnTheScreen();
-    expect(screen.getByText('Readiness below the planned band for two days.'))
+    expect(screen.getByText('Eased for safety — a recent safety signal lowered this target.'))
       .toBeOnTheScreen();
+    expect(screen.queryByText(/held_safety/)).toBeNull();
+  });
+
+  test('F2(c): an unrecognised stored reason renders the change but NO caption', () => {
+    mockState = baseState({
+      todayPlan: {
+        plannedSessionId: 1, focus: 'lower', phase: 'accumulation',
+        slots: [slot({
+          plannedSlotId: 10, movementName: 'Back Squat',
+          autopilot: { rpeDelta: 0.5, setDelta: 0, reason: 'mystery_reason' },
+        })],
+      },
+    });
+    render(<TodayScreen />);
+    expect(screen.getByText('Back Squat — effort target raised by 0.5')).toBeOnTheScreen();
+    expect(screen.queryByText(/mystery_reason/)).toBeNull();
+    expect(screen.queryByText(/Eased|Nudged/)).toBeNull();
   });
 
   test('missing readiness is stated as missing, never filled in with a number', () => {
@@ -473,5 +540,59 @@ describe('Today never manufactures a coaching message', () => {
     render(<TodayScreen />);
     expect(screen.getByTestId('today-readiness-none')).toBeOnTheScreen();
     expect(screen.queryByText(/\/ 100/)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sol R4 F3 — the stopped-today card
+// ---------------------------------------------------------------------------
+
+describe('F3: a stopped day never re-offers the planned workout', () => {
+  test('the stopped card has no planned start, and its only start says it is unplanned', () => {
+    mockState = baseState({
+      blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'halted' })],
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('today-card-stopped')).toBeOnTheScreen();
+    expect(screen.getByText('Lower — stopped')).toBeOnTheScreen();
+    expect(screen.queryByTestId('today-card-planned')).toBeNull();
+    expect(screen.queryByTestId('today-primary-start')).toBeNull();
+    expect(screen.queryByText('Start workout')).toBeNull();
+    // The planned preview row must not be shown as today's workout.
+    expect(screen.queryByText(/Goblet Squat/)).toBeNull();
+    expect(screen.getByTestId('today-stopped-extra')).toBeOnTheScreen();
+    expect(screen.getByText('Start an extra unplanned session')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Start an extra unplanned session today')).toBeOnTheScreen();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sol R4 F5 — a refused start never navigates
+// ---------------------------------------------------------------------------
+
+describe('F5: Today opens the workout only after a session actually exists', () => {
+  test('a refused start (store sets error, no session) stays on Today and shows why', () => {
+    mockState.startSession = jest.fn(() => {
+      mockState.error = 'This plan contains a movement outside the current access boundary. Regenerate or edit it before starting.';
+    });
+    const onOpenSession = jest.fn();
+    render(<TodayScreen onOpenSession={onOpenSession} />);
+    fireEvent.press(screen.getByTestId('today-primary-start'));
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onOpenSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId('today-screen')).toBeOnTheScreen();
+    expect(screen.getByTestId('today-error')).toHaveTextContent('This plan contains a movement outside the current access boundary. Regenerate or edit it before starting.');
+  });
+
+  test('the stopped-day extra action is guarded the same way', () => {
+    mockState = baseState({
+      blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'halted' })],
+    });
+    mockState.startSession = jest.fn(() => { mockState.error = 'Refused.'; });
+    const onOpenSession = jest.fn();
+    render(<TodayScreen onOpenSession={onOpenSession} />);
+    fireEvent.press(screen.getByTestId('today-stopped-extra'));
+    expect(onOpenSession).not.toHaveBeenCalled();
+    expect(screen.getByText('Refused.')).toBeOnTheScreen();
   });
 });

@@ -135,6 +135,11 @@ describe('Today actions keep their production identity in the shell', () => {
       todayPlan: { plannedSessionId: 1, focus: 'lower', slots: [{ plannedSlotId: 10, movementName: 'Back Squat', sets: 3, target: { kind: 'reps', reps: 8 } }] },
       blockSessions: [{ plannedSessionId: 1, weekIndex: 1, dayIndex: 1, focus: 'lower', sessionDate: '2026-07-15', slotCount: 1, completionStatus: null }],
     });
+    // Sol R4 F5: success means the store created a session; Today navigates
+    // only once one exists.
+    mockState.startSession = jest.fn(() => {
+      mockState.session = { sessionId: 8, date: '2026-07-15', startedAtMs: 1, sets: [] };
+    });
     render(<AppShellTestHarness />);
     expect(screen.getByTestId('today-card-planned')).toBeOnTheScreen();
     fireEvent.press(screen.getByTestId('today-primary-start'));
@@ -158,6 +163,59 @@ describe('Today actions keep their production identity in the shell', () => {
 // ---------------------------------------------------------------------------
 // Reachability of every non-primary surface
 // ---------------------------------------------------------------------------
+
+describe('Sol R4 F5: a refused start keeps the athlete on Today', () => {
+  test('the store refuses (inaccessible planned movement): no WORKOUT surface, error visible', () => {
+    mockState = state({
+      todayPlan: { plannedSessionId: 1, focus: 'lower', slots: [{ plannedSlotId: 10, movementName: 'Back Squat', sets: 3, target: { kind: 'reps', reps: 8 } }] },
+      blockSessions: [{ plannedSessionId: 1, weekIndex: 1, dayIndex: 1, focus: 'lower', sessionDate: '2026-07-15', slotCount: 1, completionStatus: null }],
+    });
+    mockState.startSession = jest.fn(() => {
+      mockState.error = 'This plan contains a movement outside the current access boundary. Regenerate or edit it before starting.';
+    });
+    render(<AppShellTestHarness />);
+    fireEvent.press(screen.getByTestId('today-primary-start'));
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('today-screen')).toBeOnTheScreen();
+    expect(screen.queryByTestId('session-screen-shown')).toBeNull();
+    expect(screen.queryByText('Ready when you are.')).toBeNull();
+    expect(screen.getByText('This plan contains a movement outside the current access boundary. Regenerate or edit it before starting.')).toBeOnTheScreen();
+  });
+});
+
+describe('Sol R4 F1: "Back to Today" actually returns to Today', () => {
+  const outcomeState = () => state({
+    session: null,
+    lastEndedSessionId: 42,
+    loadSessionOutcome: jest.fn(() => ({ outcomeKind: 'stopped_safely', finalizedAtMs: 1_757_548_800_000 })),
+    loadSessionSummaryFacts: jest.fn(() => ({ durationMin: 12, exercises: [], previousSets: [] })),
+    dismissOutcome: jest.fn(),
+    endSession: jest.fn(),
+  });
+
+  test('pressing it dismisses once, lands on the Today surface, and leaves Today as the only history entry', () => {
+    mockState = outcomeState();
+    const seen = [];
+    render(<AppShellTestHarness onBackState={(p) => seen.push(p)} />);
+    fireEvent.press(screen.getByTestId('header-session'));
+    expect(screen.getByTestId('session-screen-shown')).toBeOnTheScreen();
+    expect(screen.getByText('Session stopped safely.')).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByLabelText('Back to Today'));
+
+    expect(screen.getByTestId('today-screen')).toBeOnTheScreen();
+    expect(screen.queryByTestId('session-screen-shown')).toBeNull();
+    // The idle WORKOUT copy Sol's device capture showed must not be what the athlete sees.
+    expect(screen.queryByText('Ready when you are.')).toBeNull();
+    expect(mockState.dismissOutcome).toHaveBeenCalledTimes(1);
+    // Dismissal is not completion: no second write path is touched.
+    expect(mockState.endSession).not.toHaveBeenCalled();
+    expect(mockState.startSession).not.toHaveBeenCalled();
+    // setTab('today') collapses history to the root, so Android back exits
+    // instead of reopening the summary.
+    expect(seen[seen.length - 1]).toBe(false);
+  });
+});
 
 describe('Readiness, Session, Library and Profile remain reachable', () => {
   test('the header controls route to each preserved surface with descriptive accessible names', () => {

@@ -8728,3 +8728,165 @@ ASTRA UX PHASE 1 AUDIT R3: REQUEST CHANGES (two findings, both remediated in
 this turn; candidate needs commit + APK rebuild before re-verification)
 
 PUSH / MERGE / RELEASE: NOT AUTHORIZED
+
+
+---
+
+## Entry 0114 — 2026-09-11 · Opus 5 executes Sol R4 remediation (F1–F5)
+
+### Input G(x)
+
+````text
+please see Sols latest audit findings, is it safe to compact before we execute the following plan?
+Not ready to merge. The latest Opus repair itself is sound, but the full Astra Phase 1 candidate still has four blocking truth/flow defects.
+`ASTRA UX PHASE 1 AUDIT: REQUEST CHANGES`
+Findings
+
+1. [P1] “Back to Today” does not navigate to Today.
+[SessionScreen.tsx (line 533)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/screens/SessionScreen.tsx:533) only calls `dismissOutcome`; [App.tsx (line 232)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/App.tsx:232) provides no navigation callback. The retained [device capture](C:/Users/fpike/AppData/Local/Temp/r3_evidence/r5_back_on_today.png) proves the result: the athlete remains on WORKOUT and sees “Ready when you are.”
+2. [P1] “WHAT CHANGED TODAY” uses block-wide—not today-specific—adjustments.
+[TodayScreen.tsx (line 129)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/screens/TodayScreen.tsx:129) consumes every `pendingAutopilotAdjustment`. The query at [useStore.ts (line 4698)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/state/useStore.ts:4698) filters only by active block, not session date. Its existing verifier deliberately returns adjustments from two different dates. The UI can therefore claim tomorrow’s change happened today and displays raw values such as `held_safety`. Use only `todayPlan.slots[].autopilot`, with plain-language reason copy.
+3. [P1] A stopped planned session is presented as an unstarted planned workout.
+[todayState.ts (line 160)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/state/todayState.ts:160) treats `completionStatus: 'halted'` as `planned`. However, [useStore.ts (line 4829)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/state/useStore.ts:4829) detects the previous attempt and starts the next session as `free_form`, despite Today previewing the planned workout.
+Product ruling: a safely stopped session closes that planned attempt for the day. Render a distinct `stopped_today` state; any additional session must be explicitly labelled unplanned.
+4. [P1] Adapted-session summaries can duplicate the planned-set denominator.
+[useStore.ts (line 4775)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/state/useStore.ts:4775) groups summary sets by movement while `planned_sets` belongs to the session slot. If an athlete logs a set and then substitutes the movement, both movements inherit the same planned-set count. The summary can consequently report, for example, `1 logged · 4 planned` and `3 logged · 4 planned` for one four-set slot. Preserve slot identity and omit or render the denominator only once when a slot contains multiple movements.
+5. [P2] Today navigates to WORKOUT even when starting is refused.
+[TodayScreen.tsx (line 123)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/screens/TodayScreen.tsx:123) calls `onOpenSession` unconditionally. The store has several legitimate fail-closed returns, including inaccessible planned movements at [useStore.ts (line 4849)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/astra-athlete-first-ux/apps/mobile/src/state/useStore.ts:4849). Navigation should occur only after an active session exists; otherwise remain on Today and show the error.
+
+The `d576fb9` fixes—restoring `SafeAreaView` and making hidden-dot tests falsifiable—are approved.
+Verification was otherwise strong: typecheck passed, targeted tests passed 132/132, full `verify:ci` passed 26 suites/415 tests, and the QA artifact passed all 55 checks. APK SHA-256 is `461ff73f…bcc8c3`, correctly bound to HEAD `d576fb9`. The tracked tree remains clean.
+After these four product corrections and the start-failure guard, rerun focused negative tests, the stopped-session device journey, `verify:ci`, then rebuild and verify the APK after the final commit.
+`PUSH / MERGE / RELEASE: NOT AUTHORIZED`
+
+please create a plan for yourself to follow first , i will compact manually from myside before implementing
+````
+
+Follow-up owner message in the same turn sequence (verbatim):
+
+````text
+dont worry about compacting , it compacted automatically
+````
+
+The owner approved the written plan
+(`C:/Users/fpike/.claude/plans/please-see-sols-latest-fluffy-widget.md`) before
+execution.
+
+### Output F(G(x))
+
+Opening gate verified before any other write:
+
+- Branch `claude/astra-athlete-first-ux`; HEAD
+  `d576fb99913258ee28928cc23de2d0cb845d9afb`.
+- Tracked tree clean; untracked exactly `AGENTS.md` and
+  `HANDOVER_RELAY_TO_SUCCESSOR.md` (neither staged, neither touched).
+- Last prior entry: 0113. This entry appends only.
+
+Role boundary: Opus 5 is the EXECUTOR for this remediation and is therefore not
+independent of it. The candidate requires Sol or another independent re-audit.
+
+Step records follow as the work completes.
+
+### F1 [P1] — "Back to Today" now navigates to Today
+
+`SessionScreen` gained an optional `onReturnToToday` prop; the outcome button
+calls `dismissOutcome()` (still the ONLY store call — no second completion
+write) and then `onReturnToToday?.()`. `App.tsx` passes
+`() => setTab('today')`, which collapses the tab history to `['today']`, so
+Android back exits from the root rather than reopening the summary.
+Test (`NavigationShell.test.js`): outcome shown → press → `today-screen` shown,
+`session-screen-shown` absent, "Ready when you are." absent, `dismissOutcome`
+called once, `endSession`/`startSession` never called, back-poppable false.
+
+### F2 [P1] — "WHAT CHANGED TODAY" reads only today's plan
+
+TodayScreen no longer subscribes to the block-wide
+`pendingAutopilotAdjustments`; it derives rows from
+`todayPlan.slots[].autopilot`, keyed `adjust-${plannedSlotId}`. Reason copy
+comes from the new pure `apps/mobile/src/state/autopilotCopy.ts`, extracted
+verbatim from BlockScreen's `autopilotExplanation` (BlockScreen now calls it;
+its copy is byte-identical). An unknown reason renders no caption — a raw token
+is never shown. The store query `getPendingAutopilotAdjustments` is untouched.
+The old test fixture used a free-text reason the persisted enum cannot hold and
+was replaced by three real-shape cases: (a) another day's adjustment never
+appears, (b) `held_safety` renders plain language and never the token,
+(c) an unknown reason renders the change without a caption.
+
+### F3 [P1] — a safe stop closes today's planned attempt
+
+`todayState.ts` adds `stopped_today` (priority 3, after `halted` and
+`active_session`) for `todayPlan !== null && completionStatus === 'halted'`.
+The Today card reads "{Focus} — stopped", offers no "Start workout", and its
+only start is "Start an extra unplanned session" — matching the store, which
+already starts that path as `free_form`. INTENTIONAL REVERSAL: the prior test
+asserting halted → `planned` (`TodayScreen.test.js`) is replaced under Sol's
+product ruling.
+
+### F4 [P1] — the planned-set denominator belongs to the slot
+
+The summary SELECT now also returns `st.session_plan_slot_id`; grouping moved
+to the pure `groupSummaryExercises` in `sessionSummary.ts`. A movement's
+denominator is the sum of `planned_sets` over its distinct slots, and null when
+it has no slotted set or when ANY of its slots also holds another movement
+(a substitution) — so one four-set slot can no longer report "1 logged ·
+4 planned" and "3 logged · 4 planned". Pure tests (a)–(d) plus a shared-slot
+case; and a new `verify_store_sql.mjs` check executes the store's REAL summary
+SELECT (extracted from `useStore.ts`) against the seeded lifecycle's planned +
+substituted slots and requires each set's `session_plan_slot_id`.
+
+### F5 [P2] — Today navigates only after a session exists
+
+`startAndOpen` requests the start and a one-shot effect navigates only when
+`session !== null`; a refusal leaves the athlete on Today with `today-error`
+visible. Hook-only, per the BlockScreen convention. All six Today start sites
+inherit it. Observation, NOT changed (outside Sol's scope): BlockScreen's own
+start (`BlockScreen.tsx` `startSession(); onSessionStarted?.()`) has the same
+unconditional pattern.
+
+### Mutations (each applied, watched failing, restored from a hashed backup; no git checkout)
+
+| Id | Mutation | Failed | sha256 before = after |
+|---|---|---|---|
+| M-F1 | drop `onReturnToToday?.()` | 1 | `9f5e6339…dfe8052` (SessionScreen.tsx) |
+| M-F2 | revert Today to block-wide list + raw reason | 3 | `4857fd8d…7fa0444` (TodayScreen.tsx) |
+| M-F3 | remove the `stopped_today` branch | 3 | `477dd88b…d729f2` (todayState.ts) |
+| M-F4 | disable the shared-slot guard | 3 | `42155f9e…380979` (sessionSummary.ts) |
+| M-F4sql | drop `st.session_plan_slot_id` from the store SELECT | 1 verifier check | `72c1c61d…893dd9` (useStore.ts) |
+| M-F5 | navigate unconditionally | 3 | `5aac9bf9…ebc714` (TodayScreen.tsx) |
+
+### Gates (fresh, before commit)
+
+| Command | Exit | Result |
+|---|---|---|
+| `git diff --check` | 0 | clean |
+| `npm run typecheck` | 0 | clean |
+| `npx jest --config apps/mobile/jest.config.js --runInBand` TodayScreen + NavigationShell + SessionSummary + SessionScreen + ProgressScreen | 0 | 5 suites / 182 tests |
+| `npm run verify:components` | 0 | 26 suites / 430 tests |
+| `npm run verify:store` | 0 | ALL CHECKS PASSED (incl. 3 new F4 checks) |
+| `npm run verify:ci` | 0 | ALL CHECKS PASSED; 26 suites / 430 tests |
+
+### Commit, APK and device evidence
+
+This entry is committed TOGETHER with the source and test changes in one
+commit. `./gradlew assembleQa` and `npm run verify:qa-candidate` run
+immediately after it, and the stopped-session device journey runs on that exact
+APK. The APK SHA-256, the provenance line and the device capture hashes are
+recorded OUTSIDE the repository
+(`%LOCALAPPDATA%\Temp\astra_r4_remediation_evidence.md`), because any tracked
+write after the build would break the APK's tracked-diff fingerprint.
+
+### Boundaries
+
+No schema, migration, engine, progression, prescription, ranking, suspension,
+biometric, network, Firebase, account, or sync change. Files: `App.tsx`,
+`BlockScreen.tsx` (copy extraction only), `SessionScreen.tsx`,
+`TodayScreen.tsx`, `sessionSummary.ts`, `todayState.ts`, `useStore.ts`
+(summary SELECT + grouping delegation only), new `autopilotCopy.ts`, three
+component test files, `verify_store_sql.mjs`, and this ledger. Nothing pushed,
+merged, rebased, tagged, signed, or released. `AGENTS.md` and
+`HANDOVER_RELAY_TO_SUCCESSOR.md` untouched, untracked, never staged.
+
+Opus 5 executed this remediation and is not independent of it. Ready for Sol /
+independent re-audit.
+
+PUSH / MERGE / RELEASE: NOT AUTHORIZED

@@ -27,10 +27,15 @@
  *
  * WHAT IS NEVER MANUFACTURED
  * --------------------------
- * The adjustment section renders only when `pendingAutopilotAdjustments` is
- * genuinely non-empty. There is no "no changes today" reassurance line,
- * because §3.1 forbids manufacturing an adjustment message when nothing
- * changed, and a sentence asserting stability is still a claim.
+ * The adjustment section renders only when TODAY's planned slots genuinely
+ * carry a persisted autopilot adjustment (`todayPlan.slots[].autopilot`). It
+ * never reads the block-wide `pendingAutopilotAdjustments` list: that query
+ * spans every date in the active block, so it could present tomorrow's change
+ * as something that happened today (Sol R4 F2). Reasons are shown only through
+ * `autopilotReasonCopy` — a raw stored token is never rendered. There is no
+ * "no changes today" reassurance line, because §3.1 forbids manufacturing an
+ * adjustment message when nothing changed, and a sentence asserting stability
+ * is still a claim.
  */
 import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -38,13 +43,14 @@ import { useStore } from '../state/useStore';
 import { theme } from '../theme/theme';
 import {
   deriveTodayState,
-  describeAdjustments,
+  describeAdjustment,
   durationCopy,
   durationEstimate,
   type SessionRef,
   type TodayState,
 } from '../state/todayState';
 import { classifyReadiness } from './ReadinessScreen';
+import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 
 export interface TodayScreenProps {
@@ -80,7 +86,6 @@ export default function TodayScreen({
   const lastTriage = useStore((s) => s.lastTriage);
   const vector = useStore((s) => s.vector);
   const profile = useStore((s) => s.profile);
-  const pendingAutopilotAdjustments = useStore((s) => s.pendingAutopilotAdjustments);
   const startSession = useStore((s) => s.startSession);
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
@@ -115,19 +120,46 @@ export default function TodayScreen({
   }), [today, session, halted, todayPlan, blockSessions, block, hasArchivedBlock]);
 
   /**
-   * Start, then hand the athlete to the session surface — the SAME two calls
-   * BlockScreen makes (`startSession(); onSessionStarted?.()`). The store
-   * refuses the start itself when a halt stands or a session is already open,
-   * so this handler adds no guard of its own and cannot drift from the rule.
+   * Start, then hand the athlete to the session surface ONLY if a session now
+   * exists (Sol R4 F5). `startSession()` is the same production call Coach
+   * makes, but the store has several legitimate fail-closed refusals (a safety
+   * halt, an open session, a movement outside the access boundary, an invalid
+   * routine) that return without creating a session and set `error`.
+   * Navigating unconditionally dropped the athlete on an idle WORKOUT screen
+   * and hid that error. Here the start is requested, and a one-shot effect
+   * decides on the next render: session present → open it; absent → stay on
+   * Today, where `today-error` shows why. `startSession` is synchronous, so
+   * that first render already reflects the outcome. The session is read
+   * through the hook, not `useStore.getState()` (see BlockScreen: component
+   * tests mock the store with a bare selector).
    */
+  const [awaitingStart, setAwaitingStart] = React.useState(false);
   const startAndOpen = React.useCallback(() => {
+    setAwaitingStart(true);
     startSession();
-    onOpenSession?.();
-  }, [startSession, onOpenSession]);
+  }, [startSession]);
+  React.useEffect(() => {
+    if (!awaitingStart) return;
+    setAwaitingStart(false);
+    if (session !== null) onOpenSession?.();
+  }, [awaitingStart, session, onOpenSession]);
 
-  const adjustmentLines = useMemo(
-    () => describeAdjustments(pendingAutopilotAdjustments),
-    [pendingAutopilotAdjustments],
+  // Sol R4 F2: ONLY today's own planned slots. One row per adjusted slot,
+  // keyed by its planned-slot identity, never by index.
+  const adjustments = useMemo(
+    () => (todayPlan?.slots ?? [])
+      .filter((slot) => slot.autopilot !== undefined)
+      .map((slot) => ({
+        key: `adjust-${slot.plannedSlotId}`,
+        line: describeAdjustment({
+          movementName: slot.movementName,
+          rpeDelta: slot.autopilot!.rpeDelta,
+          setDelta: slot.autopilot!.setDelta,
+          reason: slot.autopilot!.reason,
+        }),
+        why: autopilotReasonCopy(slot.autopilot!.reason),
+      })),
+    [todayPlan],
   );
 
   if (status === 'booting') {
@@ -227,6 +259,26 @@ export default function TodayScreen({
           </View>
         );
       }
+
+      case 'stopped_today':
+        return (
+          <View style={styles.card} testID="today-card-stopped">
+            <Text style={styles.eyebrow}>TODAY</Text>
+            <Text style={styles.title}>{focusName(state.focus)} — stopped</Text>
+            <Text style={styles.body}>
+              You stopped today&apos;s session safely. That planned session is closed for today.
+            </Text>
+            {/* Sol R4 F3: no "Start workout" here. The planned attempt is
+                closed, and the store starts any further session as free_form,
+                so the only start offered says plainly that it is unplanned. */}
+            <QuietAction
+              label="Start an extra unplanned session"
+              onPress={startAndOpen}
+              accessibilityLabel="Start an extra unplanned session today"
+              testID="today-stopped-extra"
+            />
+          </View>
+        );
 
       case 'completed_today':
         return (
@@ -363,17 +415,16 @@ export default function TodayScreen({
         </Text>
       )}
 
-      {/* Only real, persisted adjustments. Nothing renders when nothing moved. */}
-      {adjustmentLines.length > 0 && (
+      {/* Only real, persisted adjustments on TODAY's slots. Nothing renders
+          when nothing moved; an unrecognised reason renders no caption. */}
+      {adjustments.length > 0 && (
         <View style={styles.section} testID="today-adjustments">
           <Text style={styles.sectionTitle}>WHAT CHANGED TODAY</Text>
-          {adjustmentLines.map((line, index) => (
-            <Text key={`${index}:${line}`} style={styles.body}>{line}</Text>
-          ))}
-          {pendingAutopilotAdjustments.map((adjustment, index) => (
-            <Text key={`why:${index}:${adjustment.plannedSlotId}`} style={styles.caption}>
-              {adjustment.reason}
-            </Text>
+          {adjustments.map((a) => (
+            <View key={a.key} testID={a.key}>
+              <Text style={styles.body}>{a.line}</Text>
+              {a.why !== null && <Text style={styles.caption}>{a.why}</Text>}
+            </View>
           ))}
         </View>
       )}

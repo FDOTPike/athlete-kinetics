@@ -80,6 +80,14 @@ export type TodayState =
       /** Earlier unfinished sessions, reported but never acted on for them. */
       overdue: SessionRef[];
     }
+  /**
+   * Today's planned session was started and STOPPED safely (finalized as
+   * `halted`). Sol R4 F3 product ruling: a safe stop closes that planned
+   * attempt for the day. Any further session is explicitly unplanned — the
+   * store already starts it as `free_form` (useStore startSession,
+   * `alreadyPlannedToday > 0`), so Today must not preview the planned workout.
+   */
+  | { kind: 'stopped_today'; focus: string; next: SessionRef | null }
   /** Today's planned session is already finalized as complete. */
   | { kind: 'completed_today'; focus: string; next: SessionRef | null }
   /** No session today, and at least one earlier planned session is unfinished. */
@@ -136,13 +144,16 @@ export const nextSessionAfter = (
  *                        (useStore.ts:4730).
  *   2. active_session  — an open session outranks any plan; resuming it is the
  *                        only action that cannot lose logged work.
- *   3. planned         — today's own work comes before anything historical, so
+ *   3. stopped_today   — today's planned session was stopped safely; that
+ *                        attempt is closed, so the planned workout is NOT
+ *                        offered again (Sol R4 F3).
+ *   4. planned         — today's own work comes before anything historical, so
  *                        an overdue session is REPORTED here, not acted on.
- *   4. completed_today — today's session is finalized; no start is offered,
+ *   5. completed_today — today's session is finalized; no start is offered,
  *                        because offering one would invite a duplicate.
- *   5. overdue         — nothing today, but real unfinished work exists.
- *   6. scheduled_rest  — the plan genuinely schedules rest today.
- *   7. unscheduled     — there is no plan covering today at all.
+ *   6. overdue         — nothing today, but real unfinished work exists.
+ *   7. scheduled_rest  — the plan genuinely schedules rest today.
+ *   8. unscheduled     — there is no plan covering today at all.
  */
 export function deriveTodayState(input: TodayStateInput): TodayState {
   const { today, blockSessions, todayPlan } = input;
@@ -156,6 +167,10 @@ export function deriveTodayState(input: TodayStateInput): TodayState {
   // `todayPlan` is refreshBlock's own find on sessionDate === today, so the
   // matching summary row is the authority for whether it is already finalized.
   const todayRow = blockSessions.find((s) => s.sessionDate === today) ?? null;
+
+  if (todayPlan !== null && todayRow?.completionStatus === 'halted') {
+    return { kind: 'stopped_today', focus: todayPlan.focus, next };
+  }
 
   if (todayPlan !== null && todayRow?.completionStatus !== 'complete') {
     return {

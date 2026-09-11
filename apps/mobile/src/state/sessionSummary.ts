@@ -56,10 +56,82 @@ export interface SummarySetFact {
 export interface SummaryExercise {
   movementId: number;
   movementName: string;
-  /** `session_plan_slot.planned_sets` for this movement, null when unmapped. */
+  /**
+   * Planned sets attributable to THIS movement alone, or null when that cannot
+   * be stated honestly — see `groupSummaryExercises`.
+   */
   plannedSets: number | null;
   sets: SummarySetFact[];
 }
+
+/** One persisted set row as the store reads it, with its slot identity. */
+export interface SummarySetRow {
+  movementId: number;
+  movementName: string;
+  reps: number;
+  loadKg: number;
+  timeS: number | null;
+  /** `set_target.session_plan_slot_id`; null for a set with no planned slot. */
+  sessionPlanSlotId: number | null;
+  /** `session_plan_slot.planned_sets` of that slot; null when unmapped. */
+  plannedSets: number | null;
+}
+
+/**
+ * Group the ended session's set rows into per-movement summary exercises
+ * WITHOUT duplicating a slot's planned-set denominator (Sol R4 F4).
+ *
+ * `planned_sets` belongs to a SESSION SLOT, not to a movement. A substitution
+ * keeps the slot and changes its movement, so a four-set slot can hold one set
+ * of the original movement and three of the replacement. Grouping by movement
+ * and copying the slot's count onto each would report "1 logged · 4 planned"
+ * AND "3 logged · 4 planned" for one four-set slot — eight planned sets that
+ * were never planned.
+ *
+ * The rule, over distinct slots:
+ * - a movement's denominator is the SUM of planned_sets over the distinct slots
+ *   its sets belong to (the same movement may legitimately fill two slots);
+ * - it is null when the movement has no slotted set at all, or when ANY of its
+ *   slots also holds another movement — that slot's planned count cannot be
+ *   honestly divided between them, so no fraction is rendered for either.
+ * Row order never changes the result. Display order follows first appearance.
+ */
+export const groupSummaryExercises = (rows: readonly SummarySetRow[]): SummaryExercise[] => {
+  const movementsBySlot = new Map<number, Set<number>>();
+  const plannedBySlot = new Map<number, number | null>();
+  const byMovement = new Map<number, { name: string; slots: Set<number>; sets: SummarySetFact[] }>();
+  for (const row of rows) {
+    let entry = byMovement.get(row.movementId);
+    if (entry === undefined) {
+      entry = { name: row.movementName, slots: new Set(), sets: [] };
+      byMovement.set(row.movementId, entry);
+    }
+    entry.sets.push({ reps: row.reps, loadKg: row.loadKg, timeS: row.timeS });
+    if (row.sessionPlanSlotId !== null) {
+      entry.slots.add(row.sessionPlanSlotId);
+      let members = movementsBySlot.get(row.sessionPlanSlotId);
+      if (members === undefined) {
+        members = new Set();
+        movementsBySlot.set(row.sessionPlanSlotId, members);
+      }
+      members.add(row.movementId);
+      if (!plannedBySlot.has(row.sessionPlanSlotId)) {
+        plannedBySlot.set(row.sessionPlanSlotId, row.plannedSets);
+      }
+    }
+  }
+  return [...byMovement.entries()].map(([movementId, e]) => {
+    let plannedSets: number | null = null;
+    if (e.slots.size > 0) {
+      const shared = [...e.slots].some((slot) => (movementsBySlot.get(slot)?.size ?? 0) > 1);
+      const counts = [...e.slots].map((slot) => plannedBySlot.get(slot) ?? null);
+      if (!shared && counts.every((c) => c !== null)) {
+        plannedSets = counts.reduce<number>((sum, c) => sum + (c as number), 0);
+      }
+    }
+    return { movementId, movementName: e.name, plannedSets, sets: e.sets };
+  });
+};
 
 /** One persisted set from an earlier session, a candidate for comparison. */
 export interface PreviousSetFact {

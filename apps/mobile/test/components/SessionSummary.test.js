@@ -25,6 +25,7 @@ import SessionScreen from '../../src/screens/SessionScreen';
 import {
   buildSessionSummary,
   exerciseClassOf,
+  groupSummaryExercises,
   implementClassOf,
   matchPreviousFacts,
   NO_NEXT_SESSION_TEXT,
@@ -506,5 +507,73 @@ describe('screen laws: D5, D6, D8, D9', () => {
     render(<SessionScreen />);
     expect(screen.getByText(/This effort rating will be saved with the set\.|Effort rating is optional; leave it blank if you are unsure\./)).toBeOnTheScreen();
     expect(screen.queryByText(/Coach evidence/)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sol R4 F4 — the planned-set denominator belongs to the SLOT
+// ---------------------------------------------------------------------------
+
+describe('F4: groupSummaryExercises never duplicates a slot denominator', () => {
+  const row = (movementId, movementName, sessionPlanSlotId, plannedSets, reps = 5, loadKg = 20) => ({
+    movementId, movementName, reps, loadKg, timeS: null, sessionPlanSlotId, plannedSets,
+  });
+  const lines = (exercises) => buildSessionSummary({
+    exercises, previousSets: [], durationMin: null, blockSessions: [], today: '2026-09-11',
+  }).exerciseLines.map((l) => l.text);
+
+  test('(a) one four-set slot: 1 set of A, then substituted to B for 3 — neither claims the 4', () => {
+    const exercises = groupSummaryExercises([
+      row(1, 'Back Squat', 50, 4),
+      row(2, 'Goblet Squat', 50, 4),
+      row(2, 'Goblet Squat', 50, 4),
+      row(2, 'Goblet Squat', 50, 4),
+    ]);
+    expect(exercises.map((e) => e.plannedSets)).toEqual([null, null]);
+    const text = lines(exercises);
+    expect(text).toEqual(['Back Squat — 1 set · most reps in one set 5 · heaviest load used 20 kg',
+      'Goblet Squat — 3 sets · most reps in one set 5 · heaviest load used 20 kg']);
+    for (const t of text) {
+      expect(t).not.toMatch(/planned/);
+      expect(t).not.toMatch(/of 4/);
+    }
+  });
+
+  test('(a) is order-independent: interleaved rows give the same result', () => {
+    const exercises = groupSummaryExercises([
+      row(2, 'Goblet Squat', 50, 4),
+      row(1, 'Back Squat', 50, 4),
+      row(2, 'Goblet Squat', 50, 4),
+    ]);
+    expect(exercises.every((e) => e.plannedSets === null)).toBe(true);
+  });
+
+  test('(b) the same movement filling two exclusive 3-set slots sums them: "6 of 6 sets"', () => {
+    const rows = [...Array(3)].map(() => row(1, 'Row', 60, 3))
+      .concat([...Array(3)].map(() => row(1, 'Row', 61, 3)));
+    const exercises = groupSummaryExercises(rows);
+    expect(exercises).toHaveLength(1);
+    expect(exercises[0].plannedSets).toBe(6);
+    expect(lines(exercises)[0]).toMatch(/^Row — 6 of 6 sets/);
+  });
+
+  test('(c) a single-movement slot is unchanged: "3 sets logged · 4 planned"', () => {
+    const exercises = groupSummaryExercises([row(1, 'Row', 70, 4), row(1, 'Row', 70, 4), row(1, 'Row', 70, 4)]);
+    expect(exercises[0].plannedSets).toBe(4);
+    expect(lines(exercises)[0]).toMatch(/^Row — 3 sets logged · 4 planned/);
+  });
+
+  test('(d) a set with no planned slot has no denominator', () => {
+    const exercises = groupSummaryExercises([row(1, 'Row', null, null), row(1, 'Row', null, null)]);
+    expect(exercises[0].plannedSets).toBeNull();
+    expect(lines(exercises)[0]).toMatch(/^Row — 2 sets ·/);
+  });
+
+  test('a movement sharing ONE slot loses its fraction even if it also owns another slot', () => {
+    const exercises = groupSummaryExercises([
+      row(1, 'Back Squat', 80, 3), row(1, 'Back Squat', 81, 3), row(2, 'Goblet Squat', 81, 3),
+    ]);
+    expect(exercises.find((e) => e.movementId === 1).plannedSets).toBeNull();
+    expect(exercises.find((e) => e.movementId === 2).plannedSets).toBeNull();
   });
 });

@@ -238,7 +238,18 @@ function rowsOf<T>(res: unknown): T[] {
   return Array.isArray(arr) ? (arr as T[]) : [];
 }
 
-export default function SessionScreen(): React.JSX.Element {
+export interface SessionScreenProps {
+  /**
+   * Shell-supplied: return the athlete to Today after the post-session outcome
+   * is dismissed. Sol R4 F1: the button is labelled "Back to Today", so it must
+   * actually navigate there — dismissing alone left the athlete on the idle
+   * WORKOUT surface ("Ready when you are."). Optional so the screen still
+   * renders standalone in component tests.
+   */
+  onReturnToToday?: () => void;
+}
+
+export default function SessionScreen({ onReturnToToday }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
   const {
     movements, session, sessionPlan, activeSessionPlanSlotId, profile, oneRepMaxes,
@@ -530,7 +541,12 @@ export default function SessionScreen(): React.JSX.Element {
         <View style={styles.outcomeFooter}>
           <SecondaryButton
             label="Back to Today"
-            onPress={dismissOutcome}
+            onPress={() => {
+              // dismissOutcome is the ONLY store call here: it clears the
+              // outcome view and performs no second completion write.
+              dismissOutcome();
+              onReturnToToday?.();
+            }}
             accessibilityLabel="Back to Today"
             style={{ alignSelf: 'stretch' }}
           />
