@@ -7698,6 +7698,170 @@ ASTRA UX PHASE 1 AUDIT: BLOCKED — DEVICE EVIDENCE PENDING
 Then state:
 
 PUSH / MERGE / RELEASE: NOT AUTHORIZED
+
+## Entry 0115 — 2026-09-11 · Astra UX follow-up
+
+### Input G(x)
+
+````text
+Execute the bounded Astra UX follow-up work order below.
+
+Outcome: close the three non-blocking athlete-facing issues found after the independent audit of commit 623eeedf4d87f977962af00dfa6cab673a00b913, produce a clean, fully tested local commit, and stop for independent review. Do not push, merge, rebase, tag, sign, or release.
+
+Opening gate:
+- Confirm 623eeedf4d87f977962af00dfa6cab673a00b913 is the starting commit or an ancestor of HEAD.
+- Confirm the tracked tree is clean before editing and report any existing untracked files without staging or deleting them.
+- Read AGENT_WORKFLOW.md sections 1–3 and 8, the tail of PROMPT_LEDGER.md from Entry 0114, and only the source/tests directly relevant to this work.
+- The first repository write must append the next PROMPT_LEDGER.md entry with this complete prompt verbatim. Preserve the ledger append-only.
+
+Product rulings and implementation scope:
+
+1. Guard Plan-screen starts.
+BlockScreen.tsx currently calls startSession() and then onSessionStarted() unconditionally for both planned and confirmed-unplanned starts. Apply the same law already proven on Today: navigate only after the store actually contains a newly active session. If startSession refuses, remain on Plan and render the existing store error. Cover both planned and unplanned buttons. Preserve the existing active-session “Open active session” action and prevent duplicate starts or navigation.
+
+2. Replace raw halt-reason tokens with athlete-facing copy.
+SessionScreen.tsx must never render the raw RunnerHaltReason values manual, niggle, pain, or safety. Add one pure, exhaustive formatter close to the screen or in a small state/copy module. Use these meanings:
+- manual: “You chose to stop this session.”
+- niggle: “You reported that something felt off, so this session is paused.”
+- pain: “You reported pain, so this session is paused.”
+- safety: use a non-empty matched triage coaching cue when one exists; otherwise “A safety concern paused this session.”
+Unknown or absent values must fail closed to the existing generic safety message, never display a raw token.
+
+3. Make the reps cue truthful for every session provenance.
+Replace the current “Planned target … the plan stays unchanged” sentence with provenance-neutral beginner-readable copy. Use: “Target: {N} reps. Log the reps you actually completed.” This copy must work for planned, substituted, day-swapped, added, and free-form slots, and the unplanned journey must contain neither “Planned target” nor “the plan stays unchanged.” Do not change prescription, logging, session-origin, or progression behavior.
+
+Tests and falsification:
+- Add focused component/navigation tests proving a refused planned start and refused confirmed-unplanned start stay on Plan, expose the error, and never invoke the navigation callback; successful starts navigate exactly once.
+- Test every RunnerHaltReason and prove the raw tokens are absent from the rendered athlete surface.
+- Test the exact provenance-neutral reps cue on at least planned and free-form slots and assert the retired phrases are absent.
+- Mutation-test the Plan start guard and at least one copy contract; restore files byte-identically and report the observed failures.
+- Keep changes UI/copy/test-only. No schema, migration, engine, progression, prescription, ranking, suspension, network, Firebase, biometric, or account work.
+
+Verification:
+1. git diff --check
+2. npm run typecheck
+3. focused changed suites
+4. npm run verify:components
+5. npm run verify:store only if store code changed
+6. npm run verify:ci once at the frozen candidate
+7. Close the new ledger output with exact paths, commands, results, mutations, limitations, and authority boundary.
+8. Commit all tracked work locally. After that final commit, build the QA APK and run npm run verify:qa-candidate. Record post-commit artifact provenance and hashes outside the repository so no later tracked write invalidates the APK.
+9. If an emulator is available, verify the manual-stop screen and an extra unplanned session at 360 dp / font scale 1.30, retaining evidence outside the repository. If unavailable, report DEVICE EVIDENCE PENDING without inventing evidence.
+
+Final handoff must give the starting commit, final HEAD/tree, exact changed paths, test results, APK hash/provenance, device evidence or explicit pending status, tracked/untracked status, and confirm nothing was pushed, merged, rebased, tagged, signed, or released. End with:
+
+ASTRA UX FOLLOW-UP COMPLETE — READY FOR INDEPENDENT AUDIT
+````
+
+### Output F(G(x))
+
+Opening gate verified before any repository write:
+
+- Starting commit and HEAD: `623eeedf4d87f977962af00dfa6cab673a00b913`.
+- Starting tree: `6bd3c4adc59bff445472eb8ab6ca4431c6f3b5e5`.
+- The starting tracked tree was clean; there were no untracked files.
+- This entry is the first repository write and appends only after Entry 0114.
+
+Step records follow as the work completes.
+
+### Implemented surface
+
+- `apps/mobile/src/screens/BlockScreen.tsx`: both planned and confirmed-unplanned
+  starts now share one pending/ref-protected start path. It calls the existing
+  store action once, navigates only when a new active session is observed, and
+  otherwise keeps Plan mounted with the store refusal in the action-scoped
+  `plan-start-error` alert. The pre-existing `Open active session` action is
+  unchanged and still never calls `startSession`.
+- `apps/mobile/src/screens/SessionScreen.tsx`: one pure formatter maps every
+  `RunnerHaltReason` to athlete-facing copy. Its `satisfies
+  Record<Exclude<RunnerHaltReason, 'safety'>, string>` contract makes new
+  non-safety reasons a compile-time copy obligation; unknown, absent, and blank
+  safety evidence fail closed to `A safety concern paused this session.` A
+  non-empty matched triage cue is used only for `safety`.
+- `apps/mobile/src/screens/SessionScreen.tsx`: the repetition cue is exactly
+  `Target: {N} reps. Log the reps you actually completed.` and is independent
+  of slot provenance.
+- `apps/mobile/test/components/FocusScreens.test.js`: refusal coverage for
+  planned and confirmed-unplanned starts, success-once coverage for both paths,
+  and a same-commit double-press falsifier.
+- `apps/mobile/test/components/SessionScreen.test.js`: rendered-copy coverage
+  for `manual`, `niggle`, `pain`, and `safety`, plus blank/absent/unknown
+  fail-closed cases; exact repetition-copy coverage spans `planned`,
+  `substituted`, `day_swapped`, `added`, and `free_form`.
+
+No store source changed. No prescription, logging, session-origin, progression,
+schema, migration, engine, ranking, suspension, network, Firebase, biometric,
+account, or sync behavior changed.
+
+### Falsification evidence
+
+| Mutation | Focused command and observed failure | Restore proof |
+|---|---|---|
+| Plan start guard changed from `if (newlyActive)` to an unconditional pending-start navigation condition | `npx jest --config apps/mobile/jest.config.js --runInBand apps/mobile/test/components/FocusScreens.test.js -t "Plan session starts"` exited 1; both refusal cases failed because `onSessionStarted` was called once | `BlockScreen.tsx` SHA-256 before/after `53956f46dcc542c7ae24075c63e044dfeb42cefb3942ba95a0170c40e0102154` |
+| Repetition cue restored to the retired `Planned target ... the plan stays unchanged` sentence | `npx jest --config apps/mobile/jest.config.js --runInBand apps/mobile/test/components/SessionScreen.test.js -t "actual reps initialize|provenance-neutral"` exited 1; 6/6 selected copy cases failed | `SessionScreen.tsx` SHA-256 before/after `05d14fcedab4ae1233e07ee9f7e330aa900804e767865f4b0523e5081c786f2d` |
+
+Raw mutation logs are outside the repository at
+`C:\Users\fpike\AppData\Local\Temp\astra_ux_followup_0115\mutation_plan_guard.log`
+and
+`C:\Users\fpike\AppData\Local\Temp\astra_ux_followup_0115\mutation_reps_copy.log`.
+Both mutations were reversed with exact inverse patches; the focused tests were
+watched green again after the matching hashes were confirmed.
+
+### Verification
+
+| Command | Exit | Result |
+|---|---:|---|
+| `npm ci` | 0 | 787 lockfile-pinned packages installed; npm reported 24 dependency advisories (1 low, 7 moderate, 15 high, 1 critical), not altered in this bounded work |
+| `npm run fetch:embedder` | 0 | immutable revision `751bff37182d3f1213fa05d7196b954e230abad9` fetched and every artifact hash verified |
+| `git diff --check` | 0 | clean before the frozen verification run |
+| `npm run typecheck` | 0 | clean after dependency bootstrap (the first pre-bootstrap attempt could not find `tsc`) |
+| `npx jest --config apps/mobile/jest.config.js --runInBand apps/mobile/test/components/FocusScreens.test.js apps/mobile/test/components/SessionScreen.test.js` | 0 | 2 suites, 131 tests passed |
+| `npm run verify:components` | 0 | 26 suites, 446 tests passed |
+| `npm run verify:store` | not run separately | store source was unchanged; the gate ran inside `verify:ci` and passed 672/672 SQL checks plus 16/16 routine-template checks |
+| `npm run verify:ci` | 0 | single frozen-candidate run passed all 21 gates; final component stage was 26 suites / 446 tests |
+
+The complete CI transcript is outside the repository at
+`C:\Users\fpike\AppData\Local\Temp\astra_ux_followup_0115\verify_ci.log`.
+`verify:ci` ran after the app source and tests were frozen; only this
+evidence-only ledger closure follows it. Existing Jest Animated `act(...)`
+warnings, SafeAreaView deprecation output, and resolver diagnostics remained
+non-failing. No device observation is claimed yet.
+
+### Post-commit evidence and authority boundary
+
+The five tracked paths in this entry are:
+
+1. `PROMPT_LEDGER.md`
+2. `apps/mobile/src/screens/BlockScreen.tsx`
+3. `apps/mobile/src/screens/SessionScreen.tsx`
+4. `apps/mobile/test/components/FocusScreens.test.js`
+5. `apps/mobile/test/components/SessionScreen.test.js`
+
+The local commit, QA APK build, `verify:qa-candidate`, APK provenance/hashes,
+and any emulator captures are deliberately performed after this ledger closes.
+Their exact results will be written only to
+`C:\Users\fpike\AppData\Local\Temp\astra_ux_followup_0115\post_commit_evidence.md`
+so no later tracked write can invalidate artifact provenance. If a usable
+emulator is absent, that external record and the final handoff will state
+`DEVICE EVIDENCE PENDING` without inference.
+
+This execution is not an independent review of itself. Nothing is authorized
+to push, merge, rebase, tag, sign, or release. RAM envelope: unchanged. Runtime
+latency: one synchronous store call plus one local React transition per Plan
+start; no network or engine path added. Constraint delta: UI/copy/tests only.
+
+#### MASTER LEDGER ENTRY
+
+- Input: clean HEAD `623eeedf4d87f977962af00dfa6cab673a00b913`, tree
+  `6bd3c4adc59bff445472eb8ab6ca4431c6f3b5e5`, no untracked files.
+- Constraints enforced: offline-only; strict typing; no frozen migration or
+  decision-engine edits; append-only ledger; store start remains sole writer;
+  local commit and QA evidence only.
+- Actions: guarded both Plan starts; formatted halt reasons; neutralized reps
+  copy; added rendered interaction/copy tests; mutation-proved both contracts;
+  ran the required gates.
+- RAM/latency/constraint deltas: no data/model/runtime-memory change; negligible
+  UI-only transition state; authority remains bounded to five tracked paths.
 ````
 
 Owner follow-up, verbatim, after the first opening-gate run returned

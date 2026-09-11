@@ -881,8 +881,11 @@ test('bodyweight actual reps initialize from the plan, edit, and reach logSet un
   render(<SessionScreen />);
   // Initial draft comes from the planned target (5), shown with the honest
   // planned-vs-actual cue.
-  expect(screen.getByTestId('actual-reps-cue').props.children.join(''))
-    .toContain('Planned target 5');
+  expect(screen.getByTestId('actual-reps-cue')).toHaveTextContent(
+    'Target: 5 reps. Log the reps you actually completed.',
+  );
+  expect(screen.queryByText(/Planned target/)).toBeNull();
+  expect(screen.queryByText(/the plan stays unchanged/)).toBeNull();
   expect(screen.getByLabelText('Actual reps 5')).toBeOnTheScreen();
 
   // The athlete did 12, not the planned 5: increment 7 times and log.
@@ -895,6 +898,26 @@ test('bodyweight actual reps initialize from the plan, edit, and reach logSet un
   // untouched (it only exists in the slot, not the set).
   expect(mockState.logSet).toHaveBeenCalledWith(1, 12, 0, null, undefined, undefined, undefined, undefined, 1);
 });
+
+test.each(['planned', 'substituted', 'day_swapped', 'added', 'free_form'])(
+  'the reps cue is provenance-neutral for a %s slot',
+  (provenanceKind) => {
+    mockState = state({
+      sessionPlan: [slot(1, 1, 7, { provenanceKind })],
+      runner: runner({
+        slots: [{ sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 3, target: { kind: 'reps', reps: 7 }, targetRpe: 8 }],
+        slotSetCounts: [0],
+      }),
+    });
+    render(<SessionScreen />);
+
+    expect(screen.getByTestId('actual-reps-cue')).toHaveTextContent(
+      'Target: 7 reps. Log the reps you actually completed.',
+    );
+    expect(screen.queryByText(/Planned target/)).toBeNull();
+    expect(screen.queryByText(/the plan stays unchanged/)).toBeNull();
+  },
+);
 
 test('actual-reps draft survives a rerender until the set is logged (PQ-12)', () => {
   const { rerender } = render(<SessionScreen />);
@@ -948,6 +971,45 @@ test('a triage halt on a live runner persists safety before ending the session',
   expect(mockState.runnerHalt.mock.invocationCallOrder[0]).toBeLessThan(
     mockState.endSession.mock.invocationCallOrder[0],
   );
+});
+
+test.each([
+  ['manual', 'You chose to stop this session.', null],
+  ['niggle', 'You reported that something felt off, so this session is paused.', null],
+  ['pain', 'You reported pain, so this session is paused.', null],
+  ['safety', 'Stop and reassess this symptom.', 'Stop and reassess this symptom.'],
+])('halt reason %s renders athlete-facing copy and never the raw token', (haltReason, expected, coachingCue) => {
+  mockState = state({
+    runner: runner({ phase: 'halted', haltReason }),
+    lastTriage: coachingCue === null ? null : {
+      kind: 'matched',
+      directive: { halt: true, vector: { coaching_cue: coachingCue } },
+    },
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText(expected)).toBeOnTheScreen();
+  expect(screen.queryByText(new RegExp(`^${haltReason}$`, 'i'))).toBeNull();
+});
+
+test.each([
+  ['safety without a cue', 'safety', '   '],
+  ['an absent halt reason', null, 'A cue must not override an absent reason.'],
+  ['an unknown halt reason', 'unexpected', 'A cue must not override an unknown reason.'],
+])('%s fails closed to the generic safety message', (_caseName, haltReason, coachingCue) => {
+  mockState = state({
+    runner: runner({ phase: 'halted', haltReason }),
+    lastTriage: {
+      kind: 'matched',
+      directive: { halt: true, vector: { coaching_cue: coachingCue } },
+    },
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText('A safety concern paused this session.')).toBeOnTheScreen();
+  if (typeof haltReason === 'string') {
+    expect(screen.queryByText(new RegExp(`^${haltReason}$`, 'i'))).toBeNull();
+  }
 });
 
 test('a completed runner takes precedence over a later triage halt', () => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
 import BlockScreen from '../../src/screens/BlockScreen';
 import { theme } from '../../src/theme/theme';
@@ -189,6 +189,82 @@ test('COACH keeps the trajectory compact and expands a session only when its day
   expect(screen.getByLabelText('Manage current block')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Manage current block'));
   expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
+});
+
+describe('Plan session starts navigate only after the store creates a session', () => {
+  test('a refused planned start stays on Plan, exposes the store error, and never navigates', () => {
+    const onSessionStarted = jest.fn();
+    mockState = baseState();
+    mockState.startSession = jest.fn(() => {
+      mockState.error = 'This planned session cannot start safely.';
+    });
+
+    render(<BlockScreen onSessionStarted={onSessionStarted} />);
+    fireEvent.press(screen.getByLabelText('Start session'));
+
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onSessionStarted).not.toHaveBeenCalled();
+    expect(screen.getByText('Today: Lower')).toBeOnTheScreen();
+    expect(screen.getByTestId('plan-start-error')).toHaveTextContent(
+      'This planned session cannot start safely.',
+    );
+  });
+
+  test('a refused confirmed-unplanned start stays on Plan, exposes the store error, and never navigates', () => {
+    const onSessionStarted = jest.fn();
+    mockState = baseState({ todayPlan: null, prescription: null });
+    mockState.startSession = jest.fn(() => {
+      mockState.error = 'An unplanned session cannot start while training is paused.';
+    });
+
+    render(<BlockScreen onSessionStarted={onSessionStarted} />);
+    fireEvent.press(screen.getByText('Start without a planned session'));
+    fireEvent.press(screen.getByLabelText('Start an unplanned session'));
+    fireEvent.press(screen.getByLabelText('Start unplanned session'));
+
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onSessionStarted).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Recovery day').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('plan-start-error')).toHaveTextContent(
+      'An unplanned session cannot start while training is paused.',
+    );
+  });
+
+  test('a successful planned start navigates exactly once and ignores a duplicate press', () => {
+    const onSessionStarted = jest.fn();
+    mockState = baseState();
+    mockState.startSession = jest.fn(() => {
+      mockState.session = { sessionId: 71, date: TODAY, startedAtMs: 1, sets: [] };
+    });
+
+    render(<BlockScreen onSessionStarted={onSessionStarted} />);
+    const start = screen.getByLabelText('Start session');
+    act(() => {
+      fireEvent.press(start);
+      fireEvent.press(start);
+    });
+
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onSessionStarted).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('plan-start-error')).toBeNull();
+  });
+
+  test('a successful confirmed-unplanned start navigates exactly once', () => {
+    const onSessionStarted = jest.fn();
+    mockState = baseState({ todayPlan: null, prescription: null });
+    mockState.startSession = jest.fn(() => {
+      mockState.session = { sessionId: 72, date: TODAY, startedAtMs: 1, sets: [] };
+    });
+
+    render(<BlockScreen onSessionStarted={onSessionStarted} />);
+    fireEvent.press(screen.getByText('Start without a planned session'));
+    fireEvent.press(screen.getByLabelText('Start an unplanned session'));
+    fireEvent.press(screen.getByLabelText('Start unplanned session'));
+
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onSessionStarted).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('plan-start-error')).toBeNull();
+  });
 });
 
 test('COACH opens the Manage program editor and saves future preferences', () => {

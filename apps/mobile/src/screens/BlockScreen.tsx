@@ -226,6 +226,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
+  const [awaitingSessionStart, setAwaitingSessionStart] = useState(false);
+  const [sessionStartError, setSessionStartError] = useState<string | null>(null);
+  const sessionStartPendingRef = useRef(false);
+  const sessionIdBeforeStartRef = useRef<number | null>(null);
 
   // continueTrainingProgram reports every refusal through the store's `error`
   // and returns without creating a block, so dismissing the preview card the
@@ -243,6 +247,26 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     }
     setNextProgramPreview(null);
   }, [continuationPending, storeError]);
+
+  // Starting a session can legitimately fail closed in the store. Keep the
+  // athlete on Plan until a NEW active session exists, then navigate exactly
+  // once. The ref closes the double-tap window before React commits the local
+  // pending state; the existing active-session action remains a separate
+  // resume path and never calls startSession.
+  useEffect(() => {
+    if (!awaitingSessionStart) return;
+    setAwaitingSessionStart(false);
+    sessionStartPendingRef.current = false;
+    const newlyActive = session !== null
+      && session.sessionId !== sessionIdBeforeStartRef.current;
+    if (newlyActive) {
+      onSessionStarted?.();
+      return;
+    }
+    if (storeError !== null && storeError !== undefined) {
+      setSessionStartError(storeError);
+    }
+  }, [awaitingSessionStart, session, storeError, onSessionStarted]);
   const [showChooser, setShowChooser] = useState(false);
 
   const hasSubView =
@@ -401,14 +425,13 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     setDetail({ summary: nextPlanned, slots: loadSessionSlots(nextPlanned.plannedSessionId) });
   };
 
-  const startPlannedSession = (): void => {
+  const startAndOpenSession = (): void => {
+    if (sessionStartPendingRef.current || session !== null) return;
+    sessionStartPendingRef.current = true;
+    sessionIdBeforeStartRef.current = null;
+    setSessionStartError(null);
+    setAwaitingSessionStart(true);
     startSession();
-    onSessionStarted?.();
-  };
-
-  const startUnplannedSession = (): void => {
-    startSession();
-    onSessionStarted?.();
   };
 
   let todayTitle = 'Recovery day';
@@ -611,7 +634,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               accessibilityLabel="Review program continuation"
             />
           ) : todayPlan !== null ? (
-            <PrimaryButton label="Start session" onPress={startPlannedSession} accessibilityLabel="Start session" />
+            <PrimaryButton label="Start session" onPress={startAndOpenSession} accessibilityLabel="Start session" />
           ) : block === null ? (
             <PrimaryButton label="Set up a four-week block" onPress={openManageBlock} accessibilityLabel="Set up a four-week block" />
           ) : (
@@ -636,6 +659,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             </>
           )}
         </View>
+        {sessionStartError !== null && (
+          <Text
+            style={styles.errorText}
+            testID="plan-start-error"
+            accessibilityRole="alert"
+          >
+            {sessionStartError}
+          </Text>
+        )}
       </View>
 
       {nextProgramPreview !== null && (
@@ -1145,7 +1177,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               ) : (
                 <>
                   <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
-                  <PrimaryButton label="Start unplanned session" onPress={startUnplannedSession} accessibilityLabel="Start unplanned session" />
+                  <PrimaryButton label="Start unplanned session" onPress={startAndOpenSession} accessibilityLabel="Start unplanned session" />
                   <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
                 </>
               )}

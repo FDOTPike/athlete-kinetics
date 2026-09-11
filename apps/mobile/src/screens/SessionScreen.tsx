@@ -1,7 +1,7 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer } from '@ak/inference';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
@@ -26,6 +26,31 @@ const secondsText = (n: number): string => {
   const min = Math.floor(value / 60);
   const sec = value % 60;
   return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
+};
+
+const GENERIC_HALT_COPY = 'A safety concern paused this session.';
+const NON_SAFETY_HALT_COPY = {
+  manual: 'You chose to stop this session.',
+  niggle: 'You reported that something felt off, so this session is paused.',
+  pain: 'You reported pain, so this session is paused.',
+} satisfies Record<Exclude<RunnerHaltReason, 'safety'>, string>;
+
+/** Exhaustive athlete-facing copy for persisted runner halt reasons. The
+ * Record above makes a newly added non-safety RunnerHaltReason a type error
+ * until copy is supplied. Runtime-unknown, absent, and blank safety evidence
+ * all fail closed to one generic safety message; raw tokens are never output. */
+const formatRunnerHaltReason = (
+  reason: RunnerHaltReason | null | undefined,
+  matchedTriageCue: string | null | undefined,
+): string => {
+  if (reason === 'safety') {
+    const cue = matchedTriageCue?.trim();
+    return cue === undefined || cue.length === 0 ? GENERIC_HALT_COPY : cue;
+  }
+  if (reason === 'manual' || reason === 'niggle' || reason === 'pain') {
+    return NON_SAFETY_HALT_COPY[reason];
+  }
+  return GENERIC_HALT_COPY;
 };
 
 /** Strict load-draft parsing (Sol audit correction 1): decimal notation only,
@@ -733,7 +758,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           <View style={styles.haltCard} accessibilityRole="alert">
             <Text style={styles.haltTitle}>Stop training for today.</Text>
             <Text style={styles.haltBody}>
-              {runner?.haltReason ?? (lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : 'A safety report needs your attention before more sets are logged.')}
+              {formatRunnerHaltReason(
+                runner?.haltReason,
+                lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : null,
+              )}
             </Text>
             <View style={{ marginTop: theme.space[4], alignSelf: 'stretch' }}>
               <SecondaryButton
@@ -925,7 +953,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           />
                           {target?.kind !== 'time' && (
                             <Text style={styles.effortCue} testID="actual-reps-cue">
-                              Planned target {target?.kind === 'reps' ? target.reps : '—'}. Enter what you actually did — the plan stays unchanged.
+                              Target: {target?.kind === 'reps' ? target.reps : '—'} reps. Log the reps you actually completed.
                             </Text>
                           )}
                           <View style={styles.loadField}>
