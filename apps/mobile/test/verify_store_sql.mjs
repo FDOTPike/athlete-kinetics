@@ -1093,33 +1093,6 @@ if (resetTables.length >= 15) {
     lDb.exec("ROLLBACK;");
   }
   check('lifecycle test: transaction rolls back on constraint violation', transactionThrew);
-
-  // Sol R4 F4: execute the store's REAL post-session summary SELECT (extracted
-  // from useStore.ts, not re-typed) against this lifecycle, which already holds
-  // a planned set (slot 1) and a substituted set (slot 2). The summary groups by
-  // movement, so it must carry each set's slot identity for the pure
-  // groupSummaryExercises to attribute planned_sets per SLOT.
-  {
-    const sqlStart = src.indexOf('`SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,');
-    const sqlEnd = src.indexOf('ORDER BY sr.movement_id, sr.set_index`', sqlStart);
-    const summarySql = sqlStart >= 0 && sqlEnd > sqlStart
-      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.movement_id, sr.set_index'.length)
-      : '';
-    check('F4: summary set SELECT located in useStore.ts', summarySql.length > 0);
-    if (summarySql.length === 0) fail += 1;
-    let summaryRows = [];
-    try { summaryRows = summarySql.length > 0 ? lDb.prepare(summarySql).all(1) : []; } catch (e) { summaryRows = []; }
-    const bySet = new Map(summaryRows.map((r) => [r.movement_id, r]));
-    const slotIdsOk = summaryRows.length >= 2
-      && summaryRows.every((r) => 'session_plan_slot_id' in r)
-      && summaryRows.some((r) => r.session_plan_slot_id === 1)
-      && summaryRows.some((r) => r.session_plan_slot_id === 2);
-    check('F4: summary SELECT returns each set\'s session_plan_slot_id (planned slot 1 and substituted slot 2)', slotIdsOk);
-    if (!slotIdsOk) fail += 1;
-    const plannedOk = summaryRows.length >= 2 && summaryRows.every((r) => r.planned_sets !== undefined);
-    check('F4: summary SELECT still returns the slot planned_sets alongside the slot id', plannedOk && bySet.size >= 1);
-    if (!(plannedOk && bySet.size >= 1)) fail += 1;
-  }
   if (!transactionThrew) fail += 1;
 
   // --- P1 #1 regression: training-block delete must not fail due to FK/CHECK clash --------

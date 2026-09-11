@@ -5,22 +5,14 @@
  * Android hardware BackHandler and iOS left-edge swipe call `goBack()`, which:
  * 1. Checks if an active sub-view handler consumes the back event (e.g. closes a modal/card/step).
  * 2. If no sub-view handles it, pops the tab history stack to switch to the previous tab.
- * 3. Only exits the app (returns false to Android BackHandler) when on the root tab ('today') with no sub-views open.
+ * 3. Only exits the app (returns false to Android BackHandler) when on the root tab ('readiness') with no sub-views open.
  *
  * State safety: navigation only alters UI visibility/stack; logged training history and store state are untouched.
  */
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { BackHandler, PanResponder, Platform, View, StyleSheet, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
 
-/**
- * Tab keys. W4 (Astra UX Phase 1): the PRIMARY destinations are exactly
- * 'today', 'coach' (presented as Plan), and 'progress'. The remaining keys are
- * preserved internal route identities — 'readiness' (Readiness detail),
- * 'session' (the live workout), 'library', and 'athlete' (Profile/settings) —
- * reachable from header controls rather than the primary bar, so no capability
- * is lost and existing deterministic back behaviour is unchanged.
- */
-export type Tab = 'readiness' | 'session' | 'coach' | 'library' | 'athlete' | 'today' | 'progress';
+export type Tab = 'readiness' | 'session' | 'coach' | 'library' | 'athlete';
 
 export type BackHandlerFn = () => boolean;
 
@@ -35,11 +27,11 @@ interface NavigationContextValue {
 const NavigationContext = createContext<NavigationContextValue | null>(null);
 
 const fallbackContext: NavigationContextValue = {
-  tab: 'today',
+  tab: 'readiness',
   setTab: () => {},
   goBack: () => false,
   registerSubViewBack: () => () => {},
-  tabHistory: ['today'],
+  tabHistory: ['readiness'],
 };
 
 export interface NavigationProviderProps {
@@ -47,7 +39,7 @@ export interface NavigationProviderProps {
   initialTab?: Tab;
 }
 
-export function NavigationProvider({ children, initialTab = 'today' }: NavigationProviderProps): React.JSX.Element {
+export function NavigationProvider({ children, initialTab = 'readiness' }: NavigationProviderProps): React.JSX.Element {
   const [tabHistory, setTabHistory] = useState<Tab[]>([initialTab]);
   const subViewHandlersRef = useRef<Set<BackHandlerFn>>(new Set());
 

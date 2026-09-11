@@ -17,9 +17,8 @@ import {
   type BlockFocus,
   type SchemaType,
 } from '@ak/inference';
-import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
+import { Chip, PrimaryButton, SecondaryButton } from '../components/ui';
 import { theme } from '../theme/theme';
-import { recommendedProgramDefaults } from '../state/programDefaults';
 import {
   useStore,
   type TrainingProgramDay,
@@ -57,27 +56,19 @@ export default function ProgramSetupScreen({
   const storeError = useStore((s) => s.error);
 
   const initialFrequency = program?.days.length ?? profile.weekly_frequency;
-  // W2: every programming control now OPENS on a disclosed coach default
-  // instead of on null. The first run is review-and-confirm; the controls are
-  // all still here, one disclosure away, and an existing program still wins
-  // over the recommendation when editing.
-  const recommended = useMemo(() => recommendedProgramDefaults(profile), [profile]);
-  const [buildMode, setBuildMode] = useState<'coach' | 'custom'>(
-    editing && (program?.movementPreferences.length ?? 0) > 0 ? 'custom' : recommended.buildMode,
+  const [buildMode, setBuildMode] = useState<'coach' | 'custom' | null>(
+    editing && (program?.movementPreferences.length ?? 0) > 0 ? 'custom' : editing ? 'coach' : null,
   );
-  const [horizonKind, setHorizonKind] = useState<'weeks' | 'date'>(
-    editing ? (program?.horizonKind ?? recommended.horizonKind) : recommended.horizonKind,
+  const [horizonKind, setHorizonKind] = useState<'weeks' | 'date' | null>(
+    editing ? (program?.horizonKind ?? null) : null,
   );
-  const [blockCount, setBlockCount] = useState<number>(
-    editing ? (program?.plannedBlockCount ?? recommended.blockCount) : recommended.blockCount,
+  const [blockCount, setBlockCount] = useState<number | null>(
+    editing ? (program?.plannedBlockCount ?? null) : null,
   );
   const [reviewDate, setReviewDate] = useState(program?.requestedReviewDate ?? '');
-  const [schemaType, setSchemaType] = useState<SchemaType>(
-    editing ? (program?.schemaType ?? recommended.schemaType) : recommended.schemaType,
+  const [schemaType, setSchemaType] = useState<SchemaType | null>(
+    editing ? (program?.schemaType ?? null) : profile.training_age === 'beginner' ? 'LINEAR' : null,
   );
-  // Editing IS the fine-tuning task, so the optional area opens for it. A first
-  // run keeps it closed: the point is that nothing in there has to be touched.
-  const [advancedOpen, setAdvancedOpen] = useState(editing);
   const [dayIndices, setDayIndices] = useState<number[]>(() =>
     program?.days.map((day) => day.dayIndex) ?? [...defaultProgramDayIndices(initialFrequency)],
   );
@@ -102,9 +93,8 @@ export default function ProgramSetupScreen({
   const [localError, setLocalError] = useState<string | null>(null);
 
   const input = useMemo<TrainingProgramInput | null>(() => {
-    // Only ONE way to be incomplete survives: choosing the Date horizon and not
-    // yet typing a date. Every other field now opens on a real value, so the
-    // form can no longer be blocked by a decision the athlete never made.
+    if (horizonKind === null || schemaType === null || buildMode === null) return null;
+    if (horizonKind === 'weeks' && blockCount === null) return null;
     if (horizonKind === 'date' && reviewDate.trim() === '') return null;
     const defaultFocuses = programFocuses(profile.objective, dayIndices.length);
     const days: TrainingProgramDay[] = dayIndices.map((dayIndex, i) => ({
@@ -113,7 +103,7 @@ export default function ProgramSetupScreen({
     }));
     return {
       horizon: horizonKind === 'weeks'
-        ? { kind: 'weeks', blockCount }
+        ? { kind: 'weeks', blockCount: blockCount! }
         : { kind: 'date', requestedReviewDate: reviewDate.trim() },
       schemaType,
       dayIndices,
@@ -180,13 +170,7 @@ export default function ProgramSetupScreen({
     if (saved) onComplete?.();
   };
 
-  // W2 note: before the coach defaults landed, `input` was null on first
-  // render, so nothing below ever dereferenced a preview until the athlete had
-  // filled the form in. The preview now runs immediately, which puts these
-  // derivations on the very first paint of a first-run athlete's screen — so
-  // each one is defensive about a plan that is missing an optional array.
-  // A throw here is a blank screen at exactly the worst moment.
-  const weekOne = previewResult.preview?.plan?.sessions?.filter((session) => session.week_index === 1) ?? [];
+  const weekOne = previewResult.preview?.plan.sessions.filter((session) => session.week_index === 1) ?? [];
 
   // --- W3 disclosures: honest style, capacity, anchor coverage -------------
   // The athlete-facing style is the goal's honest meaning (WO §2.2), shown
@@ -295,7 +279,7 @@ export default function ProgramSetupScreen({
 
   // Ranking decisions from the generated preview: anchor substitutions and
   // reasoned bodyweight fallbacks surface verbatim in the preview card.
-  const rankingNotes = previewResult.preview?.plan?.warnings?.filter((w) =>
+  const rankingNotes = previewResult.preview?.plan.warnings.filter((w) =>
     w.includes('unavailable for') || w.includes('no loaded')) ?? [];
 
   // R3 (Round 2, ledger 0060): the weekly progression summary rendered in the
@@ -303,7 +287,7 @@ export default function ProgramSetupScreen({
   // week-3 -> 4 (deload) changes for every representative slot of the
   // generated plan — the same function the evidence harness prints.
   const progressionSummary = useMemo(() => {
-    if (previewResult.preview?.plan == null) return [];
+    if (previewResult.preview === null) return [];
     const bodyweightNames = new Set((movements ?? [])
       .filter((m) => (m.supportedPrefixes ?? []).length === 1 && m.supportedPrefixes[0] === 'Bodyweight')
       .map((m) => m.movement_id));
@@ -316,17 +300,17 @@ export default function ProgramSetupScreen({
     );
   }, [previewResult.preview, movements]);
 
-  // R8 §2.3 said a rule must never be enforced invisibly. That contract is kept
-  // in full — what changed is how many rules there are left to enforce. Four of
-  // the original five prompts ("choose who selects movements", "choose when you
-  // want to review", "choose a program duration", "choose a progression
-  // method") are gone because the decisions they policed now arrive with
-  // disclosed defaults, not because the explanation was dropped. The one rule
-  // that can still block is still explained, in the same live region.
+  // First unmet requirement for enabling Create program, in the order the form
+  // asks for them. Rendered next to the disabled button so the rule is never
+  // enforced invisibly.
   const missingRequirement = useMemo<string | null>(() => {
+    if (buildMode === null) return 'Choose who selects movements.';
+    if (horizonKind === null) return 'Choose when you want to review the program.';
+    if (horizonKind === 'weeks' && blockCount === null) return 'Choose a program duration.';
     if (horizonKind === 'date' && reviewDate.trim() === '') return 'Enter a review date.';
+    if (schemaType === null) return 'Choose a progression method.';
     return null;
-  }, [horizonKind, reviewDate]);
+  }, [buildMode, horizonKind, blockCount, reviewDate, schemaType]);
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -335,44 +319,6 @@ export default function ProgramSetupScreen({
       <Text style={styles.body}>
         Goal: {profile.objective.replace('_', ' ')} — {styleLabel}. Four-week blocks stay intact. You choose when to review the goal.
       </Text>
-
-      {/* W2: the recommendation, stated before anything is asked. Every value
-          the athlete no longer has to choose is named here, so nothing is
-          applied quietly. */}
-      {!editing && (
-        <View style={styles.card} testID="program-recommendation-card">
-          <Text style={styles.sectionTitle}>What the coach has picked for you</Text>
-          <Text style={styles.notice}>{recommended.disclosure}</Text>
-          <Text style={styles.caption}>
-            Your {dayIndices.length}-day week comes from the training days you already gave during
-            setup. Nothing here is permanent — you can change all of it later in Athlete / Profile.
-          </Text>
-        </View>
-      )}
-
-      {/* W2: the athlete reviews a real generated week BEFORE committing to it.
-          This is read-only on purpose; editing movements is the Customize path
-          inside the optional area below. */}
-      {!editing && weekOne.length > 0 && (
-        <View style={styles.card} testID="recommended-week-card">
-          <Text style={styles.sectionTitle}>Your first week</Text>
-          {weekOne.map((session) => (
-            <View key={session.day_index} style={styles.session}>
-              <Text style={styles.sessionTitle}>
-                {DAY_NAME[session.day_index - 1] ?? `Day ${session.day_index}`} · {session.focus}
-              </Text>
-              {session.slots.map((slot) => {
-                const movement = movements.find((item) => item.movement_id === slot.movement_id);
-                return (
-                  <Text key={slot.slot_index} style={styles.caption}>
-                    {movement?.name ?? `Movement ${slot.movement_id}`} — {slot.sets}×{slot.reps}
-                  </Text>
-                );
-              })}
-            </View>
-          ))}
-        </View>
-      )}
 
       {powerExplanation && (
         <View style={styles.card} testID="power-explanation-card">
@@ -452,16 +398,6 @@ export default function ProgramSetupScreen({
         </View>
       )}
 
-      {/* Everything the required path no longer asks for. Not removed, not
-          hidden behind a different screen — one disclosure away, with every
-          control that was here before, in the same order. */}
-      <Disclosure
-        label={editing ? 'Program controls' : 'Fine-tune your program (optional)'}
-        hint="Movement selection, review horizon, training days, progression method"
-        open={advancedOpen}
-        onOpenChange={setAdvancedOpen}
-        testID="program-advanced"
-      >
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>1. Who chooses movements?</Text>
         <View style={styles.row}>
@@ -594,7 +530,6 @@ export default function ProgramSetupScreen({
           ))}
         </View>
       )}
-      </Disclosure>
 
       {(localError ?? previewResult.error ?? storeError) !== null && (
         <Text style={styles.error}>{localError ?? previewResult.error ?? storeError}</Text>

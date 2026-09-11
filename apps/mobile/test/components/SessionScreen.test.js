@@ -401,7 +401,7 @@ test('guided mode keeps only the current movement expanded and future work unava
 test('untouched actual RPE logs null instead of fabricating target equality', () => {
   render(<SessionScreen />);
 
-  expect(screen.getByText('Effort rating is optional; leave it blank if you are unsure.')).toBeOnTheScreen();
+  expect(screen.getByText('Unanswered RPE is left out of Coach evidence.')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
 
   expect(mockState.logSet).toHaveBeenCalledWith(
@@ -1121,7 +1121,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 
     const { unmount } = render(<SessionScreen />);
     expect(screen.getByText(expected)).toBeOnTheScreen();
-    expect(screen.getByText('Session saved · Tuesday 21 July 2026')).toBeOnTheScreen();
+    expect(screen.getByText('Session saved · Tuesday 21 July')).toBeOnTheScreen();
     unmount();
   }
 
@@ -1163,8 +1163,8 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
   expect(screen.getByText('Session saved')).toBeOnTheScreen();
   
   // Test dismissing the outcome screen (S2)
-  expect(screen.getByLabelText("Back to Today")).toBeOnTheScreen();
-  fireEvent.press(screen.getByLabelText("Back to Today"));
+  expect(screen.getByLabelText("Back to Ready")).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText("Back to Ready"));
   expect(mockState.dismissOutcome).toHaveBeenCalled();
   unmount();
 });
