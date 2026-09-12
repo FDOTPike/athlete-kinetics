@@ -6,6 +6,7 @@
 - Reserved migration: `064`.
 - Purpose: give external activities, ordinary weekly planning, and clinician constraints one offline deterministic data contract.
 - This docket authorizes no schema or product behavior until the listed decisions are ratified.
+- Evidence/policy input: `docs/research/accessible-coach/WO04_POLICY_DECISION_DOCKET.md` (D01–D10) and its linked evidence register, source-to-rule matrix, and persona audit. Those D identifiers remain the policy checkpoint; this file uses `SC-*` identifiers for the narrower persistence/API choices so the two dockets cannot be confused.
 
 ## 2. Proposed invariant set
 
@@ -52,42 +53,42 @@ No duration-times-effort formula is approved as a clinical safety score.
 
 ## 3. Decisions required before Migration 064
 
-### D-01 — Schema decomposition
+### SC-01 — Schema decomposition
 
 - Proposed: separate activity definitions, activity occurrences, clinician constraints, and constraint applicability rows.
 - Decide: approve, amend, or reject.
 
-### D-02 — Recurrence and time-zone law
+### SC-02 — Recurrence and time-zone law
 
 - Proposed: local civil recurrence plus IANA zone; materialized occurrences carry resolved instants.
 - Decide: approve handling of daylight-saving gaps/overlaps and travel across zones.
 
-### D-03 — Demand vocabulary
+### SC-03 — Demand vocabulary
 
 - Proposed: a bounded non-medical vocabulary for affected regions and broad demand (`low`, `moderate`, `high`, `unknown`).
 - Decide: approve terms or require an evidence-backed alternative. `unknown` must remain available.
 
-### D-04 — Clinician constraint types and units
+### SC-04 — Clinician constraint types and units
 
 - Decide the first executable constraint set, permitted units, applicability targets, and validation ranges.
 - Recommendation: ship no executable numeric threshold until a qualified clinical reviewer approves its semantics.
 
-### D-05 — Provenance and verification
+### SC-05 — Provenance and verification
 
 - Proposed: athlete-entered clinician guidance defaults to `user_reported`; the app must not imply clinician verification.
 - Decide whether any verified-source workflow exists in this offline release.
 
-### D-06 — Conflict and expiry behavior
+### SC-06 — Conflict and expiry behavior
 
 - Proposed: conflict, expiry, and missing required facts produce `review_required` and hold affected planning changes.
 - Decide whether unaffected sessions may continue.
 
-### D-07 — Backup restore mode
+### SC-07 — Backup restore mode
 
 - Decide: full replacement only, merge, or both.
 - Recommendation: begin with validated full replacement plus pre-restore backup; defer merge until identity/conflict laws are proven.
 
-### D-08 — Experience-level policy conflict
+### SC-08 — Experience-level policy conflict
 
 - Current audit observation: experience alone changes prescribed set volume and some symptom severity gates.
 - Decide separately:
@@ -95,7 +96,7 @@ No duration-times-effort formula is approved as a clinical safety score.
   - whether beginner symptom reporting may ever receive a less conservative threshold.
 - Recommendation: do not ratify a less conservative symptom threshold without qualified clinical review.
 
-### D-09 — Default-profile assumptions
+### SC-09 — Default-profile assumptions
 
 - Current defaults assume intermediate experience, four weekly days, 90-minute duration, and RPE 9.
 - Decide whether absence of onboarding data should block prescription, use clearly disclosed conservative defaults, or enter a setup-required state.
@@ -104,7 +105,7 @@ No duration-times-effort formula is approved as a clinical safety score.
 
 Before implementation, the owner and qualified clinical reviewer must record:
 
-- disposition for D-01 through D-09;
+- disposition for policy D01–D10 and contract SC-01 through SC-09;
 - accepted vocabulary and units;
 - which constraints are executable versus display-only;
 - allowed continuation behavior when one activity or constraint is unknown;

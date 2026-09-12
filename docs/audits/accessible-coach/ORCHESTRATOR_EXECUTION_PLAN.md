@@ -49,7 +49,7 @@
 ### 3.4 WO-04 — Evidence and policy audit
 
 - Model/effort: `gpt-6-astra`, high.
-- Status: dispatched independently on `codex/ac-wo04-evidence`.
+- Status: completed, audited, and integrated as `cc39b15`; owner/clinical checkpoint remains open.
 - Ownership: primary/official evidence register, source-to-rule matrix, persona audit, policy docket, and handover.
 - Exclusions: product code, schema, migration, UI, native work, and silent policy ratification.
 - Exit: every proposed policy is labelled current, proposed, uncertain, or owner/clinical decision required.
