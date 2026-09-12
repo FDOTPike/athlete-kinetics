@@ -9419,3 +9419,53 @@ SC-01–SC-09).
   branch was pushed. `verify:ci` was run once, read-only, at `a0c4c20`.
 
 Entry 0118 is closed.
+
+---
+
+## Entry 0119 — 2026-09-13 · Opus F1/F2 remediation and delegated product rulings
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+Please see Opus Audit,
+and fix F1 and F2 before proceed with the next work orders. Also i need help deciding with the owner decisions, can you put Astra on High or medium to assist with deciding for me, just let astra take over as the product owner decision marker, allow it to decide
+`````
+
+### Output F(G(x))
+
+- Imported Opus's independent audit commit onto
+  `codex/accessible-coach-2026-09-12` before remediation, preserving the exact
+  finding text at
+  `docs/audits/accessible-coach/OPUS5_INDEPENDENT_AUDIT_2026-09-13.md`.
+- Closed F1 structurally: the full-screen dismiss layer is no longer the sole
+  accessible node. The explanation is a modal accessibility boundary with a
+  separately focusable heading and definition, initial accessibility focus on
+  the heading, accessibility-escape handling, a non-accessible outside-tap
+  layer, and a distinct 56-unit Close control.
+- Closed F2 structurally: `SPECIALIST` is exposed as a heading and every
+  specialist choice announces the `Specialist equipment` qualifier while
+  retaining selected/not-selected accessibility state.
+- Updated four affected component suites. Focused verification passed with
+  4 suites / 82 tests plus typecheck and `git diff --check`.
+- Mutation evidence is non-vacuous: removing `accessibilityViewIsModal` failed
+  only the new F1 contract; removing the specialist heading/label semantics
+  failed the two F2 assertions. Both mutations were restored before the green
+  run.
+- Francis delegated product authority to GPT-6 Astra at high effort. Astra
+  ratified D01-D10, SC-01-SC-09 and the supplemental privacy, deletion,
+  technical-bound, backup, taxonomy, copy and sequencing decisions in
+  `docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md`.
+- The owner/clinical gate is now explicitly split. The bounded Migration 064
+  capture/accounting/mechanical-review-hold slice and WO-05 are product-
+  authorized after slot recheck; clinical thresholds, screening semantics,
+  instruction interpretation, symptom policy and live alerts remain
+  unauthorized pending qualified review.
+- No schema, migration, planner, recommendation, live-monitoring, backup
+  product, network, animation, push, merge or release action was performed.
+
+The exact committed tip still requires the full repository verification, QA
+APK rebuild/artifact check, and native accessibility-tree exercise. Those
+artifact results are reported outside this append-only entry so a later hash
+write cannot invalidate the candidate it describes.
