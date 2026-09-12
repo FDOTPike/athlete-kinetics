@@ -24,7 +24,7 @@
 ### 3.1 WO-01 — Keyboard accessibility
 
 - Model/effort: `gpt-5.6-sol`, medium.
-- Status: dispatched first on `codex/ac-wo01-keyboard`.
+- Status: completed, independently reviewed, and integrated as `89e140a`; native Android verification remains an integration responsibility.
 - Product ownership: `App.tsx`; the input-bearing screens identified by inventory; a shared keyboard-aware scroll primitive; matching component tests.
 - Evidence ownership: `docs/audits/accessible-coach/WO01_INPUT_INVENTORY.md` and a WO-01 handover.
 - Exclusions: store, schema, migrations, native configuration, package dependencies, recommendation engines, backup, activity, clinician, and animation work.
@@ -33,15 +33,15 @@
 ### 3.2 WO-02 — Onboarding clarity
 
 - Model/effort: `gpt-5.6-sol`, medium.
-- Dependency: begins only after WO-01 is reviewed and integrated because both touch onboarding/profile/setup input surfaces.
+- Status/dependency: dispatched on `codex/ac-wo02-onboarding` from integrated tip `2af3adc`, after WO-01 review and integration because both touch onboarding/profile/setup input surfaces.
 - Product ownership: onboarding, profile, program setup, readiness/today copy and layout, existing `InfoTip` use, and matching tests.
-- Required outcomes: athlete-facing `weight loss` wording; clearer experience/equipment selection; explicit program ceilings; RPE introduced as effort; review of RIR/RPE use; summary grouped into About You / Your Week / Safety Limits with edit paths.
+- Required outcomes: athlete-facing `weight loss` wording; clearer experience/equipment selection; explicit program ceilings; RPE introduced as effort; review of RIR/RPE use; Ready summary grouped into the work order's exact applicable sections — GOAL, EXPERIENCE, YOUR WEEK, EQUIPMENT, EXISTING ACTIVITIES, and TRAINING SUPPORT — with edit paths.
 - Exclusions: new training policy, prescription math, schema, activity contract, clinician inference, and animation work.
 
 ### 3.3 WO-03 — Local backup and restore foundation
 
 - Model/effort: `gpt-5.6-sol`, high.
-- Status: dispatched independently on `codex/ac-wo03-backup`.
+- Status: deterministic contract foundation completed, reviewed, and integrated as `8ec58e3`; product UI/native snapshot/restore/encryption work is not implemented.
 - Ownership: pure backup inventory/codec modules, round-trip tests, optional contract verifier, backup design docket and handover.
 - Exclusions: screens, store integration, OS picker, encryption claims, atomic live restore claims, migrations, and the reserved shared contract.
 - Dependency: after Migration 064 lands, backup inventory and round-trip coverage must be re-run before backup is product-complete.
@@ -61,6 +61,7 @@
 - Schema ownership: one integration task only; Migration 064; shared types, repositories, deterministic weekly planner inputs, and tests.
 - Rule: activities and clinician constraints must enter planning through one normalized contract rather than parallel special cases.
 - Exclusions until ratified: clinical units/thresholds, automated interpretation of free text, remote sync, calendars, and probabilistic load inference.
+- Current status: WO-06 source/entry-point review dispatched documentation-only on `codex/ac-wo06-clinical-design`; Migration 064 and recommendation changes remain held at the Francis/qualified-clinical checkpoint.
 
 ### 3.6 WO-07 — Live heart-rate assessment
 
@@ -72,7 +73,8 @@
 ### 3.7 WO-08 — Activity and movement coverage
 
 - Model/effort: `gpt-5.6-sol`, high.
-- Dependency: shared activity contract integrated.
+- Status: current-state inventory and first-batch curation design completed, audited, and integrated as `2af3adc`; no product taxonomy/schema change shipped.
+- Dependency: the proposed 15-kind log-only activity batch remains pending shared-contract ratification.
 - Scope: expand deterministic local coverage and mappings without inventing exercise equivalence or clinical safety rules.
 
 ### 3.8 WO-09 — Offline movement animations
