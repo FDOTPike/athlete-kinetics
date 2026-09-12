@@ -162,15 +162,15 @@ assert.equal(readFileSync(contractPath, 'utf8'), sourceBefore, 'mutation test mu
 assert.equal(readFileSync(builtContractPath, 'utf8'), builtBefore, 'mutation test must retain compiled contract byte-identically');
 
 // Inventory gate: table sentinels cover every live durable table except the
-// row-sentinel cutoff table. Ensure the audit lists the resulting 86 names.
+// row-sentinel cutoff table. Ensure the audit lists the resulting 104 names.
 const runnerSource = readFileSync(join(import.meta.dirname, '..', '..', 'src', 'migrationRunner.ts'), 'utf8');
 const tableNames = [...runnerSource.matchAll(/type: 'table', name: '([^']+)'/g)].map((match) => match[1]);
-assert.equal(new Set(tableNames).size, 85, 'live chain must have 85 unique table sentinels');
+assert.equal(new Set(tableNames).size, 103, 'live chain must have 103 unique table sentinels');
 assert.match(runnerSource, /type: 'row',[\s\S]*?name: 'routine_template_contract_cutoff'/, 'cutoff must remain a row-level table sentinel');
 const inventory = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'docs', 'audits', 'accessible-coach', 'WO03_DURABLE_DATA_INVENTORY.md'), 'utf8');
 for (const tableName of [...new Set(tableNames), 'routine_template_contract_cutoff']) {
   assert.ok(inventory.includes(`\`${tableName}\``), `inventory must list ${tableName}`);
 }
-assert.match(inventory, /Final live durable tables: 86/, 'inventory must state the complete live table count');
+assert.match(inventory, /Final live durable tables: 104/, 'inventory must state the complete live table count');
 
-console.log('verify:backup PASS — deterministic round trip, manifest/payload integrity, compatibility, 86-table inventory, replace, cancel, low-storage, rollback');
+console.log('verify:backup PASS — deterministic round trip, manifest/payload integrity, compatibility, 104-table inventory, replace, cancel, low-storage, rollback');

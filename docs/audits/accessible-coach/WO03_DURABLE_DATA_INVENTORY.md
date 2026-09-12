@@ -1,8 +1,8 @@
 # WO-03 durable data inventory
 
-Date: 2026-09-12
-Frozen source: `87624d9e43189ddd87db317e24d4379ef5a13fae`
-Live chain: migration files through `063`; `004` is a parameterized materializer, not a migration. The migration array therefore has 62 entries and a fully migrated database reports `PRAGMA user_version = 62`. Slot `064` is centrally reserved and is not present here.
+Date: 2026-09-13
+Originally frozen at `87624d9e43189ddd87db317e24d4379ef5a13fae`; updated by the Accessible Coach integration candidate.
+Live chain: migration files through `064`; `004` is a parameterized materializer, not a migration. The migration array therefore has 63 entries and a fully migrated database reports `PRAGMA user_version = 63`. Slot `064` is the product-ratified neutral activity/support capture contract; it contains no executable clinical limit or screening schema.
 
 ## Discovery result
 
@@ -17,7 +17,7 @@ No restorable backup or restore implementation exists at the frozen source.
 
 `coach_athletes.json` is stored in the app document directory outside SQLite. It contains registry version, active athlete id, athlete ids/display names/database filenames/creation times, and the device-wide advanced-tools preference. Each athlete maps to a distinct SQLite file (`athlete_kinetics.db` for the default athlete, otherwise `ak_athlete_<id>.db`). A complete all-athletes transfer must keep the registry and every referenced database together. Copying only the active database is not a complete Coach Mode backup.
 
-## Final live durable tables: 86
+## Final live durable tables: 104
 
 The inventory comes from the complete migration chain and the recovery sentinels. Temporary replacement tables and the superseded `user_profile` table are listed separately below.
 
@@ -64,6 +64,29 @@ The inventory comes from the complete migration chain and the recovery sentinels
 - `block_suspension_origin`
 
 These tables collectively carry goal/program state, generated schedule, routine definitions, decisions that explain generated slots, immutable suspension history, and foreign-key identity. They must be treated as one graph, not independently merged.
+
+### External activities and training support (18)
+
+- `activity_definition` — stable neutral activity identity and the ratified 15-kind log-only taxonomy.
+- `activity_requirement` — activity-specific facility/equipment context, separate from strength movement eligibility.
+- `activity_series` — weekly local-civil recurrence intent, timezone, timing commitment, and nullable expected duration/effort.
+- `activity_occurrence` — stable planned/completed/cancelled/missed occurrence identity and explicitly resolved time facts.
+- `activity_completion` — one factual actual/partial completion per occurrence; duration and effort remain separate.
+- `activity_source_link` — explicit manual/import/coached-session reconciliation without fuzzy matching.
+- `activity_typical_week_report` — separately dated user-reported habit window, never completed work.
+- `activity_typical_week_item` — activities described by a typical-week report.
+- `health_support_profile` — capture/review state; no clearance state exists.
+- `health_support_preference` — non-executable position/transition/rest preferences.
+- `health_support_note` — user-reported non-executable support notes.
+- `clinician_instruction` — stable envelope for an instruction entered by the athlete.
+- `clinician_instruction_revision` — user-reported/not-verified transcription history.
+- `health_support_hold` — explicit mechanical review/request hold state and reason code.
+- `health_support_scope` — exact activity/movement/all/unresolved applicability for an instruction or hold.
+- `recommendation_support_record` — content-free identity, status, engine version, and timestamp for a prospective recommendation attempt.
+- `recommendation_activity_basis` — exact occurrence identities/revisions considered by that attempt.
+- `recommendation_hold_basis` — exact hold identities/revisions and mechanical reason codes decisive for that attempt; no support prose.
+
+These tables are athlete-owned health/schedule information. A complete backup must include the graph atomically and use reviewed authenticated encryption before becoming shareable. The current generic backup contract is still design-only and does not yet provide that protected native adapter.
 
 ### Native workout history, execution checkpoints, and outcomes (14)
 
@@ -139,7 +162,7 @@ These rows are bundled/reference data rather than athlete-authored data. A physi
 
 ## WO-05/WO-06 boundary
 
-The shared existing-activity/clinician contract does not exist at slot 063. This inventory therefore contains no claimed final table for recurring activities, condition information, or clinician instructions. The backup format accepts new named data sets without inventing that schema. After central migration 064 and the shared contract land, re-run this inventory and the representative round trip; do not ship transfer while those new fields are absent from the backup adapter.
+Migration 064 now supplies the shared neutral persistence contract. It does not by itself ship the WO-05 capture UI, apply holds at every personalized-advice boundary, or provide protected backup/restore. Those remain separately testable implementation stages. Do not call backup complete while the native encrypted adapter and all-table round trip are absent.
 
 ## CSV is not a backup
 

@@ -66,7 +66,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 063 adds movement_load_intent, which the store now reads on boot and writes
   // from the athlete's declaration (OW-001), so its statements are validated
   // against the real table here.
-  '063_movement_load_intent.sql'];
+  '063_movement_load_intent.sql',
+  // 064 is the shared neutral activity/support persistence contract. Feature
+  // adapters are separate modules, but the real store database must migrate it.
+  '064_accessible_coach_support.sql'];
 
 
 const db = new DatabaseSync(':memory:');

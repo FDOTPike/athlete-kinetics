@@ -9469,3 +9469,55 @@ The exact committed tip still requires the full repository verification, QA
 APK rebuild/artifact check, and native accessibility-tree exercise. Those
 artifact results are reported outside this append-only entry so a later hash
 write cannot invalidate the candidate it describes.
+
+---
+
+## Entry 0120 — 2026-09-13 · Accessible Coach shared contract and Migration 064
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+Please proceed and and present a start audit prompt for Opus to review everything.
+`````
+
+This continues the authorized sequence in
+`docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md` after the
+Opus F1/F2 remediation and Francis-delegated Astra product rulings.
+
+### Output F(G(x))
+
+- Rechecked the complete repository and confirmed that `064` remained the next
+  free migration slot at the start of implementation.
+- Added one exported offline deterministic TypeScript contract for factual
+  activity records, exact occurrence/source identity, separately nullable
+  duration and whole-session Effort, user-reported/not-verified support data,
+  explicit review holds/scopes, and content-free recommendation provenance.
+- Added Migration 064 as an 18-table capture/accounting/mechanical-hold
+  foundation. The chain now has 63 executable migrations and reports
+  `user_version = 63`.
+- Added strict calendar/time shape, immutable occurrence origin, no-inferred-row
+  installation, completion-state consistency, exact source reconciliation,
+  technical resource bounds, privacy-preserving instruction deletion, and
+  production self-heal coverage for every table and enforcement trigger.
+- Updated the durable-data inventory and backup gate to the exact 104 live-table
+  corpus. This is not a native backup implementation.
+- Added pure and schema tests. Three deliberate mutations independently proved
+  the accounting, withdrawn-hold, and not-verified-source gates turn red; all
+  were removed before the final green run.
+- Final verification: typecheck pass; policy pass; migrations pass; backup pass;
+  store 673/673; pipeline 51 checks; full `verify:ci` exit 0 with 27 suites and
+  467 tests. Two stale whole-chain count assertions failed on the first full
+  runs and were corrected to the actual 001–064/63-file chain before the final
+  pass.
+- Handover written at
+  `HANDOVER_2026-09-13_ACCESSIBLE_COACH_MIGRATION_064.md` with exact implemented,
+  unimplemented, clinical-exclusion, and independent-audit boundaries.
+- WO-05 UI/store wiring, WO-06 prospective-advice entry-point wiring, protected
+  native backup/restore, clinical semantics, live alerts, iOS/device acceptance,
+  C6, push, merge, tag, and release remain unperformed.
+
+Entry 0120 is closed for the bounded Migration 064 foundation. The exact final
+commit and QA artifact hash are reported externally after this append-only
+write so no self-referential tracked edit invalidates their provenance.

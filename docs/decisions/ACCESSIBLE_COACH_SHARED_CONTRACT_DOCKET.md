@@ -7,6 +7,7 @@
 - Purpose: give external activities, ordinary weekly planning, and clinician constraints one offline deterministic data contract.
 - Controlling ruling: `docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md`, made under Francis's explicit product-authority delegation.
 - The bounded capture/accounting/mechanical-hold slice is product-authorized. Clinical interpretation, executable medical thresholds, screening and live alerts remain unauthorized.
+- Implementation candidate: Migration 064 and its shared TypeScript contract are present on `codex/accessible-coach-2026-09-12` for independent audit. They are not merged or released, and the WO-05 capture UI plus WO-06 advice-entry-point wiring remain separate work.
 - Evidence/policy input: `docs/research/accessible-coach/WO04_POLICY_DECISION_DOCKET.md` (D01–D10) and its linked evidence register, source-to-rule matrix, and persona audit. Those D identifiers remain the policy checkpoint; this file uses `SC-*` identifiers for the narrower persistence/API choices so the two dockets cannot be confused.
 
 ## 2. Proposed invariant set
