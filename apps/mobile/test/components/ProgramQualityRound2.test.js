@@ -77,7 +77,7 @@ describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answe
 
   test('NEXT is disabled with an explanation until the athlete answers no/yes', () => {
     toLimits();
-    expect(screen.getByText('ANYTHING I SHOULD TRAIN AROUND?')).toBeOnTheScreen();
+    expect(screen.getByText('ANY TRAINING NOTES TO RECORD?')).toBeOnTheScreen();
     expect(screen.getByLabelText('Next')).toBeDisabled();
     // The rule is never invisible: the screen says why NEXT is off.
     expect(screen.getByText(/Choose YES or NO to continue/)).toBeOnTheScreen();

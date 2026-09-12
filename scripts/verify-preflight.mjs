@@ -39,6 +39,40 @@ console.log('=== [preflight] offline verification prerequisites ===');
 // --- [1] node_modules present -------------------------------------------------
 check('dependencies installed (node_modules present)', existsSync(join(ROOT, 'node_modules')));
 
+// React Native embeds a renderer that requires an exact React version. Its
+// package peer range is intentionally broader, so npm can resolve a newer
+// React that passes installation and host tests but crashes on first native
+// render interaction. Read the renderer's own runtime guard and fail before a
+// candidate APK can be built from an incompatible dependency tree.
+try {
+  const reactVersion = JSON.parse(readFileSync(
+    join(ROOT, 'node_modules', 'react', 'package.json'), 'utf-8',
+  )).version;
+  const rendererSource = readFileSync(join(
+    ROOT,
+    'node_modules',
+    'react-native',
+    'Libraries',
+    'Renderer',
+    'implementations',
+    'ReactNativeRenderer-prod.js',
+  ), 'utf-8');
+  const rendererVersion = rendererSource.match(
+    /if \(\"([^\"]+)\" !== isomorphicReactPackageVersion\)/,
+  )?.[1];
+  check(
+    'React version matches the embedded React Native renderer exactly',
+    Boolean(rendererVersion) && reactVersion === rendererVersion,
+    `react=${reactVersion}; renderer=${rendererVersion ?? 'unresolved'}`,
+  );
+} catch (e) {
+  check(
+    'React version matches the embedded React Native renderer exactly',
+    false,
+    String(e.message).slice(0, 120),
+  );
+}
+
 // --- [2] required native dependency loads (sharp as used by transformers) -----
 // @xenova/transformers v2 lazily requires sharp for image models. A broken or
 // missing native binding surfaces only deep inside a later gate unless proven
@@ -66,6 +100,7 @@ import {
   transformersRevisionArtifactPath,
 } from './embedder-integrity.mjs';
 
+const embedderFailStart = fail;
 for (const rel of REMOTE_ARTIFACTS) {
   const p = transformersRevisionArtifactPath(rel, DEFAULT_TRANSFORMERS_CACHE_ROOT, PINNED_REVISION);
   if (!existsSync(p)) {
@@ -80,7 +115,7 @@ for (const rel of REMOTE_ARTIFACTS) {
     check(`revision cache artifact verified: ${rel}`, false, String(e.message).slice(0, 120));
   }
 }
-if (fail > 0 || REMOTE_ARTIFACTS.some((rel) => !existsSync(
+if (fail > embedderFailStart || REMOTE_ARTIFACTS.some((rel) => !existsSync(
   transformersRevisionArtifactPath(rel, DEFAULT_TRANSFORMERS_CACHE_ROOT, PINNED_REVISION),
 ))) {
   remediation(
