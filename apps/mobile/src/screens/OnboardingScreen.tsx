@@ -329,7 +329,12 @@ export default function OnboardingScreen(): React.JSX.Element {
         ))}
       </View>
 
-      <KeyboardAwareScrollView testID="onboarding-scroll-view" style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <KeyboardAwareScrollView
+        key={step}
+        testID="onboarding-scroll-view"
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+      >
         {step === 'welcome' && (
           <View>
             <Text style={styles.h1}>YOUR COACH.{'\n'}IN YOUR POCKET.{'\n'}OFFLINE.</Text>
