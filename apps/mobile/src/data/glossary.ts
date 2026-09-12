@@ -30,7 +30,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'RPE',
     category: 'effort',
     definition:
-      'Rate of Perceived Exertion on a 1–10 scale. A rating of how hard a set felt, where a 10 means no more clean reps could be completed and an 8 means about two clean reps remained in reserve.',
+      'How hard did that feel? 1 is very easy. 10 is your hardest effort. RPE is the stored technical name for this athlete-reported effort scale.',
     aliases: ['rate of perceived exertion', 'effort rating', 'rpe scale'],
   },
   {
@@ -81,6 +81,26 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
       'The hardest any set should feel this block. A ceiling, not a target.',
     aliases: ['rpe max', 'maximum rpe', 'highest rpe'],
   },
+
+  // --- Onboarding choices ---
+  { id: 'NEW TO THIS', term: 'NEW TO THIS', category: 'general', definition: 'Choose this if structured training is still new, or you are returning after a long break. The coach starts with a simpler progression.' },
+  { id: 'SOME MILEAGE', term: 'SOME MILEAGE', category: 'general', definition: 'Choose this if you have trained consistently for about one to three years and the basic lifts feel familiar.' },
+  { id: 'EXPERIENCED', term: 'EXPERIENCED', category: 'general', definition: 'Choose this if you have at least three years of consistent, structured training.' },
+  { id: 'COMPETITIVE', term: 'COMPETITIVE', category: 'general', definition: 'Choose this if you compete, or your training is planned and monitored at a competitive level.' },
+  { id: 'FULL GYM', term: 'FULL GYM', category: 'general', definition: 'Selects the standard equipment found in a broad commercial gym setup. You can customize individual items afterward.' },
+  { id: 'HOME BASIC', term: 'HOME BASIC', category: 'general', definition: 'Selects a compact home setup with dumbbells, a kettlebell, bands, and mats. You can customize individual items afterward.' },
+  { id: 'MINIMAL', term: 'MINIMAL', category: 'general', definition: 'Selects no equipment. The coach can still use movements that need only your bodyweight.' },
+  { id: 'BARBELL', term: 'BARBELL', category: 'movement', definition: 'A straight bar loaded with weight plates.' },
+  { id: 'SQUAT RACK', term: 'SQUAT RACK', category: 'movement', definition: 'A stable rack that supports a barbell at adjustable heights.' },
+  { id: 'BENCH', term: 'BENCH', category: 'movement', definition: 'A flat or adjustable weight-training bench.' },
+  { id: 'DUMBBELLS', term: 'DUMBBELLS', category: 'movement', definition: 'A pair or range of handheld free weights.' },
+  { id: 'KETTLEBELL', term: 'KETTLEBELL', category: 'movement', definition: 'A handled free weight used for strength and conditioning.' },
+  { id: 'PULL-UP BAR', term: 'PULL-UP BAR', category: 'movement', definition: 'A fixed overhead bar for hanging and pulling movements.' },
+  { id: 'NORDIC BENCH', term: 'NORDIC BENCH', category: 'movement', definition: 'A bench that anchors the lower legs for Nordic curls.' },
+  { id: 'BANDS', term: 'BANDS', category: 'movement', definition: 'Elastic resistance bands in one or more strengths.' },
+  { id: 'CABLE MACHINE', term: 'CABLE MACHINE', category: 'movement', definition: 'An adjustable pulley machine with a weight stack.' },
+  { id: 'MATS', term: 'MATS', category: 'movement', definition: 'Floor padding for kneeling, lying, or grappling work.' },
+  { id: 'BOARDS', term: 'BOARDS', category: 'movement', definition: 'Stable training boards used for supported movement variations.' },
 
   // --- Metrics & Prescription ---
   {

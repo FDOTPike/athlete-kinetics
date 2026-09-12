@@ -1022,6 +1022,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                             </View>
                           </View>
 
+                          <Text style={styles.effortCue} testID="effort-scale-explanation">
+                            How hard did that feel? 1 is very easy. 10 is your hardest effort.
+                          </Text>
+
                           {/* Primary Unanchored RIR Question for rep-based work */}
                           {target?.kind !== 'time' && (
                             <View style={styles.rirContainer} testID="rir-question-container">
@@ -1065,7 +1069,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           {safeRpe !== null && (
                             <View style={styles.derivedRpeContainer} testID="derived-rpe-display">
                               <Text style={styles.derivedRpeLabel}>
-                                Reported actual RPE {safeRpe.toFixed(1)}
+                                Reported effort {safeRpe.toFixed(1)}
                               </Text>
                             </View>
                           )}
@@ -1075,11 +1079,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                             <Pressable
                               onPress={() => setDirectEntryOpen((prev) => !prev)}
                               accessibilityRole="button"
-                              accessibilityLabel={directEntryOpen ? 'Hide direct RPE entry' : 'Enter RPE directly'}
+                              accessibilityLabel={directEntryOpen ? 'Hide direct Effort entry' : 'Enter Effort directly'}
                               style={styles.directToggle}
                             >
                               <Text style={styles.directToggleText}>
-                                {directEntryOpen ? 'Hide direct RPE' : 'Enter RPE directly'}
+                                {directEntryOpen ? 'Hide direct Effort' : 'Enter Effort directly'}
                               </Text>
                             </Pressable>
 
@@ -1087,7 +1091,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               <View style={styles.directEntryBlock} testID="direct-rpe-block">
                                 <Stepper
                                   testID="current-rpe-stepper"
-                                  label="Actual RPE"
+                                  label="Effort"
                                   tip="RPE"
                                   value={directRpe !== null ? directRpe.toFixed(1) : '—'}
                                   onDecrement={() => {
@@ -1118,7 +1122,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                           setSelectedChoice(null);
                                         }
                                       }}
-                                      accessibilityLabel={`RPE ${val.toFixed(1)}`}
+                                      accessibilityLabel={`Effort ${val.toFixed(1)}`}
                                       style={styles.halfStepChip}
                                     />
                                   ))}
@@ -1129,8 +1133,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
                           <Text style={styles.effortCue} testID="rpe-cue">
                             {safeRpe !== null
-                              ? (effortCue(safeRpe) ?? 'RPE is optional evidence — leave it untouched to skip.')
-                              : 'RPE is optional evidence — leave it untouched to skip.'}
+                              ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
+                              : 'Effort is optional evidence — leave it untouched to skip.'}
                           </Text>
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>

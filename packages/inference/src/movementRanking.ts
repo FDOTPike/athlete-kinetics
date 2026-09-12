@@ -168,7 +168,7 @@ const OBJECTIVE_STYLE_LABELS: Record<Objective, string> = {
   gpp: 'General athlete',
   hybrid: 'Strength + grappling',
   rehab: 'Return to training',
-  weight_loss: 'Fat-loss support',
+  weight_loss: 'Weight-loss support',
 };
 
 export const objectiveStyleLabel = (objective: Objective): string =>

@@ -264,8 +264,8 @@ describe('049 specialist equipment is explicit opt-in only', () => {
     expect(screen.getByText('SPECIALIST')).toBeOnTheScreen();
     // The onboarding draft starts from DEFAULT_PROFILE: every STANDARD item is
     // pre-owned, and the specialist toggle is off — that asymmetry is the point.
-    expect(screen.getByLabelText('BARBELL: owned')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Specialist equipment BOARDS: not owned')).toBeOnTheScreen();
+    expect(screen.getByLabelText('BARBELL. A straight bar loaded with weight plates.').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByLabelText('BOARDS. Stable training boards used for supported movement variations.').props.accessibilityState.selected).toBe(false);
     expect(screen.getByText(/Specialist items stay off unless you turn them on/)).toBeOnTheScreen();
   });
 });

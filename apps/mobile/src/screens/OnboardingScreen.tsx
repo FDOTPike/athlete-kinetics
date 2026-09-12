@@ -47,6 +47,7 @@ import {
 } from '@ak/inference';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
+import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
@@ -62,7 +63,7 @@ const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
   gpp: { label: 'ALL-ROUND FITNESS', blurb: 'Strong, capable, ready for anything' },
   hybrid: { label: 'STRENGTH + GRAPPLING', blurb: 'Lift heavy and keep mat time first' },
   rehab: { label: 'RETURN TO TRAINING', blurb: 'Coming back carefully, no diagnosis' },
-  weight_loss: { label: 'FAT-LOSS SUPPORT', blurb: 'Stay active and keep your muscle' },
+  weight_loss: { label: 'WEIGHT-LOSS SUPPORT', blurb: 'Stay active and keep your muscle' },
 };
 
 const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
@@ -101,6 +102,26 @@ const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
   boards: 'BOARDS',
 };
 
+const EQUIPMENT_DESCRIPTION: Record<EquipmentItem, string> = {
+  barbell: 'A straight bar loaded with weight plates.',
+  squat_rack: 'A stable rack that supports a barbell at adjustable heights.',
+  bench: 'A flat or adjustable weight-training bench.',
+  dumbbells: 'A pair or range of handheld free weights.',
+  kettlebell: 'A handled free weight used for strength and conditioning.',
+  pullup_bar: 'A fixed overhead bar for hanging and pulling movements.',
+  nordic_bench: 'A bench that anchors the lower legs for Nordic curls.',
+  bands: 'Elastic resistance bands in one or more strengths.',
+  cable_machine: 'An adjustable pulley machine with a weight stack.',
+  mats: 'Floor padding for kneeling, lying, or grappling work.',
+  boards: 'Stable training boards used for supported movement variations.',
+};
+
+const PRESET_COPY = {
+  full_gym: { label: 'FULL GYM', blurb: 'A broad setup with racks, free weights, cables, bands, and mats.' },
+  home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, bands, and mats.' },
+  minimal: { label: 'MINIMAL', blurb: 'No equipment required; bodyweight movements remain available.' },
+} as const;
+
 /** Plain-language read of an RPE effort cap, shown live under the stepper. */
 const effortBlurb = (rpe: number): string => {
   if (rpe <= 7.0) return 'Comfortable — always plenty left in the tank.';
@@ -111,6 +132,73 @@ const effortBlurb = (rpe: number): string => {
 
 type StepKey =
   | 'welcome' | 'goal' | 'experience' | 'logistics' | 'equipment' | 'limits' | 'review';
+
+interface ChoiceRowProps {
+  readonly label: string;
+  readonly description: string;
+  readonly selected: boolean;
+  readonly onSelect: () => void;
+  readonly infoTerm: string;
+  readonly accessibilityLabel?: string;
+}
+
+function ChoiceRow({
+  label,
+  description,
+  selected,
+  onSelect,
+  infoTerm,
+  accessibilityLabel,
+}: ChoiceRowProps): React.JSX.Element {
+  return (
+    <View style={styles.choiceRow}>
+      <Pressable
+        onPress={onSelect}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? `${label}. ${description}`}
+        accessibilityState={{ selected }}
+        style={({ pressed }) => [
+          styles.choiceSelect,
+          selected && styles.choiceSelected,
+          pressed && !selected && styles.choicePressed,
+        ]}
+      >
+        <Text style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}>{label}</Text>
+        <Text style={[styles.choiceDescription, selected && styles.choiceDescriptionSelected]}>
+          {description}
+        </Text>
+      </Pressable>
+      <InfoTip term={infoTerm} />
+    </View>
+  );
+}
+
+interface ReviewSectionProps {
+  readonly heading: string;
+  readonly description: string;
+  readonly onEdit: () => void;
+  readonly children?: React.ReactNode;
+}
+
+function ReviewSection({ heading, description, onEdit, children }: ReviewSectionProps): React.JSX.Element {
+  return (
+    <View style={styles.reviewSection}>
+      <View style={styles.reviewHeadingRow}>
+        <Text style={styles.reviewHeading} accessibilityRole="header">{heading}</Text>
+        <Pressable
+          onPress={onEdit}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${heading.toLowerCase()}`}
+          style={styles.reviewEdit}
+        >
+          <Text style={styles.reviewEditText}>EDIT</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.reviewDescription}>{description}</Text>
+      {children}
+    </View>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -241,7 +329,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         ))}
       </View>
 
-      <KeyboardAwareScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <KeyboardAwareScrollView testID="onboarding-scroll-view" style={styles.body} contentContainerStyle={styles.bodyContent}>
         {step === 'welcome' && (
           <View>
             <Text style={styles.h1}>YOUR COACH.{'\n'}IN YOUR POCKET.{'\n'}OFFLINE.</Text>
@@ -292,15 +380,16 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'experience' && (
           <View style={styles.cardGroup}>
             <Text style={styles.h2}>HOW LONG HAVE YOU BEEN TRAINING?</Text>
-            <Text style={styles.pDim}>Be honest — the coach calibrates everything to this.</Text>
+            <Text style={styles.pDim}>Choose the option that feels closest. You can change it later.</Text>
             {TRAINING_AGES.map((a) => (
-              <Chip
+              <ChoiceRow
                 key={a}
-                label={`${AGE_COPY[a].label} — ${AGE_COPY[a].blurb}`}
+                label={AGE_COPY[a].label}
+                description={AGE_COPY[a].blurb}
                 selected={draft.training_age === a}
-                onPress={() => selectTrainingAge(a)}
+                onSelect={() => selectTrainingAge(a)}
+                infoTerm={AGE_COPY[a].label}
                 accessibilityLabel={`${AGE_COPY[a].label}. ${AGE_COPY[a].blurb}`}
-                style={styles.cardChip}
               />
             ))}
           </View>
@@ -324,8 +413,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               style={styles.stepperBlock}
             />
             <Text style={styles.pDim}>
-              A realistic ceiling beats an optimistic one. The coach treats these
-              as hard limits — extra work past them gets damped, not rewarded.
+              Choose a week that feels manageable. A realistic ceiling beats an optimistic one. You can change this later in Athlete Profile.
             </Text>
           </View>
         )}
@@ -333,14 +421,16 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'equipment' && (
           <View>
             <Text style={styles.h2}>WHAT CAN YOU GET YOUR HANDS ON?</Text>
-            <View style={styles.presetRow}>
+            <View style={styles.choiceGroup}>
               {(['full_gym', 'home_basic', 'minimal'] as const).map((p) => (
-                <Chip
+                <ChoiceRow
                   key={p}
-                  label={p.replace('_', ' ').toUpperCase()}
+                  label={PRESET_COPY[p].label}
+                  description={PRESET_COPY[p].blurb}
                   selected={presetSelected(p)}
-                  onPress={() => patch({ equipment_inventory: [...EQUIPMENT_PRESETS[p]] })}
-                  accessibilityLabel={`Preset: ${p.replace('_', ' ')}${presetSelected(p) ? ', selected' : ''}`}
+                  onSelect={() => patch({ equipment_inventory: [...EQUIPMENT_PRESETS[p]] })}
+                  infoTerm={PRESET_COPY[p].label}
+                  accessibilityLabel={`${PRESET_COPY[p].label}. ${PRESET_COPY[p].blurb}`}
                 />
               ))}
             </View>
@@ -354,16 +444,18 @@ export default function OnboardingScreen(): React.JSX.Element {
             />
             {showCustomEquipment && (
               <View>
-                <View style={styles.chipWrap}>
+                <View style={styles.choiceGroup}>
                   {STANDARD_EQUIPMENT_ITEMS.map((item) => {
                     const owned = draft.equipment_inventory.includes(item);
                     return (
-                      <Chip
+                      <ChoiceRow
                         key={item}
                         label={EQUIPMENT_LABEL[item]}
+                        description={EQUIPMENT_DESCRIPTION[item]}
                         selected={owned}
-                        onPress={() => toggleEquipment(item)}
-                        accessibilityLabel={`${EQUIPMENT_LABEL[item]}: ${owned ? 'owned' : 'not owned'}`}
+                        onSelect={() => toggleEquipment(item)}
+                        infoTerm={EQUIPMENT_LABEL[item]}
+                        accessibilityLabel={`${EQUIPMENT_LABEL[item]}. ${EQUIPMENT_DESCRIPTION[item]}`}
                       />
                     );
                   })}
@@ -372,16 +464,18 @@ export default function OnboardingScreen(): React.JSX.Element {
                     no default ever grants it, so movements needing it stay
                     teaching-only until it is deliberately selected here. */}
                 <Text style={styles.fieldLabel}>SPECIALIST</Text>
-                <View style={styles.chipWrap}>
+                <View style={styles.choiceGroup}>
                   {SPECIALIST_EQUIPMENT_ITEMS.map((item) => {
                     const owned = draft.equipment_inventory.includes(item);
                     return (
-                      <Chip
+                      <ChoiceRow
                         key={item}
                         label={EQUIPMENT_LABEL[item]}
+                        description={EQUIPMENT_DESCRIPTION[item]}
                         selected={owned}
-                        onPress={() => toggleEquipment(item)}
-                        accessibilityLabel={`Specialist equipment ${EQUIPMENT_LABEL[item]}: ${owned ? 'owned' : 'not owned'}`}
+                        onSelect={() => toggleEquipment(item)}
+                        infoTerm={EQUIPMENT_LABEL[item]}
+                        accessibilityLabel={`${EQUIPMENT_LABEL[item]}. ${EQUIPMENT_DESCRIPTION[item]}`}
                       />
                     );
                   })}
@@ -451,73 +545,87 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Text style={styles.h2}>
               {name.trim().length > 0 ? `READY, ${name.trim().toUpperCase()}.` : 'READY.'}
             </Text>
-            <View style={styles.summaryBox}>
-              <Text style={styles.summaryRow}>GOAL — {OBJECTIVE_COPY[draft.objective].label}</Text>
-              <Text style={styles.summaryRow}>EXPERIENCE — {AGE_COPY[draft.training_age].label}</Text>
-              <Text style={styles.summaryRow}>
-                WEEK — {draft.weekly_frequency} days, ≤{draft.session_duration_cap_min} min
-              </Text>
-              <Text style={styles.summaryRow}>
-                EQUIPMENT — {draft.equipment_inventory.length}/{EQUIPMENT_ITEMS.length} items
-              </Text>
-              <Text style={styles.summaryRow} testID="onboarding-summary-limits-row">
-                LIMITATIONS — {(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
-                  ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} noted`
-                  : 'none noted'}
-              </Text>
-              <Text style={styles.summaryRow} testID="onboarding-summary-loads-row">
-                {draft.training_age === 'beginner'
-                  ? 'LOADS — you choose the first; next time starts from what you logged'
-                  : loadPreference === 'auto'
-                    ? 'LOADS — coach suggests'
-                    : 'LOADS — you choose'}
-              </Text>
-            </View>
+            <View style={styles.reviewSections}>
+              <ReviewSection
+                heading="GOAL"
+                description={OBJECTIVE_COPY[draft.objective].label}
+                onEdit={() => setStepIdx(1)}
+              />
+              <ReviewSection
+                heading="EXPERIENCE"
+                description={`${AGE_COPY[draft.training_age].label}. ${AGE_COPY[draft.training_age].blurb}`}
+                onEdit={() => setStepIdx(2)}
+              />
+              <ReviewSection
+                heading="YOUR WEEK"
+                description={`${draft.weekly_frequency} training days per week, up to ${draft.session_duration_cap_min} minutes each.`}
+                onEdit={() => setStepIdx(3)}
+              />
+              <ReviewSection
+                heading="EQUIPMENT"
+                description={draft.equipment_inventory.length === 0
+                  ? 'No equipment selected.'
+                  : draft.equipment_inventory.map((item) => EQUIPMENT_LABEL[item]).join(', ')}
+                onEdit={() => setStepIdx(4)}
+              />
+              <ReviewSection
+                heading="TRAINING SUPPORT"
+                description={(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
+                  ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} limitation notes recorded for your reference.`
+                  : 'No limitations noted. You can add or change these later.'}
+                onEdit={() => setStepIdx(5)}
+              >
+                <Text style={styles.reviewSupportLine} testID="onboarding-summary-limits-row">
+                  LIMITATIONS — {(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
+                    ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} noted`
+                    : 'none noted'}
+                </Text>
+                <Text style={styles.reviewSupportLine} testID="onboarding-summary-loads-row">
+                  {draft.training_age === 'beginner'
+                    ? 'LOADS — you choose the first; next time starts from what you logged'
+                    : loadPreference === 'auto'
+                      ? 'LOADS — coach suggests'
+                      : 'LOADS — you choose'}
+                </Text>
+                <View testID="onboarding-coach-defaults">
+                  <Text style={styles.reviewSupportLine}>COACH DEFAULTS — EDIT ANYTIME IN ATHLETE PROFILE</Text>
+                  <Text style={styles.reviewDescription}>
+                    Effort ceiling {draft.base_rpe_cap.toFixed(1)} — {effortBlurb(draft.base_rpe_cap)}
+                    {'\n'}How hard did that feel? 1 is very easy. 10 is your hardest effort.
+                    {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
+                    {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
+                    {'\n'}Progression method: {PROGRESSION_METHOD_LABEL[draft.progression_methodology]}
+                  </Text>
+                </View>
 
-            {/* Coach defaults, disclosed honestly. Every value here is a safe
-                default the athlete can change later in the ATHLETE tab; the
-                fine-tuning area below is optional. Round 2 (ledger 0060)
-                adds the progression methodology so EVERY removed advanced
-                default is disclosed in one place. */}
-            <View testID="onboarding-coach-defaults">
-              <Text style={styles.fieldLabel}>
-                COACH DEFAULTS — EDIT ANYTIME IN ATHLETE / PROFILE
-              </Text>
-              <Text style={styles.pDim}>
-                Effort ceiling RPE {draft.base_rpe_cap.toFixed(1)} — {effortBlurb(draft.base_rpe_cap)}
-                {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
-                {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
-                {'\n'}Progression method: {PROGRESSION_METHOD_LABEL[draft.progression_methodology]}
-              </Text>
+                {draft.training_age !== 'beginner' && (
+                  <View style={styles.fineTune} testID="onboarding-loads-step">
+                    <Text style={styles.fieldLabel}>WHO PICKS THE WEIGHTS? (OPTIONAL)</Text>
+                    {(['auto', 'manual'] as const).map((p) => (
+                      <Chip
+                        key={p}
+                        testID={p === 'auto' ? 'onboarding-loads-auto' : 'onboarding-loads-manual'}
+                        label={`${LOAD_PREFERENCE_COPY[p].label} — ${LOAD_PREFERENCE_COPY[p].blurb}`}
+                        selected={loadPreference === p}
+                        onPress={() => chooseLoadPreference(p)}
+                        accessibilityLabel={p === 'auto'
+                          ? 'Coach suggests. Targets come from your numbers and history.'
+                          : 'I choose. You set every load, with coach suggestions as reference.'}
+                        style={styles.cardChip}
+                      />
+                    ))}
+                  </View>
+                )}
+                {draft.training_age === 'beginner' && (
+                  <Text style={styles.reviewDescription}>
+                    You choose the first weight. Next time starts from what you logged. Your effort ceiling starts at 8.5 and can change as your experience grows.
+                  </Text>
+                )}
+              </ReviewSection>
             </View>
-
-            {draft.training_age !== 'beginner' && (
-              <View style={styles.fineTune} testID="onboarding-loads-step">
-                <Text style={styles.fieldLabel}>WHO PICKS THE WEIGHTS? (OPTIONAL)</Text>
-                {(['auto', 'manual'] as const).map((p) => (
-                  <Chip
-                    key={p}
-                    testID={p === 'auto' ? 'onboarding-loads-auto' : 'onboarding-loads-manual'}
-                    label={`${LOAD_PREFERENCE_COPY[p].label} — ${LOAD_PREFERENCE_COPY[p].blurb}`}
-                    selected={loadPreference === p}
-                    onPress={() => chooseLoadPreference(p)}
-                    accessibilityLabel={p === 'auto'
-                      ? 'Coach suggests. Targets come from your numbers and history.'
-                      : 'I choose. You set every load, with coach suggestions as reference.'}
-                    style={styles.cardChip}
-                  />
-                ))}
-              </View>
-            )}
-            {draft.training_age === 'beginner' && (
-              <Text style={styles.pDim}>
-                While you&apos;re new, the coach picks the weights and caps effort at
-                8.5 — you&apos;ll grow into the rest.
-              </Text>
-            )}
 
             <Text style={styles.pDim}>
-              Change any of this later in the ATHLETE tab. Your first prescription
+              Change any of this later in Athlete Profile. Your first prescription
               is waiting on the READY tab.
             </Text>
             <PrimaryButton
@@ -589,20 +697,47 @@ const styles = StyleSheet.create({
   demoLink: { marginTop: theme.space[3] },
   cardGroup: { gap: theme.space[2] },
   cardChip: { marginBottom: theme.space[1] },
+  choiceGroup: { gap: theme.space[2] },
+  choiceRow: { flexDirection: 'row', alignItems: 'stretch', gap: theme.space[2] },
+  choiceSelect: {
+    flex: 1,
+    minHeight: theme.touch.min,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+    borderRadius: theme.radius.chip,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+  },
+  choiceSelected: { backgroundColor: theme.color.textHi, borderColor: theme.color.textHi },
+  choicePressed: { backgroundColor: theme.color.ink1 },
+  choiceLabel: { ...theme.font.label, color: theme.color.textHi, flexShrink: 1 },
+  choiceLabelSelected: { color: theme.color.ink0 },
+  choiceDescription: { ...theme.font.body, color: theme.color.textMid, marginTop: theme.space[1], flexShrink: 1 },
+  choiceDescriptionSelected: { color: theme.color.ink0 },
   stepperBlock: { marginBottom: theme.space[4] },
   notesInput: {
     backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.control,
     color: theme.color.textHi, ...theme.font.body, minHeight: 88, padding: theme.space[3], textAlignVertical: 'top',
   },
-  presetRow: { flexDirection: 'row', gap: theme.space[2], marginBottom: theme.space[3] },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   fineTune: { marginBottom: theme.space[3] },
   limitsGateNotice: { paddingHorizontal: theme.space[3], paddingBottom: theme.space[2] },
-  summaryBox: {
+  reviewSections: { gap: theme.space[3], marginBottom: theme.space[4] },
+  reviewSection: {
     backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.control,
-    padding: theme.space[4], marginBottom: theme.space[4], gap: theme.space[2],
+    padding: theme.space[4], gap: theme.space[2],
   },
-  summaryRow: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600' },
+  reviewHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space[2] },
+  reviewHeading: { ...theme.font.eyebrow, color: theme.color.textHi, flexShrink: 1 },
+  reviewDescription: { ...theme.font.body, color: theme.color.textMid },
+  reviewSupportLine: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600' },
+  reviewEdit: {
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewEditText: { ...theme.font.label, color: theme.color.textHi },
   startBtn: {
     marginTop: theme.space[2],
   },

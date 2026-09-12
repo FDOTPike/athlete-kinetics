@@ -413,7 +413,7 @@ export default function ProfileScreen(): React.JSX.Element {
         onInc={() => saveProfile({ session_duration_cap_min: profile.session_duration_cap_min + 15 })}
       />
       <NumberRow
-        label="6 · BASE EFFORT CEILING (RPE)"
+        label="6 · EFFORT CEILING"
         tip="RPE"
         display={profile.base_rpe_cap.toFixed(1)}
         onDec={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap - 0.5 })}
