@@ -374,6 +374,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
       </View>
       <View style={styles.searchBox}>
         <TextInput
+          disableFullscreenUI
           value={search}
           onChangeText={setSearch}
           placeholder={`Search ${movements.length} movements...`}

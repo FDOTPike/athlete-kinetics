@@ -981,6 +981,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                 <Text style={styles.loadAdjustText}>−</Text>
                               </Pressable>
                               <TextInput
+                                disableFullscreenUI
                                 testID="session-load-input"
                                 style={styles.loadInput}
                                 value={loadText}

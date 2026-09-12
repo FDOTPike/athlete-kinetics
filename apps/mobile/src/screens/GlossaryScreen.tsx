@@ -83,6 +83,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <TextInput
+          disableFullscreenUI
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}

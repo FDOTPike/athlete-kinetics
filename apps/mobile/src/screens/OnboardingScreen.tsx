@@ -344,6 +344,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             </Text>
             <Text style={styles.fieldLabel}>WHAT SHOULD I CALL YOU?</Text>
             <TextInput
+              disableFullscreenUI
               style={styles.nameInput}
               value={name}
               onChangeText={setName}
@@ -522,6 +523,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 <Text style={styles.fieldLabel}>PAST INJURIES</Text>
                 <Text style={styles.pDim}>One per line, like &quot;knee: old ACL, careful with deep squats&quot;.</Text>
                 <TextInput
+                  disableFullscreenUI
                   style={styles.notesInput}
                   value={injuryText}
                   onChangeText={setInjuryText}
@@ -532,6 +534,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 />
                 <Text style={styles.fieldLabel}>MOBILITY LIMITS</Text>
                 <TextInput
+                  disableFullscreenUI
                   style={styles.notesInput}
                   value={mobilityText}
                   onChangeText={setMobilityText}

@@ -149,6 +149,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           <Text style={styles.numBtnText}>−</Text>
         </Pressable>
         <TextInput
+          disableFullscreenUI
           style={styles.oneRmInput}
           value={text}
           onChangeText={setText}
@@ -431,6 +432,7 @@ export default function ProfileScreen(): React.JSX.Element {
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>8 · HISTORICAL INJURIES (one per line, &quot;region: note&quot;)</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.notesInput}
           value={injuryText}
           onChangeText={(t) => {
@@ -449,6 +451,7 @@ export default function ProfileScreen(): React.JSX.Element {
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>9 · MOBILITY LIMITS (one per line)</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.notesInput}
           value={mobilityText}
           onChangeText={(t) => {
@@ -685,6 +688,7 @@ export default function ProfileScreen(): React.JSX.Element {
           <View key={band.level} style={styles.bandRow}>
             <Text style={styles.bandLevel}>LEVEL {band.level}</Text>
             <TextInput
+              disableFullscreenUI
               defaultValue={band.label}
               onEndEditing={(event) => saveBandLevel(band.level, event.nativeEvent.text)}
               maxLength={48}
@@ -801,6 +805,7 @@ export default function ProfileScreen(): React.JSX.Element {
         <Text style={styles.fieldLabel}>BODYWEIGHT TODAY (KG)</Text>
         <View style={styles.numberRow}>
           <TextInput
+            disableFullscreenUI
             style={styles.oneRmInput}
             value={bodyweightText}
             onChangeText={setBodyweightText}
@@ -836,6 +841,7 @@ export default function ProfileScreen(): React.JSX.Element {
             {HISTORY_IMPORT_EXAMPLE}
           </Text>
           <TextInput
+            disableFullscreenUI
             style={styles.importInput}
             value={historyText}
             onChangeText={(value) => { setHistoryText(value); setHistoryPreview(null); setHistoryNotice(null); }}
@@ -1053,6 +1059,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 return (
                   <View key={a.id} style={styles.athleteRow}>
                     <TextInput
+                      disableFullscreenUI
                       style={styles.athleteEditInput}
                       value={editAthleteName}
                       onChangeText={setEditAthleteName}
@@ -1131,6 +1138,7 @@ export default function ProfileScreen(): React.JSX.Element {
             })}
             <View style={styles.athleteRow}>
               <TextInput
+                disableFullscreenUI
                 style={styles.athleteEditInput}
                 value={newAthleteName}
                 onChangeText={setNewAthleteName}

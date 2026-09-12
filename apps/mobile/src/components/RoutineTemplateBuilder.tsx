@@ -729,6 +729,7 @@ export function RoutineTemplateBuilder({
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Template Name</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.textInput}
           value={name}
           onChangeText={setName}
@@ -895,6 +896,7 @@ export function RoutineTemplateBuilder({
                       <View style={styles.doseField}>
                         <Text style={styles.captionText}>Sets</Text>
                         <TextInput
+                          disableFullscreenUI
                           style={styles.doseInput}
                           value={String(slot.sets ?? defaults?.sets ?? '')}
                           onChangeText={(value) => updateDose(index, 'sets', value)}
@@ -905,6 +907,7 @@ export function RoutineTemplateBuilder({
                       <View style={styles.doseField}>
                         <Text style={styles.captionText}>Reps</Text>
                         <TextInput
+                          disableFullscreenUI
                           style={styles.doseInput}
                           value={String(slot.reps ?? defaults?.reps ?? '')}
                           onChangeText={(value) => updateDose(index, 'reps', value)}
@@ -934,6 +937,7 @@ export function RoutineTemplateBuilder({
                           <InfoTip term={majorProjection === undefined ? 'RPE' : 'RPE MAX'} />
                         </View>
                         <TextInput
+                          disableFullscreenUI
                           style={styles.doseInput}
                           value={String(peakRpe ?? '')}
                           onChangeText={(value) => updateDose(index, 'targetRpe', value)}
@@ -1060,6 +1064,7 @@ export function RoutineTemplateBuilder({
               <SecondaryButton label="Close" onPress={closePicker} accessibilityLabel="Close movement picker" />
             </View>
             <TextInput
+              disableFullscreenUI
               testID="movement-picker-search"
               value={pickerSearch}
               onChangeText={setPickerSearch}

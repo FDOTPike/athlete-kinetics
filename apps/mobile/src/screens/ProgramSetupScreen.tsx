@@ -486,7 +486,7 @@ export default function ProgramSetupScreen({
           </View>
         )}
         {horizonKind === 'date' && (
-          <TextInput value={reviewDate} onChangeText={setReviewDate} placeholder="YYYY-MM-DD"
+          <TextInput disableFullscreenUI value={reviewDate} onChangeText={setReviewDate} placeholder="YYYY-MM-DD"
             placeholderTextColor={theme.color.textLow} style={styles.input} autoCapitalize="none" />
         )}
         {previewResult.preview !== null && (

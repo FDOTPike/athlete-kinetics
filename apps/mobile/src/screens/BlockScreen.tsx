@@ -1199,6 +1199,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               </Text>
             )}
             <TextInput
+              disableFullscreenUI
               style={styles.reportInput}
               value={reportText}
               onChangeText={setReportText}
