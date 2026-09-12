@@ -9221,3 +9221,40 @@ PASSED, 26 suites / 434 tests.
 The QA APK is rebuilt after this commit and `verify:qa-candidate` re-run; the
 hash is recorded outside the repository. The CodeRabbit thread is replied to and
 resolved after the push. Nothing released or pushed to `master`.
+
+
+---
+
+## Entry 0117 — 2026-09-12 · Accessible Coach consolidated execution dispatch
+
+### Input G(x)
+
+Owner supplied `docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md` and directed
+(verbatim):
+
+`````text
+Orchestrator: use this document as the consolidated work order for both of Francis's feedback messages. Create bounded implementation tasks with the suggested models and effort levels, refine file ownership and dependencies after inspecting current code, and execute the required work toward a tested build today. Preserve offline deterministic architecture. Start with keyboard accessibility, then onboarding clarity; pursue backup and evidence research independently. Integrate existing activities with weekly planning and clinician constraints through one shared data contract. Bring concrete new policy/schema decisions to the existing review checkpoint. Finish with an honest tested/untested/deferred report. Only spend remaining capacity on offline movement animations once required work is complete.
+`````
+
+### Output F(G(x)) — dispatch state
+
+- Selected `e8cedca5defb688e1728e7bb917970921481e3f1`, the latest merged
+  `origin/codex/rpe-familiarisation` lineage, rather than stale local `master`.
+- Recovered detached follow-up `ffae074fafa7981db43287a5e8c51348fdaedaca`
+  by cherry-picking it as `87624d9e43189ddd87db317e24d4379ef5a13fae`.
+- Established integration branch `codex/accessible-coach-2026-09-12` and
+  preserved the exact consolidated work order in-repository.
+- Reproduced the pre-dispatch baseline: `typecheck` passed; `verify:ci` passed
+  with 21 gates and 26 suites / 434 tests.
+- Dispatched bounded, isolated WO-01 keyboard, WO-03 backup-foundation, and
+  WO-04 evidence/policy tasks with the document's model/effort intent. WO-02 is
+  held behind WO-01 because their screen ownership overlaps.
+- Reserved Migration 064 exclusively for the later shared activity/clinician
+  contract. No parallel executor may edit schema or migrations.
+- Added the refined ownership/dependency plan and a proposed, explicitly
+  unratified shared-contract decision docket. Product schema/recommendation
+  behavior remains gated on the existing owner/clinical review checkpoint.
+- WO-09 offline animations remain deferred until every required task is closed.
+
+This entry remains open for tested-build results and the final honest status
+split. Nothing pushed, merged, tagged, signed, released, or submitted to C6.
