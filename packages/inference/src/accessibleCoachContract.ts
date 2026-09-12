@@ -33,6 +33,25 @@ export type ActivityProvenance = 'user_reported' | 'imported' | 'coached_session
 export type TimingCommitment = 'fixed' | 'flexible';
 export type ActivityOccurrenceState = 'planned' | 'completed' | 'cancelled' | 'missed';
 export type ActivityCompletionState = 'partial' | 'completed';
+export const ACTIVITY_MODALITY_IDS = [
+  'outdoor_bicycle',
+  'stationary_upright',
+  'stationary_recumbent',
+  'handcycle',
+  'other',
+  'unknown',
+] as const;
+export type ActivityModalityId = (typeof ACTIVITY_MODALITY_IDS)[number];
+export const ACTIVITY_PURPOSE_IDS = [
+  'practice',
+  'match',
+  'recreation',
+  'conditioning',
+  'transport',
+  'other',
+  'unknown',
+] as const;
+export type ActivityPurposeId = (typeof ACTIVITY_PURPOSE_IDS)[number];
 export type TimeResolutionState =
   | 'unresolved'
   | 'unambiguous'
@@ -119,6 +138,8 @@ export interface ActivityOccurrence {
   readonly resolverVersion: string | null;
   readonly state: ActivityOccurrenceState;
   readonly timing: TimingCommitment;
+  readonly modalityId: ActivityModalityId;
+  readonly purposeId: ActivityPurposeId;
   readonly expectedDurationMin: number | null;
   readonly expectedEffort: number | null;
   readonly effortScaleId: EffortScaleId | null;

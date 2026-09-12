@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS activity_definition (
                     ('walking','running','swimming','cycling','strength_training',
                      'basketball','soccer','netball','rugby','cricket','field_hockey',
                      'volleyball','wheelchair_mobility','wheelchair_sport','custom')),
-  display_name     TEXT NOT NULL CHECK (length(trim(display_name)) BETWEEN 1 AND 160),
+  display_name     TEXT NOT NULL CHECK (length(trim(display_name)) >= 1 AND length(display_name) <= 160),
   demand_class     TEXT NOT NULL CHECK (demand_class IN ('low','moderate','high','unknown')),
   demand_source    TEXT NOT NULL CHECK (demand_source IN ('user_reported','curated','unknown')),
   provenance       TEXT NOT NULL CHECK (provenance = 'user_reported'),
@@ -56,12 +56,14 @@ CREATE TABLE IF NOT EXISTS activity_series (
   recurrence_kind         TEXT NOT NULL CHECK (recurrence_kind = 'weekly'),
   local_weekday           INTEGER NOT NULL CHECK (local_weekday BETWEEN 0 AND 6),
   local_start_minute      INTEGER CHECK (local_start_minute IS NULL OR local_start_minute BETWEEN 0 AND 1439),
-  timezone_id             TEXT NOT NULL CHECK (length(trim(timezone_id)) BETWEEN 1 AND 128),
+  timezone_id             TEXT NOT NULL CHECK (length(trim(timezone_id)) >= 1 AND length(timezone_id) <= 128),
   time_resolution_state   TEXT NOT NULL CHECK (time_resolution_state IN
                             ('unresolved','unambiguous','earlier_offset','later_offset','shift_forward_confirmed')),
-  effective_start_date    TEXT NOT NULL CHECK (date(effective_start_date) = effective_start_date),
+  effective_start_date    TEXT NOT NULL CHECK (date(effective_start_date) IS NOT NULL
+                                                AND date(effective_start_date) = effective_start_date),
   effective_end_date      TEXT CHECK (effective_end_date IS NULL OR
-                            (date(effective_end_date) = effective_end_date
+                            (date(effective_end_date) IS NOT NULL
+                             AND date(effective_end_date) = effective_end_date
                              AND effective_end_date >= effective_start_date)),
   timing_commitment       TEXT NOT NULL CHECK (timing_commitment IN ('fixed','flexible')),
   expected_duration_min   INTEGER CHECK (expected_duration_min IS NULL OR expected_duration_min > 0),
@@ -82,19 +84,26 @@ CREATE TABLE IF NOT EXISTS activity_occurrence (
   series_id               TEXT,
   original_recurrence_key TEXT,
   origin_kind             TEXT NOT NULL CHECK (origin_kind IN ('manual','imported','coached_session')),
-  origin_identity         TEXT NOT NULL CHECK (length(trim(origin_identity)) BETWEEN 1 AND 240),
+  origin_identity         TEXT NOT NULL CHECK (length(trim(origin_identity)) >= 1
+                                                 AND length(origin_identity) <= 240),
   origin_session_id       INTEGER UNIQUE REFERENCES session(session_id) ON DELETE RESTRICT,
   revision                INTEGER NOT NULL CHECK (revision >= 1),
-  local_date              TEXT NOT NULL CHECK (date(local_date) = local_date),
+  local_date              TEXT NOT NULL CHECK (date(local_date) IS NOT NULL AND date(local_date) = local_date),
   local_start_minute      INTEGER CHECK (local_start_minute IS NULL OR local_start_minute BETWEEN 0 AND 1439),
-  timezone_id             TEXT NOT NULL CHECK (length(trim(timezone_id)) BETWEEN 1 AND 128),
+  timezone_id             TEXT NOT NULL CHECK (length(trim(timezone_id)) >= 1 AND length(timezone_id) <= 128),
   time_resolution_state   TEXT NOT NULL CHECK (time_resolution_state IN
                             ('unresolved','unambiguous','earlier_offset','later_offset','shift_forward_confirmed')),
   resolved_start_at_ms    INTEGER CHECK (resolved_start_at_ms IS NULL OR resolved_start_at_ms >= 0),
   resolved_end_at_ms      INTEGER CHECK (resolved_end_at_ms IS NULL OR resolved_end_at_ms >= 0),
-  resolver_version        TEXT CHECK (resolver_version IS NULL OR length(trim(resolver_version)) BETWEEN 1 AND 80),
+  resolver_version        TEXT CHECK (resolver_version IS NULL OR
+                              (length(trim(resolver_version)) >= 1 AND length(resolver_version) <= 80)),
   occurrence_state        TEXT NOT NULL CHECK (occurrence_state IN ('planned','completed','cancelled','missed')),
   timing_commitment       TEXT NOT NULL CHECK (timing_commitment IN ('fixed','flexible')),
+  modality_id             TEXT NOT NULL DEFAULT 'unknown' CHECK (modality_id IN
+                            ('outdoor_bicycle','stationary_upright','stationary_recumbent',
+                             'handcycle','other','unknown')),
+  purpose_id              TEXT NOT NULL DEFAULT 'unknown' CHECK (purpose_id IN
+                            ('practice','match','recreation','conditioning','transport','other','unknown')),
   expected_duration_min   INTEGER CHECK (expected_duration_min IS NULL OR expected_duration_min > 0),
   expected_effort         REAL CHECK (expected_effort IS NULL OR expected_effort BETWEEN 1.0 AND 10.0),
   effort_scale_id         TEXT CHECK (effort_scale_id IS NULL OR effort_scale_id = 'whole_session_effort_1_10'),
@@ -103,7 +112,9 @@ CREATE TABLE IF NOT EXISTS activity_occurrence (
   updated_at_ms           INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms),
   FOREIGN KEY (series_id, activity_id) REFERENCES activity_series(series_id, activity_id) ON DELETE RESTRICT,
   CHECK ((series_id IS NULL AND original_recurrence_key IS NULL)
-      OR (series_id IS NOT NULL AND length(trim(original_recurrence_key)) BETWEEN 1 AND 160)),
+      OR (series_id IS NOT NULL AND original_recurrence_key IS NOT NULL
+          AND length(trim(original_recurrence_key)) >= 1
+          AND length(original_recurrence_key) <= 160)),
   CHECK ((origin_kind = 'coached_session' AND origin_session_id IS NOT NULL)
       OR (origin_kind <> 'coached_session' AND origin_session_id IS NULL)),
   CHECK ((resolved_start_at_ms IS NULL AND resolved_end_at_ms IS NULL AND resolver_version IS NULL)
@@ -147,7 +158,8 @@ CREATE TABLE IF NOT EXISTS activity_source_link (
   source_link_id    TEXT PRIMARY KEY CHECK (length(source_link_id) BETWEEN 1 AND 160),
   occurrence_id    TEXT NOT NULL REFERENCES activity_occurrence(occurrence_id) ON DELETE RESTRICT,
   source_kind      TEXT NOT NULL CHECK (source_kind IN ('manual','imported','coached_session')),
-  source_identity  TEXT NOT NULL CHECK (length(trim(source_identity)) BETWEEN 1 AND 240),
+  source_identity  TEXT NOT NULL CHECK (length(trim(source_identity)) >= 1
+                                          AND length(source_identity) <= 240),
   linked_session_id INTEGER UNIQUE REFERENCES session(session_id) ON DELETE RESTRICT,
   recorded_at_ms   INTEGER NOT NULL CHECK (recorded_at_ms >= 0),
   CHECK ((source_kind = 'coached_session' AND linked_session_id IS NOT NULL)
@@ -157,11 +169,14 @@ CREATE TABLE IF NOT EXISTS activity_source_link (
 
 CREATE TABLE IF NOT EXISTS activity_typical_week_report (
   report_id          TEXT PRIMARY KEY CHECK (length(report_id) BETWEEN 1 AND 160),
-  reported_local_date TEXT NOT NULL CHECK (date(reported_local_date) = reported_local_date),
-  coverage_start_date TEXT NOT NULL CHECK (date(coverage_start_date) = coverage_start_date),
-  coverage_end_date   TEXT NOT NULL CHECK (date(coverage_end_date) = coverage_end_date
+  reported_local_date TEXT NOT NULL CHECK (date(reported_local_date) IS NOT NULL
+                                            AND date(reported_local_date) = reported_local_date),
+  coverage_start_date TEXT NOT NULL CHECK (date(coverage_start_date) IS NOT NULL
+                                            AND date(coverage_start_date) = coverage_start_date),
+  coverage_end_date   TEXT NOT NULL CHECK (date(coverage_end_date) IS NOT NULL
+                                           AND date(coverage_end_date) = coverage_end_date
                                            AND coverage_end_date >= coverage_start_date),
-  timezone_id         TEXT NOT NULL CHECK (length(trim(timezone_id)) BETWEEN 1 AND 128),
+  timezone_id         TEXT NOT NULL CHECK (length(trim(timezone_id)) >= 1 AND length(timezone_id) <= 128),
   recorded_at_ms      INTEGER NOT NULL CHECK (recorded_at_ms >= 0)
 ) STRICT;
 
@@ -208,7 +223,7 @@ CREATE TABLE IF NOT EXISTS health_support_note (
   note_id        TEXT PRIMARY KEY CHECK (length(note_id) BETWEEN 1 AND 160),
   revision       INTEGER NOT NULL CHECK (revision >= 1),
   note_kind      TEXT NOT NULL CHECK (note_kind IN ('general','functional_context','symptom_trigger','rest_context')),
-  body_text      TEXT NOT NULL CHECK (length(trim(body_text)) BETWEEN 1 AND 4000),
+  body_text      TEXT NOT NULL CHECK (length(trim(body_text)) >= 1 AND length(body_text) <= 4000),
   provenance     TEXT NOT NULL CHECK (provenance = 'user_reported'),
   recorded_at_ms INTEGER NOT NULL CHECK (recorded_at_ms >= 0),
   updated_at_ms  INTEGER NOT NULL CHECK (updated_at_ms >= recorded_at_ms)
@@ -227,17 +242,23 @@ CREATE TABLE IF NOT EXISTS clinician_instruction (
 CREATE TABLE IF NOT EXISTS clinician_instruction_revision (
   instruction_id      TEXT NOT NULL REFERENCES clinician_instruction(instruction_id) ON DELETE CASCADE,
   revision            INTEGER NOT NULL CHECK (revision >= 1),
-  instruction_text    TEXT NOT NULL CHECK (length(trim(instruction_text)) BETWEEN 1 AND 16000),
+  instruction_text    TEXT NOT NULL CHECK (length(trim(instruction_text)) >= 1
+                                             AND length(instruction_text) <= 16000),
   issuer_text         TEXT CHECK (issuer_text IS NULL OR length(issuer_text) <= 160),
   source_class        TEXT NOT NULL CHECK (source_class = 'clinician_guidance_as_reported'),
   provenance          TEXT NOT NULL CHECK (provenance = 'user_reported'),
   verification_state  TEXT NOT NULL CHECK (verification_state = 'not_verified'),
   recorded_at_ms      INTEGER NOT NULL CHECK (recorded_at_ms >= 0),
-  instruction_date    TEXT CHECK (instruction_date IS NULL OR date(instruction_date) = instruction_date),
-  effective_date      TEXT CHECK (effective_date IS NULL OR date(effective_date) = effective_date),
-  review_date         TEXT CHECK (review_date IS NULL OR date(review_date) = review_date),
-  expiry_date         TEXT CHECK (expiry_date IS NULL OR date(expiry_date) = expiry_date),
-  date_zone_id        TEXT CHECK (date_zone_id IS NULL OR length(trim(date_zone_id)) BETWEEN 1 AND 128),
+  instruction_date    TEXT CHECK (instruction_date IS NULL OR
+                           (date(instruction_date) IS NOT NULL AND date(instruction_date) = instruction_date)),
+  effective_date      TEXT CHECK (effective_date IS NULL OR
+                           (date(effective_date) IS NOT NULL AND date(effective_date) = effective_date)),
+  review_date         TEXT CHECK (review_date IS NULL OR
+                           (date(review_date) IS NOT NULL AND date(review_date) = review_date)),
+  expiry_date         TEXT CHECK (expiry_date IS NULL OR
+                           (date(expiry_date) IS NOT NULL AND date(expiry_date) = expiry_date)),
+  date_zone_id        TEXT CHECK (date_zone_id IS NULL OR
+                           (length(trim(date_zone_id)) >= 1 AND length(date_zone_id) <= 128)),
   date_status         TEXT NOT NULL CHECK (date_status IN ('unknown','as_reported')),
   transcription_state TEXT NOT NULL CHECK (transcription_state IN ('draft','user_confirmed')),
   confirmed_at_ms     INTEGER CHECK (confirmed_at_ms IS NULL OR confirmed_at_ms >= recorded_at_ms),
@@ -276,10 +297,12 @@ CREATE TABLE IF NOT EXISTS recommendation_support_record (
   decision_id            TEXT PRIMARY KEY CHECK (length(decision_id) BETWEEN 1 AND 160),
   advice_target_kind     TEXT NOT NULL CHECK (advice_target_kind IN
                           ('program','block','session','slot','movement_substitution')),
-  advice_target_identity TEXT NOT NULL CHECK (length(trim(advice_target_identity)) BETWEEN 1 AND 160),
+  advice_target_identity TEXT NOT NULL CHECK (length(trim(advice_target_identity)) >= 1
+                                                AND length(advice_target_identity) <= 160),
   support_status         TEXT NOT NULL CHECK (support_status IN
                           ('available','held','setup_required','support_unavailable')),
-  engine_version         TEXT NOT NULL CHECK (length(trim(engine_version)) BETWEEN 1 AND 80),
+  engine_version         TEXT NOT NULL CHECK (length(trim(engine_version)) >= 1
+                                                AND length(engine_version) <= 80),
   generated_at_ms        INTEGER NOT NULL CHECK (generated_at_ms >= 0),
   UNIQUE (advice_target_kind, advice_target_identity, generated_at_ms)
 ) STRICT;
@@ -369,6 +392,21 @@ BEGIN
   SELECT RAISE(ABORT, 'activity_occurrence: origin identity is immutable');
 END;
 
+-- Source identity is global across origins and explicit reconciliation links.
+-- Close both insertion orders: the source-link trigger below handles
+-- origin-first, while this trigger handles link-first.
+CREATE TRIGGER IF NOT EXISTS trg_activity_occurrence_source_consistency_bi
+BEFORE INSERT ON activity_occurrence
+WHEN EXISTS (
+  SELECT 1 FROM activity_source_link l
+  WHERE l.source_kind = NEW.origin_kind
+    AND l.source_identity = NEW.origin_identity
+    AND l.occurrence_id <> NEW.occurrence_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'activity_occurrence: source identity belongs to another occurrence');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_activity_source_link_origin_consistency_bi
 BEFORE INSERT ON activity_source_link
 WHEN EXISTS (
@@ -447,6 +485,23 @@ WHEN NOT (NEW.hold_id IS OLD.hold_id
            AND instruction_revision = NEW.instruction_revision) >= 256))
 BEGIN
   SELECT RAISE(ABORT, 'health_support_scope: owner scope limit reached');
+END;
+
+-- Held review state may be withdrawn only as an explicit versioned action and
+-- cannot disappear by absence. Withdrawn rows may be deleted later because
+-- they no longer gate personalized advice.
+CREATE TRIGGER IF NOT EXISTS trg_health_support_hold_no_delete_held_bd
+BEFORE DELETE ON health_support_hold
+WHEN OLD.state = 'held'
+BEGIN
+  SELECT RAISE(ABORT, 'health_support_hold: held state cannot be deleted');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_health_support_hold_versioned_withdrawal_bu
+BEFORE UPDATE OF state ON health_support_hold
+WHEN OLD.state = 'held' AND NEW.state = 'withdrawn' AND NEW.revision <= OLD.revision
+BEGIN
+  SELECT RAISE(ABORT, 'health_support_hold: withdrawal requires a revision increment');
 END;
 
 -- Privacy-preserving deletion: remove the transcription and its direct scopes,

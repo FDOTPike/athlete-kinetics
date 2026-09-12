@@ -238,6 +238,7 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'trigger', name: 'trg_activity_completion_completed_bu' },          // 064
   { type: 'trigger', name: 'trg_activity_occurrence_completion_consistency_bu' }, // 064
   { type: 'trigger', name: 'trg_activity_occurrence_origin_immutable_bu' },     // 064
+  { type: 'trigger', name: 'trg_activity_occurrence_source_consistency_bi' },  // 064
   { type: 'trigger', name: 'trg_activity_source_link_origin_consistency_bi' }, // 064
   { type: 'trigger', name: 'trg_activity_source_link_identity_immutable_bu' }, // 064
   { type: 'trigger', name: 'trg_health_support_note_limit_bi' },              // 064
@@ -246,6 +247,8 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'trigger', name: 'trg_clinician_instruction_revision_limit_bu' },   // 064
   { type: 'trigger', name: 'trg_health_support_scope_limit_bi' },             // 064
   { type: 'trigger', name: 'trg_health_support_scope_limit_bu' },             // 064
+  { type: 'trigger', name: 'trg_health_support_hold_no_delete_held_bd' },     // 064
+  { type: 'trigger', name: 'trg_health_support_hold_versioned_withdrawal_bu' }, // 064
   { type: 'trigger', name: 'trg_clinician_instruction_delete_bd' },           // 064
 ];
 
@@ -306,6 +309,7 @@ const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
   // This trigger lives on activity_occurrence and names the later-in-064
   // activity_completion table, so it has the same replay constraint.
   'trg_activity_occurrence_completion_consistency_bu', // 064 -> activity_completion
+  'trg_activity_occurrence_source_consistency_bi', // 064 -> activity_source_link
   'trg_activity_source_link_origin_consistency_bi', // 064 -> activity_occurrence
   // Deleting a clinician envelope names the later-in-064 scope/hold tables.
   'trg_clinician_instruction_delete_bd',      // 064 -> health_support_scope/hold

@@ -6,7 +6,11 @@ const {
   indexExplicitActivitySources,
   summarizeCompletedActivities,
 } = require('./.build/activityOccurrences.js');
-const { ACTIVITY_KIND_IDS } = require('./.build/accessibleCoachContract.js');
+const {
+  ACTIVITY_KIND_IDS,
+  ACTIVITY_MODALITY_IDS,
+  ACTIVITY_PURPOSE_IDS,
+} = require('./.build/accessibleCoachContract.js');
 
 const occurrence = (occurrenceId, state = 'planned') => ({
   occurrenceId,
@@ -26,6 +30,8 @@ const occurrence = (occurrenceId, state = 'planned') => ({
   resolverVersion: null,
   state,
   timing: 'flexible',
+  modalityId: 'unknown',
+  purposeId: 'unknown',
   expectedDurationMin: null,
   expectedEffort: null,
 });
@@ -48,6 +54,13 @@ assert.deepEqual(ACTIVITY_KIND_IDS, [
   'walking', 'running', 'swimming', 'cycling', 'strength_training',
   'basketball', 'soccer', 'netball', 'rugby', 'cricket', 'field_hockey',
   'volleyball', 'wheelchair_mobility', 'wheelchair_sport', 'custom',
+]);
+assert.deepEqual(ACTIVITY_MODALITY_IDS, [
+  'outdoor_bicycle', 'stationary_upright', 'stationary_recumbent',
+  'handcycle', 'other', 'unknown',
+]);
+assert.deepEqual(ACTIVITY_PURPOSE_IDS, [
+  'practice', 'match', 'recreation', 'conditioning', 'transport', 'other', 'unknown',
 ]);
 
 const summary = summarizeCompletedActivities({
@@ -111,4 +124,4 @@ assert.throws(
   'the same source can never be fuzzily or accidentally assigned to two occurrences',
 );
 
-console.log('verify_activity_occurrences PASS — 15-kind log-only taxonomy, nullable effort, explicit identity, one-count accounting');
+console.log('verify_activity_occurrences PASS — ratified log-only taxonomy, nullable effort, explicit identity, one-count accounting');
