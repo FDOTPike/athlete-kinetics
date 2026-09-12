@@ -491,10 +491,10 @@ export default function OnboardingScreen(): React.JSX.Element {
 
         {step === 'limits' && (
           <View>
-            <Text style={styles.h2}>ANYTHING I SHOULD TRAIN AROUND?</Text>
+            <Text style={styles.h2}>ANY TRAINING NOTES TO RECORD?</Text>
             <Text style={styles.pDim}>
-              Old injuries or mobility limits the coach should respect. This never
-              replaces medical advice.
+              Optional notes for your records. These notes do not change the coach&apos;s
+              recommendations or replace medical advice.
             </Text>
             <View style={styles.cardGroup}>
               <Chip
@@ -661,8 +661,8 @@ export default function OnboardingScreen(): React.JSX.Element {
       {limitsGateOpen && (
         <View style={styles.limitsGateNotice}>
           <Text style={styles.pDim} accessibilityLiveRegion="polite">
-            Choose YES or NO to continue — the coach plans around limitations
-            only when you tell them.
+            Choose YES or NO to continue. This records your answer; it does not
+            change recommendations.
           </Text>
         </View>
       )}

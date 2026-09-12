@@ -316,12 +316,23 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     ['experience', 'HOW LONG HAVE YOU BEEN TRAINING?'],
     ['your week', 'YOUR WEEK'],
     ['equipment', 'WHAT CAN YOU GET YOUR HANDS ON?'],
-    ['training support', 'ANYTHING I SHOULD TRAIN AROUND?'],
+    ['training support', 'ANY TRAINING NOTES TO RECORD?'],
   ])('WO-02 Edit %s returns to its source field', (section, expectedHeading) => {
     render(<OnboardingScreen />);
     advanceAnsweringLimits(6, 0);
     fireEvent.press(screen.getByLabelText(`Edit ${section}`));
     expect(screen.getByText(expectedHeading)).toBeOnTheScreen();
+  });
+
+  test('training notes are described as non-executable records, not coaching adaptations', () => {
+    render(<OnboardingScreen />);
+    advance(5);
+
+    expect(screen.getByText('ANY TRAINING NOTES TO RECORD?')).toBeOnTheScreen();
+    expect(screen.getByText("Optional notes for your records. These notes do not change the coach's recommendations or replace medical advice.")).toBeOnTheScreen();
+    expect(screen.getByText('Choose YES or NO to continue. This records your answer; it does not change recommendations.')).toBeOnTheScreen();
+    expect(screen.queryByText(/coach should respect/i)).toBeNull();
+    expect(screen.queryByText(/coach plans around limitations/i)).toBeNull();
   });
 
   test('Profile load selection is editable for non-beginners when no session is active', () => {
