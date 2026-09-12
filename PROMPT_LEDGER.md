@@ -9317,3 +9317,105 @@ tests. A mutation forcing its description back to `numberOfLines={1}` fails the
 new assertion and was restored before the green run. This follow-up requires
 one final exact-tip APK rebuild and goal-screen capture; no policy, schema,
 engine, backup, activity, clinical, network, or animation scope was added.
+
+---
+
+## Entry 0118 — 2026-09-13 · Opus 5 independent audit of the Codex/Astra UX accessible-coach slice
+
+**Verbatim input**
+
+```
+Audit the work done by Codex, Astra UX
+```
+
+Followed mid-turn by:
+
+```
+Please Audit this soon after 
+Accessible Coach Execution Plan — 2026-09-12
+
+## 1. Authority and outcome
+
+- Consolidated source: `docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md`.
+- Owner direction: execute bounded work toward a tested build today; preserve the offline deterministic architecture; report tested, untested, and deferred work honestly.
+- Integration branch: `codex/accessible-coach-2026-09-12`.
+- Integration base: `e8cedca5defb688e1728e7bb917970921481e3f1` (`origin/codex/rpe-familiarisation`).
+- Recovered follow-up: detached commit `ffae074fafa7981db43287a5e8c51348fdaedaca` was cherry-picked as `87624d9e43189ddd87db317e24d4379ef5a13fae` before dispatch.
+- Baseline at the integration base: `typecheck` passed; `verify:ci` passed with 21 gates and 26 suites / 434 tests.
+```
+
+and:
+
+```
+Lastly I want you to review The "Francis' policy/schema dispositions plus clinician review" workorder thats queued up next
+```
+
+**Context.** Audit target was the release-lineage integration branch
+`codex/accessible-coach-2026-09-12` (tip `a0c4c20`), covering the 16 commits
+`229c2cd..a0c4c20` dispatched from
+`docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md` (WO-01 … WO-10), plus the six
+per-work-order branches. Claims audited: Entry 0117,
+`HANDOVER_2026-09-12_ACCESSIBLE_COACH_INTEGRATION.md`, the execution plan, and
+the five per-WO handovers. The queued checkpoint reviewed was
+`docs/decisions/ACCESSIBLE_COACH_CHECKPOINT_2026-09-12.md` (D01–D10,
+SC-01–SC-09).
+
+**Output**
+
+- Audit report: `docs/audits/accessible-coach/OPUS5_INDEPENDENT_AUDIT_2026-09-13.md`.
+- Audit branch `claude/astra-ux-audit-2026-09-13` was cut from `a0c4c20` and the
+  report committed there, deliberately NOT onto the integration branch, so
+  `a0c4c20` stays byte-identical to the commit its APK provenance claims. The
+  Codex integration worktree was left clean at `a0c4c20`.
+- Verdict: claim accuracy HIGH, no overclaim found in the status taxonomy; gate
+  integrity PASS (22 gates, none weakened); verification independently
+  reproduced (`verify:ci` exit 0, 27 suites / 467 tests).
+- Reproduced from scratch rather than read off the handover: the 21/21
+  `disableFullscreenUI` inventory; absence of user-facing "fat loss"; the exact
+  week and effort copy; 56 dp info targets confirmed against on-device bounds
+  (168 px at 3×); `ffae074`→`87624d9` cherry-pick fidelity via identical
+  `git patch-id --stable` `1a24ce3b…`; the baseline `21 gates / 26 suites /
+  434 tests` (434 recomputed exactly by `.each`-aware counting, delta exactly
+  33); migration `064` unallocated across every local and remote branch;
+  `INTERNET` removed via `tools:node="remove"`; and 8/8 WO-04 `file#line`
+  citations landing on their claimed constructs.
+- Two substantive defects, both inside the screen-reader surface the handover
+  itself lists as untested. F1: the `InfoTip` popover's only focusable node is a
+  full-screen button named "Dismiss explanation" whose explicit `content-desc`
+  suppresses the definition text, so TalkBack never speaks the explanation
+  WO-02 commissioned — confirmed from Codex's own `14_final_experience_info.xml`
+  dump. F2: the "Specialist equipment" qualifier left the accessibility tree
+  with no `accessibilityRole="header"` replacement, the rewritten
+  `ContentCorrection049.test.js` no longer asserts the distinction, and
+  `SPECIALIST` appears in none of the 64 evidence dumps because the equipment
+  customize list was never expanded on device.
+- Four minor findings: F3 "Match the final navigation label" unmet (copy says
+  "Athlete Profile", tab label is `PROFILE`); F4 `EQUIPMENT_DESCRIPTION`
+  duplicated into the glossary where `InfoTip` throws on drift; F5 the
+  keyboard-primitive reach sentence overstates `LibraryScreenV2`; F6 all seven
+  branches are local-only and a stray untracked work-order copy sits in master.
+- Credited beyond their claims: an unmentioned latent fix in
+  `verify-preflight.mjs` (`fail > 0` → `fail > embedderFailStart`), and the
+  existing `verify:backup` inventory gate that fails closed when a schema table
+  is missing from `WO03_DURABLE_DATA_INVENTORY.md` — which already protects the
+  Migration 064 hand-off.
+- Queued-checkpoint review, four findings. R1: Migration 064 as scoped needs
+  OWNER approval only — D07 and SC-04 already defer executable types/units, so
+  WO-05 is not clinician-blocked and the combined token framing understates
+  what can proceed. R2: D02's removal of the experience-tier uplift
+  (`blockGenerator.ts:886`, `routineMicrocycle.ts:200`, elite 48/100 vs
+  intermediate 32/60) is an unfunded engine dependency that blocks the
+  conformance claim and has no work order, owner, or test — its oracle (R05's
+  tier counterfactual) does not exist in `packages/inference/test`. R3: the
+  unnamed clinical reviewer is the true critical path; scope it as a six-item
+  written brief. R4: `064` verified free, thirteen local branches queued at
+  `063`.
+- Recorded for the handback, since the handover correctly could not contain it:
+  the final-tip `app-qa.apk` is 194,534,936 bytes, SHA-256
+  `cea97dbd89043fd0719a2aa3fc4368876ad2e4971580cbbb1485996413809b73`. This does
+  not match the handover's `0152cf8a…`/194,534,980 bytes, which is expected —
+  that hash belongs to the earlier `7f4c8c0` candidate.
+- No product code, test, gate, schema, or policy was changed by this audit. No
+  branch was pushed. `verify:ci` was run once, read-only, at `a0c4c20`.
+
+Entry 0118 is closed.
