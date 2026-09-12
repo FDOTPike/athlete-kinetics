@@ -261,11 +261,11 @@ describe('049 specialist equipment is explicit opt-in only', () => {
     // W2 (program-quality work order §6.2): presets come first and the
     // standard grid is collapsed until the athlete explicitly customizes.
     fireEvent.press(screen.getByLabelText('Customize equipment'));
-    expect(screen.getByText('SPECIALIST')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'SPECIALIST' })).toBeOnTheScreen();
     // The onboarding draft starts from DEFAULT_PROFILE: every STANDARD item is
     // pre-owned, and the specialist toggle is off — that asymmetry is the point.
     expect(screen.getByLabelText('BARBELL. A straight bar loaded with weight plates.').props.accessibilityState.selected).toBe(true);
-    expect(screen.getByLabelText('BOARDS. Stable training boards used for supported movement variations.').props.accessibilityState.selected).toBe(false);
+    expect(screen.getByLabelText('Specialist equipment BOARDS. Stable training boards used for supported movement variations.').props.accessibilityState.selected).toBe(false);
     expect(screen.getByText(/Specialist items stay off unless you turn them on/)).toBeOnTheScreen();
   });
 });

@@ -112,7 +112,7 @@ describe('LearningLayer (Work Order B)', () => {
     }
   });
 
-  test('tapping an InfoTip opens modal with exact GLOSSARY definition and closes on dismiss', () => {
+  test('an InfoTip exposes its explanation as modal content with a separate close control', () => {
     render(<InfoTip term="DELOAD" />);
 
     // Initially modal body is not visible
@@ -122,12 +122,14 @@ describe('LearningLayer (Work Order B)', () => {
     fireEvent.press(screen.getByLabelText('What does DELOAD mean?'));
 
     // Modal opens showing term title and verbatim body
-    expect(screen.getByText('DELOAD')).toBeOnTheScreen();
-    expect(screen.getByText(GLOSSARY.DELOAD)).toBeOnTheScreen();
-    expect(screen.getByText('tap anywhere to close')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'DELOAD' })).toBeOnTheScreen();
+    expect(screen.getByText(GLOSSARY.DELOAD).props.accessible).toBe(true);
+    expect(screen.getByText('Tap outside or use Close to return.').props.accessible).toBe(true);
+    expect(screen.getByTestId('info-tip-dialog').props.accessibilityViewIsModal).toBe(true);
+    expect(screen.getByTestId('info-tip-backdrop').props.accessible).toBe(false);
 
-    // Dismiss
-    fireEvent.press(screen.getByLabelText('Dismiss explanation'));
+    // The close control is independently focusable; the backdrop cannot mask the content.
+    fireEvent.press(screen.getByRole('button', { name: 'Dismiss explanation' }));
     expect(screen.queryByText(GLOSSARY.DELOAD)).toBeNull();
   });
 
@@ -191,4 +193,3 @@ describe('LearningLayer (Work Order B)', () => {
     expect(screen.getAllByText('Undetailed Movement').length).toBeGreaterThan(0);
   });
 });
-

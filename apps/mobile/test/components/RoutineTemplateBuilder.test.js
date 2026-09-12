@@ -171,8 +171,8 @@ describe('RoutineTemplateBuilder', () => {
     for (const { tooltipTerm } of EXPECTED_LOADING_METHODS) {
       const infoButton = screen.getByLabelText(`What does ${tooltipTerm} mean?`);
       fireEvent.press(infoButton);
-      const explanation = screen.getByLabelText('Dismiss explanation');
-      expect(within(explanation).getByText(tooltipTerm, { exact: true })).toBeOnTheScreen();
+      expect(screen.getByRole('header', { name: tooltipTerm })).toBeOnTheScreen();
+      expect(screen.getByTestId('info-tip-dialog').props.accessibilityViewIsModal).toBe(true);
       fireEvent.press(screen.getByLabelText('Dismiss explanation'));
       expect(screen.queryByLabelText('Dismiss explanation')).toBeNull();
     }

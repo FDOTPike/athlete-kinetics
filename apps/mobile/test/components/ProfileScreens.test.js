@@ -266,7 +266,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByText('Under a year of consistent training, or returning after a long break').props.numberOfLines).toBeUndefined();
 
     fireEvent.press(info);
-    expect(screen.getByText(/Choose this if structured training is still new/)).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'NEW TO THIS' })).toBeOnTheScreen();
+    expect(screen.getByText(/Choose this if structured training is still new/).props.accessible).toBe(true);
     expect(selection.props.accessibilityState.selected).toBe(false);
     fireEvent.press(screen.getByLabelText('Dismiss explanation'));
     fireEvent.press(selection);
@@ -281,8 +282,11 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(StyleSheet.flatten(preset.props.style)).toMatchObject({ minHeight: 56, flex: 1 });
     expect(screen.getByRole('button', { name: 'What does FULL GYM mean?' })).not.toBe(preset);
     fireEvent.press(screen.getByLabelText('Customize equipment'));
+    expect(screen.getByRole('header', { name: 'SPECIALIST' })).toBeOnTheScreen();
     const barbell = screen.getByRole('button', { name: /BARBELL\. A straight bar/ });
+    const boards = screen.getByRole('button', { name: /Specialist equipment BOARDS\. Stable training boards/ });
     expect(screen.getByRole('button', { name: 'What does BARBELL mean?' })).not.toBe(barbell);
+    expect(boards.props.accessibilityState.selected).toBe(false);
     expect(screen.getAllByLabelText(/^What does .* mean\?$/)).toHaveLength(14);
     expect(screen.getByText('A straight bar loaded with weight plates.').props.numberOfLines).toBeUndefined();
   });

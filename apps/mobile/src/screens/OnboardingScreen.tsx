@@ -469,7 +469,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 {/* Specialist equipment is a SEPARATE, explicit opt-in: no preset and
                     no default ever grants it, so movements needing it stay
                     teaching-only until it is deliberately selected here. */}
-                <Text style={styles.fieldLabel}>SPECIALIST</Text>
+                <Text style={styles.fieldLabel} accessibilityRole="header">SPECIALIST</Text>
                 <View style={styles.choiceGroup}>
                   {SPECIALIST_EQUIPMENT_ITEMS.map((item) => {
                     const owned = draft.equipment_inventory.includes(item);
@@ -481,7 +481,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                         selected={owned}
                         onSelect={() => toggleEquipment(item)}
                         infoTerm={EQUIPMENT_LABEL[item]}
-                        accessibilityLabel={`${EQUIPMENT_LABEL[item]}. ${EQUIPMENT_DESCRIPTION[item]}`}
+                        accessibilityLabel={`Specialist equipment ${EQUIPMENT_LABEL[item]}. ${EQUIPMENT_DESCRIPTION[item]}`}
                       />
                     );
                   })}
