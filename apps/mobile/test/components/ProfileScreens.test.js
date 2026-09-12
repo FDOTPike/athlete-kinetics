@@ -243,6 +243,10 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<OnboardingScreen />);
     fireEvent.press(screen.getByLabelText('Next'));
     expect(screen.getByLabelText(/WEIGHT-LOSS SUPPORT/)).toBeOnTheScreen();
+    const goal = screen.getByRole('button', { name: /WEIGHT-LOSS SUPPORT\. Stay active/ });
+    expect(StyleSheet.flatten(goal.props.style)).toMatchObject({ minHeight: 56, flex: 1 });
+    expect(screen.getByText('WEIGHT-LOSS SUPPORT').props.numberOfLines).toBeUndefined();
+    expect(screen.getByText('Stay active and keep your muscle').props.numberOfLines).toBeUndefined();
     expect(screen.queryByText(/fat[- ]loss/i)).toBeNull();
     fireEvent.press(screen.getByLabelText('Next'));
     fireEvent.press(screen.getByLabelText('Next'));

@@ -9305,3 +9305,15 @@ Entry 0117 is closed for this bounded same-day execution slice. The final
 documentation tip is rebuilt once after this ledger write; its exact artifact
 hash is reported externally so no self-referential tracked write invalidates
 the candidate manifest.
+
+#### Device acceptance addendum
+
+The first final-tip screenshot exposed one additional WO-02 acceptance miss:
+goal descriptions still used the shared one-line `Chip` and ellipsized at
+360 dp/font scale 1.30. Goals now use the same complete, vertically wrapped
+choice-row presentation as the other onboarding selections, without adding an
+unrequested information icon. The focused Profile/Onboarding suite passes 48
+tests. A mutation forcing its description back to `numberOfLines={1}` fails the
+new assertion and was restored before the green run. This follow-up requires
+one final exact-tip APK rebuild and goal-screen capture; no policy, schema,
+engine, backup, activity, clinical, network, or animation scope was added.

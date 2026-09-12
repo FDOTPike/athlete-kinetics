@@ -138,7 +138,7 @@ interface ChoiceRowProps {
   readonly description: string;
   readonly selected: boolean;
   readonly onSelect: () => void;
-  readonly infoTerm: string;
+  readonly infoTerm?: string;
   readonly accessibilityLabel?: string;
 }
 
@@ -168,7 +168,7 @@ function ChoiceRow({
           {description}
         </Text>
       </Pressable>
-      <InfoTip term={infoTerm} />
+      {infoTerm !== undefined && <InfoTip term={infoTerm} />}
     </View>
   );
 }
@@ -371,13 +371,13 @@ export default function OnboardingScreen(): React.JSX.Element {
           <View style={styles.cardGroup}>
             <Text style={styles.h2}>WHAT ARE WE TRAINING FOR?</Text>
             {OBJECTIVES.map((o) => (
-              <Chip
+              <ChoiceRow
                 key={o}
-                label={`${OBJECTIVE_COPY[o].label} — ${OBJECTIVE_COPY[o].blurb}`}
+                label={OBJECTIVE_COPY[o].label}
+                description={OBJECTIVE_COPY[o].blurb}
                 selected={draft.objective === o}
-                onPress={() => patch({ objective: o })}
+                onSelect={() => patch({ objective: o })}
                 accessibilityLabel={`${OBJECTIVE_COPY[o].label}. ${OBJECTIVE_COPY[o].blurb}`}
-                style={styles.cardChip}
               />
             ))}
           </View>
