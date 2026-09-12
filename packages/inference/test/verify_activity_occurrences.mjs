@@ -15,6 +15,7 @@ const occurrence = (occurrenceId, state = 'planned') => ({
   originalRecurrenceKey: null,
   originKind: 'manual',
   originIdentity: `manual:${occurrenceId}`,
+  originSessionId: null,
   revision: 1,
   localDate: '2026-09-13',
   localStartMinute: null,

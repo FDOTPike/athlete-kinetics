@@ -2828,6 +2828,8 @@ const TRIGGERS_064 = [
   'trg_activity_completion_completed_bu',
   'trg_activity_occurrence_completion_consistency_bu',
   'trg_activity_occurrence_origin_immutable_bu',
+  'trg_activity_source_link_origin_consistency_bi',
+  'trg_activity_source_link_identity_immutable_bu',
   'trg_health_support_note_limit_bi',
   'trg_clinician_instruction_limit_bi',
   'trg_clinician_instruction_revision_limit_bi',
@@ -2902,6 +2904,39 @@ const TRIGGERS_064 = [
   check('064 keeps the occurrence origin immutable after materialization',
     refused(d, `UPDATE activity_occurrence SET origin_identity='silently-relabelled'
                 WHERE occurrence_id='o-friday'`));
+  d.executeSync(`
+    INSERT INTO session (session_id,session_date,started_at_ms)
+      VALUES (64000,'2026-09-19',3000);
+    INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,origin_session_id,revision,
+       local_date,timezone_id,time_resolution_state,occurrence_state,timing_commitment,
+       created_at_ms,updated_at_ms)
+      VALUES ('o-coached','a-basketball','coached_session','session:64000',64000,1,
+        '2026-09-19','Australia/Sydney','unresolved','planned','flexible',3,3);
+    INSERT INTO activity_source_link
+      (source_link_id,occurrence_id,source_kind,source_identity,linked_session_id,recorded_at_ms)
+      VALUES ('src-coached','o-coached','coached_session','session:64000',64000,3);
+    INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-origin-only','a-basketball','manual','origin-only',1,'2026-09-20',
+        'Australia/Sydney','unresolved','planned','flexible',3,3);
+  `);
+  check('064 requires and preserves an explicit native session link for a coached origin',
+    d.raw.prepare(`SELECT 1 FROM activity_occurrence o JOIN activity_source_link l
+      ON l.occurrence_id=o.occurrence_id AND l.linked_session_id=o.origin_session_id
+      WHERE o.occurrence_id='o-coached' AND o.origin_kind='coached_session'`).get() !== undefined
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-coached-unlinked','a-basketball','coached_session','missing-session-link',1,
+        '2026-09-21','Australia/Sydney','unresolved','planned','flexible',3,3)`));
+  check('064 rejects cross-occurrence source reuse and source-link relabelling',
+    refused(d, `INSERT INTO activity_source_link
+      (source_link_id,occurrence_id,source_kind,source_identity,recorded_at_ms)
+      VALUES ('src-cross','o-coached','manual','origin-only',3)`)
+    && refused(d, `UPDATE activity_source_link SET source_identity='relabelled'
+      WHERE source_link_id='src-import'`));
   check('064 rejects impossible civil dates and a fixed occurrence without resolved instants',
     refused(d, `INSERT INTO activity_occurrence
       (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,

@@ -48,7 +48,7 @@
     "verify:ci": "node scripts/verify-preflight.mjs && npm run typecheck && npm run verify:db && npm run verify:demo && npm run verify:migrations && npm run verify:policy && npm run verify:blocks && npm run verify:autopilot && npm run verify:autopilot-counterexamples && npm run verify:biometrics && npm run verify:semantic && npm run verify:embedder && npm run verify:qa-artifact && npm run verify:store && npm run verify:coach && npm run verify:backup && npm run verify:memory-fixtures && npm run verify:progression && npm run verify:pipeline && npm run verify:runner && npm run verify:outcomes && npm run verify:library && npm run verify:coaching-content-generator && npm run verify:components",
     "verify:release": "npm run verify:ci && npm run verify:memory-contract && npm run verify:qa-candidate",
     "verify:all": "npm run verify:release",
-    "verify:components": "jest --config apps/mobile/jest.config.js --runInBand",
+    "verify:components": "jest --config apps/mobile/jest.config.js --runInBand --no-cache",
     "fetch:embedder": "node scripts/fetch-embedder.mjs",
     "embed:codebase": "node scripts/embed-codebase.mjs",
     "bench:cosine": "node scripts/bench-cosine.mjs",

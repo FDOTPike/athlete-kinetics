@@ -108,6 +108,7 @@ export interface ActivityOccurrence {
   /** Immutable identity of the source that first materialized this occurrence. */
   readonly originKind: 'manual' | 'imported' | 'coached_session';
   readonly originIdentity: string;
+  readonly originSessionId: number | null;
   readonly revision: number;
   readonly localDate: string;
   readonly localStartMinute: number | null;

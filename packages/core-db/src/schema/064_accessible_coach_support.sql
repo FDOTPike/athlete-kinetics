@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS activity_occurrence (
   original_recurrence_key TEXT,
   origin_kind             TEXT NOT NULL CHECK (origin_kind IN ('manual','imported','coached_session')),
   origin_identity         TEXT NOT NULL CHECK (length(trim(origin_identity)) BETWEEN 1 AND 240),
+  origin_session_id       INTEGER UNIQUE REFERENCES session(session_id) ON DELETE RESTRICT,
   revision                INTEGER NOT NULL CHECK (revision >= 1),
   local_date              TEXT NOT NULL CHECK (date(local_date) = local_date),
   local_start_minute      INTEGER CHECK (local_start_minute IS NULL OR local_start_minute BETWEEN 0 AND 1439),
@@ -103,6 +104,8 @@ CREATE TABLE IF NOT EXISTS activity_occurrence (
   FOREIGN KEY (series_id, activity_id) REFERENCES activity_series(series_id, activity_id) ON DELETE RESTRICT,
   CHECK ((series_id IS NULL AND original_recurrence_key IS NULL)
       OR (series_id IS NOT NULL AND length(trim(original_recurrence_key)) BETWEEN 1 AND 160)),
+  CHECK ((origin_kind = 'coached_session' AND origin_session_id IS NOT NULL)
+      OR (origin_kind <> 'coached_session' AND origin_session_id IS NULL)),
   CHECK ((resolved_start_at_ms IS NULL AND resolved_end_at_ms IS NULL AND resolver_version IS NULL)
       OR (resolved_start_at_ms IS NOT NULL AND resolved_end_at_ms IS NOT NULL
           AND resolver_version IS NOT NULL AND resolved_end_at_ms >= resolved_start_at_ms)),
@@ -359,10 +362,33 @@ BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_activity_occurrence_origin_immutable_bu
-BEFORE UPDATE OF origin_kind, origin_identity ON activity_occurrence
+BEFORE UPDATE OF origin_kind, origin_identity, origin_session_id ON activity_occurrence
 WHEN NEW.origin_kind <> OLD.origin_kind OR NEW.origin_identity <> OLD.origin_identity
+ OR NEW.origin_session_id IS NOT OLD.origin_session_id
 BEGIN
   SELECT RAISE(ABORT, 'activity_occurrence: origin identity is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_activity_source_link_origin_consistency_bi
+BEFORE INSERT ON activity_source_link
+WHEN EXISTS (
+  SELECT 1 FROM activity_occurrence o
+  WHERE o.origin_kind = NEW.source_kind
+    AND o.origin_identity = NEW.source_identity
+    AND o.occurrence_id <> NEW.occurrence_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'activity_source_link: source origin belongs to another occurrence');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_activity_source_link_identity_immutable_bu
+BEFORE UPDATE OF occurrence_id, source_kind, source_identity, linked_session_id ON activity_source_link
+WHEN NEW.occurrence_id <> OLD.occurrence_id
+ OR NEW.source_kind <> OLD.source_kind
+ OR NEW.source_identity <> OLD.source_identity
+ OR NEW.linked_session_id IS NOT OLD.linked_session_id
+BEGIN
+  SELECT RAISE(ABORT, 'activity_source_link: identity mapping is immutable');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_health_support_note_limit_bi
