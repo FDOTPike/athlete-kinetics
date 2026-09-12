@@ -52,7 +52,7 @@ more conservative**; halts (sharp pain, dizziness, chest symptoms) end it.
 
 ```powershell
 npm ci                 # requires npm >= 11.6 (install-script policy is enforced)
-npm run verify:ci      # 21 gates + typecheck; semantic/embedder need network
+npm run verify:ci      # 22 gates + typecheck; semantic/embedder need network
 npm run seed           # deterministic 180-day athlete -> athlete_kinetics.seed.db
 ```
 

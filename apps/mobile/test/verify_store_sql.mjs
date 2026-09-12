@@ -1780,7 +1780,7 @@ if (resetTables.length >= 15) {
   const ciMatches = Array.from(ciYmlContent.matchAll(/\((\d+)\s+gates/g));
   const ciGateCounts = ciMatches.map((m) => Number(m[1]));
 
-  a('verify:ci script invokes exactly 21 verify:* targets', verifyInvocations === 21, `got ${verifyInvocations}`);
+  a('verify:ci script invokes exactly 22 verify:* targets', verifyInvocations === 22, `got ${verifyInvocations}`);
   a('AGENT_WORKFLOW.md documents exact verify:ci gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
   a('ci.yml documents exact verify:ci gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
 
