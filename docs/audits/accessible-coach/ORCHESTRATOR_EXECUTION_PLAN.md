@@ -24,7 +24,7 @@
 ### 3.1 WO-01 — Keyboard accessibility
 
 - Model/effort: `gpt-5.6-sol`, medium.
-- Status: completed, independently reviewed, and integrated as `89e140a`; native Android verification remains an integration responsibility.
+- Status: implemented and integrated from `89e140a`, with Android shell/scroll follow-ups in `fb265c8`, `80faa77`, and `7f4c8c0`. The final integration run covered a 4 GB Pixel 9 Pro Android emulator at 360 dp, font scale 1.30, portrait and landscape. iOS remains untested.
 - Product ownership: `App.tsx`; the input-bearing screens identified by inventory; a shared keyboard-aware scroll primitive; matching component tests.
 - Evidence ownership: `docs/audits/accessible-coach/WO01_INPUT_INVENTORY.md` and a WO-01 handover.
 - Exclusions: store, schema, migrations, native configuration, package dependencies, recommendation engines, backup, activity, clinician, and animation work.
@@ -33,7 +33,7 @@
 ### 3.2 WO-02 — Onboarding clarity
 
 - Model/effort: `gpt-5.6-sol`, medium.
-- Status/dependency: dispatched on `codex/ac-wo02-onboarding` from integrated tip `2af3adc`, after WO-01 review and integration because both touch onboarding/profile/setup input surfaces.
+- Status/dependency: implemented after WO-01 and integrated in `55bc949`; the truthful non-clinical notes correction is `3aba520`. The goal, experience, equipment, notes, and review flow was exercised on the Android integration emulator. Existing Activities remains intentionally absent because WO-05 has no ratified capture contract.
 - Product ownership: onboarding, profile, program setup, readiness/today copy and layout, existing `InfoTip` use, and matching tests.
 - Required outcomes: athlete-facing `weight loss` wording; clearer experience/equipment selection; explicit program ceilings; RPE introduced as effort; review of RIR/RPE use; Ready summary grouped into the work order's exact applicable sections — GOAL, EXPERIENCE, YOUR WEEK, EQUIPMENT, EXISTING ACTIVITIES, and TRAINING SUPPORT — with edit paths.
 - Exclusions: new training policy, prescription math, schema, activity contract, clinician inference, and animation work.
@@ -61,7 +61,7 @@
 - Schema ownership: one integration task only; Migration 064; shared types, repositories, deterministic weekly planner inputs, and tests.
 - Rule: activities and clinician constraints must enter planning through one normalized contract rather than parallel special cases.
 - Exclusions until ratified: clinical units/thresholds, automated interpretation of free text, remote sync, calendars, and probabilistic load inference.
-- Current status: WO-06 source/entry-point review dispatched documentation-only on `codex/ac-wo06-clinical-design`; Migration 064 and recommendation changes remain held at the Francis/qualified-clinical checkpoint.
+- Current status: the WO-06 source/entry-point review is integrated as design-only `d97a60f`. The concrete recommended dispositions are assembled in `docs/decisions/ACCESSIBLE_COACH_CHECKPOINT_2026-09-12.md`. Migration 064 and recommendation changes remain held at the Francis/qualified-clinical checkpoint.
 
 ### 3.6 WO-07 — Live heart-rate assessment
 
@@ -87,6 +87,7 @@
 
 - Model/effort: `gpt-6-astra`, xhigh.
 - Dependency: all accepted implementation work integrated.
+- Status: integration verification executed. Exact final values live in `HANDOVER_2026-09-12_ACCESSIBLE_COACH_INTEGRATION.md` and the user handback; a tracked document cannot contain the SHA-256 of an APK built from the same document commit without invalidating provenance.
 - Required checks: diff hygiene, typecheck, focused tests, full `verify:ci`, QA APK build, `verify:qa-candidate`, provenance hash, and emulator/device evidence appropriate to the changed surfaces.
 - Release authority: not implied by a green build. C6 and owner release/push decisions remain separate.
 
@@ -107,7 +108,8 @@
 - Current beginner symptom thresholds may relax severity handling; this requires owner/clinical review and must not be changed as copy-only work.
 - The repository has no demonstrated product-complete backup/restore path; a pure codec is not equivalent to safe live restore.
 - External activities and clinician constraints do not yet share a normalized persistence/planning contract.
-- The integration worktree has no local dependency install yet; build evidence will be produced only after accepted code is integrated.
+- React and the React Native embedded renderer were found mismatched during the first emulator run. They are now pinned to the same exact `19.1.4` version and preflight fails closed on future drift.
+- A first Android landscape run exposed Gboard extract mode. Every one of the 21 product `TextInput` call sites now opts out, with a mutation-proven inventory gate.
 
 ## 6. Completion-report contract
 

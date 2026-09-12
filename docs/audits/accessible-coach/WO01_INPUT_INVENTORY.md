@@ -72,4 +72,22 @@ Discovery on 2026-09-12: `adb devices -l` returned no attached devices. `emulato
 | Android keyboard open/close/reopen and first control tap | UNVERIFIED | No attached device/emulator |
 | iOS portrait/landscape/large text, multiline and numeric | UNVERIFIED | No iOS device/simulator available; no iOS verification claimed |
 
+## Integration device update — 2026-09-12
+
+The earlier discovery result above is retained as append-only history. Integration subsequently provisioned `Codex_Pixel_9_Pro_API_35` (`emulator-5554`), Android 35, with `MemTotal: 4013940 kB`, a 1080 × 2400 override at 480 dpi (360 dp), and font scale 1.30.
+
+| Platform / scenario | Integration status | Observation |
+|---|---|---|
+| Android small-screen portrait, rotation locked, name and limitations multiline | PASS | With the IME shown, the name and past-injury fields were fully visible at `[48,1101][1032,1260]`; footer Next was fully visible at `[755,1299][1044,1467]`. |
+| Android first control tap with keyboard open | PASS | One tap on Next advanced from name to goal and dismissed the IME; no dismissal-only first tap was required. The same one-tap transition advanced limitations to review. |
+| Android font scale 1.30 onboarding choices | PASS in exercised flow | Experience and equipment cards wrapped complete text vertically. Each independent information control measured 168 px = 56 dp at 480 dpi and opened its matching explanation without changing the selection. |
+| Android step transition scroll reset | PASS | Limits reopened at its heading after the longer equipment page; the prior scroll offset no longer clipped the next step's title. |
+| Android landscape multiline | PASS for in-app entry context | Initial device evidence exposed Gboard's separate full-screen extract editor. `7f4c8c0` adds `disableFullscreenUI` to all 21 static product inputs. The rebuilt APK kept the focused injury field and app context on screen in landscape with the IME shown. |
+| Android rotation/edit retention | PASS in exercised flow | `knee:oldACL` remained in the controlled draft across portrait-to-landscape rotation. Existing component coverage separately proves onboarding back/forward retention. |
+| Android numeric keyboards across Profile, Session, and Routine Builder | UNVERIFIED ON DEVICE | Keyboard types and shared source contract are component/source tested; these separate journeys were not exercised in this integration window. |
+| Android TalkBack focus/announcement order | UNVERIFIED | No assistive-technology session was run. |
+| iOS portrait/landscape/large text, multiline and numeric | UNVERIFIED | No iOS device/simulator was available on this Windows host. |
+
+Selected raw evidence is outside the repository at `C:\Users\fpike\AppData\Local\Temp\accessible-coach-20260912`. The exact product candidate at `7f4c8c0446c7b14433225675dd92646b723e899e` passed `verify:qa-candidate`; its SHA-256 was `0152cf8a1ab7aec2297afa0e014d4a3e8f132ce007cc5bf4ca0d9b103fdd33b0` before the final documentation-only closeout commit. The final artifact is rebuilt and reported separately so its provenance remains exact.
+
 Native acceptance remains required before release. Suggested rerun order is limitations multiline in small portrait, keyboard back/reopen, first tap on Next; repeat at font scale 1.30 and landscape; then profile 1RM/bodyweight, session load, library/glossary search filters, routine modal search and Save.

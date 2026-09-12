@@ -9258,3 +9258,50 @@ Orchestrator: use this document as the consolidated work order for both of Franc
 
 This entry remains open for tested-build results and the final honest status
 split. Nothing pushed, merged, tagged, signed, released, or submitted to C6.
+
+#### Completion update
+
+- Integrated WO-01 keyboard accessibility, WO-02 onboarding/effort clarity,
+  the deterministic WO-03 backup contract foundation, WO-04 evidence/policy,
+  WO-06 clinical-contract design, and WO-08 coverage inventory on
+  `codex/accessible-coach-2026-09-12`.
+- Preserved the offline deterministic boundary: the QA APK carries no INTERNET
+  permission; no account, network inference, activity-load guess, free-text
+  medical parser, live-monitoring claim, clinical threshold, or probabilistic
+  recommendation path was added.
+- Corrected four integration-only native defects found by execution: mismatched
+  React/embedded-renderer versions, Android footer occlusion, onboarding
+  cross-step scroll retention, and Android landscape full-screen IME extract
+  mode. The last fix covers all 21 static product `TextInput` sites and has a
+  mutation-proven inventory gate.
+- Full `npm run verify:ci` passed with all configured gates and 27 component
+  suites / 467 tests. The exact product candidate at `7f4c8c0` built and passed
+  `verify:qa-candidate`; its clean-provenance APK was 194,534,980 bytes with
+  SHA-256 `0152cf8a1ab7aec2297afa0e014d4a3e8f132ce007cc5bf4ca0d9b103fdd33b0`.
+- Android native evidence used an Android 35 Pixel 9 Pro emulator with
+  `MemTotal: 4013940 kB`, 360 dp geometry, and font scale 1.30. The exercised
+  onboarding path passed portrait keyboard visibility, first-tap navigation,
+  full experience/equipment card text, distinct 56 dp information controls,
+  limitations scroll reset, multiline retention, review grouping, and
+  landscape in-app input context.
+- Published concrete orchestrator recommendations for D01–D10 and SC-01–SC-09
+  in `docs/decisions/ACCESSIBLE_COACH_CHECKPOINT_2026-09-12.md`. They remain
+  proposals: Francis has not ratified them and no qualified clinical reviewer
+  has signed them.
+- Therefore WO-05 product activity integration, WO-06 product clinician
+  support, Migration 064, WO-07 live monitoring, and all dependent persona,
+  restore, and no-double-counting journeys are deferred at the owner/clinical
+  checkpoint. WO-09 animation work was not started because required work is
+  still open.
+- WO-03 is not represented as a working backup product: it supplies a tested
+  canonical/checksum/replace-only contract foundation only. No snapshot UI,
+  OS picker, encryption, atomic live restore, or phone-to-phone restore exists.
+- iOS, assistive-technology navigation, physical-device execution, numeric
+  keyboard device routes, product restore/upgrade, C6, release signing, push,
+  merge, tag, and release remain untested or not performed as itemized in
+  `HANDOVER_2026-09-12_ACCESSIBLE_COACH_INTEGRATION.md`.
+
+Entry 0117 is closed for this bounded same-day execution slice. The final
+documentation tip is rebuilt once after this ledger write; its exact artifact
+hash is reported externally so no self-referential tracked write invalidates
+the candidate manifest.
