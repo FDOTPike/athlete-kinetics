@@ -151,6 +151,7 @@ describe('Learning Glossary & InfoTip Contracts (WO §7.2 Items 12–16)', () =>
     expect(GlossaryScreen).not.toBeNull();
 
     const { getByPlaceholderText, getByText, queryByText } = render(<GlossaryScreen />);
+    expect(screen.getByTestId('glossary-screen').props.keyboardShouldPersistTaps).toBe('handled');
     const searchInput = getByPlaceholderText(/search/i);
 
     // 1. Case-insensitive search by term: "rir" -> matches "RIR"

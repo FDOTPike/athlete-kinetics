@@ -19,6 +19,7 @@ import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import {
   PrimaryButton,
@@ -454,7 +455,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   }
 
   return (
-    <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled" testID="coach-screen">
+    <KeyboardAwareScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.screenContent} testID="coach-screen">
       {/* Header Wordmark */}
       <View style={styles.header}>
         <Text style={styles.wordmark}>pikeMethods</Text>
@@ -1273,7 +1274,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           </View>
         </Disclosure>
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

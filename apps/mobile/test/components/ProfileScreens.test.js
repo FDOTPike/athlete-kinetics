@@ -229,6 +229,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   test('renders OnboardingScreen wizard correctly using shared primitives', () => {
     render(<OnboardingScreen />);
 
+    expect(screen.getByTestId('keyboard-aware-scroll-view')).toBeOnTheScreen();
     expect(screen.getByText(/YOUR COACH\./)).toBeOnTheScreen();
     expect(screen.getByPlaceholderText('Your name')).toBeOnTheScreen();
 
@@ -245,6 +246,30 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByTestId('profile-load-pref-manual'));
     expect(saveLoadPreferenceMock).toHaveBeenCalledWith('manual');
     expect(screen.getByText(/Applies to your next session\./)).toBeOnTheScreen();
+  });
+
+  test('profile multiline and numeric drafts survive editing and commit valid values', () => {
+    mockState.movements = [{ movement_id: 11, name: 'Competition Squat' }];
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('keyboard-aware-scroll-view')).toBeOnTheScreen();
+    const injury = screen.getByLabelText('Historical injuries, one per line');
+    fireEvent.changeText(injury, 'knee: old ACL\nshoulder: old dislocation');
+    expect(screen.getByLabelText('Historical injuries, one per line').props.value)
+      .toBe('knee: old ACL\nshoulder: old dislocation');
+    expect(mockState.saveProfile).toHaveBeenLastCalledWith({
+      injury_flags: [
+        { region: 'knee', note: 'old ACL' },
+        { region: 'shoulder', note: 'old dislocation' },
+      ],
+    });
+
+    const squat = screen.getByLabelText('SQUAT one rep max in kilograms, type to set');
+    expect(squat.props.keyboardType).toBe('numeric');
+    fireEvent.changeText(squat, '142.5');
+    expect(screen.getByLabelText('SQUAT one rep max in kilograms, type to set').props.value).toBe('142.5');
+    fireEvent(squat, 'endEditing', { nativeEvent: { text: '142.5' } });
+    expect(mockState.saveOneRepMax).toHaveBeenCalledWith(11, 142.5);
   });
 
   test('Profile load selection is disabled during an active session', () => {
@@ -429,12 +454,34 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByLabelText('Yes, let me add notes'));
     expect(screen.getByLabelText('Past injuries, one per line as region colon note')).toBeOnTheScreen();
     fireEvent.changeText(screen.getByLabelText('Past injuries, one per line as region colon note'), 'knee: old ACL');
+    expect(screen.getByLabelText('Past injuries, one per line as region colon note').props.value).toBe('knee: old ACL');
     // "No" is an explicit clearing of the draft notes, not a silent skip.
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     expect(screen.queryByLabelText('Past injuries, one per line as region colon note')).toBeNull();
     fireEvent.press(screen.getByLabelText('Next')); // review
     expect(screen.getByTestId('onboarding-summary-limits-row').props.children.join(''))
       .toBe('LIMITATIONS — none noted');
+  });
+
+  test('limitations drafts survive keyboard-era back and forward navigation until completion', () => {
+    render(<OnboardingScreen />);
+    advance(5);
+    fireEvent.press(screen.getByLabelText('Yes, let me add notes'));
+    fireEvent.changeText(
+      screen.getByLabelText('Past injuries, one per line as region colon note'),
+      'knee: old ACL',
+    );
+    fireEvent.changeText(
+      screen.getByLabelText('Mobility limits, one per line as region colon note'),
+      'ankle: limited dorsiflexion',
+    );
+
+    fireEvent.press(screen.getByLabelText('Back'));
+    fireEvent.press(screen.getByLabelText('Next'));
+    expect(screen.getByLabelText('Past injuries, one per line as region colon note').props.value)
+      .toBe('knee: old ACL');
+    expect(screen.getByLabelText('Mobility limits, one per line as region colon note').props.value)
+      .toBe('ankle: limited dorsiflexion');
   });
 
   test('nothing persists before Finish and back navigation keeps the draft', () => {

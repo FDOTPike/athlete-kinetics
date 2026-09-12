@@ -476,6 +476,7 @@ test('COACH leaves the safety form behind its explicit action even during a halt
   expect(screen.getByText('Stop training today')).toBeOnTheScreen();
   expect(screen.queryByLabelText('Describe how your body feels today')).toBeNull();
   fireEvent.press(screen.getByLabelText('Review safety report'));
+  expect(screen.getByTestId('coach-screen').props.keyboardShouldPersistTaps).toBe('handled');
   expect(screen.getByLabelText('Describe how your body feels today')).toBeOnTheScreen();
 });
 

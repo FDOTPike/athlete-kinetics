@@ -382,6 +382,8 @@ test('athlete-entered load survives a rerender and refreshed history evidence', 
   });
   const view = render(<SessionScreen />);
 
+  expect(screen.getByTestId('keyboard-aware-scroll-view')).toBeOnTheScreen();
+  expect(screen.getByTestId('session-load-input').props.keyboardType).toBe('numeric');
   fireEvent.changeText(screen.getByTestId('session-load-input'), '32.5');
   mockState.lastLoggedLoads = { 1: 80 };
   view.rerender(<SessionScreen />);

@@ -12,7 +12,7 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -30,6 +30,7 @@ import {
   type UserProfile,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
@@ -353,7 +354,7 @@ export default function ProfileScreen(): React.JSX.Element {
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
       <Text style={styles.subheading}>
@@ -1181,7 +1182,7 @@ export default function ProfileScreen(): React.JSX.Element {
       >
         <Text style={styles.buildText}>BUILD 0.1.0</Text>
       </Pressable>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

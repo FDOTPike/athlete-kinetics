@@ -1,12 +1,13 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -741,7 +742,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" accessibilityLabel="Current workout timeline">
+      <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
@@ -1360,7 +1361,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             </View>
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

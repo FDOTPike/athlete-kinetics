@@ -24,7 +24,7 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   DEFAULT_PROFILE,
   ENERGY_SYSTEMS,
@@ -46,6 +46,7 @@ import {
   type UserProfile,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
@@ -240,7 +241,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         ))}
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         {step === 'welcome' && (
           <View>
             <Text style={styles.h1}>YOUR COACH.{'\n'}IN YOUR POCKET.{'\n'}OFFLINE.</Text>
@@ -527,7 +528,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             />
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Footer: BACK / NEXT. On the limitations screen NEXT stays disabled
           until an explicit yes/no answer exists (R5, Round 2); the caption

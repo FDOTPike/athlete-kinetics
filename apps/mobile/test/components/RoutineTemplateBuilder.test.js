@@ -269,6 +269,7 @@ describe('RoutineTemplateBuilder', () => {
   test('preserves athlete-authored ordering when saving', () => {
     const onSaved = jest.fn();
     render(<RoutineTemplateBuilder onSaved={onSaved} />);
+    expect(screen.getByTestId('keyboard-aware-scroll-view')).toBeOnTheScreen();
     fireEvent.changeText(screen.getByLabelText('Routine template name'), 'Ordered day');
 
     fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));

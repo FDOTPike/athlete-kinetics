@@ -12,7 +12,6 @@ import {
   FlatList,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -42,6 +41,10 @@ import {
 } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type Movement, type RoutineTemplate } from '../state/useStore';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView, {
+  KEYBOARD_DISMISS_MODE,
+  KEYBOARD_TAP_BEHAVIOR,
+} from './KeyboardAwareScrollView';
 import InfoTip from './InfoTip';
 import {
   PrimaryButton,
@@ -703,7 +706,7 @@ export function RoutineTemplateBuilder({
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>
         {initialTemplate ? 'Edit Routine Template' : 'Build Routine Template'}
       </Text>
@@ -1096,7 +1099,8 @@ export function RoutineTemplateBuilder({
               initialNumToRender={14}
               maxToRenderPerBatch={18}
               windowSize={7}
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps={KEYBOARD_TAP_BEHAVIOR}
+              keyboardDismissMode={KEYBOARD_DISMISS_MODE}
               ListEmptyComponent={(
                 <View>
                   {(collapsedTiers[1] || pickerTierBuckets[1].length === 0) && renderTierHeader(1)}
@@ -1279,7 +1283,7 @@ export function RoutineTemplateBuilder({
           />
         )}
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
