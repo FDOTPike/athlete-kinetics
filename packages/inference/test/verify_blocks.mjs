@@ -20,6 +20,7 @@
  * Run:  npm run verify:blocks
  */
 import { createRequire } from 'node:module';
+import { verifyR05Blocks } from './verify_r05.mjs';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -2505,5 +2506,6 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
     divergent.join('; ') || `${schemas.length} schemas x ${phases.length} phases identical`);
 }
 
+try { verifyR05Blocks(); } catch (error) { check('R05 experience-only block workload', false, error.message); }
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

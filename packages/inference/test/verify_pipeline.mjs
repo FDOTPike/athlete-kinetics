@@ -1,5 +1,6 @@
 'use strict';
 import { createRequire } from 'node:module';
+import { verifyR05Routines } from './verify_r05.mjs';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -769,6 +770,8 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
     trainingAge: 'elite', durationCapMin: 120, baseRpeCap: 9,
     availableMovementIds: allAvailable, ...overrides,
   });
+
+  check('R05 experience-only routine workload', () => verifyR05Routines(composeReal, liftFamilies));
 
   check('same-day Board Press plus Competition Bench is one weighted family exposure across two locked variations', () => {
     const boardId = idOf('Board Press');

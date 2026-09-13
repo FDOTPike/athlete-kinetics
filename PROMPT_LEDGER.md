@@ -9742,3 +9742,21 @@ Stop with the PR open and fully reported. Do not merge it.
   authorized. The final HEAD, full-gate result, rebuilt APK hash, PR URL,
   GitHub checks and CodeRabbit disposition are reported in the PR and the
   handback, so no self-referential tracked edit invalidates their provenance.
+
+
+You are the inference-policy executor for owner ruling D02.
+
+STARTING IDENTITY
+Start only from origin/codex/rpe-familiarisation at exact commit b94053b4d63fb0ffd3b933aa1890d80f7313a87b in the isolated Codex worktree. Freeze path, branch, HEAD, tree, status, upstream, and divergence. Stop on mismatch or concurrent writes. The first repository write must append this entire prompt verbatim to PROMPT_LEDGER.md.
+
+OWNERSHIP
+Product ownership is limited to packages/inference engine files governing blockGenerator.ts workingSetsFor, routineMicrocycle.ts AGE_SET_DELTA and experience-family budgets, plus their directly relevant verifiers. Do not edit apps/mobile/src/state/useStore.ts, Migration 064, activity/support UI, schemas, or unrelated copy.
+
+RATIFIED POLICY
+Experience tier alone must not increase session count, minutes, sets, target effort, or fatigue budget. Eligibility differences and beginner-specific safety protections may remain. The required counterfactual oracle is: identical activity, time, recovery, equipment, goals, and hard limits, changing training tier alone must add zero workload.
+
+TEST FIRST
+Add R05 as an executable counterfactual before implementation and prove it fails against the merged baseline for the real cause. Then make the smallest coherent policy change. Preserve beginner protections and eligibility semantics. Exercise every experience family and relevant generation path. Record every prescription output changed in verify:blocks, verify:pipeline, and verify:autopilot with before/after evidence. If an existing ratified policy genuinely conflicts, stop and present the exact conflict and a concrete owner proposal; do not overrule it silently.
+
+VALIDATION
+Run focused inference gates, typecheck, git diff --check, and npm run verify:ci before push. Mutation-check the counterfactual so it cannot pass vacuously. Commit and normally push only this task branch. Do not merge, touch master, rebase published history, force-push, tag, release, or claim C6. Return exact base/head/tree, changed prescriptions, tests, commits, push state, and “MERGE / RELEASE / C6: NOT PERFORMED”.
