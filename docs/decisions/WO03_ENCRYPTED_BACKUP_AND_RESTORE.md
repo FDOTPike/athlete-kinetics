@@ -19,6 +19,7 @@ The portable format is `pikeMethods-encrypted-backup`, version 1. Its encrypted 
 - `@noble/ciphers` supplies AES-256-GCM with a 96-bit nonce and 128-bit authentication tag. A new nonce and salt are drawn for every seal operation.
 - Entropy comes directly from the native `RNGetRandomValues` TurboModule installed by `react-native-get-random-values`. The adapter deliberately does not call the package's JavaScript compatibility shim, so its remote-debug `Math.random` fallback cannot be used. Missing or malformed native entropy fails backup creation.
 - `@noble/hashes` supplies SHA-256 for snapshot and file verification.
+- Noble's UTF-8 encoder is used for sealing. React Native's Hermes runtime does not provide the `TextDecoder` global expected by Noble's decoder, so authenticated plaintext is decoded by a bounded 8,192-code-unit mobile adapter that strictly rejects truncated, overlong, surrogate, and out-of-range UTF-8 sequences.
 - Password bytes, derived keys, and decrypted container plaintext are zeroed on reachable exit paths. Passwords, keys, health-support prose, and decrypted archive data are not logged or intentionally persisted.
 
 This composes established primitives; it does not introduce a custom cipher, authentication construction, or random-number generator.
@@ -64,6 +65,6 @@ Exact equality for athlete durable data is defined as the restored registry plus
 
 ## Verification obligations and deferred work
 
-The candidate tests real-chain all-athlete activity/support round trips, byte-exact restored SQLite content, concurrent WAL writes, running snapshot caps, wrong passwords, tampering, truncation, hostile KDF values, duplicate identities, unsupported formats, low/unknown storage, failed copies, interrupted replacement, stale markers, failed rollback, partial cleanup, hostile paths, abandoned cache cleanup, and fail-closed boot integration.
+The candidate tests real-chain all-athlete activity/support round trips, byte-exact restored SQLite content, concurrent WAL writes, running snapshot caps, wrong passwords, tampering, truncation, hostile KDF values, duplicate identities, unsupported formats, low/unknown storage, failed copies, interrupted replacement, stale markers, failed rollback, partial cleanup, hostile paths, abandoned cache cleanup, and fail-closed boot integration. A mobile regression opens an approximately 1.8 MiB authenticated plaintext archive with `TextDecoder` absent, exercises astral Unicode, and rejects non-canonical or malformed UTF-8.
 
 Android OS picker create/open must be smoke-tested in the QA candidate when a device or emulator is available. iOS remains explicitly untested. Streaming backups above the v1 caps, merge restore, cloud backup, medical interpretation, recommendation changes, monitoring, movement animation, and CSV/history export are outside this decision.
