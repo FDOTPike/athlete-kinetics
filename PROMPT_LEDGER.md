@@ -9521,3 +9521,224 @@ Opus F1/F2 remediation and Francis-delegated Astra product rulings.
 Entry 0120 is closed for the bounded Migration 064 foundation. The exact final
 commit and QA artifact hash are reported externally after this append-only
 write so no self-referential tracked edit invalidates their provenance.
+
+---
+
+## Entry 0121 — 2026-09-13 · Accessible Coach PR ownership, full-range audit and review remediation
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+You are the independent PR owner and reviewer for the Accessible Coach candidate.
+
+WORKTREE
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\accessible-coach-2026-09-12
+
+EXPECTED STATE — VERIFY, DO NOT ASSUME
+Head branch: codex/accessible-coach-2026-09-12
+Expected HEAD: 26d755df8eed87a331fdeb693e4ea55d36e57963
+Expected tree: 9db08b62c5cf108b77dddaccc49b353a0609e128
+PR base: codex/rpe-familiarisation
+Known base at dispatch: e8cedca5defb688e1728e7bb917970921481e3f1
+Expected divergence: base 0 / feature 24
+Expected status: clean
+
+AUTHORITY
+
+You may:
+- Independently audit the entire PR range.
+- Create and manage the GitHub PR.
+- Inspect CodeRabbit feedback and GitHub Actions logs.
+- Reproduce confirmed failures locally.
+- Apply the smallest justified remediation.
+- Add non-vacuous regression tests.
+- Commit fixes and normally push this feature branch.
+- Wait for CI and review checks to settle.
+
+You may not:
+- Merge the PR.
+- Modify, merge, or push master.
+- Rebase, squash, rewrite history, or force-push.
+- Tag, release, sign a production build, or claim C6.
+- modify another worktree or branch.
+- Treat missing, cancelled, skipped, or still-running checks as green.
+- Commit build outputs, secrets, local evidence, or unrelated cleanup.
+
+STEP 0 — FREEZE IDENTITY
+
+Before changing anything:
+
+1. Fetch remote refs without modifying the working tree.
+2. Record:
+   - absolute worktree path;
+   - branch;
+   - HEAD and tree;
+   - status;
+   - staged, unstaged, and untracked paths;
+   - upstream;
+   - remote feature-branch SHA;
+   - merge base and left/right divergence against `origin/codex/rpe-familiarisation`.
+3. Confirm no PR already exists for this head branch.
+4. If the worktree is dirty, HEAD differs unexpectedly, the feature branch is behind its base, or another agent is writing to it, stop and report the discrepancy. Do not repair identity silently.
+
+STEP 1 — INDEPENDENT FULL-RANGE AUDIT
+
+Audit:
+
+origin/codex/rpe-familiarisation..codex/accessible-coach-2026-09-12
+
+Do not limit review to the final two commits. Treat handovers and earlier reports as untrusted supporting evidence.
+
+Review specifically for:
+
+- Migration 064 constraints, triggers, upgrade convergence, source identity, recurrence NULL semantics, support-history immutability, date validation, bounded text, taxonomy vocabulary, and rollback behaviour.
+- Activity adapter transaction atomicity, stable identity reuse, duplicate accounting, NULL missingness, planned/completed/missed/cancelled transitions, weekly-series versioning, DST ambiguity, and athlete isolation.
+- Offline determinism and absence of new runtime networking.
+- No duration × effort score, RIR inference, medical interpretation, fabricated measurement, automatic session movement, or silent training-dose change.
+- Store boot, athlete switching, date rollover, and error propagation.
+- Keyboard accessibility, touch targets, screen-reader labels, large-text layout risk, and Profile/Plan navigation.
+- Test quality: detect vacuous source checks, fixture-only false greens, stale artifacts, and untested production paths.
+- Secrets, generated files, unrelated changes, performance regressions, unsafe SQL construction, or unbounded queries.
+
+Classify findings as P0/P1/P2/P3 with exact file and line evidence. Only P0/P1 block the PR; a concrete correctness, integrity, privacy, or accessibility defect may also block even if initially labelled lower.
+
+STEP 2 — LOCAL VERIFICATION
+
+Run from the repository root:
+
+- `git diff --check`
+- focused Migration 064 and activity adapter tests;
+- focused Activities/Profile/Plan/keyboard component tests;
+- `npm run verify:ci`
+
+Known previously reproduced result:
+- full verification exit 0;
+- 29/29 component suites;
+- 478/478 component tests.
+
+Do not accept those numbers from this prompt—reproduce them.
+
+Confirm the existing QA artifact is not tracked. The prior exact-tip APK was:
+
+apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk
+SHA-256: 79084EB3A03D8F125D80E2A0C49E6AFF72040EC1C9D7AE033948D73794A63177
+Size: 194,610,372 bytes
+Bound commit: 26d755df8eed87a331fdeb693e4ea55d36e57963
+
+If HEAD changes, that APK becomes stale. Rebuild and re-run
+`npm run verify:qa-candidate` only after the final remediation commit and clean-tree check.
+
+STEP 3 — REMEDIATE ONLY CONFIRMED DEFECTS
+
+For each confirmed defect:
+
+1. Reproduce it where practical.
+2. Add or strengthen a regression test that fails for the defect’s actual cause.
+3. Apply the smallest safe fix.
+4. Run the focused test.
+5. Run `npm run verify:ci`.
+6. Commit with a narrow, descriptive message.
+7. Push normally to:
+   `origin/codex/accessible-coach-2026-09-12`
+
+Do not perform speculative refactors or expand WO-05 into automatic coaching adaptation.
+
+STEP 4 — CREATE THE PR
+
+If the audit is clean or all blocking findings are closed, create a PR with:
+
+Base: codex/rpe-familiarisation
+Head: codex/accessible-coach-2026-09-12
+Suggested title:
+`feat: add Accessible Coach foundations and factual activity ledger`
+
+The PR description must include:
+
+- exact audited base and final head;
+- summary of the full 24-commit range;
+- Migration 064 audit remediation;
+- keyboard and onboarding work;
+- offline backup/evidence foundations;
+- factual Activities UI/store adapter;
+- explicit product-policy boundaries;
+- reproduced tests;
+- final APK provenance if rebuilt;
+- deferred work;
+- statement that merge, release, and C6 remain unauthorized.
+
+STEP 5 — RUN AND DEBUG CI
+
+After creating the PR:
+
+1. Monitor every required GitHub check to completion.
+2. Inspect the failing job and exact failing step before editing.
+3. Reproduce failures locally where practical.
+4. Distinguish product/test failure from infrastructure failure.
+5. Apply only justified fixes using the remediation protocol above.
+6. Push normally and wait for the replacement run.
+7. Never treat an older green run as evidence for a newer commit.
+8. Confirm the final GitHub checks are attached to the final HEAD SHA.
+
+Allow CodeRabbit to review. If automatic review does not start, use the repository-supported PR review command rather than changing repository configuration solely to trigger it. Address actionable findings; reply with evidence when rejecting an incorrect suggestion. Do not resolve a thread until its disposition is supported by the final code and checks.
+
+STEP 6 — FINAL HANDOVER
+
+Return:
+
+PR URL:
+BASE SHA:
+FINAL HEAD SHA:
+FINAL TREE SHA:
+COMMITS ADDED DURING REVIEW:
+AUDIT VERDICT: APPROVE / REQUEST CHANGES
+P0/P1 FINDINGS:
+P2/P3 OBSERVATIONS:
+LOCAL VERIFY:
+QA ARTIFACT:
+GITHUB CI:
+CODERABBIT:
+WORKTREE CLEAN:
+REMOTE MATCH:
+MERGE AUTHORITY: NOT GRANTED
+RELEASE / TAG / C6: NOT PERFORMED
+DEFERRED WORK:
+
+Stop with the PR open and fully reported. Do not merge it.
+`````
+
+### Output F(G(x))
+
+- Identity frozen before any change: branch `codex/accessible-coach-2026-09-12`,
+  HEAD `26d755d`, tree `9db08b6`, clean, upstream equal to remote, merge base
+  `e8cedca`, divergence base 0 / feature 24, no existing PR, no index lock.
+- Reproduced at `26d755d`: `verify:ci` exit 0, 29/29 component suites,
+  478/478 component tests, store 674/674, pipeline 51, backup 104 tables.
+  Existing APK confirmed untracked (gitignored) and byte-identical to the
+  stated `79084eb3…` / 194,610,372 bytes.
+- Full-range audit re-verified the Migration 064 remediation in `addd258`
+  against a real SQLite chain, then audited the WO-05 adapter, screen, Plan
+  disclosure and store lifecycle in `26d755d`.
+- Fixed three confirmed defects, each test-first (the new test failed on the
+  prior code for the defect's actual cause):
+  1. Logging completion of a planned activity pre-filled ACTUAL MINUTES with
+     the planned duration, so an untouched save recorded a plan as a
+     measurement (`6beada4`).
+  2. Editing a weekly schedule overwrote its `effective_start_date` with
+     today (`986a5da`).
+  3. Repeated MARK MISSED / MARK CANCELLED and NONE RECORDED controls exposed
+     identical accessible names, so a screen-reader user could write a state
+     to the wrong activity (`ce68154`).
+- Reproduced but not changed: a database that booted the pre-remediation 064
+  QA builds (`523db79`, `9a9a1ea`) passes sentinel self-heal yet keeps the old
+  table shape and fails at the boot-time activity read with
+  `no such column: o.modality_id`. No released or merged install carries that
+  schema; affected QA devices must clear app data. Recorded in the PR.
+- This entry was appended after the review fixes rather than as the first
+  file operation of the prompt; the omission is recorded here rather than
+  hidden. `addd258` and `26d755d` added no ledger entries of their own.
+- Merge, tag, release, production signing and C6: not performed and not
+  authorized. The final HEAD, full-gate result, rebuilt APK hash, PR URL,
+  GitHub checks and CodeRabbit disposition are reported in the PR and the
+  handback, so no self-referential tracked edit invalidates their provenance.
