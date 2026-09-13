@@ -23,12 +23,12 @@ The inner JSON envelope uses:
 - `manifest.restorePolicy`: fixed to `replace`.
 - `manifest.protection.mode`: fixed to `plaintext` for this inner envelope. This is a truthful marker, not an assertion that exported health data is adequately protected.
 - `manifest.dataSetCounts`: sorted data-set names and row counts for preview/cross-check.
-- `manifest.integrityChecksum`: `SHA-256`, canonicalization/scope ids, and lower-case digest over canonical manifest metadata plus payload, excluding only the digest field itself. This binds schema/version/scope/count/protection metadata against accidental or malicious alteration.
+- `manifest.integrityChecksum`: `SHA-256`, canonicalization/scope ids, and lower-case digest over canonical manifest metadata plus payload, excluding only the digest field itself. This detects accidental corruption of the schema/version/scope/count/protection metadata and payload. Because the digest is unkeyed, anyone who alters a backup can recompute it, so it neither detects deliberate alteration nor establishes authenticity.
 - `payload.dataSets`: extensible named logical data sets. Each declares identity fields and JSON rows. Data sets, identity fields, object keys, and row identities serialize deterministically.
 
 Canonicalization is the project-defined `ak-canonical-json-v1`: lexicographically sorted object keys, significant array order, JSON number rendering, and rejection of non-finite numbers. It is not claimed to implement an external canonical-JSON standard.
 
-The SHA-256 implementation is injected. Tests use Node’s established crypto implementation; mobile integration must supply an established native crypto provider. The contract does not ship a home-grown cryptographic primitive. SHA-256 here detects corruption/tampering but, because it is unkeyed, provides neither authenticity nor encryption; only the proposed authenticated-encryption wrapper can provide those properties.
+The SHA-256 implementation is injected. Tests use Node’s established crypto implementation; mobile integration must supply an established native crypto provider. The contract does not ship a home-grown cryptographic primitive. SHA-256 here detects accidental corruption only. Because it is unkeyed it provides no tamper resistance, authenticity, or encryption; only the proposed authenticated-encryption wrapper can provide those properties.
 
 ## Extensibility and compatibility
 

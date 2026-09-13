@@ -12,6 +12,8 @@
 
 ## 2. Proposed invariant set
 
+> This is the pre-ratification proposal, kept as the decision record. Where the controlling Astra rulings amended it, the original wording is struck through and the ratified amendment is stated inline; the amendment governs.
+
 ### 2.1 Time and recurrence
 
 - Store recurring activity definitions separately from generated occurrences.
@@ -23,7 +25,7 @@
 ### 2.2 Activity load
 
 - Minimum activity facts: activity kind, start/duration, fixed/flexible state, occurrence status, and source identity.
-- Optional athlete effort uses the existing RPE 1–10 construct. Missing effort remains `null`; it is not converted from RIR or guessed from duration.
+- ~~Optional athlete effort uses the existing RPE 1–10 construct.~~ **Amended by D04:** optional athlete effort uses the named, versioned whole-session scale `whole_session_effort_1_10` — a nullable expected or actual value stored with its scale ID and version, report time, and provenance — never strength-set RPE or RIR semantics. Missing effort remains `null`; it is not converted from RIR or guessed from duration.
 - Optional demand classification uses a small ratified vocabulary rather than a medical score.
 - The same real-world activity must not be counted twice when represented by a recurrence and an occurrence, or by an imported and manually-entered record.
 
@@ -31,7 +33,7 @@
 
 - A constraint is structured and typed; free text is context only and never executable.
 - Required provenance fields: source class, recorded time, review/expiry state, and whether the claim was user-reported or independently verified.
-- Product state is one of `pending_review`, `cleared_with_restrictions`, or `review_required`; `cleared` without qualifications is not inferred.
+- ~~Product state is one of `pending_review`, `cleared_with_restrictions`, or `review_required`;~~ **Amended by D07:** the first slice authorizes only `not_assessed`, `pending_review`, and `review_required`; `cleared_with_restrictions` and any clearance transition are deferred pending qualified clinical review. `cleared` without qualifications is not inferred.
 - Applying or changing an executable constraint requires explicit athlete confirmation.
 - Expired, conflicting, incomplete, or unknown constraints fail closed by holding the affected recommendation for review, not by inventing a safe prescription.
 
@@ -51,7 +53,7 @@ No duration-times-effort formula is approved as a clinical safety score.
 
 - Backup format version 1 must declare the database/application version and covered table set.
 - Once Migration 064 exists, its rows are required in the backup inventory and round-trip suite.
-- Restore default is not decided; merge restore is not assumed safe.
+- ~~Restore default is not decided; merge restore is not assumed safe.~~ **Amended by SC-07:** restore is full replacement only, after validation, preview, and a confirmed usable recovery copy. Merge restore is not supported: `decideRestore` returns `merge_not_supported` for merge, and a valid restore is `mode: 'replace'` with `recoveryCopyRequired: true`.
 
 ## 3. Decisions required before Migration 064
 
@@ -89,6 +91,7 @@ No duration-times-effort formula is approved as a clinical safety score.
 
 - Decide: full replacement only, merge, or both.
 - Recommendation: begin with validated full replacement plus pre-restore backup; defer merge until identity/conflict laws are proven.
+- Ratified (SC-07): full replacement only, with a confirmed recovery copy before atomic replacement; merge restore is rejected. See `docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md`.
 
 ### SC-08 — Experience-level policy conflict
 

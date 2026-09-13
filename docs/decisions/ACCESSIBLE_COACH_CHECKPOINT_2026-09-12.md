@@ -5,7 +5,7 @@
 - Status: `PRODUCT OWNER RATIFIED WITH EXPLICIT CLINICAL EXCLUSIONS — CLINICAL APPROVAL PENDING`.
 - Owner/product decider: Astra at high effort, under Francis's explicit delegation on 2026-09-13.
 - Qualified clinical reviewer: not yet identified.
-- Shared migration reservation: `064`; no SQL has been created.
+- Shared migration reservation: `064`. When this checkpoint was written on 2026-09-12 no SQL had been created; Migration 064 now exists as an unmerged implementation candidate on `codex/accessible-coach-2026-09-12` (see `HANDOVER_2026-09-13_ACCESSIBLE_COACH_MIGRATION_064.md`).
 - Inputs: `docs/research/accessible-coach/WO04_POLICY_DECISION_DOCKET.md`, `docs/audits/accessible-coach/WO06_CLINICAL_CONTRACT_REVIEW.md`, `docs/audits/accessible-coach/WO08_ACTIVITY_MOVEMENT_COVERAGE.md`, `docs/decisions/ACCESSIBLE_COACH_SHARED_CONTRACT_DOCKET.md`, and `docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md`.
 - Controlling product record: `docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md`. It ratifies the bounded product slice and explicitly does not authorize medical logic or claim clinical approval.
 
