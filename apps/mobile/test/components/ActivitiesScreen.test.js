@@ -144,4 +144,26 @@ describe('WO-05 factual activities screen', () => {
     expect(mockState.setActivityOccurrenceState).toHaveBeenNthCalledWith(2, 'occurrence-1', 'cancelled');
     expect(mockState.endActivitySeries).toHaveBeenCalledWith('series-1');
   });
+
+  test('logging a planned activity never pre-fills its planned minutes as the actual measurement', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      occurrences: [{
+        occurrenceId: 'occurrence-plan', activityId: 'activity-1', displayName: 'Walk',
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: 30, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      }],
+    };
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+
+    const actualMinutes = screen.getByLabelText('Actual activity duration in minutes');
+    expect(actualMinutes.props.value).toBe('');
+    expect(actualMinutes.props.placeholder).toMatch(/Planned 30 min/);
+    fireEvent.press(screen.getByRole('button', { name: 'SAVE ACTUAL ACTIVITY' }));
+    expect(mockState.completeActivityOccurrence).toHaveBeenCalledWith({
+      occurrenceId: 'occurrence-plan', actualDurationMin: null, actualEffort: null,
+    });
+  });
 });

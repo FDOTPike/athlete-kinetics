@@ -517,7 +517,9 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             <View>
               <SecondaryButton label="LOG ACTUAL COMPLETION" onPress={() => {
                 setCompletionTarget(row);
-                setCompletionDuration(row.expectedDurationMin?.toString() ?? '');
+                // Actual minutes are an observation. The plan is shown only as
+                // placeholder context so an untouched save stays unknown.
+                setCompletionDuration('');
                 setCompletionEffort('');
                 setError(null);
               }} accessibilityLabel={`Log actual completion for ${row.displayName}`} />
@@ -536,7 +538,10 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
           <Text style={styles.label}>ACTUAL MINUTES (OPTIONAL)</Text>
           <TextInput disableFullscreenUI style={styles.input} value={completionDuration}
             onChangeText={setCompletionDuration} keyboardType="number-pad"
-            accessibilityLabel="Actual activity duration in minutes" placeholder="Leave blank if unknown"
+            accessibilityLabel="Actual activity duration in minutes"
+            placeholder={completionTarget.expectedDurationMin === null
+              ? 'Leave blank if unknown'
+              : `Planned ${completionTarget.expectedDurationMin} min · leave blank if unknown`}
             placeholderTextColor={theme.color.textLow} />
           <Text style={styles.label}>ACTUAL EFFORT (OPTIONAL)</Text>
           <TextInput disableFullscreenUI style={styles.input} value={completionEffort}
