@@ -330,7 +330,10 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
                 disabled={activityId !== undefined}
                 onPress={() => {
                   setKindId(kind);
-                  if (kindId !== 'custom' || displayName === KIND_LABELS.custom) {
+                  // Replace only a generated label. A name the athlete typed is
+                  // their fact and survives a change of activity type.
+                  if (displayName.trim() === ''
+                      || (Object.values(KIND_LABELS) as string[]).includes(displayName)) {
                     setDisplayName(KIND_LABELS[kind]);
                   }
                 }}

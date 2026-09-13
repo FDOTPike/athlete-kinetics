@@ -191,4 +191,22 @@ describe('WO-05 factual activities screen', () => {
     expect(screen.getByRole('button', { name: 'No facility recorded' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'No activity equipment recorded' })).toBeOnTheScreen();
   });
+
+  test('switching activity type keeps a name the athlete typed and only replaces generated names', () => {
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+    const nameField = () => screen.getByLabelText('Activity name shown in the app');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Activity type: Basketball' }));
+    expect(nameField().props.value).toBe('Basketball');
+
+    fireEvent.changeText(nameField(), 'Friday social hoops');
+    fireEvent.press(screen.getByRole('button', { name: 'Activity type: Netball' }));
+    expect(nameField().props.value).toBe('Friday social hoops');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Activity type: Another activity' }));
+    fireEvent.changeText(nameField(), 'Hobby horsing');
+    fireEvent.press(screen.getByRole('button', { name: 'Activity type: Rugby' }));
+    expect(nameField().props.value).toBe('Hobby horsing');
+  });
 });
