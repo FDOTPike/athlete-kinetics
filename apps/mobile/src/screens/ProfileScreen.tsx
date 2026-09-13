@@ -37,6 +37,7 @@ import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/u
 import InfoTip from '../components/InfoTip';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
+import ActivitiesScreen from './ActivitiesScreen';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -277,6 +278,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
   const [bodyweightText, setBodyweightText] = useState('');
   const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [activitiesOpen, setActivitiesOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
   const buildTapCount = useRef(0);
   const buildTapReset = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -286,6 +288,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const hasSubView =
     glossaryOpen ||
+    activitiesOpen ||
     labOpen ||
     confirmingDeleteAthleteId !== null ||
     confirmingWipeBlock ||
@@ -293,6 +296,7 @@ export default function ProfileScreen(): React.JSX.Element {
     confirmingDeleteBandLevel !== null;
   useSubViewBack(hasSubView, () => {
     if (glossaryOpen) setGlossaryOpen(false);
+    else if (activitiesOpen) setActivitiesOpen(false);
     else if (labOpen) setLabOpen(false);
     else if (confirmingDeleteAthleteId !== null) setConfirmingDeleteAthleteId(null);
     else if (confirmingWipeBlock) setConfirmingWipeBlock(false);
@@ -348,6 +352,10 @@ export default function ProfileScreen(): React.JSX.Element {
 
   if (glossaryOpen) {
     return <GlossaryScreen onClose={() => setGlossaryOpen(false)} />;
+  }
+
+  if (activitiesOpen) {
+    return <ActivitiesScreen onClose={() => setActivitiesOpen(false)} />;
   }
 
   if (labOpen && advancedToolsUnlocked) {
@@ -922,6 +930,20 @@ export default function ProfileScreen(): React.JSX.Element {
             ))
           )}
         </Disclosure>
+      </View>
+
+      {/* ---- Learning & Terminology Glossary ---- */}
+      <View style={styles.mgmtSection} testID="existing-activities-section">
+        <Text style={styles.mgmtHeading}>EXISTING ACTIVITIES</Text>
+        <Text style={styles.fieldHint}>
+          Keep sport, walking, swimming, cycling, outside gym work, and other activities separate from equipment.
+          Record only what you know; missing time, duration, or effort stays unknown.
+        </Text>
+        <QuietAction
+          label="OPEN YOUR ACTIVITIES"
+          onPress={() => setActivitiesOpen(true)}
+          accessibilityLabel="Open your existing activities"
+        />
       </View>
 
       {/* ---- Learning & Terminology Glossary ---- */}

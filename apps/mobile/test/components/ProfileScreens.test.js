@@ -65,6 +65,16 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       oneRepMaxes: {},
       saveOneRepMax: jest.fn(),
       today: '2026-07-15',
+      activityLedger: {
+        definitions: [], series: [], occurrences: [], completedLast28Days: 0,
+        knownMinutesLast28Days: 0, completedWithUnknownDuration: 0,
+        scheduledKnownMinutesPerWeek: 0, scheduledWithUnknownDuration: 0,
+      },
+      saveWeeklyActivity: jest.fn(),
+      saveOneOffActivity: jest.fn(),
+      completeActivityOccurrence: jest.fn(),
+      setActivityOccurrenceState: jest.fn(),
+      endActivitySeries: jest.fn(),
       importHistory: jest.fn(() => ({ committed: false, duplicate: false, preview: { sessions: [], errors: [], warnings: [], unknownMovementNames: [], formatVersion: null } })),
       saveBodyweight: jest.fn(),
       loadMeasuredHistory: jest.fn(() => []),
@@ -641,6 +651,19 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
 
     // ProfileScreen content is restored
     expect(getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+  });
+
+  test('WO-05 opens the factual activity ledger from Profile and returns without adding a root tab', () => {
+    render(
+      <NavigationProvider initialTab="athlete">
+        <ProfileScreen />
+      </NavigationProvider>,
+    );
+    fireEvent.press(screen.getByRole('button', { name: 'Open your existing activities' }));
+    expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'YOUR ACTIVITIES' })).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Back to athlete profile' }));
+    expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
   });
 });
 

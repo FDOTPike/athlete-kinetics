@@ -21,6 +21,7 @@ import InfoTip from '../components/InfoTip';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -48,6 +49,16 @@ const PHASE_LABEL: Record<string, string> = {
   intensification: 'Build strength',
   realization: 'Realise',
   deload: 'Deload',
+};
+
+const ACTIVITY_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+const activityTime = (minute: number | null): string => {
+  if (minute === null) return 'time not set';
+  const hour = Math.floor(minute / 60);
+  const suffix = hour >= 12 ? 'pm' : 'am';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${String(minute % 60).padStart(2, '0')} ${suffix}`;
 };
 
 const GLOSSARY_PHASE_TERM: Record<string, 'BUILD' | 'INTENSIFICATION' | 'REALISE' | 'DELOAD'> = {
@@ -169,6 +180,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const storeError = useStore((s) => s.error);
   const today = useStore((s) => s.today);
   const profile = useStore((s) => s.profile);
+  const activityLedger = useStore((s) => s.activityLedger ?? EMPTY_ACTIVITY_LEDGER);
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
   const triageReady = useStore((s) => s.triageReady);
@@ -460,6 +472,28 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
       <View style={styles.header}>
         <Text style={styles.wordmark}>pikeMethods</Text>
       </View>
+
+      {activityLedger.series.some((row) => row.effectiveEndDate === null) && (
+        <Disclosure
+          label="YOUR OTHER WEEKLY ACTIVITIES"
+          hint="Recorded commitments shown beside this plan"
+          testID="plan-existing-activities"
+        >
+          {activityLedger.series.filter((row) => row.effectiveEndDate === null).map((row) => (
+            <View key={row.seriesId}>
+              <Text style={styles.cardTitle}>{row.displayName}</Text>
+              <Text style={styles.bodyText}>
+                {ACTIVITY_WEEKDAYS[row.localWeekday]} · {activityTime(row.localStartMinute)} · {row.timing}
+                {row.expectedDurationMin === null ? ' · duration unknown' : ` · ${row.expectedDurationMin} expected minutes`}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.bodyText}>
+            These are your reported facts. This version shows them alongside the plan but does not silently
+            move, add, remove, or intensify coach sessions.
+          </Text>
+        </Disclosure>
+      )}
 
       {block === null && hasArchivedBlock && (
         <View style={styles.card}>

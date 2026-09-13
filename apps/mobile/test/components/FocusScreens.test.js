@@ -64,6 +64,11 @@ const baseState = (overrides = {}) => ({
   status: 'ready',
   error: null,
   today: TODAY,
+  activityLedger: {
+    definitions: [], series: [], occurrences: [], completedLast28Days: 0,
+    knownMinutesLast28Days: 0, completedWithUnknownDuration: 0,
+    scheduledKnownMinutesPerWeek: 0, scheduledWithUnknownDuration: 0,
+  },
   profile: {
     objective: 'strength', training_age: 'intermediate', weekly_frequency: 4,
     equipment_inventory: ['barbell', 'dumbbells', 'bench'], base_rpe_cap: 8.5,
@@ -116,6 +121,26 @@ const baseState = (overrides = {}) => ({
 });
 
 beforeEach(() => { mockState = baseState(); });
+
+test('PLAN shows factual fixed activities without claiming it changed the coach dose', () => {
+  mockState = baseState({
+    activityLedger: {
+      definitions: [], occurrences: [], completedLast28Days: 0, knownMinutesLast28Days: 0,
+      completedWithUnknownDuration: 0, scheduledKnownMinutesPerWeek: 60,
+      scheduledWithUnknownDuration: 0,
+      series: [{
+        seriesId: 'series-basketball', activityId: 'activity-basketball', displayName: 'Basketball',
+        revision: 1, localWeekday: 5, localStartMinute: 1020, timezoneId: 'Australia/Sydney',
+        timing: 'fixed', expectedDurationMin: 60, expectedEffort: null,
+        effectiveStartDate: '2026-07-01', effectiveEndDate: null,
+      }],
+    },
+  });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'YOUR OTHER WEEKLY ACTIVITIES' }));
+  expect(screen.getByText('Friday · 5:00 pm · fixed · 60 expected minutes')).toBeOnTheScreen();
+  expect(screen.getByText(/does not silently move, add, remove, or intensify coach sessions/i)).toBeOnTheScreen();
+});
 
 test('READY keeps one direct action and hides raw metrics until the relevant disclosure opens', () => {
   const openCoach = jest.fn();
