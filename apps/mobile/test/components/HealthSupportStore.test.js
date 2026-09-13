@@ -118,3 +118,62 @@ test('Unicode resource bounds reject rather than truncate and note deletion pres
   expect(adapter.details().instructions).toHaveLength(1);
   expect(adapter.evaluate(all).status).toBe('held');
 });
+
+test('one captured support snapshot evaluates a large candidate set without candidate-amplified reads', () => {
+  const { db, adapter } = setup();
+  const insertMovement = db.raw.prepare('INSERT INTO movement(movement_id) VALUES (?)');
+  const insertHold = db.raw.prepare(`INSERT INTO health_support_hold
+    (hold_id,revision,origin,state,reason_code,created_at_ms,updated_at_ms)
+    VALUES (?,1,'user_requested','held','review_requested',1,1)`);
+  const insertScope = db.raw.prepare(`INSERT INTO health_support_scope
+    (scope_id,hold_id,target_kind,movement_id) VALUES (?,?,'movement',?)`);
+  for (let movementId = 3; movementId <= 400; movementId += 1) insertMovement.run(movementId);
+  for (let movementId = 1; movementId <= 64; movementId += 1) {
+    insertHold.run(`hold-${movementId}`);
+    insertScope.run(`scope-${movementId}`, `hold-${movementId}`, movementId);
+  }
+
+  let reads = 0;
+  const executeSync = db.executeSync.bind(db);
+  db.executeSync = (sql, values) => {
+    if (/^\s*(SELECT|WITH)\b/i.test(String(sql))) reads += 1;
+    return executeSync(sql, values);
+  };
+  const snapshot = adapter.captureEvaluation();
+  const captureReads = reads;
+  const decisions = Array.from({ length: 400 }, (_, index) =>
+    snapshot.evaluate([{ targetKind: 'movement', movementId: index + 1 }]));
+
+  expect(captureReads).toBe(68); // contract + profile + holds + orphan check + 64 scope reads
+  expect(reads).toBe(captureReads);
+  expect(decisions.slice(0, 64).every((decision) => decision.status === 'held')).toBe(true);
+  expect(decisions.slice(64).every((decision) => decision.status === 'available')).toBe(true);
+});
+
+test('decision evidence preserves the supplied factual identity and fails closed above the schema bound', () => {
+  const { db, adapter } = setup();
+  const identity = 'session-start:session:42:movement:1';
+  expect(adapter.recordDecision([{ targetKind: 'movement', movementId: 1 }], 'session', identity, 120).status).toBe('available');
+  const row = db.raw.prepare(`SELECT decision_id,advice_target_identity AS identity
+    FROM recommendation_support_record`).get();
+  expect(row.identity).toBe(identity);
+  expect(row.identity).not.toContain(row.decision_id);
+
+  expect(adapter.recordDecision([{ targetKind: 'movement', movementId: 1 }], 'session', identity, 120).status).toBe('available');
+  expect(db.raw.prepare(`SELECT generated_at_ms FROM recommendation_support_record
+    WHERE advice_target_identity=?`).all(identity).map((record) => record.generated_at_ms)).toEqual([120]);
+
+  db.raw.prepare("UPDATE recommendation_support_record SET engine_version='older-engine'").run();
+  expect(adapter.recordDecision([{ targetKind: 'movement', movementId: 1 }], 'session', identity, 120).status).toBe('support_unavailable');
+  db.raw.prepare("UPDATE recommendation_support_record SET engine_version='wo06-capture-2'").run();
+
+  db.raw.exec(`INSERT INTO health_support_hold
+    (hold_id,revision,origin,state,reason_code,created_at_ms,updated_at_ms)
+    VALUES ('changed-same-ms',1,'user_requested','held','review_requested',1,1);
+    INSERT INTO health_support_scope (scope_id,hold_id,target_kind,movement_id)
+    VALUES ('changed-same-ms-scope','changed-same-ms','movement',1);`);
+  expect(adapter.recordDecision([{ targetKind: 'movement', movementId: 1 }], 'session', identity, 120).status).toBe('support_unavailable');
+
+  expect(adapter.recordDecision(all, 'session', 'x'.repeat(161), 121).status).toBe('support_unavailable');
+  expect(db.raw.prepare('SELECT count(*) AS n FROM recommendation_support_record').get().n).toBe(1);
+});

@@ -114,7 +114,10 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
       {details.notes.map((n, index) => <View key={n.noteId} style={styles.section}>
         <Text style={styles.text}>{label(n.noteKind)}: {n.bodyText}</Text>
         <Button title={`Edit support note ${index + 1}`} onPress={() => { setNoteId(n.noteId); setNote(n.bodyText); setNoteKind(n.noteKind); }} />
-        <Button title={`Delete support note ${index + 1}`} onPress={() => save((r) => state.deleteSupportNote(athleteId, n.noteId, r))} />
+        <Button title={`Delete support note ${index + 1}`} onPress={() => save((r) => {
+          state.deleteSupportNote(athleteId, n.noteId, r);
+          if (noteId === n.noteId) { setNote(''); setNoteId(undefined); }
+        })} />
       </View>)}
       <Text style={styles.title}>Clinician instructions</Text>
       <Text style={styles.text}>{SUPPORT_DISCLOSURE}</Text>

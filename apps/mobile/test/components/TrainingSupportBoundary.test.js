@@ -33,11 +33,17 @@ const unhold = () => mockDriver.raw.exec("UPDATE health_support_hold SET state='
 const programInput = { horizon: { kind: 'weeks', blockCount: 2 }, schemaType: 'LINEAR', dayIndices: [1, 3, 5] };
 
 beforeEach(async () => {
+  let nowMs = Date.now();
+  jest.spyOn(Date, 'now').mockImplementation(() => ++nowMs);
   mockDriver = makeNodeSqliteDriver();
   useStore.setState({ status: 'booting', error: null, session: null, runner: null });
   state().boot();
   await new Promise((resolve) => setImmediate(resolve));
   expect(state().status).toBe('ready');
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 test('daily prescription: an unscoped held row prevents publication even with a real readiness vector', () => {
@@ -219,6 +225,72 @@ test('profile real-store journey captures, confirms, edits and deletes an instru
   expect(state().getTrainingSupportDecision().status).toBe('held');
   fireEvent.press(view.getByLabelText('Hide health and training support'));
   expect(view.queryByText('Changed private transcription')).toBeNull();
+});
+
+test('deleting the note in the editor clears its text and identity only after deletion succeeds', () => {
+  const athlete = state().activeAthleteId;
+  state().saveSupportNote(athlete, 'general', 'Private note being edited', undefined, 0);
+  const original = state().getHealthSupportDetails(athlete).notes[0];
+  const view = render(<ProfileScreen />);
+  fireEvent.press(view.getByLabelText('Show health and training support'));
+  fireEvent.press(view.getByLabelText('Edit support note 1'));
+  expect(view.getByLabelText('Support note text').props.value).toBe('Private note being edited');
+
+  fireEvent.press(view.getByLabelText('Delete support note 1'));
+  expect(view.getByLabelText('Support note text').props.value).toBe('');
+  expect(state().getHealthSupportDetails(athlete).notes).toHaveLength(0);
+
+  fireEvent.changeText(view.getByLabelText('Support note text'), 'Replacement note');
+  fireEvent.press(view.getByLabelText('Save support note'));
+  const replacement = state().getHealthSupportDetails(athlete).notes;
+  expect(replacement).toHaveLength(1);
+  expect(replacement[0]).toMatchObject({ bodyText: 'Replacement note' });
+  expect(replacement[0].noteId).not.toBe(original.noteId);
+});
+
+test('a failed deletion preserves the current note text and identity for retry', () => {
+  const athlete = state().activeAthleteId;
+  state().saveSupportNote(athlete, 'general', 'Private note survives failure', undefined, 0);
+  const original = state().getHealthSupportDetails(athlete).notes[0];
+  const view = render(<ProfileScreen />);
+  fireEvent.press(view.getByLabelText('Show health and training support'));
+  fireEvent.press(view.getByLabelText('Edit support note 1'));
+
+  // Make the open form's revision stale without publishing a store revision that would reload it.
+  mockDriver.raw.exec('UPDATE health_support_profile SET revision=revision+1');
+  fireEvent.press(view.getByLabelText('Delete support note 1'));
+  expect(view.getByText(/Support changed/)).toBeTruthy();
+  expect(view.getByLabelText('Support note text').props.value).toBe('Private note survives failure');
+  expect(state().getHealthSupportDetails(athlete).notes).toHaveLength(1);
+
+  // Restore only the synthetic revision drift, then prove Save still targets the same note.
+  mockDriver.raw.exec('UPDATE health_support_profile SET revision=revision-1');
+  fireEvent.changeText(view.getByLabelText('Support note text'), 'Retained editor identity');
+  fireEvent.press(view.getByLabelText('Save support note'));
+  const notes = state().getHealthSupportDetails(athlete).notes;
+  expect(notes).toHaveLength(1);
+  expect(notes[0]).toMatchObject({ noteId: original.noteId, bodyText: 'Retained editor identity' });
+});
+
+test('deleting a different support note preserves the current editor text and identity', () => {
+  const athlete = state().activeAthleteId;
+  state().saveSupportNote(athlete, 'general', 'Note open in editor', undefined, 0);
+  state().saveSupportNote(athlete, 'rest_context', 'Different note to delete', undefined, 1);
+  const before = state().getHealthSupportDetails(athlete).notes;
+  const editedIndex = before.findIndex((entry) => entry.bodyText === 'Note open in editor');
+  const deletedIndex = before.findIndex((entry) => entry.bodyText === 'Different note to delete');
+  const editedId = before[editedIndex].noteId;
+  const view = render(<ProfileScreen />);
+  fireEvent.press(view.getByLabelText('Show health and training support'));
+  fireEvent.press(view.getByLabelText(`Edit support note ${editedIndex + 1}`));
+  fireEvent.press(view.getByLabelText(`Delete support note ${deletedIndex + 1}`));
+  expect(view.getByLabelText('Support note text').props.value).toBe('Note open in editor');
+
+  fireEvent.changeText(view.getByLabelText('Support note text'), 'Edited note after other deletion');
+  fireEvent.press(view.getByLabelText('Save support note'));
+  const notes = state().getHealthSupportDetails(athlete).notes;
+  expect(notes).toHaveLength(1);
+  expect(notes[0]).toMatchObject({ noteId: editedId, bodyText: 'Edited note after other deletion' });
 });
 
 test('session UI withdraws next-step and set controls when support changes during a session', () => {

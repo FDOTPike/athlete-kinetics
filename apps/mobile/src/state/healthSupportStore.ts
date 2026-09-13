@@ -36,6 +36,12 @@ export interface SupportFacts {
   readonly athleteId: string; readonly contractAvailable: boolean; readonly revision: number;
   readonly reviewState: HealthSupportReviewState; readonly holds: readonly Omit<HealthSupportHold, 'scopes'>[];
 }
+export interface SupportEvaluationSnapshot {
+  /** Evaluate any number of prospective targets against one already-captured,
+   * content-free support snapshot. Callers must still use recordDecision at
+   * the actual mutation boundary; this is preview filtering only. */
+  readonly evaluate: (targets: readonly PersonalizedAdviceTarget[]) => TrainingSupportDecision;
+}
 
 const rows = <T>(result: unknown): T[] => {
   const value = (result as { rows?: unknown }).rows;
@@ -100,30 +106,46 @@ export function createHealthSupportStore(binding: SupportBinding, current: () =>
       return { athleteId: binding.athleteId, contractAvailable: true, ...p, holds };
     } catch { return unavailable(); }
   };
-  const evaluate = (targets: readonly PersonalizedAdviceTarget[]): TrainingSupportDecision => {
+  const captureEvaluation = (): SupportEvaluationSnapshot & { readonly facts: SupportFacts } => {
     const snapshot = facts();
-    if (!snapshot.contractAvailable) return evaluateTrainingSupport({ contractAvailable: false, holds: [], target: { targetKind: 'all_prescription' } });
-    const holdIds: string[] = [];
-    const reasonCodes = new Set<string>();
+    if (!snapshot.contractAvailable) return {
+      facts: snapshot,
+      evaluate: () => evaluateTrainingSupport({ contractAvailable: false, holds: [], target: { targetKind: 'all_prescription' } }),
+    };
     try {
-      // At most one hold's scopes in memory (256 rows per owner in frozen 064).
-      // Do not hydrate all historical revision scopes or any prose for a collapsed screen.
-      for (const h of snapshot.holds) {
-        if (h.state === 'withdrawn') continue;
-        const scopes = query<HealthSupportScope>(`SELECT scope_id AS scopeId,instruction_id AS instructionId,
+      // Frozen 064 bounds each hold to 256 scopes. Capture every current hold
+      // exactly once for this preview operation; cost scales with the support
+      // corpus, never with the candidate library, and no prose is hydrated.
+      const holds = snapshot.holds.filter((h) => h.state !== 'withdrawn').map((h) => ({
+        ...h,
+        scopes: query<HealthSupportScope>(`SELECT scope_id AS scopeId,instruction_id AS instructionId,
           instruction_revision AS instructionRevision,hold_id AS holdId,target_kind AS targetKind,
           activity_id AS activityId,series_id AS seriesId,occurrence_id AS occurrenceId,movement_id AS movementId,
           NULL AS reportedScopeText FROM health_support_scope WHERE hold_id=?
-          OR (instruction_id=? AND instruction_revision=?) ORDER BY scope_id`, [h.holdId, h.instructionId, h.instructionRevision]);
-        const matches = (targets.length ? targets : [{ targetKind: 'all_prescription' as const }]).some((target) =>
-          evaluateTrainingSupport({ contractAvailable: true, holds: [{ ...h, scopes }], target }).status === 'held');
-        if (matches) { holdIds.push(h.holdId); reasonCodes.add(h.reasonCode); }
-      }
+          OR (instruction_id=? AND instruction_revision=?) ORDER BY scope_id`, [h.holdId, h.instructionId, h.instructionRevision]),
+      }));
       check();
-      return holdIds.length ? { status: 'held', holdIds: holdIds.sort(), reasonCodes: [...reasonCodes].sort() }
-        : { status: 'available', holdIds: [] };
-    } catch { return { status: 'support_unavailable', holdIds: [] }; }
+      return {
+        facts: snapshot,
+        evaluate: (targets) => {
+          const holdIds: string[] = [];
+          const reasonCodes = new Set<string>();
+          for (const h of holds) {
+            const matches = (targets.length ? targets : [{ targetKind: 'all_prescription' as const }]).some((target) =>
+              evaluateTrainingSupport({ contractAvailable: true, holds: [h], target }).status === 'held');
+            if (matches) { holdIds.push(h.holdId); reasonCodes.add(h.reasonCode); }
+          }
+          return holdIds.length ? { status: 'held', holdIds: holdIds.sort(), reasonCodes: [...reasonCodes].sort() }
+            : { status: 'available', holdIds: [] };
+        },
+      };
+    } catch {
+      const unavailableSnapshot = unavailable();
+      return { facts: unavailableSnapshot, evaluate: () => ({ status: 'support_unavailable', holdIds: [] }) };
+    }
   };
+  const evaluate = (targets: readonly PersonalizedAdviceTarget[]): TrainingSupportDecision =>
+    captureEvaluation().evaluate(targets);
   const transaction = <T>(work: () => T): T => {
     check();
     db.executeSync('SAVEPOINT health_support_write');
@@ -179,7 +201,7 @@ export function createHealthSupportStore(binding: SupportBinding, current: () =>
     return { athleteId: binding.athleteId, ...profile(), preferences, notes, instructions };
   };
   return {
-    facts, evaluate, details,
+    facts, evaluate, captureEvaluation: (): SupportEvaluationSnapshot => captureEvaluation(), details,
     savePreference: (kind: HealthSupportPreferenceKind, value: string, detail: string, revision: number, atMs: number) => write(revision, atMs, () => {
       db.executeSync(`INSERT INTO health_support_preference (preference_id,revision,preference_kind,reported_value,
         detail_text,provenance,recorded_at_ms,updated_at_ms) VALUES (?,1,?,?,?,'user_reported',?,?)
@@ -262,14 +284,35 @@ export function createHealthSupportStore(binding: SupportBinding, current: () =>
       // Re-read decisive revisions inside the caller's transaction. No UI snapshot is authority.
       try {
         return transaction(() => {
-          const decision = evaluate(targets);
+          if (!Number.isSafeInteger(atMs) || atMs < 0) return { status: 'support_unavailable', holdIds: [] };
+          const captured = captureEvaluation();
+          const decision = captured.evaluate(targets);
           if (decision.status === 'support_unavailable') return decision;
-          const snapshot = facts();
+          const targetIdentity = bounded(identity, 160);
+          const existing = query<{ decisionId: string; supportStatus: string; engineVersion: string }>(`SELECT decision_id AS decisionId,
+            support_status AS supportStatus,engine_version AS engineVersion FROM recommendation_support_record
+            WHERE advice_target_kind=? AND advice_target_identity=? AND generated_at_ms=?`,
+          [kind, targetIdentity, atMs])[0];
+          if (existing !== undefined) {
+            const persistedBasis = query<{ holdId: string; holdRevision: number; reasonCode: string }>(`SELECT hold_id AS holdId,
+              hold_revision AS holdRevision,reason_code AS reasonCode FROM recommendation_hold_basis
+              WHERE decision_id=? ORDER BY hold_id`, [existing.decisionId]);
+            const currentBasis = decision.holdIds.map((holdId) => {
+              const hold = captured.facts.holds.find((candidate) => candidate.holdId === holdId);
+              return hold === undefined ? null : { holdId, holdRevision: hold.revision, reasonCode: hold.reasonCode };
+            });
+            const exactBasis = !currentBasis.includes(null)
+              && JSON.stringify(persistedBasis) === JSON.stringify(currentBasis);
+            return existing.engineVersion === 'wo06-capture-2'
+              && existing.supportStatus === decision.status && exactBasis
+              ? decision
+              : { status: 'support_unavailable', holdIds: [] };
+          }
           const id = allocate('support-decision', atMs, 'recommendation_support_record', 'decision_id');
           db.executeSync(`INSERT INTO recommendation_support_record VALUES (?,?,?,?,?,?)`,
-            [id, kind, bounded(`${identity}:${id}`, 160), decision.status, 'wo06-capture-1', atMs]);
+            [id, kind, targetIdentity, decision.status, 'wo06-capture-2', atMs]);
           for (const holdId of decision.holdIds) {
-            const h = snapshot.holds.find((candidate) => candidate.holdId === holdId);
+            const h = captured.facts.holds.find((candidate) => candidate.holdId === holdId);
             if (!h) throw new Error(SUPPORT_UNAVAILABLE_MESSAGE);
             db.executeSync('INSERT INTO recommendation_hold_basis VALUES (?,?,?,?)', [id, h.holdId, h.revision, h.reasonCode]);
           }
