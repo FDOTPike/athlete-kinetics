@@ -19,7 +19,7 @@ The portable format is `pikeMethods-encrypted-backup`, version 1. Its encrypted 
 - `@noble/ciphers` supplies AES-256-GCM with a 96-bit nonce and 128-bit authentication tag. A new nonce and salt are drawn for every seal operation.
 - Entropy comes directly from the native `RNGetRandomValues` TurboModule installed by `react-native-get-random-values`. The adapter deliberately does not call the package's JavaScript compatibility shim, so its remote-debug `Math.random` fallback cannot be used. Missing or malformed native entropy fails backup creation.
 - `@noble/hashes` supplies SHA-256 for snapshot and file verification.
-- Password bytes, derived keys, decrypted plaintext, and transient database byte arrays are zeroed on reachable exit paths. Passwords, keys, health-support prose, and decrypted archive data are not logged or persisted.
+- Password bytes, derived keys, and decrypted container plaintext are zeroed on reachable exit paths. Passwords, keys, health-support prose, and decrypted archive data are not logged or intentionally persisted.
 
 This composes established primitives; it does not introduce a custom cipher, authentication construction, or random-number generator.
 
@@ -45,7 +45,7 @@ The implementation caps aggregate decoded database bytes at 8 MiB. It first pref
 
 `react-native-blob-util` supplies app-private file stat/copy/move/hash operations. Before replacement, the app creates an encrypted recovery backup, moves it to its durable private path, re-reads it there, and proves its authentication. Storage preflight requires three times the replacement bytes with a 32 MiB minimum; unknown or insufficient capacity fails closed.
 
-The restore journal is written and revalidated before plaintext staging or rollback copies. It accepts only exact normalized children of the trusted document/database roots, exact target database basenames, unique and disjoint paths, registry-entry consistency, and staged/rollback names derived from the 128-bit operation id. Every copy/move boolean and resulting hash is checked before the next destructive step.
+The restore journal is written and revalidated before plaintext staging or rollback copies. It accepts only exact normalized children of the trusted document/database roots, exact target database basenames, unique and disjoint paths, registry-entry consistency, and staged/rollback names derived from the 128-bit operation id. Recovery and rollback copies must return success and match their source hashes before destruction. Incoming staged databases are authenticated, schema-checked, and hash-verified before boolean-checked same-filesystem moves. The durable journal and operation-bound markers govern interruption recovery.
 
 Operation-id-bound applying, committed, and rollback-complete markers make cold-start behavior deterministic:
 
