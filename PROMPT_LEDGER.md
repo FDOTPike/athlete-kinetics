@@ -9742,3 +9742,24 @@ Stop with the PR open and fully reported. Do not merge it.
   authorized. The final HEAD, full-gate result, rebuilt APK hash, PR URL,
   GitHub checks and CodeRabbit disposition are reported in the PR and the
   handback, so no self-referential tracked edit invalidates their provenance.
+
+---
+
+## Entry 0150 — 2026-09-13 · WO-07 live heart-rate capability audit
+
+### Input G(x)
+
+````
+Execute WO-07 as a bounded monitoring-capability audit from the supplied worktree, whose required base is origin/codex/rpe-familiarisation at b94053b4d63fb0ffd3b933aa1890d80f7313a87b. First verify path, detached/base identity, tree, status, diff, remote divergence, and repository instructions; stop and report if the base is wrong or the tree is dirty. Read docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md, especially WO-07, and inspect packages/biometrics plus Android/iOS/native dependencies. Distinguish historical health-data import from a genuinely live heart-rate stream. Produce a factual platform/device capability matrix covering foreground, background, lock-screen, permission, pairing, reconnect, sample timestamp/freshness, and connection state. Do not infer support from an installed dependency. Do not claim a wearable, platform, live alert, or medical-monitoring capability without primary evidence and reproducible native hardware evidence. If no live source is verifiable, deliver the assessment and an explicit unavailable-state recommendation only; do not implement or claim live monitoring. Any deterministic evaluator proposal must treat clinician-entered limits as explicit user/clinician inputs, define exact-boundary/stale/unavailable behavior, never label missing data safe, and remain advisory-only. Preserve offline deterministic architecture and freeze Migration 064. Do not modify prescription/progression logic, merge, rebase, touch master, tag, release, force-push, or claim C6. Append the verbatim prompt to PROMPT_LEDGER.md before repository writes. Keep generated evidence out of the repo unless clearly required. Run proportionate checks for any changed files. Commit only a clean, narrowly scoped documentation/audit deliverable and push only its feature branch with a normal non-force push. Finish with exact branch, base/HEAD/tree, changed paths, sources and verification boundaries, tests run, pushed ref, and explicit implemented/verified/design-only/deferred states.
+````
+
+### Output F(G(x))
+
+- Added `docs/audits/accessible-coach/WO07_LIVE_HEART_RATE_CAPABILITY_AUDIT.md`,
+  a source/configuration audit that identifies the existing Android Health
+  Connect path as historical daily HRV/resting-HR/sleep import only and marks
+  every live heart-rate/wearable path unavailable or unverified.
+- Verification: `npm run typecheck`, `npm run verify:biometrics`, and
+  `git diff --check` passed after `npm ci` restored the lockfile dependencies.
+- No native hardware, live alert, evaluator, migration, prescription,
+  progression, pairing, release, tag, merge, or C6 work was performed.
