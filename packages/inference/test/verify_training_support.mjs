@@ -92,5 +92,21 @@ assert.equal(evaluateTrainingSupport({
   holds: [hold('malformed', 'instruction_unreviewed', [scope('sx', 'activity_definition')])],
 }).status, 'held', 'a malformed scope is unresolved, so it holds athlete-wide rather than only its own kind');
 
-console.log('verify_training_support PASS — unavailable fails closed, scopes are exact, unresolved is athlete-wide, withdrawal is explicit');
+assert.equal(evaluateTrainingSupport({ contractAvailable: true,
+  target: { targetKind: 'activity_occurrence', occurrenceId: 'friday', activityId: 'swim' },
+  holds: [hold('definition', 'instruction_unreviewed', [scope('s', 'activity_definition', { activityId: 'swim' })])],
+}).status, 'held', 'definition scope follows its explicitly identified occurrence');
+assert.equal(evaluateTrainingSupport({ contractAvailable: true,
+  target: { targetKind: 'activity_occurrence', occurrenceId: 'friday', activityId: 'swim' },
+  holds: [hold('definition', 'instruction_unreviewed', [scope('s', 'activity_definition', { activityId: 'walk' })])],
+}).status, 'available', 'explicitly different definition proves disjointness');
+assert.equal(evaluateTrainingSupport({ contractAvailable: true,
+  target: { targetKind: 'activity_occurrence', occurrenceId: 'friday' },
+  holds: [hold('definition', 'instruction_unreviewed', [scope('s', 'activity_definition', { activityId: 'swim' })])],
+}).status, 'held', 'unknown parent identity cannot prove disjointness');
 
+assert.deepEqual(evaluateTrainingSupport({ contractAvailable: true, target: { targetKind: 'all_prescription' },
+  holds: ['z', 'ä', 'a', 'A'].map((id) => hold(id, 'review_requested', [])),
+}).holdIds, ['A', 'a', 'z', 'ä'], 'decision identity ordering uses fixed code-unit order, not the device locale');
+
+console.log('verify_training_support PASS — unavailable fails closed, scopes follow identity, unresolved is athlete-wide, withdrawal is explicit');

@@ -7,7 +7,7 @@ import { SELECTABLE_SCHEMA_TYPES } from '@ak/inference';
 let mockState;
 
 jest.mock('../../src/state/useStore', () => ({
-  useStore: (selector) => selector(mockState),
+  useStore: (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState }),
   formatTeachingOnlyReason: (verdict) => verdict === undefined
     ? 'Access cannot be verified right now.'
     : verdict.reasons.includes('capability') ? 'Capability evidence is required.' : 'Teaching only.',

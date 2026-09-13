@@ -38,6 +38,7 @@ import InfoTip from '../components/InfoTip';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
 import ActivitiesScreen from './ActivitiesScreen';
+import HealthTrainingSupportForm from '../components/HealthTrainingSupportForm';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -367,8 +368,8 @@ export default function ProfileScreen(): React.JSX.Element {
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
       <Text style={styles.subheading}>
-        These answers are hard limits on every prescription — the coach can tighten
-        them day to day, never exceed them.
+        Your training settings guide the coach. Health notes and preferences stay
+        in your records; instructions can place coach suggestions on hold.
       </Text>
 
       <View
@@ -384,6 +385,7 @@ export default function ProfileScreen(): React.JSX.Element {
         </Text>
       </View>
 
+      <HealthTrainingSupportForm />
       <ChipRow
         label="1 · OBJECTIVE"
         tip="GPP"

@@ -22,7 +22,6 @@ const sameTarget = (scope: HealthSupportScope, target: PersonalizedAdviceTarget)
   if (scope.targetKind === 'all_prescription' || scope.targetKind === 'unresolved') return true;
   if (targetIdentifierMissing(scope)) return true;
   if (target.targetKind === 'all_prescription') return true;
-  if (scope.targetKind !== target.targetKind) return false;
   if (scope.targetKind === 'activity_definition') {
     return target.activityId === undefined || scope.activityId === target.activityId;
   }
@@ -51,7 +50,7 @@ export function evaluateTrainingSupport(input: {
   const matched = input.holds
     .filter((hold) => hold.state === 'held')
     .filter((hold) => hold.scopes.length === 0 || hold.scopes.some((scope) => sameTarget(scope, input.target)))
-    .sort((a, b) => a.holdId.localeCompare(b.holdId));
+    .sort((a, b) => a.holdId < b.holdId ? -1 : a.holdId > b.holdId ? 1 : 0);
 
   if (matched.length === 0) return { status: 'available', holdIds: [] };
   return {

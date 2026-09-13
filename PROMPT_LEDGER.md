@@ -9742,3 +9742,73 @@ Stop with the PR open and fully reported. Do not merge it.
   authorized. The final HEAD, full-gate result, rebuilt APK hash, PR URL,
   GitHub checks and CodeRabbit disposition are reported in the PR and the
   handback, so no self-referential tracked edit invalidates their provenance.
+
+## WO-06 implementation execution — 2026-09-13
+
+You are the safety-critical implementation executor for Accessible Coach WO-06.
+
+STARTING IDENTITY
+Your Codex worktree must start from origin/codex/rpe-familiarisation at exact commit b94053b4d63fb0ffd3b933aa1890d80f7313a87b, the merge commit for PR #15. Verify path, branch, HEAD, tree, status, upstream, and divergence before any repository write. If the base differs, the tree is dirty, or another process is writing, stop and report. Use the Codex-created feature branch in this isolated worktree.
+
+PROTOCOL
+Read AGENTS.md and the applicable instructions, then read:
+- docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md
+- docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md
+- docs/audits/accessible-coach/WO06_CLINICAL_CONTRACT_REVIEW.md
+- PR #15's merged Migration 064 and activity adapter.
+
+The first repository write must append this entire execution prompt verbatim to PROMPT_LEDGER.md. Preserve append-only history. Migration 064 is frozen and must never be edited. Prefer its existing contract. If a schema change is genuinely required, first prove the next migration number is unused across relevant local and remote refs and prove upgrade from an installed 064 database.
+
+IMPLEMENT WO-06
+Build the Athlete Profile “Health and training support” UI and a parameterised, transactional store adapter over Migration 064. Support review state, position/transition/rest preferences, typed notes, and clinician-instruction transcription with explicit per-revision athlete confirmation. Use the exact disclosure: “Clinician instruction, entered by you — not independently verified.” Keep detail collapsed by default. Before deletion, explain that a content-free hold remains.
+
+Enforce evaluateTrainingSupport at every current prospective-advice entry point identified in WO06_CLINICAL_CONTRACT_REVIEW.md, re-deriving all dated line references from current code:
+- daily prescription publication;
+- block/program preview and commit;
+- continuation and preference-driven dose;
+- free-form and add-plan-slot defaults;
+- all substitution layers;
+- skill-chain next rung;
+- load advisory;
+- APRE next-week update, while finalisation stays truthful;
+- session start including repeat/free-form;
+- set logging in both UI and store.
+
+Held, unresolved, unscoped, or unavailable support data must fail closed for prospective personalised advice. Withdrawn and proven-disjoint holds must not block. Stop, rest, end-session, history, and retrospective factual activity logging remain available. Prose must never drive a decision; persist only content-free decision IDs, revisions, scopes, and reason codes. No screening, diagnosis, clearance, medical thresholds, symptom interpretation, live alert, or numeric clinician limit.
+
+TEST FIRST
+For each entry point, add a non-vacuous test that fails on the prior code for the real cause, then implement the smallest shared enforcement boundary. Include withdrawn/disjoint controls, deletion-marker persistence, prose invariance, missing-contract support_unavailable, athlete isolation, rollback, and a real-store component journey. Mutation-check high-risk shared gates where practical.
+
+VALIDATION AND HANDOFF
+Run focused tests, typecheck, git diff --check, and npm run verify:ci before any push. If product code changes, commit cleanly, build an exact-tip QA APK, run npm run verify:qa-candidate, and record size/SHA/provenance. Push only this task branch normally. Do not merge any branch, touch master, rewrite history, force-push, tag, release, sign production, or claim C6. Return exact base/head/tree, files, tests, commits, push state, findings/deferred items, and “MERGE / RELEASE / C6: NOT PERFORMED”.
+
+### WO-06 Output F(G(x)) — MASTER LEDGER ENTRY
+
+- Input identity: clean isolated worktree at exact PR #15 merge
+  b94053b4d63fb0ffd3b933aa1890d80f7313a87b, tree
+  99759f7be3af360a17037f3b18dd0f817cfd6704. The supplied execution prompt
+  was appended as the first repository write. The task branch is
+  codex/ac-wo06-training-support.
+- Implemented optional Health and training support capture, bounded typed
+  notes/preferences, per-revision transcription confirmation, athlete/handle
+  isolation, transactional optimistic revisions and content-free deletion holds.
+  Migration 064 is unchanged; no new migration or clinical interpretation.
+- Wired current prospective daily/program/block/routine/substitution/rung/load/
+  APRE/session/rest-progression/set-entry boundaries. Held and unavailable data
+  withhold advice; explicit withdrawal/disjoint identities retain existing
+  behavior. Stop, rest, truthful finalization and factual history remain usable.
+- Validation: final verify:ci exit 0; 31 component suites / 531 tests; focused
+  support 49/49; store SQL 675/675; backup 104-table inventory; typecheck and
+  diff check green. Six deliberate mutations were detected and removed.
+- Execution-order deviation: several expanded tests were added after initial
+  wiring, then failed behaviorally against the pinned base in retained replays.
+  This is not a claim that every final test preceded all implementation.
+- Handover: HANDOVER_2026-09-13_WO06_TRAINING_SUPPORT.md. Detailed entry-point
+  map and retained-failure evidence are in the WO06 implementation evidence.
+  Final commit/tree, normal push and exact-tip QA artifact are recorded after
+  the clean commit in the handback and ignored scratch/wo06/HANDOFF.json.
+- Constraints: no medical thresholds, clearance, prose interpretation, live
+  alerts or runtime networking added. Memory ceilings unchanged; RAM/latency
+  deltas and native accessibility/device acceptance were not measured.
+  Protected backup transfer/restore, clinical review and native QA remain deferred.
+- MERGE / RELEASE / C6: NOT PERFORMED.

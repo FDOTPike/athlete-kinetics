@@ -5,6 +5,7 @@ import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
+import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
@@ -510,14 +511,14 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     const outcomeCopy: Record<string, string> = isBeginner
       ? {
           followed_plan: "You followed today's plan. Recover well.",
-          adapted_session: "You adjusted the session and kept the work appropriate.",
+          adapted_session: "Session adjusted.",
           stopped_safely: "Stopping was the right call. Recovery is part of the plan.",
           session_recorded: "Your session is saved. Continue from here next time.",
         }
       : {
           followed_plan: "Plan followed.",
           adapted_session: "Session adapted.",
-          stopped_safely: "Session stopped safely.",
+          stopped_safely: "Session stopped.",
           session_recorded: "Session recorded.",
         };
 
@@ -579,6 +580,19 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         </View>
       </View>
     );
+  }
+
+  const trainingSupport = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision(sessionPlan.map((slot) => slot.movementId))
+    : { status: 'support_unavailable' as const };
+  if (trainingSupport.status !== 'available') {
+    return <View style={styles.idle} accessibilityRole="alert">
+      <Text style={styles.idleTitle}>Coach suggestions on hold</Text>
+      <Text style={styles.idleBody}>{trainingSupport.status === 'held' ? SUPPORT_HELD_MESSAGE : SUPPORT_UNAVAILABLE_MESSAGE}</Text>
+      <Text style={styles.idleBody}>You can continue resting. Your completed work stays recorded.</Text>
+      {session !== null && <SecondaryButton label="Finish session" accessibilityLabel="Finish session while support is on hold"
+        onPress={() => { runnerHalt('manual'); endSession(); }} />}
+    </View>;
   }
 
   if (session === null) {
@@ -680,6 +694,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   const logCurrent = (): void => {
     if (currentSlot === null || currentMovement === null || target === null || resting) return;
+    if (state.getTrainingSupportDecision([currentMovement.movement_id]).status !== 'available') return;
     // Equipment/safety/capability/attestation restrictions block execution of
     // this slot even though they no longer block the whole session.
     if (!currentSlotExecutable) return;
@@ -1361,7 +1376,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                 );
               })}
               {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
-                <Text style={styles.noOptions}>No safe replacement is available with today’s equipment. It is okay to finish here.</Text>
+                <Text style={styles.noOptions}>No replacement is available under the current app checks. It is okay to finish here.</Text>
               )}
             </View>
           </View>

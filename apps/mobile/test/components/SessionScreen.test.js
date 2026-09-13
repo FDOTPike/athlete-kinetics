@@ -39,7 +39,7 @@ jest.mock('@ak/inference', () => {
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
 jest.mock('../../src/state/useStore', () => {
-  const storeFunc = (selector) => selector(mockState);
+  const storeFunc = (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState });
   storeFunc.setState = jest.fn((updates) => {
     Object.assign(mockState, updates);
   });
@@ -1175,7 +1175,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 
   const beginnerOutcomes = [
     { kind: 'followed_plan', expected: "You followed today's plan. Recover well." },
-    { kind: 'adapted_session', expected: "You adjusted the session and kept the work appropriate." },
+    { kind: 'adapted_session', expected: "Session adjusted." },
     { kind: 'stopped_safely', expected: "Stopping was the right call. Recovery is part of the plan." },
     { kind: 'session_recorded', expected: "Your session is saved. Continue from here next time." },
   ];
@@ -1202,7 +1202,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
   const nonBeginnerOutcomes = [
     { kind: 'followed_plan', expected: "Plan followed." },
     { kind: 'adapted_session', expected: "Session adapted." },
-    { kind: 'stopped_safely', expected: "Session stopped safely." },
+    { kind: 'stopped_safely', expected: "Session stopped." },
     { kind: 'session_recorded', expected: "Session recorded." },
   ];
 

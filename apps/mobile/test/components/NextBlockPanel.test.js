@@ -16,7 +16,7 @@ jest.mock('../../src/state/useStore', () => ({
     amber: '#FFB454',
     red: '#FF5D5D',
   },
-  useStore: (selector) => selector(mockState),
+  useStore: (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState }),
 }));
 
 describe('NextBlockPanel (Work Order C)', () => {

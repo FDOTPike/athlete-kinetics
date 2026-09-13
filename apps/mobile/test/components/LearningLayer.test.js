@@ -18,7 +18,7 @@ jest.mock('../../src/state/useStore', () => ({
     amber: '#FFB454',
     red: '#FF5D5D',
   },
-  useStore: (selector) => selector(mockState),
+  useStore: (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState }),
   formatTeachingOnlyReason: (verdict) => verdict === undefined
     ? 'Access cannot be verified right now.'
     : verdict.reasons.includes('capability') ? 'Capability evidence is required.' : 'Teaching only.',
