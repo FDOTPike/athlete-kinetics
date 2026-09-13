@@ -9742,3 +9742,27 @@ Stop with the PR open and fully reported. Do not merge it.
   authorized. The final HEAD, full-gate result, rebuilt APK hash, PR URL,
   GitHub checks and CodeRabbit disposition are reported in the PR and the
   handback, so no self-referential tracked edit invalidates their provenance.
+
+---
+
+## 2026-09-13 — PR #15 carry-over defects executor prompt
+
+```text
+You are the bounded executor for PR #15 carry-over defects only.
+
+STARTING IDENTITY
+Your isolated Codex worktree must start from origin/codex/rpe-familiarisation at exact commit b94053b4d63fb0ffd3b933aa1890d80f7313a87b. Freeze path, branch, HEAD, tree, status, upstream, and divergence before writing. Stop on any mismatch or concurrent writer. The first repository write must append this entire prompt verbatim to PROMPT_LEDGER.md. Migration 064 is frozen; do not edit it.
+
+SCOPE
+Read AGENTS.md, docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md, the Astra owner rulings, the merged WO-05 handover, apps/mobile/src/state/activityStore.ts, ActivitiesScreen.tsx, and their tests. Fix exactly these four observations:
+1. saveOneOffActivity must reject completed or missed facts dated after the athlete’s current local day. Use an explicit/injected clock boundary suitable for deterministic tests; do not trust caller prose or an unrelated fixture timestamp.
+2. saveWeeklyActivity editing must fail when seriesId matches no row and must never reopen an ended series.
+3. Preserve the athlete’s reported optional effort exactly if the schema accepts it; do not silently round to 0.5. If current schema forbids exact storage, stop with evidence instead of changing frozen Migration 064.
+4. When the completion form opens, move screen-reader and keyboard focus to it. Give the entry form and completion form separate error state so one operation cannot leak an error into the other.
+
+TEST-FIRST LAW
+For each defect, add a test that demonstrably fails on the merged PR #15 implementation for the stated cause. Add success and boundary controls. Avoid source-text-only tests where executable behavior is available. Do not refactor unrelated activity policy or add coach adaptation.
+
+VALIDATION
+Run the focused adapter/screen/Profile/Plan/keyboard suites, typecheck, git diff --check, then npm run verify:ci. Commit narrow changes and normally push only this task branch. If product code changes, build an exact-tip QA APK and run verify:qa-candidate. Do not merge, rebase published history, force-push, touch master, tag, release, or claim C6. Report base/head/tree, reproduced defects, tests proving each fix, commits, artifact provenance, push state, and deferred items.
+```

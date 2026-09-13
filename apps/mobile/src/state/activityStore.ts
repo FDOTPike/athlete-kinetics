@@ -152,7 +152,7 @@ const optionalEffort = (value: number | null): number | null => {
   if (!Number.isFinite(value) || value < 1 || value > 10) {
     throw new Error('Effort must be between 1 and 10.');
   }
-  return Math.round(value * 2) / 2;
+  return value;
 };
 
 const nextId = (db: DB, prefix: string, table: string, column: string, atMs: number): string => {
@@ -391,6 +391,16 @@ export const saveWeeklyActivity = (db: DB, input: WeeklyActivityInput, atMs: num
   const [effortScaleId, effortScaleVersion] = effortColumns(effort);
   db.executeSync('BEGIN');
   try {
+    if (input.seriesId !== undefined) {
+      const activeSeries = rowsOf<{ activity_id: string }>(db.executeSync(
+        `SELECT activity_id FROM activity_series
+          WHERE series_id=? AND effective_end_date IS NULL`,
+        [input.seriesId],
+      ))[0];
+      if (input.activityId === undefined || activeSeries?.activity_id !== input.activityId) {
+        throw new Error('Weekly activity was not found.');
+      }
+    }
     const activityId = saveDefinition(db, input, atMs);
     const seriesId = input.seriesId
       ?? nextId(db, 'series', 'activity_series', 'series_id', atMs);
@@ -408,7 +418,7 @@ export const saveWeeklyActivity = (db: DB, input: WeeklyActivityInput, atMs: num
       db.executeSync(
         `UPDATE activity_series
             SET revision=revision+1,local_weekday=?,local_start_minute=?,timezone_id=?,
-                time_resolution_state='unresolved',effective_end_date=NULL,
+                time_resolution_state='unresolved',
                 timing_commitment=?,expected_duration_min=?,expected_effort=?,effort_scale_id=?,
                 effort_scale_version=?,updated_at_ms=?
           WHERE series_id=? AND activity_id=?`,
@@ -426,8 +436,17 @@ export const saveWeeklyActivity = (db: DB, input: WeeklyActivityInput, atMs: num
   }
 };
 
-export const saveOneOffActivity = (db: DB, input: OneOffActivityInput, atMs: number): string => {
+export const saveOneOffActivity = (
+  db: DB,
+  input: OneOffActivityInput,
+  atMs: number,
+  currentLocalDate: string,
+): string => {
   const localDate = strictLocalDate(input.localDate);
+  const today = strictLocalDate(currentLocalDate);
+  if ((input.state === 'completed' || input.state === 'missed') && localDate > today) {
+    throw new Error('Completed or missed activities cannot be dated in the future.');
+  }
   const timezone = boundedText(input.timezoneId, 'Timezone', 128);
   const expectedDuration = optionalWhole(input.expectedDurationMin, 'Expected duration', 1, 1440);
   const actualDuration = optionalWhole(input.actualDurationMin, 'Actual duration', 1, 1440);

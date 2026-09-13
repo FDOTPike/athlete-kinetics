@@ -2526,7 +2526,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   saveOneOffActivity: (input) => {
-    const id = saveOneOffActivityInDb(getDb(), input, Date.now());
+    const atMs = Date.now();
+    const id = saveOneOffActivityInDb(getDb(), input, atMs, localDateOf(atMs));
     get().refreshActivityLedger();
     return id;
   },

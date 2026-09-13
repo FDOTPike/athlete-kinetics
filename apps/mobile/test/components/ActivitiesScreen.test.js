@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import ActivitiesScreen from '../../src/screens/ActivitiesScreen';
 
 let mockState;
@@ -165,6 +166,54 @@ describe('WO-05 factual activities screen', () => {
     expect(mockState.completeActivityOccurrence).toHaveBeenCalledWith({
       occurrenceId: 'occurrence-plan', actualDurationMin: null, actualEffort: null,
     });
+  });
+
+  test('moves keyboard and screen-reader focus into the completion form when it opens', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      occurrences: [{
+        occurrenceId: 'occurrence-plan', activityId: 'activity-1', displayName: 'Walk',
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: 30, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      }],
+    };
+    const accessibilityFocus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+    const firstCompletionInput = screen.getByLabelText('Actual activity duration in minutes');
+    expect(firstCompletionInput.props.autoFocus).toBe(true);
+    fireEvent(firstCompletionInput, 'layout', { nativeEvent: { layout: {} } });
+    expect(accessibilityFocus).toHaveBeenCalled();
+  });
+
+  test('keeps entry and completion errors isolated when both forms are mounted', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      occurrences: [{
+        occurrenceId: 'occurrence-plan', activityId: 'activity-1', displayName: 'Walk',
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: 30, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      }],
+    };
+    mockState.saveWeeklyActivity.mockImplementation(() => { throw new Error('Entry failed.'); });
+    mockState.completeActivityOccurrence.mockImplementation(() => { throw new Error('Completion failed.'); });
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+    const entryForm = screen.getByTestId('activity-entry-form');
+    const completionForm = screen.getByTestId('activity-completion-form');
+
+    fireEvent.press(within(entryForm).getByRole('button', { name: 'Save activity facts' }));
+    expect(within(entryForm).getByRole('alert')).toHaveTextContent('Entry failed.');
+    expect(within(completionForm).queryByRole('alert')).toBeNull();
+
+    fireEvent.press(within(completionForm).getByRole('button', { name: 'SAVE ACTUAL ACTIVITY' }));
+    expect(within(completionForm).getByRole('alert')).toHaveTextContent('Completion failed.');
+    expect(within(entryForm).getByRole('alert')).toHaveTextContent('Entry failed.');
   });
 
   test('planned-activity actions and empty choices announce which activity and field they change', () => {

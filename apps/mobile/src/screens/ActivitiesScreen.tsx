@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, findNodeHandle, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   ACTIVITY_DEMANDS,
   ACTIVITY_EQUIPMENT_KINDS,
@@ -112,10 +112,13 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
   const [modalityId, setModalityId] = useState<ActivityModalityId>('unknown');
   const [purposeId, setPurposeId] = useState<ActivityPurposeId>('unknown');
   const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [entryError, setEntryError] = useState<string | null>(null);
+  const [completionError, setCompletionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [completionTarget, setCompletionTarget] = useState<ActivityOccurrenceFact | null>(null);
   const [completionDuration, setCompletionDuration] = useState('');
   const [completionEffort, setCompletionEffort] = useState('');
+  const completionDurationRef = useRef<React.ElementRef<typeof TextInput>>(null);
 
   const activeSeries = useMemo(
     () => ledger.series.filter((row) => row.effectiveEndDate === null),
@@ -139,7 +142,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
     setOneOffState('completed');
     setModalityId('unknown');
     setPurposeId('unknown');
-    setError(null);
+    setEntryError(null);
   };
 
   const definitionFor = (id: string): ActivityDefinitionFact | undefined =>
@@ -163,13 +166,13 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
       : `${String(Math.floor(row.localStartMinute / 60)).padStart(2, '0')}:${String(row.localStartMinute % 60).padStart(2, '0')}`);
     setDurationText(row.expectedDurationMin?.toString() ?? '');
     setEffortText(row.expectedEffort?.toString() ?? '');
-    setError(null);
+    setEntryError(null);
     setNotice(null);
     setFormOpen(true);
   };
 
   const save = (): void => {
-    setError(null);
+    setEntryError(null);
     try {
       const startMinute = parseMinute(timeText);
       const duration = parseOptionalNumber(durationText);
@@ -215,23 +218,23 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
       resetForm();
       setFormOpen(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setEntryError(caught instanceof Error ? caught.message : String(caught));
     }
   };
 
   const updatePlannedState = (occurrenceId: string, state: 'cancelled' | 'missed'): void => {
-    setError(null);
+    setActionError(null);
     try {
       setActivityOccurrenceState(occurrenceId, state);
       setNotice(state === 'cancelled' ? 'Activity marked cancelled.' : 'Activity marked missed.');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setActionError(caught instanceof Error ? caught.message : String(caught));
     }
   };
 
   const finishCompletion = (): void => {
     if (completionTarget === null) return;
-    setError(null);
+    setCompletionError(null);
     try {
       completeActivityOccurrence({
         occurrenceId: completionTarget.occurrenceId,
@@ -243,7 +246,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
       setCompletionEffort('');
       setNotice('Actual activity recorded.');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setCompletionError(caught instanceof Error ? caught.message : String(caught));
     }
   };
 
@@ -471,14 +474,14 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             <Text style={styles.hint}>Pool access is a facility. Swimming is the activity. These facts do not change strength-equipment eligibility.</Text>
           </Disclosure>
 
-          {error !== null && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+          {entryError !== null && <Text accessibilityRole="alert" style={styles.error}>{entryError}</Text>}
           <PrimaryButton label="SAVE ACTIVITY" onPress={save} accessibilityLabel="Save activity facts" />
           <QuietAction label="CANCEL" onPress={() => { resetForm(); setFormOpen(false); }} />
         </View>
       )}
 
       {notice !== null && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
-      {!formOpen && error !== null && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+      {!formOpen && actionError !== null && <Text accessibilityRole="alert" style={styles.error}>{actionError}</Text>}
 
       <Text accessibilityRole="header" style={styles.sectionTitle}>WEEKLY COMMITMENTS</Text>
       {activeSeries.length === 0 ? (
@@ -498,7 +501,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             accessibilityLabel={`Edit weekly schedule for ${row.displayName}`} />
           <QuietAction label="END THIS SCHEDULE" onPress={() => {
             try { endActivitySeries(row.seriesId); setNotice('Weekly schedule ended; past facts were kept.'); }
-            catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); }
+            catch (caught) { setActionError(caught instanceof Error ? caught.message : String(caught)); }
           }} accessibilityLabel={`End weekly schedule for ${row.displayName}`} />
         </View>
       ))}
@@ -526,7 +529,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
                 // placeholder context so an untouched save stays unknown.
                 setCompletionDuration('');
                 setCompletionEffort('');
-                setError(null);
+                setCompletionError(null);
               }} accessibilityLabel={`Log actual completion for ${row.displayName}`} />
               <View style={styles.chips}>
                 <QuietAction label="MARK MISSED" onPress={() => updatePlannedState(row.occurrenceId, 'missed')}
@@ -543,8 +546,12 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
         <View style={styles.form} testID="activity-completion-form">
           <Text accessibilityRole="header" style={styles.sectionTitle}>LOG {completionTarget.displayName.toUpperCase()}</Text>
           <Text style={styles.label}>ACTUAL MINUTES (OPTIONAL)</Text>
-          <TextInput disableFullscreenUI style={styles.input} value={completionDuration}
+          <TextInput ref={completionDurationRef} autoFocus disableFullscreenUI style={styles.input} value={completionDuration}
             onChangeText={setCompletionDuration} keyboardType="number-pad"
+            onLayout={() => {
+              const handle = findNodeHandle(completionDurationRef.current);
+              if (handle !== null) AccessibilityInfo.setAccessibilityFocus(handle);
+            }}
             accessibilityLabel="Actual activity duration in minutes"
             placeholder={completionTarget.expectedDurationMin === null
               ? 'Leave blank if unknown'
@@ -555,9 +562,9 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             onChangeText={setCompletionEffort} keyboardType="decimal-pad"
             accessibilityLabel="Actual whole activity effort from 1 to 10"
             placeholder="1 very easy · 10 hardest effort" placeholderTextColor={theme.color.textLow} />
-          {error !== null && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+          {completionError !== null && <Text accessibilityRole="alert" style={styles.error}>{completionError}</Text>}
           <PrimaryButton label="SAVE ACTUAL ACTIVITY" onPress={finishCompletion} />
-          <QuietAction label="CANCEL" onPress={() => setCompletionTarget(null)} />
+          <QuietAction label="CANCEL" onPress={() => { setCompletionError(null); setCompletionTarget(null); }} />
         </View>
       )}
     </KeyboardAwareScrollView>
