@@ -198,19 +198,21 @@ const ROLE_DEFAULTS: Readonly<Record<RoutineRole, readonly [number, number, numb
 };
 
 const AGE_SET_DELTA: Readonly<Record<TrainingAge, number>> = {
-  beginner: -1, intermediate: 0, advanced: 1, elite: 1,
+  beginner: -1, intermediate: 0, advanced: 0, elite: 0,
 };
 
 /** Dose ceilings are deliberately exposure-count agnostic. Five light,
- * distributed exposures can fit; one excessive exposure is adapted. */
+ * distributed exposures can fit; one excessive exposure is adapted.
+ * D02: experience alone grants no extra fatigue allowance. All eligible tiers
+ * retain the intermediate ceilings; the beginner standalone lock stays closed. */
 export const ROUTINE_FAMILY_STRESS_BUDGETS: Readonly<Record<TrainingAge, {
   readonly session: number;
   readonly week: number;
 }>> = {
   beginner: { session: 0, week: 0 },
   intermediate: { session: 32, week: 60 },
-  advanced: { session: 40, week: 80 },
-  elite: { session: 48, week: 100 },
+  advanced: { session: 32, week: 60 },
+  elite: { session: 32, week: 60 },
 };
 
 const round1 = (value: number): number => Math.round(value * 10) / 10;

@@ -9760,3 +9760,9 @@ Add R05 as an executable counterfactual before implementation and prove it fails
 
 VALIDATION
 Run focused inference gates, typecheck, git diff --check, and npm run verify:ci before push. Mutation-check the counterfactual so it cannot pass vacuously. Commit and normally push only this task branch. Do not merge, touch master, rebase published history, force-push, tag, release, or claim C6. Return exact base/head/tree, changed prescriptions, tests, commits, push state, and “MERGE / RELEASE / C6: NOT PERFORMED”.
+
+D02 scope clarification: asked whether to include the independent experience-only
+set uplift in `packages/inference/src/routineComposer.ts` and its R05 coverage.
+Owner reply, verbatim:
+
+Include routineComposer.ts

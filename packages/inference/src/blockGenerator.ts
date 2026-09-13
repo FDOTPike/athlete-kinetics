@@ -876,7 +876,8 @@ export function generateBlock(input: BlockInput): BlockPlan {
       const tierAvailableIds = new Set(tierPool.map((m) => m.movement_id));
 
       // Working sets: objective scheme + macro phase + schema row, damped for
-      // hybrid strength days (interference) and beginners, +1 for elites.
+      // hybrid strength days (interference) and beginners. D02: experience
+      // alone adds no workload; the beginner safety reduction remains.
       // Factored so the loaded and bodyweight classes run through IDENTICAL
       // logic and differ only in which setsDelta row they carry. The deload
       // zeroes the delta for both — week 4 is a strict volume deload.
@@ -887,7 +888,6 @@ export function generateBlock(input: BlockInput): BlockPlan {
         let baseSets = scheme.sets + phaseSets + (deload ? 0 : setsDelta);
         if (profile.objective === 'hybrid' && STRENGTH_FOCI.has(focus)) baseSets -= 1;
         if (profile.training_age === 'beginner') baseSets -= 1;
-        if (profile.training_age === 'elite') baseSets += 1;
         baseSets = clamp(baseSets, 2, 6);
         // R2 dose-role rule (Round 2, ledger 0060): accessory slots of a
         // hypertrophy strength day take the named role delta AFTER the

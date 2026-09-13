@@ -1,6 +1,6 @@
 'use strict';
 import { createRequire } from 'node:module';
-import { verifyR05Routines } from './verify_r05.mjs';
+import { verifyR05Routines, verifyR05Legacy } from './verify_r05.mjs';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -313,6 +313,7 @@ check('routine composer preserves the athlete-authored slot order', () => {
   assert.deepEqual(result.slots.map((slot) => slot.movementId), [4, 1, 2]);
   assert.deepEqual(result.slots.map((slot) => slot.slotIndex), [1, 2, 3]);
 });
+check('R05 legacy routine experience-only workload', () => verifyR05Legacy(composeRoutine));
 check('four method strategies are deterministic and distinct', () => {
   const base = { selections: [{ movementId: 1, role: 'major' }], objective: 'strength', trainingAge: 'intermediate', durationCapMin: 60, baseRpeCap: 9, availableMovementIds: new Set([1]) };
   const signatures = ['LINEAR', 'WAVE', 'STEP', 'APRE'].map((schemaType) => JSON.stringify(composeRoutine({ ...base, schemaType }).slots));
