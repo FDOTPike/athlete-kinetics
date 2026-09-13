@@ -12,7 +12,6 @@ import {
   cleanupRestoreFiles,
   cleanupAbandonedBackupDirectories,
   collectBoundedSnapshots,
-  copyFileConfirmed,
   decideRestore,
   executeInterruptedRestoreRecovery,
   hasRequiredStorage,
@@ -71,8 +70,10 @@ interface BlobFs {
   unlink(path: string): Promise<void>;
   mkdir(path: string): Promise<void>;
   ls(path: string): Promise<string[]>;
-  cp(path: string, destination: string): Promise<boolean>;
-  mv(path: string, destination: string): Promise<boolean>;
+  // react-native-blob-util's Android success callbacks carry no value even
+  // though its public declarations currently say Promise<boolean>.
+  cp(path: string, destination: string): Promise<unknown>;
+  mv(path: string, destination: string): Promise<unknown>;
   stat(path: string): Promise<{ size: string | number }>;
   hash(path: string, algorithm: 'sha256'): Promise<string>;
   df(): Promise<{ free?: number; internal_free?: string; external_free?: string }>;
@@ -157,6 +158,21 @@ async function removeConfirmed(path: string, message: string): Promise<void> {
   if (await io.exists(path)) throw new Error(message);
 }
 
+async function copyPathConfirmed(source: string, destination: string, message: string): Promise<void> {
+  const io = fs();
+  await io.cp(source, destination);
+  if (!(await io.exists(destination))
+    || await io.hash(source, 'sha256') !== await io.hash(destination, 'sha256')) {
+    throw new Error(message);
+  }
+}
+
+async function movePathConfirmed(source: string, destination: string, message: string): Promise<void> {
+  const io = fs();
+  await io.mv(source, destination);
+  if (await io.exists(source) || !(await io.exists(destination))) throw new Error(message);
+}
+
 const documentPath = (name: string): string => `${fs().dirs.DocumentDir}/${name}`;
 const operationMarkerPath = (kind: RestoreMarkerKind, operationId: string): string =>
   documentPath(restoreMarkerFile(kind, operationId));
@@ -172,7 +188,11 @@ async function publishRestoreMetadata(
     exists: (path) => io.exists(path),
     read: async (path) => asText(await io.readFile(path, 'utf8')),
     write: (path, text) => io.writeFile(path, text, 'utf8'),
-    move: (source, target) => io.mv(source, target),
+    move: (source, target) => movePathConfirmed(
+      source,
+      target,
+      'Restore metadata could not be published. Existing data is unchanged.',
+    ),
     remove: (path) => io.unlink(path),
   }, destination, temporary, value, validate);
 }
@@ -466,9 +486,7 @@ async function rollback(journal: RestoreJournalV1): Promise<void> {
   await rollbackRestoreFiles(journal, {
     exists: (path) => io.exists(path),
     remove: (path) => io.unlink(path),
-    copy: async (source, destination) => {
-      if (!(await io.cp(source, destination))) throw new Error('rollback copy failed');
-    },
+    copy: (source, destination) => copyPathConfirmed(source, destination, 'rollback copy failed'),
   });
   for (const entry of journal.entries) {
     if (entry.existedBefore && entry.rollbackPath !== null
@@ -500,9 +518,7 @@ async function cleanupJournal(journal: RestoreJournalV1): Promise<void> {
   ], async () => cleanupRestoreFiles(journal, {
     exists: (path) => io.exists(path),
     remove: (path) => io.unlink(path),
-    copy: async (source, destination) => {
-      if (!(await io.cp(source, destination))) throw new Error('cleanup copy failed');
-    },
+    copy: (source, destination) => copyPathConfirmed(source, destination, 'cleanup copy failed'),
   }), documentPath(RESTORE_JOURNAL_FILE), async (path) => removeConfirmed(
     path,
     path.endsWith(RESTORE_JOURNAL_FILE)
@@ -596,7 +612,11 @@ async function replaceAllData(incoming: BackupArchiveV1): Promise<void> {
     // cleanup path and can never be mistaken for an in-progress replacement.
     for (const [index, entry] of entries.entries()) {
       if (entry.existedBefore && entry.rollbackPath !== null) {
-        await copyFileConfirmed((source, destination) => io.cp(source, destination), entry.targetPath, entry.rollbackPath);
+        await copyPathConfirmed(
+          entry.targetPath,
+          entry.rollbackPath,
+          'A database recovery copy could not be confirmed. Existing data is unchanged.',
+        );
         if (await io.hash(entry.targetPath, 'sha256') !== await io.hash(entry.rollbackPath, 'sha256')) {
           throw new Error('A database recovery copy did not match its source. Existing data is unchanged.');
         }
@@ -609,7 +629,11 @@ async function replaceAllData(incoming: BackupArchiveV1): Promise<void> {
       }
     }
     if (registryExistedBefore) {
-      await copyFileConfirmed((source, destination) => io.cp(source, destination), registryTargetPath, registryRollbackPath);
+      await copyPathConfirmed(
+        registryTargetPath,
+        registryRollbackPath,
+        'The registry recovery copy could not be confirmed. Existing data is unchanged.',
+      );
       if (await io.hash(registryTargetPath, 'sha256') !== await io.hash(registryRollbackPath, 'sha256')) {
         throw new Error('The registry recovery copy did not match its source. Existing data is unchanged.');
       }
@@ -625,12 +649,21 @@ async function replaceAllData(incoming: BackupArchiveV1): Promise<void> {
     await writeMarkerConfirmed('applying', operationId);
     closeStoreDatabaseForRestore();
     storeClosed = true;
-    for (const entry of entries) {
+    for (const [index, entry] of entries.entries()) {
       await removeIfPresent(entry.targetPath);
-      if (entry.stagedPath !== null && !(await io.mv(entry.stagedPath, entry.targetPath))) throw new Error('Database replacement did not complete.');
+      if (entry.stagedPath !== null) {
+        await movePathConfirmed(entry.stagedPath, entry.targetPath, 'Database replacement did not complete.');
+        const expected = incomingByName.get(allNames[index]!);
+        if (expected === undefined || await io.hash(entry.targetPath, 'sha256') !== expected.sha256Hex) {
+          throw new Error('Database replacement did not match the authenticated backup.');
+        }
+      }
     }
     await removeIfPresent(registryTargetPath);
-    if (!(await io.mv(registryStagedPath, registryTargetPath))) throw new Error('Athlete registry replacement did not complete.');
+    await movePathConfirmed(registryStagedPath, registryTargetPath, 'Athlete registry replacement did not complete.');
+    if (!stagedRegistryMatches(asText(await io.readFile(registryTargetPath, 'utf8')), incomingRegistry)) {
+      throw new Error('Athlete registry replacement did not match the authenticated backup.');
+    }
     await writeMarkerConfirmed('committed', operationId);
     committed = true;
     await cleanupJournal(journal);
@@ -873,7 +906,11 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       const verified = await openBackup(asText(await fs().readFile(temporaryRecoveryPath, 'utf8')), password, mobileBackupCrypto);
       if (!verified.ok) throw new Error('The recovery backup could not be verified. Existing data is unchanged.');
       await removeIfPresent(recoveryPath);
-      if (!(await fs().mv(temporaryRecoveryPath, recoveryPath))) throw new Error('The verified recovery backup could not be retained. Existing data is unchanged.');
+      await movePathConfirmed(
+        temporaryRecoveryPath,
+        recoveryPath,
+        'The verified recovery backup could not be retained. Existing data is unchanged.',
+      );
       validatePortableBackupFileSize((await fs().stat(recoveryPath)).size);
       const retained = await openBackup(asText(await fs().readFile(recoveryPath, 'utf8')), password, mobileBackupCrypto);
       if (!retained.ok || retained.archive.backupId !== verified.archive.backupId) {

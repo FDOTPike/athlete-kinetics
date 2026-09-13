@@ -33,7 +33,7 @@ export interface AtomicMetadataIo {
   exists(path: string): Promise<boolean>;
   read(path: string): Promise<string>;
   write(path: string, value: string): Promise<void>;
-  move(source: string, destination: string): Promise<boolean>;
+  move(source: string, destination: string): Promise<void>;
   remove(path: string): Promise<void>;
 }
 
@@ -57,7 +57,8 @@ export async function publishAtomicMetadata(
   if (!validate(await io.read(temporary))) {
     throw new Error('Restore metadata temporary write could not be verified. Existing data is unchanged.');
   }
-  if (!(await io.move(temporary, destination))) {
+  await io.move(temporary, destination);
+  if (await io.exists(temporary) || !(await io.exists(destination))) {
     throw new Error('Restore metadata could not be published. Existing data is unchanged.');
   }
   if (!validate(await io.read(destination))) {

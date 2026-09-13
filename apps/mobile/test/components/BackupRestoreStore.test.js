@@ -17,6 +17,7 @@ let mockSelectedSize;
 let mockRegistryStageMode = 'reorder';
 let mockFailIncomingMove = false;
 let mockFailRollbackCopy = false;
+let mockDropRecoveryMove = false;
 let mockFileOps = [];
 const mockKeepLocalCopy = jest.fn(async () => {
   const localPath = `${mockCacheDir}/selected-local.pmbak`;
@@ -63,12 +64,13 @@ const mockFs = {
   async ls(path) { return existsSync(path) ? readdirSync(path) : []; },
   async cp(path, destination) {
     if (mockFailRollbackCopy && path.includes('.ak-rollback-')) return false;
-    copyFileSync(path, destination); return true;
+    copyFileSync(path, destination); return undefined;
   },
   async mv(path, destination) {
     if (mockFailIncomingMove && path.includes('.ak-incoming-')) return false;
+    if (mockDropRecoveryMove && path.endsWith('pikeMethods-recovery-current.pmbak.new')) return undefined;
     mockFileOps.push(['move', path, destination]);
-    renameSync(path, destination); return true;
+    renameSync(path, destination); return undefined;
   },
   async stat(path) { return { size: statSync(path).size }; },
   async hash(path) { return mockHashFile(path); },
@@ -193,6 +195,7 @@ beforeEach(async () => {
   mockRegistryStageMode = 'reorder';
   mockFailIncomingMove = false;
   mockFailRollbackCopy = false;
+  mockDropRecoveryMove = false;
   mockFileOps = [];
   mockKeepLocalCopy.mockClear();
   mockSaveDocuments.mockClear();
@@ -314,6 +317,25 @@ test('real backup store restores exact databases and semantic registry regardles
     && /^.*\/\.ak_restore_applying-[a-f0-9]{32}$/.test(path));
   expect(committedCleanupIndex).toBeLessThan(applyingCleanupIndex);
   expect(journalCleanupIndex).toBeGreaterThan(Math.max(...markerCleanupIndices));
+});
+
+test('resolved native recovery move without a destination fails closed before replacement', async () => {
+  await useBackupStore.getState().chooseRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('preview');
+  const registryBefore = mockHashFile(join(mockDocumentDir, 'coach_athletes.json'));
+  mockDropRecoveryMove = true;
+
+  await useBackupStore.getState().confirmRestore('restore-password');
+
+  expect(useBackupStore.getState().status).toBe('error');
+  expect(useBackupStore.getState().message).toMatch(/recovery backup could not be retained/i);
+  expect(mockHashFile(join(mockDocumentDir, 'coach_athletes.json'))).toBe(registryBefore);
+  expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(currentHashes.default);
+  expect(mockHashFile(join(mockLibraryDir, 'ak_athlete_old1.db'))).toBe(currentHashes.obsolete);
+  expect(existsSync(join(mockLibraryDir, 'ak_athlete_a123.db'))).toBe(false);
+  expect(existsSync(join(mockDocumentDir, 'pikeMethods-recovery-current.pmbak'))).toBe(false);
+  expect(mockFileOps.some(([kind, _source, destination]) => kind === 'move'
+    && destination === `${mockDocumentDir}/.ak_restore_journal.json`)).toBe(false);
 });
 
 test('staged registry validation rejects content that only matches after boot-time sanitization', async () => {

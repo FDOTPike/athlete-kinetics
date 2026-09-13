@@ -19,10 +19,9 @@ test('publishes recovery metadata only after verified same-directory temporary b
     write: async (path, value) => { calls.push(['write', path]); files.set(path, value); },
     move: async (source, destination) => {
       calls.push(['move', source, destination]);
-      if (!files.has(source)) return false;
+      if (!files.has(source)) return;
       files.set(destination, files.get(source));
       files.delete(source);
-      return true;
     },
     remove: async (path) => { calls.push(['remove', path]); files.delete(path); },
   };
@@ -35,6 +34,26 @@ test('publishes recovery metadata only after verified same-directory temporary b
     ['write', temporary],
     ['move', temporary, destination],
   ]);
+});
+
+test.each([
+  ['missing destination', false],
+  ['unchanged source', true],
+])('a resolved native move with %s fails closed', async (_name, copyDestination) => {
+  const files = new Map();
+  await expect(publishAtomicMetadata({
+    exists: async (path) => files.has(path),
+    read: async (path) => files.get(path) ?? '',
+    write: async (path, value) => { files.set(path, value); },
+    move: async (source, destination) => {
+      if (copyDestination) files.set(destination, files.get(source));
+      return undefined;
+    },
+    remove: async (path) => { files.delete(path); },
+  }, '/doc/final', '/doc/source.new', 'operation', (value) => value === 'operation'))
+    .rejects.toThrow(/could not be published/);
+  expect(files.has('/doc/final')).toBe(copyDestination);
+  expect(files.get('/doc/source.new')).toBe('operation');
 });
 
 test('a torn temporary metadata write never reaches the authoritative path', async () => {
