@@ -154,6 +154,40 @@ try {
     'fresh-install restore bytes must exactly match the snapshotted database bytes');
   assert.deepEqual(backup.base64ToBytes(opened.archive.databases[1].databaseBase64), alexBytes);
 
+  assert.deepEqual(backup.base64ToBytes(''), new Uint8Array());
+  assert.deepEqual(backup.base64ToBytes('AA=='), new Uint8Array([0]));
+  assert.deepEqual(backup.base64ToBytes('AAA='), new Uint8Array([0, 0]));
+  for (const malformed of ['A', 'A===', 'AA=A', '=AAA', 'AAAA====', 'AA\u0100=']) {
+    assert.throws(() => backup.base64ToBytes(malformed), (error) => error.code === 'invalid_container',
+      `malformed Base64 must be rejected: ${JSON.stringify(malformed)}`);
+  }
+
+  const largeDatabaseBytes = new Uint8Array(3 * 1024 * 1024);
+  for (let index = 0; index < largeDatabaseBytes.length; index += 1) largeDatabaseBytes[index] = index & 255;
+  largeDatabaseBytes.set(Buffer.from('SQLite format 3\0', 'binary'));
+  const largeBase64 = backup.bytesToBase64(largeDatabaseBytes);
+  assert.deepEqual(backup.base64ToBytes(largeBase64), largeDatabaseBytes,
+    'the bounded decoder must preserve a large valid payload');
+  const malformedLargeBase64 = `${largeBase64.slice(0, -1)}!`;
+  assert.throws(() => backup.base64ToBytes(malformedLargeBase64), (error) => error.code === 'invalid_container',
+    'a malformed character at the end of a large payload must fail validation');
+  const overCapBase64 = `!${'A'.repeat(Math.ceil((backup.MAX_DATABASE_BYTES + 1) / 3) * 4 - 1)}`;
+  assert.throws(() => backup.base64ToBytes(overCapBase64), (error) => error.code === 'resource_limit',
+    'decoded size must be rejected before allocating or scanning an over-cap payload');
+
+  const largeArchive = {
+    ...archive,
+    backupId: 'ffeeddccbbaa99887766554433221100',
+    registry: { ...archive.registry, athletes: [archive.registry.athletes[0]] },
+    databases: [snapshot('default', 'athlete_kinetics.db', largeDatabaseBytes)],
+  };
+  const largeSealed = await backup.sealBackup(largeArchive, password, cryptoProvider);
+  const largeOpened = await backup.openBackup(largeSealed, password, cryptoProvider);
+  assert.equal(largeOpened.ok, true, 'real AES-GCM must open a sealed 3 MiB database snapshot');
+  assert.equal(largeOpened.archive.databases[0].sha256Hex, cryptoProvider.sha256Hex(largeDatabaseBytes));
+  assert.deepEqual(backup.base64ToBytes(largeOpened.archive.databases[0].databaseBase64), largeDatabaseBytes,
+    'real AES-GCM seal/open must preserve all 3 MiB exactly');
+
   assert.equal((await backup.openBackup(sealed, 'wrong password value', cryptoProvider)).code, 'authentication_failed');
   const outer = JSON.parse(sealed);
   const tamperedCiphertext = `${outer.ciphertextBase64.slice(0, -8)}AAAAAAAA`;

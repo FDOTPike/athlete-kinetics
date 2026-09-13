@@ -12,15 +12,19 @@ export default function BackupTransferPanel(): React.JSX.Element {
   const status = useBackupStore((state) => state.status);
   const message = useBackupStore((state) => state.message);
   const preview = useBackupStore((state) => state.preview);
+  const startupSafe = useBackupStore((state) => state.startupSafe);
+  const recoveryAvailable = useBackupStore((state) => state.recoveryAvailable);
   const lastSuccessfulBackupAt = useBackupStore((state) => state.lastSuccessfulBackupAt);
   const createBackup = useBackupStore((state) => state.createBackup);
   const chooseRestore = useBackupStore((state) => state.chooseRestore);
+  const reviewRecovery = useBackupStore((state) => state.reviewRecovery);
   const confirmRestore = useBackupStore((state) => state.confirmRestore);
   const cancelRestore = useBackupStore((state) => state.cancelRestore);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
 
   const working = status === 'working';
+  const recoveryBlocked = startupSafe !== true;
   const strongEnough = password.length >= 12;
   const confirmed = strongEnough && password === confirmation;
 
@@ -71,17 +75,31 @@ export default function BackupTransferPanel(): React.JSX.Element {
       <QuietAction
         label="CREATE ENCRYPTED BACKUP"
         onPress={() => { void createBackup(password); }}
-        disabled={working || !confirmed}
+        disabled={working || recoveryBlocked || !confirmed}
         accessibilityLabel="Create encrypted backup of all athletes and choose where to save it"
         testID="create-backup-button"
       />
       <QuietAction
         label="RESTORE ENCRYPTED BACKUP"
         onPress={() => { void chooseRestore(password); }}
-        disabled={working || !strongEnough || preview !== null}
+        disabled={working || recoveryBlocked || !strongEnough || preview !== null}
         accessibilityLabel="Choose and preview an encrypted backup to replace all data"
         testID="choose-restore-button"
       />
+      {recoveryAvailable && (
+        <>
+          <Text style={styles.detail}>
+            A protected copy from the previous restore is available. Review it using the password from that restore.
+          </Text>
+          <QuietAction
+            label="REVIEW PREVIOUS DATA RECOVERY"
+            onPress={() => { void reviewRecovery(password); }}
+            disabled={working || recoveryBlocked || !strongEnough || preview !== null}
+            accessibilityLabel="Review the protected data recovery from the previous restore"
+            testID="review-recovery-button"
+          />
+        </>
+      )}
       {message !== null && (
         <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
       )}
@@ -98,11 +116,11 @@ export default function BackupTransferPanel(): React.JSX.Element {
           <QuietAction
             label="CONFIRM REPLACE ALL DATA"
             onPress={() => { void confirmRestore(password); }}
-            disabled={working || !strongEnough}
+            disabled={working || recoveryBlocked || !strongEnough}
             accessibilityLabel="Confirm replace all current athlete data from this backup"
             testID="confirm-restore-button"
           />
-          <QuietAction label="KEEP CURRENT DATA" onPress={cancelRestore} disabled={working} testID="cancel-restore-button" />
+          <QuietAction label="KEEP CURRENT DATA" onPress={cancelRestore} disabled={working || recoveryBlocked} testID="cancel-restore-button" />
         </View>
       )}
     </View>

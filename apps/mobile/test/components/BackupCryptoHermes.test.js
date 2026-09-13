@@ -18,7 +18,7 @@ import {
   openBackup,
   sealBackup,
 } from '@ak/core-db';
-import { strictUtf8Decode } from '../../src/state/backupCrypto';
+import { mobileBackupCrypto, strictUtf8Decode } from '../../src/state/backupCrypto';
 
 const fixedKey = new Uint8Array(32).fill(0x5a);
 const testCrypto = {
@@ -94,6 +94,26 @@ test.each([
   [0xf0, 0x9f, 0x92],             // truncated sequence
 ])('strict decoder rejects malformed UTF-8 %#', (...values) => {
   expect(() => strictUtf8Decode(Uint8Array.from(values))).toThrow('Backup plaintext is not valid UTF-8.');
+});
+
+test('the shipped mobile provider uses the strict decoder when Hermes has no TextDecoder', () => {
+  const originalTextDecoder = global.TextDecoder;
+  Object.defineProperty(global, 'TextDecoder', { configurable: true, writable: true, value: undefined });
+  try {
+    expect(mobileBackupCrypto.utf8Decode(new Uint8Array([0x41, 0xf0, 0x9f, 0x8f, 0x8b, 0xef, 0xb8, 0x8f])))
+      .toBe('A🏋️');
+    for (const malformed of [
+      [0xf0, 0x80, 0x80, 0x80], // four-byte overlong NUL
+      [0xf5, 0x80, 0x80, 0x80], // lead byte above Unicode range
+      [0xc2, 0x7f],             // non-continuation second byte
+      [0xe1, 0xc0, 0x80],       // illegal continuation lead in third-byte sequence
+    ]) {
+      expect(() => mobileBackupCrypto.utf8Decode(Uint8Array.from(malformed)))
+        .toThrow('Backup plaintext is not valid UTF-8.');
+    }
+  } finally {
+    Object.defineProperty(global, 'TextDecoder', { configurable: true, writable: true, value: originalTextDecoder });
+  }
 });
 
 test('malformed authenticated plaintext is classified as an invalid archive', async () => {

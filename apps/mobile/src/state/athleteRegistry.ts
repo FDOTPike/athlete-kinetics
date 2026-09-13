@@ -19,7 +19,7 @@ import {
   serializeRegistry,
   type AthleteRegistry,
 } from './athleteRegistryCore';
-import { dataMutationAllowed } from './dataMaintenanceLock';
+import { athleteDataBootAllowed, dataMutationAllowed } from './dataMaintenanceLock';
 
 interface BlobUtilFs {
   dirs: { DocumentDir: string };
@@ -52,7 +52,11 @@ export async function loadRegistry(): Promise<AthleteRegistry> {
 }
 
 export async function saveRegistry(reg: AthleteRegistry): Promise<boolean> {
-  if (!dataMutationAllowed()) return false;
+  // A free maintenance lock is not sufficient authority to mutate the
+  // registry. Recovery can deliberately leave the lock released while normal
+  // athlete-data boot remains revoked, and registry writes in that window can
+  // make the recovery journal describe a state that no longer exists.
+  if (!dataMutationAllowed() || !athleteDataBootAllowed()) return false;
   try {
     await blobFs().writeFile(registryPath(), serializeRegistry(reg), 'utf8');
     return true;

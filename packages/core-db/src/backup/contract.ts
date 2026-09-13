@@ -18,7 +18,14 @@ export const MAX_AGGREGATE_DATABASE_BYTES = 8 * 1024 * 1024;
 export const MAX_DATABASE_BYTES = MAX_AGGREGATE_DATABASE_BYTES;
 export const MAX_BACKUP_PASSWORD_CHARACTERS = 1_024;
 
-const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+const BASE64_LOOKUP = new Int16Array(128).fill(-1);
+for (let index = 0; index < 26; index += 1) {
+  BASE64_LOOKUP[65 + index] = index;
+  BASE64_LOOKUP[97 + index] = 26 + index;
+}
+for (let index = 0; index < 10; index += 1) BASE64_LOOKUP[48 + index] = 52 + index;
+BASE64_LOOKUP[43] = 62;
+BASE64_LOOKUP[47] = 63;
 const SHA256_HEX = /^[a-f0-9]{64}$/;
 const DB_NAME = /^(?:athlete_kinetics|ak_athlete_[a-z0-9]+)\.db$/;
 const ATHLETE_ID = /^(?:default|[a-z0-9]+)$/;
@@ -146,25 +153,33 @@ export function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export function base64ToBytes(text: string, maximumBytes = MAX_DATABASE_BYTES): Uint8Array {
-  if (!BASE64.test(text)) throw new BackupContractError('invalid_container', 'Backup encoding is invalid.');
+  if (text.length % 4 !== 0) throw new BackupContractError('invalid_container', 'Backup encoding is invalid.');
   const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0;
   const length = (text.length / 4) * 3 - padding;
   if (!Number.isSafeInteger(length) || length < 0 || length > maximumBytes) {
     throw new BackupContractError('resource_limit', 'Backup is too large for this version.');
   }
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const lookup = new Int16Array(128).fill(-1);
-  for (let index = 0; index < alphabet.length; index += 1) lookup[alphabet.charCodeAt(index)] = index;
   const result = new Uint8Array(length);
   let output = 0;
   for (let offset = 0; offset < text.length; offset += 4) {
-    const a = lookup[text.charCodeAt(offset)]!;
-    const b = lookup[text.charCodeAt(offset + 1)]!;
+    const finalQuantum = offset + 4 === text.length;
+    const aChar = text.charCodeAt(offset);
+    const bChar = text.charCodeAt(offset + 1);
     const cChar = text.charCodeAt(offset + 2);
     const dChar = text.charCodeAt(offset + 3);
-    const c = cChar === 61 ? 0 : lookup[cChar]!;
-    const d = dChar === 61 ? 0 : lookup[dChar]!;
-    const packed = (a << 18) | (b << 12) | (c << 6) | d;
+    const a = aChar < BASE64_LOOKUP.length ? BASE64_LOOKUP[aChar]! : -1;
+    const b = bChar < BASE64_LOOKUP.length ? BASE64_LOOKUP[bChar]! : -1;
+    const c = cChar < BASE64_LOOKUP.length ? BASE64_LOOKUP[cChar]! : -1;
+    const d = dChar < BASE64_LOOKUP.length ? BASE64_LOOKUP[dChar]! : -1;
+    const validPadding = finalQuantum
+      ? (padding === 0 && c >= 0 && d >= 0)
+        || (padding === 1 && c >= 0 && dChar === 61)
+        || (padding === 2 && cChar === 61 && dChar === 61)
+      : c >= 0 && d >= 0;
+    if (a < 0 || b < 0 || !validPadding) {
+      throw new BackupContractError('invalid_container', 'Backup encoding is invalid.');
+    }
+    const packed = (a << 18) | (b << 12) | (Math.max(c, 0) << 6) | Math.max(d, 0);
     if (output < length) result[output++] = (packed >>> 16) & 255;
     if (output < length) result[output++] = (packed >>> 8) & 255;
     if (output < length) result[output++] = packed & 255;

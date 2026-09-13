@@ -56,6 +56,7 @@ jest.mock('@ak/biometrics', () => ({
 jest.mock('../../src/state/backupStore', () => {
   const safeBackupState = {
     startupSafe: true,
+    recoveryAvailable: false,
     status: 'idle',
     message: null,
     preview: null,
@@ -63,6 +64,7 @@ jest.mock('../../src/state/backupStore', () => {
     initialize: jest.fn(() => Promise.resolve()),
     createBackup: jest.fn(),
     chooseRestore: jest.fn(),
+    reviewRecovery: jest.fn(),
     confirmRestore: jest.fn(),
     cancelRestore: jest.fn(),
   };

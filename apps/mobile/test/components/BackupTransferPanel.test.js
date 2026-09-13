@@ -7,8 +7,9 @@ jest.mock('../../src/state/backupStore', () => ({ useBackupStore: (selector) => 
 
 beforeEach(() => {
   mockState = {
-    status: 'idle', message: null, lastSuccessfulBackupAt: null, preview: null,
-    initialize: jest.fn(), createBackup: jest.fn(), chooseRestore: jest.fn(), confirmRestore: jest.fn(), cancelRestore: jest.fn(),
+    status: 'idle', startupSafe: true, message: null, lastSuccessfulBackupAt: null, preview: null,
+    recoveryAvailable: false,
+    initialize: jest.fn(), createBackup: jest.fn(), chooseRestore: jest.fn(), reviewRecovery: jest.fn(), confirmRestore: jest.fn(), cancelRestore: jest.fn(),
   };
 });
 
@@ -55,4 +56,31 @@ test('preview confirmation is explicit and cancellation never invokes restore', 
   expect(mockState.confirmRestore).not.toHaveBeenCalled();
   fireEvent.press(screen.getByTestId('confirm-restore-button'));
   expect(mockState.confirmRestore).toHaveBeenCalledWith('restore-passphrase');
+});
+
+test('offers a bounded password-gated path to review the previous encrypted recovery', () => {
+  mockState.recoveryAvailable = true;
+  render(<BackupTransferPanel />);
+  expect(screen.getByText(/protected copy from the previous restore is available/)).toBeOnTheScreen();
+  expect(screen.getByText(/password from that restore/)).toBeOnTheScreen();
+  const action = screen.getByTestId('review-recovery-button');
+  expect(action.props.accessibilityState.disabled).toBe(true);
+  fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'previous-password');
+  fireEvent.press(screen.getByTestId('review-recovery-button'));
+  expect(mockState.reviewRecovery).toHaveBeenCalledWith('previous-password');
+});
+
+test('recovery-required startup state disables every backup and restore action', () => {
+  mockState.startupSafe = false;
+  mockState.recoveryAvailable = true;
+  mockState.preview = {
+    backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
+  };
+  render(<BackupTransferPanel />);
+  fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'previous-password');
+  fireEvent.changeText(screen.getByLabelText('Confirm backup password'), 'previous-password');
+  for (const id of ['create-backup-button', 'choose-restore-button', 'review-recovery-button', 'confirm-restore-button', 'cancel-restore-button']) {
+    expect(screen.getByTestId(id).props.accessibilityState.disabled).toBe(true);
+  }
 });

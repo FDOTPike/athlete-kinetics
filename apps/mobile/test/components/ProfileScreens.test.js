@@ -8,9 +8,9 @@ import { NavigationProvider } from '../../src/navigation/navigation';
 
 let mockState;
 const mockBackupState = {
-  status: 'idle', message: null, lastSuccessfulBackupAt: null, preview: null,
+  status: 'idle', startupSafe: true, recoveryAvailable: false, message: null, lastSuccessfulBackupAt: null, preview: null,
   initialize: jest.fn(), createBackup: jest.fn(), chooseRestore: jest.fn(),
-  confirmRestore: jest.fn(), cancelRestore: jest.fn(),
+  reviewRecovery: jest.fn(), confirmRestore: jest.fn(), cancelRestore: jest.fn(),
 };
 
 jest.mock('@ak/inference', () => ({
