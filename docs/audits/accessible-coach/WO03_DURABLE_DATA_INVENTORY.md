@@ -4,18 +4,22 @@ Date: 2026-09-13
 Originally frozen at `87624d9e43189ddd87db317e24d4379ef5a13fae`; updated by the Accessible Coach integration candidate.
 Live chain: migration files through `064`; `004` is a parameterized materializer, not a migration. The migration array therefore has 63 entries and a fully migrated database reports `PRAGMA user_version = 63`. Slot `064` is the product-ratified neutral activity/support capture contract; it contains no executable clinical limit or screening schema.
 
-## Discovery result
+## Discovery result and candidate disposition
 
-No restorable backup or restore implementation exists at the frozen source.
+No restorable backup or restore implementation existed at the frozen source. The WO-03B candidate now adds an encrypted, all-athlete, replace-only implementation. The baseline findings below remain useful evidence of why existing export and diagnostic features could not be reused as backup.
 
 - `AK_HISTORY_V1` is a paste-only training-history import format. It imports sessions and sets after preview; it is not an export and cannot recreate profile, preferences, programs, routines, telemetry, or the athlete registry.
 - The Coach Verification Lab can share a deliberately redacted diagnostic report. That report is not user data backup.
-- `react-native-blob-util` can read and write known paths, but the repository has no OS create/open document picker bridge and no backup snapshot flow.
-- There is no database backup API call, `VACUUM INTO`, recovery-copy flow, atomic swap, portable encryption, backup preview, or persisted “last successful backup” state in app source.
+- At the frozen source, `react-native-blob-util` could read and write known paths, but the repository had no OS create/open document picker bridge and no backup snapshot flow.
+- At the frozen source, there was no database backup API call, `VACUUM INTO`, recovery-copy flow, journaled replacement, portable encryption, backup preview, or persisted “last successful backup” state.
+
+The candidate closes those gaps with authenticated AES-256-GCM/scrypt containers, OS document create/open operations, private `VACUUM INTO` snapshots, exhaustive schema checks, a verified encrypted recovery backup, operation-bound restore journaling, and a startup recovery gate. The implementation decision and failure policy are recorded in `docs/decisions/WO03_ENCRYPTED_BACKUP_AND_RESTORE.md`.
 
 ## Non-database durable data
 
-`coach_athletes.json` is stored in the app document directory outside SQLite. It contains registry version, active athlete id, athlete ids/display names/database filenames/creation times, and the device-wide advanced-tools preference. Each athlete maps to a distinct SQLite file (`athlete_kinetics.db` for the default athlete, otherwise `ak_athlete_<id>.db`). A complete all-athletes transfer must keep the registry and every referenced database together. Copying only the active database is not a complete Coach Mode backup.
+`coach_athletes.json` is stored in the app document directory outside SQLite. It contains registry version, active athlete id, athlete ids/display names/database filenames/creation times, and the device-wide advanced-tools preference. Each athlete maps to a distinct SQLite file (`athlete_kinetics.db` for the default athlete, otherwise `ak_athlete_<id>.db`). The candidate always carries the registry and one consistent physical snapshot of every referenced athlete database in one authenticated archive. Copying only the active database is not a complete Coach Mode backup.
+
+`backup_preferences.json` stores only the timestamp of the last portable backup whose OS save action returned success. It is operational UI state, is not athlete data, and is not part of the portable archive. The private `pikeMethods-recovery-current.pmbak`, restore journal, operation markers, rollback copies, and incoming files are recovery machinery rather than portable payload. Temporary plaintext snapshots exist only under narrowly named app-private cache directories (`ak-backup-<32 lowercase hex characters>`) and are cleaned on every reachable path; matching abandoned directories are swept before normal boot. Passwords, derived keys, decrypted archives, and private support prose are never written to diagnostics or metadata.
 
 ## Final live durable tables: 104
 
@@ -86,7 +90,7 @@ These tables collectively carry goal/program state, generated schedule, routine 
 - `recommendation_activity_basis` — exact occurrence identities/revisions considered by that attempt.
 - `recommendation_hold_basis` — exact hold identities/revisions and mechanical reason codes decisive for that attempt; no support prose.
 
-These tables are athlete-owned health/schedule information. A complete backup must include the graph atomically and use reviewed authenticated encryption before becoming shareable. The current generic backup contract is still design-only and does not yet provide that protected native adapter.
+These tables are athlete-owned health/schedule information. The candidate includes the complete graph inside each physical SQLite snapshot, authenticates it before it becomes shareable, and verifies the real migration-chain schema before restore. Restore preview is generated only after successful authentication and intentionally exposes no support-note prose.
 
 ### Native workout history, execution checkpoints, and outcomes (14)
 
@@ -151,18 +155,20 @@ Some of these are derived or aggregated, but no verified full rebuild path exist
 - `movement_sport_tracking`
 - `movement_tier_alignment`
 
-These rows are bundled/reference data rather than athlete-authored data. A physical SQLite snapshot naturally includes them. A future logical restore should normally reseed them from the target app and migrate athlete-owned references by stable identifiers; overwriting a newer app’s catalog with an older backup would be a downgrade hazard. That rule needs an integration adapter and cannot be inferred by the generic envelope.
+These rows are bundled/reference data rather than athlete-authored data. The candidate physical snapshot includes them and therefore preserves exact foreign-key identity. Format version, app schema version, migration slot, table count, every user table/column/index/trigger definition, and their fingerprint are checked before replacement. A newer or otherwise unsupported schema fails closed; no downgrade or inferred logical adapter is attempted.
 
 ## Non-table schema objects and superseded intermediates
 
-- Views `v_readiness_inputs` and `v_training_daily_all` contain no independent rows and should be recreated by migrations, not serialized as data.
-- Indexes and triggers are schema/invariant objects and should be recreated by migrations. They are not backup data sets.
+- Views `v_readiness_inputs` and `v_training_daily_all` contain no independent rows. Physical snapshots retain their definitions with the database, while the restore schema contract deliberately fingerprints the 174 durable table/index/trigger objects.
+- Indexes and triggers are schema/invariant objects, not independent data sets. They are nevertheless included by the physical snapshot and verified exhaustively because omitting or mutating them could weaken restored invariants.
 - `user_profile` is created by 006, copied into `athlete_profile`, and dropped by 007; it is not live.
 - `movement_equipment_v049`, `movement_role_eligibility_v052`, `routine_template_slot_v052`, and `planned_slot_autopilot_061` are migration replacement tables renamed into their final names; their temporary names are not live data classes.
 
-## WO-05/WO-06 boundary
+## Candidate capacity and WO-05/WO-06 boundary
 
-Migration 064 now supplies the shared neutral persistence contract. It does not by itself ship the WO-05 capture UI, apply holds at every personalized-advice boundary, or provide protected backup/restore. Those remain separately testable implementation stages. Do not call backup complete while the native encrypted adapter and all-table round trip are absent.
+The in-memory v1 implementation fails closed above 8 MiB of aggregate decoded database snapshot bytes or above a 16 MiB portable file. Both live files and the running `VACUUM INTO` output total are checked before accumulating or reading the next snapshot. Larger streaming backups are explicitly deferred rather than weakening cryptography or risking constrained-device memory exhaustion.
+
+Migration 064 supplies the shared neutral persistence contract and remains byte-identical to the frozen base. WO-03B protects and transfers that data but does not by itself ship the WO-05 capture UI or apply holds at every personalized-advice boundary. Those remain separately testable stages. This candidate must not be used to claim C6.
 
 ## CSV is not a backup
 

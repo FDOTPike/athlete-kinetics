@@ -17,6 +17,7 @@
  *     are never mapped to 'blocked_existing_data'.
  */
 import { useStore, localToday } from '../../src/state/useStore';
+import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockDriver;
@@ -25,6 +26,7 @@ let mockDriver;
 // microtask queue (setImmediate fires after every pending microtask) before
 // asserting readiness.
 const bootRealStore = async () => {
+  authorizeAthleteDataBoot();
   useStore.setState({ status: 'booting', error: null });
   useStore.getState().boot();
   await new Promise((resolve) => setImmediate(resolve));

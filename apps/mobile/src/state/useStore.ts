@@ -40,6 +40,7 @@ import {
   type AthleteEntry,
 } from './athleteRegistryCore';
 import { loadRegistry, saveRegistry } from './athleteRegistry';
+import { athleteDataBootAllowed } from './dataMaintenanceLock';
 import {
   createHealthSupportStore, SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE,
   type SupportDetails, type SupportFacts, type SupportInstructionInput,
@@ -990,6 +991,24 @@ interface KineticsStore {
 let db: DB | null = null;
 let dbAthleteId: string | null = null;
 let bootInFlight = false;
+
+/** Narrow lifecycle boundary used only by replace-only restore. The restore
+ * journal and verified recovery copy already exist before this is called. */
+export function closeStoreDatabaseForRestore(): void {
+  if (db !== null) closeKineticsDb(db);
+  db = null;
+  dbAthleteId = null;
+  bootInFlight = false;
+  useStore.setState({ status: 'booting' });
+}
+
+/** Re-open and rehydrate after either replacement or deterministic rollback. */
+export function restartStoreAfterRestore(): void {
+  bootInFlight = false;
+  useStore.setState({ status: 'booting' });
+  useStore.getState().boot();
+}
+
 const getDb = (): DB => {
   if (db === null) throw new Error('kinetics db not booted');
   return db;
@@ -2361,6 +2380,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   onboarded: true,
 
   boot: () => {
+    if (!athleteDataBootAllowed()) return;
     if (get().status === 'ready') return;
     // Audit A6: App.tsx and ReadinessScreen both invoke boot() on mount; the
     // second concurrent boot reopened the DB and leaked the first handle.

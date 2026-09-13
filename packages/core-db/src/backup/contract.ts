@@ -1,103 +1,120 @@
-import { canonicalJson, isJsonValue, type JsonObject, type JsonValue } from './canonicalJson';
+import { canonicalJson, type JsonValue } from './canonicalJson';
 
-export const BACKUP_FORMAT = 'pikeMethods-backup' as const;
+export const BACKUP_FORMAT = 'pikeMethods-encrypted-backup' as const;
 export const BACKUP_FORMAT_VERSION = 1 as const;
-export const BACKUP_CANONICALIZATION = 'ak-canonical-json-v1' as const;
 export const BACKUP_RESTORE_POLICY = 'replace' as const;
+export const BACKUP_CIPHER = 'AES-256-GCM' as const;
+export const BACKUP_KDF = 'scrypt' as const;
+export const BACKUP_KDF_N = 65_536 as const;
+export const BACKUP_KDF_R = 8 as const;
+export const BACKUP_KDF_P = 1 as const;
+export const BACKUP_KDF_KEY_BYTES = 32 as const;
+export const BACKUP_SALT_BYTES = 16 as const;
+export const BACKUP_NONCE_BYTES = 12 as const;
+export const BACKUP_TAG_BYTES = 16 as const;
+export const MAX_BACKUP_TEXT_BYTES = 16 * 1024 * 1024;
+export const MAX_ATHLETES_PER_BACKUP = 100;
+export const MAX_AGGREGATE_DATABASE_BYTES = 8 * 1024 * 1024;
+export const MAX_DATABASE_BYTES = MAX_AGGREGATE_DATABASE_BYTES;
+export const MAX_BACKUP_PASSWORD_CHARACTERS = 1_024;
 
-export type BackupScope = 'single-athlete' | 'all-athletes';
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+const SHA256_HEX = /^[a-f0-9]{64}$/;
+const DB_NAME = /^(?:athlete_kinetics|ak_athlete_[a-z0-9]+)\.db$/;
+const ATHLETE_ID = /^(?:default|[a-z0-9]+)$/;
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const SQLITE_HEADER = 'SQLite format 3\u0000';
 
-export interface BackupChecksumProvider {
-  /** Lower-case, 64-character SHA-256 hex digest of UTF-8 text. */
-  sha256Hex(text: string): string;
+export interface BackupCryptoProvider {
+  randomBytes(length: number): Uint8Array;
+  deriveScryptKey(passwordUtf8: Uint8Array, salt: Uint8Array, parameters: {
+    readonly N: number; readonly r: number; readonly p: number; readonly dkLen: number;
+  }): Promise<Uint8Array>;
+  encryptAes256Gcm(key: Uint8Array, nonce: Uint8Array, plaintext: Uint8Array, aad: Uint8Array): Promise<Uint8Array>;
+  decryptAes256Gcm(key: Uint8Array, nonce: Uint8Array, ciphertextAndTag: Uint8Array, aad: Uint8Array): Promise<Uint8Array>;
+  sha256Hex(bytes: Uint8Array): string;
+  utf8Encode(text: string): Uint8Array;
+  utf8Decode(bytes: Uint8Array): string;
 }
 
-export interface BackupDataSetInput {
+export interface BackupAthleteEntry {
+  readonly id: string;
   readonly name: string;
-  readonly identityFields: readonly string[];
-  readonly rows: readonly JsonObject[];
+  readonly dbName: string;
+  readonly createdAtMs: number;
 }
 
-export interface CreateBackupInput {
+export interface BackupRegistry {
+  readonly version: 1;
+  readonly activeId: string;
+  readonly advancedToolsUnlocked: boolean;
+  readonly athletes: readonly BackupAthleteEntry[];
+}
+
+export interface BackupDatabaseSnapshot {
+  readonly athleteId: string;
+  readonly dbName: string;
+  readonly byteLength: number;
+  readonly sha256Hex: string;
+  readonly userVersion: number;
+  readonly tableCount: number;
+  readonly databaseBase64: string;
+}
+
+export interface BackupArchiveV1 {
+  readonly archiveVersion: 1;
   readonly backupId: string;
   readonly createdAt: string;
   readonly sourceAppVersion: string;
-  /** SQLite PRAGMA user_version (chain length), not the numbered SQL filename. */
   readonly sourceSchemaVersion: number;
-  /** Highest numbered migration slot bundled by the source app. */
   readonly sourceMigrationSlot: number;
-  readonly scope: BackupScope;
-  readonly dataSets: readonly BackupDataSetInput[];
+  readonly scope: 'all-athletes';
+  readonly restorePolicy: typeof BACKUP_RESTORE_POLICY;
+  readonly registry: BackupRegistry;
+  readonly databases: readonly BackupDatabaseSnapshot[];
+  readonly previousSuccessfulBackupAt: string | null;
 }
 
-export interface BackupDataSet {
-  readonly name: string;
-  readonly identityFields: readonly string[];
-  readonly rows: readonly JsonObject[];
-}
-
-export interface BackupEnvelopeV1 {
+export interface EncryptedBackupContainerV1 {
   readonly format: typeof BACKUP_FORMAT;
   readonly formatVersion: typeof BACKUP_FORMAT_VERSION;
-  readonly manifest: {
-    readonly backupId: string;
-    readonly createdAt: string;
-    readonly sourceAppVersion: string;
-    readonly sourceSchemaVersion: number;
-    readonly sourceMigrationSlot: number;
-    readonly scope: BackupScope;
-    readonly restorePolicy: typeof BACKUP_RESTORE_POLICY;
-    readonly protection: { readonly mode: 'plaintext' };
-    readonly dataSetCounts: readonly { readonly name: string; readonly rowCount: number }[];
-    readonly integrityChecksum: {
-      readonly algorithm: 'SHA-256';
-      readonly canonicalization: typeof BACKUP_CANONICALIZATION;
-      readonly scope: 'manifest-and-payload-excluding-digest';
-      readonly digestHex: string;
-    };
+  readonly kdf: {
+    readonly algorithm: typeof BACKUP_KDF;
+    readonly N: typeof BACKUP_KDF_N;
+    readonly r: typeof BACKUP_KDF_R;
+    readonly p: typeof BACKUP_KDF_P;
+    readonly keyBytes: typeof BACKUP_KDF_KEY_BYTES;
+    readonly saltBase64: string;
   };
-  readonly payload: { readonly dataSets: readonly BackupDataSet[] };
+  readonly cipher: {
+    readonly algorithm: typeof BACKUP_CIPHER;
+    readonly nonceBase64: string;
+    readonly tagBytes: typeof BACKUP_TAG_BYTES;
+  };
+  readonly ciphertextBase64: string;
 }
 
-export type BackupParseErrorCode =
-  | 'invalid_json'
-  | 'invalid_shape'
+export type BackupOpenErrorCode =
+  | 'invalid_container'
   | 'unknown_format'
   | 'unsupported_version'
   | 'newer_version'
-  | 'checksum_mismatch'
-  | 'duplicate_identifier'
-  | 'noncanonical_input';
+  | 'resource_limit'
+  | 'authentication_failed'
+  | 'invalid_archive'
+  | 'duplicate_identity'
+  | 'database_corrupt';
 
-export type BackupParseResult =
-  | { readonly ok: true; readonly envelope: BackupEnvelopeV1 }
-  | { readonly ok: false; readonly code: BackupParseErrorCode; readonly message: string };
+export type BackupOpenResult =
+  | { readonly ok: true; readonly archive: BackupArchiveV1 }
+  | { readonly ok: false; readonly code: BackupOpenErrorCode; readonly message: string };
 
 export class BackupContractError extends Error {
-  constructor(
-    readonly code: Exclude<BackupParseErrorCode, 'invalid_json' | 'unknown_format' | 'unsupported_version' | 'newer_version' | 'checksum_mismatch' | 'noncanonical_input'>,
-    message: string,
-  ) {
+  constructor(readonly code: BackupOpenErrorCode, message: string) {
     super(message);
     this.name = 'BackupContractError';
   }
 }
-
-const DATA_SET_NAME = /^[a-z][a-z0-9_.-]{0,127}$/;
-const FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const SHA256_HEX = /^[a-f0-9]{64}$/;
-const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
-
-function isUtcIsoTimestamp(value: string): boolean {
-  if (!ISO_UTC.test(value)) return false;
-  const epochMs = Date.parse(value);
-  if (!Number.isFinite(epochMs)) return false;
-  const normalizedInput = value.includes('.') ? value : value.replace('Z', '.000Z');
-  return new Date(epochMs).toISOString() === normalizedInput;
-}
-
-const compareCodeUnits = (left: string, right: string): number =>
-  left < right ? -1 : left > right ? 1 : 0;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -108,201 +125,274 @@ const hasExactKeys = (value: Record<string, unknown>, keys: readonly string[]): 
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 };
 
-function identityKey(row: JsonObject, fields: readonly string[]): string {
-  return fields.map((field) => canonicalJson(row[field])).join('\u001f');
+function isUtcTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && ISO_UTC.test(value) && new Date(value).toISOString() === value;
 }
 
-function normalizeDataSets(dataSets: readonly BackupDataSetInput[]): BackupDataSet[] {
-  const names = new Set<string>();
-  const normalized = dataSets.map((dataSet): BackupDataSet => {
-    if (!DATA_SET_NAME.test(dataSet.name)) {
-      throw new BackupContractError('invalid_shape', `invalid data-set name: ${dataSet.name}`);
-    }
-    if (names.has(dataSet.name)) {
-      throw new BackupContractError('duplicate_identifier', `duplicate data-set name: ${dataSet.name}`);
-    }
-    names.add(dataSet.name);
-    const identityFields = [...dataSet.identityFields].sort();
-    if (
-      identityFields.length === 0
-      || new Set(identityFields).size !== identityFields.length
-      || identityFields.some((field) => !FIELD_NAME.test(field))
-    ) {
-      throw new BackupContractError('invalid_shape', `invalid identity fields for ${dataSet.name}`);
-    }
-    const keyedRows = dataSet.rows.map((row) => {
-      if (!isJsonValue(row) || Array.isArray(row)) {
-        throw new BackupContractError('invalid_shape', `${dataSet.name} contains a non-JSON row`);
-      }
-      for (const field of identityFields) {
-        if (!(field in row) || row[field] === null) {
-          throw new BackupContractError('invalid_shape', `${dataSet.name} row lacks identity field ${field}`);
-        }
-      }
-      return { key: identityKey(row, identityFields), row };
-    });
-    keyedRows.sort((left, right) => compareCodeUnits(left.key, right.key));
-    for (let index = 1; index < keyedRows.length; index += 1) {
-      if (keyedRows[index - 1].key === keyedRows[index].key) {
-        throw new BackupContractError('duplicate_identifier', `duplicate row identifier in ${dataSet.name}`);
-      }
-    }
-    return { name: dataSet.name, identityFields, rows: keyedRows.map(({ row }) => row) };
-  });
-  normalized.sort((left, right) => compareCodeUnits(left.name, right.name));
-  return normalized;
-}
-
-function envelopeAsJson(envelope: BackupEnvelopeV1): JsonValue {
-  return envelope as unknown as JsonValue;
-}
-
-export function serializeBackup(
-  input: CreateBackupInput,
-  checksumProvider: BackupChecksumProvider,
-): string {
-  if (input.backupId.trim().length === 0 || input.sourceAppVersion.trim().length === 0) {
-    throw new BackupContractError('invalid_shape', 'backup and app versions must be non-empty');
+export function bytesToBase64(bytes: Uint8Array): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let result = '';
+  for (let offset = 0; offset < bytes.length; offset += 3) {
+    const a = bytes[offset] ?? 0;
+    const b = bytes[offset + 1] ?? 0;
+    const c = bytes[offset + 2] ?? 0;
+    const packed = (a << 16) | (b << 8) | c;
+    result += alphabet[(packed >>> 18) & 63];
+    result += alphabet[(packed >>> 12) & 63];
+    result += offset + 1 < bytes.length ? alphabet[(packed >>> 6) & 63] : '=';
+    result += offset + 2 < bytes.length ? alphabet[packed & 63] : '=';
   }
+  return result;
+}
+
+export function base64ToBytes(text: string, maximumBytes = MAX_DATABASE_BYTES): Uint8Array {
+  if (!BASE64.test(text)) throw new BackupContractError('invalid_container', 'Backup encoding is invalid.');
+  const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0;
+  const length = (text.length / 4) * 3 - padding;
+  if (!Number.isSafeInteger(length) || length < 0 || length > maximumBytes) {
+    throw new BackupContractError('resource_limit', 'Backup is too large for this version.');
+  }
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lookup = new Int16Array(128).fill(-1);
+  for (let index = 0; index < alphabet.length; index += 1) lookup[alphabet.charCodeAt(index)] = index;
+  const result = new Uint8Array(length);
+  let output = 0;
+  for (let offset = 0; offset < text.length; offset += 4) {
+    const a = lookup[text.charCodeAt(offset)]!;
+    const b = lookup[text.charCodeAt(offset + 1)]!;
+    const cChar = text.charCodeAt(offset + 2);
+    const dChar = text.charCodeAt(offset + 3);
+    const c = cChar === 61 ? 0 : lookup[cChar]!;
+    const d = dChar === 61 ? 0 : lookup[dChar]!;
+    const packed = (a << 18) | (b << 12) | (c << 6) | d;
+    if (output < length) result[output++] = (packed >>> 16) & 255;
+    if (output < length) result[output++] = (packed >>> 8) & 255;
+    if (output < length) result[output++] = packed & 255;
+  }
+  return result;
+}
+
+/** Validate provider-reported size before reading a selected portable backup
+ * into JavaScript memory. Unknown, fractional, empty, and oversized files are
+ * rejected rather than relying on an eventual allocation failure. */
+export function validatePortableBackupFileSize(value: unknown): number {
+  const size = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN;
+  if (!Number.isSafeInteger(size) || size < 1) {
+    throw new BackupContractError('resource_limit', 'The selected backup size could not be verified safely.');
+  }
+  if (size > MAX_BACKUP_TEXT_BYTES) {
+    throw new BackupContractError('resource_limit', 'The selected backup is too large for this version.');
+  }
+  return size;
+}
+
+export function validateAggregateDatabaseBytes(values: readonly unknown[]): number {
+  let total = 0;
+  for (const value of values) {
+    const size = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN;
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw new BackupContractError('resource_limit', 'Backup database sizes could not be verified safely.');
+    }
+    total += size;
+    if (!Number.isSafeInteger(total) || total > MAX_AGGREGATE_DATABASE_BYTES) {
+      throw new BackupContractError('resource_limit', 'Backup is too large for this version.');
+    }
+  }
+  return total;
+}
+
+function outerMetadata(container: Omit<EncryptedBackupContainerV1, 'ciphertextBase64'>): string {
+  return canonicalJson(container as unknown as JsonValue);
+}
+
+function validateArchive(value: unknown, crypto: BackupCryptoProvider): BackupArchiveV1 {
+  if (!isRecord(value) || !hasExactKeys(value, [
+    'archiveVersion', 'backupId', 'createdAt', 'sourceAppVersion', 'sourceSchemaVersion',
+    'sourceMigrationSlot', 'scope', 'restorePolicy', 'registry', 'databases', 'previousSuccessfulBackupAt',
+  ])) throw new BackupContractError('invalid_archive', 'Authenticated backup contents are invalid.');
   if (
-    !isUtcIsoTimestamp(input.createdAt)
-    || !Number.isInteger(input.sourceSchemaVersion) || input.sourceSchemaVersion < 0
-    || !Number.isInteger(input.sourceMigrationSlot) || input.sourceMigrationSlot < 0
-  ) {
-    throw new BackupContractError('invalid_shape', 'createdAt or source schema identity is invalid');
+    value.archiveVersion !== 1 || typeof value.backupId !== 'string' || value.backupId.length < 8
+    || !isUtcTimestamp(value.createdAt) || typeof value.sourceAppVersion !== 'string' || value.sourceAppVersion.length === 0
+    || !Number.isInteger(value.sourceSchemaVersion) || (value.sourceSchemaVersion as number) < 0
+    || !Number.isInteger(value.sourceMigrationSlot) || (value.sourceMigrationSlot as number) < 0
+    || value.scope !== 'all-athletes' || value.restorePolicy !== BACKUP_RESTORE_POLICY
+    || (value.previousSuccessfulBackupAt !== null && !isUtcTimestamp(value.previousSuccessfulBackupAt))
+    || !isRecord(value.registry) || !Array.isArray(value.databases)
+  ) throw new BackupContractError('invalid_archive', 'Authenticated backup contents are invalid.');
+  const registry = value.registry;
+  if (!hasExactKeys(registry, ['version', 'activeId', 'advancedToolsUnlocked', 'athletes'])
+    || registry.version !== 1 || typeof registry.activeId !== 'string'
+    || typeof registry.advancedToolsUnlocked !== 'boolean' || !Array.isArray(registry.athletes)
+    || registry.athletes.length < 1 || registry.athletes.length > MAX_ATHLETES_PER_BACKUP
+    || value.databases.length !== registry.athletes.length) {
+    throw new BackupContractError('invalid_archive', 'Authenticated backup registry is invalid.');
   }
-  if (input.scope !== 'single-athlete' && input.scope !== 'all-athletes') {
-    throw new BackupContractError('invalid_shape', 'backup scope is invalid');
+  const ids = new Set<string>();
+  const dbNames = new Set<string>();
+  const athletes: BackupAthleteEntry[] = registry.athletes.map((entry): BackupAthleteEntry => {
+    if (!isRecord(entry) || !hasExactKeys(entry, ['id', 'name', 'dbName', 'createdAtMs'])
+      || typeof entry.id !== 'string' || !ATHLETE_ID.test(entry.id)
+      || typeof entry.name !== 'string' || entry.name.trim().length === 0 || entry.name.length > 24
+      || typeof entry.dbName !== 'string' || !DB_NAME.test(entry.dbName)
+      || (entry.id === 'default' ? entry.dbName !== 'athlete_kinetics.db' : entry.dbName !== `ak_athlete_${entry.id}.db`)
+      || typeof entry.createdAtMs !== 'number' || !Number.isSafeInteger(entry.createdAtMs) || entry.createdAtMs < 0
+      || ids.has(entry.id) || dbNames.has(entry.dbName)) {
+      throw new BackupContractError('duplicate_identity', 'Backup contains invalid or duplicate athlete identities.');
+    }
+    ids.add(entry.id);
+    dbNames.add(entry.dbName);
+    return entry as unknown as BackupAthleteEntry;
+  });
+  if (!ids.has(registry.activeId)) throw new BackupContractError('invalid_archive', 'Backup active athlete is missing.');
+  const declaredDatabaseSizes: number[] = [];
+  for (const snapshot of value.databases) {
+    if (!isRecord(snapshot) || typeof snapshot.byteLength !== 'number' || !Number.isSafeInteger(snapshot.byteLength)) {
+      throw new BackupContractError('invalid_archive', 'Authenticated database inventory is invalid.');
+    }
+    declaredDatabaseSizes.push(snapshot.byteLength);
   }
-  const dataSets = normalizeDataSets(input.dataSets);
-  const payload = { dataSets } as const;
-  const manifestWithoutDigest = {
-    backupId: input.backupId,
-    createdAt: input.createdAt,
-    sourceAppVersion: input.sourceAppVersion,
-    sourceSchemaVersion: input.sourceSchemaVersion,
-    sourceMigrationSlot: input.sourceMigrationSlot,
-    scope: input.scope,
-    restorePolicy: BACKUP_RESTORE_POLICY,
-    protection: { mode: 'plaintext' as const },
-    dataSetCounts: dataSets.map(({ name, rows }) => ({ name, rowCount: rows.length })),
-  };
-  const integrityContent = { manifest: manifestWithoutDigest, payload };
-  const digestHex = checksumProvider.sha256Hex(canonicalJson(integrityContent as unknown as JsonValue));
-  if (!SHA256_HEX.test(digestHex)) {
-    throw new BackupContractError('invalid_shape', 'checksum provider returned invalid SHA-256 hex');
+  validateAggregateDatabaseBytes(declaredDatabaseSizes);
+  const snapshots = new Map<string, BackupDatabaseSnapshot>();
+  for (const snapshot of value.databases) {
+    if (!isRecord(snapshot) || !hasExactKeys(snapshot, [
+      'athleteId', 'dbName', 'byteLength', 'sha256Hex', 'userVersion', 'tableCount', 'databaseBase64',
+    ]) || typeof snapshot.athleteId !== 'string' || !ids.has(snapshot.athleteId)
+      || typeof snapshot.dbName !== 'string' || snapshot.dbName !== athletes.find((a) => a.id === snapshot.athleteId)?.dbName
+      || typeof snapshot.byteLength !== 'number' || !Number.isSafeInteger(snapshot.byteLength)
+      || snapshot.byteLength < 100 || snapshot.byteLength > MAX_DATABASE_BYTES
+      || typeof snapshot.sha256Hex !== 'string' || !SHA256_HEX.test(snapshot.sha256Hex)
+      || typeof snapshot.userVersion !== 'number' || !Number.isInteger(snapshot.userVersion) || snapshot.userVersion !== value.sourceSchemaVersion
+      || typeof snapshot.tableCount !== 'number' || !Number.isInteger(snapshot.tableCount) || snapshot.tableCount !== 104
+      || typeof snapshot.databaseBase64 !== 'string' || snapshots.has(snapshot.athleteId)) {
+      throw new BackupContractError('invalid_archive', 'Authenticated database inventory is invalid.');
+    }
+    const bytes = base64ToBytes(snapshot.databaseBase64, MAX_DATABASE_BYTES);
+    const magic = String.fromCharCode(...bytes.subarray(0, SQLITE_HEADER.length));
+    if (bytes.length !== snapshot.byteLength || magic !== SQLITE_HEADER || crypto.sha256Hex(bytes) !== snapshot.sha256Hex) {
+      throw new BackupContractError('database_corrupt', 'A database snapshot did not pass integrity validation.');
+    }
+    snapshots.set(snapshot.athleteId, snapshot as unknown as BackupDatabaseSnapshot);
   }
-  const envelope: BackupEnvelopeV1 = {
+  if (snapshots.size !== athletes.length) throw new BackupContractError('invalid_archive', 'Backup is missing an athlete database.');
+  return value as unknown as BackupArchiveV1;
+}
+
+export async function sealBackup(archiveInput: BackupArchiveV1, password: string, crypto: BackupCryptoProvider): Promise<string> {
+  if (password.length < 12) throw new BackupContractError('invalid_archive', 'Use a backup password with at least 12 characters.');
+  if (password.length > MAX_BACKUP_PASSWORD_CHARACTERS) throw new BackupContractError('resource_limit', 'Backup password is too long.');
+  const archive = validateArchive(archiveInput, crypto);
+  const salt = crypto.randomBytes(BACKUP_SALT_BYTES);
+  const nonce = crypto.randomBytes(BACKUP_NONCE_BYTES);
+  if (salt.length !== BACKUP_SALT_BYTES || nonce.length !== BACKUP_NONCE_BYTES) {
+    throw new BackupContractError('invalid_container', 'Secure random-byte provider failed.');
+  }
+  const metadata = {
     format: BACKUP_FORMAT,
     formatVersion: BACKUP_FORMAT_VERSION,
-    manifest: {
-      ...manifestWithoutDigest,
-      integrityChecksum: {
-        algorithm: 'SHA-256',
-        canonicalization: BACKUP_CANONICALIZATION,
-        scope: 'manifest-and-payload-excluding-digest',
-        digestHex,
-      },
-    },
-    payload,
-  };
-  return canonicalJson(envelopeAsJson(envelope));
-}
-
-function failure(code: BackupParseErrorCode, message: string): BackupParseResult {
-  return { ok: false, code, message };
-}
-
-function validateEnvelopeShape(value: unknown): value is BackupEnvelopeV1 {
-  if (!isRecord(value) || !hasExactKeys(value, ['format', 'formatVersion', 'manifest', 'payload'])) return false;
-  if (!isRecord(value.manifest) || !isRecord(value.payload)) return false;
-  if (!hasExactKeys(value.payload, ['dataSets']) || !Array.isArray(value.payload.dataSets)) return false;
-  if (!hasExactKeys(value.manifest, [
-    'backupId', 'createdAt', 'sourceAppVersion', 'sourceSchemaVersion', 'sourceMigrationSlot', 'scope', 'restorePolicy',
-    'protection', 'dataSetCounts', 'integrityChecksum',
-  ])) return false;
-  if (!isRecord(value.manifest.protection) || !hasExactKeys(value.manifest.protection, ['mode'])) return false;
-  if (!isRecord(value.manifest.integrityChecksum) || !hasExactKeys(value.manifest.integrityChecksum, ['algorithm', 'canonicalization', 'scope', 'digestHex'])) return false;
-  return true;
-}
-
-export function parseBackup(text: string, checksumProvider: BackupChecksumProvider): BackupParseResult {
-  let parsed: unknown;
+    kdf: { algorithm: BACKUP_KDF, N: BACKUP_KDF_N, r: BACKUP_KDF_R, p: BACKUP_KDF_P, keyBytes: BACKUP_KDF_KEY_BYTES, saltBase64: bytesToBase64(salt) },
+    cipher: { algorithm: BACKUP_CIPHER, nonceBase64: bytesToBase64(nonce), tagBytes: BACKUP_TAG_BYTES },
+  } as const;
+  const passwordBytes = crypto.utf8Encode(password);
+  const plaintext = crypto.utf8Encode(canonicalJson(archive as unknown as JsonValue));
+  let key: Uint8Array | null = null;
   try {
-    parsed = JSON.parse(text) as unknown;
-  } catch {
-    return failure('invalid_json', 'backup is not complete JSON');
+    key = await crypto.deriveScryptKey(passwordBytes, salt, {
+      N: BACKUP_KDF_N, r: BACKUP_KDF_R, p: BACKUP_KDF_P, dkLen: BACKUP_KDF_KEY_BYTES,
+    });
+    if (key.length !== BACKUP_KDF_KEY_BYTES) throw new BackupContractError('invalid_container', 'Password KDF failed.');
+    const ciphertext = await crypto.encryptAes256Gcm(
+      key, nonce, plaintext, crypto.utf8Encode(outerMetadata(metadata)),
+    );
+    const container: EncryptedBackupContainerV1 = { ...metadata, ciphertextBase64: bytesToBase64(ciphertext) };
+    const result = canonicalJson(container as unknown as JsonValue);
+    if (result.length > MAX_BACKUP_TEXT_BYTES) throw new BackupContractError('resource_limit', 'Backup is too large for this version.');
+    return result;
+  } finally {
+    passwordBytes.fill(0);
+    plaintext.fill(0);
+    key?.fill(0);
   }
-  if (!isRecord(parsed)) return failure('invalid_shape', 'backup root must be an object');
-  if (parsed.format !== BACKUP_FORMAT) return failure('unknown_format', 'file is not a pikeMethods backup');
-  if (typeof parsed.formatVersion !== 'number' || !Number.isInteger(parsed.formatVersion)) {
-    return failure('unsupported_version', 'backup format version is invalid');
-  }
-  if (parsed.formatVersion > BACKUP_FORMAT_VERSION) {
-    return failure('newer_version', 'backup was created by a newer incompatible app version');
-  }
-  if (parsed.formatVersion !== BACKUP_FORMAT_VERSION) {
-    return failure('unsupported_version', 'backup format version is unsupported');
-  }
-  if (!validateEnvelopeShape(parsed)) return failure('invalid_shape', 'backup fields are missing or unknown');
-  const manifest = parsed.manifest;
-  if (
-    typeof manifest.backupId !== 'string' || manifest.backupId.trim().length === 0
-    || typeof manifest.createdAt !== 'string' || !isUtcIsoTimestamp(manifest.createdAt)
-    || typeof manifest.sourceAppVersion !== 'string' || manifest.sourceAppVersion.trim().length === 0
-    || typeof manifest.sourceSchemaVersion !== 'number' || !Number.isInteger(manifest.sourceSchemaVersion) || manifest.sourceSchemaVersion < 0
-    || typeof manifest.sourceMigrationSlot !== 'number' || !Number.isInteger(manifest.sourceMigrationSlot) || manifest.sourceMigrationSlot < 0
-    || (manifest.scope !== 'single-athlete' && manifest.scope !== 'all-athletes')
-    || manifest.restorePolicy !== BACKUP_RESTORE_POLICY
-    || manifest.protection.mode !== 'plaintext'
-    || manifest.integrityChecksum.algorithm !== 'SHA-256'
-    || manifest.integrityChecksum.canonicalization !== BACKUP_CANONICALIZATION
-    || manifest.integrityChecksum.scope !== 'manifest-and-payload-excluding-digest'
-    || typeof manifest.integrityChecksum.digestHex !== 'string' || !SHA256_HEX.test(manifest.integrityChecksum.digestHex)
-    || !Array.isArray(manifest.dataSetCounts)
-  ) return failure('invalid_shape', 'backup manifest is invalid');
+}
 
-  let dataSets: BackupDataSet[];
+function parseContainer(text: string): EncryptedBackupContainerV1 | BackupOpenResult {
+  if (text.length > MAX_BACKUP_TEXT_BYTES) return { ok: false, code: 'resource_limit', message: 'Backup is too large for this version.' };
+  let value: unknown;
+  try { value = JSON.parse(text) as unknown; } catch { return { ok: false, code: 'invalid_container', message: 'Backup file is incomplete or invalid.' }; }
+  if (!isRecord(value)) return { ok: false, code: 'invalid_container', message: 'Backup file is invalid.' };
+  if (value.format !== BACKUP_FORMAT) return { ok: false, code: 'unknown_format', message: 'This is not an encrypted pikeMethods backup.' };
+  if (typeof value.formatVersion !== 'number' || !Number.isInteger(value.formatVersion)) return { ok: false, code: 'unsupported_version', message: 'Backup version is invalid.' };
+  if (value.formatVersion > BACKUP_FORMAT_VERSION) return { ok: false, code: 'newer_version', message: 'This backup needs a newer version of pikeMethods.' };
+  if (value.formatVersion !== BACKUP_FORMAT_VERSION) return { ok: false, code: 'unsupported_version', message: 'This backup version is not supported.' };
+  if (!hasExactKeys(value, ['format', 'formatVersion', 'kdf', 'cipher', 'ciphertextBase64'])
+    || !isRecord(value.kdf) || !isRecord(value.cipher)
+    || !hasExactKeys(value.kdf, ['algorithm', 'N', 'r', 'p', 'keyBytes', 'saltBase64'])
+    || !hasExactKeys(value.cipher, ['algorithm', 'nonceBase64', 'tagBytes'])
+    || value.kdf.algorithm !== BACKUP_KDF || value.kdf.N !== BACKUP_KDF_N || value.kdf.r !== BACKUP_KDF_R
+    || value.kdf.p !== BACKUP_KDF_P || value.kdf.keyBytes !== BACKUP_KDF_KEY_BYTES
+    || value.cipher.algorithm !== BACKUP_CIPHER || value.cipher.tagBytes !== BACKUP_TAG_BYTES
+    || typeof value.kdf.saltBase64 !== 'string' || typeof value.cipher.nonceBase64 !== 'string'
+    || typeof value.ciphertextBase64 !== 'string') {
+    return { ok: false, code: 'resource_limit', message: 'Backup security parameters are unsupported.' };
+  }
   try {
-    if (!parsed.payload.dataSets.every(isRecord)) throw new BackupContractError('invalid_shape', 'data set must be an object');
-    dataSets = normalizeDataSets(parsed.payload.dataSets.map((value): BackupDataSetInput => {
-      if (!hasExactKeys(value as unknown as Record<string, unknown>, ['name', 'identityFields', 'rows'])) {
-        throw new BackupContractError('invalid_shape', 'data-set fields are missing or unknown');
-      }
-      if (typeof value.name !== 'string' || !Array.isArray(value.identityFields) || !value.identityFields.every((field) => typeof field === 'string') || !Array.isArray(value.rows) || !value.rows.every(isRecord)) {
-        throw new BackupContractError('invalid_shape', 'data-set shape is invalid');
-      }
-      return { name: value.name, identityFields: value.identityFields, rows: value.rows as JsonObject[] };
-    }));
+    if (base64ToBytes(value.kdf.saltBase64, BACKUP_SALT_BYTES).length !== BACKUP_SALT_BYTES
+      || base64ToBytes(value.cipher.nonceBase64, BACKUP_NONCE_BYTES).length !== BACKUP_NONCE_BYTES) {
+      return { ok: false, code: 'invalid_container', message: 'Backup security metadata is invalid.' };
+    }
   } catch (error) {
-    if (error instanceof BackupContractError) return failure(error.code, error.message);
-    return failure('invalid_shape', 'data-set payload is invalid');
+    return error instanceof BackupContractError
+      ? { ok: false, code: error.code, message: error.message }
+      : { ok: false, code: 'invalid_container', message: 'Backup security metadata is invalid.' };
   }
+  return value as unknown as EncryptedBackupContainerV1;
+}
 
-  const counts = manifest.dataSetCounts;
-  if (!counts.every((value) => isRecord(value)
-    && hasExactKeys(value, ['name', 'rowCount'])
-    && typeof value.name === 'string'
-    && typeof value.rowCount === 'number'
-    && Number.isInteger(value.rowCount)
-    && value.rowCount >= 0)) {
-    return failure('invalid_shape', 'data-set counts are invalid');
+export async function openBackup(text: string, password: string, crypto: BackupCryptoProvider): Promise<BackupOpenResult> {
+  const parsed = parseContainer(text);
+  if ('ok' in parsed) return parsed;
+  if (password.length > MAX_BACKUP_PASSWORD_CHARACTERS) {
+    return { ok: false, code: 'resource_limit', message: 'Backup password is too long.' };
   }
-  const expectedCounts = dataSets.map(({ name, rows }) => ({ name, rowCount: rows.length }));
-  if (canonicalJson(counts as unknown as JsonValue) !== canonicalJson(expectedCounts as unknown as JsonValue)) {
-    return failure('invalid_shape', 'manifest counts do not match the payload');
+  let salt: Uint8Array;
+  let nonce: Uint8Array;
+  let ciphertext: Uint8Array;
+  try {
+    salt = base64ToBytes(parsed.kdf.saltBase64, BACKUP_SALT_BYTES);
+    nonce = base64ToBytes(parsed.cipher.nonceBase64, BACKUP_NONCE_BYTES);
+    ciphertext = base64ToBytes(parsed.ciphertextBase64, MAX_BACKUP_TEXT_BYTES);
+  } catch (error) {
+    return error instanceof BackupContractError
+      ? { ok: false, code: error.code, message: error.message }
+      : { ok: false, code: 'invalid_container', message: 'Backup encoding is invalid.' };
   }
-  const {
-    integrityChecksum: _integrityChecksum,
-    ...manifestWithoutDigest
-  } = manifest;
-  const integrityCanonical = canonicalJson({ manifest: manifestWithoutDigest, payload: parsed.payload } as unknown as JsonValue);
-  if (checksumProvider.sha256Hex(integrityCanonical) !== manifest.integrityChecksum.digestHex) {
-    return failure('checksum_mismatch', 'backup integrity checksum does not match its manifest and payload');
+  const metadata = { format: parsed.format, formatVersion: parsed.formatVersion, kdf: parsed.kdf, cipher: parsed.cipher };
+  const passwordBytes = crypto.utf8Encode(password);
+  let key: Uint8Array | null = null;
+  try {
+    key = await crypto.deriveScryptKey(passwordBytes, salt, {
+      N: BACKUP_KDF_N, r: BACKUP_KDF_R, p: BACKUP_KDF_P, dkLen: BACKUP_KDF_KEY_BYTES,
+    });
+  } catch {
+    return { ok: false, code: 'authentication_failed', message: 'Backup password is wrong or the file was damaged.' };
+  } finally {
+    passwordBytes.fill(0);
   }
-  const normalizedEnvelope: BackupEnvelopeV1 = { ...parsed, payload: { dataSets } };
-  if (canonicalJson(envelopeAsJson(normalizedEnvelope)) !== text) {
-    return failure('noncanonical_input', 'backup bytes are not in canonical form');
+  let plaintext: Uint8Array;
+  try {
+    plaintext = await crypto.decryptAes256Gcm(key, nonce, ciphertext, crypto.utf8Encode(outerMetadata(metadata)));
+  } catch {
+    key.fill(0);
+    return { ok: false, code: 'authentication_failed', message: 'Backup password is wrong or the file was damaged.' };
   }
-  return { ok: true, envelope: normalizedEnvelope };
+  key.fill(0);
+  let archiveValue: unknown;
+  try { archiveValue = JSON.parse(crypto.utf8Decode(plaintext)) as unknown; }
+  catch { return { ok: false, code: 'invalid_archive', message: 'Authenticated backup contents are invalid.' }; }
+  finally { plaintext.fill(0); }
+  try {
+    return { ok: true, archive: validateArchive(archiveValue, crypto) };
+  } catch (error) {
+    if (error instanceof BackupContractError) return { ok: false, code: error.code, message: error.message };
+    return { ok: false, code: 'invalid_archive', message: 'Authenticated backup contents are invalid.' };
+  }
 }

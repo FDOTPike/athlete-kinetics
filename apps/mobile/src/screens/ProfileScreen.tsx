@@ -39,6 +39,7 @@ import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
 import ActivitiesScreen from './ActivitiesScreen';
 import HealthTrainingSupportForm from '../components/HealthTrainingSupportForm';
+import BackupTransferPanel from '../components/BackupTransferPanel';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -947,6 +948,8 @@ export default function ProfileScreen(): React.JSX.Element {
           accessibilityLabel="Open your existing activities"
         />
       </View>
+
+      <BackupTransferPanel />
 
       {/* ---- Learning & Terminology Glossary ---- */}
       <View style={styles.mgmtSection} testID="learning-terminology-section">

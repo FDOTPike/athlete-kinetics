@@ -1,4 +1,5 @@
 import { useStore } from '../../src/state/useStore';
+import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockDriver;
@@ -18,6 +19,7 @@ const evidenceFor = (operation) => mockDriver.raw.prepare(`SELECT decision_id,ad
   FROM recommendation_support_record WHERE advice_target_identity LIKE ? ORDER BY generated_at_ms DESC LIMIT 1`).get(`${operation}:%`);
 
 beforeEach(async () => {
+  authorizeAthleteDataBoot();
   mockDriver = makeNodeSqliteDriver();
   useStore.setState({ status: 'booting', error: null, session: null, runner: null });
   state().boot();

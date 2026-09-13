@@ -7,6 +7,11 @@ import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
 
 let mockState;
+const mockBackupState = {
+  status: 'idle', message: null, lastSuccessfulBackupAt: null, preview: null,
+  initialize: jest.fn(), createBackup: jest.fn(), chooseRestore: jest.fn(),
+  confirmRestore: jest.fn(), cancelRestore: jest.fn(),
+};
 
 jest.mock('@ak/inference', () => ({
   ...jest.requireActual('@ak/inference'),
@@ -22,6 +27,10 @@ jest.mock('@ak/inference', () => ({
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
   useStore: (selector) => selector(mockState),
+}));
+
+jest.mock('../../src/state/backupStore', () => ({
+  useBackupStore: (selector) => selector(mockBackupState),
 }));
 
 const baseProfile = {

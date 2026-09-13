@@ -51,6 +51,25 @@ jest.mock('../../src/inference/deviceEmbedder', () => ({
 jest.mock('@ak/biometrics', () => ({
   tryCreateHealthConnectBridge: jest.fn(() => Promise.resolve(null)),
 }));
+// Navigation tests begin after the central cold-start recovery authority has
+// declared the data safe. BackupBootIntegration owns the fail-closed cases.
+jest.mock('../../src/state/backupStore', () => {
+  const safeBackupState = {
+    startupSafe: true,
+    status: 'idle',
+    message: null,
+    preview: null,
+    lastSuccessfulBackupAt: null,
+    initialize: jest.fn(() => Promise.resolve()),
+    createBackup: jest.fn(),
+    chooseRestore: jest.fn(),
+    confirmRestore: jest.fn(),
+    cancelRestore: jest.fn(),
+  };
+  const useBackupStore = (selector) => selector(safeBackupState);
+  useBackupStore.getState = () => safeBackupState;
+  return { useBackupStore };
+});
 
 const state = (overrides = {}) => ({
   status: 'ready',

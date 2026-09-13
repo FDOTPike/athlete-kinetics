@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { useStore, localToday } from '../../src/state/useStore';
+import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import SessionScreen from '../../src/screens/SessionScreen';
 import { RoutineTemplateBuilder } from '../../src/components/RoutineTemplateBuilder';
@@ -33,6 +34,7 @@ const unhold = () => mockDriver.raw.exec("UPDATE health_support_hold SET state='
 const programInput = { horizon: { kind: 'weeks', blockCount: 2 }, schemaType: 'LINEAR', dayIndices: [1, 3, 5] };
 
 beforeEach(async () => {
+  authorizeAthleteDataBoot();
   let nowMs = Date.now();
   jest.spyOn(Date, 'now').mockImplementation(() => ++nowMs);
   mockDriver = makeNodeSqliteDriver();

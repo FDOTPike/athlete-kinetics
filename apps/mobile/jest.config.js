@@ -26,6 +26,12 @@ module.exports = {
     // `\\\\` does not match a POSIX-normalized path.
     '\\.sql$': path.join(__dirname, 'test', 'sqlRawTransformer.js'),
   },
+  // Noble publishes ESM. Keep the React Native preset's node_modules boundary,
+  // opening it only for the two audited primitive packages imported by the
+  // backup adapter so unrelated dependencies are never transformed implicitly.
+  transformIgnorePatterns: [
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@noble/(?:ciphers|hashes))/)',
+  ],
   moduleNameMapper: {
     '^@ak/inference$': '<rootDir>/../../packages/inference/src/index.ts',
     '^@ak/core-db$': '<rootDir>/../../packages/core-db/src/index.ts',

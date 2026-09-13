@@ -19,6 +19,7 @@ import {
   serializeRegistry,
   type AthleteRegistry,
 } from './athleteRegistryCore';
+import { dataMutationAllowed } from './dataMaintenanceLock';
 
 interface BlobUtilFs {
   dirs: { DocumentDir: string };
@@ -51,6 +52,7 @@ export async function loadRegistry(): Promise<AthleteRegistry> {
 }
 
 export async function saveRegistry(reg: AthleteRegistry): Promise<boolean> {
+  if (!dataMutationAllowed()) return false;
   try {
     await blobFs().writeFile(registryPath(), serializeRegistry(reg), 'utf8');
     return true;

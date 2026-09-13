@@ -24,6 +24,7 @@
  * Expected to FAIL against 5f1cb6a.
  */
 import { useStore } from '../../src/state/useStore';
+import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockDriver;
@@ -41,6 +42,7 @@ const store = () => useStore.getState();
 const raw = () => mockDriver.raw;
 
 const bootRealStore = async () => {
+  authorizeAthleteDataBoot();
   useStore.setState({ status: 'booting', error: null });
   store().boot();
   await new Promise((resolve) => setImmediate(resolve));
