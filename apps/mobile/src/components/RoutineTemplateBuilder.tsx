@@ -12,7 +12,6 @@ import {
   FlatList,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -42,6 +41,10 @@ import {
 } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type Movement, type RoutineTemplate } from '../state/useStore';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView, {
+  KEYBOARD_DISMISS_MODE,
+  KEYBOARD_TAP_BEHAVIOR,
+} from './KeyboardAwareScrollView';
 import InfoTip from './InfoTip';
 import {
   PrimaryButton,
@@ -703,7 +706,7 @@ export function RoutineTemplateBuilder({
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>
         {initialTemplate ? 'Edit Routine Template' : 'Build Routine Template'}
       </Text>
@@ -726,6 +729,7 @@ export function RoutineTemplateBuilder({
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Template Name</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.textInput}
           value={name}
           onChangeText={setName}
@@ -892,6 +896,7 @@ export function RoutineTemplateBuilder({
                       <View style={styles.doseField}>
                         <Text style={styles.captionText}>Sets</Text>
                         <TextInput
+                          disableFullscreenUI
                           style={styles.doseInput}
                           value={String(slot.sets ?? defaults?.sets ?? '')}
                           onChangeText={(value) => updateDose(index, 'sets', value)}
@@ -902,6 +907,7 @@ export function RoutineTemplateBuilder({
                       <View style={styles.doseField}>
                         <Text style={styles.captionText}>Reps</Text>
                         <TextInput
+                          disableFullscreenUI
                           style={styles.doseInput}
                           value={String(slot.reps ?? defaults?.reps ?? '')}
                           onChangeText={(value) => updateDose(index, 'reps', value)}
@@ -931,6 +937,7 @@ export function RoutineTemplateBuilder({
                           <InfoTip term={majorProjection === undefined ? 'RPE' : 'RPE MAX'} />
                         </View>
                         <TextInput
+                          disableFullscreenUI
                           style={styles.doseInput}
                           value={String(peakRpe ?? '')}
                           onChangeText={(value) => updateDose(index, 'targetRpe', value)}
@@ -1057,6 +1064,7 @@ export function RoutineTemplateBuilder({
               <SecondaryButton label="Close" onPress={closePicker} accessibilityLabel="Close movement picker" />
             </View>
             <TextInput
+              disableFullscreenUI
               testID="movement-picker-search"
               value={pickerSearch}
               onChangeText={setPickerSearch}
@@ -1096,7 +1104,8 @@ export function RoutineTemplateBuilder({
               initialNumToRender={14}
               maxToRenderPerBatch={18}
               windowSize={7}
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps={KEYBOARD_TAP_BEHAVIOR}
+              keyboardDismissMode={KEYBOARD_DISMISS_MODE}
               ListEmptyComponent={(
                 <View>
                   {(collapsedTiers[1] || pickerTierBuckets[1].length === 0) && renderTierHeader(1)}
@@ -1279,7 +1288,7 @@ export function RoutineTemplateBuilder({
           />
         )}
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

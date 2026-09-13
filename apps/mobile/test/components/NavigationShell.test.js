@@ -20,6 +20,7 @@
  *    cold-start root.
  */
 import React from 'react';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { NavigationProvider, useNavigation } from '../../src/navigation/navigation';
 import AppShellTestHarness from '../../src/AppShellTestHarness';
@@ -98,6 +99,12 @@ beforeEach(() => { mockState = state(); });
 // ---------------------------------------------------------------------------
 
 describe('exactly Today, Plan and Progress are the primary destinations', () => {
+  test('the shared shell actively resizes above the keyboard on both platforms', () => {
+    render(<AppShellTestHarness />);
+    expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior)
+      .toBe(Platform.OS === 'ios' ? 'padding' : 'height');
+  });
+
   test('the primary bar renders TODAY, PLAN, PROGRESS and nothing else', () => {
     render(<AppShellTestHarness />);
     expect(screen.getByTestId('tab-today')).toBeOnTheScreen();

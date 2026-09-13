@@ -14,7 +14,7 @@ env:
 
 jobs:
   verify:
-    name: Verification suite (21 gates + typecheck)
+    name: Verification suite (22 gates + typecheck)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -46,7 +46,7 @@ jobs:
       #       packet (AK_MEM_EVIDENCE_SESSION) that no runner possesses.
       # Both live in `npm run verify:release`, which is run by the owner before
       # a release, NOT here. `verify:all` is an alias for `verify:release`.
-      - name: verify:ci (21 gates + typecheck)
+      - name: verify:ci (22 gates + typecheck)
         run: npm run verify:ci
       - name: Seeder physiology — pinned alignment + today's alignment
         run: |

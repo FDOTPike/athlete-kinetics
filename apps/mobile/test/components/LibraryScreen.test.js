@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking, StyleSheet } from 'react-native';
+import { Linking, Platform, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import LibraryScreen from '../../src/screens/LibraryScreen';
 import { theme } from '../../src/theme/theme';
@@ -134,6 +134,9 @@ describe('LibraryScreen Phase 2a', () => {
 
   test('searches target muscles as well as movement copy', () => {
     render(<LibraryScreen />);
+    expect(screen.getByTestId('library-list').props.keyboardShouldPersistTaps).toBe('handled');
+    expect(screen.getByTestId('library-list').props.keyboardDismissMode)
+      .toBe(Platform.OS === 'ios' ? 'interactive' : 'on-drag');
     fireEvent.changeText(screen.getByLabelText('Search movements'), 'pectorals');
     expect(screen.getByText('Dumbbell Bench Press')).toBeOnTheScreen();
     expect(screen.queryByText('Goblet Squat')).not.toBeOnTheScreen();

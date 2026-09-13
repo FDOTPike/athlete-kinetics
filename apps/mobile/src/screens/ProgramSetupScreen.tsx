@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   accessContextForBlockFocus,
   ANCHOR_MOVEMENT_NAMES,
@@ -19,6 +19,7 @@ import {
 } from '@ak/inference';
 import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { recommendedProgramDefaults } from '../state/programDefaults';
 import {
   useStore,
@@ -329,7 +330,7 @@ export default function ProgramSetupScreen({
   }, [horizonKind, reviewDate]);
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <KeyboardAwareScrollView style={styles.root} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{editing ? 'MANAGE PROGRAM' : 'BUILD YOUR PROGRAM'}</Text>
       <Text style={styles.title}>{styleLabel}</Text>
       <Text style={styles.body}>
@@ -485,7 +486,7 @@ export default function ProgramSetupScreen({
           </View>
         )}
         {horizonKind === 'date' && (
-          <TextInput value={reviewDate} onChangeText={setReviewDate} placeholder="YYYY-MM-DD"
+          <TextInput disableFullscreenUI value={reviewDate} onChangeText={setReviewDate} placeholder="YYYY-MM-DD"
             placeholderTextColor={theme.color.textLow} style={styles.input} autoCapitalize="none" />
         )}
         {previewResult.preview !== null && (
@@ -624,7 +625,7 @@ export default function ProgramSetupScreen({
         disabled={input === null || previewResult.preview === null} />
       {onCancel !== undefined && <SecondaryButton label="Cancel" onPress={onCancel} />}
       <Text style={styles.caption}>Program starts {today}. Future blocks require confirmation.</Text>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

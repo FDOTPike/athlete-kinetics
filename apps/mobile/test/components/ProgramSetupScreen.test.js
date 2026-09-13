@@ -225,6 +225,7 @@ test('editing opens the controls, because fine-tuning IS the task there', () => 
 test('the one rule that can still block is still explained, and still live-announced', () => {
   mockState = stateFor('intermediate');
   render(<ProgramSetupScreen />);
+  expect(screen.getByTestId('keyboard-aware-scroll-view')).toBeOnTheScreen();
 
   // Nothing is unmet on arrival.
   expect(screen.queryByText('Enter a review date.')).toBeNull();

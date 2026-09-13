@@ -19,6 +19,7 @@ import {
   type MovementAvailability,
 } from '../state/useStore';
 import { theme } from '../theme/theme';
+import { KEYBOARD_DISMISS_MODE, KEYBOARD_TAP_BEHAVIOR } from '../components/KeyboardAwareScrollView';
 
 const PATTERN_LABELS: Record<string, string> = {
   push_h: 'Horizontal Press',
@@ -373,6 +374,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
       </View>
       <View style={styles.searchBox}>
         <TextInput
+          disableFullscreenUI
           value={search}
           onChangeText={setSearch}
           placeholder={`Search ${movements.length} movements...`}
@@ -397,7 +399,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
         />
       </View>
       <Text style={styles.filterLabel}>Pattern</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll} keyboardShouldPersistTaps={KEYBOARD_TAP_BEHAVIOR}>
         <Chip
           label="All patterns"
           selected={patternFilter === null}
@@ -415,7 +417,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
         ))}
       </ScrollView>
       <Text style={styles.filterLabel}>Equipment</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll} keyboardShouldPersistTaps={KEYBOARD_TAP_BEHAVIOR}>
         <Chip
           label="All equipment"
           selected={equipmentFilter === null}
@@ -499,7 +501,8 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           </View>
         )}
         contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps={KEYBOARD_TAP_BEHAVIOR}
+        keyboardDismissMode={KEYBOARD_DISMISS_MODE}
         stickySectionHeadersEnabled={false}
         initialNumToRender={18}
         maxToRenderPerBatch={18}

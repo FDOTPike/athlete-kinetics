@@ -204,7 +204,7 @@ export function AppShell(): React.JSX.Element {
       )}
       <KeyboardAvoidingView
         style={styles.body}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         testID="shell-body"
       >
         {showOnboarding ? (

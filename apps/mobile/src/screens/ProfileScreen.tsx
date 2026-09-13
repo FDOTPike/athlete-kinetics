@@ -12,7 +12,7 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -30,12 +30,14 @@ import {
   type UserProfile,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
 import InfoTip from '../components/InfoTip';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
+import ActivitiesScreen from './ActivitiesScreen';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -148,6 +150,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           <Text style={styles.numBtnText}>−</Text>
         </Pressable>
         <TextInput
+          disableFullscreenUI
           style={styles.oneRmInput}
           value={text}
           onChangeText={setText}
@@ -275,6 +278,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
   const [bodyweightText, setBodyweightText] = useState('');
   const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [activitiesOpen, setActivitiesOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
   const buildTapCount = useRef(0);
   const buildTapReset = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -284,6 +288,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const hasSubView =
     glossaryOpen ||
+    activitiesOpen ||
     labOpen ||
     confirmingDeleteAthleteId !== null ||
     confirmingWipeBlock ||
@@ -291,6 +296,7 @@ export default function ProfileScreen(): React.JSX.Element {
     confirmingDeleteBandLevel !== null;
   useSubViewBack(hasSubView, () => {
     if (glossaryOpen) setGlossaryOpen(false);
+    else if (activitiesOpen) setActivitiesOpen(false);
     else if (labOpen) setLabOpen(false);
     else if (confirmingDeleteAthleteId !== null) setConfirmingDeleteAthleteId(null);
     else if (confirmingWipeBlock) setConfirmingWipeBlock(false);
@@ -348,12 +354,16 @@ export default function ProfileScreen(): React.JSX.Element {
     return <GlossaryScreen onClose={() => setGlossaryOpen(false)} />;
   }
 
+  if (activitiesOpen) {
+    return <ActivitiesScreen onClose={() => setActivitiesOpen(false)} />;
+  }
+
   if (labOpen && advancedToolsUnlocked) {
     return <CoachVerificationLabScreen onClose={() => setLabOpen(false)} />;
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
       <Text style={styles.subheading}>
@@ -412,7 +422,7 @@ export default function ProfileScreen(): React.JSX.Element {
         onInc={() => saveProfile({ session_duration_cap_min: profile.session_duration_cap_min + 15 })}
       />
       <NumberRow
-        label="6 · BASE EFFORT CEILING (RPE)"
+        label="6 · EFFORT CEILING"
         tip="RPE"
         display={profile.base_rpe_cap.toFixed(1)}
         onDec={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap - 0.5 })}
@@ -430,6 +440,7 @@ export default function ProfileScreen(): React.JSX.Element {
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>8 · HISTORICAL INJURIES (one per line, &quot;region: note&quot;)</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.notesInput}
           value={injuryText}
           onChangeText={(t) => {
@@ -448,6 +459,7 @@ export default function ProfileScreen(): React.JSX.Element {
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>9 · MOBILITY LIMITS (one per line)</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.notesInput}
           value={mobilityText}
           onChangeText={(t) => {
@@ -684,6 +696,7 @@ export default function ProfileScreen(): React.JSX.Element {
           <View key={band.level} style={styles.bandRow}>
             <Text style={styles.bandLevel}>LEVEL {band.level}</Text>
             <TextInput
+              disableFullscreenUI
               defaultValue={band.label}
               onEndEditing={(event) => saveBandLevel(band.level, event.nativeEvent.text)}
               maxLength={48}
@@ -800,6 +813,7 @@ export default function ProfileScreen(): React.JSX.Element {
         <Text style={styles.fieldLabel}>BODYWEIGHT TODAY (KG)</Text>
         <View style={styles.numberRow}>
           <TextInput
+            disableFullscreenUI
             style={styles.oneRmInput}
             value={bodyweightText}
             onChangeText={setBodyweightText}
@@ -835,6 +849,7 @@ export default function ProfileScreen(): React.JSX.Element {
             {HISTORY_IMPORT_EXAMPLE}
           </Text>
           <TextInput
+            disableFullscreenUI
             style={styles.importInput}
             value={historyText}
             onChangeText={(value) => { setHistoryText(value); setHistoryPreview(null); setHistoryNotice(null); }}
@@ -915,6 +930,20 @@ export default function ProfileScreen(): React.JSX.Element {
             ))
           )}
         </Disclosure>
+      </View>
+
+      {/* ---- Learning & Terminology Glossary ---- */}
+      <View style={styles.mgmtSection} testID="existing-activities-section">
+        <Text style={styles.mgmtHeading}>EXISTING ACTIVITIES</Text>
+        <Text style={styles.fieldHint}>
+          Keep sport, walking, swimming, cycling, outside gym work, and other activities separate from equipment.
+          Record only what you know; missing time, duration, or effort stays unknown.
+        </Text>
+        <QuietAction
+          label="OPEN YOUR ACTIVITIES"
+          onPress={() => setActivitiesOpen(true)}
+          accessibilityLabel="Open your existing activities"
+        />
       </View>
 
       {/* ---- Learning & Terminology Glossary ---- */}
@@ -1052,6 +1081,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 return (
                   <View key={a.id} style={styles.athleteRow}>
                     <TextInput
+                      disableFullscreenUI
                       style={styles.athleteEditInput}
                       value={editAthleteName}
                       onChangeText={setEditAthleteName}
@@ -1130,6 +1160,7 @@ export default function ProfileScreen(): React.JSX.Element {
             })}
             <View style={styles.athleteRow}>
               <TextInput
+                disableFullscreenUI
                 style={styles.athleteEditInput}
                 value={newAthleteName}
                 onChangeText={setNewAthleteName}
@@ -1181,7 +1212,7 @@ export default function ProfileScreen(): React.JSX.Element {
       >
         <Text style={styles.buildText}>BUILD 0.1.0</Text>
       </Pressable>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

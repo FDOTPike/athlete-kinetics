@@ -19,7 +19,9 @@ import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -47,6 +49,16 @@ const PHASE_LABEL: Record<string, string> = {
   intensification: 'Build strength',
   realization: 'Realise',
   deload: 'Deload',
+};
+
+const ACTIVITY_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+const activityTime = (minute: number | null): string => {
+  if (minute === null) return 'time not set';
+  const hour = Math.floor(minute / 60);
+  const suffix = hour >= 12 ? 'pm' : 'am';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${String(minute % 60).padStart(2, '0')} ${suffix}`;
 };
 
 const GLOSSARY_PHASE_TERM: Record<string, 'BUILD' | 'INTENSIFICATION' | 'REALISE' | 'DELOAD'> = {
@@ -168,6 +180,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const storeError = useStore((s) => s.error);
   const today = useStore((s) => s.today);
   const profile = useStore((s) => s.profile);
+  const activityLedger = useStore((s) => s.activityLedger ?? EMPTY_ACTIVITY_LEDGER);
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
   const triageReady = useStore((s) => s.triageReady);
@@ -226,6 +239,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
+  const [awaitingSessionStart, setAwaitingSessionStart] = useState(false);
+  const [sessionStartError, setSessionStartError] = useState<string | null>(null);
+  const sessionStartPendingRef = useRef(false);
+  const sessionIdBeforeStartRef = useRef<number | null>(null);
 
   // continueTrainingProgram reports every refusal through the store's `error`
   // and returns without creating a block, so dismissing the preview card the
@@ -243,6 +260,26 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     }
     setNextProgramPreview(null);
   }, [continuationPending, storeError]);
+
+  // Starting a session can legitimately fail closed in the store. Keep the
+  // athlete on Plan until a NEW active session exists, then navigate exactly
+  // once. The ref closes the double-tap window before React commits the local
+  // pending state; the existing active-session action remains a separate
+  // resume path and never calls startSession.
+  useEffect(() => {
+    if (!awaitingSessionStart) return;
+    setAwaitingSessionStart(false);
+    sessionStartPendingRef.current = false;
+    const newlyActive = session !== null
+      && session.sessionId !== sessionIdBeforeStartRef.current;
+    if (newlyActive) {
+      onSessionStarted?.();
+      return;
+    }
+    if (storeError !== null && storeError !== undefined) {
+      setSessionStartError(storeError);
+    }
+  }, [awaitingSessionStart, session, storeError, onSessionStarted]);
   const [showChooser, setShowChooser] = useState(false);
 
   const hasSubView =
@@ -401,14 +438,13 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     setDetail({ summary: nextPlanned, slots: loadSessionSlots(nextPlanned.plannedSessionId) });
   };
 
-  const startPlannedSession = (): void => {
+  const startAndOpenSession = (): void => {
+    if (sessionStartPendingRef.current || session !== null) return;
+    sessionStartPendingRef.current = true;
+    sessionIdBeforeStartRef.current = null;
+    setSessionStartError(null);
+    setAwaitingSessionStart(true);
     startSession();
-    onSessionStarted?.();
-  };
-
-  const startUnplannedSession = (): void => {
-    startSession();
-    onSessionStarted?.();
   };
 
   let todayTitle = 'Recovery day';
@@ -431,11 +467,33 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   }
 
   return (
-    <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled" testID="coach-screen">
+    <KeyboardAwareScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.screenContent} testID="coach-screen">
       {/* Header Wordmark */}
       <View style={styles.header}>
         <Text style={styles.wordmark}>pikeMethods</Text>
       </View>
+
+      {activityLedger.series.some((row) => row.effectiveEndDate === null) && (
+        <Disclosure
+          label="YOUR OTHER WEEKLY ACTIVITIES"
+          hint="Recorded commitments shown beside this plan"
+          testID="plan-existing-activities"
+        >
+          {activityLedger.series.filter((row) => row.effectiveEndDate === null).map((row) => (
+            <View key={row.seriesId}>
+              <Text style={styles.cardTitle}>{row.displayName}</Text>
+              <Text style={styles.bodyText}>
+                {ACTIVITY_WEEKDAYS[row.localWeekday]} · {activityTime(row.localStartMinute)} · {row.timing}
+                {row.expectedDurationMin === null ? ' · duration unknown' : ` · ${row.expectedDurationMin} expected minutes`}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.bodyText}>
+            These are your reported facts. This version shows them alongside the plan but does not silently
+            move, add, remove, or intensify coach sessions.
+          </Text>
+        </Disclosure>
+      )}
 
       {block === null && hasArchivedBlock && (
         <View style={styles.card}>
@@ -611,7 +669,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               accessibilityLabel="Review program continuation"
             />
           ) : todayPlan !== null ? (
-            <PrimaryButton label="Start session" onPress={startPlannedSession} accessibilityLabel="Start session" />
+            <PrimaryButton label="Start session" onPress={startAndOpenSession} accessibilityLabel="Start session" />
           ) : block === null ? (
             <PrimaryButton label="Set up a four-week block" onPress={openManageBlock} accessibilityLabel="Set up a four-week block" />
           ) : (
@@ -636,6 +694,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             </>
           )}
         </View>
+        {sessionStartError !== null && (
+          <Text
+            style={styles.errorText}
+            testID="plan-start-error"
+            accessibilityRole="alert"
+          >
+            {sessionStartError}
+          </Text>
+        )}
       </View>
 
       {nextProgramPreview !== null && (
@@ -1145,7 +1212,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               ) : (
                 <>
                   <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
-                  <PrimaryButton label="Start unplanned session" onPress={startUnplannedSession} accessibilityLabel="Start unplanned session" />
+                  <PrimaryButton label="Start unplanned session" onPress={startAndOpenSession} accessibilityLabel="Start unplanned session" />
                   <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
                 </>
               )}
@@ -1166,6 +1233,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               </Text>
             )}
             <TextInput
+              disableFullscreenUI
               style={styles.reportInput}
               value={reportText}
               onChangeText={setReportText}
@@ -1241,7 +1309,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           </View>
         </Disclosure>
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

@@ -163,12 +163,12 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
   });
 
   // Open direct RPE entry to inspect both stepper widths in the phone-width stack
-  fireEvent.press(screen.getByText(/Enter RPE directly/i));
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
 
   const usablePhoneWidth = 411 - 40;
   [
     ['current-reps-stepper', 'Actual reps', 'Actual reps 5', '5'],
-    ['current-rpe-stepper', 'Actual RPE', 'Actual RPE —', '—'],
+    ['current-rpe-stepper', 'Effort', 'Effort —', '—'],
   ].forEach(([testID, label, accessibilityLabel, expectedValue]) => {
     expect(StyleSheet.flatten(screen.getByTestId(testID).props.style)).toMatchObject({
       flex: 0,
@@ -382,6 +382,8 @@ test('athlete-entered load survives a rerender and refreshed history evidence', 
   });
   const view = render(<SessionScreen />);
 
+  expect(screen.getByTestId('keyboard-aware-scroll-view')).toBeOnTheScreen();
+  expect(screen.getByTestId('session-load-input').props.keyboardType).toBe('numeric');
   fireEvent.changeText(screen.getByTestId('session-load-input'), '32.5');
   mockState.lastLoggedLoads = { 1: 80 };
   view.rerender(<SessionScreen />);
@@ -413,15 +415,26 @@ test('untouched actual RPE logs null instead of fabricating target equality', ()
 test('adjusting actual RPE marks and records the changed answer', () => {
   render(<SessionScreen />);
 
-  fireEvent.press(screen.getByText(/Enter RPE directly/i));
-  fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
-  expect(screen.getByLabelText('Actual RPE 8.5')).toBeOnTheScreen();
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+  fireEvent.press(screen.getByLabelText('Increase Effort'));
+  expect(screen.getAllByLabelText('Effort 8.5')).toHaveLength(2);
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
 
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, 8.5,
     undefined, undefined, undefined, undefined, 1,
   );
+});
+
+test('WO-02 labels athlete-reported RPE as Effort with the exact scale explanation while retaining strength-set RIR', () => {
+  render(<SessionScreen />);
+
+  expect(screen.getByText('How hard did that feel? 1 is very easy. 10 is your hardest effort.')).toBeOnTheScreen();
+  expect(screen.getByText('How many more clean reps could you have completed?')).toBeOnTheScreen();
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Effort 8.5' })).toBeOnTheScreen();
+  expect(screen.queryByText('Actual RPE')).toBeNull();
 });
 
 // ---------------------------------------------------------------------------
@@ -452,7 +465,7 @@ test('§7.2 Item 1: a new rep-based set starts with no actual-effort answer sele
 
   // Target RPE must remain visible as prescription guidance, never preselected as actual RPE
   expect(screen.getByText(/Target.*RPE 8\.0/)).toBeOnTheScreen();
-  expect(screen.queryByLabelText(/Actual RPE 8\.0/i)).toBeNull();
+  expect(screen.queryByLabelText(/Effort 8\.0/i)).toBeNull();
 });
 
 test('§7.2 Item 2: absence of Confirm target RPE action and target is not preselected', () => {
@@ -577,7 +590,7 @@ test('§7.2 Item 9: optional direct RPE entry supports half-step boundaries with
   render(<SessionScreen />);
 
   // Direct entry must be behind an explicit affordance, not exposed as prefilled primary input
-  const directToggle = screen.getByText(/Enter RPE directly/i);
+  const directToggle = screen.getByText(/Enter Effort directly/i);
   fireEvent.press(directToggle);
 
   // Opening direct entry must NOT prefill or confirm target RPE (8.0)
@@ -598,11 +611,10 @@ test('F-01 falsifier 1: direct RPE stepper opens from target-independent state, 
   });
   render(<SessionScreen />);
 
-  fireEvent.press(screen.getByText(/Enter RPE directly/i));
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
 
   // Must NOT display or pin the prescribed target RPE (6.5)
-  expect(screen.queryByLabelText('Actual RPE 6.5')).toBeNull();
-  expect(screen.getByLabelText('Actual RPE —')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
 });
 
 test('F-01 falsifier 2: first increment from opened direct-entry stepper does not compute from target RPE', () => {
@@ -614,13 +626,12 @@ test('F-01 falsifier 2: first increment from opened direct-entry stepper does no
   });
   render(<SessionScreen />);
 
-  fireEvent.press(screen.getByText(/Enter RPE directly/i));
-  fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+  fireEvent.press(screen.getByLabelText('Increase Effort'));
 
   // First increment must NOT equal targetRpe + 0.5 (6.5 + 0.5 = 7.0)
-  expect(screen.queryByLabelText('Actual RPE 7.0')).toBeNull();
   // Instead, computes from neutral base (8.0 + 0.5 = 8.5)
-  expect(screen.getByLabelText('Actual RPE 8.5')).toBeOnTheScreen();
+  expect(screen.getAllByLabelText('Effort 8.5')).toHaveLength(2);
 
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
   expect(mockState.logSet).toHaveBeenCalledWith(
@@ -642,12 +653,12 @@ test('target-derived effort cue is not shown when actual effort is unanswered or
 
   // target RPE 8 plus no answer must not display "about two good reps left"
   expect(rpeCue.props.children).not.toMatch(/about two good reps left/i);
-  expect(rpeCue.props.children).toBe('RPE is optional evidence — leave it untouched to skip.');
+  expect(rpeCue.props.children).toBe('Effort is optional evidence — leave it untouched to skip.');
 
   // target RPE 8 plus Not sure must remain neutral
   fireEvent.press(screen.getByRole('button', { name: 'Not sure' }));
   expect(screen.getByTestId('rpe-cue').props.children).toBe(
-    'RPE is optional evidence — leave it untouched to skip.',
+    'Effort is optional evidence — leave it untouched to skip.',
   );
 
   // null persistence remains intact
@@ -669,7 +680,7 @@ test('explicit RIR or direct RPE answer derives cue from safeRpe only, restoring
 
   // Before an explicit answer: neutral guidance
   expect(screen.getByTestId('rpe-cue').props.children).toBe(
-    'RPE is optional evidence — leave it untouched to skip.',
+    'Effort is optional evidence — leave it untouched to skip.',
   );
 
   // selecting 2 RIR (safeRpe 8.0) displays the RPE-8 cue
@@ -679,8 +690,8 @@ test('explicit RIR or direct RPE answer derives cue from safeRpe only, restoring
   );
 
   // direct RPE 8.5 displays its corresponding cue
-  fireEvent.press(screen.getByText(/Enter RPE directly/i));
-  fireEvent.press(screen.getByRole('button', { name: 'RPE 8.5' }));
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
   expect(screen.getByTestId('rpe-cue').props.children).toBe(
     'Very hard; about one good rep left.',
   );
@@ -688,7 +699,7 @@ test('explicit RIR or direct RPE answer derives cue from safeRpe only, restoring
   // selecting Not sure restores neutral guidance
   fireEvent.press(screen.getByRole('button', { name: 'Not sure' }));
   expect(screen.getByTestId('rpe-cue').props.children).toBe(
-    'RPE is optional evidence — leave it untouched to skip.',
+    'Effort is optional evidence — leave it untouched to skip.',
   );
 
   // null persistence remains intact
@@ -881,8 +892,11 @@ test('bodyweight actual reps initialize from the plan, edit, and reach logSet un
   render(<SessionScreen />);
   // Initial draft comes from the planned target (5), shown with the honest
   // planned-vs-actual cue.
-  expect(screen.getByTestId('actual-reps-cue').props.children.join(''))
-    .toContain('Planned target 5');
+  expect(screen.getByTestId('actual-reps-cue')).toHaveTextContent(
+    'Target: 5 reps. Log the reps you actually completed.',
+  );
+  expect(screen.queryByText(/Planned target/)).toBeNull();
+  expect(screen.queryByText(/the plan stays unchanged/)).toBeNull();
   expect(screen.getByLabelText('Actual reps 5')).toBeOnTheScreen();
 
   // The athlete did 12, not the planned 5: increment 7 times and log.
@@ -895,6 +909,26 @@ test('bodyweight actual reps initialize from the plan, edit, and reach logSet un
   // untouched (it only exists in the slot, not the set).
   expect(mockState.logSet).toHaveBeenCalledWith(1, 12, 0, null, undefined, undefined, undefined, undefined, 1);
 });
+
+test.each(['planned', 'substituted', 'day_swapped', 'added', 'free_form'])(
+  'the reps cue is provenance-neutral for a %s slot',
+  (provenanceKind) => {
+    mockState = state({
+      sessionPlan: [slot(1, 1, 7, { provenanceKind })],
+      runner: runner({
+        slots: [{ sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 3, target: { kind: 'reps', reps: 7 }, targetRpe: 8 }],
+        slotSetCounts: [0],
+      }),
+    });
+    render(<SessionScreen />);
+
+    expect(screen.getByTestId('actual-reps-cue')).toHaveTextContent(
+      'Target: 7 reps. Log the reps you actually completed.',
+    );
+    expect(screen.queryByText(/Planned target/)).toBeNull();
+    expect(screen.queryByText(/the plan stays unchanged/)).toBeNull();
+  },
+);
 
 test('actual-reps draft survives a rerender until the set is logged (PQ-12)', () => {
   const { rerender } = render(<SessionScreen />);
@@ -921,7 +955,7 @@ test('effort cues render plain-language anchors with stop guidance and no biomet
   render(<SessionScreen />);
   // Unanswered set shows neutral guidance, not target-derived cue
   expect(screen.getByTestId('rpe-cue').props.children).toBe(
-    'RPE is optional evidence — leave it untouched to skip.',
+    'Effort is optional evidence — leave it untouched to skip.',
   );
   // Selecting an answer renders the plain-language cue derived from safeRpe
   fireEvent.press(screen.getByRole('button', { name: '2' }));
@@ -948,6 +982,45 @@ test('a triage halt on a live runner persists safety before ending the session',
   expect(mockState.runnerHalt.mock.invocationCallOrder[0]).toBeLessThan(
     mockState.endSession.mock.invocationCallOrder[0],
   );
+});
+
+test.each([
+  ['manual', 'You chose to stop this session.', null],
+  ['niggle', 'You reported that something felt off, so this session is paused.', null],
+  ['pain', 'You reported pain, so this session is paused.', null],
+  ['safety', 'Stop and reassess this symptom.', 'Stop and reassess this symptom.'],
+])('halt reason %s renders athlete-facing copy and never the raw token', (haltReason, expected, coachingCue) => {
+  mockState = state({
+    runner: runner({ phase: 'halted', haltReason }),
+    lastTriage: coachingCue === null ? null : {
+      kind: 'matched',
+      directive: { halt: true, vector: { coaching_cue: coachingCue } },
+    },
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText(expected)).toBeOnTheScreen();
+  expect(screen.queryByText(new RegExp(`^${haltReason}$`, 'i'))).toBeNull();
+});
+
+test.each([
+  ['safety without a cue', 'safety', '   '],
+  ['an absent halt reason', null, 'A cue must not override an absent reason.'],
+  ['an unknown halt reason', 'unexpected', 'A cue must not override an unknown reason.'],
+])('%s fails closed to the generic safety message', (_caseName, haltReason, coachingCue) => {
+  mockState = state({
+    runner: runner({ phase: 'halted', haltReason }),
+    lastTriage: {
+      kind: 'matched',
+      directive: { halt: true, vector: { coaching_cue: coachingCue } },
+    },
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText('A safety concern paused this session.')).toBeOnTheScreen();
+  if (typeof haltReason === 'string') {
+    expect(screen.queryByText(new RegExp(`^${haltReason}$`, 'i'))).toBeNull();
+  }
 });
 
 test('a completed runner takes precedence over a later triage halt', () => {
@@ -1290,8 +1363,8 @@ test('nullable target RPE uses the same fallback for display and initialization'
 
   const sourceBefore = screen.getByTestId('session-load-source-line').props.children;
   const draftBefore = screen.getByTestId('session-load-input').props.value;
-  fireEvent.press(screen.getByText(/Enter RPE directly/i));
-  fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+  fireEvent.press(screen.getByLabelText('Increase Effort'));
   expect(screen.getByTestId('session-load-source-line').props.children).toBe(sourceBefore);
   expect(screen.getByTestId('session-load-input').props.value).toBe(draftBefore);
   expect(resolveLoadSelectionSpy.mock.calls.every(([input]) => input.targetRpe === 8)).toBe(true);

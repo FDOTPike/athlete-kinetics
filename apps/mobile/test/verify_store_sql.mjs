@@ -66,7 +66,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 063 adds movement_load_intent, which the store now reads on boot and writes
   // from the athlete's declaration (OW-001), so its statements are validated
   // against the real table here.
-  '063_movement_load_intent.sql'];
+  '063_movement_load_intent.sql',
+  // 064 is the shared neutral activity/support persistence contract. Feature
+  // adapters are separate modules, but the real store database must migrate it.
+  '064_accessible_coach_support.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -1768,6 +1771,7 @@ if (resetTables.length >= 15) {
   console.log('[documentation & CI gate count drift check]');
   const pkgJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
   const verifyCiScript = pkgJson.scripts['verify:ci'] ?? '';
+  const verifyComponentsScript = pkgJson.scripts['verify:components'] ?? '';
   const verifyInvocations = (verifyCiScript
     .match(/npm run verify:(?!all\b|ci\b|release\b)[a-z0-9-]+/g) ?? []).length;
 
@@ -1780,7 +1784,9 @@ if (resetTables.length >= 15) {
   const ciMatches = Array.from(ciYmlContent.matchAll(/\((\d+)\s+gates/g));
   const ciGateCounts = ciMatches.map((m) => Number(m[1]));
 
-  a('verify:ci script invokes exactly 21 verify:* targets', verifyInvocations === 21, `got ${verifyInvocations}`);
+  a('verify:ci script invokes exactly 22 verify:* targets', verifyInvocations === 22, `got ${verifyInvocations}`);
+  a('verify:components bypasses stale transformed migration caches',
+    /(?:^|\s)--no-cache(?:\s|$)/.test(verifyComponentsScript), verifyComponentsScript);
   a('AGENT_WORKFLOW.md documents exact verify:ci gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
   a('ci.yml documents exact verify:ci gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
 

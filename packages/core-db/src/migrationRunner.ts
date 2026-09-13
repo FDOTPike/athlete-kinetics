@@ -213,6 +213,43 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'movement_load_intent' },                            // 063
   { type: 'trigger', name: 'trg_movement_load_intent_supported_bi' },         // 063
   { type: 'trigger', name: 'trg_movement_load_intent_supported_bu' },         // 063
+  // 064 neutral external-activity capture and user-reported support records.
+  // Every durable table is a sentinel: losing one must never look like an
+  // empty/cleared athlete profile at latest user_version.
+  { type: 'table', name: 'activity_definition' },                             // 064
+  { type: 'table', name: 'activity_requirement' },                            // 064
+  { type: 'table', name: 'activity_series' },                                 // 064
+  { type: 'table', name: 'activity_occurrence' },                             // 064
+  { type: 'table', name: 'activity_completion' },                             // 064
+  { type: 'table', name: 'activity_source_link' },                            // 064
+  { type: 'table', name: 'activity_typical_week_report' },                    // 064
+  { type: 'table', name: 'activity_typical_week_item' },                      // 064
+  { type: 'table', name: 'health_support_profile' },                          // 064
+  { type: 'table', name: 'health_support_preference' },                       // 064
+  { type: 'table', name: 'health_support_note' },                             // 064
+  { type: 'table', name: 'clinician_instruction' },                           // 064
+  { type: 'table', name: 'clinician_instruction_revision' },                  // 064
+  { type: 'table', name: 'health_support_hold' },                             // 064
+  { type: 'table', name: 'health_support_scope' },                            // 064
+  { type: 'table', name: 'recommendation_support_record' },                  // 064
+  { type: 'table', name: 'recommendation_activity_basis' },                  // 064
+  { type: 'table', name: 'recommendation_hold_basis' },                      // 064
+  { type: 'trigger', name: 'trg_activity_completion_completed_bi' },          // 064
+  { type: 'trigger', name: 'trg_activity_completion_completed_bu' },          // 064
+  { type: 'trigger', name: 'trg_activity_occurrence_completion_consistency_bu' }, // 064
+  { type: 'trigger', name: 'trg_activity_occurrence_origin_immutable_bu' },     // 064
+  { type: 'trigger', name: 'trg_activity_occurrence_source_consistency_bi' },  // 064
+  { type: 'trigger', name: 'trg_activity_source_link_origin_consistency_bi' }, // 064
+  { type: 'trigger', name: 'trg_activity_source_link_identity_immutable_bu' }, // 064
+  { type: 'trigger', name: 'trg_health_support_note_limit_bi' },              // 064
+  { type: 'trigger', name: 'trg_clinician_instruction_limit_bi' },            // 064
+  { type: 'trigger', name: 'trg_clinician_instruction_revision_limit_bi' },   // 064
+  { type: 'trigger', name: 'trg_clinician_instruction_revision_limit_bu' },   // 064
+  { type: 'trigger', name: 'trg_health_support_scope_limit_bi' },             // 064
+  { type: 'trigger', name: 'trg_health_support_scope_limit_bu' },             // 064
+  { type: 'trigger', name: 'trg_health_support_hold_no_delete_held_bd' },     // 064
+  { type: 'trigger', name: 'trg_health_support_hold_versioned_withdrawal_bu' }, // 064
+  { type: 'trigger', name: 'trg_clinician_instruction_delete_bd' },           // 064
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -264,6 +301,18 @@ const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
   // rename and are not what puts them here.
   'trg_suspension_episode_program_no_delete_bd', // 062 -> suspension_episode
   'trg_block_suspension_origin_no_delete_bd',    // 062 -> suspension_episode
+  // These name activity_occurrence, created after the chain's rename point.
+  // Drop them only during a full self-heal replay; 064 recreates them before
+  // sentinel validation returns control to the app.
+  'trg_activity_completion_completed_bi',        // 064 -> activity_occurrence
+  'trg_activity_completion_completed_bu',        // 064 -> activity_occurrence
+  // This trigger lives on activity_occurrence and names the later-in-064
+  // activity_completion table, so it has the same replay constraint.
+  'trg_activity_occurrence_completion_consistency_bu', // 064 -> activity_completion
+  'trg_activity_occurrence_source_consistency_bi', // 064 -> activity_source_link
+  'trg_activity_source_link_origin_consistency_bi', // 064 -> activity_occurrence
+  // Deleting a clinician envelope names the later-in-064 scope/hold tables.
+  'trg_clinician_instruction_delete_bd',      // 064 -> health_support_scope/hold
 ];
 
 function dropReplayBlockingTriggers(db: MigrationDb): void {

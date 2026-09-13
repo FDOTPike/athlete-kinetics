@@ -248,7 +248,7 @@ console.log('[§2.2] objective/style label mapping');
     gpp: 'General athlete',
     hybrid: 'Strength + grappling',
     rehab: 'Return to training',
-    weight_loss: 'Fat-loss support',
+    weight_loss: 'Weight-loss support',
   };
   for (const [objective, label] of Object.entries(expected)) {
     check(`[§2.2] ${objective} maps to the honest style label "${label}"`,

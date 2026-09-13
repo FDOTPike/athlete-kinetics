@@ -1,12 +1,13 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer } from '@ak/inference';
+import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -26,6 +27,31 @@ const secondsText = (n: number): string => {
   const min = Math.floor(value / 60);
   const sec = value % 60;
   return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
+};
+
+const GENERIC_HALT_COPY = 'A safety concern paused this session.';
+const NON_SAFETY_HALT_COPY = {
+  manual: 'You chose to stop this session.',
+  niggle: 'You reported that something felt off, so this session is paused.',
+  pain: 'You reported pain, so this session is paused.',
+} satisfies Record<Exclude<RunnerHaltReason, 'safety'>, string>;
+
+/** Exhaustive athlete-facing copy for persisted runner halt reasons. The
+ * Record above makes a newly added non-safety RunnerHaltReason a type error
+ * until copy is supplied. Runtime-unknown, absent, and blank safety evidence
+ * all fail closed to one generic safety message; raw tokens are never output. */
+const formatRunnerHaltReason = (
+  reason: RunnerHaltReason | null | undefined,
+  matchedTriageCue: string | null | undefined,
+): string => {
+  if (reason === 'safety') {
+    const cue = matchedTriageCue?.trim();
+    return cue === undefined || cue.length === 0 ? GENERIC_HALT_COPY : cue;
+  }
+  if (reason === 'manual' || reason === 'niggle' || reason === 'pain') {
+    return NON_SAFETY_HALT_COPY[reason];
+  }
+  return GENERIC_HALT_COPY;
 };
 
 /** Strict load-draft parsing (Sol audit correction 1): decimal notation only,
@@ -716,7 +742,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" accessibilityLabel="Current workout timeline">
+      <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
@@ -733,7 +759,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           <View style={styles.haltCard} accessibilityRole="alert">
             <Text style={styles.haltTitle}>Stop training for today.</Text>
             <Text style={styles.haltBody}>
-              {runner?.haltReason ?? (lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : 'A safety report needs your attention before more sets are logged.')}
+              {formatRunnerHaltReason(
+                runner?.haltReason,
+                lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : null,
+              )}
             </Text>
             <View style={{ marginTop: theme.space[4], alignSelf: 'stretch' }}>
               <SecondaryButton
@@ -925,7 +954,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           />
                           {target?.kind !== 'time' && (
                             <Text style={styles.effortCue} testID="actual-reps-cue">
-                              Planned target {target?.kind === 'reps' ? target.reps : '—'}. Enter what you actually did — the plan stays unchanged.
+                              Target: {target?.kind === 'reps' ? target.reps : '—'} reps. Log the reps you actually completed.
                             </Text>
                           )}
                           <View style={styles.loadField}>
@@ -952,6 +981,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                 <Text style={styles.loadAdjustText}>−</Text>
                               </Pressable>
                               <TextInput
+                                disableFullscreenUI
                                 testID="session-load-input"
                                 style={styles.loadInput}
                                 value={loadText}
@@ -992,6 +1022,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               </Pressable>
                             </View>
                           </View>
+
+                          <Text style={styles.effortCue} testID="effort-scale-explanation">
+                            How hard did that feel? 1 is very easy. 10 is your hardest effort.
+                          </Text>
 
                           {/* Primary Unanchored RIR Question for rep-based work */}
                           {target?.kind !== 'time' && (
@@ -1036,7 +1070,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           {safeRpe !== null && (
                             <View style={styles.derivedRpeContainer} testID="derived-rpe-display">
                               <Text style={styles.derivedRpeLabel}>
-                                Reported actual RPE {safeRpe.toFixed(1)}
+                                Reported effort {safeRpe.toFixed(1)}
                               </Text>
                             </View>
                           )}
@@ -1046,11 +1080,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                             <Pressable
                               onPress={() => setDirectEntryOpen((prev) => !prev)}
                               accessibilityRole="button"
-                              accessibilityLabel={directEntryOpen ? 'Hide direct RPE entry' : 'Enter RPE directly'}
+                              accessibilityLabel={directEntryOpen ? 'Hide direct Effort entry' : 'Enter Effort directly'}
                               style={styles.directToggle}
                             >
                               <Text style={styles.directToggleText}>
-                                {directEntryOpen ? 'Hide direct RPE' : 'Enter RPE directly'}
+                                {directEntryOpen ? 'Hide direct Effort' : 'Enter Effort directly'}
                               </Text>
                             </Pressable>
 
@@ -1058,7 +1092,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               <View style={styles.directEntryBlock} testID="direct-rpe-block">
                                 <Stepper
                                   testID="current-rpe-stepper"
-                                  label="Actual RPE"
+                                  label="Effort"
                                   tip="RPE"
                                   value={directRpe !== null ? directRpe.toFixed(1) : '—'}
                                   onDecrement={() => {
@@ -1089,7 +1123,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                           setSelectedChoice(null);
                                         }
                                       }}
-                                      accessibilityLabel={`RPE ${val.toFixed(1)}`}
+                                      accessibilityLabel={`Effort ${val.toFixed(1)}`}
                                       style={styles.halfStepChip}
                                     />
                                   ))}
@@ -1100,8 +1134,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
                           <Text style={styles.effortCue} testID="rpe-cue">
                             {safeRpe !== null
-                              ? (effortCue(safeRpe) ?? 'RPE is optional evidence — leave it untouched to skip.')
-                              : 'RPE is optional evidence — leave it untouched to skip.'}
+                              ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
+                              : 'Effort is optional evidence — leave it untouched to skip.'}
                           </Text>
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
@@ -1332,7 +1366,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             </View>
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

@@ -1,12 +1,20 @@
 /**
  * InfoTip.tsx — reusable ⓘ glossary tooltip for S&C terminology.
  *
- * Tap the icon, get a plain-language card; tap anywhere to dismiss.
+ * Tap the icon, get a plain-language card; tap outside or use Close to dismiss.
  * RN core only (Modal with animationType="none"), no positioning math —
  * a centered card never clips inside ScrollViews or nav strips.
  */
-import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { palette } from '../state/useStore';
 import { theme } from '../theme/theme';
 
@@ -55,6 +63,14 @@ export interface InfoTipProps {
 
 export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
+  const titleRef = useRef<React.ElementRef<typeof Text>>(null);
+  const close = useCallback(() => setOpen(false), []);
+  const focusExplanation = useCallback(() => {
+    const titleHandle = findNodeHandle(titleRef.current);
+    if (titleHandle !== null) {
+      AccessibilityInfo.setAccessibilityFocus(titleHandle);
+    }
+  }, []);
   const entry = getGlossaryEntry(term);
 
   if (!entry) {
@@ -82,19 +98,42 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
           <Text style={styles.iconText}>i</Text>
         </View>
       </Pressable>
-      <Modal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
-        <Pressable
+      <Modal
+        visible={open}
+        transparent
+        animationType="none"
+        onRequestClose={close}
+        onShow={focusExplanation}
+      >
+        <View
+          testID="info-tip-dialog"
           style={styles.backdrop}
-          onPress={() => setOpen(false)}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss explanation"
+          accessibilityViewIsModal
+          onAccessibilityEscape={close}
         >
+          <Pressable
+            testID="info-tip-backdrop"
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+            accessible={false}
+            importantForAccessibility="no"
+          />
           <View style={styles.card}>
-            <Text style={styles.cardTerm}>{title}</Text>
-            <Text style={styles.cardBody}>{entry.definition}</Text>
-            <Text style={styles.cardHint}>tap anywhere to close</Text>
+            <Text ref={titleRef} accessible accessibilityRole="header" style={styles.cardTerm}>
+              {title}
+            </Text>
+            <Text accessible style={styles.cardBody}>{entry.definition}</Text>
+            <Text accessible style={styles.cardHint}>Tap outside or use Close to return.</Text>
+            <Pressable
+              style={styles.closeButton}
+              onPress={close}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss explanation"
+            >
+              <Text style={styles.closeButtonText}>CLOSE</Text>
+            </Pressable>
           </View>
-        </Pressable>
+        </View>
       </Modal>
     </>
   );
@@ -138,4 +177,13 @@ const styles = StyleSheet.create({
   cardTerm: { color: colors.green, fontSize: 15, fontWeight: '800', letterSpacing: 2 },
   cardBody: { color: colors.text, fontSize: 15, lineHeight: 22 },
   cardHint: { color: colors.dim, fontSize: 12, marginTop: 4 },
+  closeButton: {
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    marginTop: 8,
+  },
+  closeButtonText: { color: colors.text, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
 });

@@ -62,7 +62,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '060_program_goal_tier_alignment.sql',
   '061_autopilot_attribution_convergence.sql',
   '062_suspension_sidecar_immutability.sql',
-  '063_movement_load_intent.sql'];
+  '063_movement_load_intent.sql',
+  '064_accessible_coach_support.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1680,7 +1681,15 @@ console.log('[2s] R1 durable-object drift guard');
 console.log('[2t] R1 missing-table self-heal matrix (production runner)');
 for (const target of ['movement_capability_family', 'movement_capability_attestation',
   'routine_template_slot', 'history_import_session', 'history_import_set',
-  'history_import_capability_evidence']) {
+  'history_import_capability_evidence',
+  'activity_definition', 'activity_requirement', 'activity_series',
+  'activity_occurrence', 'activity_completion', 'activity_source_link',
+  'activity_typical_week_report', 'activity_typical_week_item',
+  'health_support_profile', 'health_support_preference', 'health_support_note',
+  'clinician_instruction', 'clinician_instruction_revision',
+  'health_support_hold', 'health_support_scope',
+  'recommendation_support_record', 'recommendation_activity_basis',
+  'recommendation_hold_basis']) {
   const db = freshDb();
   runMigrations(db, MIGRATIONS);
   const before = uv(db);
@@ -1741,11 +1750,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 62 files (slots 001-063, no 004) -> user_version 62. This count is
+    // 63 files (slots 001-064, no 004) -> user_version 63. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 063 (OW-001 athlete load-intent declaration).
-    check('fresh install reaches user_version 62 (62 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 62,
+    // silent one. Re-pinned for 064 (Accessible Coach shared contract).
+    check('fresh install reaches user_version 63 (63 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 63,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -2798,8 +2807,462 @@ const intents = (db) => db.raw
 }
 
 // (4) ARRAY INDEX AND user_version.
-check(`063 is appended at array index ${IDX_063}, never spliced`,
-  IDX_063 === MIGRATIONS.length - 1 && IDX_063 === 61, `index=${IDX_063} length=${MIGRATIONS.length}`);
+check(`063 remains at array index ${IDX_063}, never spliced`,
+  IDX_063 === 61, `index=${IDX_063} length=${MIGRATIONS.length}`);
+
+// --- 2ad. 064 Accessible Coach shared capture/accounting/hold contract -------
+console.log('[2ad] 064 Accessible Coach neutral shared contract');
+const IDX_064 = FILES.indexOf('064_accessible_coach_support.sql');
+const TABLES_064 = [
+  'activity_definition', 'activity_requirement', 'activity_series',
+  'activity_occurrence', 'activity_completion', 'activity_source_link',
+  'activity_typical_week_report', 'activity_typical_week_item',
+  'health_support_profile', 'health_support_preference', 'health_support_note',
+  'clinician_instruction', 'clinician_instruction_revision',
+  'health_support_hold', 'health_support_scope',
+  'recommendation_support_record', 'recommendation_activity_basis',
+  'recommendation_hold_basis',
+];
+const TRIGGERS_064 = [
+  'trg_activity_completion_completed_bi',
+  'trg_activity_completion_completed_bu',
+  'trg_activity_occurrence_completion_consistency_bu',
+  'trg_activity_occurrence_origin_immutable_bu',
+  'trg_activity_occurrence_source_consistency_bi',
+  'trg_activity_source_link_origin_consistency_bi',
+  'trg_activity_source_link_identity_immutable_bu',
+  'trg_health_support_note_limit_bi',
+  'trg_clinician_instruction_limit_bi',
+  'trg_clinician_instruction_revision_limit_bi',
+  'trg_clinician_instruction_revision_limit_bu',
+  'trg_health_support_scope_limit_bi',
+  'trg_health_support_scope_limit_bu',
+  'trg_health_support_hold_no_delete_held_bd',
+  'trg_health_support_hold_versioned_withdrawal_bu',
+  'trg_clinician_instruction_delete_bd',
+];
+
+{
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  check('064 is the appended migration and completes the chain',
+    IDX_064 === MIGRATIONS.length - 1 && IDX_064 === 62 && uv(d) === 63,
+    `index=${IDX_064} uv=${uv(d)}`);
+  check('064 installs every shared table and enforcement trigger',
+    TABLES_064.every((name) => d.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))
+      && TRIGGERS_064.every((name) => triggerPresent(d, name)));
+  check('064 fresh install infers no activity, health fact, instruction, or hold',
+    TABLES_064.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+  const rawTextBounds = [
+    ['activity_definition', 'display_name', 160],
+    ['activity_series', 'timezone_id', 128],
+    ['activity_occurrence', 'origin_identity', 240],
+    ['activity_occurrence', 'timezone_id', 128],
+    ['activity_occurrence', 'resolver_version', 80],
+    ['activity_occurrence', 'original_recurrence_key', 160],
+    ['activity_source_link', 'source_identity', 240],
+    ['activity_typical_week_report', 'timezone_id', 128],
+    ['health_support_note', 'body_text', 4000],
+    ['clinician_instruction_revision', 'instruction_text', 16000],
+    ['clinician_instruction_revision', 'issuer_text', 160],
+    ['clinician_instruction_revision', 'date_zone_id', 128],
+    ['health_support_preference', 'detail_text', 4000],
+    ['health_support_scope', 'reported_scope_text', 4000],
+    ['recommendation_support_record', 'advice_target_identity', 160],
+    ['recommendation_support_record', 'engine_version', 80],
+  ];
+  check('064 DDL carries raw text caps rather than trim-bypassable caps',
+    rawTextBounds.every(([table, column, limit]) => String(d.raw.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+    ).get(table)?.sql ?? '').includes(`length(${column}) <= ${limit}`)));
+  check('064 rejects whitespace-padded display text beyond its raw cap',
+    refused(d, `INSERT INTO activity_definition
+      (activity_id,kind_id,display_name,demand_class,demand_source,provenance,created_at_ms,updated_at_ms)
+      VALUES ('a-padded','custom','x${' '.repeat(160)}','unknown','unknown','user_reported',1,1)`));
+
+  d.executeSync(`
+    INSERT INTO activity_definition
+      (activity_id, kind_id, display_name, demand_class, demand_source, provenance, created_at_ms, updated_at_ms)
+    VALUES ('a-basketball', 'basketball', 'Friday basketball', 'unknown', 'unknown', 'user_reported', 1, 1);
+    INSERT INTO activity_requirement
+      (requirement_id, activity_id, requirement_kind, requirement_code, requirement_state, provenance, recorded_at_ms)
+    VALUES ('req-court', 'a-basketball', 'facility', 'court', 'known_available', 'user_reported', 1);
+    INSERT INTO activity_series
+      (series_id, activity_id, revision, recurrence_kind, local_weekday, local_start_minute,
+       timezone_id, time_resolution_state, effective_start_date, effective_end_date,
+       timing_commitment, expected_duration_min, expected_effort, effort_scale_id,
+       effort_scale_version, created_at_ms, updated_at_ms)
+    VALUES ('s-friday', 'a-basketball', 1, 'weekly', 5, 1020,
+      'Australia/Sydney', 'unambiguous', '2026-09-01', NULL,
+      'fixed', 60, NULL, NULL, NULL, 1, 1);
+    INSERT INTO activity_occurrence
+      (occurrence_id, activity_id, series_id, original_recurrence_key, revision,
+       origin_kind, origin_identity,
+       local_date, local_start_minute, timezone_id, time_resolution_state,
+       resolved_start_at_ms, resolved_end_at_ms, resolver_version,
+        occurrence_state, timing_commitment, modality_id, purpose_id,
+        expected_duration_min, expected_effort,
+        effort_scale_id, effort_scale_version, created_at_ms, updated_at_ms)
+    VALUES ('o-friday', 'a-basketball', 's-friday', '2026-09-18', 1,
+      'manual', 'manual-friday',
+      '2026-09-18', 1020, 'Australia/Sydney', 'unambiguous', 1000, 2000,
+       'tzdb-fixture-1', 'completed', 'fixed', 'unknown', 'match',
+       60, NULL, NULL, NULL, 1, 2);
+    INSERT INTO activity_completion
+      (occurrence_id, completion_state, actual_start_at_ms, actual_end_at_ms,
+       actual_duration_min, actual_effort, effort_scale_id, effort_scale_version,
+       effort_reported_at_ms, provenance, recorded_at_ms)
+    VALUES ('o-friday', 'completed', 1000, 2000, 55, NULL, NULL, NULL,
+      NULL, 'user_reported', 2000);
+    INSERT INTO activity_source_link
+      (source_link_id, occurrence_id, source_kind, source_identity, linked_session_id, recorded_at_ms)
+    VALUES ('src-manual', 'o-friday', 'manual', 'manual-friday', NULL, 2000),
+           ('src-import', 'o-friday', 'imported', 'vendor-friday', NULL, 2000);
+  `);
+  const friday = d.raw.prepare(`
+    SELECT s.local_weekday, s.local_start_minute, s.timezone_id,
+            s.timing_commitment, o.modality_id, o.purpose_id, c.actual_duration_min,
+           (SELECT COUNT(*) FROM activity_source_link l WHERE l.occurrence_id=o.occurrence_id) AS sources
+    FROM activity_series s
+    JOIN activity_occurrence o USING(series_id, activity_id)
+    JOIN activity_completion c USING(occurrence_id)
+  `).get();
+  check('064 preserves a fixed Friday 17:00 occurrence and counts its factual completion once',
+    friday.local_weekday === 5 && friday.local_start_minute === 1020
+       && friday.timezone_id === 'Australia/Sydney' && friday.timing_commitment === 'fixed'
+       && friday.modality_id === 'unknown' && friday.purpose_id === 'match'
+       && friday.actual_duration_min === 55 && friday.sources === 2,
+    JSON.stringify(friday));
+  check('064 keeps the occurrence origin immutable after materialization',
+    refused(d, `UPDATE activity_occurrence SET origin_identity='silently-relabelled'
+                WHERE occurrence_id='o-friday'`));
+  d.executeSync(`
+    INSERT INTO session (session_id,session_date,started_at_ms)
+      VALUES (64000,'2026-09-19',3000);
+    INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,origin_session_id,revision,
+       local_date,timezone_id,time_resolution_state,occurrence_state,timing_commitment,
+       created_at_ms,updated_at_ms)
+      VALUES ('o-coached','a-basketball','coached_session','session:64000',64000,1,
+        '2026-09-19','Australia/Sydney','unresolved','planned','flexible',3,3);
+    INSERT INTO activity_source_link
+      (source_link_id,occurrence_id,source_kind,source_identity,linked_session_id,recorded_at_ms)
+      VALUES ('src-coached','o-coached','coached_session','session:64000',64000,3);
+    INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-origin-only','a-basketball','manual','origin-only',1,'2026-09-20',
+        'Australia/Sydney','unresolved','planned','flexible',3,3);
+  `);
+  check('064 requires and preserves an explicit native session link for a coached origin',
+    d.raw.prepare(`SELECT 1 FROM activity_occurrence o JOIN activity_source_link l
+      ON l.occurrence_id=o.occurrence_id AND l.linked_session_id=o.origin_session_id
+      WHERE o.occurrence_id='o-coached' AND o.origin_kind='coached_session'`).get() !== undefined
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-coached-unlinked','a-basketball','coached_session','missing-session-link',1,
+        '2026-09-21','Australia/Sydney','unresolved','planned','flexible',3,3)`));
+  check('064 rejects cross-occurrence source reuse and source-link relabelling',
+    refused(d, `INSERT INTO activity_source_link
+      (source_link_id,occurrence_id,source_kind,source_identity,recorded_at_ms)
+      VALUES ('src-cross','o-coached','manual','origin-only',3)`)
+    && refused(d, `UPDATE activity_source_link SET source_identity='relabelled'
+      WHERE source_link_id='src-import'`));
+  d.executeSync(`INSERT INTO activity_source_link
+    (source_link_id,occurrence_id,source_kind,source_identity,recorded_at_ms)
+    VALUES ('src-link-first','o-coached','imported','link-first-origin',3)`);
+  check('064 rejects source identity collisions regardless of insertion order',
+    refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-link-first','a-basketball','imported','link-first-origin',1,'2026-09-21',
+        'Australia/Sydney','unresolved','planned','flexible',3,3)`));
+  check('064 requires a recurrence key and admits one occurrence per series slot',
+    refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,series_id,revision,origin_kind,origin_identity,
+       local_date,timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-null-key','a-basketball','s-friday',1,'manual','null-key',
+        '2026-09-18','Australia/Sydney','unresolved','planned','flexible',3,3)`)
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,series_id,original_recurrence_key,revision,
+       origin_kind,origin_identity,local_date,timezone_id,time_resolution_state,
+       occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-duplicate-slot','a-basketball','s-friday','2026-09-18',1,
+        'manual','duplicate-slot','2026-09-18','Australia/Sydney','unresolved',
+        'planned','flexible',3,3)`));
+  d.executeSync(`
+    INSERT INTO activity_definition
+      (activity_id,kind_id,display_name,demand_class,demand_source,provenance,created_at_ms,updated_at_ms)
+      VALUES ('a-cycle','cycling','Recumbent cycle','unknown','unknown','user_reported',4,4);
+    INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,
+       modality_id,purpose_id,created_at_ms,updated_at_ms)
+      VALUES ('o-cycle','a-cycle','manual','cycle-manual',1,'2026-09-22',
+        'Australia/Sydney','unresolved','planned','flexible',
+        'stationary_recumbent','conditioning',4,4);
+  `);
+  const cycleContext = d.raw.prepare(`SELECT modality_id,purpose_id FROM activity_occurrence
+    WHERE occurrence_id='o-cycle'`).get();
+  check('064 preserves ratified modality and occurrence-purpose context',
+    cycleContext?.modality_id === 'stationary_recumbent'
+      && cycleContext?.purpose_id === 'conditioning', JSON.stringify(cycleContext));
+  check('064 rejects unratified modality and occurrence-purpose tokens',
+    refused(d, `UPDATE activity_occurrence SET modality_id='recumbent-ish' WHERE occurrence_id='o-cycle'`)
+      && refused(d, `UPDATE activity_occurrence SET purpose_id='competition-ish' WHERE occurrence_id='o-cycle'`));
+  d.executeSync(`INSERT INTO activity_typical_week_report
+    (report_id,reported_local_date,coverage_start_date,coverage_end_date,timezone_id,recorded_at_ms)
+    VALUES ('typical-1','2026-09-13','2026-08-16','2026-09-12','Australia/Sydney',4)`);
+  check('064 rejects unparseable civil dates across activity date fields', [
+    `UPDATE activity_series SET effective_start_date='2026-13-01' WHERE series_id='s-friday'`,
+    `UPDATE activity_series SET effective_end_date='2026-13-01' WHERE series_id='s-friday'`,
+    `UPDATE activity_occurrence SET local_date='2026-13-01' WHERE occurrence_id='o-friday'`,
+    `UPDATE activity_typical_week_report SET reported_local_date='2026-13-01' WHERE report_id='typical-1'`,
+    `UPDATE activity_typical_week_report SET coverage_start_date='2026-13-01' WHERE report_id='typical-1'`,
+    `UPDATE activity_typical_week_report SET coverage_end_date='2026-13-01' WHERE report_id='typical-1'`,
+  ].every((sql) => refused(d, sql)));
+  check('064 rejects impossible civil dates and a fixed occurrence without resolved instants',
+    refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-bad-date','a-basketball','manual','bad-date',1,'2026-02-30',
+        'Australia/Sydney','unresolved','planned','flexible',1,1)`)
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-unparseable-date','a-basketball','manual','unparseable-date',1,'2026-13-01',
+        'Australia/Sydney','unresolved','planned','flexible',1,1)`)
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       local_start_minute,timezone_id,time_resolution_state,occurrence_state,
+       timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-unresolved-fixed','a-basketball','manual','unresolved-fixed',1,'2026-09-19',
+        1020,'Australia/Sydney','unresolved','planned','fixed',1,1)`));
+  check('064 rejects an effort value without its named/versioned scale',
+    refused(d, `INSERT INTO activity_definition VALUES ('a-walk','walking','Walk','unknown','unknown','user_reported',1,1);
+      INSERT INTO activity_occurrence
+        (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,timezone_id,time_resolution_state,
+         occurrence_state,timing_commitment,expected_effort,created_at_ms,updated_at_ms)
+      VALUES ('o-bad','a-walk','manual','bad-effort',1,'2026-09-13','Australia/Sydney','unresolved','planned','flexible',7,1,1)`));
+  check('064 rejects completion evidence for an occurrence not explicitly completed',
+    !refused(d, `INSERT OR IGNORE INTO activity_definition VALUES ('a-walk','walking','Walk','unknown','unknown','user_reported',1,1)`)
+      && !refused(d, `INSERT INTO activity_occurrence
+        (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,timezone_id,time_resolution_state,
+          occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+        VALUES ('o-planned','a-walk','manual','planned-walk',1,'2026-09-13','Australia/Sydney','unresolved','planned','flexible',1,1)`)
+      && refused(d, `INSERT INTO activity_completion
+        (occurrence_id,completion_state,provenance,recorded_at_ms)
+        VALUES ('o-planned','completed','user_reported',1)`));
+
+  d.executeSync('BEGIN');
+  d.executeSync(`INSERT INTO clinician_instruction
+    (instruction_id,current_revision,created_at_ms) VALUES ('instruction-1',1,10)`);
+  d.executeSync(`INSERT INTO clinician_instruction_revision
+    (instruction_id,revision,instruction_text,issuer_text,source_class,provenance,
+     verification_state,recorded_at_ms,date_status,transcription_state,
+     confirmed_at_ms,lifecycle)
+    VALUES ('instruction-1',1,'Reported instruction text','Clinician as entered',
+      'clinician_guidance_as_reported','user_reported','not_verified',10,'unknown',
+      'user_confirmed',11,'current')`);
+  d.executeSync(`INSERT INTO health_support_hold
+    (hold_id,revision,instruction_id,instruction_revision,origin,state,reason_code,created_at_ms,updated_at_ms)
+    VALUES ('hold-1',1,'instruction-1',1,'instruction_review','held','instruction_unreviewed',10,10)`);
+  d.executeSync(`INSERT INTO health_support_scope
+    (scope_id,hold_id,target_kind,occurrence_id)
+    VALUES ('scope-1','hold-1','activity_occurrence','o-friday')`);
+  d.executeSync(`INSERT INTO health_support_scope
+    (scope_id,instruction_id,instruction_revision,target_kind,reported_scope_text)
+    VALUES ('scope-direct','instruction-1',1,'unresolved','scope as reported')`);
+  d.executeSync(`INSERT INTO recommendation_support_record
+    (decision_id,advice_target_kind,advice_target_identity,support_status,engine_version,generated_at_ms)
+    VALUES ('decision-1','session','planned-session:7','held','fixture-1',20)`);
+  d.executeSync(`INSERT INTO recommendation_activity_basis
+    (decision_id,occurrence_id,occurrence_revision) VALUES ('decision-1','o-friday',1)`);
+  d.executeSync(`INSERT INTO recommendation_hold_basis
+    (decision_id,hold_id,hold_revision,reason_code)
+    VALUES ('decision-1','hold-1',1,'instruction_unreviewed')`);
+  d.executeSync('COMMIT');
+  check('064 stores confirmed transcription as user-reported/not-verified and an exact explicit hold scope',
+    d.raw.prepare(`SELECT 1 FROM clinician_instruction_revision r
+      JOIN health_support_hold h ON h.instruction_id=r.instruction_id AND h.instruction_revision=r.revision
+      JOIN health_support_scope s USING(hold_id)
+      WHERE r.provenance='user_reported' AND r.verification_state='not_verified'
+         AND h.state='held' AND s.target_kind='activity_occurrence' AND s.occurrence_id='o-friday'`).get() !== undefined);
+  check('064 rejects unparseable civil dates across instruction date fields', [
+    'instruction_date', 'effective_date', 'review_date', 'expiry_date',
+  ].every((column) => refused(d, `UPDATE clinician_instruction_revision
+    SET ${column}='2026-13-01' WHERE instruction_id='instruction-1' AND revision=1`)));
+  check('064 rejects whitespace-padded instruction text beyond its raw cap',
+    refused(d, `UPDATE clinician_instruction_revision
+      SET instruction_text='x${' '.repeat(16000)}'
+      WHERE instruction_id='instruction-1' AND revision=1`));
+  check('064 has no clearance, diagnosis, screening, medical metric, operator, unit, or threshold column',
+    !TABLES_064.flatMap((name) => d.raw.prepare(`PRAGMA table_info(${name})`).all())
+      .some((column) => /clear|diagnos|screen|metric|operator|threshold|medical|limit_value|unit/i.test(String(column.name))));
+  check('064 rejects a claimed verified clinician source',
+    refused(d, `INSERT INTO clinician_instruction_revision
+      (instruction_id,revision,instruction_text,source_class,provenance,verification_state,
+       recorded_at_ms,date_status,transcription_state,lifecycle)
+      VALUES ('instruction-1',2,'text','clinician_guidance_as_reported','user_reported',
+        'verified',20,'unknown','draft','current')`));
+  check('064 rejects a scope whose target kind and target ID disagree',
+    refused(d, `INSERT INTO health_support_scope
+      (scope_id,hold_id,target_kind,movement_id) VALUES ('bad-scope','hold-1','activity_occurrence',1)`));
+  check('064 persists content-free recommendation provenance without copying support prose',
+    d.raw.prepare(`SELECT 1 FROM recommendation_support_record r
+      JOIN recommendation_activity_basis a USING(decision_id)
+      JOIN recommendation_hold_basis h USING(decision_id)
+      WHERE r.support_status='held' AND a.occurrence_id='o-friday'
+        AND h.hold_id='hold-1' AND h.hold_revision=1
+        AND h.reason_code='instruction_unreviewed'`).get() !== undefined
+    && !['recommendation_support_record','recommendation_activity_basis','recommendation_hold_basis']
+      .flatMap((name) => d.raw.prepare(`PRAGMA table_info(${name})`).all())
+       .some((column) => /text|note|prose|instruction/i.test(String(column.name))));
+  d.executeSync(`INSERT INTO health_support_hold
+    (hold_id,revision,origin,state,reason_code,created_at_ms,updated_at_ms)
+    VALUES ('free-held',1,'user_requested','held','review_requested',20,20)`);
+  check('064 a held review marker cannot disappear or be withdrawn without a revision bump',
+    refused(d, `DELETE FROM health_support_hold WHERE hold_id='free-held'`)
+      && refused(d, `UPDATE health_support_hold SET state='withdrawn' WHERE hold_id='free-held'`)
+      && !refused(d, `UPDATE health_support_hold
+        SET state='withdrawn',revision=2,updated_at_ms=21 WHERE hold_id='free-held'`)
+      && !refused(d, `DELETE FROM health_support_hold WHERE hold_id='free-held'`));
+  d.executeSync('BEGIN');
+  d.executeSync(`INSERT INTO clinician_instruction
+    (instruction_id,current_revision,created_at_ms) VALUES ('instruction-unscoped',1,30)`);
+  d.executeSync(`INSERT INTO clinician_instruction_revision
+    (instruction_id,revision,instruction_text,source_class,provenance,verification_state,
+     recorded_at_ms,date_status,transcription_state,lifecycle)
+    VALUES ('instruction-unscoped',1,'reported','clinician_guidance_as_reported',
+      'user_reported','not_verified',30,'unknown','draft','current')`);
+  d.executeSync(`INSERT INTO health_support_hold
+    (hold_id,revision,instruction_id,instruction_revision,origin,state,reason_code,created_at_ms,updated_at_ms)
+    VALUES ('unscoped-deletion-marker',1,'instruction-unscoped',1,'instruction_review',
+      'held','instruction_unreviewed',30,30)`);
+  d.executeSync('COMMIT');
+  d.executeSync(`DELETE FROM clinician_instruction WHERE instruction_id='instruction-unscoped'`);
+  const unscopedMarker = d.raw.prepare(`SELECT origin,state,reason_code,revision FROM health_support_hold
+    WHERE hold_id='unscoped-deletion-marker'`).get();
+  check('064 an unscoped deleted-support marker remains athlete-wide and non-deletable',
+    unscopedMarker?.origin === 'deleted_support_review'
+      && unscopedMarker?.state === 'held'
+      && unscopedMarker?.reason_code === 'support_deleted'
+      && unscopedMarker?.revision === 2
+      && refused(d, `DELETE FROM health_support_hold WHERE hold_id='unscoped-deletion-marker'`),
+    JSON.stringify(unscopedMarker));
+  d.executeSync(`DELETE FROM clinician_instruction WHERE instruction_id='instruction-1'`);
+  const deletedSupport = d.raw.prepare(`SELECT h.origin,h.state,h.reason_code,h.instruction_id,
+      (SELECT COUNT(*) FROM health_support_scope s WHERE s.hold_id=h.hold_id) AS retained_scopes,
+      (SELECT COUNT(*) FROM recommendation_hold_basis b WHERE b.hold_id=h.hold_id) AS retained_evidence
+    FROM health_support_hold h WHERE h.hold_id='hold-1'`).get();
+  check('064 deletion removes sensitive revisions/direct scope but retains a content-free protective marker',
+    Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM clinician_instruction_revision
+      WHERE instruction_id='instruction-1'`).get().c) === 0
+      && Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM health_support_scope
+        WHERE instruction_id='instruction-1' OR reported_scope_text IS NOT NULL`).get().c) === 0
+      && deletedSupport?.origin === 'deleted_support_review'
+      && deletedSupport?.state === 'held'
+      && deletedSupport?.reason_code === 'support_deleted'
+      && deletedSupport?.instruction_id === null
+      && Number(deletedSupport?.retained_scopes) === 1
+      && Number(deletedSupport?.retained_evidence) === 1,
+    JSON.stringify(deletedSupport));
+}
+
+{
+  const bounds = freshDb();
+  runMigrations(bounds, MIGRATIONS);
+
+  check('064 rejects whitespace-padded notes beyond the 4,000-code-point raw cap',
+    refused(bounds, `INSERT INTO health_support_note
+      (note_id,revision,note_kind,body_text,provenance,recorded_at_ms,updated_at_ms)
+      VALUES ('padded-note',1,'general','x${' '.repeat(4000)}','user_reported',1,1)`));
+
+  const noteInsert = bounds.raw.prepare(`INSERT INTO health_support_note
+    (note_id,revision,note_kind,body_text,provenance,recorded_at_ms,updated_at_ms)
+    VALUES (?,1,'general','bounded note','user_reported',1,1)`);
+  for (let i = 0; i < 256; i += 1) noteInsert.run(`note-${i}`);
+  check('064 enforces the per-athlete 256-note bound without truncation or deletion',
+    refused(bounds, `INSERT INTO health_support_note VALUES
+      ('note-overflow',1,'general','must reject','user_reported',1,1)`)
+    && Number(bounds.raw.prepare('SELECT COUNT(*) AS c FROM health_support_note').get().c) === 256);
+
+  bounds.executeSync('BEGIN');
+  const envelopeInsert = bounds.raw.prepare(`INSERT INTO clinician_instruction
+    (instruction_id,current_revision,created_at_ms) VALUES (?,1,1)`);
+  const firstRevisionInsert = bounds.raw.prepare(`INSERT INTO clinician_instruction_revision
+    (instruction_id,revision,instruction_text,source_class,provenance,verification_state,
+     recorded_at_ms,date_status,transcription_state,lifecycle)
+    VALUES (?,1,'reported','clinician_guidance_as_reported','user_reported','not_verified',
+      1,'unknown','draft','current')`);
+  for (let i = 0; i < 64; i += 1) {
+    envelopeInsert.run(`bounded-instruction-${i}`);
+    firstRevisionInsert.run(`bounded-instruction-${i}`);
+  }
+  bounds.executeSync('COMMIT');
+  check('064 enforces the per-athlete 64-instruction-envelope bound',
+    refused(bounds, `INSERT INTO clinician_instruction VALUES ('instruction-overflow',1,1)`)
+    && Number(bounds.raw.prepare('SELECT COUNT(*) AS c FROM clinician_instruction').get().c) === 64);
+
+  const revisions = freshDb();
+  runMigrations(revisions, MIGRATIONS);
+  revisions.executeSync('BEGIN');
+  revisions.executeSync(`INSERT INTO clinician_instruction VALUES ('revision-target',64,1)`);
+  const revisionInsert = revisions.raw.prepare(`INSERT INTO clinician_instruction_revision
+    (instruction_id,revision,instruction_text,source_class,provenance,verification_state,
+     recorded_at_ms,date_status,transcription_state,lifecycle)
+    VALUES ('revision-target',?,'reported','clinician_guidance_as_reported','user_reported',
+      'not_verified',1,'unknown','draft','current')`);
+  for (let i = 1; i <= 64; i += 1) revisionInsert.run(i);
+  revisions.executeSync(`INSERT INTO clinician_instruction VALUES ('revision-source',65,1)`);
+  revisions.executeSync(`INSERT INTO clinician_instruction_revision
+    VALUES ('revision-source',65,'reported',NULL,'clinician_guidance_as_reported','user_reported',
+      'not_verified',1,NULL,NULL,NULL,NULL,NULL,'unknown','draft',NULL,NULL,'current')`);
+  revisions.executeSync('COMMIT');
+  check('064 revision bound cannot be bypassed by moving a row between envelopes',
+    refused(revisions, `UPDATE clinician_instruction_revision SET instruction_id='revision-target'
+      WHERE instruction_id='revision-source' AND revision=65`)
+    && Number(revisions.raw.prepare(`SELECT COUNT(*) AS c FROM clinician_instruction_revision
+      WHERE instruction_id='revision-target'`).get().c) === 64);
+
+  const scopes = freshDb();
+  runMigrations(scopes, MIGRATIONS);
+  scopes.executeSync(`INSERT INTO health_support_hold
+    VALUES ('scope-target',1,NULL,NULL,'user_requested','held','review_requested',1,1),
+           ('scope-source',1,NULL,NULL,'user_requested','held','review_requested',1,1)`);
+  const scopeInsert = scopes.raw.prepare(`INSERT INTO health_support_scope
+    (scope_id,hold_id,target_kind) VALUES (?,'scope-target','all_prescription')`);
+  for (let i = 0; i < 256; i += 1) scopeInsert.run(`bounded-scope-${i}`);
+  scopes.executeSync(`INSERT INTO health_support_scope
+    (scope_id,hold_id,target_kind) VALUES ('movable-scope','scope-source','all_prescription')`);
+  check('064 scope bound cannot be bypassed by changing a row owner',
+    refused(scopes, `UPDATE health_support_scope SET hold_id='scope-target'
+      WHERE scope_id='movable-scope'`)
+    && Number(scopes.raw.prepare(`SELECT COUNT(*) AS c FROM health_support_scope
+      WHERE hold_id='scope-target'`).get().c) === 256);
+}
+
+{
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_064);
+  const before = Number(upgrade.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c);
+  runMigrations(upgrade, MIGRATIONS);
+  check('064 clean upgrade preserves the existing 300-movement corpus and adds no inferred rows',
+    uv(upgrade) === 63
+      && Number(upgrade.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c) === before
+      && TABLES_064.every((name) => Number(upgrade.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+}
+
+for (const name of TRIGGERS_064) {
+  const heal = freshDb();
+  runMigrations(heal, MIGRATIONS);
+  heal.raw.exec(`DROP TRIGGER ${name}`);
+  const detected = sentinelsMissing(heal).includes(name);
+  runMigrations(heal, MIGRATIONS);
+  check(`064 ${name}: loss detected and self-healed`,
+    detected && triggerPresent(heal, name) && uv(heal) === 63);
+}
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

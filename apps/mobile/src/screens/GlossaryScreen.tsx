@@ -26,6 +26,7 @@ import {
 } from '../data/glossary';
 import { theme } from '../theme/theme';
 import { Chip, QuietAction } from '../components/ui';
+import KeyboardAwareScrollView, { KEYBOARD_TAP_BEHAVIOR } from '../components/KeyboardAwareScrollView';
 
 export interface GlossaryScreenProps {
   readonly onClose?: () => void;
@@ -60,10 +61,9 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
   }, [searchResults, activeCategory]);
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
       testID="glossary-screen"
     >
       {onClose !== undefined && (
@@ -83,6 +83,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <TextInput
+          disableFullscreenUI
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -111,6 +112,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipScroll}
+          keyboardShouldPersistTaps={KEYBOARD_TAP_BEHAVIOR}
         >
           {CATEGORY_CHIPS.map((chip) => (
             <Chip
@@ -159,7 +161,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
           ))}
         </View>
       )}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

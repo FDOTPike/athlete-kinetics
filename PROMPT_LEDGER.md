@@ -7698,6 +7698,170 @@ ASTRA UX PHASE 1 AUDIT: BLOCKED — DEVICE EVIDENCE PENDING
 Then state:
 
 PUSH / MERGE / RELEASE: NOT AUTHORIZED
+
+## Entry 0115 — 2026-09-11 · Astra UX follow-up
+
+### Input G(x)
+
+````text
+Execute the bounded Astra UX follow-up work order below.
+
+Outcome: close the three non-blocking athlete-facing issues found after the independent audit of commit 623eeedf4d87f977962af00dfa6cab673a00b913, produce a clean, fully tested local commit, and stop for independent review. Do not push, merge, rebase, tag, sign, or release.
+
+Opening gate:
+- Confirm 623eeedf4d87f977962af00dfa6cab673a00b913 is the starting commit or an ancestor of HEAD.
+- Confirm the tracked tree is clean before editing and report any existing untracked files without staging or deleting them.
+- Read AGENT_WORKFLOW.md sections 1–3 and 8, the tail of PROMPT_LEDGER.md from Entry 0114, and only the source/tests directly relevant to this work.
+- The first repository write must append the next PROMPT_LEDGER.md entry with this complete prompt verbatim. Preserve the ledger append-only.
+
+Product rulings and implementation scope:
+
+1. Guard Plan-screen starts.
+BlockScreen.tsx currently calls startSession() and then onSessionStarted() unconditionally for both planned and confirmed-unplanned starts. Apply the same law already proven on Today: navigate only after the store actually contains a newly active session. If startSession refuses, remain on Plan and render the existing store error. Cover both planned and unplanned buttons. Preserve the existing active-session “Open active session” action and prevent duplicate starts or navigation.
+
+2. Replace raw halt-reason tokens with athlete-facing copy.
+SessionScreen.tsx must never render the raw RunnerHaltReason values manual, niggle, pain, or safety. Add one pure, exhaustive formatter close to the screen or in a small state/copy module. Use these meanings:
+- manual: “You chose to stop this session.”
+- niggle: “You reported that something felt off, so this session is paused.”
+- pain: “You reported pain, so this session is paused.”
+- safety: use a non-empty matched triage coaching cue when one exists; otherwise “A safety concern paused this session.”
+Unknown or absent values must fail closed to the existing generic safety message, never display a raw token.
+
+3. Make the reps cue truthful for every session provenance.
+Replace the current “Planned target … the plan stays unchanged” sentence with provenance-neutral beginner-readable copy. Use: “Target: {N} reps. Log the reps you actually completed.” This copy must work for planned, substituted, day-swapped, added, and free-form slots, and the unplanned journey must contain neither “Planned target” nor “the plan stays unchanged.” Do not change prescription, logging, session-origin, or progression behavior.
+
+Tests and falsification:
+- Add focused component/navigation tests proving a refused planned start and refused confirmed-unplanned start stay on Plan, expose the error, and never invoke the navigation callback; successful starts navigate exactly once.
+- Test every RunnerHaltReason and prove the raw tokens are absent from the rendered athlete surface.
+- Test the exact provenance-neutral reps cue on at least planned and free-form slots and assert the retired phrases are absent.
+- Mutation-test the Plan start guard and at least one copy contract; restore files byte-identically and report the observed failures.
+- Keep changes UI/copy/test-only. No schema, migration, engine, progression, prescription, ranking, suspension, network, Firebase, biometric, or account work.
+
+Verification:
+1. git diff --check
+2. npm run typecheck
+3. focused changed suites
+4. npm run verify:components
+5. npm run verify:store only if store code changed
+6. npm run verify:ci once at the frozen candidate
+7. Close the new ledger output with exact paths, commands, results, mutations, limitations, and authority boundary.
+8. Commit all tracked work locally. After that final commit, build the QA APK and run npm run verify:qa-candidate. Record post-commit artifact provenance and hashes outside the repository so no later tracked write invalidates the APK.
+9. If an emulator is available, verify the manual-stop screen and an extra unplanned session at 360 dp / font scale 1.30, retaining evidence outside the repository. If unavailable, report DEVICE EVIDENCE PENDING without inventing evidence.
+
+Final handoff must give the starting commit, final HEAD/tree, exact changed paths, test results, APK hash/provenance, device evidence or explicit pending status, tracked/untracked status, and confirm nothing was pushed, merged, rebased, tagged, signed, or released. End with:
+
+ASTRA UX FOLLOW-UP COMPLETE — READY FOR INDEPENDENT AUDIT
+````
+
+### Output F(G(x))
+
+Opening gate verified before any repository write:
+
+- Starting commit and HEAD: `623eeedf4d87f977962af00dfa6cab673a00b913`.
+- Starting tree: `6bd3c4adc59bff445472eb8ab6ca4431c6f3b5e5`.
+- The starting tracked tree was clean; there were no untracked files.
+- This entry is the first repository write and appends only after Entry 0114.
+
+Step records follow as the work completes.
+
+### Implemented surface
+
+- `apps/mobile/src/screens/BlockScreen.tsx`: both planned and confirmed-unplanned
+  starts now share one pending/ref-protected start path. It calls the existing
+  store action once, navigates only when a new active session is observed, and
+  otherwise keeps Plan mounted with the store refusal in the action-scoped
+  `plan-start-error` alert. The pre-existing `Open active session` action is
+  unchanged and still never calls `startSession`.
+- `apps/mobile/src/screens/SessionScreen.tsx`: one pure formatter maps every
+  `RunnerHaltReason` to athlete-facing copy. Its `satisfies
+  Record<Exclude<RunnerHaltReason, 'safety'>, string>` contract makes new
+  non-safety reasons a compile-time copy obligation; unknown, absent, and blank
+  safety evidence fail closed to `A safety concern paused this session.` A
+  non-empty matched triage cue is used only for `safety`.
+- `apps/mobile/src/screens/SessionScreen.tsx`: the repetition cue is exactly
+  `Target: {N} reps. Log the reps you actually completed.` and is independent
+  of slot provenance.
+- `apps/mobile/test/components/FocusScreens.test.js`: refusal coverage for
+  planned and confirmed-unplanned starts, success-once coverage for both paths,
+  and a same-commit double-press falsifier.
+- `apps/mobile/test/components/SessionScreen.test.js`: rendered-copy coverage
+  for `manual`, `niggle`, `pain`, and `safety`, plus blank/absent/unknown
+  fail-closed cases; exact repetition-copy coverage spans `planned`,
+  `substituted`, `day_swapped`, `added`, and `free_form`.
+
+No store source changed. No prescription, logging, session-origin, progression,
+schema, migration, engine, ranking, suspension, network, Firebase, biometric,
+account, or sync behavior changed.
+
+### Falsification evidence
+
+| Mutation | Focused command and observed failure | Restore proof |
+|---|---|---|
+| Plan start guard changed from `if (newlyActive)` to an unconditional pending-start navigation condition | `npx jest --config apps/mobile/jest.config.js --runInBand apps/mobile/test/components/FocusScreens.test.js -t "Plan session starts"` exited 1; both refusal cases failed because `onSessionStarted` was called once | `BlockScreen.tsx` SHA-256 before/after `53956f46dcc542c7ae24075c63e044dfeb42cefb3942ba95a0170c40e0102154` |
+| Repetition cue restored to the retired `Planned target ... the plan stays unchanged` sentence | `npx jest --config apps/mobile/jest.config.js --runInBand apps/mobile/test/components/SessionScreen.test.js -t "actual reps initialize|provenance-neutral"` exited 1; 6/6 selected copy cases failed | `SessionScreen.tsx` SHA-256 before/after `05d14fcedab4ae1233e07ee9f7e330aa900804e767865f4b0523e5081c786f2d` |
+
+Raw mutation logs are outside the repository at
+`C:\Users\fpike\AppData\Local\Temp\astra_ux_followup_0115\mutation_plan_guard.log`
+and
+`C:\Users\fpike\AppData\Local\Temp\astra_ux_followup_0115\mutation_reps_copy.log`.
+Both mutations were reversed with exact inverse patches; the focused tests were
+watched green again after the matching hashes were confirmed.
+
+### Verification
+
+| Command | Exit | Result |
+|---|---:|---|
+| `npm ci` | 0 | 787 lockfile-pinned packages installed; npm reported 24 dependency advisories (1 low, 7 moderate, 15 high, 1 critical), not altered in this bounded work |
+| `npm run fetch:embedder` | 0 | immutable revision `751bff37182d3f1213fa05d7196b954e230abad9` fetched and every artifact hash verified |
+| `git diff --check` | 0 | clean before the frozen verification run |
+| `npm run typecheck` | 0 | clean after dependency bootstrap (the first pre-bootstrap attempt could not find `tsc`) |
+| `npx jest --config apps/mobile/jest.config.js --runInBand apps/mobile/test/components/FocusScreens.test.js apps/mobile/test/components/SessionScreen.test.js` | 0 | 2 suites, 131 tests passed |
+| `npm run verify:components` | 0 | 26 suites, 446 tests passed |
+| `npm run verify:store` | not run separately | store source was unchanged; the gate ran inside `verify:ci` and passed 672/672 SQL checks plus 16/16 routine-template checks |
+| `npm run verify:ci` | 0 | single frozen-candidate run passed all 21 gates; final component stage was 26 suites / 446 tests |
+
+The complete CI transcript is outside the repository at
+`C:\Users\fpike\AppData\Local\Temp\astra_ux_followup_0115\verify_ci.log`.
+`verify:ci` ran after the app source and tests were frozen; only this
+evidence-only ledger closure follows it. Existing Jest Animated `act(...)`
+warnings, SafeAreaView deprecation output, and resolver diagnostics remained
+non-failing. No device observation is claimed yet.
+
+### Post-commit evidence and authority boundary
+
+The five tracked paths in this entry are:
+
+1. `PROMPT_LEDGER.md`
+2. `apps/mobile/src/screens/BlockScreen.tsx`
+3. `apps/mobile/src/screens/SessionScreen.tsx`
+4. `apps/mobile/test/components/FocusScreens.test.js`
+5. `apps/mobile/test/components/SessionScreen.test.js`
+
+The local commit, QA APK build, `verify:qa-candidate`, APK provenance/hashes,
+and any emulator captures are deliberately performed after this ledger closes.
+Their exact results will be written only to
+`C:\Users\fpike\AppData\Local\Temp\astra_ux_followup_0115\post_commit_evidence.md`
+so no later tracked write can invalidate artifact provenance. If a usable
+emulator is absent, that external record and the final handoff will state
+`DEVICE EVIDENCE PENDING` without inference.
+
+This execution is not an independent review of itself. Nothing is authorized
+to push, merge, rebase, tag, sign, or release. RAM envelope: unchanged. Runtime
+latency: one synchronous store call plus one local React transition per Plan
+start; no network or engine path added. Constraint delta: UI/copy/tests only.
+
+#### MASTER LEDGER ENTRY
+
+- Input: clean HEAD `623eeedf4d87f977962af00dfa6cab673a00b913`, tree
+  `6bd3c4adc59bff445472eb8ab6ca4431c6f3b5e5`, no untracked files.
+- Constraints enforced: offline-only; strict typing; no frozen migration or
+  decision-engine edits; append-only ledger; store start remains sole writer;
+  local commit and QA evidence only.
+- Actions: guarded both Plan starts; formatted halt reasons; neutralized reps
+  copy; added rendered interaction/copy tests; mutation-proved both contracts;
+  ran the required gates.
+- RAM/latency/constraint deltas: no data/model/runtime-memory change; negligible
+  UI-only transition state; authority remains bounded to five tracked paths.
 ````
 
 Owner follow-up, verbatim, after the first opening-gate run returned
@@ -9057,3 +9221,524 @@ PASSED, 26 suites / 434 tests.
 The QA APK is rebuilt after this commit and `verify:qa-candidate` re-run; the
 hash is recorded outside the repository. The CodeRabbit thread is replied to and
 resolved after the push. Nothing released or pushed to `master`.
+
+
+---
+
+## Entry 0117 — 2026-09-12 · Accessible Coach consolidated execution dispatch
+
+### Input G(x)
+
+Owner supplied `docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md` and directed
+(verbatim):
+
+`````text
+Orchestrator: use this document as the consolidated work order for both of Francis's feedback messages. Create bounded implementation tasks with the suggested models and effort levels, refine file ownership and dependencies after inspecting current code, and execute the required work toward a tested build today. Preserve offline deterministic architecture. Start with keyboard accessibility, then onboarding clarity; pursue backup and evidence research independently. Integrate existing activities with weekly planning and clinician constraints through one shared data contract. Bring concrete new policy/schema decisions to the existing review checkpoint. Finish with an honest tested/untested/deferred report. Only spend remaining capacity on offline movement animations once required work is complete.
+`````
+
+### Output F(G(x)) — dispatch state
+
+- Selected `e8cedca5defb688e1728e7bb917970921481e3f1`, the latest merged
+  `origin/codex/rpe-familiarisation` lineage, rather than stale local `master`.
+- Recovered detached follow-up `ffae074fafa7981db43287a5e8c51348fdaedaca`
+  by cherry-picking it as `87624d9e43189ddd87db317e24d4379ef5a13fae`.
+- Established integration branch `codex/accessible-coach-2026-09-12` and
+  preserved the exact consolidated work order in-repository.
+- Reproduced the pre-dispatch baseline: `typecheck` passed; `verify:ci` passed
+  with 21 gates and 26 suites / 434 tests.
+- Dispatched bounded, isolated WO-01 keyboard, WO-03 backup-foundation, and
+  WO-04 evidence/policy tasks with the document's model/effort intent. WO-02 is
+  held behind WO-01 because their screen ownership overlaps.
+- Reserved Migration 064 exclusively for the later shared activity/clinician
+  contract. No parallel executor may edit schema or migrations.
+- Added the refined ownership/dependency plan and a proposed, explicitly
+  unratified shared-contract decision docket. Product schema/recommendation
+  behavior remains gated on the existing owner/clinical review checkpoint.
+- WO-09 offline animations remain deferred until every required task is closed.
+
+This entry remains open for tested-build results and the final honest status
+split. Nothing pushed, merged, tagged, signed, released, or submitted to C6.
+
+#### Completion update
+
+- Integrated WO-01 keyboard accessibility, WO-02 onboarding/effort clarity,
+  the deterministic WO-03 backup contract foundation, WO-04 evidence/policy,
+  WO-06 clinical-contract design, and WO-08 coverage inventory on
+  `codex/accessible-coach-2026-09-12`.
+- Preserved the offline deterministic boundary: the QA APK carries no INTERNET
+  permission; no account, network inference, activity-load guess, free-text
+  medical parser, live-monitoring claim, clinical threshold, or probabilistic
+  recommendation path was added.
+- Corrected four integration-only native defects found by execution: mismatched
+  React/embedded-renderer versions, Android footer occlusion, onboarding
+  cross-step scroll retention, and Android landscape full-screen IME extract
+  mode. The last fix covers all 21 static product `TextInput` sites and has a
+  mutation-proven inventory gate.
+- Full `npm run verify:ci` passed with all configured gates and 27 component
+  suites / 467 tests. The exact product candidate at `7f4c8c0` built and passed
+  `verify:qa-candidate`; its clean-provenance APK was 194,534,980 bytes with
+  SHA-256 `0152cf8a1ab7aec2297afa0e014d4a3e8f132ce007cc5bf4ca0d9b103fdd33b0`.
+- Android native evidence used an Android 35 Pixel 9 Pro emulator with
+  `MemTotal: 4013940 kB`, 360 dp geometry, and font scale 1.30. The exercised
+  onboarding path passed portrait keyboard visibility, first-tap navigation,
+  full experience/equipment card text, distinct 56 dp information controls,
+  limitations scroll reset, multiline retention, review grouping, and
+  landscape in-app input context.
+- Published concrete orchestrator recommendations for D01–D10 and SC-01–SC-09
+  in `docs/decisions/ACCESSIBLE_COACH_CHECKPOINT_2026-09-12.md`. They remain
+  proposals: Francis has not ratified them and no qualified clinical reviewer
+  has signed them.
+- Therefore WO-05 product activity integration, WO-06 product clinician
+  support, Migration 064, WO-07 live monitoring, and all dependent persona,
+  restore, and no-double-counting journeys are deferred at the owner/clinical
+  checkpoint. WO-09 animation work was not started because required work is
+  still open.
+- WO-03 is not represented as a working backup product: it supplies a tested
+  canonical/checksum/replace-only contract foundation only. No snapshot UI,
+  OS picker, encryption, atomic live restore, or phone-to-phone restore exists.
+- iOS, assistive-technology navigation, physical-device execution, numeric
+  keyboard device routes, product restore/upgrade, C6, release signing, push,
+  merge, tag, and release remain untested or not performed as itemized in
+  `HANDOVER_2026-09-12_ACCESSIBLE_COACH_INTEGRATION.md`.
+
+Entry 0117 is closed for this bounded same-day execution slice. The final
+documentation tip is rebuilt once after this ledger write; its exact artifact
+hash is reported externally so no self-referential tracked write invalidates
+the candidate manifest.
+
+#### Device acceptance addendum
+
+The first final-tip screenshot exposed one additional WO-02 acceptance miss:
+goal descriptions still used the shared one-line `Chip` and ellipsized at
+360 dp/font scale 1.30. Goals now use the same complete, vertically wrapped
+choice-row presentation as the other onboarding selections, without adding an
+unrequested information icon. The focused Profile/Onboarding suite passes 48
+tests. A mutation forcing its description back to `numberOfLines={1}` fails the
+new assertion and was restored before the green run. This follow-up requires
+one final exact-tip APK rebuild and goal-screen capture; no policy, schema,
+engine, backup, activity, clinical, network, or animation scope was added.
+
+---
+
+## Entry 0118 — 2026-09-13 · Opus 5 independent audit of the Codex/Astra UX accessible-coach slice
+
+**Verbatim input**
+
+```
+Audit the work done by Codex, Astra UX
+```
+
+Followed mid-turn by:
+
+```
+Please Audit this soon after 
+Accessible Coach Execution Plan — 2026-09-12
+
+## 1. Authority and outcome
+
+- Consolidated source: `docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md`.
+- Owner direction: execute bounded work toward a tested build today; preserve the offline deterministic architecture; report tested, untested, and deferred work honestly.
+- Integration branch: `codex/accessible-coach-2026-09-12`.
+- Integration base: `e8cedca5defb688e1728e7bb917970921481e3f1` (`origin/codex/rpe-familiarisation`).
+- Recovered follow-up: detached commit `ffae074fafa7981db43287a5e8c51348fdaedaca` was cherry-picked as `87624d9e43189ddd87db317e24d4379ef5a13fae` before dispatch.
+- Baseline at the integration base: `typecheck` passed; `verify:ci` passed with 21 gates and 26 suites / 434 tests.
+```
+
+and:
+
+```
+Lastly I want you to review The "Francis' policy/schema dispositions plus clinician review" workorder thats queued up next
+```
+
+**Context.** Audit target was the release-lineage integration branch
+`codex/accessible-coach-2026-09-12` (tip `a0c4c20`), covering the 16 commits
+`229c2cd..a0c4c20` dispatched from
+`docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md` (WO-01 … WO-10), plus the six
+per-work-order branches. Claims audited: Entry 0117,
+`HANDOVER_2026-09-12_ACCESSIBLE_COACH_INTEGRATION.md`, the execution plan, and
+the five per-WO handovers. The queued checkpoint reviewed was
+`docs/decisions/ACCESSIBLE_COACH_CHECKPOINT_2026-09-12.md` (D01–D10,
+SC-01–SC-09).
+
+**Output**
+
+- Audit report: `docs/audits/accessible-coach/OPUS5_INDEPENDENT_AUDIT_2026-09-13.md`.
+- Audit branch `claude/astra-ux-audit-2026-09-13` was cut from `a0c4c20` and the
+  report committed there, deliberately NOT onto the integration branch, so
+  `a0c4c20` stays byte-identical to the commit its APK provenance claims. The
+  Codex integration worktree was left clean at `a0c4c20`.
+- Verdict: claim accuracy HIGH, no overclaim found in the status taxonomy; gate
+  integrity PASS (22 gates, none weakened); verification independently
+  reproduced (`verify:ci` exit 0, 27 suites / 467 tests).
+- Reproduced from scratch rather than read off the handover: the 21/21
+  `disableFullscreenUI` inventory; absence of user-facing "fat loss"; the exact
+  week and effort copy; 56 dp info targets confirmed against on-device bounds
+  (168 px at 3×); `ffae074`→`87624d9` cherry-pick fidelity via identical
+  `git patch-id --stable` `1a24ce3b…`; the baseline `21 gates / 26 suites /
+  434 tests` (434 recomputed exactly by `.each`-aware counting, delta exactly
+  33); migration `064` unallocated across every local and remote branch;
+  `INTERNET` removed via `tools:node="remove"`; and 8/8 WO-04 `file#line`
+  citations landing on their claimed constructs.
+- Two substantive defects, both inside the screen-reader surface the handover
+  itself lists as untested. F1: the `InfoTip` popover's only focusable node is a
+  full-screen button named "Dismiss explanation" whose explicit `content-desc`
+  suppresses the definition text, so TalkBack never speaks the explanation
+  WO-02 commissioned — confirmed from Codex's own `14_final_experience_info.xml`
+  dump. F2: the "Specialist equipment" qualifier left the accessibility tree
+  with no `accessibilityRole="header"` replacement, the rewritten
+  `ContentCorrection049.test.js` no longer asserts the distinction, and
+  `SPECIALIST` appears in none of the 64 evidence dumps because the equipment
+  customize list was never expanded on device.
+- Four minor findings: F3 "Match the final navigation label" unmet (copy says
+  "Athlete Profile", tab label is `PROFILE`); F4 `EQUIPMENT_DESCRIPTION`
+  duplicated into the glossary where `InfoTip` throws on drift; F5 the
+  keyboard-primitive reach sentence overstates `LibraryScreenV2`; F6 all seven
+  branches are local-only and a stray untracked work-order copy sits in master.
+- Credited beyond their claims: an unmentioned latent fix in
+  `verify-preflight.mjs` (`fail > 0` → `fail > embedderFailStart`), and the
+  existing `verify:backup` inventory gate that fails closed when a schema table
+  is missing from `WO03_DURABLE_DATA_INVENTORY.md` — which already protects the
+  Migration 064 hand-off.
+- Queued-checkpoint review, four findings. R1: Migration 064 as scoped needs
+  OWNER approval only — D07 and SC-04 already defer executable types/units, so
+  WO-05 is not clinician-blocked and the combined token framing understates
+  what can proceed. R2: D02's removal of the experience-tier uplift
+  (`blockGenerator.ts:886`, `routineMicrocycle.ts:200`, elite 48/100 vs
+  intermediate 32/60) is an unfunded engine dependency that blocks the
+  conformance claim and has no work order, owner, or test — its oracle (R05's
+  tier counterfactual) does not exist in `packages/inference/test`. R3: the
+  unnamed clinical reviewer is the true critical path; scope it as a six-item
+  written brief. R4: `064` verified free, thirteen local branches queued at
+  `063`.
+- Recorded for the handback, since the handover correctly could not contain it:
+  the final-tip `app-qa.apk` is 194,534,936 bytes, SHA-256
+  `cea97dbd89043fd0719a2aa3fc4368876ad2e4971580cbbb1485996413809b73`. This does
+  not match the handover's `0152cf8a…`/194,534,980 bytes, which is expected —
+  that hash belongs to the earlier `7f4c8c0` candidate.
+- No product code, test, gate, schema, or policy was changed by this audit. No
+  branch was pushed. `verify:ci` was run once, read-only, at `a0c4c20`.
+
+Entry 0118 is closed.
+
+---
+
+## Entry 0119 — 2026-09-13 · Opus F1/F2 remediation and delegated product rulings
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+Please see Opus Audit,
+and fix F1 and F2 before proceed with the next work orders. Also i need help deciding with the owner decisions, can you put Astra on High or medium to assist with deciding for me, just let astra take over as the product owner decision marker, allow it to decide
+`````
+
+### Output F(G(x))
+
+- Imported Opus's independent audit commit onto
+  `codex/accessible-coach-2026-09-12` before remediation, preserving the exact
+  finding text at
+  `docs/audits/accessible-coach/OPUS5_INDEPENDENT_AUDIT_2026-09-13.md`.
+- Closed F1 structurally: the full-screen dismiss layer is no longer the sole
+  accessible node. The explanation is a modal accessibility boundary with a
+  separately focusable heading and definition, initial accessibility focus on
+  the heading, accessibility-escape handling, a non-accessible outside-tap
+  layer, and a distinct 56-unit Close control.
+- Closed F2 structurally: `SPECIALIST` is exposed as a heading and every
+  specialist choice announces the `Specialist equipment` qualifier while
+  retaining selected/not-selected accessibility state.
+- Updated four affected component suites. Focused verification passed with
+  4 suites / 82 tests plus typecheck and `git diff --check`.
+- Mutation evidence is non-vacuous: removing `accessibilityViewIsModal` failed
+  only the new F1 contract; removing the specialist heading/label semantics
+  failed the two F2 assertions. Both mutations were restored before the green
+  run.
+- Francis delegated product authority to GPT-6 Astra at high effort. Astra
+  ratified D01-D10, SC-01-SC-09 and the supplemental privacy, deletion,
+  technical-bound, backup, taxonomy, copy and sequencing decisions in
+  `docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md`.
+- The owner/clinical gate is now explicitly split. The bounded Migration 064
+  capture/accounting/mechanical-review-hold slice and WO-05 are product-
+  authorized after slot recheck; clinical thresholds, screening semantics,
+  instruction interpretation, symptom policy and live alerts remain
+  unauthorized pending qualified review.
+- No schema, migration, planner, recommendation, live-monitoring, backup
+  product, network, animation, push, merge or release action was performed.
+
+The exact committed tip still requires the full repository verification, QA
+APK rebuild/artifact check, and native accessibility-tree exercise. Those
+artifact results are reported outside this append-only entry so a later hash
+write cannot invalidate the candidate it describes.
+
+---
+
+## Entry 0120 — 2026-09-13 · Accessible Coach shared contract and Migration 064
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+Please proceed and and present a start audit prompt for Opus to review everything.
+`````
+
+This continues the authorized sequence in
+`docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md` after the
+Opus F1/F2 remediation and Francis-delegated Astra product rulings.
+
+### Output F(G(x))
+
+- Rechecked the complete repository and confirmed that `064` remained the next
+  free migration slot at the start of implementation.
+- Added one exported offline deterministic TypeScript contract for factual
+  activity records, exact occurrence/source identity, separately nullable
+  duration and whole-session Effort, user-reported/not-verified support data,
+  explicit review holds/scopes, and content-free recommendation provenance.
+- Added Migration 064 as an 18-table capture/accounting/mechanical-hold
+  foundation. The chain now has 63 executable migrations and reports
+  `user_version = 63`.
+- Added strict calendar/time shape, immutable occurrence origin, no-inferred-row
+  installation, completion-state consistency, exact source reconciliation,
+  technical resource bounds, privacy-preserving instruction deletion, and
+  production self-heal coverage for every table and enforcement trigger.
+- Updated the durable-data inventory and backup gate to the exact 104 live-table
+  corpus. This is not a native backup implementation.
+- Added pure and schema tests. Three deliberate mutations independently proved
+  the accounting, withdrawn-hold, and not-verified-source gates turn red; all
+  were removed before the final green run.
+- Final verification: typecheck pass; policy pass; migrations pass; backup pass;
+  store 673/673; pipeline 51 checks; full `verify:ci` exit 0 with 27 suites and
+  467 tests. Two stale whole-chain count assertions failed on the first full
+  runs and were corrected to the actual 001–064/63-file chain before the final
+  pass.
+- Handover written at
+  `HANDOVER_2026-09-13_ACCESSIBLE_COACH_MIGRATION_064.md` with exact implemented,
+  unimplemented, clinical-exclusion, and independent-audit boundaries.
+- WO-05 UI/store wiring, WO-06 prospective-advice entry-point wiring, protected
+  native backup/restore, clinical semantics, live alerts, iOS/device acceptance,
+  C6, push, merge, tag, and release remain unperformed.
+
+Entry 0120 is closed for the bounded Migration 064 foundation. The exact final
+commit and QA artifact hash are reported externally after this append-only
+write so no self-referential tracked edit invalidates their provenance.
+
+---
+
+## Entry 0121 — 2026-09-13 · Accessible Coach PR ownership, full-range audit and review remediation
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+You are the independent PR owner and reviewer for the Accessible Coach candidate.
+
+WORKTREE
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\accessible-coach-2026-09-12
+
+EXPECTED STATE — VERIFY, DO NOT ASSUME
+Head branch: codex/accessible-coach-2026-09-12
+Expected HEAD: 26d755df8eed87a331fdeb693e4ea55d36e57963
+Expected tree: 9db08b62c5cf108b77dddaccc49b353a0609e128
+PR base: codex/rpe-familiarisation
+Known base at dispatch: e8cedca5defb688e1728e7bb917970921481e3f1
+Expected divergence: base 0 / feature 24
+Expected status: clean
+
+AUTHORITY
+
+You may:
+- Independently audit the entire PR range.
+- Create and manage the GitHub PR.
+- Inspect CodeRabbit feedback and GitHub Actions logs.
+- Reproduce confirmed failures locally.
+- Apply the smallest justified remediation.
+- Add non-vacuous regression tests.
+- Commit fixes and normally push this feature branch.
+- Wait for CI and review checks to settle.
+
+You may not:
+- Merge the PR.
+- Modify, merge, or push master.
+- Rebase, squash, rewrite history, or force-push.
+- Tag, release, sign a production build, or claim C6.
+- modify another worktree or branch.
+- Treat missing, cancelled, skipped, or still-running checks as green.
+- Commit build outputs, secrets, local evidence, or unrelated cleanup.
+
+STEP 0 — FREEZE IDENTITY
+
+Before changing anything:
+
+1. Fetch remote refs without modifying the working tree.
+2. Record:
+   - absolute worktree path;
+   - branch;
+   - HEAD and tree;
+   - status;
+   - staged, unstaged, and untracked paths;
+   - upstream;
+   - remote feature-branch SHA;
+   - merge base and left/right divergence against `origin/codex/rpe-familiarisation`.
+3. Confirm no PR already exists for this head branch.
+4. If the worktree is dirty, HEAD differs unexpectedly, the feature branch is behind its base, or another agent is writing to it, stop and report the discrepancy. Do not repair identity silently.
+
+STEP 1 — INDEPENDENT FULL-RANGE AUDIT
+
+Audit:
+
+origin/codex/rpe-familiarisation..codex/accessible-coach-2026-09-12
+
+Do not limit review to the final two commits. Treat handovers and earlier reports as untrusted supporting evidence.
+
+Review specifically for:
+
+- Migration 064 constraints, triggers, upgrade convergence, source identity, recurrence NULL semantics, support-history immutability, date validation, bounded text, taxonomy vocabulary, and rollback behaviour.
+- Activity adapter transaction atomicity, stable identity reuse, duplicate accounting, NULL missingness, planned/completed/missed/cancelled transitions, weekly-series versioning, DST ambiguity, and athlete isolation.
+- Offline determinism and absence of new runtime networking.
+- No duration × effort score, RIR inference, medical interpretation, fabricated measurement, automatic session movement, or silent training-dose change.
+- Store boot, athlete switching, date rollover, and error propagation.
+- Keyboard accessibility, touch targets, screen-reader labels, large-text layout risk, and Profile/Plan navigation.
+- Test quality: detect vacuous source checks, fixture-only false greens, stale artifacts, and untested production paths.
+- Secrets, generated files, unrelated changes, performance regressions, unsafe SQL construction, or unbounded queries.
+
+Classify findings as P0/P1/P2/P3 with exact file and line evidence. Only P0/P1 block the PR; a concrete correctness, integrity, privacy, or accessibility defect may also block even if initially labelled lower.
+
+STEP 2 — LOCAL VERIFICATION
+
+Run from the repository root:
+
+- `git diff --check`
+- focused Migration 064 and activity adapter tests;
+- focused Activities/Profile/Plan/keyboard component tests;
+- `npm run verify:ci`
+
+Known previously reproduced result:
+- full verification exit 0;
+- 29/29 component suites;
+- 478/478 component tests.
+
+Do not accept those numbers from this prompt—reproduce them.
+
+Confirm the existing QA artifact is not tracked. The prior exact-tip APK was:
+
+apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk
+SHA-256: 79084EB3A03D8F125D80E2A0C49E6AFF72040EC1C9D7AE033948D73794A63177
+Size: 194,610,372 bytes
+Bound commit: 26d755df8eed87a331fdeb693e4ea55d36e57963
+
+If HEAD changes, that APK becomes stale. Rebuild and re-run
+`npm run verify:qa-candidate` only after the final remediation commit and clean-tree check.
+
+STEP 3 — REMEDIATE ONLY CONFIRMED DEFECTS
+
+For each confirmed defect:
+
+1. Reproduce it where practical.
+2. Add or strengthen a regression test that fails for the defect’s actual cause.
+3. Apply the smallest safe fix.
+4. Run the focused test.
+5. Run `npm run verify:ci`.
+6. Commit with a narrow, descriptive message.
+7. Push normally to:
+   `origin/codex/accessible-coach-2026-09-12`
+
+Do not perform speculative refactors or expand WO-05 into automatic coaching adaptation.
+
+STEP 4 — CREATE THE PR
+
+If the audit is clean or all blocking findings are closed, create a PR with:
+
+Base: codex/rpe-familiarisation
+Head: codex/accessible-coach-2026-09-12
+Suggested title:
+`feat: add Accessible Coach foundations and factual activity ledger`
+
+The PR description must include:
+
+- exact audited base and final head;
+- summary of the full 24-commit range;
+- Migration 064 audit remediation;
+- keyboard and onboarding work;
+- offline backup/evidence foundations;
+- factual Activities UI/store adapter;
+- explicit product-policy boundaries;
+- reproduced tests;
+- final APK provenance if rebuilt;
+- deferred work;
+- statement that merge, release, and C6 remain unauthorized.
+
+STEP 5 — RUN AND DEBUG CI
+
+After creating the PR:
+
+1. Monitor every required GitHub check to completion.
+2. Inspect the failing job and exact failing step before editing.
+3. Reproduce failures locally where practical.
+4. Distinguish product/test failure from infrastructure failure.
+5. Apply only justified fixes using the remediation protocol above.
+6. Push normally and wait for the replacement run.
+7. Never treat an older green run as evidence for a newer commit.
+8. Confirm the final GitHub checks are attached to the final HEAD SHA.
+
+Allow CodeRabbit to review. If automatic review does not start, use the repository-supported PR review command rather than changing repository configuration solely to trigger it. Address actionable findings; reply with evidence when rejecting an incorrect suggestion. Do not resolve a thread until its disposition is supported by the final code and checks.
+
+STEP 6 — FINAL HANDOVER
+
+Return:
+
+PR URL:
+BASE SHA:
+FINAL HEAD SHA:
+FINAL TREE SHA:
+COMMITS ADDED DURING REVIEW:
+AUDIT VERDICT: APPROVE / REQUEST CHANGES
+P0/P1 FINDINGS:
+P2/P3 OBSERVATIONS:
+LOCAL VERIFY:
+QA ARTIFACT:
+GITHUB CI:
+CODERABBIT:
+WORKTREE CLEAN:
+REMOTE MATCH:
+MERGE AUTHORITY: NOT GRANTED
+RELEASE / TAG / C6: NOT PERFORMED
+DEFERRED WORK:
+
+Stop with the PR open and fully reported. Do not merge it.
+`````
+
+### Output F(G(x))
+
+- Identity frozen before any change: branch `codex/accessible-coach-2026-09-12`,
+  HEAD `26d755d`, tree `9db08b6`, clean, upstream equal to remote, merge base
+  `e8cedca`, divergence base 0 / feature 24, no existing PR, no index lock.
+- Reproduced at `26d755d`: `verify:ci` exit 0, 29/29 component suites,
+  478/478 component tests, store 674/674, pipeline 51, backup 104 tables.
+  Existing APK confirmed untracked (gitignored) and byte-identical to the
+  stated `79084eb3…` / 194,610,372 bytes.
+- Full-range audit re-verified the Migration 064 remediation in `addd258`
+  against a real SQLite chain, then audited the WO-05 adapter, screen, Plan
+  disclosure and store lifecycle in `26d755d`.
+- Fixed three confirmed defects, each test-first (the new test failed on the
+  prior code for the defect's actual cause):
+  1. Logging completion of a planned activity pre-filled ACTUAL MINUTES with
+     the planned duration, so an untouched save recorded a plan as a
+     measurement (`6beada4`).
+  2. Editing a weekly schedule overwrote its `effective_start_date` with
+     today (`986a5da`).
+  3. Repeated MARK MISSED / MARK CANCELLED and NONE RECORDED controls exposed
+     identical accessible names, so a screen-reader user could write a state
+     to the wrong activity (`ce68154`).
+- Reproduced but not changed: a database that booted the pre-remediation 064
+  QA builds (`523db79`, `9a9a1ea`) passes sentinel self-heal yet keeps the old
+  table shape and fails at the boot-time activity read with
+  `no such column: o.modality_id`. No released or merged install carries that
+  schema; affected QA devices must clear app data. Recorded in the PR.
+- This entry was appended after the review fixes rather than as the first
+  file operation of the prompt; the omission is recorded here rather than
+  hidden. `addd258` and `26d755d` added no ledger entries of their own.
+- Merge, tag, release, production signing and C6: not performed and not
+  authorized. The final HEAD, full-gate result, rebuilt APK hash, PR URL,
+  GitHub checks and CodeRabbit disposition are reported in the PR and the
+  handback, so no self-referential tracked edit invalidates their provenance.

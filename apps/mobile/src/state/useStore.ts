@@ -55,6 +55,19 @@ import {
   readActiveLoadPreference,
 } from './loadPreferenceStore';
 import {
+  EMPTY_ACTIVITY_LEDGER,
+  completeActivityOccurrence as completeActivityOccurrenceInDb,
+  endActivitySeries as endActivitySeriesInDb,
+  readActivityLedger,
+  saveOneOffActivity as saveOneOffActivityInDb,
+  saveWeeklyActivity as saveWeeklyActivityInDb,
+  setActivityOccurrenceState as setActivityOccurrenceStateInDb,
+  type ActivityLedgerSnapshot,
+  type CompleteActivityInput,
+  type OneOffActivityInput,
+  type WeeklyActivityInput,
+} from './activityStore';
+import {
   buildPatternWindow,
   addDaysIso,
   composeRoutineMicrocycle,
@@ -590,6 +603,9 @@ interface KineticsStore {
   status: BootStatus;
   error: string | null;
   today: string;
+  /** WO-05: athlete-reported activity facts from Migration 064. This is a
+   * factual ledger only; it does not silently change the training dose. */
+  activityLedger: ActivityLedgerSnapshot;
   returnCheckin: ReturnCheckinState | null;
   vector: StateVectorRow | null; // null = no state_vector row for today
   trend: TrendPoint[];           // trailing 14 days, ascending
@@ -671,6 +687,15 @@ interface KineticsStore {
   onboarded: boolean;
 
   boot: () => void;
+  refreshActivityLedger: () => void;
+  saveWeeklyActivity: (input: WeeklyActivityInput) => string;
+  saveOneOffActivity: (input: OneOffActivityInput) => string;
+  completeActivityOccurrence: (input: CompleteActivityInput) => void;
+  setActivityOccurrenceState: (
+    occurrenceId: string,
+    state: 'cancelled' | 'missed',
+  ) => void;
+  endActivitySeries: (seriesId: string) => void;
   /** Re-sync everything date-derived when the calendar day has changed since
    *  the last read (overnight backgrounding, app left open past midnight).
    *  Cheap no-op when the date is unchanged. */
@@ -2158,6 +2183,7 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
  *  reads the real value from the new file. */
 const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   vector: null, trend: [], session: null, prescription: null, returnCheckin: null,
+  activityLedger: EMPTY_ACTIVITY_LEDGER,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
   activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
@@ -2179,6 +2205,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   status: 'booting',
   error: null,
   today: localToday(),
+  activityLedger: EMPTY_ACTIVITY_LEDGER,
   returnCheckin: null,
   vector: null,
   trend: [],
@@ -2308,6 +2335,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().refreshBlock();
       get().refreshProgram();
       get().refreshSuspension();
+      get().refreshActivityLedger();
       get().loadRoutineTemplates();
       get().refreshReturnCheckin();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
@@ -2485,6 +2513,37 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       bootInFlight = false;
     }
     })();
+  },
+
+  refreshActivityLedger: () => {
+    set({ activityLedger: readActivityLedger(getDb(), localToday()) });
+  },
+
+  saveWeeklyActivity: (input) => {
+    const id = saveWeeklyActivityInDb(getDb(), input, Date.now());
+    get().refreshActivityLedger();
+    return id;
+  },
+
+  saveOneOffActivity: (input) => {
+    const id = saveOneOffActivityInDb(getDb(), input, Date.now());
+    get().refreshActivityLedger();
+    return id;
+  },
+
+  completeActivityOccurrence: (input) => {
+    completeActivityOccurrenceInDb(getDb(), input, Date.now());
+    get().refreshActivityLedger();
+  },
+
+  setActivityOccurrenceState: (occurrenceId, state) => {
+    setActivityOccurrenceStateInDb(getDb(), occurrenceId, state, Date.now());
+    get().refreshActivityLedger();
+  },
+
+  endActivitySeries: (seriesId) => {
+    endActivitySeriesInDb(getDb(), seriesId, localToday(), Date.now());
+    get().refreshActivityLedger();
   },
 
   saveProfile: (patch) => {
@@ -3303,6 +3362,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
     }
     get().refreshVector();   // also advances store.today
+    get().refreshActivityLedger(); // advances the factual 28-day activity window
     get().refreshNiggles();  // yesterday's niggles drop out of the active set
     get().refreshBlock();
     get().refreshProgram();
