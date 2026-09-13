@@ -9,8 +9,18 @@ export type TrainingSupportDecision =
   | { readonly status: 'held'; readonly holdIds: readonly string[]; readonly reasonCodes: readonly string[] }
   | { readonly status: 'support_unavailable'; readonly holdIds: readonly [] };
 
+// Migration 064 forbids a targeted scope without its identifier, but this is an
+// exported boundary. A malformed scope has an unknown target, so it is treated
+// as unresolved and holds athlete-wide rather than being silently skipped.
+const targetIdentifierMissing = (scope: HealthSupportScope): boolean =>
+  (scope.targetKind === 'activity_definition' && (scope.activityId ?? null) === null)
+  || (scope.targetKind === 'activity_series' && (scope.seriesId ?? null) === null)
+  || (scope.targetKind === 'activity_occurrence' && (scope.occurrenceId ?? null) === null)
+  || (scope.targetKind === 'movement' && (scope.movementId ?? null) === null);
+
 const sameTarget = (scope: HealthSupportScope, target: PersonalizedAdviceTarget): boolean => {
   if (scope.targetKind === 'all_prescription' || scope.targetKind === 'unresolved') return true;
+  if (targetIdentifierMissing(scope)) return true;
   if (target.targetKind === 'all_prescription') return true;
   if (scope.targetKind !== target.targetKind) return false;
   if (scope.targetKind === 'activity_definition') {
