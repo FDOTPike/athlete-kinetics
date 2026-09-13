@@ -449,7 +449,8 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             <Text style={styles.hint}>This is context, not a clinical rating or an exercise prescription.</Text>
             <Text style={styles.label}>KNOWN FACILITY OR SETTING</Text>
             <View style={styles.chips}>
-              <Chip label="NONE RECORDED" selected={facilityCode === null} onPress={() => setFacilityCode(null)} />
+              <Chip label="NONE RECORDED" selected={facilityCode === null} onPress={() => setFacilityCode(null)}
+                accessibilityLabel="No facility recorded" />
               {FACILITIES.map((item) => (
                 <Chip key={item} label={words(item).toUpperCase()} selected={facilityCode === item}
                   onPress={() => setFacilityCode(item)} accessibilityLabel={`Activity facility: ${words(item)}`} />
@@ -457,7 +458,8 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             </View>
             <Text style={styles.label}>KNOWN ACTIVITY EQUIPMENT</Text>
             <View style={styles.chips}>
-              <Chip label="NONE RECORDED" selected={equipmentCode === null} onPress={() => setEquipmentCode(null)} />
+              <Chip label="NONE RECORDED" selected={equipmentCode === null} onPress={() => setEquipmentCode(null)}
+                accessibilityLabel="No activity equipment recorded" />
               {EQUIPMENT.map((item) => (
                 <Chip key={item} label={words(item).toUpperCase()} selected={equipmentCode === item}
                   onPress={() => setEquipmentCode(item)} accessibilityLabel={`Activity equipment: ${words(item)}`} />
@@ -524,8 +526,10 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
                 setError(null);
               }} accessibilityLabel={`Log actual completion for ${row.displayName}`} />
               <View style={styles.chips}>
-                <QuietAction label="MARK MISSED" onPress={() => updatePlannedState(row.occurrenceId, 'missed')} />
-                <QuietAction label="MARK CANCELLED" onPress={() => updatePlannedState(row.occurrenceId, 'cancelled')} />
+                <QuietAction label="MARK MISSED" onPress={() => updatePlannedState(row.occurrenceId, 'missed')}
+                  accessibilityLabel={`Mark ${row.displayName} missed`} />
+                <QuietAction label="MARK CANCELLED" onPress={() => updatePlannedState(row.occurrenceId, 'cancelled')}
+                  accessibilityLabel={`Mark ${row.displayName} cancelled`} />
               </View>
             </View>
           )}

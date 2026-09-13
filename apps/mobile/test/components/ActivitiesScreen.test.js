@@ -137,8 +137,8 @@ describe('WO-05 factual activities screen', () => {
       occurrenceId: 'occurrence-1', actualDurationMin: 42, actualEffort: null,
     });
 
-    fireEvent.press(screen.getByRole('button', { name: 'MARK MISSED' }));
-    fireEvent.press(screen.getByRole('button', { name: 'MARK CANCELLED' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Mark Walk missed' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Mark Walk cancelled' }));
     fireEvent.press(screen.getByRole('button', { name: 'End weekly schedule for Walk' }));
     expect(mockState.setActivityOccurrenceState).toHaveBeenNthCalledWith(1, 'occurrence-1', 'missed');
     expect(mockState.setActivityOccurrenceState).toHaveBeenNthCalledWith(2, 'occurrence-1', 'cancelled');
@@ -165,5 +165,30 @@ describe('WO-05 factual activities screen', () => {
     expect(mockState.completeActivityOccurrence).toHaveBeenCalledWith({
       occurrenceId: 'occurrence-plan', actualDurationMin: null, actualEffort: null,
     });
+  });
+
+  test('planned-activity actions and empty choices announce which activity and field they change', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      occurrences: ['Walk', 'Swim'].map((name) => ({
+        occurrenceId: `occurrence-${name}`, activityId: `activity-${name}`, displayName: name,
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: null, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      })),
+    };
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+
+    // With two planned cards, a screen-reader user navigating by control must
+    // know which activity each factual state change will be written to.
+    fireEvent.press(screen.getByRole('button', { name: 'Mark Swim missed' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Mark Walk cancelled' }));
+    expect(mockState.setActivityOccurrenceState).toHaveBeenNthCalledWith(1, 'occurrence-Swim', 'missed');
+    expect(mockState.setActivityOccurrenceState).toHaveBeenNthCalledWith(2, 'occurrence-Walk', 'cancelled');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+    fireEvent.press(screen.getByRole('button', { name: 'ACCESS AND BROAD DEMAND (OPTIONAL)' }));
+    expect(screen.getByRole('button', { name: 'No facility recorded' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'No activity equipment recorded' })).toBeOnTheScreen();
   });
 });
