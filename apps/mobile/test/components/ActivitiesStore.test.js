@@ -211,4 +211,24 @@ describe('WO-05 activity store adapter', () => {
       expectedDurationMin: null, expectedEffort: null, actualDurationMin: null, actualEffort: null,
     }, 9002)).toThrow('needs a duration so its end time is not guessed');
   });
+
+  test('editing a weekly schedule keeps the date the commitment actually began', () => {
+    const db = database();
+    const seriesId = saveWeeklyActivity(db, {
+      ...base, localWeekday: 5, localStartMinute: 1020, timezoneId: 'Australia/Sydney',
+      timing: 'fixed', expectedDurationMin: 60, expectedEffort: null,
+      effectiveStartDate: '2026-09-01',
+    }, 10000);
+    const activityId = readActivityLedger(db, '2026-09-13').definitions[0].activityId;
+    saveWeeklyActivity(db, {
+      ...base, activityId, seriesId, displayName: 'Friday pool session',
+      localWeekday: 5, localStartMinute: 1080, timezoneId: 'Australia/Sydney',
+      timing: 'fixed', expectedDurationMin: 60, expectedEffort: null,
+      effectiveStartDate: '2026-09-13',
+    }, 11000);
+
+    expect(readActivityLedger(db, '2026-09-13').series[0]).toEqual(expect.objectContaining({
+      seriesId, revision: 2, localStartMinute: 1080, effectiveStartDate: '2026-09-01',
+    }));
+  });
 });

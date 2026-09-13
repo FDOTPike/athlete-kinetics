@@ -408,11 +408,13 @@ export const saveWeeklyActivity = (db: DB, input: WeeklyActivityInput, atMs: num
       db.executeSync(
         `UPDATE activity_series
             SET revision=revision+1,local_weekday=?,local_start_minute=?,timezone_id=?,
-                time_resolution_state='unresolved',effective_start_date=?,effective_end_date=NULL,
+                time_resolution_state='unresolved',effective_end_date=NULL,
                 timing_commitment=?,expected_duration_min=?,expected_effort=?,effort_scale_id=?,
                 effort_scale_version=?,updated_at_ms=?
           WHERE series_id=? AND activity_id=?`,
-        [input.localWeekday, startMinute, timezone, startDate, input.timing, duration, effort,
+        // effective_start_date is when the commitment began. An edit revises
+        // the schedule; it must not rewrite that historical fact to today.
+        [input.localWeekday, startMinute, timezone, input.timing, duration, effort,
           effortScaleId, effortScaleVersion, atMs, seriesId, activityId],
       );
     }
