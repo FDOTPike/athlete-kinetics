@@ -178,13 +178,22 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
+
+/** Stand-ins for the database-backed store actions below while the athlete
+ *  database is closed: a Coach Mode swap still booting, or a boot that failed.
+ *  Profile stays usable then, because it is where the athlete switches back, so
+ *  its controls do nothing instead of throwing 'kinetics db not booted' from a
+ *  press handler, which no error boundary catches. */
+const inertWhileClosed = (): void => undefined;
+const refusedWhileClosed = (): boolean => false;
+
 export default function ProfileScreen(): React.JSX.Element {
   const profile = useStore((s) => s.profile);
-  const saveProfile = useStore((s) => s.saveProfile);
+  const saveProfile = useStore((s) => (s.status === 'ready' ? s.saveProfile : inertWhileClosed));
   const uiPreferences = useStore((s) => s.uiPreferences);
-  const saveUiPreferences = useStore((s) => s.saveUiPreferences);
+  const saveUiPreferences = useStore((s) => (s.status === 'ready' ? s.saveUiPreferences : inertWhileClosed));
   const loadPreference = useStore((s) => s.loadPreference);
-  const saveLoadPreference = useStore((s) => s.saveLoadPreference);
+  const saveLoadPreference = useStore((s) => (s.status === 'ready' ? s.saveLoadPreference : refusedWhileClosed));
   const loadIntents = useStore((s) => s.loadIntents);
   const getMovementAvailabilityVerdicts = useStore((s) => s.getMovementAvailabilityVerdicts);
   const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
@@ -202,10 +211,10 @@ export default function ProfileScreen(): React.JSX.Element {
   // and ProfileScreen mounts NO error surface of its own, so without this the
   // athlete taps a chip, nothing changes, and nothing says why.
   const [intentError, setIntentError] = useState<string | null>(null);
-  const saveMovementLoadIntent = useStore((s) => s.saveMovementLoadIntent);
+  const saveMovementLoadIntent = useStore((s) => (s.status === 'ready' ? s.saveMovementLoadIntent : refusedWhileClosed));
   const bandLadder = useStore((s) => s.bandLadder);
-  const saveBandLevel = useStore((s) => s.saveBandLevel);
-  const deleteBandLevel = useStore((s) => s.deleteBandLevel);
+  const saveBandLevel = useStore((s) => (s.status === 'ready' ? s.saveBandLevel : inertWhileClosed));
+  const deleteBandLevel = useStore((s) => (s.status === 'ready' ? s.deleteBandLevel : inertWhileClosed));
   const movements = useStore((s) => s.movements);
   // OW-001: exactly the movements that have a choice to make. A single
   // supported implement is not a choice, so those never appear — which is also
@@ -243,13 +252,13 @@ export default function ProfileScreen(): React.JSX.Element {
     [databaseReady, movements, getMovementAvailabilityVerdicts, movementAvailabilityRevision, niggles, profile],
   );
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
-  const saveOneRepMax = useStore((s) => s.saveOneRepMax);
+  const saveOneRepMax = useStore((s) => (s.status === 'ready' ? s.saveOneRepMax : inertWhileClosed));
   const biometricsStatus = useStore((s) => s.biometricsStatus);
   const syncBiometrics = useStore((s) => s.syncBiometrics);
   const requestBiometricsAccess = useStore((s) => s.requestBiometricsAccess);
   const profileSlots = useStore((s) => s.profileSlots);
-  const switchProfile = useStore((s) => s.switchProfile);
-  const wipeActiveBlockState = useStore((s) => s.wipeActiveBlockState);
+  const switchProfile = useStore((s) => (s.status === 'ready' ? s.switchProfile : inertWhileClosed));
+  const wipeActiveBlockState = useStore((s) => (s.status === 'ready' ? s.wipeActiveBlockState : inertWhileClosed));
   const session = useStore((s) => s.session);
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
@@ -262,7 +271,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const loadRecentOutcomes = useStore((s) => s.loadRecentOutcomes);
   const today = useStore((s) => s.today);
   const importHistory = useStore((s) => s.importHistory);
-  const saveBodyweight = useStore((s) => s.saveBodyweight);
+  const saveBodyweight = useStore((s) => (s.status === 'ready' ? s.saveBodyweight : inertWhileClosed));
   const loadMeasuredHistory = useStore((s) => s.loadMeasuredHistory);
 
   // Hydrate recent outcomes in effect (never query directly in render body!)
@@ -828,7 +837,10 @@ export default function ProfileScreen(): React.JSX.Element {
             style={styles.oneRmInput}
             value={bodyweightText}
             onChangeText={setBodyweightText}
+            editable={databaseReady}
             onEndEditing={() => {
+              // A focused input can still end editing after the database closed.
+              if (!databaseReady) return;
               const value = Number.parseFloat(bodyweightText.replace(',', '.'));
               saveBodyweight(today, Number.isFinite(value) && value >= 20 ? value : null);
               setRecentMeasures(loadMeasuredHistory(14));
@@ -909,7 +921,9 @@ export default function ProfileScreen(): React.JSX.Element {
               <Chip
                 label="COMMIT IMPORT"
                 selected={false}
+                disabled={!databaseReady}
                 onPress={() => {
+                  if (!databaseReady) return;
                   const result = importHistory(historyText, importVerified, includeImportReadiness);
                   setHistoryPreview(result.preview);
                   setHistoryNotice(result.committed
@@ -953,6 +967,7 @@ export default function ProfileScreen(): React.JSX.Element {
         <QuietAction
           label="OPEN YOUR ACTIVITIES"
           onPress={() => setActivitiesOpen(true)}
+          disabled={!databaseReady}
           accessibilityLabel="Open your existing activities"
         />
       </View>
@@ -1201,6 +1216,7 @@ export default function ProfileScreen(): React.JSX.Element {
           <QuietAction
             label="OPEN COACH VERIFICATION LAB"
             onPress={() => setLabOpen(true)}
+            disabled={!databaseReady}
             accessibilityLabel="Open Coach Verification Lab"
           />
           <QuietAction

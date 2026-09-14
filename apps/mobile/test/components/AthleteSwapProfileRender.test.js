@@ -314,3 +314,80 @@ test('a switch whose boot fails leaves the database closed, and Profile still ne
   expectNoClosedDatabaseRead();
   expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
 });
+
+// ---------------------------------------------------------------------------
+// CodeRabbit on PR #16: after a failed boot Profile stays usable — it is where
+// the athlete switches back — so its database-backed controls must do nothing
+// while the database is closed. A throw from a press handler is not caught by
+// any error boundary.
+// ---------------------------------------------------------------------------
+
+const { HISTORY_IMPORT_EXAMPLE } = require('@ak/inference');
+
+const countIn = (dbName, table) => Number(drivers.get(dbName).raw
+  .prepare(`SELECT COUNT(*) AS c FROM ${table}`).get().c);
+/** The outermost rendered element carrying these props, so its handler can be
+ *  invoked even where the control is disabled: a focused input can still report
+ *  end-of-editing after the database has closed underneath it. */
+const handlerOf = (props) => screen.UNSAFE_getAllByProps(props)[0];
+
+test('after a failed boot, Profile database controls do nothing, and switching back recovers', async () => {
+  mockRegistry = twoAthleteRegistry();
+  await bootRealStore();
+  store().generateNewBlock('LINEAR');
+  expect(store().error).toBeNull();
+  await mountProfile();
+  const before = {
+    blocks: countIn(DB_A, 'training_block'),
+    bodyweight: countIn(DB_A, 'bodyweight_daily'),
+    imports: countIn(DB_A, 'history_import'),
+  };
+  expect(before.blocks).toBe(1);
+  fireEvent.press(screen.getByLabelText('Coach mode, 2 athletes, collapsed'));
+
+  openFails.add(DB_B);
+  fireEvent.press(screen.getByLabelText('Athlete Athlete B, tap to switch'));
+  await settle();
+  expect(store().status).toBe('error');
+  expectDatabaseClosed();
+
+  // A destructive write reached through ordinary taps.
+  fireEvent.press(screen.getByLabelText("Delete the current block and today's state"));
+  fireEvent.press(screen.getByLabelText('Confirm delete current block & state'));
+
+  // Bodyweight: not editable, and inert even if end-of-editing still arrives.
+  expect(screen.getByLabelText('Bodyweight today in kilograms').props.editable).toBe(false);
+  act(() => { handlerOf({ accessibilityLabel: 'Bodyweight today in kilograms' }).props.onEndEditing(); });
+
+  // Import: a preview that WOULD commit on a booted store, then the commit.
+  fireEvent.press(screen.getByText('IMPORT TRAINING HISTORY'));
+  fireEvent.changeText(screen.getByLabelText('Paste AK history import text'), HISTORY_IMPORT_EXAMPLE);
+  fireEvent.press(screen.getByLabelText('Preview history import without saving'));
+  expect(screen.getByText(/\d+ sessions · 0 errors/)).toBeOnTheScreen();
+  expect(screen.queryByText(/^Unknown:/)).toBeNull();
+  expect(screen.getByLabelText('Commit reviewed history import').props.accessibilityState.disabled).toBe(true);
+  act(() => { handlerOf({ label: 'COMMIT IMPORT' }).props.onPress(); });
+
+  // Sub-screens that read or write the database do not open.
+  expect(screen.getByLabelText('Open your existing activities').props.accessibilityState.disabled).toBe(true);
+  expect(screen.getByLabelText('Open Coach Verification Lab').props.accessibilityState.disabled).toBe(true);
+
+  await settle();
+  expectNoClosedDatabaseRead();
+  expect(store().status).toBe('error');
+
+  // Recovery: the athlete switches back from the same screen, and every
+  // restriction lifts once the database is open again.
+  fireEvent.press(screen.getByLabelText('Athlete Athlete A, tap to switch'));
+  await settle();
+  expect(store().status).toBe('ready');
+  expect(store().activeAthleteId).toBe(ATHLETE_A);
+  expect(screen.getByLabelText('Bodyweight today in kilograms').props.editable).not.toBe(false);
+  expect(screen.getByLabelText('Open your existing activities').props.accessibilityState.disabled).toBe(false);
+  expectNoClosedDatabaseRead();
+
+  // Nothing tapped while the database was closed reached A's file.
+  expect(countIn(DB_A, 'training_block')).toBe(before.blocks);
+  expect(countIn(DB_A, 'bodyweight_daily')).toBe(before.bodyweight);
+  expect(countIn(DB_A, 'history_import')).toBe(before.imports);
+});
