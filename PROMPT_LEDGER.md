@@ -10181,3 +10181,43 @@ Do not merge master/main, force-push, tag, release, sign production or claim C6.
   unnumbered "WO-06 implementation execution" entry after 0121; the PR base
   `origin/codex/rpe-familiarisation` ends at 0126; 0122 is used by
   `codex/ac-wo03-product-backup`. No local or remote ref uses 0127.
+
+### Output F(G(x))
+
+- Start identity: worktree `C:/Users/fpike/.codex/worktrees/3057/Athlete App`,
+  branch `codex/ac-wo06-training-support` at
+  2d4325f59452ec875142d696a15b97cd97d76900, tree
+  fafab65d96df2c75906b62aef4eac8ee65775593, clean, 0/0 against its upstream;
+  2 ahead / 4 behind origin/codex/rpe-familiarisation (ec7f411, tree 50255d1).
+  No Git lock was present.
+- Merge: normal `--no-ff` merge of origin/codex/rpe-familiarisation. The only
+  conflict was this ledger (both sides appended after Entry 0121). It was
+  resolved from the index stages as the common prefix, the WO-06 execution
+  entry, Entries 0123-0126, then this entry. Removing the base-side block
+  reproduced the WO-06 side byte-for-byte, and removing the WO-06 blocks
+  reproduced the base side byte-for-byte. ProfileScreen.tsx, App.tsx and
+  NavigationShell.test.js merged without conflict and keep both PR #16's
+  'ready' guards and WO-06's support form, copy and store-mock default. No
+  product code was edited; Migration 064, packages/core-db, clinical policy,
+  inference, schema, backup format and networking are unchanged.
+- Added evidence (test only): AthleteSwapProfileRender.test.js drives the
+  WO-06 support form through a failed boot on the real store. Advice reports
+  support_unavailable, opening the form exposes no write control, no support
+  row or revision changes, and switching back restores it. Mutations, each
+  restored by sha256: removing the form's load catch failed with
+  `kinetics db not booted`; letting the support decision permit on failure
+  failed the support_unavailable assertion.
+- Validation on 759de70 (tree 041ba56): `git diff --check` clean;
+  `npm run typecheck` exit 0; focused HealthSupportStore,
+  TrainingSupportBoundary, TrainingSupportEvidenceIdentity, ProfileScreens,
+  AthleteSwapProfileRender, ContentCorrection049 and NavigationShell: 7
+  suites, 144 tests passed before the added case (AthleteSwapProfileRender
+  5/5 after it); `npm run verify:ci` exit 0 with 33 suites / 548 tests,
+  store SQL 675/675 and backup 104-table inventory.
+- No APK was rebuilt: conflict resolution changed no product code. The earlier
+  WO-06 QA APK (sha256 e016a396…) was built from the pre-merge tree and is not
+  a candidate for this merged tip.
+- Not verified: native device/emulator behaviour of the merged guards and
+  form, screen reader and keyboard journeys, clinical review. The push, PR URL
+  and CI status are reported in the PR and handback, not here.
+- MERGE / RELEASE / C6: NOT PERFORMED.
