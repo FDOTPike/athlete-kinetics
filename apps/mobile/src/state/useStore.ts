@@ -40,6 +40,7 @@ import {
   type AthleteEntry,
 } from './athleteRegistryCore';
 import { loadRegistry, saveRegistry } from './athleteRegistry';
+import { athleteDataBootAllowed, tryAcquireDataMutationLease } from './dataMaintenanceLock';
 import {
   createHealthSupportStore, SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE,
   type SupportDetails, type SupportFacts, type SupportInstructionInput,
@@ -990,6 +991,26 @@ interface KineticsStore {
 let db: DB | null = null;
 let dbAthleteId: string | null = null;
 let bootInFlight = false;
+/** Shown when a normal athlete-data action cannot take its mutation lease. */
+const DATA_LOCKED_MESSAGE = 'Athlete data is temporarily locked for backup or restore.';
+
+/** Narrow lifecycle boundary used only by replace-only restore. The restore
+ * journal and verified recovery copy already exist before this is called. */
+export function closeStoreDatabaseForRestore(): void {
+  if (db !== null) closeKineticsDb(db);
+  db = null;
+  dbAthleteId = null;
+  bootInFlight = false;
+  useStore.setState({ status: 'booting' });
+}
+
+/** Re-open and rehydrate after either replacement or deterministic rollback. */
+export function restartStoreAfterRestore(): void {
+  bootInFlight = false;
+  useStore.setState({ status: 'booting' });
+  useStore.getState().boot();
+}
+
 const getDb = (): DB => {
   if (db === null) throw new Error('kinetics db not booted');
   return db;
@@ -2367,16 +2388,25 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   onboarded: true,
 
   boot: () => {
+    if (!athleteDataBootAllowed()) return;
     if (get().status === 'ready') return;
     // Audit A6: App.tsx and ReadinessScreen both invoke boot() on mount; the
     // second concurrent boot reopened the DB and leaked the first handle.
     if (bootInFlight) return;
+    // PR #18 review: hold a mutation lease from the registry read through the
+    // database open and hydration, so backup or restore cannot start inside boot.
+    const releaseBootLease = tryAcquireDataMutationLease();
+    if (releaseBootLease === null) return;
     bootInFlight = true;
     // Async wrapper: the athlete-registry read is the only await; everything
     // after it is the original synchronous boot path against the chosen file.
     void (async () => {
     try {
       const reg = await loadRegistry();
+      // Authority can be withdrawn while the registry read is pending: the lease
+      // keeps maintenance out, but not a recovery revocation. Recheck before
+      // opening any athlete database.
+      if (!athleteDataBootAllowed()) return;
       const entry = activeEntry(reg);
       set({
         athletes: reg.athletes,
@@ -2626,6 +2656,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
     } finally {
       bootInFlight = false;
+      releaseBootLease();
     }
     })();
   },
@@ -3200,6 +3231,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return;
     }
     if (id === get().activeAthleteId && get().status === 'ready') return;
+    // Lease from the registry read through the write, the close and the boot hand-off.
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) {
+      set({ error: DATA_LOCKED_MESSAGE });
+      return;
+    }
     set({ status: 'booting', error: null });
     void (async () => {
       try {
@@ -3220,6 +3257,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         get().boot(); // status is 'booting' -> full open/migrate/hydrate path
       } catch (e) {
         set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      } finally {
+        releaseLease();
       }
     })();
   },
@@ -3227,6 +3266,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   createAthlete: (name) => {
     if (get().session !== null) {
       set({ error: 'End the active session before adding athletes.' });
+      return;
+    }
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) {
+      set({ error: DATA_LOCKED_MESSAGE });
       return;
     }
     set({ status: 'booting', error: null });
@@ -3251,23 +3295,41 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         get().boot();
       } catch (e) {
         set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      } finally {
+        releaseLease();
       }
     })();
   },
 
   renameAthleteEntry: (id, name) => {
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) {
+      set({ error: DATA_LOCKED_MESSAGE });
+      return;
+    }
     void (async () => {
-      const reg = regRenameAthlete(await loadRegistry(), id, name);
-      if (!(await saveRegistry(reg))) {
-        set({ error: 'Rename not saved — registry write failed.' });
-        return;
+      try {
+        const reg = regRenameAthlete(await loadRegistry(), id, name);
+        if (!(await saveRegistry(reg))) {
+          set({ error: 'Rename not saved — registry write failed.' });
+          return;
+        }
+        set({ athletes: reg.athletes });
+      } finally {
+        releaseLease();
       }
-      set({ athletes: reg.athletes });
     })();
   },
 
   deleteAthlete: (id) => {
+    // The lease also covers the database file removal after the registry write.
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) {
+      set({ error: DATA_LOCKED_MESSAGE });
+      return;
+    }
     void (async () => {
+      try {
       const { reg, removed } = regRemoveAthlete(await loadRegistry(), id);
       if (removed === null) {
         set({ error: 'The active and default athletes cannot be deleted.' });
@@ -3288,17 +3350,29 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         athletes: reg.athletes,
         error: fileGone ? null : 'Athlete removed from the list, but their database file could not be deleted. It holds no visible data and can be cleared by reinstalling.',
       });
+      } finally {
+        releaseLease();
+      }
     })();
   },
 
   setAdvancedToolsUnlocked: (unlocked) => {
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) {
+      set({ error: DATA_LOCKED_MESSAGE });
+      return;
+    }
     void (async () => {
-      const reg = regSetAdvancedToolsUnlocked(await loadRegistry(), unlocked);
-      if (!(await saveRegistry(reg))) {
-        set({ error: 'Advanced tools setting not saved — registry write failed.' });
-        return;
+      try {
+        const reg = regSetAdvancedToolsUnlocked(await loadRegistry(), unlocked);
+        if (!(await saveRegistry(reg))) {
+          set({ error: 'Advanced tools setting not saved — registry write failed.' });
+          return;
+        }
+        set({ advancedToolsUnlocked: unlocked, error: null });
+      } finally {
+        releaseLease();
       }
-      set({ advancedToolsUnlocked: unlocked, error: null });
     })();
   },
 
@@ -3354,13 +3428,22 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       onboarded: true,
     });
     if (get().prescription !== null) get().computePrescription([]);
+    const releaseNameLease = tryAcquireDataMutationLease();
+    if (releaseNameLease === null) {
+      set({ error: 'Athlete name not saved — athlete data is locked for backup or restore. You can rename them in the ATHLETE tab.' });
+      return;
+    }
     void (async () => {
-      const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
-      if (!(await saveRegistry(reg))) {
-        set({ error: 'Athlete name not saved — registry write failed. You can rename them in the ATHLETE tab.' });
-        return;
+      try {
+        const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
+        if (!(await saveRegistry(reg))) {
+          set({ error: 'Athlete name not saved — registry write failed. You can rename them in the ATHLETE tab.' });
+          return;
+        }
+        set({ athletes: reg.athletes });
+      } finally {
+        releaseNameLease();
       }
-      set({ athletes: reg.athletes });
     })();
   },
 

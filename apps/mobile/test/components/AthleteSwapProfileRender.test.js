@@ -28,6 +28,7 @@ import { Text, View } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import { useStore } from '../../src/state/useStore';
+import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 const ATHLETE_A = 'default';
@@ -210,6 +211,10 @@ const twoAthleteRegistry = () => ({
 });
 
 beforeEach(() => {
+  // WO-03B: the store boots only after startup restore recovery authorizes
+  // athlete data, which App.tsx does before the first boot. These tests start
+  // from that authorized state; backup suites own the unauthorized cases.
+  authorizeAthleteDataBoot();
   drivers = new Map();
   openFails = new Set();
   mockHoldBootRead = false;

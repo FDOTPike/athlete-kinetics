@@ -1,5 +1,6 @@
 export { DB_NAME, closeKineticsDb, openKineticsDb, setInferenceMode } from './pragmas';
 export { migrate } from './migrations';
+export * from './backup';
 export {
   archiveActiveTrainingBlock,
   insertTrainingProgram,

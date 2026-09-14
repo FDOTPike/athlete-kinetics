@@ -31,11 +31,13 @@
  * Expected to FAIL against 48719b07988ad30d255b0fed37f45ed5db49c935.
  */
 import { useStore, localToday } from '../../src/state/useStore';
+import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockDriver;
 
 const bootRealStore = async () => {
+  authorizeAthleteDataBoot();
   useStore.setState({ status: 'booting', error: null });
   useStore.getState().boot();
   await new Promise((resolve) => setImmediate(resolve));

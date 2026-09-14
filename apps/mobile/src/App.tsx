@@ -3,7 +3,7 @@
  *
  * Zero navigation library: five tabs, NavigationProvider stack, 64pt tab targets.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AppState,
   KeyboardAvoidingView,
@@ -29,6 +29,10 @@ import LibraryScreen from './screens/LibraryScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import { statusBarPaddingTop } from './layout/statusBarPadding';
+import { useBackupStore } from './state/backupStore';
+import { bootAfterSafeRecovery } from './state/backupStartup';
+import { authorizeAthleteDataBoot } from './state/dataMaintenanceLock';
+import { QuietAction } from './components/ui';
 
 /**
  * W4: exactly THREE primary destinations. PLAN is the coach/program-management
@@ -120,6 +124,24 @@ export function AppShell(): React.JSX.Element {
   const showProgramSetup = programSetupPending && !setupDismissed;
   const { tab, setTab } = useNavigation();
   const boot = useStore((s) => s.boot);
+  const backupStartupSafe = useBackupStore((s) => s.startupSafe);
+  const backupStartupMessage = useBackupStore((s) => s.message);
+  // PR #18 review: a persistent recovery failure must not be a dead end. One
+  // bounded, user-started attempt at a time reruns the same startup recovery
+  // authority; athlete data stays closed unless that recovery succeeds.
+  const recoveryRetryInFlight = useRef(false);
+  const [recoveryRetrying, setRecoveryRetrying] = useState(false);
+  const retryProtectedRecovery = (): void => {
+    if (recoveryRetryInFlight.current) return;
+    recoveryRetryInFlight.current = true;
+    setRecoveryRetrying(true);
+    void bootAfterSafeRecovery(
+      () => useBackupStore.getState().initialize(), authorizeAthleteDataBoot, boot,
+    ).catch(() => false).finally(() => {
+      recoveryRetryInFlight.current = false;
+      setRecoveryRetrying(false);
+    });
+  };
   const status = useStore((s) => s.status);
   const onboarded = useStore((s) => s.onboarded);
   // W4: the header SESSION control shows a live-workout marker from the same
@@ -130,7 +152,13 @@ export function AppShell(): React.JSX.Element {
   const showOnboarding = status === 'ready' && !onboarded;
 
   useEffect(() => {
-    boot();
+    // Resolve an interrupted replace journal before any athlete database is
+    // opened. A cold-start rollback therefore never races normal hydration.
+    // Recovery failure keeps the normal store closed. Opening athlete data
+    // after a failed rollback could turn recoverable files into a mixed state.
+    void bootAfterSafeRecovery(
+      () => useBackupStore.getState().initialize(), authorizeAthleteDataBoot, boot,
+    ).catch(() => undefined);
     // Async, optional: wires subjective-report triage when the embedding
     // model is reachable; the app is fully functional without it.
     void tryCreateDeviceEmbedder().then((e) => {
@@ -151,6 +179,28 @@ export function AppShell(): React.JSX.Element {
     });
     return () => sub.remove();
   }, [boot]);
+
+  if (backupStartupSafe !== true) {
+    return (
+      <SafeAreaView style={styles.root} testID="backup-recovery-gate">
+        <View style={styles.crashBox}>
+          <Text style={styles.crashTitle}>{backupStartupSafe === false ? 'RECOVERY NEEDED' : 'CHECKING DATA'}</Text>
+          <Text style={styles.crashText}>{backupStartupSafe === false
+            ? (backupStartupMessage ?? 'Athlete data stays closed until restore recovery succeeds.')
+            : 'Checking for an interrupted restore before opening athlete data.'}</Text>
+          {backupStartupSafe === false && (
+            <QuietAction
+              label={recoveryRetrying ? 'RETRYING PROTECTED RECOVERY' : 'RETRY PROTECTED RECOVERY'}
+              accessibilityLabel="Retry protected recovery"
+              testID="backup-recovery-retry"
+              disabled={recoveryRetrying}
+              onPress={retryProtectedRecovery}
+            />
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // The shell root stays a SafeAreaView. `styles.root.paddingTop` only covers
   // Android (statusBarPaddingTop returns 0 off-Android), so SafeAreaView is the

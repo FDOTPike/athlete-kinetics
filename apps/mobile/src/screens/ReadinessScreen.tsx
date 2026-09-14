@@ -5,7 +5,7 @@
  * recommendation stays visible; the underlying vector and history are only
  * available through inline disclosure.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
@@ -126,10 +126,6 @@ export default function ReadinessScreen({
       setRefreshing(false);
     }
   }, [refreshVector]);
-
-  useEffect(() => {
-    boot();
-  }, [boot]);
 
   if (status === 'booting') {
     return (

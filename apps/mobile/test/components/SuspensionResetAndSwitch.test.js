@@ -37,6 +37,7 @@
  * Expected to FAIL against 3ec532d6082e4ad96470c413a3365dc7f531a765.
  */
 import { useStore, localToday } from '../../src/state/useStore';
+import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 const ATHLETE_A = 'default';
@@ -99,6 +100,7 @@ const settle = async () => {
 };
 
 const bootRealStore = async () => {
+  authorizeAthleteDataBoot();
   useStore.setState({ status: 'booting', error: null });
   store().boot();
   await settle();

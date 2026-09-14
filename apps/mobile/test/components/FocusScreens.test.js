@@ -122,6 +122,13 @@ const baseState = (overrides = {}) => ({
 
 beforeEach(() => { mockState = baseState(); });
 
+test('READY mount is never an independent database boot authority', () => {
+  mockState = baseState({ status: 'booting', boot: jest.fn() });
+  render(<ReadinessScreen />);
+  expect(mockState.boot).not.toHaveBeenCalled();
+  expect(screen.getByText('Preparing your training data.')).toBeOnTheScreen();
+});
+
 test('PLAN shows factual fixed activities without claiming it changed the coach dose', () => {
   mockState = baseState({
     activityLedger: {

@@ -83,6 +83,8 @@ const runnerSnapshot = (useStore) => JSON.parse(JSON.stringify(useStore.getState
 const bootStore = async () => {
   jest.resetModules();
   globalThis.__akTestSqlite = null;
+  const { authorizeAthleteDataBoot } = require('../../src/state/dataMaintenanceLock');
+  authorizeAthleteDataBoot();
   const { useStore } = require('../../src/state/useStore');
   useStore.getState().boot();
   // boot() awaits the athlete-registry read (which fails closed to the default

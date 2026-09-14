@@ -27,7 +27,13 @@ describe('KeyboardAwareScrollView contract', () => {
       return [...source.matchAll(/<TextInput\b[\s\S]*?\/>/g)].map((match) => ({ file, tag: match[0] }));
     });
 
-    expect(inputTags).toHaveLength(29);
+    const backupInputs = inputTags.filter(({ file }) => path.basename(file) === 'BackupTransferPanel.tsx');
+    expect(inputTags).toHaveLength(29 + 2);
+    expect(backupInputs).toHaveLength(2);
+    expect(backupInputs.map(({ tag }) => tag)).toEqual(expect.arrayContaining([
+      expect.stringContaining('accessibilityLabel="Backup password, at least 12 characters"'),
+      expect.stringContaining('accessibilityLabel="Confirm backup password"'),
+    ]));
     for (const input of inputTags) {
       expect({ file: path.relative(srcRoot, input.file), tag: input.tag })
         .toEqual(expect.objectContaining({ tag: expect.stringMatching(/\bdisableFullscreenUI\b/) }));

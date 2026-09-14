@@ -51,6 +51,27 @@ jest.mock('../../src/inference/deviceEmbedder', () => ({
 jest.mock('@ak/biometrics', () => ({
   tryCreateHealthConnectBridge: jest.fn(() => Promise.resolve(null)),
 }));
+// Navigation tests begin after the central cold-start recovery authority has
+// declared the data safe. BackupBootIntegration owns the fail-closed cases.
+jest.mock('../../src/state/backupStore', () => {
+  const safeBackupState = {
+    startupSafe: true,
+    recoveryAvailable: false,
+    status: 'idle',
+    message: null,
+    preview: null,
+    lastSuccessfulBackupAt: null,
+    initialize: jest.fn(() => Promise.resolve(true)),
+    createBackup: jest.fn(),
+    chooseRestore: jest.fn(),
+    reviewRecovery: jest.fn(),
+    confirmRestore: jest.fn(),
+    cancelRestore: jest.fn(),
+  };
+  const useBackupStore = (selector) => selector(safeBackupState);
+  useBackupStore.getState = () => safeBackupState;
+  return { useBackupStore };
+});
 
 const state = (overrides = {}) => ({
   status: 'ready',
@@ -433,4 +454,22 @@ describe('cold start and back behaviour stay deterministic under the new shell',
     act(() => { handled = navRef.goBack(); });
     expect(handled).toBe(false);
   });
+});
+
+// ---------------------------------------------------------------------------
+// PR #18 review: the startup helper's result contract
+// ---------------------------------------------------------------------------
+
+test('startup follows the recovery result contract: initialize resolving true authorizes athlete data and boots once', async () => {
+  const boot = jest.fn();
+  mockState = state({ boot });
+  const { useBackupStore } = require('../../src/state/backupStore');
+  useBackupStore.getState().initialize.mockClear();
+  render(<AppShellTestHarness />);
+  await act(async () => {
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+  });
+  expect(useBackupStore.getState().initialize).toHaveBeenCalledTimes(1);
+  await expect(useBackupStore.getState().initialize.mock.results[0].value).resolves.toBe(true);
+  expect(boot).toHaveBeenCalledTimes(1);
 });
