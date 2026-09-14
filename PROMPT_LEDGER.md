@@ -9742,3 +9742,117 @@ Stop with the PR open and fully reported. Do not merge it.
   authorized. The final HEAD, full-gate result, rebuilt APK hash, PR URL,
   GitHub checks and CodeRabbit disposition are reported in the PR and the
   handback, so no self-referential tracked edit invalidates their provenance.
+
+---
+
+## Entry 0123 — 2026-09-14 · Athlete file swap render crash ("kinetics db not booted")
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+Investigate and fix a confirmed render-time crash in the Athlete App (React Native, repo at C:\Users\fpike\Documents\Claude Coding\Athlete App). Read AGENT_WORKFLOW.md and .agents/rules/coding-rules-general.md first; the repo requires the verbatim prompt to be appended to PROMPT_LEDGER.md as the first file write, test-first changes, `npm run typecheck` before any commit, and no push/merge/tag/release without the owner. Migration 064 and all shipped migrations are frozen.
+
+OBSERVED (2026-09-14, QA build on an Android 15 google_apis emulator, branch codex/ac-wo03-product-backup @ 1d44acb):
+1. Profile tab → tap "BUILD 0.1.0" seven times to unlock advanced tools → expand MANAGE ATHLETES → type a name → ADD ATHLETE.
+2. The app immediately shows the root error boundary: "APP ERROR / kinetics db not booted / Screenshot this and report it. Your data is untouched." The process stays alive; a cold relaunch recovers into the new athlete's onboarding, and the registry and databases are intact.
+3. JS stack from logcat (pid of the app): getDb ← getMovementAvailabilityVerdicts ← (useMemo) ← ProfileScreen ← RootErrorBoundary.
+Evidence (ignored scratch files in that worktree): .worktrees\ac-wo03-product-backup\scratch\wo03b\emulator\34_logcat_app_add_athlete.txt (full stack), 31_second_athlete_onboarding.png and 33_state_after_add_athlete_timeout.xml (error screen), 35_state_after_add_athlete_error.txt (on-disk state).
+
+CODE PATH (verify line numbers against current code):
+- apps/mobile/src/state/useStore.ts `createAthlete` (~3241-3270): after saving the registry it closes the database and sets `db = null`, then `set({ ...PER_ATHLETE_RESET, athletes, activeAthleteId })`, then `get().boot()`. The `set` re-renders subscribers while `db` is still null.
+- apps/mobile/src/state/useStore.ts `getDb` (~1012-1015) throws 'kinetics db not booted' when `db === null`; `getMovementAvailabilityVerdicts` (~4117-4118) calls `getDb()` synchronously.
+- apps/mobile/src/screens/ProfileScreen.tsx (~191-236): a `useMemo` depending on `[movements, getMovementAvailabilityVerdicts, movementAvailabilityRevision, niggles, profile]` calls `getMovementAvailabilityVerdicts('library')` during render. PER_ATHLETE_RESET changes those dependencies, so the memo recomputes while the database is closed.
+- `git log -S getMovementAvailabilityVerdicts -- apps/mobile/src/screens/ProfileScreen.tsx` shows the usage arrived in c90aa92 (2026-09-09), which predates the backup branch; the backup branch did not change createAthlete, PER_ATHLETE_RESET, getDb or getMovementAvailabilityVerdicts. It has NOT yet been reproduced on a build without the backup branch, so confirm on the release lineage first.
+
+WORK:
+1. Branch from origin/codex/rpe-familiarisation (release lineage; confirm c90aa92 is an ancestor with `git merge-base --is-ancestor`). Release-lineage PRs target codex/rpe-familiarisation, not master.
+2. Write a failing component test that mounts ProfileScreen against the real store and triggers createAthlete (and check switchAthlete, which follows the same close-then-reset pattern) and asserts no throw / no error boundary.
+3. Apply the smallest fix that keeps render paths from reading a closed database during an athlete file swap (for example, make the render-time read tolerate the booting state, or order the reset so no subscriber recomputes against a null handle). Do not change dose, programming or schema behavior.
+4. Prove non-vacuity by reverting the fix and watching the new test fail, then run the focused suites, `npm run typecheck` and `npm run verify:ci`. Report what you verified and what you could not.
+`````
+
+Numbering: Entry 0122 is already claimed by the unmerged local branch
+`codex/ac-wo03-product-backup` (`1d44acb`, WO-03B retained-recovery
+remediation), which descends from this entry's base `b94053b`. This entry takes
+0123 so the two cannot collide when both reach `codex/rpe-familiarisation`.
+
+### Output F(G(x))
+
+- Branch `claude/fix-athlete-swap-closed-db`, cut with `--no-track` from
+  `origin/codex/rpe-familiarisation` at `b94053b`;
+  `git merge-base --is-ancestor c90aa92` exited 0. This entry's append was the
+  first file write after that checkout, which was needed so it landed in the
+  release-lineage ledger.
+- Reproduced on the release lineage without the backup branch, in a component
+  test rather than on a device. `AthleteSwapProfileRender.test.js` mounts the
+  real ProfileScreen on the real store and migration chain, and its registry
+  seam holds open the read `boot()` makes after a swap. Against unmodified
+  `b94053b` source all 3 tests failed with the boundary catching
+  `kinetics db not booted` via `getDb (useStore.ts:972)` ←
+  `getMovementAvailabilityVerdicts (useStore.ts:3952)` ←
+  `ProfileScreen.tsx:214` inside `useMemo` — the device stack.
+- Cause: `createAthlete`/`switchAthlete` close the database and null the
+  handle, publish `PER_ATHLETE_RESET`, then call `boot()`, which awaits a
+  registry read before reopening. React renders the reset in that gap.
+  ProfileScreen had three reads on that path: the availability memo, the
+  `loadMeasuredHistory` effect (unguarded, throws) and the `loadRecentOutcomes`
+  effect (catches and logs), both effects keyed on `activeAthleteId`.
+- Fix, `apps/mobile/src/screens/ProfileScreen.tsx` only: a `databaseReady`
+  selector (`status === 'ready'`). Until it is true the memo offers no choices
+  and both effects set empty lists; both effects re-run when it returns. No
+  store, dose, programming, schema or migration change.
+- Fixture: `ProfileScreens.test.js` mock state gains `status: 'ready'`.
+  Without it, 11 tests that assume a booted store failed (for example
+  `Unable to find an element with text: Plan followed`).
+- Mutations, each run from the fixed file and restored by sha256: full revert
+  fails 3/3; memo guard removed fails 3/3; measures effect reverted fails 3/3
+  via `loadMeasuredHistory (useStore.ts:4622)`; outcomes effect reverted fails
+  3/3 on the logged `Failed to load recent session outcomes: kinetics db not
+  booted`; guard weakened to `!== 'booting'` fails only the failed-boot test;
+  `databaseReady` dropped from the effect dependencies fails the two
+  "reads the new athlete" assertions.
+- Final tree: `npm run typecheck` exit 0; `npm run verify:ci` exit 0 with
+  `PREFLIGHT OK` and components `Test Suites: 30 passed, 30 total`,
+  `Tests: 485 passed, 485 total`; `git diff --check` clean. Captured outputs
+  are in the ignored `scratch/athlete-swap-render/` of this worktree.
+- Not verified: the fix on a device or emulator build; whether builds before
+  `c90aa92` crashed through the measures effect instead.
+- No commit, push, PR, merge, tag or release; a commit was not requested.
+
+---
+
+## Entry 0124 — 2026-09-14 · Commit and PR for the athlete file swap render fix
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+Commit these and open a PR
+`````
+
+"These" are the four paths Entry 0123 left uncommitted on
+`claude/fix-athlete-swap-closed-db`.
+
+### Output F(G(x))
+
+- Checked before this entry was written: `origin/codex/rpe-familiarisation` is
+  still `b94053b`, the branch's parent; `claude/fix-athlete-swap-closed-db`
+  does not exist on origin; no PR exists for that head; `gh` is authenticated
+  as `FDOTPike`; only sample git hooks are present.
+- One commit on `claude/fix-athlete-swap-closed-db`, parent `b94053b`, carrying
+  exactly `apps/mobile/src/screens/ProfileScreen.tsx`,
+  `apps/mobile/test/components/AthleteSwapProfileRender.test.js`,
+  `apps/mobile/test/components/ProfileScreens.test.js` and this ledger
+  (Entries 0123 and 0124). The source and test changes are the ones Entry
+  0123's `verify:ci` ran on; only ledger text was added since.
+- The commit is made only if `npm run typecheck` exits 0 on this tree
+  immediately beforehand. The push is explicit
+  (`git push -u origin HEAD:claude/fix-athlete-swap-closed-db`) and the PR
+  targets `codex/rpe-familiarisation`, not `master`.
+- The commit hash, push result, PR URL and CI results are reported in the PR
+  and the handback rather than here, so no self-referential tracked edit
+  invalidates their provenance.
+- Merge, tag, release and C6: not performed and not authorized.

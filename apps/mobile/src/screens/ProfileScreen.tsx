@@ -189,6 +189,14 @@ export default function ProfileScreen(): React.JSX.Element {
   const getMovementAvailabilityVerdicts = useStore((s) => s.getMovementAvailabilityVerdicts);
   const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
   const niggles = useStore((s) => s.niggles);
+  // Coach Mode file swap: createAthlete and switchAthlete close the database,
+  // publish PER_ATHLETE_RESET while status is 'booting', and boot() reopens it
+  // only after an awaited registry read; a boot that fails leaves it closed
+  // under 'error'. This screen starts the swap, so it stays mounted through all
+  // of that and re-renders on the reset. Every database read below waits for
+  // 'ready' — reading any earlier throws 'kinetics db not booted' into the root
+  // error boundary.
+  const databaseReady = useStore((s) => s.status === 'ready');
   // AUDIT W4: action-scoped, like the suspension controls on BlockScreen. The
   // save can fail (unknown movement, unsupported implement, a database error)
   // and ProfileScreen mounts NO error surface of its own, so without this the
@@ -204,6 +212,7 @@ export default function ProfileScreen(): React.JSX.Element {
   // why nothing here can be read as taking element zero of a dropdown.
   const ambiguousMovements = useMemo(
     () => {
+      if (!databaseReady) return [];
       // AUDIT W3.5-3.7: offer a choice only for movements this athlete can
       // actually do. `library` is the authoritative athlete-facing availability
       // context — LibraryScreenV2 gates its browse list on exactly this — so
@@ -231,7 +240,7 @@ export default function ProfileScreen(): React.JSX.Element {
         .filter((m) => m.offerablePrefixes.length > 1)
         .sort((a, b) => a.name.localeCompare(b.name));
     },
-    [movements, getMovementAvailabilityVerdicts, movementAvailabilityRevision, niggles, profile],
+    [databaseReady, movements, getMovementAvailabilityVerdicts, movementAvailabilityRevision, niggles, profile],
   );
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const saveOneRepMax = useStore((s) => s.saveOneRepMax);
@@ -257,14 +266,16 @@ export default function ProfileScreen(): React.JSX.Element {
   const loadMeasuredHistory = useStore((s) => s.loadMeasuredHistory);
 
   // Hydrate recent outcomes in effect (never query directly in render body!)
+  // Both reads wait for the database (see databaseReady) and re-run when it
+  // returns, so a swap shows the new athlete's rows, never the previous one's.
   const [recentOutcomes, setRecentOutcomes] = useState<{ outcomeKind: string; finalizedAtMs: number }[]>([]);
   useEffect(() => {
-    setRecentOutcomes(loadRecentOutcomes(20));
-  }, [activeAthleteId, session, loadRecentOutcomes]);
+    setRecentOutcomes(databaseReady ? loadRecentOutcomes(20) : []);
+  }, [activeAthleteId, session, loadRecentOutcomes, databaseReady]);
 
   useEffect(() => {
-    setRecentMeasures(loadMeasuredHistory(14));
-  }, [activeAthleteId, loadMeasuredHistory]);
+    setRecentMeasures(databaseReady ? loadMeasuredHistory(14) : []);
+  }, [activeAthleteId, loadMeasuredHistory, databaseReady]);
   // In-canvas double-confirm states (P2 & P5)
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
