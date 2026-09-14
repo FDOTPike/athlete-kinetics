@@ -4,11 +4,11 @@ This is software-routing and persistence evidence, not clinical validation or a 
 
 ## Starting identity and authority
 
-- Worktree: `C:/Users/fpike/.codex/worktrees/3057/Athlete App`.
+- Worktree: an isolated Codex worktree of this repository, on branch `codex/ac-wo06-training-support`.
 - Base and live `origin/codex/rpe-familiarisation`: `b94053b4d63fb0ffd3b933aa1890d80f7313a87b`.
 - Base tree: `99759f7be3af360a17037f3b18dd0f817cfd6704`; divergence `0 / 0`; clean working tree.
 - Codex initially supplied a detached worktree with no upstream. After the required first-write prompt append, Codex created `codex/ac-wo06-training-support` at that exact commit. No other checkout was changed.
-- There is no repository AGENTS.md. The ancestor `C:/Users/fpike/.codex/AGENTS.md` was empty. Read AGENT_WORKFLOW.md, the accessible-coach work orders, the ratified Astra owner rulings, the full WO-06 contract review, Migration 064 and the merged activity adapter.
+- There is no repository AGENTS.md. The Codex `AGENTS.md` above the repository root was empty. Read AGENT_WORKFLOW.md, the accessible-coach work orders, the ratified Astra owner rulings, the full WO-06 contract review, Migration 064 and the merged activity adapter.
 - No worktree/common Git lock was found. An elevated read-only process-command-line check found no process targeting this worktree other than the check itself. This is a bounded observation, not proof about all possible file handles.
 - The first repository write appended the supplied execution prompt to PROMPT_LEDGER.md. The previous ledger prefix was subsequently checked unchanged.
 

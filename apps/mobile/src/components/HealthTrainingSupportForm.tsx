@@ -48,13 +48,13 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
   const reload = (): void => {
     try {
       const loaded = state.getHealthSupportDetails(athleteId);
-      setDetails(loaded);
+      setDetails(loaded); setError(null);
       setPreferenceDetail({ position: loaded.preferences.find((p) => p.preferenceKind === 'position')?.detailText ?? '',
         position_transitions: loaded.preferences.find((p) => p.preferenceKind === 'position_transitions')?.detailText ?? '',
         rest: loaded.preferences.find((p) => p.preferenceKind === 'rest')?.detailText ?? '' });
     } catch { setDetails(null); setError(SUPPORT_UNAVAILABLE_MESSAGE); }
   };
-  useEffect(() => { if (expanded) reload(); }, [expanded, state.healthSupportRevision]);
+  useEffect(() => { if (expanded) reload(); }, [expanded, state.healthSupportRevision, state.status]);
   const save = (work: (revision: number) => void): void => {
     if (details === null) return;
     try { work(details.revision); setError(null); reload(); }
@@ -145,6 +145,7 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
         const input: SupportInstructionInput = { instructionId, instructionText: instruction, issuerText: issuer, ...dates, scopes };
         state.saveSupportInstruction(athleteId, input, instructionDraftRevision ?? r);
         setInstructionDraftRevision(null); setInstruction(''); setInstructionId(undefined); setIssuer('');
+        setScopes([{ targetKind: 'unresolved' }]); setScopeSearch(''); setScopeKind('unresolved');
         setDates({ instructionDate: '', effectiveDate: '', reviewDate: '', expiryDate: '', dateZoneId: '' });
       })} />
       {details.instructions.map((i, index) => {

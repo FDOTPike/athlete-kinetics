@@ -299,6 +299,42 @@ describe('Readiness, Session, Library and Profile remain reachable', () => {
 });
 
 // ---------------------------------------------------------------------------
+// PR #16 review: header surfaces that read the database wait for it
+// ---------------------------------------------------------------------------
+
+describe('PR #16 review: LIBRARY and WORKOUT never read the database before it is ready', () => {
+  // An athlete swap (createAthlete / switchAthlete) closes the database and
+  // publishes its reset while status is 'booting'; boot() reopens it only after
+  // an awaited registry read, and a boot that fails leaves it closed under
+  // 'error'. The header stays tappable throughout. LibraryScreenV2 and
+  // SessionScreen both call the database-backed availability getter while
+  // rendering, so the shell must not mount them until status is 'ready' — the
+  // rule PROGRESS and PLAN already follow. Each case then flips the SAME shell
+  // to 'ready' and proves the surface does make that read, so the "not called"
+  // assertion is not an unobserved spy.
+  test.each([
+    ['LIBRARY', 'booting', 'header-library', 'library-list', 'library'],
+    ['LIBRARY', 'error', 'header-library', 'library-list', 'library'],
+    ['WORKOUT', 'booting', 'header-session', 'session-screen-shown', 'weight_room'],
+    ['WORKOUT', 'error', 'header-session', 'session-screen-shown', 'weight_room'],
+  ])('%s waits while status is %s, then reads availability once ready', (_label, status, control, surface, context) => {
+    mockState = state({
+      status,
+      getMovementAvailabilityVerdicts: jest.fn(() => { throw new Error('kinetics db not booted'); }),
+    });
+    const { rerender } = render(<AppShellTestHarness />);
+    fireEvent.press(screen.getByTestId(control));
+    expect(screen.queryByTestId(surface)).toBeNull();
+    expect(mockState.getMovementAvailabilityVerdicts).not.toHaveBeenCalled();
+
+    mockState = state({ getMovementAvailabilityVerdicts: jest.fn(() => []) });
+    rerender(<AppShellTestHarness />);
+    expect(screen.getByTestId(surface)).toBeOnTheScreen();
+    expect(mockState.getMovementAvailabilityVerdicts).toHaveBeenCalledWith(context);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Cold start root and back behaviour
 // ---------------------------------------------------------------------------
 

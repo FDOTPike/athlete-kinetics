@@ -1032,6 +1032,12 @@ const SUPPORT_ADVICE_KINDS = {
   'substitution-preview': 'movement_substitution', 'day-swap': 'movement_substitution',
 } as const;
 type SupportOperation = keyof typeof SUPPORT_ADVICE_KINDS;
+/** The movement a runner control acts on now. Without a current slot there is
+ * no narrower target, so the check covers all prescription (fails closed). */
+const runnerCurrentMovementIds = (runner: Parameters<typeof currentRunnerSlot>[0] | null): readonly number[] | undefined => {
+  const slot = runner === null ? null : currentRunnerSlot(runner);
+  return slot === null ? undefined : [slot.movementId];
+};
 const supportMovementIdentity = (ids?: readonly number[]): string => {
   const distinct = [...new Set(ids ?? [])].sort((a, b) => a - b);
   if (distinct.length === 0) return 'all-prescription';
@@ -5414,7 +5420,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   advanceRunnerRest: () => {
     const supportState = get();
-    if (!get().requireTrainingSupport('rest-to-work', supportState.sessionPlan.map((s) => s.movementId),
+    if (!get().requireTrainingSupport('rest-to-work', runnerCurrentMovementIds(supportState.runner),
       `session:${supportState.session?.sessionId ?? 'none'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
@@ -5435,7 +5441,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   skipRunnerRest: () => {
     const supportState = get();
-    if (!get().requireTrainingSupport('skip-rest', supportState.sessionPlan.map((s) => s.movementId),
+    if (!get().requireTrainingSupport('skip-rest', runnerCurrentMovementIds(supportState.runner),
       `session:${supportState.session?.sessionId ?? 'none'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
@@ -5456,7 +5462,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   setRunnerRestOverride: (seconds) => {
     const supportState = get();
-    if (!get().requireTrainingSupport('rest-override', supportState.sessionPlan.map((s) => s.movementId),
+    if (!get().requireTrainingSupport('rest-override', runnerCurrentMovementIds(supportState.runner),
       `session:${supportState.session?.sessionId ?? 'none'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
@@ -5507,7 +5513,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   runnerDeclineSubstitution: () => {
     const supportState = get();
-    if (!get().requireTrainingSupport('decline-substitution', supportState.sessionPlan.map((s) => s.movementId),
+    if (!get().requireTrainingSupport('decline-substitution', runnerCurrentMovementIds(supportState.runner),
       `session:${supportState.session?.sessionId ?? 'none'}:slot:${supportState.activeSessionPlanSlotId ?? 'none'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
@@ -5533,7 +5539,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       ? null
       : advanceSessionRunner(supportState.runner, { kind: 'SKIP_SLOT', atMs: skippedAtMs });
     const destinationSlot = previewRunner === null ? null : currentRunnerSlot(previewRunner);
-    if (!get().requireTrainingSupport('skip-to-next-slot', supportState.sessionPlan.map((s) => s.movementId),
+    // Skipping the final slot completes the session: there is no destination to
+    // advise on, and ending must stay reachable under a hold.
+    const completesSession = previewRunner !== null && destinationSlot === null;
+    if (!completesSession && !get().requireTrainingSupport('skip-to-next-slot', destinationSlot === null ? undefined : [destinationSlot.movementId],
       `session:${supportState.session?.sessionId ?? 'none'}:slot:${destinationSlot?.sessionPlanSlotId ?? 'complete'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;

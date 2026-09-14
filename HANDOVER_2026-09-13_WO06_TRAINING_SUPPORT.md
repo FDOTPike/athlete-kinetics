@@ -1,6 +1,6 @@
 # WO-06 handover
 
-Branch: `codex/ac-wo06-training-support` in `C:/Users/fpike/.codex/worktrees/3057/Athlete App`.
+Branch: `codex/ac-wo06-training-support`, built in an isolated Codex worktree of this repository.
 
 Base: `b94053b4d63fb0ffd3b933aa1890d80f7313a87b`.
 Base tree: `99759f7be3af360a17037f3b18dd0f817cfd6704`.

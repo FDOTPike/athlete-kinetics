@@ -60,6 +60,9 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     saveLoadPreferenceMock = jest.fn();
 
     mockState = {
+      // A booted store: ProfileScreen reads the database (availability verdicts,
+      // recent outcomes, measured history) only once status is 'ready'.
+      status: 'ready',
       profile: baseProfile,
       saveProfile: jest.fn(),
       uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },

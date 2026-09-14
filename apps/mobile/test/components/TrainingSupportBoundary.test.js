@@ -550,3 +550,121 @@ test('decision evidence identifies block, slot and substitution advice through t
   expect(kindFor('add-plan-slot')).toBe('slot');
   expect(kindFor('substitution-preview')).toBe('movement_substitution');
 });
+
+test('a second instruction draft starts unresolved instead of inheriting the previous instruction scope', () => {
+  const athlete = state().activeAthleteId;
+  const movement = state().movements[0];
+  const view = render(<ProfileScreen />);
+  fireEvent.press(view.getByLabelText('Show health and training support'));
+  fireEvent.press(view.getByLabelText('Choose an exercise'));
+  fireEvent.press(view.getAllByLabelText(`Select ${movement.name}`)[0]);
+  fireEvent.changeText(view.getByLabelText('Clinician instruction text'), 'First scoped instruction');
+  fireEvent.press(view.getByLabelText('Save clinician instruction draft'));
+
+  // After a successful save the editor returns to the fail-closed default.
+  expect(view.getByText('Scope unresolved: all coach suggestions will be held.')).toBeTruthy();
+  fireEvent.changeText(view.getByLabelText('Clinician instruction text'), 'Second instruction');
+  fireEvent.press(view.getByLabelText('Save clinician instruction draft'));
+
+  const scopesByText = Object.fromEntries(state().getHealthSupportDetails(athlete).instructions
+    .map((instruction) => [instruction.instructionText, instruction.scopes]));
+  expect(scopesByText['First scoped instruction'])
+    .toEqual([expect.objectContaining({ targetKind: 'movement', movementId: movement.movement_id })]);
+  expect(scopesByText['Second instruction']).toEqual([expect.objectContaining({ targetKind: 'unresolved' })]);
+});
+
+// Owner ruling on PR #17 (C4): runner controls check the movement their action
+// affects, not every movement in the session.
+const currentRunnerMovementId = () => state().runner.slots[state().runner.slotIndex].movementId;
+const planMovementOtherThan = (movementId) => {
+  const other = state().sessionPlan.find((slot) => slot.movementId !== movementId);
+  expect(other).toBeDefined();
+  return other.movementId;
+};
+const startResting = (action) => {
+  logSlot(startPlanned());
+  expect(state().runner.phase).toBe('resting');
+  if (action === 'advanceRunnerRest') useStore.setState({ runner: { ...state().runner, restStartedAtMs: 0 } });
+};
+const noSupportError = () => expect(state().error ?? '').not.toMatch(/support/i);
+
+test.each(['skipRunnerRest', 'advanceRunnerRest', 'setRunnerRestOverride'])('%s is not blocked by a hold on another session movement', (action) => {
+  startResting(action);
+  const before = state().runner;
+  hold(planMovementOtherThan(currentRunnerMovementId()));
+  state()[action](60);
+  expect(state().runner).not.toEqual(before);
+  noSupportError();
+});
+
+test.each(['skipRunnerRest', 'advanceRunnerRest', 'setRunnerRestOverride'])('%s is blocked by a hold on the current movement', (action) => {
+  startResting(action);
+  const before = state().runner;
+  hold(currentRunnerMovementId());
+  state()[action](60);
+  expect(state().runner).toEqual(before);
+  expect(state().error).toMatch(/support/i);
+});
+
+test('declining a substitution is not blocked by a hold on another session movement', () => {
+  startPlanned();
+  const current = currentRunnerMovementId();
+  state().runnerThumbsDown();
+  expect(state().runner.substitutionOfferedForSessionPlanSlotId).not.toBeNull();
+  hold(planMovementOtherThan(current));
+  state().runnerDeclineSubstitution();
+  expect(state().runner.substitutionOfferedForSessionPlanSlotId).toBeNull();
+  noSupportError();
+});
+
+test('declining a substitution is blocked by a hold on the current movement', () => {
+  startPlanned();
+  const current = currentRunnerMovementId();
+  state().runnerThumbsDown();
+  const offered = state().runner;
+  expect(offered.substitutionOfferedForSessionPlanSlotId).not.toBeNull();
+  hold(current);
+  state().runnerDeclineSubstitution();
+  expect(state().runner).toEqual(offered);
+  expect(state().error).toMatch(/support/i);
+});
+
+const skipDestination = () => {
+  const { runner } = state();
+  const destination = runner.slots[runner.slotIndex + 1];
+  expect(destination).toBeDefined();
+  return destination;
+};
+
+test('skipping into a held destination movement is blocked', () => {
+  startPlanned();
+  const before = state().runner;
+  hold(skipDestination().movementId);
+  state().runnerSkipSlot();
+  expect(state().runner).toEqual(before);
+  expect(state().error).toMatch(/support/i);
+});
+
+test('skipping is not blocked by a hold on a movement other than the destination', () => {
+  startPlanned();
+  const destination = skipDestination();
+  hold(planMovementOtherThan(destination.movementId));
+  state().runnerSkipSlot();
+  expect(state().runner.slots[state().runner.slotIndex].sessionPlanSlotId).toBe(destination.sessionPlanSlotId);
+  noSupportError();
+});
+
+test('skipping the final slot completes the session despite a hold, so ending stays reachable', () => {
+  startPlanned();
+  for (let guard = 0; state().runner.slotIndex < state().runner.slots.length - 1 && guard < 50; guard += 1) {
+    state().runnerSkipSlot();
+  }
+  expect(state().runner.phase).toBe('working');
+  expect(state().runner.slotIndex).toBe(state().runner.slots.length - 1);
+  hold();
+  state().runnerSkipSlot();
+  expect(state().runner.phase).toBe('complete');
+  noSupportError();
+  state().endSession();
+  expect(state().session).toBeNull();
+});
