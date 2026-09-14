@@ -169,6 +169,9 @@ describe('049 specialist equipment is explicit opt-in only', () => {
   beforeEach(() => {
     saveProfile = jest.fn();
     mockState = {
+      // A booted store: ProfileScreen's database-backed actions (saveProfile
+      // among them) do nothing until status is 'ready'.
+      status: 'ready',
       profile: baseProfile,
       saveProfile,
       uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },

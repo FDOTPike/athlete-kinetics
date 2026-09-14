@@ -227,7 +227,13 @@ export function AppShell(): React.JSX.Element {
                 onOpenCoach={() => setTab('coach')}
               />
             )}
-            {tab === 'session' && (
+            {/* PR #16 review: SessionScreen and LibraryScreenV2 read movement
+                availability from the database while rendering. An athlete swap
+                closes the database while status is 'booting', with this header
+                still tappable, and a boot that fails leaves it closed under
+                'error' — so, like Progress and Coach, both mount only once the
+                database is ready. */}
+            {tab === 'session' && status === 'ready' && (
               <View style={{ flex: 1 }} testID="session-screen-shown">
                 <SessionScreen onReturnToToday={() => setTab('today')} />
               </View>
@@ -239,7 +245,7 @@ export function AppShell(): React.JSX.Element {
             {tab === 'coach' && status === 'ready' && (
               <BlockScreen onSessionStarted={() => setTab('session')} />
             )}
-            {tab === 'library' && <LibraryScreen />}
+            {tab === 'library' && status === 'ready' && <LibraryScreen />}
             {tab === 'athlete' && (
               <View style={{ flex: 1 }} testID="athlete-screen-shown">
                 <ProfileScreen />
