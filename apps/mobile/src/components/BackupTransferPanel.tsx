@@ -109,10 +109,16 @@ export default function BackupTransferPanel(): React.JSX.Element {
           <Text style={styles.body}>Created {new Date(preview.createdAt).toLocaleString()}</Text>
           <Text style={styles.body}>{preview.databaseCount} athlete database{preview.databaseCount === 1 ? '' : 's'} · {Math.ceil(preview.totalBytes / 1_048_576)} MB</Text>
           <Text style={styles.body}>Athletes: {preview.athleteNames.join(', ')}</Text>
-          <Text style={styles.warning}>
-            Replace only: this removes all current athlete data and replaces it with this backup. Nothing is merged.
-            Before replacement, pikeMethods creates and verifies an encrypted recovery backup on this phone.
-          </Text>
+          {preview.source === 'retained_recovery' ? (
+            <Text style={styles.warning}>
+              This replaces current data with the previous recovery. It will not create another undo point.
+            </Text>
+          ) : (
+            <Text style={styles.warning}>
+              Replace only: this removes all current athlete data and replaces it with this backup. Nothing is merged.
+              Before replacement, pikeMethods creates and verifies an encrypted recovery backup on this phone.
+            </Text>
+          )}
           <QuietAction
             label="CONFIRM REPLACE ALL DATA"
             onPress={() => { void confirmRestore(password); }}

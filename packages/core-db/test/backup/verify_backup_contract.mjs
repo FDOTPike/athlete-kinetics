@@ -194,6 +194,23 @@ try {
   const tampered = backup.canonicalJson({ ...outer, ciphertextBase64: tamperedCiphertext });
   assert.equal((await backup.openBackup(tampered, password, cryptoProvider)).code, 'authentication_failed');
   assert.equal((await backup.openBackup(sealed.slice(0, -20), password, cryptoProvider)).code, 'invalid_container');
+  assert.equal(backup.isWellFormedBackupContainer(sealed), true, 'a complete sealed container is well-formed without the password');
+  assert.equal(backup.isWellFormedBackupContainer(tampered), true,
+    'well-formedness is structural only: tampered ciphertext still needs password authentication to fail');
+  for (const [label, candidate] of [
+    ['torn write', sealed.slice(0, Math.floor(sealed.length / 2))],
+    ['truncated tail', sealed.slice(0, -20)],
+    ['empty', ''],
+    ['not JSON', 'pikeMethods-recovery-current.pmbak'],
+    ['foreign format', backup.canonicalJson({ ...outer, format: 'other-backup' })],
+    ['newer version', backup.canonicalJson({ ...outer, formatVersion: 2 })],
+    ['hostile KDF', backup.canonicalJson({ ...outer, kdf: { ...outer.kdf, N: 2 ** 30 } })],
+    ['ragged ciphertext', backup.canonicalJson({ ...outer, ciphertextBase64: `${outer.ciphertextBase64}A` })],
+    ['empty ciphertext', backup.canonicalJson({ ...outer, ciphertextBase64: '' })],
+    ['oversized', 'x'.repeat(backup.MAX_BACKUP_TEXT_BYTES + 1)],
+  ]) {
+    assert.equal(backup.isWellFormedBackupContainer(candidate), false, `malformed recovery candidate must not be well-formed: ${label}`);
+  }
   assert.equal((await backup.openBackup(backup.canonicalJson({ ...outer, formatVersion: 2 }), password, cryptoProvider)).code, 'newer_version');
 
   let hostileKdfCalled = false;
@@ -369,13 +386,28 @@ try {
   ), /source removed/);
   assert.equal(removedSourceRead, true, 'the first source may be read, while removed later sources fail before creation/read');
 
-  const abandoned = ['ak-backup-00112233445566778899aabbccddeeff', 'ak-backup-not-an-operation', 'user-cache'];
+  const operationHex = '00112233445566778899aabbccddeeff';
+  const abandoned = [`ak-backup-${operationHex}`, `ak-portable-${operationHex}.pmbak`];
+  const retainedCacheNames = [
+    'ak-backup-not-an-operation', 'user-cache', 'user-backup.pmbak', 'selected-local.pmbak',
+    `ak-backup-${operationHex}.pmbak`, `ak-portable-${operationHex}`, `ak-portable-${operationHex.toUpperCase()}.pmbak`,
+    `ak-portable-${operationHex.slice(1)}.pmbak`, `ak-portable-${operationHex}0.pmbak`, `ak-portable-${operationHex}.PMBAK`,
+    `ak-portable-${operationHex}.pmbak.new`, `ak-portable-${operationHex}.pmbak\n`, `xak-portable-${operationHex}.pmbak`,
+    `ak-portable-${operationHex}pmbak`, `ak-portable-${operationHex}.pmbakx`, `ak-portable-g${operationHex.slice(1)}.pmbak`,
+    `nested/ak-portable-${operationHex}.pmbak`, `ak-portable--${operationHex}.pmbak`,
+  ];
+  for (const name of abandoned) {
+    assert.equal(backup.isAbandonedBackupCacheEntry(name), true, `exact generated cache name must match: ${name}`);
+  }
+  for (const name of retainedCacheNames) {
+    assert.equal(backup.isAbandonedBackupCacheEntry(name), false, `unrelated or lookalike cache name must be retained: ${JSON.stringify(name)}`);
+  }
   const removed = [];
-  assert.deepEqual(await backup.cleanupAbandonedBackupDirectories(abandoned, async (name) => { removed.push(name); }), [abandoned[0]]);
-  assert.deepEqual(removed, [abandoned[0]], 'restart cleanup must only sweep narrowly named private snapshot directories');
-  await assert.rejects(() => backup.cleanupAbandonedBackupDirectories([abandoned[0]], async () => {
+  assert.deepEqual(await backup.cleanupAbandonedBackupCacheEntries([...retainedCacheNames, ...abandoned], async (name) => { removed.push(name); }), abandoned);
+  assert.deepEqual(removed, abandoned, 'restart cleanup must only sweep exact generated snapshot directories and portable ciphertext files');
+  await assert.rejects(() => backup.cleanupAbandonedBackupCacheEntries([abandoned[1]], async () => {
     throw new Error('cleanup failed');
-  }), /cleanup failed/, 'failed abandoned-plaintext cleanup must propagate and keep normal boot gated');
+  }), /cleanup failed/, 'failed abandoned cache cleanup must propagate and keep normal boot gated');
 
   const inventory = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'docs', 'audits', 'accessible-coach', 'WO03_DURABLE_DATA_INVENTORY.md'), 'utf8');
   for (const tableName of tableNames) assert.ok(inventory.includes(`\`${tableName}\``), `inventory must list ${tableName}`);

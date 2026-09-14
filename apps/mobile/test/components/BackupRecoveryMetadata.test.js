@@ -71,13 +71,14 @@ test('a torn temporary metadata write never reaches the authoritative path', asy
   expect(files.has(destination)).toBe(false);
 });
 
-test('sweeps only exact orphan metadata and preserves the retained recovery backup', async () => {
+test('sweeps only exact orphan metadata and leaves every recovery rotation file to reconciliation', async () => {
   const names = [
     restoreJournalTempFile(operationId),
     restoreMarkerFile('applying', operationId),
     restoreMarkerTempFile('committed', operationId),
     '.ak_restore_applying',
     'pikeMethods-recovery-current.pmbak.new',
+    'pikeMethods-recovery-current.pmbak.previous',
     'pikeMethods-recovery-current.pmbak',
     '.ak_restore_applying-not-an-operation',
     'user-file.new',
@@ -89,10 +90,15 @@ test('sweeps only exact orphan metadata and preserves the retained recovery back
       restoreMarkerFile('applying', operationId),
       restoreMarkerTempFile('committed', operationId),
       '.ak_restore_applying',
-      'pikeMethods-recovery-current.pmbak.new',
     ]);
-  expect(removed).not.toContain('/doc/pikeMethods-recovery-current.pmbak');
-  expect(removed).not.toContain('/doc/user-file.new');
+  for (const retained of [
+    'pikeMethods-recovery-current.pmbak',
+    'pikeMethods-recovery-current.pmbak.new',
+    'pikeMethods-recovery-current.pmbak.previous',
+    'user-file.new',
+  ]) {
+    expect(removed).not.toContain(`/doc/${retained}`);
+  }
 });
 
 test('while a journal exists, sweeps torn temp publications but retains authoritative markers', async () => {

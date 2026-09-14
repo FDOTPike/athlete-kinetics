@@ -84,3 +84,39 @@ test('recovery-required startup state disables every backup and restore action',
     expect(screen.getByTestId(id).props.accessibilityState.disabled).toBe(true);
   }
 });
+
+test('previous-recovery preview states that no undo point is created instead of the portable recovery promise', () => {
+  mockState.preview = {
+    backupId: 'recovery', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Recovery A1', 'Recovery A2'],
+    databaseCount: 2, totalBytes: 2_097_152, replaceOnly: true, source: 'retained_recovery',
+  };
+  render(<BackupTransferPanel />);
+  expect(screen.getByText('This replaces current data with the previous recovery. It will not create another undo point.')).toBeOnTheScreen();
+  expect(screen.queryByText(/creates and verifies an encrypted recovery backup/)).toBeNull();
+  expect(screen.queryByText(/Replace only: this removes all current athlete data/)).toBeNull();
+});
+
+test('portable-backup preview keeps the recovery-backup promise without the no-undo warning', () => {
+  mockState.preview = {
+    backupId: 'portable', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true, source: 'portable_backup',
+  };
+  render(<BackupTransferPanel />);
+  expect(screen.getByText(/creates and verifies an encrypted recovery backup/)).toBeOnTheScreen();
+  expect(screen.queryByText(/will not create another undo point/)).toBeNull();
+});
+
+test('an in-flight backup or restore keeps every action disabled', () => {
+  mockState.status = 'working';
+  mockState.recoveryAvailable = true;
+  mockState.preview = {
+    backupId: 'portable', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true, source: 'portable_backup',
+  };
+  render(<BackupTransferPanel />);
+  fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'in-flight-password');
+  fireEvent.changeText(screen.getByLabelText('Confirm backup password'), 'in-flight-password');
+  for (const id of ['create-backup-button', 'choose-restore-button', 'review-recovery-button', 'confirm-restore-button', 'cancel-restore-button']) {
+    expect(screen.getByTestId(id).props.accessibilityState.disabled).toBe(true);
+  }
+});

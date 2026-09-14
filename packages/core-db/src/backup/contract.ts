@@ -362,6 +362,15 @@ function parseContainer(text: string): EncryptedBackupContainerV1 | BackupOpenRe
   return value as unknown as EncryptedBackupContainerV1;
 }
 
+/** Password-free structural inspection used only to reconcile an interrupted
+ * recovery rotation at startup. True means the text is a complete, supported
+ * encrypted container envelope; it never proves authenticity, which still
+ * requires openBackup with the password. */
+export function isWellFormedBackupContainer(text: string): boolean {
+  const parsed = parseContainer(text);
+  return !('ok' in parsed) && parsed.ciphertextBase64.length > 0 && parsed.ciphertextBase64.length % 4 === 0;
+}
+
 export async function openBackup(text: string, password: string, crypto: BackupCryptoProvider): Promise<BackupOpenResult> {
   const parsed = parseContainer(text);
   if ('ok' in parsed) return parsed;

@@ -18,6 +18,7 @@ export {
   BackupContractError,
   base64ToBytes,
   bytesToBase64,
+  isWellFormedBackupContainer,
   openBackup,
   sealBackup,
   validatePortableBackupFileSize,
@@ -47,12 +48,13 @@ export {
 } from './restoreModel';
 export {
   cleanupRestoreFiles,
-  cleanupAbandonedBackupDirectories,
+  cleanupAbandonedBackupCacheEntries,
   collectBoundedSnapshots,
   copyFileConfirmed,
   executeInterruptedRestoreRecovery,
   hasRequiredStorage,
   interruptedRestoreAction,
+  isAbandonedBackupCacheEntry,
   replacementStorageRequirement,
   rollbackRestoreFiles,
   type RestoreFileOps,

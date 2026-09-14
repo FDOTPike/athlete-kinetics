@@ -6,16 +6,18 @@ import {
   BACKUP_SCHEMA_MIGRATION_SLOT,
   BACKUP_SCHEMA_TABLE_COUNT,
   BACKUP_SCHEMA_USER_VERSION,
+  BackupContractError,
   MAX_DATABASE_BYTES,
   base64ToBytes,
   bytesToBase64,
   cleanupRestoreFiles,
-  cleanupAbandonedBackupDirectories,
+  cleanupAbandonedBackupCacheEntries,
   collectBoundedSnapshots,
   decideRestore,
   executeInterruptedRestoreRecovery,
   hasRequiredStorage,
   isCurrentBackupSchema,
+  isWellFormedBackupContainer,
   openBackup,
   replacementStorageRequirement,
   rollbackRestoreFiles,
@@ -45,6 +47,7 @@ import {
   LEGACY_ROLLBACK_MARKER_FILE,
   RECOVERY_BACKUP_FILE,
   RECOVERY_BACKUP_NEW_FILE,
+  RECOVERY_BACKUP_PREVIOUS_FILE,
   RESTORE_JOURNAL_FILE,
   cleanupRestorePublication,
   publishAtomicMetadata,
@@ -54,6 +57,13 @@ import {
   sweepStandaloneRestoreMetadata,
   type RestoreMarkerKind,
 } from './backupRecoveryMetadata';
+import {
+  RecoveryPublicationUnresolvedError,
+  publishRecoveryBackup,
+  reconcileRecoveryPublication,
+  type RecoveryPublicationIo,
+  type RecoveryPublicationPaths,
+} from './backupRecoveryPublication';
 
 const APP_VERSION = '0.1.0';
 const SCHEMA_VERSION = BACKUP_SCHEMA_USER_VERSION;
@@ -219,13 +229,49 @@ async function ensurePlaintextSnapshotsRemoved(workDirectory: string): Promise<v
   );
 }
 
-async function sweepAbandonedSnapshots(): Promise<void> {
+/** Startup cache cleanup failure is reported as itself, never as restore
+ * recovery, and keeps athlete data closed like any unconfirmed cleanup. */
+class BackupCacheCleanupError extends Error {}
+
+async function sweepAbandonedCacheEntries(): Promise<void> {
   const io = fs();
-  const names = await io.ls(io.dirs.CacheDir);
-  await cleanupAbandonedBackupDirectories(names, async (name) => {
-    const path = `${io.dirs.CacheDir}/${name}`;
-    if (await io.exists(path)) await io.unlink(path);
-  });
+  try {
+    const names = await io.ls(io.dirs.CacheDir);
+    await cleanupAbandonedBackupCacheEntries(names, (name) => removeConfirmed(
+      `${io.dirs.CacheDir}/${name}`,
+      'Abandoned backup cache removal could not be confirmed.',
+    ));
+  } catch {
+    throw new BackupCacheCleanupError('Temporary backup files could not be removed safely. Athlete data stays closed.');
+  }
+}
+
+const RECOVERY_NOT_RETAINED = 'The verified recovery backup could not be retained. Existing data is unchanged.';
+
+const recoveryPublicationPaths = (): RecoveryPublicationPaths => ({
+  final: documentPath(RECOVERY_BACKUP_FILE),
+  fresh: documentPath(RECOVERY_BACKUP_NEW_FILE),
+  previous: documentPath(RECOVERY_BACKUP_PREVIOUS_FILE),
+});
+
+function recoveryPublicationIo(): RecoveryPublicationIo {
+  const io = fs();
+  return {
+    exists: (path) => io.exists(path),
+    read: async (path) => {
+      // An empty or oversized file cannot be a supported container; treat it as
+      // malformed text rather than reading it into memory.
+      try { validatePortableBackupFileSize((await io.stat(path)).size); }
+      catch (error) {
+        if (error instanceof BackupContractError) return '';
+        throw error;
+      }
+      return asText(await io.readFile(path, 'utf8'));
+    },
+    write: (path, value) => io.writeFile(path, value, 'utf8'),
+    move: (source, destination) => movePathConfirmed(source, destination, RECOVERY_NOT_RETAINED),
+    remove: (path) => removeConfirmed(path, RECOVERY_NOT_RETAINED),
+  };
 }
 
 function openDatabase(dbName: string, location?: string): DB {
@@ -702,6 +748,10 @@ async function replaceAllData(incoming: BackupArchiveV1): Promise<void> {
   }
 }
 
+/** Where an authenticated restore preview came from. Provenance is recorded
+ * when the archive is authenticated, never inferred from its contents or ID. */
+export type RestoreSource = 'portable_backup' | 'retained_recovery';
+
 export interface RestorePreview {
   readonly backupId: string;
   readonly createdAt: string;
@@ -709,6 +759,7 @@ export interface RestorePreview {
   readonly databaseCount: number;
   readonly totalBytes: number;
   readonly replaceOnly: true;
+  readonly source: RestoreSource;
 }
 
 interface BackupState {
@@ -726,9 +777,32 @@ interface BackupState {
   cancelRestore(): void;
 }
 
-let pendingArchive: BackupArchiveV1 | null = null;
+/** The single restore candidate a confirmation may use: an authenticated,
+ * compatibility-checked archive and the source it was authenticated from. */
+interface PendingRestore {
+  readonly archive: BackupArchiveV1;
+  readonly source: RestoreSource;
+}
+
+let pendingRestore: PendingRestore | null = null;
+
+/** Claimed synchronously, before any await, by every backup and restore action
+ * so a second tap cannot start another KDF, picker, or replacement. */
+let actionInFlight = false;
 
 class RestoreRecoveryRequiredError extends Error {}
+
+function restorePreview({ archive, source }: PendingRestore): RestorePreview {
+  return {
+    backupId: archive.backupId,
+    createdAt: archive.createdAt,
+    athleteNames: archive.registry.athletes.map((entry) => entry.name),
+    databaseCount: archive.databases.length,
+    totalBytes: archive.databases.reduce((sum, database) => sum + database.byteLength, 0),
+    replaceOnly: true,
+    source,
+  };
+}
 
 async function actionCanProceed(
   state: BackupState,
@@ -738,13 +812,18 @@ async function actionCanProceed(
     set({ status: 'error', message: 'Data recovery must finish before backup or restore actions can run.', preview: null });
     return false;
   }
-  if (await fs().exists(documentPath(RESTORE_JOURNAL_FILE))) {
-    revokeAthleteDataBoot();
-    set({ startupSafe: false, status: 'error', message: 'Data recovery must finish before backup or restore actions can run.', preview: null });
-    return false;
-  }
-  try { await sweepRestoreMetadata(false); }
-  catch {
+  try {
+    const io = fs();
+    // A restore journal or an unreconciled recovery rotation needs startup recovery.
+    if (await io.exists(documentPath(RESTORE_JOURNAL_FILE))
+      || await io.exists(documentPath(RECOVERY_BACKUP_NEW_FILE))
+      || await io.exists(documentPath(RECOVERY_BACKUP_PREVIOUS_FILE))) {
+      revokeAthleteDataBoot();
+      set({ startupSafe: false, status: 'error', message: 'Data recovery must finish before backup or restore actions can run.', preview: null });
+      return false;
+    }
+    await sweepRestoreMetadata(false);
+  } catch {
     revokeAthleteDataBoot();
     set({ startupSafe: false, status: 'error', message: 'Recovery cleanup could not be verified. Athlete data stays closed.', preview: null });
     return false;
@@ -757,7 +836,13 @@ export const useBackupStore = create<BackupState>((set, get) => ({
   initialize: async () => {
     try {
       revokeAthleteDataBoot();
-      await sweepAbandonedSnapshots();
+      await sweepAbandonedCacheEntries();
+      await reconcileRecoveryPublication(
+        recoveryPublicationIo(),
+        recoveryPublicationPaths(),
+        isWellFormedBackupContainer,
+        await fs().exists(documentPath(RESTORE_JOURNAL_FILE)),
+      );
       const rolledBack = await recoverInterruptedRestore();
       set({
         startupSafe: true,
@@ -767,19 +852,27 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         message: rolledBack ? 'An interrupted restore was rolled back. Your earlier data is available.' : null,
       });
       return true;
-    } catch {
-      set({ startupSafe: false, status: 'error', message: 'Restore recovery needs attention. Athlete data stays closed to protect the recovery files.' });
+    } catch (error) {
+      set({
+        startupSafe: false,
+        status: 'error',
+        message: error instanceof BackupCacheCleanupError
+          ? error.message
+          : 'Restore recovery needs attention. Athlete data stays closed to protect the recovery files.',
+      });
       return false;
     }
   },
   createBackup: async (password) => {
-    if (get().status === 'working' || !(await actionCanProceed(get(), set))) return;
+    if (actionInFlight || get().status === 'working') return;
+    actionInFlight = true;
     set({ status: 'working', message: 'Creating an encrypted snapshot…', preview: null });
-    pendingArchive = null;
+    pendingRestore = null;
     let workDirectory: string | null = null;
     let encryptedPath: string | null = null;
     let releaseMaintenance: (() => void) | null = null;
     try {
+      if (!(await actionCanProceed(get(), set))) return;
       releaseMaintenance = acquireDataMaintenanceLock('encrypted-backup');
       closeStoreDatabaseForRestore();
       const created = await createEncryptedBytes(password, get().lastSuccessfulBackupAt);
@@ -799,20 +892,24 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       const cancelled = picker.isErrorWithCode(error) && error.code === picker.errorCodes.OPERATION_CANCELED;
       set({ status: cancelled ? 'idle' : 'error', message: cancelled ? 'Backup cancelled. Nothing was saved.' : error instanceof Error ? error.message : 'Backup could not be created.' });
     } finally {
-      if (encryptedPath !== null) await removeIfPresent(encryptedPath);
-      if (workDirectory !== null) await removeIfPresent(workDirectory);
-      if (releaseMaintenance !== null) {
-        releaseMaintenance();
-        restartStoreAfterRestore();
-      }
+      try {
+        if (encryptedPath !== null) await removeIfPresent(encryptedPath);
+        if (workDirectory !== null) await removeIfPresent(workDirectory);
+        if (releaseMaintenance !== null) {
+          releaseMaintenance();
+          restartStoreAfterRestore();
+        }
+      } finally { actionInFlight = false; }
     }
   },
   chooseRestore: async (password) => {
-    if (get().status === 'working' || !(await actionCanProceed(get(), set))) return;
-    pendingArchive = null;
+    if (actionInFlight || get().status === 'working') return;
+    actionInFlight = true;
+    pendingRestore = null;
     set({ status: 'working', message: 'Opening encrypted backup…', preview: null });
     let localPath: string | null = null;
     try {
+      if (!(await actionCanProceed(get(), set))) return;
       localPath = await pickerOpen();
       if (localPath === null) { set({ status: 'idle', message: 'Restore cancelled. Your data is unchanged.' }); return; }
       validatePortableBackupFileSize((await fs().stat(localPath)).size);
@@ -825,27 +922,24 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         supportedSourceMigrationSlots: [MIGRATION_SLOT],
       });
       if (!decision.ok) throw new Error(decision.message);
-      pendingArchive = opened.archive;
-      set({
-        status: 'preview', message: 'Review this backup before replacing data.',
-        preview: {
-          backupId: opened.archive.backupId, createdAt: opened.archive.createdAt,
-          athleteNames: opened.archive.registry.athletes.map((entry) => entry.name),
-          databaseCount: opened.archive.databases.length,
-          totalBytes: opened.archive.databases.reduce((sum, database) => sum + database.byteLength, 0),
-          replaceOnly: true,
-        },
-      });
+      const pending: PendingRestore = { archive: opened.archive, source: 'portable_backup' };
+      pendingRestore = pending;
+      set({ status: 'preview', message: 'Review this backup before replacing data.', preview: restorePreview(pending) });
     } catch (error) {
-      pendingArchive = null;
+      pendingRestore = null;
       set({ status: 'error', message: error instanceof Error ? error.message : 'Backup could not be opened.', preview: null });
-    } finally { if (localPath !== null) await removeIfPresent(localPath); }
+    } finally {
+      try { if (localPath !== null) await removeIfPresent(localPath); }
+      finally { actionInFlight = false; }
+    }
   },
   reviewRecovery: async (password) => {
-    if (get().status === 'working' || !(await actionCanProceed(get(), set))) return;
-    pendingArchive = null;
+    if (actionInFlight || get().status === 'working') return;
+    actionInFlight = true;
+    pendingRestore = null;
     set({ status: 'working', message: 'Opening protected data recovery…', preview: null });
     try {
+      if (!(await actionCanProceed(get(), set))) return;
       const recoveryPath = documentPath(RECOVERY_BACKUP_FILE);
       if (!(await fs().exists(recoveryPath))) {
         set({ recoveryAvailable: false });
@@ -861,68 +955,61 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         supportedSourceMigrationSlots: [MIGRATION_SLOT],
       });
       if (!decision.ok) throw new Error('Previous data recovery is not compatible with this app version.');
-      pendingArchive = opened.archive;
+      const pending: PendingRestore = { archive: opened.archive, source: 'retained_recovery' };
+      pendingRestore = pending;
       set({
         status: 'preview',
         message: 'Review the previous data recovery before replacing current data.',
-        preview: {
-          backupId: opened.archive.backupId,
-          createdAt: opened.archive.createdAt,
-          athleteNames: opened.archive.registry.athletes.map((entry) => entry.name),
-          databaseCount: opened.archive.databases.length,
-          totalBytes: opened.archive.databases.reduce((sum, database) => sum + database.byteLength, 0),
-          replaceOnly: true,
-        },
+        preview: restorePreview(pending),
       });
     } catch (error) {
-      pendingArchive = null;
+      pendingRestore = null;
       set({
         status: 'error',
         message: error instanceof Error ? error.message : 'Previous data recovery could not be opened.',
         preview: null,
       });
+    } finally {
+      actionInFlight = false;
     }
   },
   confirmRestore: async (password) => {
-    const incoming = pendingArchive;
-    if (incoming === null || get().status !== 'preview' || !(await actionCanProceed(get(), set))) return;
-    set({ status: 'working', message: 'Creating and verifying a recovery backup…' });
+    const pending = pendingRestore;
+    if (actionInFlight || pending === null || get().status !== 'preview') return;
+    actionInFlight = true;
+    const usesRetainedRecovery = pending.source === 'retained_recovery';
+    set({
+      status: 'working',
+      message: usesRetainedRecovery ? 'Replacing all athlete data…' : 'Creating and verifying a recovery backup…',
+    });
     let recoveryWork: string | null = null;
-    let temporaryRecoveryPath: string | null = null;
     let releaseMaintenance: (() => void) | null = null;
     let safeToRestart = true;
     try {
+      if (!(await actionCanProceed(get(), set))) return;
       releaseMaintenance = acquireDataMaintenanceLock('encrypted-restore');
       revokeAthleteDataBoot();
       closeStoreDatabaseForRestore();
-      const recovery = await createEncryptedBytes(password, get().lastSuccessfulBackupAt);
-      recoveryWork = recovery.workDirectory;
-      await ensurePlaintextSnapshotsRemoved(recoveryWork);
-      recoveryWork = null;
-      const recoveryPath = documentPath(RECOVERY_BACKUP_FILE);
-      temporaryRecoveryPath = documentPath(RECOVERY_BACKUP_NEW_FILE);
-      await removeConfirmed(temporaryRecoveryPath, 'A previous temporary recovery file could not be removed safely. Existing data is unchanged.');
-      await fs().writeFile(temporaryRecoveryPath, recovery.text, 'utf8');
-      const verified = await openBackup(asText(await fs().readFile(temporaryRecoveryPath, 'utf8')), password, mobileBackupCrypto);
-      if (!verified.ok) throw new Error('The recovery backup could not be verified. Existing data is unchanged.');
-      await removeIfPresent(recoveryPath);
-      await movePathConfirmed(
-        temporaryRecoveryPath,
-        recoveryPath,
-        'The verified recovery backup could not be retained. Existing data is unchanged.',
-      );
-      validatePortableBackupFileSize((await fs().stat(recoveryPath)).size);
-      const retained = await openBackup(asText(await fs().readFile(recoveryPath, 'utf8')), password, mobileBackupCrypto);
-      if (!retained.ok || retained.archive.backupId !== verified.archive.backupId) {
-        throw new Error('The retained recovery backup could not be verified. Existing data is unchanged.');
+      if (!usesRetainedRecovery) {
+        // A portable restore may supersede the retained recovery only after this
+        // current-data recovery is sealed, authenticated, and durably retained.
+        const recovery = await createEncryptedBytes(password, get().lastSuccessfulBackupAt);
+        recoveryWork = recovery.workDirectory;
+        await ensurePlaintextSnapshotsRemoved(recoveryWork);
+        recoveryWork = null;
+        await publishRecoveryBackup(recoveryPublicationIo(), recoveryPublicationPaths(), recovery.text, async (text) => {
+          const opened = await openBackup(text, password, mobileBackupCrypto);
+          return opened.ok ? opened.archive.backupId : null;
+        });
+        set({ recoveryAvailable: true });
+        set({ status: 'working', message: 'Recovery backup verified. Replacing all athlete data…' });
       }
-      set({ recoveryAvailable: true });
-      set({ status: 'working', message: 'Recovery backup verified. Replacing all athlete data…' });
-      await replaceAllData(incoming);
-      pendingArchive = null;
+      // A retained previous-data recovery is the undo point being used: it is
+      // never rewritten or superseded, and no replacement undo point is created.
+      await replaceAllData(pending.archive);
       set({ status: 'success', message: 'Restore complete. All athlete data was replaced from the backup.', preview: null });
     } catch (error) {
-      safeToRestart = !(error instanceof RestoreRecoveryRequiredError);
+      safeToRestart = !(error instanceof RestoreRecoveryRequiredError || error instanceof RecoveryPublicationUnresolvedError);
       if (!safeToRestart) revokeAthleteDataBoot();
       set({
         startupSafe: safeToRestart ? get().startupSafe : false,
@@ -931,28 +1018,31 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         preview: null,
       });
     } finally {
-      pendingArchive = null;
-      if (recoveryWork !== null) await removeIfPresent(recoveryWork);
-      if (temporaryRecoveryPath !== null) await removeIfPresent(temporaryRecoveryPath);
-      if (releaseMaintenance !== null) releaseMaintenance();
-      if (releaseMaintenance !== null && safeToRestart) {
-        if (await fs().exists(documentPath(RESTORE_JOURNAL_FILE))) {
-          revokeAthleteDataBoot();
-          set({ startupSafe: false, status: 'error', message: 'Data recovery must finish before athlete data can reopen.' });
-        } else {
-          authorizeAthleteDataBoot();
-          restartStoreAfterRestore();
+      pendingRestore = null;
+      try {
+        if (recoveryWork !== null) await removeIfPresent(recoveryWork);
+        if (releaseMaintenance !== null) releaseMaintenance();
+        if (releaseMaintenance !== null && safeToRestart) {
+          if (await fs().exists(documentPath(RESTORE_JOURNAL_FILE))) {
+            revokeAthleteDataBoot();
+            set({ startupSafe: false, status: 'error', message: 'Data recovery must finish before athlete data can reopen.' });
+          } else {
+            authorizeAthleteDataBoot();
+            restartStoreAfterRestore();
+          }
         }
-      }
+      } finally { actionInFlight = false; }
     }
   },
   cancelRestore: () => {
+    // An in-flight action has already captured what it needs; cancelling must
+    // not relabel it or re-enable controls while it runs.
+    if (actionInFlight) return;
+    pendingRestore = null;
     if (get().startupSafe !== true || !athleteDataBootAllowed()) {
-      pendingArchive = null;
       set({ status: 'error', message: 'Data recovery must finish before backup or restore actions can run.', preview: null });
       return;
     }
-    pendingArchive = null;
     set({ status: 'idle', message: 'Restore cancelled. Your data is unchanged.', preview: null });
   },
 }));

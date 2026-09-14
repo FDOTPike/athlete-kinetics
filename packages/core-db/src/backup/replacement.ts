@@ -62,13 +62,22 @@ export async function executeInterruptedRestoreRecovery(
   return action === 'rollback';
 }
 
-export async function cleanupAbandonedBackupDirectories(
+const ABANDONED_PLAINTEXT_SNAPSHOT_DIRECTORY = /^ak-backup-[a-f0-9]{32}$/;
+const ABANDONED_PORTABLE_CIPHERTEXT_FILE = /^ak-portable-[a-f0-9]{32}\.pmbak$/;
+
+/** Exact generated cache names only: a plaintext snapshot work directory, or
+ * the encrypted portable file staged for the operating-system save flow. */
+export function isAbandonedBackupCacheEntry(name: string): boolean {
+  return ABANDONED_PLAINTEXT_SNAPSHOT_DIRECTORY.test(name) || ABANDONED_PORTABLE_CIPHERTEXT_FILE.test(name);
+}
+
+export async function cleanupAbandonedBackupCacheEntries(
   names: readonly string[],
   remove: (name: string) => Promise<void>,
 ): Promise<readonly string[]> {
   const removed: string[] = [];
   for (const name of names) {
-    if (!/^ak-backup-[a-f0-9]{32}$/.test(name)) continue;
+    if (!isAbandonedBackupCacheEntry(name)) continue;
     await remove(name);
     removed.push(name);
   }

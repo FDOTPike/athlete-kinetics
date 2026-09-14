@@ -4,6 +4,7 @@ export const LEGACY_COMMIT_MARKER_FILE = '.ak_restore_committed';
 export const LEGACY_ROLLBACK_MARKER_FILE = '.ak_restore_rolled_back';
 export const RECOVERY_BACKUP_FILE = 'pikeMethods-recovery-current.pmbak';
 export const RECOVERY_BACKUP_NEW_FILE = `${RECOVERY_BACKUP_FILE}.new`;
+export const RECOVERY_BACKUP_PREVIOUS_FILE = `${RECOVERY_BACKUP_FILE}.previous`;
 
 export type RestoreMarkerKind = 'applying' | 'committed' | 'rolled_back';
 
@@ -68,8 +69,9 @@ export async function publishAtomicMetadata(
 
 /** Exact-name sweep used only while no restore operation is running. With no
  * journal, operation-bound marker files cannot authorize or suppress any
- * replacement; they are standalone cleanup debris. A recovery .new file is
- * likewise unverified and never replaces the retained encrypted recovery. */
+ * replacement; they are standalone cleanup debris. Recovery rotation files
+ * (.new and .previous) are never swept by name: only
+ * reconcileRecoveryPublication decides which recovery candidate survives. */
 export async function sweepStandaloneRestoreMetadata(
   documentDirectory: string,
   names: readonly string[],
@@ -78,7 +80,7 @@ export async function sweepStandaloneRestoreMetadata(
 ): Promise<readonly string[]> {
   const removed: string[] = [];
   for (const name of names) {
-    const alwaysOrphan = JOURNAL_TEMP.test(name) || OPERATION_MARKER_TEMP.test(name) || name === RECOVERY_BACKUP_NEW_FILE;
+    const alwaysOrphan = JOURNAL_TEMP.test(name) || OPERATION_MARKER_TEMP.test(name);
     const standalone = !journalPresent && (OPERATION_MARKER.test(name) || LEGACY_MARKERS.has(name));
     if (!alwaysOrphan && !standalone) continue;
     await remove(`${documentDirectory}/${name}`);
