@@ -548,3 +548,25 @@ test('decision evidence identifies block, slot and substitution advice through t
   expect(kindFor('add-plan-slot')).toBe('slot');
   expect(kindFor('substitution-preview')).toBe('movement_substitution');
 });
+
+test('a second instruction draft starts unresolved instead of inheriting the previous instruction scope', () => {
+  const athlete = state().activeAthleteId;
+  const movement = state().movements[0];
+  const view = render(<ProfileScreen />);
+  fireEvent.press(view.getByLabelText('Show health and training support'));
+  fireEvent.press(view.getByLabelText('Choose an exercise'));
+  fireEvent.press(view.getAllByLabelText(`Select ${movement.name}`)[0]);
+  fireEvent.changeText(view.getByLabelText('Clinician instruction text'), 'First scoped instruction');
+  fireEvent.press(view.getByLabelText('Save clinician instruction draft'));
+
+  // After a successful save the editor returns to the fail-closed default.
+  expect(view.getByText('Scope unresolved: all coach suggestions will be held.')).toBeTruthy();
+  fireEvent.changeText(view.getByLabelText('Clinician instruction text'), 'Second instruction');
+  fireEvent.press(view.getByLabelText('Save clinician instruction draft'));
+
+  const scopesByText = Object.fromEntries(state().getHealthSupportDetails(athlete).instructions
+    .map((instruction) => [instruction.instructionText, instruction.scopes]));
+  expect(scopesByText['First scoped instruction'])
+    .toEqual([expect.objectContaining({ targetKind: 'movement', movementId: movement.movement_id })]);
+  expect(scopesByText['Second instruction']).toEqual([expect.objectContaining({ targetKind: 'unresolved' })]);
+});

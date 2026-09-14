@@ -18,6 +18,11 @@ const evidenceFor = (operation) => mockDriver.raw.prepare(`SELECT decision_id,ad
   FROM recommendation_support_record WHERE advice_target_identity LIKE ? ORDER BY generated_at_ms DESC LIMIT 1`).get(`${operation}:%`);
 
 beforeEach(async () => {
+  // evidenceFor picks the newest record by generated_at_ms; two decisions in the
+  // same millisecond would make that pick arbitrary, so every read of the clock
+  // advances it, as TrainingSupportBoundary.test.js does.
+  let nowMs = Date.now();
+  jest.spyOn(Date, 'now').mockImplementation(() => ++nowMs);
   mockDriver = makeNodeSqliteDriver();
   useStore.setState({ status: 'booting', error: null, session: null, runner: null });
   state().boot();
