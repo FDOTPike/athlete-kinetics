@@ -11278,3 +11278,229 @@ Comment 3 — comment_id=4010002005, inline thread: reply via `gh api repos/FDOT
   are reported in the pull request and handback. Emulator journeys ran on the
   54d62d5 build; this commit changes documentation only.
 - MERGE / RELEASE / C6: NOT PERFORMED.
+
+
+---
+
+## Entry 0133 — 2026-09-15 · D02 integration: remove experience-only workload uplift onto the post-PR #18 base
+
+### Input G(x)
+
+Owner work order, reproduced verbatim:
+
+`````text
+You are the implementation executor for the Accessible Coach programme.
+
+WORK ORDER: D02 — Remove experience-only workload uplift and integrate it onto the post-PR #18 base.
+
+MODEL / EFFORT
+- Claude Opus 5
+- High effort
+- Do not claim independent audit; Codex/Sol will audit the completed candidate.
+
+AUTHORITATIVE REPOSITORY
+C:\Users\fpike\Documents\Claude Coding\Athlete App
+
+CURRENT TARGET BASE
+- Remote branch: origin/codex/rpe-familiarisation
+- Expected current tip after merged PR #18:
+  9c7c91f6b7beaf73a9e98155b8ae626fd101875d
+- Do not assume this is still current. Fetch and verify it before writing.
+
+EXISTING D02 CANDIDATE — TREAT AS UNTRUSTED INPUT
+- Branch: origin/codex/d02-inference-policy
+- Expected tip: 327f84255b97f89973f8a06de52cbd4b830e07a7
+- Existing commits:
+  - 9e9f739 test(inference): expose D02 experience-only workload uplift
+  - 327f842 fix(inference): remove experience-only workload and fatigue uplift
+- Existing worktree, for read-only comparison if present:
+  C:\Users\fpike\.codex\worktrees\abec\Athlete App
+
+CONTROLLING DECISION
+Read these completely before implementation:
+- AGENT_WORKFLOW.md
+- docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md
+- docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md
+- docs/decisions/ACCESSIBLE_COACH_CHECKPOINT_2026-09-12.md
+- packages/inference/test/D02_EVIDENCE.md from the D02 candidate
+
+D02 is already owner-ratified:
+- Experience alone must not add sessions, minutes, sets, target effort or fatigue allowance.
+- Experience may continue governing movement eligibility, beginner protections and explanation depth.
+- Do not weaken the beginner whitelist or beginner set reduction.
+- Do not introduce a replacement dose heuristic in this work order.
+
+STEP 0 — IDENTITY AND ISOLATION
+
+1. Fetch origin without rebasing or rewriting history.
+2. Confirm PR #18 is present in origin/codex/rpe-familiarisation.
+3. Record:
+   - repository path
+   - branch
+   - HEAD and tree SHA
+   - status
+   - upstream divergence
+   - target-base SHA
+   - D02-source SHA
+4. Create a fresh worktree and integration branch from the verified target:
+   - suggested worktree:
+     C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\d02-policy-integration
+   - suggested branch:
+     claude/d02-policy-integration
+5. Do not modify the existing Codex-managed D02 worktree.
+6. Append this complete execution prompt to PROMPT_LEDGER.md as the first repository write. Preserve the ledger append-only.
+7. Follow AGENT_WORKFLOW.md's shell-write and verification rules.
+
+STEP 1 — AUDIT THE EXISTING D02 CANDIDATE
+
+Before integrating it, independently inspect the two D02 commits and establish:
+
+- Exactly which production outputs change.
+- Whether all experience-only uplift paths are covered.
+- Whether training age still affects anything outside the authorized boundary.
+- Whether beginner eligibility and conservative reductions remain intact.
+- Whether any existing authored/custom routine is unexpectedly rewritten.
+- Whether the compressed before/after evidence is reproducible and contains no secrets or machine-local data.
+- Whether any test assertion was weakened to make the change pass.
+
+The expected production scope is currently:
+
+- packages/inference/src/blockGenerator.ts
+- packages/inference/src/routineComposer.ts
+- packages/inference/src/routineMicrocycle.ts
+
+Do not accept additional product scope without documenting why it is required.
+
+STEP 2 — INTEGRATE
+
+If the candidate is sound, merge origin/codex/d02-inference-policy into the new branch using a normal non-squash merge so its test-first history remains visible.
+
+Do not rebase, force-push or rewrite the existing commits.
+
+Resolve conflicts conservatively:
+
+- PROMPT_LEDGER.md: retain every existing entry verbatim and append chronologically.
+- Preserve PR #16's database-readiness protections.
+- Preserve PR #17's Migration 064 and health-support boundary.
+- Preserve PR #18's backup mutation leases, recovery-candidate retention and protected retry.
+- Do not edit Migration 064 or any shipped migration.
+- Do not change backup, clinical, activity, UI or native Android behaviour.
+- Do not start activity-aware recommendation work yet.
+
+If review finds a defect in the candidate, add the smallest corrective commit on this integration branch. Never conceal it inside conflict resolution.
+
+STEP 3 — NON-VACUOUS ACCEPTANCE TESTS
+
+Require tests that prove:
+
+1. With identical executable movements, availability, schedule, time limit, effort cap and objective, changing only:
+   intermediate → advanced → elite
+   does not increase:
+   - session count
+   - prescribed sets
+   - reps
+   - target effort
+   - duration allocation
+   - family/session/week fatigue allowance
+   - inclusion or slot count
+
+2. Beginner-specific safeguards still operate:
+   - beginner movement eligibility remains unchanged;
+   - the existing beginner reduction remains non-increasing;
+   - standalone-routine restrictions remain closed where currently required.
+
+3. The comparison is not vacuous:
+   - sessions and prescriptions actually execute;
+   - every tested family/schema/objective is exercised;
+   - controlled fixtures use movements eligible across compared tiers.
+
+4. Mutation checks separately restore and detect:
+   - elite block +1 set;
+   - advanced/elite routine +1 set;
+   - advanced family budget uplift;
+   - elite family budget uplift;
+   - compatibility-composer uplift;
+   - an empty-output false green.
+
+5. Existing before/after capture remains reproducible:
+   - no captured input disappears;
+   - no dose increase occurs;
+   - every changed output is enumerated;
+   - binary evidence hash and reproduction command are documented.
+
+Do not equate output equality with medical validation. This is a product-policy and deterministic-software test.
+
+STEP 4 — VERIFICATION
+
+Run, at minimum:
+
+- git diff --check
+- npm run typecheck
+- the focused D02 verifier
+- node packages/inference/test/mutation_check_r05.mjs
+- npm run verify:blocks
+- npm run verify:pipeline
+- npm run verify:autopilot
+- npm run verify:policy
+- npm run verify:ci
+
+Verify every claimed result by execution. Do not merely quote the old D02 evidence.
+
+Because this changes pure prescription policy rather than native UI, an emulator journey is not required for completion. If a QA APK is built, bind it to the exact clean commit and run verify:qa-candidate, but do not represent that as C6 or independent product acceptance.
+
+STEP 5 — HANDOVER, COMMIT AND PR
+
+Create:
+HANDOVER_2026-09-15_D02_INFERENCE_POLICY_INTEGRATION.md
+
+Include:
+
+- exact starting and final identity;
+- commits integrated and any corrective commits;
+- production and test file inventory;
+- precise before/after prescription effects;
+- mutation results;
+- all commands and exit statuses;
+- confirmation that Migration 064 and backup/clinical/activity code are unchanged;
+- explicit tested, untested and deferred sections;
+- remaining dependency: activity-aware recommendations may begin only after independent approval of D02.
+
+Close the PROMPT_LEDGER entry only after all results exist.
+
+If all required checks pass:
+
+1. Commit the integration and handover with clear messages.
+2. Ensure the worktree is clean.
+3. Push only claude/d02-policy-integration with a normal non-force push.
+4. Open a PR targeting codex/rpe-familiarisation.
+5. Do not merge the PR.
+6. Do not tag, release, sign production artifacts or claim C6.
+7. Finish with:
+
+IMPLEMENTATION: COMPLETE or INCOMPLETE
+D02 POLICY GATES: PASS or FAIL
+FULL VERIFY: PASS or FAIL
+READY FOR INDEPENDENT AUDIT: YES or NO
+PUSH: <result>
+PR: <URL or NOT OPENED>
+MERGE / RELEASE / C6: NOT PERFORMED
+`````
+
+### Output F(G(x))
+
+Pending. This entry is closed only after the audit, merge, acceptance tests and
+verification results exist.
+
+- Starting identity (frozen before this write): worktree
+  `.worktrees/d02-policy-integration`, new branch `claude/d02-policy-integration`
+  created from `origin/codex/rpe-familiarisation` at
+  `9c7c91f6b7beaf73a9e98155b8ae626fd101875d` (tree
+  `452d86b72691854073f0e9eb96470c9f6acbb997`, "Merge pull request #18"), clean,
+  no upstream configured. PR #18 is merged into that commit.
+- D02 source: `origin/codex/d02-inference-policy` at
+  `327f84255b97f89973f8a06de52cbd4b830e07a7` (tree
+  `01e31e44594895d6c2a329acf949019f34789481`); merge base with the target
+  `b94053b4d63fb0ffd3b933aa1890d80f7313a87b`, the target being 31 commits ahead.
+- Entry number: 0133 is the next number unused on every local and remote ref
+  on this lineage. `codex/wo07-live-hr-capability-audit` carries an unmerged
+  Entry 0150 and does not contain this base.
