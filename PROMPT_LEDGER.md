@@ -9856,3 +9856,78 @@ Commit these and open a PR
   and the handback rather than here, so no self-referential tracked edit
   invalidates their provenance.
 - Merge, tag, release and C6: not performed and not authorized.
+
+---
+
+## Entry 0125 — 2026-09-14 · Sol's blocking finding on PR #16: Library reads the closed database during an athlete swap
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+Please see the finding by Sol
+Blocking finding
+`App.tsx` mounts Library during `status === 'booting'`, while `LibraryScreenV2` immediately calls the same database-backed availability getter that caused the Profile crash.
+During an athlete switch, tapping LIBRARY inside the closed-database window can therefore reach `kinetics db not booted`.
+1 comment
+P1Library can read the closed database during an athlete swap.claude/worktrees/state-c-data-integrity-ffaf27/apps/mobile/src/App.tsx:242
+Everything else looks good:
+
+* PR head `8cf53e9b…` is clean and one commit ahead of its base.
+* Both GitHub CI jobs passed.
+* Merge state is `CLEAN`.
+* The new three-test athlete-swap suite passed locally.
+* The Profile fix itself is correct and narrowly scoped.
+* No migration or schema changes.
+
+CodeRabbit’s green status is only a skipped review, not an approval; reviews are disabled for this non-default base branch.
+Recommended remediation:
+
+```
+{tab === 'library' && status === 'ready' && <LibraryScreen />}
+```
+
+Add a non-vacuous `NavigationShell` test proving Library performs no database read while booting, push the updated head, rerun CI, and trigger CodeRabbit manually with `@coderabbitai review`.
+After those pass on the new head, I would consider [PR #16](https://github.com/FDOTPike/athlete-kinetics/pull/16) safe to merge.
+`````
+
+The first line's trailing space is not reproduced, so `git diff --check` stays
+clean; nothing else differs.
+
+### Output F(G(x))
+
+- Checked first: PR #16 head `8cf53e9` was the same on local and origin, the
+  base was still `b94053b`, GitHub reported merge state `CLEAN`, and no local
+  or remote ref claimed Entry 0125.
+- Reproduced before changing code, and found the same defect behind WORKOUT:
+  `SessionScreen.tsx:298-304` calls `getMovementAvailabilityVerdicts` in a
+  render memo (`'weight_room'` whenever no session is open, as during any
+  swap), and `App.tsx` mounted it with no status gate. Four new
+  `NavigationShell.test.js` cases (LIBRARY and WORKOUT, each under `'booting'`
+  and `'error'`) failed against the ungated shell with
+  `kinetics db not booted` at `LibraryScreenV2.tsx:129` and
+  `SessionScreen.tsx:300`; the other 18 shell tests passed.
+- Checked and left unchanged: TodayScreen and ReadinessScreen make no database
+  read before their `'booting'` early returns; SessionScreen's outcome and
+  summary reads run only when `lastEndedSessionId` is set, which the swap
+  resets to null.
+- Fix, `apps/mobile/src/App.tsx` only: WORKOUT and LIBRARY mount only when
+  `status === 'ready'`, the rule Progress and Coach already follow. `'ready'`
+  rather than `!== 'booting'`, because a boot that fails leaves the database
+  closed under `'error'`. Gating WORKOUT goes one mount point beyond Sol's
+  recommended remediation, for the same defect.
+- Each new case then flips the same shell to `'ready'` and requires the surface
+  to mount and call the getter with `'library'` or `'weight_room'`, so the
+  "never called" assertion is not an unobserved spy.
+- Mutations, each restored by sha256: Library gate removed fails only the two
+  LIBRARY cases; Session gate removed fails only the two WORKOUT cases; both
+  gates weakened to `!== 'booting'` fail only the two `'error'` cases.
+- Final tree: `NavigationShell` `Tests: 22 passed, 22 total`;
+  `npm run typecheck` exit 0; `npm run verify:ci` exit 0 with `PREFLIGHT OK`,
+  `Test Suites: 30 passed, 30 total`, `Tests: 489 passed, 489 total`;
+  `git diff --check` clean.
+- Not verified: either gate on a device or emulator build.
+- The commit hash, push result, PR description update, CodeRabbit request and
+  CI results are reported in the PR and the handback rather than here.
+- Merge, tag, release and C6: not performed and not authorized.
