@@ -11016,3 +11016,52 @@ please continue next wo
   sameTarget and C6 are present in origin/codex/rpe-familiarisation.
 - Numbering: Entry 0130. This branch ends at 0122; the merged base ends at
   0129; no local or remote ref uses 0130.
+
+### Output F(G(x))
+
+- Precondition: PR #17 merged as 0d453f1 (merged tree equals PR head c206697;
+  PR-head Verification suite and Android QA + debug APKs succeeded); C4, the
+  sameTarget compatibility guard and the C6 path removal are present in the base.
+- Start: .worktrees/ac-wo03-product-backup, codex/ac-wo03-product-backup at
+  1d44acb (tree 82b323d), clean, 2 ahead / 0 behind origin b92b382; no Git lock;
+  no process targeting the worktree. 8 backup commits ahead of the new base
+  (5c2f8b0 9a8ac49 8cabb76 6c70efa 00eeea2 b92b382 408c1ef 1d44acb).
+- Audit of 408c1ef/1d44acb: no substantive defect found. Confirmed in code:
+  a retained-recovery confirmation never creates, promotes or touches the
+  retained file; portable-restore publication writes and authenticates .new,
+  renames the retained file to .previous, promotes, re-authenticates at the
+  durable path and removes .previous before replacement starts; every
+  publication death leaves the older or the newly verified archive;
+  reconciliation is ordered and idempotent and preserves everything beside a
+  journal; cache cleanup lists only the cache directory and matches anchored
+  ak-backup-<32hex> and ak-portable-<32hex>.pmbak; all four actions claim
+  the in-flight flag synchronously; plaintext snapshots are removed before the
+  ciphertext is staged and the OS save opens. Since b92b382 core-db only adds
+  the structural container check and the exact-name matcher; no KDF, cipher,
+  size or container-version constant changed; Migration 064 blob 69090f2.
+- Reproduced before merging (code identical to 1d44acb): 9 named backup
+  suites 124/124; verify:backup PASS; WO-03B mutations M01 M05 M06 M08 M10 M13
+  M16 re-run with a separate output directory, all detected by every run and
+  restored byte-exactly.
+- Disclosed, not changed: recovery publication and replacement rely on
+  rename/readback postconditions, not fsync; guarantees are for process
+  death, and power-loss durability is untested.
+- Merge c32db50 (parents ed31b9f, 0d453f1): conflicts only in PROMPT_LEDGER.md
+  (0122, 0123-0129, 0130 in number order; each side reproduced byte-for-byte)
+  and TrainingSupportEvidenceIdentity.test.js (both beforeEach additions).
+  App.tsx, ProfileScreen.tsx, useStore.ts and the shell/profile/support tests
+  merged cleanly and keep both sides; no backup source or schema changed.
+- 9ff33c4: AthleteSwapProfileRender.test.js authorizes athlete-data boot in
+  beforeEach; after the merge all 6 cases stopped at status booting because
+  WO-03B boot requires startup-recovery authorization. Test only.
+- Validation on 9ff33c4 (tree da0a09e): npm run typecheck exit 0; git diff
+  --check clean for both merge ranges; 9 backup suites 124/124 and
+  verify:backup PASS; HealthSupportStore, TrainingSupportBoundary,
+  TrainingSupportEvidenceIdentity, AthleteSwapProfileRender, NavigationShell,
+  ProfileScreens and ContentCorrection049 pass; npm run verify:ci exit 0
+  (PREFLIGHT OK; Test Suites: 43 passed, 43 total; Tests: 687 passed, 687 total; verify:store SQL — 675/675 checks green; verify_training_support PASS).
+- The exact-tip QA APK is built from the commit that adds this output. Its
+  path, size, SHA-256, verify:qa-candidate result and the emulator journeys are
+  recorded in the PR body and handback, so no later tracked commit is needed.
+- Not performed: master/main change, force-push, history rewrite, tag,
+  release, production signing. MERGE / RELEASE / C6: NOT PERFORMED.
