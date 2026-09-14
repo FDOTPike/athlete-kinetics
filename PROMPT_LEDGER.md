@@ -11065,3 +11065,49 @@ please continue next wo
   recorded in the PR body and handback, so no later tracked commit is needed.
 - Not performed: master/main change, force-push, history rewrite, tag,
   release, production signing. MERGE / RELEASE / C6: NOT PERFORMED.
+
+---
+
+## Entry 0131 — 2026-09-15 · WO-03B PR #18 review remediation: mutation leases, strict recovery candidates, recovery retry, concurrent-WAL evidence
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+please see Verdict: REQUEST CHANGES
+Opus handled branch integration, provenance, emulator testing, and documentation well, but [PR #18](https://github.com/FDOTPike/athlete-kinetics/pull/18) is not yet safe to merge.
+The audited state remains clean and unchanged:
+
+* Branch: `codex/ac-wo03-product-backup`
+* HEAD: `9d8407f5496b55d24fe1717f4c2ad29493ec0693`
+* Tree: `0b85ed491b309aa812ebfe5f73e3dbb41112e5fd`
+* CI: verification and Android builds passing
+* Merge state: clean
+* Six actionable CodeRabbit threads remain unresolved
+
+Blocking findings
+
+1. [P1] The maintenance lock does not protect in-flight asynchronous writes.
+[`dataMutationAllowed()` (line 17)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/ac-wo03-product-backup/apps/mobile/src/state/dataMaintenanceLock.ts:17) is only a momentary check. Registry writes and boot can pass the check, pause at an `await`, and then modify/reopen athlete data after backup has acquired its lock. See [`saveRegistry` (line 59)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/ac-wo03-product-backup/apps/mobile/src/state/athleteRegistry.ts:59) and [`boot` (line 2389)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/ac-wo03-product-backup/apps/mobile/src/state/useStore.ts:2389). This can produce an inconsistent archive.
+Remediation needs a real mutation lease held across awaited I/O, with backup/restore mutually exclusive against active leases. Boot must recheck authorization after `loadRegistry()`.
+2. [P1] Recovery reconciliation can discard the better backup candidate.
+[`isWellFormedBackupContainer` (line 369)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/ac-wo03-product-backup/packages/core-db/src/backup/contract.ts:369) accepts non-empty, length-aligned ciphertext without actually validating decoded bytes. Values such as `====` pass. [`reconcileRecoveryPublication` (line 52)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/ac-wo03-product-backup/apps/mobile/src/state/backupRecoveryPublication.ts:52) can then delete `fresh` and `final` in favour of that candidate.
+Strict base64 decoding and a minimum decoded size are required. Because authenticity cannot be established without the password, ambiguous candidates should be preserved or handled through an explicit recovery-selection policy—not silently called valid and used to delete alternatives.
+3. [P2] Persistent startup recovery failure strands the user.
+[App.tsx (line 166)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/ac-wo03-product-backup/apps/mobile/src/App.tsx:166) displays only “RECOVERY NEEDED” text. It offers no retry or safe recovery action. Add a bounded “Retry protected recovery” action that reruns initialization while keeping athlete data closed until reconciliation succeeds. Do not bypass `startupSafe`.
+4. [P2] The concurrent-write test is currently false-green.
+[verify_backup_contract.mjs (line 96)](/C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/ac-wo03-product-backup/packages/core-db/test/backup/verify_backup_contract.mjs:96) signals worker readiness before proving a concurrent write, swallows every SQLite error, and accepts the original 2,000 baseline rows. Therefore it does not prove the claimed concurrent-WAL behaviour. It also lacks guaranteed worker cleanup if an assertion or `VACUUM` fails.
+Require one committed `during-*` row, report unexpected worker errors, and terminate the worker in `finally`. Mutation-test the assertion.
+5. [P3] Test mock violates the production contract.
+`NavigationShell.test.js` mocks initialization as resolving `undefined`, while production returns a boolean. Change it to `true` and assert the boot helper’s actual contract.
+
+The username-containing absolute paths in the handover are documentation cleanup only and not a merge blocker.
+4 comments
+P1Check-only lock permits backup races.worktrees/ac-wo03-product-backup/apps/mobile/src/state/dataMaintenanceLock.ts:17-18P1Structurally invalid ciphertext is accepted.worktrees/ac-wo03-product-backup/packages/core-db/src/backup/contract.ts:369-371P2Recovery failure has no exit.worktrees/ac-wo03-product-backup/apps/mobile/src/App.tsx:166-176Show 1 more comment
+Recommended next step: give Opus one focused remediation round on this same branch, followed by a fresh independent audit. Do not merge until the lease model, recovery reconciliation and concurrency evidence are corrected.
+`````
+
+- Numbering: Entry 0131. This branch ends at 0130; the merged base ends at
+  0129; codex/wo07-live-hr-capability-audit carries only 0150; no local or
+  remote ref uses 0131.

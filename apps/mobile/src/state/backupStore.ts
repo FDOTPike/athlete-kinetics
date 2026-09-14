@@ -47,9 +47,11 @@ import {
   LEGACY_ROLLBACK_MARKER_FILE,
   RECOVERY_BACKUP_FILE,
   RECOVERY_BACKUP_NEW_FILE,
+  RECOVERY_BACKUP_ALTERNATE_FILE_PATTERN,
   RECOVERY_BACKUP_PREVIOUS_FILE,
   RESTORE_JOURNAL_FILE,
   cleanupRestorePublication,
+  recoveryBackupAlternateFile,
   publishAtomicMetadata,
   restoreJournalTempFile,
   restoreMarkerFile,
@@ -252,7 +254,24 @@ const recoveryPublicationPaths = (): RecoveryPublicationPaths => ({
   final: documentPath(RECOVERY_BACKUP_FILE),
   fresh: documentPath(RECOVERY_BACKUP_NEW_FILE),
   previous: documentPath(RECOVERY_BACKUP_PREVIOUS_FILE),
+  alternateFor: (sha256Hex) => documentPath(recoveryBackupAlternateFile(sha256Hex)),
 });
+
+/** Preserved recovery candidates, by exact name, in a fixed order. */
+async function preservedRecoveryCandidates(): Promise<string[]> {
+  const io = fs();
+  return (await io.ls(io.dirs.DocumentDir))
+    .filter((name) => RECOVERY_BACKUP_ALTERNATE_FILE_PATTERN.test(name))
+    .sort()
+    .map((name) => documentPath(name));
+}
+
+/** Review selection policy: the selected retained recovery first, then preserved
+ * candidates. Authenticity is decided later, with the password. */
+async function retainedRecoveryCandidates(): Promise<string[]> {
+  const selected = documentPath(RECOVERY_BACKUP_FILE);
+  return [...(await fs().exists(selected) ? [selected] : []), ...await preservedRecoveryCandidates()];
+}
 
 function recoveryPublicationIo(): RecoveryPublicationIo {
   const io = fs();
@@ -269,6 +288,8 @@ function recoveryPublicationIo(): RecoveryPublicationIo {
       return asText(await io.readFile(path, 'utf8'));
     },
     write: (path, value) => io.writeFile(path, value, 'utf8'),
+    hash: (path) => io.hash(path, 'sha256'),
+    alternates: () => preservedRecoveryCandidates(),
     move: (source, destination) => movePathConfirmed(source, destination, RECOVERY_NOT_RETAINED),
     remove: (path) => removeConfirmed(path, RECOVERY_NOT_RETAINED),
   };
@@ -834,8 +855,12 @@ async function actionCanProceed(
 export const useBackupStore = create<BackupState>((set, get) => ({
   status: 'idle', startupSafe: null, message: null, lastSuccessfulBackupAt: null, recoveryAvailable: false, preview: null,
   initialize: async () => {
+    let releaseRecovery: (() => void) | null = null;
     try {
       revokeAthleteDataBoot();
+      // Startup recovery can roll back the registry and databases and reconcile
+      // recovery files, so it is exclusive with any mutation lease still settling.
+      releaseRecovery = acquireDataMaintenanceLock('startup-recovery');
       await sweepAbandonedCacheEntries();
       await reconcileRecoveryPublication(
         recoveryPublicationIo(),
@@ -847,7 +872,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       set({
         startupSafe: true,
         lastSuccessfulBackupAt: await readLastSuccess(),
-        recoveryAvailable: await fs().exists(documentPath(RECOVERY_BACKUP_FILE)),
+        recoveryAvailable: (await retainedRecoveryCandidates()).length > 0,
         status: rolledBack ? 'success' : 'idle',
         message: rolledBack ? 'An interrupted restore was rolled back. Your earlier data is available.' : null,
       });
@@ -861,6 +886,8 @@ export const useBackupStore = create<BackupState>((set, get) => ({
           : 'Restore recovery needs attention. Athlete data stays closed to protect the recovery files.',
       });
       return false;
+    } finally {
+      releaseRecovery?.();
     }
   },
   createBackup: async (password) => {
@@ -940,14 +967,28 @@ export const useBackupStore = create<BackupState>((set, get) => ({
     set({ status: 'working', message: 'Opening protected data recovery…', preview: null });
     try {
       if (!(await actionCanProceed(get(), set))) return;
-      const recoveryPath = documentPath(RECOVERY_BACKUP_FILE);
-      if (!(await fs().exists(recoveryPath))) {
+      const candidates = await retainedRecoveryCandidates();
+      if (candidates.length === 0) {
         set({ recoveryAvailable: false });
         throw new Error('No previous data recovery is available.');
       }
-      validatePortableBackupFileSize((await fs().stat(recoveryPath)).size);
-      const opened = await openBackup(asText(await fs().readFile(recoveryPath, 'utf8')), password, mobileBackupCrypto);
-      if (!opened.ok) throw new Error('Previous data recovery could not be opened. Check the password from the previous restore.');
+      // PR #18 review: startup cannot prove which complete container is authentic,
+      // so every candidate it preserved is tried here, in a fixed order, and the
+      // first one the password authenticates is used. No recovery file changes.
+      let opened: Awaited<ReturnType<typeof openBackup>> | null = null;
+      for (const candidatePath of candidates) {
+        try { validatePortableBackupFileSize((await fs().stat(candidatePath)).size); }
+        catch (error) {
+          if (error instanceof BackupContractError) continue;
+          throw error;
+        }
+        const attempt = await openBackup(asText(await fs().readFile(candidatePath, 'utf8')), password, mobileBackupCrypto);
+        if (attempt.ok) {
+          opened = attempt;
+          break;
+        }
+      }
+      if (opened === null || !opened.ok) throw new Error('Previous data recovery could not be opened. Check the password from the previous restore.');
       const decision = decideRestore('replace', opened.archive, {
         readerSchemaVersion: SCHEMA_VERSION,
         supportedSourceSchemaVersions: [SCHEMA_VERSION],

@@ -1,13 +1,18 @@
+import { createHash } from 'node:crypto';
 import {
   RecoveryPublicationUnresolvedError,
   publishRecoveryBackup,
   reconcileRecoveryPublication,
 } from '../../src/state/backupRecoveryPublication';
 
+const sha = (text) => createHash('sha256').update(text).digest('hex');
+const ALTERNATE_PATH = /^\/doc\/pikeMethods-recovery-current\.pmbak\.alternate-[a-f0-9]{64}$/;
+
 const paths = {
   final: '/doc/pikeMethods-recovery-current.pmbak',
   fresh: '/doc/pikeMethods-recovery-current.pmbak.new',
   previous: '/doc/pikeMethods-recovery-current.pmbak.previous',
+  alternateFor: (sha256Hex) => `/doc/pikeMethods-recovery-current.pmbak.alternate-${sha256Hex}`,
 };
 
 // Neighbouring and lookalike names that no publication or reconciliation step may touch.
@@ -16,6 +21,7 @@ const UNRELATED = Object.freeze({
   '/doc/pikeMethods-recovery-current.pmbak.previous.new': 'unrelated-previous-new',
   '/doc/pikeMethods-recovery-current.pmbak.new.previous': 'unrelated-new-previous',
   '/doc/pikeMethods-recovery-current.pmbak.tmp': 'unrelated-tmp',
+  '/doc/pikeMethods-recovery-current.pmbak.alternate-not-a-digest': 'unrelated-alternate-lookalike',
   '/doc/user-recovery.pmbak': 'unrelated-user',
   '/doc/coach_athletes.json': 'unrelated-registry',
 });
@@ -29,7 +35,8 @@ const SEALED = envelope('sealed-current-data');
 const SEALED_IDENTITY = 'sealed-identity';
 
 /** In-memory app-private directory. Every operation, including authentication,
- * is an indexed boundary where the process can die or the operation can fail. */
+ * hashing and listing, is an indexed boundary where the process can die or the
+ * operation can fail. */
 function harness(initial, { dieAt = null, tornDeath = false, failAt = [], corrupt = null } = {}) {
   const files = new Map(Object.entries({ ...UNRELATED, ...initial }));
   const operations = [];
@@ -65,6 +72,12 @@ function harness(initial, { dieAt = null, tornDeath = false, failAt = [], corrup
       files.set(destination, moved);
     }),
     remove: async (path) => step('remove', name(path), () => { files.delete(path); }),
+    hash: async (path) => step('hash', name(path), () => {
+      if (!files.has(path)) throw new Error(`missing ${path}`);
+      return sha(files.get(path));
+    }),
+    alternates: async () => step('alternates', 'pikeMethods-recovery-current.pmbak.alternate-*',
+      () => [...files.keys()].filter((path) => ALTERNATE_PATH.test(path)).sort()),
   };
   const authenticate = async (text) => step('verify', 'archive', () => (text === SEALED ? SEALED_IDENTITY : null));
   return { io, authenticate, files, operations };
@@ -75,6 +88,9 @@ const recoveryFiles = (files) => ({
   fresh: files.get(paths.fresh) ?? null,
   previous: files.get(paths.previous) ?? null,
 });
+const alternatesOf = (files) => Object.fromEntries([...files].filter(([path]) => ALTERNATE_PATH.test(path)).sort());
+/** Every archive text still reachable at a recovery name or a preserved-candidate name. */
+const reachable = (files) => [...Object.values(recoveryFiles(files)), ...Object.values(alternatesOf(files))];
 
 const restart = (files, options) => harness(Object.fromEntries(files), options);
 
@@ -90,40 +106,47 @@ function candidate(role, kind) {
 
 /** Every previous/final/fresh combination. Columns: previous, final, fresh,
  * the role whose bytes survive at the final path, the reconciliation outcome,
- * and whether publication, abandonment or reconciliation can produce the state
- * (proved by the enumeration test below rather than asserted by hand). */
+ * whether publication, abandonment or reconciliation can produce the state
+ * (proved by the enumeration test below rather than asserted by hand), and the
+ * well-formed roles that were not selected and are preserved under their
+ * content hash (PR #18 review: never deleted in favour of another candidate). */
 const RECONCILIATION_TABLE = [
-  ['absent', 'absent', 'absent', null, 'unchanged', true],
-  ['absent', 'absent', 'wellFormed', 'fresh', 'promoted_fresh', true],
-  ['absent', 'absent', 'malformed', null, 'discarded_malformed', true],
-  ['absent', 'wellFormed', 'absent', 'final', 'unchanged', true],
-  ['absent', 'wellFormed', 'wellFormed', 'final', 'kept_final', true],
-  ['absent', 'wellFormed', 'malformed', 'final', 'kept_final', true],
-  ['absent', 'malformed', 'absent', 'final', 'unchanged', false],
-  ['absent', 'malformed', 'wellFormed', 'final', 'kept_final', false],
-  ['absent', 'malformed', 'malformed', 'final', 'kept_final', false],
-  ['wellFormed', 'absent', 'absent', 'previous', 'restored_previous', true],
-  ['wellFormed', 'absent', 'wellFormed', 'previous', 'restored_previous', true],
-  ['wellFormed', 'absent', 'malformed', 'previous', 'restored_previous', false],
-  ['wellFormed', 'wellFormed', 'absent', 'previous', 'restored_previous', true],
-  ['wellFormed', 'wellFormed', 'wellFormed', 'previous', 'restored_previous', false],
-  ['wellFormed', 'wellFormed', 'malformed', 'previous', 'restored_previous', false],
-  ['wellFormed', 'malformed', 'absent', 'previous', 'restored_previous', false],
-  ['wellFormed', 'malformed', 'wellFormed', 'previous', 'restored_previous', false],
-  ['wellFormed', 'malformed', 'malformed', 'previous', 'restored_previous', false],
-  ['malformed', 'absent', 'absent', null, 'discarded_malformed', false],
-  ['malformed', 'absent', 'wellFormed', 'fresh', 'promoted_fresh', false],
-  ['malformed', 'absent', 'malformed', null, 'discarded_malformed', false],
-  ['malformed', 'wellFormed', 'absent', 'final', 'kept_final', false],
-  ['malformed', 'wellFormed', 'wellFormed', 'final', 'kept_final', false],
-  ['malformed', 'wellFormed', 'malformed', 'final', 'kept_final', false],
-  ['malformed', 'malformed', 'absent', 'final', 'kept_final', false],
-  ['malformed', 'malformed', 'wellFormed', 'final', 'kept_final', false],
-  ['malformed', 'malformed', 'malformed', 'final', 'kept_final', false],
+  ['absent', 'absent', 'absent', null, 'unchanged', true, []],
+  ['absent', 'absent', 'wellFormed', 'fresh', 'promoted_fresh', true, []],
+  ['absent', 'absent', 'malformed', null, 'discarded_malformed', true, []],
+  ['absent', 'wellFormed', 'absent', 'final', 'unchanged', true, []],
+  ['absent', 'wellFormed', 'wellFormed', 'final', 'kept_final', true, ['fresh']],
+  ['absent', 'wellFormed', 'malformed', 'final', 'kept_final', true, []],
+  ['absent', 'malformed', 'absent', 'final', 'unchanged', false, []],
+  ['absent', 'malformed', 'wellFormed', 'final', 'kept_final', false, ['fresh']],
+  ['absent', 'malformed', 'malformed', 'final', 'kept_final', false, []],
+  ['wellFormed', 'absent', 'absent', 'previous', 'restored_previous', true, []],
+  ['wellFormed', 'absent', 'wellFormed', 'previous', 'restored_previous', true, ['fresh']],
+  ['wellFormed', 'absent', 'malformed', 'previous', 'restored_previous', false, []],
+  ['wellFormed', 'wellFormed', 'absent', 'previous', 'restored_previous', true, ['final']],
+  ['wellFormed', 'wellFormed', 'wellFormed', 'previous', 'restored_previous', false, ['fresh', 'final']],
+  ['wellFormed', 'wellFormed', 'malformed', 'previous', 'restored_previous', false, ['final']],
+  ['wellFormed', 'malformed', 'absent', 'previous', 'restored_previous', false, []],
+  ['wellFormed', 'malformed', 'wellFormed', 'previous', 'restored_previous', false, ['fresh']],
+  ['wellFormed', 'malformed', 'malformed', 'previous', 'restored_previous', false, []],
+  ['malformed', 'absent', 'absent', null, 'discarded_malformed', false, []],
+  ['malformed', 'absent', 'wellFormed', 'fresh', 'promoted_fresh', false, []],
+  ['malformed', 'absent', 'malformed', null, 'discarded_malformed', false, []],
+  ['malformed', 'wellFormed', 'absent', 'final', 'kept_final', false, []],
+  ['malformed', 'wellFormed', 'wellFormed', 'final', 'kept_final', false, ['fresh']],
+  ['malformed', 'wellFormed', 'malformed', 'final', 'kept_final', false, []],
+  ['malformed', 'malformed', 'absent', 'final', 'kept_final', false, []],
+  ['malformed', 'malformed', 'wellFormed', 'final', 'kept_final', false, ['fresh']],
+  ['malformed', 'malformed', 'malformed', 'final', 'kept_final', false, []],
 ];
 
 function tableState(previous, final, fresh) {
   return { ...candidate('previous', previous), ...candidate('final', final), ...candidate('fresh', fresh) };
+}
+
+function preservedAlternates(initial, roles) {
+  return Object.fromEntries(roles.map((role) => initial[paths[role]])
+    .map((text) => [paths.alternateFor(sha(text)), text]).sort());
 }
 
 function publicationDeathCases(operations) {
@@ -141,14 +164,19 @@ async function cleanPublication(initial) {
   return clean;
 }
 
+const SUPERSEDE_PREVIOUS = 'remove pikeMethods-recovery-current.pmbak.previous';
+
 describe('startup reconciliation of recovery rotation files', () => {
-  test.each(RECONCILIATION_TABLE)('previous %s, final %s, fresh %s -> survivor %s (%s)', async (previous, final, fresh, survivor, outcome) => {
+  test.each(RECONCILIATION_TABLE)('previous %s, final %s, fresh %s -> survivor %s (%s)', async (previous, final, fresh, survivor, outcome, _producible, preserved) => {
     const initial = tableState(previous, final, fresh);
     const expectedFinal = survivor === null ? null : initial[paths[survivor]];
 
     const run = harness(initial);
     await expect(reconcileRecoveryPublication(run.io, paths, isWellFormed, false)).resolves.toBe(outcome);
     expect(recoveryFiles(run.files)).toEqual({ final: expectedFinal, fresh: null, previous: null });
+    expect(alternatesOf(run.files)).toEqual(preservedAlternates(initial, preserved));
+    // No well-formed candidate is ever deleted: each is selected or preserved.
+    for (const text of Object.values(initial).filter(isWellFormed)) expect(reachable(run.files)).toContain(text);
     expectUnrelatedIntact(run.files);
 
     const settled = run.operations.length;
@@ -163,20 +191,34 @@ describe('startup reconciliation of recovery rotation files', () => {
     expect(journaled.files).toEqual(before);
   });
 
-  test.each(RECONCILIATION_TABLE)('death at every reconciliation boundary converges: previous %s, final %s, fresh %s', async (previous, final, fresh, survivor) => {
+  test.each(RECONCILIATION_TABLE)('death at every reconciliation boundary converges without losing a well-formed candidate: previous %s, final %s, fresh %s', async (previous, final, fresh, survivor, _outcome, _producible, preserved) => {
     const initial = tableState(previous, final, fresh);
     const expectedFinal = survivor === null ? null : initial[paths[survivor]];
+    const wellFormedTexts = Object.values(initial).filter(isWellFormed);
     const clean = harness(initial);
     await reconcileRecoveryPublication(clean.io, paths, isWellFormed, false);
     for (let dieAt = 0; dieAt < clean.operations.length; dieAt += 1) {
       const interrupted = harness(initial, { dieAt });
       await expect(reconcileRecoveryPublication(interrupted.io, paths, isWellFormed, false)).rejects.toThrow('process death');
       if (expectedFinal !== null) expect(Object.values(recoveryFiles(interrupted.files))).toContain(expectedFinal);
+      for (const text of wellFormedTexts) expect(reachable(interrupted.files)).toContain(text);
       const restarted = restart(interrupted.files);
       await reconcileRecoveryPublication(restarted.io, paths, isWellFormed, false);
       expect(recoveryFiles(restarted.files)).toEqual({ final: expectedFinal, fresh: null, previous: null });
+      expect(alternatesOf(restarted.files)).toEqual(preservedAlternates(initial, preserved));
       expectUnrelatedIntact(restarted.files);
     }
+  });
+
+  test('a preserved candidate that already exists with identical bytes is not duplicated', async () => {
+    const run = harness({
+      [paths.previous]: RETAINED,
+      [paths.final]: SEALED,
+      [paths.alternateFor(sha(SEALED))]: SEALED,
+    });
+    await expect(reconcileRecoveryPublication(run.io, paths, isWellFormed, false)).resolves.toBe('restored_previous');
+    expect(recoveryFiles(run.files)).toEqual({ final: RETAINED, fresh: null, previous: null });
+    expect(alternatesOf(run.files)).toEqual({ [paths.alternateFor(sha(SEALED))]: SEALED });
   });
 });
 
@@ -196,7 +238,8 @@ describe('portable-restore recovery publication', () => {
       'move pikeMethods-recovery-current.pmbak.new -> pikeMethods-recovery-current.pmbak',
       'read pikeMethods-recovery-current.pmbak',
       'verify archive',
-      ...(retained ? ['remove pikeMethods-recovery-current.pmbak.previous'] : []),
+      ...(retained ? [SUPERSEDE_PREVIOUS] : []),
+      'alternates pikeMethods-recovery-current.pmbak.alternate-*',
     ]);
   });
 
@@ -219,13 +262,15 @@ describe('portable-restore recovery publication', () => {
     }
   });
 
-  test.each([true, false])('an in-process failure at every write, move, verification and removal restores the pre-publication state (retained %p)', async (retained) => {
+  test.each([true, false])('an in-process failure at every step restores the pre-publication state until the older recovery is superseded (retained %p)', async (retained) => {
     const initial = retained ? { [paths.final]: RETAINED } : {};
     const clean = await cleanPublication(initial);
+    const supersededAt = clean.operations.indexOf(SUPERSEDE_PREVIOUS);
     for (let failAt = 0; failAt < clean.operations.length; failAt += 1) {
       const run = harness(initial, { failAt: [failAt] });
       await expect(publishRecoveryBackup(run.io, paths, SEALED, run.authenticate)).rejects.toThrow();
-      expect(recoveryFiles(run.files)).toEqual({ final: retained ? RETAINED : null, fresh: null, previous: null });
+      const expectedFinal = retained ? (failAt > supersededAt ? SEALED : RETAINED) : null;
+      expect(recoveryFiles(run.files)).toEqual({ final: expectedFinal, fresh: null, previous: null });
       expectUnrelatedIntact(run.files);
     }
   });
@@ -233,6 +278,7 @@ describe('portable-restore recovery publication', () => {
   test.each([true, false])('a failed abandonment stays recoverable and startup converges without losing the retained recovery (retained %p)', async (retained) => {
     const initial = retained ? { [paths.final]: RETAINED } : {};
     const clean = await cleanPublication(initial);
+    const supersededAt = clean.operations.indexOf(SUPERSEDE_PREVIOUS);
     let unresolvedCases = 0;
     for (let failAt = 0; failAt < clean.operations.length; failAt += 1) {
       const probe = harness(initial, { failAt: [failAt] });
@@ -241,12 +287,13 @@ describe('portable-restore recovery publication', () => {
         const run = harness(initial, { failAt: [failAt, abandonAt] });
         await expect(publishRecoveryBackup(run.io, paths, SEALED, run.authenticate)).rejects.toBeInstanceOf(RecoveryPublicationUnresolvedError);
         unresolvedCases += 1;
-        if (retained) expect(Object.values(recoveryFiles(run.files))).toContain(RETAINED);
+        const undoPoint = retained && failAt > supersededAt ? SEALED : RETAINED;
+        if (retained) expect(reachable(run.files)).toContain(undoPoint);
         const restarted = restart(run.files);
         await reconcileRecoveryPublication(restarted.io, paths, isWellFormed, false);
         const survivor = recoveryFiles(restarted.files);
         expect({ fresh: survivor.fresh, previous: survivor.previous }).toEqual({ fresh: null, previous: null });
-        if (retained) expect(survivor.final).toBe(RETAINED);
+        if (retained) expect(survivor.final).toBe(undoPoint);
         else expect([null, SEALED]).toContain(survivor.final);
         expectUnrelatedIntact(restarted.files);
       }
@@ -257,10 +304,12 @@ describe('portable-restore recovery publication', () => {
   test.each([true, false])('process death at every publication boundary never leaves both archives absent and startup converges (retained %p)', async (retained) => {
     const initial = retained ? { [paths.final]: RETAINED } : {};
     const clean = await cleanPublication(initial);
-    const supersededAt = clean.operations.indexOf('remove pikeMethods-recovery-current.pmbak.previous');
+    const supersededAt = clean.operations.indexOf(SUPERSEDE_PREVIOUS);
     const freshWrittenAt = clean.operations.indexOf('write pikeMethods-recovery-current.pmbak.new');
     expect(freshWrittenAt).toBeGreaterThanOrEqual(0);
-    if (retained) expect(supersededAt).toBe(clean.operations.length - 1);
+    // Superseding the older recovery is the last file change; only the listing of
+    // preserved candidates follows it.
+    if (retained) expect(supersededAt).toBe(clean.operations.length - 2);
     for (const deathCase of publicationDeathCases(clean.operations)) {
       const run = harness(initial, deathCase);
       const publication = publishRecoveryBackup(run.io, paths, SEALED, run.authenticate);
@@ -268,7 +317,7 @@ describe('portable-restore recovery publication', () => {
       if (deathCase.dieAt < clean.operations.length) await expect(publication).rejects.toThrow();
       else await publication;
 
-      const atDeath = Object.values(recoveryFiles(run.files));
+      const atDeath = reachable(run.files);
       if (retained) {
         expect(atDeath.includes(RETAINED) || recoveryFiles(run.files).final === SEALED).toBe(true);
         if (deathCase.dieAt <= supersededAt) expect(atDeath).toContain(RETAINED);
@@ -291,6 +340,33 @@ describe('portable-restore recovery publication', () => {
         await reconcileRecoveryPublication(recovered.io, paths, isWellFormed, false);
         expect(recoveryFiles(recovered.files)).toEqual({ final: expectedFinal, fresh: null, previous: null });
       }
+    }
+  });
+
+  test.each([true, false])('preserved candidates are superseded only after the new recovery authenticates at its durable path (retained %p)', async (retained) => {
+    const PRESERVED = envelope('preserved-candidate');
+    const preservedPath = paths.alternateFor(sha(PRESERVED));
+    const initial = { ...(retained ? { [paths.final]: RETAINED } : {}), [preservedPath]: PRESERVED };
+    const clean = await cleanPublication(initial);
+    expect(recoveryFiles(clean.files)).toEqual({ final: SEALED, fresh: null, previous: null });
+    expect(alternatesOf(clean.files)).toEqual({});
+    const removedAt = clean.operations.indexOf(`remove ${preservedPath.slice('/doc/'.length)}`);
+    const durableAuthenticationAt = clean.operations.lastIndexOf('verify archive');
+    expect(removedAt).toBeGreaterThan(durableAuthenticationAt);
+    if (retained) expect(removedAt).toBeGreaterThan(clean.operations.indexOf(SUPERSEDE_PREVIOUS));
+
+    for (const deathCase of publicationDeathCases(clean.operations)) {
+      const run = harness(initial, deathCase);
+      await publishRecoveryBackup(run.io, paths, SEALED, run.authenticate).catch(() => undefined);
+      const restarted = restart(run.files);
+      await reconcileRecoveryPublication(restarted.io, paths, isWellFormed, false);
+      expect(restarted.files.get(preservedPath) ?? null).toBe(deathCase.dieAt <= removedAt ? PRESERVED : null);
+      expectUnrelatedIntact(restarted.files);
+    }
+    for (let failAt = 0; failAt < removedAt; failAt += 1) {
+      const run = harness(initial, { failAt: [failAt] });
+      await expect(publishRecoveryBackup(run.io, paths, SEALED, run.authenticate)).rejects.toThrow();
+      expect(run.files.get(preservedPath)).toBe(PRESERVED);
     }
   });
 

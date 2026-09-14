@@ -3,7 +3,7 @@
  *
  * Zero navigation library: five tabs, NavigationProvider stack, 64pt tab targets.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AppState,
   KeyboardAvoidingView,
@@ -32,6 +32,7 @@ import { statusBarPaddingTop } from './layout/statusBarPadding';
 import { useBackupStore } from './state/backupStore';
 import { bootAfterSafeRecovery } from './state/backupStartup';
 import { authorizeAthleteDataBoot } from './state/dataMaintenanceLock';
+import { QuietAction } from './components/ui';
 
 /**
  * W4: exactly THREE primary destinations. PLAN is the coach/program-management
@@ -125,6 +126,22 @@ export function AppShell(): React.JSX.Element {
   const boot = useStore((s) => s.boot);
   const backupStartupSafe = useBackupStore((s) => s.startupSafe);
   const backupStartupMessage = useBackupStore((s) => s.message);
+  // PR #18 review: a persistent recovery failure must not be a dead end. One
+  // bounded, user-started attempt at a time reruns the same startup recovery
+  // authority; athlete data stays closed unless that recovery succeeds.
+  const recoveryRetryInFlight = useRef(false);
+  const [recoveryRetrying, setRecoveryRetrying] = useState(false);
+  const retryProtectedRecovery = (): void => {
+    if (recoveryRetryInFlight.current) return;
+    recoveryRetryInFlight.current = true;
+    setRecoveryRetrying(true);
+    void bootAfterSafeRecovery(
+      () => useBackupStore.getState().initialize(), authorizeAthleteDataBoot, boot,
+    ).catch(() => false).finally(() => {
+      recoveryRetryInFlight.current = false;
+      setRecoveryRetrying(false);
+    });
+  };
   const status = useStore((s) => s.status);
   const onboarded = useStore((s) => s.onboarded);
   // W4: the header SESSION control shows a live-workout marker from the same
@@ -171,6 +188,15 @@ export function AppShell(): React.JSX.Element {
           <Text style={styles.crashText}>{backupStartupSafe === false
             ? (backupStartupMessage ?? 'Athlete data stays closed until restore recovery succeeds.')
             : 'Checking for an interrupted restore before opening athlete data.'}</Text>
+          {backupStartupSafe === false && (
+            <QuietAction
+              label={recoveryRetrying ? 'RETRYING PROTECTED RECOVERY' : 'RETRY PROTECTED RECOVERY'}
+              accessibilityLabel="Retry protected recovery"
+              testID="backup-recovery-retry"
+              disabled={recoveryRetrying}
+              onPress={retryProtectedRecovery}
+            />
+          )}
         </View>
       </SafeAreaView>
     );

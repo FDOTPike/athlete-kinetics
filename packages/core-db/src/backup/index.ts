@@ -19,6 +19,7 @@ export {
   base64ToBytes,
   bytesToBase64,
   isWellFormedBackupContainer,
+  MIN_WELL_FORMED_CIPHERTEXT_BYTES,
   openBackup,
   sealBackup,
   validatePortableBackupFileSize,

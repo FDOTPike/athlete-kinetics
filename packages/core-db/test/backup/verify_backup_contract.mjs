@@ -93,35 +93,86 @@ live.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE event
 for (let id = 1; id <= 2000; id += 1) live.prepare('INSERT INTO events VALUES (?,?)').run(id, `before-${id}`);
 live.close();
 const stop = new SharedArrayBuffer(4);
+// The writer reports readiness only after a whole concurrent transaction has
+// committed, reports any failure other than a transient busy lock, and is always
+// terminated, even when VACUUM INTO or an assertion fails.
 const writer = new Worker(`
   const { parentPort, workerData } = require('node:worker_threads');
   const { DatabaseSync } = require('node:sqlite');
   const db = new DatabaseSync(workerData.path);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
+  const BATCH = 20;
   let id = 2001;
-  parentPort.postMessage('ready');
+  let committed = 0;
+  const transientBusy = (error) => /SQLITE_BUSY|database is locked/i.test(String(error && error.message));
   const write = () => {
-    if (Atomics.load(new Int32Array(workerData.stop), 0) !== 0) { db.close(); parentPort.postMessage(id); return; }
-    try { for (let n = 0; n < 20; n += 1) db.prepare('INSERT INTO events VALUES (?,?)').run(id, 'during-' + id++); } catch {}
+    if (Atomics.load(new Int32Array(workerData.stop), 0) !== 0) {
+      db.close();
+      parentPort.postMessage({ type: 'stopped', committed });
+      return;
+    }
+    const firstId = id;
+    try {
+      db.exec('BEGIN IMMEDIATE');
+      for (let n = 0; n < BATCH; n += 1) db.prepare('INSERT INTO events VALUES (?,?)').run(id, 'during-' + id++);
+      db.exec('COMMIT');
+      committed += BATCH;
+      if (committed === BATCH) parentPort.postMessage({ type: 'committed', committed });
+    } catch (error) {
+      id = firstId;
+      try { db.exec('ROLLBACK'); } catch {}
+      if (!transientBusy(error)) {
+        parentPort.postMessage({ type: 'error', message: String(error && error.message) });
+        try { db.close(); } catch {}
+        return;
+      }
+    }
     setImmediate(write);
   };
   write();
 `, { eval: true, workerData: { path: livePath, stop } });
-await new Promise((resolve, reject) => { writer.once('message', resolve); writer.once('error', reject); });
-const snapshotSource = new DatabaseSync(livePath);
-snapshotSource.exec(`VACUUM INTO '${liveSnapshotPath.replaceAll("'", "''")}'`);
-snapshotSource.close();
-const writerFinished = new Promise((resolve, reject) => { writer.once('message', resolve); writer.once('error', reject); });
-Atomics.store(new Int32Array(stop), 0, 1);
-await writerFinished;
-await writer.terminate();
+const writerMessages = [];
+let wakeWaiter = null;
+writer.on('message', (message) => { writerMessages.push(message); wakeWaiter?.(); });
+writer.on('error', (error) => { writerMessages.push({ type: 'error', message: String(error && error.message) }); wakeWaiter?.(); });
+const waitForWriter = async (type) => {
+  for (;;) {
+    const failure = writerMessages.find((message) => message.type === 'error');
+    if (failure !== undefined) throw new Error(`concurrent WAL writer failed: ${failure.message}`);
+    const found = writerMessages.find((message) => message.type === type);
+    if (found !== undefined) return found;
+    await new Promise((resolve) => { wakeWaiter = resolve; });
+  }
+};
+let writerCommittedRows = 0;
+try {
+  await waitForWriter('committed');
+  const snapshotSource = new DatabaseSync(livePath);
+  try {
+    snapshotSource.exec(`VACUUM INTO '${liveSnapshotPath.replaceAll("'", "''")}'`);
+  } finally {
+    snapshotSource.close();
+  }
+  Atomics.store(new Int32Array(stop), 0, 1);
+  writerCommittedRows = (await waitForWriter('stopped')).committed;
+} finally {
+  Atomics.store(new Int32Array(stop), 0, 1);
+  await writer.terminate();
+}
+assert.ok(writerCommittedRows >= 20, 'the concurrent WAL writer must have committed at least one whole batch');
 const liveSnapshot = new DatabaseSync(liveSnapshotPath, { readOnly: true });
-assert.equal(liveSnapshot.prepare('PRAGMA quick_check').get().quick_check, 'ok');
-const snapshotCount = liveSnapshot.prepare('SELECT COUNT(*) AS count FROM events').get().count;
-assert.ok(snapshotCount >= 2000, 'snapshot must contain every commit that preceded the snapshot');
-assert.equal(liveSnapshot.prepare("SELECT COUNT(*) AS count FROM events WHERE value IS NULL OR value = ''").get().count, 0,
-  'snapshot must not expose partial concurrent rows');
-liveSnapshot.close();
+try {
+  assert.equal(liveSnapshot.prepare('PRAGMA quick_check').get().quick_check, 'ok');
+  assert.equal(liveSnapshot.prepare("SELECT COUNT(*) AS count FROM events WHERE value LIKE 'before-%'").get().count, 2000,
+    'snapshot must contain every baseline row');
+  const concurrentRows = liveSnapshot.prepare("SELECT COUNT(*) AS count FROM events WHERE value LIKE 'during-%'").get().count;
+  assert.ok(concurrentRows >= 20, 'snapshot must contain the concurrent WAL commit that landed before VACUUM INTO began');
+  assert.equal(concurrentRows % 20, 0, 'snapshot must contain only whole concurrent transactions');
+  assert.equal(liveSnapshot.prepare("SELECT COUNT(*) AS count FROM events WHERE value IS NULL OR value = ''").get().count, 0,
+    'snapshot must not expose partial concurrent rows');
+} finally {
+  liveSnapshot.close();
+}
 const archive = {
   archiveVersion: 1,
   backupId: '00112233445566778899aabbccddeeff',
@@ -195,6 +246,10 @@ try {
   assert.equal((await backup.openBackup(tampered, password, cryptoProvider)).code, 'authentication_failed');
   assert.equal((await backup.openBackup(sealed.slice(0, -20), password, cryptoProvider)).code, 'invalid_container');
   assert.equal(backup.isWellFormedBackupContainer(sealed), true, 'a complete sealed container is well-formed without the password');
+  assert.equal(backup.MIN_WELL_FORMED_CIPHERTEXT_BYTES, 700,
+    'minimum sealed size is the GCM tag plus the Base64 text of one minimum 512-byte SQLite page');
+  assert.equal(backup.isWellFormedBackupContainer(backup.canonicalJson({ ...outer, ciphertextBase64: backup.bytesToBase64(new Uint8Array(700)) })), true,
+    'structurally complete ciphertext at the minimum size is well-formed; authenticity still needs the password');
   assert.equal(backup.isWellFormedBackupContainer(tampered), true,
     'well-formedness is structural only: tampered ciphertext still needs password authentication to fail');
   for (const [label, candidate] of [
@@ -207,6 +262,10 @@ try {
     ['hostile KDF', backup.canonicalJson({ ...outer, kdf: { ...outer.kdf, N: 2 ** 30 } })],
     ['ragged ciphertext', backup.canonicalJson({ ...outer, ciphertextBase64: `${outer.ciphertextBase64}A` })],
     ['empty ciphertext', backup.canonicalJson({ ...outer, ciphertextBase64: '' })],
+    ['padding-only ciphertext', backup.canonicalJson({ ...outer, ciphertextBase64: '====' })],
+    ['non-alphabet ciphertext', backup.canonicalJson({ ...outer, ciphertextBase64: 'ab!d' })],
+    ['interior padding', backup.canonicalJson({ ...outer, ciphertextBase64: `AA==${outer.ciphertextBase64}` })],
+    ['ciphertext below the minimum sealed archive size', backup.canonicalJson({ ...outer, ciphertextBase64: backup.bytesToBase64(new Uint8Array(699)) })],
     ['oversized', 'x'.repeat(backup.MAX_BACKUP_TEXT_BYTES + 1)],
   ]) {
     assert.equal(backup.isWellFormedBackupContainer(candidate), false, `malformed recovery candidate must not be well-formed: ${label}`);

@@ -13,6 +13,11 @@ export const BACKUP_SALT_BYTES = 16 as const;
 export const BACKUP_NONCE_BYTES = 12 as const;
 export const BACKUP_TAG_BYTES = 16 as const;
 export const MAX_BACKUP_TEXT_BYTES = 16 * 1024 * 1024;
+/** Smallest ciphertext a real v1 archive can seal to: the GCM authentication tag
+ * plus the Base64 text (684 characters) of one minimum 512-byte SQLite page.
+ * Every archive carries at least one athlete database, so anything shorter is
+ * truncated or fabricated. Structural only: authenticity needs the password. */
+export const MIN_WELL_FORMED_CIPHERTEXT_BYTES = BACKUP_TAG_BYTES + 684;
 export const MAX_ATHLETES_PER_BACKUP = 100;
 export const MAX_AGGREGATE_DATABASE_BYTES = 8 * 1024 * 1024;
 export const MAX_DATABASE_BYTES = MAX_AGGREGATE_DATABASE_BYTES;
@@ -368,7 +373,14 @@ function parseContainer(text: string): EncryptedBackupContainerV1 | BackupOpenRe
  * requires openBackup with the password. */
 export function isWellFormedBackupContainer(text: string): boolean {
   const parsed = parseContainer(text);
-  return !('ok' in parsed) && parsed.ciphertextBase64.length > 0 && parsed.ciphertextBase64.length % 4 === 0;
+  if ('ok' in parsed) return false;
+  try {
+    // Strict Base64 (alphabet, quanta and final-quantum padding) and a minimum
+    // sealed size. This still proves nothing about authenticity.
+    return base64ToBytes(parsed.ciphertextBase64, MAX_BACKUP_TEXT_BYTES).length >= MIN_WELL_FORMED_CIPHERTEXT_BYTES;
+  } catch {
+    return false;
+  }
 }
 
 export async function openBackup(text: string, password: string, crypto: BackupCryptoProvider): Promise<BackupOpenResult> {

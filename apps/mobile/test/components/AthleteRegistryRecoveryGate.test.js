@@ -44,3 +44,19 @@ test('registry writes require both startup boot authority and a free maintenance
     release();
   }
 });
+
+test('a registry write holds a mutation lease until the write settles, so maintenance cannot start inside it', async () => {
+  authorizeAthleteDataBoot();
+  let finishWrite;
+  mockWriteFile.mockImplementationOnce(() => new Promise((resolve) => { finishWrite = resolve; }));
+  const saving = saveRegistry(registry);
+  await Promise.resolve();
+  expect(mockWriteFile).toHaveBeenCalledTimes(1);
+
+  expect(() => acquireDataMaintenanceLock('snapshot-during-registry-write')).toThrow();
+
+  finishWrite();
+  await expect(saving).resolves.toBe(true);
+  const release = acquireDataMaintenanceLock('snapshot-after-registry-write');
+  release();
+});

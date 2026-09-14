@@ -5,6 +5,14 @@ export const LEGACY_ROLLBACK_MARKER_FILE = '.ak_restore_rolled_back';
 export const RECOVERY_BACKUP_FILE = 'pikeMethods-recovery-current.pmbak';
 export const RECOVERY_BACKUP_NEW_FILE = `${RECOVERY_BACKUP_FILE}.new`;
 export const RECOVERY_BACKUP_PREVIOUS_FILE = `${RECOVERY_BACKUP_FILE}.previous`;
+/** A complete recovery container that startup reconciliation could not select
+ * without a password, preserved under its SHA-256 until a newer verified
+ * recovery supersedes it. Never swept by name. */
+export const RECOVERY_BACKUP_ALTERNATE_FILE_PATTERN = /^pikeMethods-recovery-current\.pmbak\.alternate-[a-f0-9]{64}$/;
+export function recoveryBackupAlternateFile(sha256Hex: string): string {
+  if (!/^[a-f0-9]{64}$/.test(sha256Hex)) throw new Error('A preserved recovery candidate needs a SHA-256 digest.');
+  return `${RECOVERY_BACKUP_FILE}.alternate-${sha256Hex}`;
+}
 
 export type RestoreMarkerKind = 'applying' | 'committed' | 'rolled_back';
 

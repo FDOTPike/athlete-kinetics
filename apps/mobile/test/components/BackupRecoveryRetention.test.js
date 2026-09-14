@@ -886,3 +886,94 @@ describe('W4 startup cache cleanup', () => {
     expect(existsSync(abandoned)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PR #18 review (P1): startup cannot prove authenticity without the password,
+// so a complete recovery candidate that is not selected is preserved under its
+// SHA-256 instead of being deleted. Review decides authenticity with the
+// password, and a portable restore supersedes preserved candidates only after
+// its new recovery is durable.
+// ---------------------------------------------------------------------------
+
+describe('PR #18 review: ambiguous recovery candidates are preserved, not deleted', () => {
+  const ALTERNATE_NAME = /^pikeMethods-recovery-current\.pmbak\.alternate-[a-f0-9]{64}$/;
+  const alternateNames = () => readdirSync(mockDocumentDir).filter((name) => ALTERNATE_NAME.test(name)).sort();
+  const digestOf = (text) => createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex');
+
+  test('startup keeps the older retained recovery selected and preserves the other complete candidate under its content hash', async () => {
+    const recoveryPath = join(mockDocumentDir, RECOVERY_FILE);
+    const otherCandidate = readFileSync(mockSelectedBackupPath, 'utf8');
+    renameSync(recoveryPath, `${recoveryPath}.previous`);
+    writeFileSync(recoveryPath, otherCandidate);
+
+    await expect(restartApp()).resolves.toBe(true);
+
+    expect(await retainedRecovery()).toEqual(fixture.recovery);
+    expect(alternateNames()).toEqual([`${RECOVERY_FILE}.alternate-${digestOf(otherCandidate)}`]);
+    expect(readFileSync(join(mockDocumentDir, alternateNames()[0]), 'utf8')).toBe(otherCandidate);
+    expect(restoreDebris()).toEqual([]);
+    expect(useBackupStore.getState().recoveryAvailable).toBe(true);
+  });
+
+  test('review falls back to a preserved candidate when the selected recovery does not authenticate, and changes no recovery file', async () => {
+    const recoveryPath = join(mockDocumentDir, RECOVERY_FILE);
+    const pristine = readFileSync(recoveryPath, 'utf8');
+    const alternatePath = join(mockDocumentDir, `${RECOVERY_FILE}.alternate-${digestOf(pristine)}`);
+    writeFileSync(alternatePath, pristine);
+    // Flip one ciphertext character: still a complete container, no longer authentic.
+    const container = JSON.parse(pristine);
+    const at = 128;
+    const flipped = `${container.ciphertextBase64.slice(0, at)}${container.ciphertextBase64[at] === 'A' ? 'B' : 'A'}${container.ciphertextBase64.slice(at + 1)}`;
+    writeFileSync(recoveryPath, JSON.stringify({ ...container, ciphertextBase64: flipped }));
+    const before = { selected: mockHashFile(recoveryPath), preserved: mockHashFile(alternatePath) };
+
+    await useBackupStore.getState().reviewRecovery(RECOVERY_PASSWORD);
+    expect(useBackupStore.getState().status).toBe('preview');
+    expect(useBackupStore.getState().preview).toMatchObject({
+      source: 'retained_recovery', athleteNames: athleteNames(RECOVERY_A), databaseCount: 2,
+    });
+
+    await useBackupStore.getState().confirmRestore(RECOVERY_PASSWORD);
+    expect(useBackupStore.getState().status).toBe('success');
+    expect(classifyLive()).toBe('recovery A');
+    expect({ selected: mockHashFile(recoveryPath), preserved: mockHashFile(alternatePath) }).toEqual(before);
+    expect(restoreDebris()).toEqual([]);
+  });
+
+  test('a wrong password tries every candidate and changes nothing', async () => {
+    const recoveryPath = join(mockDocumentDir, RECOVERY_FILE);
+    const pristine = readFileSync(recoveryPath, 'utf8');
+    const alternatePath = join(mockDocumentDir, `${RECOVERY_FILE}.alternate-${digestOf(pristine)}`);
+    writeFileSync(alternatePath, pristine);
+    const before = snapshotDirectories();
+    const kdfBefore = mockKdfCalls;
+
+    await useBackupStore.getState().reviewRecovery('not-the-recovery-password');
+
+    expect(useBackupStore.getState()).toMatchObject({ status: 'error', preview: null });
+    expect(useBackupStore.getState().message).toMatch(/could not be opened/);
+    expect(mockKdfCalls - kdfBefore).toBe(2);
+    expect(snapshotDirectories()).toEqual(before);
+  });
+
+  test('a portable restore supersedes preserved candidates only after its new recovery is durable and before replacement', async () => {
+    const recoveryPath = join(mockDocumentDir, RECOVERY_FILE);
+    const preservedText = readFileSync(recoveryPath, 'utf8');
+    const alternatePath = join(mockDocumentDir, `${RECOVERY_FILE}.alternate-${digestOf(preservedText)}`).replaceAll('\\', '/');
+    writeFileSync(alternatePath, preservedText);
+    await previewPortableP();
+    mockFileOps = [];
+
+    await useBackupStore.getState().confirmRestore(PORTABLE_PASSWORD);
+
+    expect(useBackupStore.getState().status).toBe('success');
+    expect(classifyLive()).toBe('portable P');
+    expect(alternateNames()).toEqual([]);
+    const finalPath = `${mockDocumentDir}/${RECOVERY_FILE}`;
+    const promoted = mockFileOps.findIndex((entry) => entry[0] === 'move' && entry[1] === `${finalPath}.new` && entry[2] === finalPath);
+    const supersededPreserved = mockFileOps.findIndex((entry) => entry[0] === 'unlink' && entry[1] === alternatePath);
+    const replacementJournal = mockFileOps.findIndex((entry) => entry[0] === 'move' && entry[2] === `${mockDocumentDir}/.ak_restore_journal.json`);
+    expect({ promoted: promoted >= 0, afterPromotion: supersededPreserved > promoted, beforeReplacement: supersededPreserved < replacementJournal })
+      .toEqual({ promoted: true, afterPromotion: true, beforeReplacement: true });
+  });
+});
