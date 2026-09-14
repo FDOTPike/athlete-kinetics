@@ -9812,3 +9812,90 @@ Run focused tests, typecheck, git diff --check, and npm run verify:ci before any
   deltas and native accessibility/device acceptance were not measured.
   Protected backup transfer/restore, clinical review and native QA remain deferred.
 - MERGE / RELEASE / C6: NOT PERFORMED.
+
+---
+
+## Entry 0127 — 2026-09-14 · Accessible Coach WO-06 integration with the PR #16 database-readiness fixes
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+You are the bounded integration executor for Accessible Coach WO-06.
+
+WORKTREE
+C:\Users\fpike\.codex\worktrees\3057\Athlete App
+
+EXPECTED START
+Branch: codex/ac-wo06-training-support
+HEAD: 2d4325f59452ec875142d696a15b97cd97d76900
+Tree: fafab65d96df2c75906b62aef4eac8ee65775593
+Upstream: origin/codex/ac-wo06-training-support
+
+CURRENT PR BASE
+Branch: origin/codex/rpe-familiarisation
+HEAD: ec7f4112934e2f4177515a1c4c67136f6509aa4c
+Tree: 50255d14f9d4beac8b80de200631407e9964a7c9
+
+PURPOSE
+Integrate the already-audited WO-06 clinician/training-support implementation with the post-PR16 database-readiness fixes. Do not expand WO-06 policy or product scope.
+
+STEP 0 — IDENTITY
+Fetch origin and verify the absolute worktree, branch, HEAD, tree, upstream, status and divergence. Stop if the worktree is dirty or another process is writing.
+
+Read:
+- AGENT_WORKFLOW.md
+- docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md
+- HANDOVER_2026-09-13_WO06_TRAINING_SUPPORT.md
+- docs/audits/accessible-coach/WO06_IMPLEMENTATION_EVIDENCE_2026-09-13.md
+- PR #16’s commits 8cf53e9, c4b8fa5 and f477551
+
+Append this complete prompt to PROMPT_LEDGER.md as the first repository write, using the next unused ledger entry after checking both branches.
+
+INTEGRATION
+1. Commit the prompt-ledger entry.
+2. Merge origin/codex/rpe-familiarisation into codex/ac-wo06-training-support with a normal merge. Do not rebase or rewrite audited history.
+3. Resolve conflicts narrowly. Known overlapping files are:
+   - PROMPT_LEDGER.md
+   - apps/mobile/src/screens/ProfileScreen.tsx
+   - apps/mobile/test/components/NavigationShell.test.js
+4. Preserve every append-only ledger entry.
+5. Preserve both:
+   - PR #16’s closed-database/database-readiness guards;
+   - WO-06’s Health and training support UI and prospective-advice holds.
+6. Do not change Migration 064, clinical policy, inference semantics, schema, backup format or networking.
+
+VERIFICATION
+Run:
+- git diff --check
+- npm run typecheck
+- focused HealthSupportStore, TrainingSupportBoundary, TrainingSupportEvidenceIdentity, Profile and NavigationShell tests
+- npm run verify:ci
+
+Prove the merged behavior includes:
+- no database-dependent screen or Profile database action before database readiness;
+- clinician-support holds still fail closed for prospective advice;
+- stopping, resting, factual history and deletion behavior remain available as designed;
+- athlete switching cannot read a closed database.
+
+If product code changed through conflict resolution, build an exact-tip QA APK and run npm run verify:qa-candidate. Record the commit, tree, APK path, size and SHA-256.
+
+DELIVERY
+Push only codex/ac-wo06-training-support using a normal non-force push. Open a PR targeting codex/rpe-familiarisation. Do not merge it yourself.
+
+Report:
+- starting and final identity;
+- conflict resolutions;
+- tests and exact results;
+- APK provenance if rebuilt;
+- PR URL and CI status;
+- anything untested or deferred.
+
+Do not merge master/main, force-push, tag, release, sign production or claim C6.
+`````
+
+- Numbering: Entry 0127. `codex/ac-wo06-training-support` ends at the
+  unnumbered "WO-06 implementation execution" entry after 0121; the PR base
+  `origin/codex/rpe-familiarisation` ends at 0126; 0122 is used by
+  `codex/ac-wo03-product-backup`. No local or remote ref uses 0127.
