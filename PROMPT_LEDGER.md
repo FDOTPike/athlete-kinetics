@@ -10400,3 +10400,35 @@ Comment 6 — comment_id=4006363759, inline thread: reply via `gh api repos/FDOT
 > only still-valid issues, skip the …
 (End of quoted GitHub text.)
 `````
+
+### Output F(G(x))
+
+- Verified each finding against 6c351ca before editing. Acted on three:
+  C2 (form load did not rerun when the database opened; stale unavailable
+  error), C3 (instruction scope carried into the next draft), C5 (newest
+  evidence could tie on generated_at_ms).
+- Fix 4ec7c47 (tree db5e64a): HealthTrainingSupportForm reloads on store
+  status change and clears the unavailable error after a successful load;
+  a successful instruction save resets scope, scope kind and search to the
+  unresolved default. TrainingSupportEvidenceIdentity uses an incrementing
+  Date.now, matching TrainingSupportBoundary.
+- Test first: new real-store cases in AthleteSwapProfileRender (failed boot,
+  then the same athlete boots with the form open) and TrainingSupportBoundary
+  (second draft after a movement-scoped save) both failed before the fix
+  ("Save support note" not found; unresolved-scope text not found) and pass
+  after it. The three affected suites: 53/53.
+- Not changed, by the integration scope (no change to support enforcement or
+  inference semantics): sameTarget target-kind matching (outside diff) and
+  C4 runner actions checking the whole session plan. Both over-hold rather
+  than under-hold; narrowing them is left to the owner. C6 workstation paths
+  in the WO-06 handover/evidence docs not edited: the same paths are recorded
+  verbatim in append-only ledger entries, and those docs are audited records.
+- Ledger: trailing spaces on blank quoted lines of this entry's verbatim
+  input were removed so git diff --check passes, as Entry 0126 did.
+- Validation on 4ec7c47: npm run typecheck exit 0; git diff --check clean;
+  npm run verify:ci exit 0 (PREFLIGHT OK; Test Suites: 33 passed, 33 total; Tests:       550 passed, 550 total; verify:store SQL — 675/675 checks green; backup 104-table
+  inventory).
+- APK not built locally; the PR android-apk CI job builds the exact-tip
+  candidate and runs verify:qa-candidate. Push, replies and CI status are
+  reported in the PR and handback.
+- MERGE / RELEASE / C6: NOT PERFORMED.
