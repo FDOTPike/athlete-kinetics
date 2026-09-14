@@ -10495,3 +10495,40 @@ Commit and push normally to codex/ac-wo06-training-support. Reply to C4/C6 with 
 
 Do not merge, rebase, force-push, tag, release, modify Migration 064, or expand clinical policy.
 `````
+
+### Output F(G(x))
+
+- Start: 3508378 (tree bdacd5a), clean, 0/0 against its upstream; next
+  unused ledger slot 0129 on every local and remote ref.
+- C4 (store, c8d962f): skip rest, rest-to-work, rest override and substitution
+  decline check the runner's current movement; skip slot checks its destination
+  movement; a skip that completes the session makes no prospective-advice check.
+  No current slot still means an all-prescription check.
+- sameTarget (inference, c8d962f): explicit compatible target kinds
+  (definition -> definition/series/occurrence, series -> series/occurrence,
+  occurrence -> occurrence, movement -> movement); other pairings disjoint.
+  all_prescription/unresolved scopes, malformed scopes, all_prescription
+  targets and missing identities within a compatible hierarchy still hold.
+- C6 (c8d962f): absolute local paths replaced with repository-relative wording
+  in HANDOVER_2026-09-13_WO06_TRAINING_SUPPORT.md and
+  WO06_IMPLEMENTATION_EVIDENCE_2026-09-13.md only; no ledger entry altered.
+- Test first: TrainingSupportBoundary gained 11 runner cases. Before the change
+  6 failed (three rest actions, decline and skip blocked by an unrelated hold;
+  final skip could not complete under a hold) and 5 blocking cases passed; all
+  11 pass after. verify_training_support gained compatible, mismatch,
+  cross-kind, missing-parent, preserved-rule and malformed-scope cases; before
+  the change it failed at "cross-kind scope is disjoint: definition ->
+  movement". Mutation: removing the compatibility guard failed the same
+  assertion; restored by sha256 49474072...
+- Validation on c8d962f (tree 43e7364): npm run typecheck exit 0; git diff
+  --check clean; verify_training_support and verify_activity_occurrences PASS;
+  focused TrainingSupportBoundary, HealthSupportStore,
+  TrainingSupportEvidenceIdentity, AthleteSwapProfileRender, ProfileScreens,
+  NavigationShell and SessionScreen: 7 suites, 246 tests passed;
+  npm run verify:ci exit 0 (PREFLIGHT OK; Test Suites: 33 passed, 33 total; Tests: 561 passed, 561 total; verify:store SQL — 675/675 checks green; backup 104-table
+  inventory).
+- The exact-tip QA APK is built from the commit that adds this output. Its
+  path, size, SHA-256 and verify:qa-candidate result are reported in the PR and
+  handback, so recording them does not move the tip.
+- Unchanged: Migration 064, packages/core-db, schema, backup format,
+  networking, clinical policy. MERGE / RELEASE / C6: NOT PERFORMED.
