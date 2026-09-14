@@ -273,7 +273,9 @@ const roleMinutes: Record<RoutineRole, number> = {
 const baseDose: Record<RoutineRole, readonly [number, number, number]> = {
   major: [4, 5, 8], supplementary: [3, 8, 7.5], accessory: [2, 12, 6.5], conditional: [2, 12, 7],
 };
-const ageSetDelta: Record<TrainingAge, number> = { beginner: -1, intermediate: 0, advanced: 1, elite: 1 };
+// D02: compatibility prescriptions follow the same no-experience-uplift law
+// as bounded microcycles, while retaining the beginner safety reduction.
+const ageSetDelta: Record<TrainingAge, number> = { beginner: -1, intermediate: 0, advanced: 0, elite: 0 };
 
 /** Revalidate a frozen routine against its live, DB-derived role policy.
  *
