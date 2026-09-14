@@ -10432,3 +10432,66 @@ Comment 6 — comment_id=4006363759, inline thread: reply via `gh api repos/FDOT
   candidate and runs verify:qa-candidate. Push, replies and CI status are
   reported in the PR and handback.
 - MERGE / RELEASE / C6: NOT PERFORMED.
+
+---
+
+## Entry 0129 — 2026-09-15 · PR #17 owner rulings: runner action targets, sameTarget compatibility, workstation paths
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+Continue PR #17 remediation at clean HEAD
+3508378f01fa4152378e5e96fe0a42cf047ec076
+in:
+C:\Users\fpike\.codex\worktrees\3057\Athlete App
+
+Owner rulings:
+
+1. C2, C3 and C5 are closed. Do not rework them.
+
+2. ACCEPT C4.
+Replace whole-session target evaluation for runner controls with the actual action target:
+- advanceRunnerRest, skipRunnerRest and setRunnerRestOverride: the current movement;
+- runnerDeclineSubstitution: the current movement;
+- runnerSkipSlot: the destination movement;
+- when runnerSkipSlot completes the session and has no destination, allow completion without a prospective-advice check.
+
+Add non-vacuous tests proving:
+- a hold on unrelated movement B does not block an action affecting movement A;
+- a hold on affected movement A does block it;
+- skipping into held destination B is blocked;
+- skipping the final slot can complete the session despite a hold because ending remains reachable.
+
+3. ACCEPT the outside-diff sameTarget finding, with an important constraint.
+Add explicit target-kind compatibility:
+- activity_definition scope → activity_definition, activity_series or activity_occurrence targets via activityId;
+- activity_series scope → activity_series or activity_occurrence via seriesId;
+- activity_occurrence scope → activity_occurrence via occurrenceId;
+- movement scope → movement via movementId;
+- incompatible cross-family kinds are disjoint.
+
+Preserve the existing safety rules:
+- all_prescription and unresolved scopes hold;
+- malformed scopes with missing required identifiers hold;
+- all_prescription targets hold;
+- within a compatible activity hierarchy, a missing parent identity cannot prove disjointness and therefore holds.
+
+Add focused tests for compatible matches, explicit mismatches, cross-kind disjointness, missing-parent fail-closed behavior and malformed scopes. Mutation-check the compatibility guard.
+
+4. ACCEPT C6.
+Remove developer-specific absolute paths only from:
+- HANDOVER_2026-09-13_WO06_TRAINING_SUPPORT.md
+- docs/audits/accessible-coach/WO06_IMPLEMENTATION_EVIDENCE_2026-09-13.md
+
+Use branch/repository-relative wording. Do not alter historical PROMPT_LEDGER entries.
+
+Append this complete ruling as the first new repository write and preserve append-only history.
+
+Run focused inference and TrainingSupportBoundary tests, typecheck, git diff --check and npm run verify:ci. Because product code changes, rebuild the exact-tip QA APK and run npm run verify:qa-candidate.
+
+Commit and push normally to codex/ac-wo06-training-support. Reply to C4/C6 with commit and test evidence; record the sameTarget disposition in a PR comment because it was outside the diff. Request one incremental CodeRabbit review after pushing.
+
+Do not merge, rebase, force-push, tag, release, modify Migration 064, or expand clinical policy.
+`````
