@@ -391,3 +391,100 @@ test('after a failed boot, Profile database controls do nothing, and switching b
   expect(countIn(DB_A, 'bodyweight_daily')).toBe(before.bodyweight);
   expect(countIn(DB_A, 'history_import')).toBe(before.imports);
 });
+
+// ---------------------------------------------------------------------------
+// WO-06 integration with PR #16: the Health and training support form lives on
+// Profile, so it is mounted through every swap. While the database is closed it
+// must not throw, must not offer a support write, must not write, and must keep
+// prospective coach suggestions held; switching back restores it.
+// ---------------------------------------------------------------------------
+
+const { SUPPORT_UNAVAILABLE_MESSAGE } = require('../../src/state/healthSupportStore');
+
+test('after a failed boot, the support form offers no write and holds advice, and switching back restores it', async () => {
+  mockRegistry = twoAthleteRegistry();
+  await bootRealStore();
+  await mountProfile();
+
+  // Booted: the form reads and writes A's file, so the closed case is not vacuous.
+  fireEvent.press(screen.getByLabelText('Show health and training support'));
+  fireEvent.changeText(screen.getByLabelText('Support note text'), 'Note saved while ready');
+  fireEvent.press(screen.getByLabelText('Save support note'));
+  await settle();
+  expect(countIn(DB_A, 'health_support_note')).toBe(1);
+  expect(store().getTrainingSupportDecision().status).toBe('available');
+  const profileRevision = Number(drivers.get(DB_A).raw
+    .prepare('SELECT revision FROM health_support_profile').get().revision);
+
+  fireEvent.press(screen.getByLabelText('Coach mode, 2 athletes, collapsed'));
+  openFails.add(DB_B);
+  fireEvent.press(screen.getByLabelText('Athlete Athlete B, tap to switch'));
+  await settle();
+  expect(store().status).toBe('error');
+  expectDatabaseClosed();
+
+  // Prospective advice fails closed rather than reading or guessing.
+  expect(store().getTrainingSupportDecision().status).toBe('support_unavailable');
+  expect(screen.getByText('Health and training support')).toBeOnTheScreen();
+  expect(screen.getAllByText(SUPPORT_UNAVAILABLE_MESSAGE).length).toBeGreaterThan(0);
+
+  // The athlete change remounted the form collapsed; opening it loads nothing
+  // and exposes no write control.
+  expect(screen.queryByLabelText('Support note text')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Show health and training support'));
+  await settle();
+  expect(screen.queryByLabelText('Support note text')).toBeNull();
+  expect(screen.queryByLabelText('Save support note')).toBeNull();
+  expect(screen.queryByLabelText('Save clinician instruction draft')).toBeNull();
+  expect(screen.queryByText('Note saved while ready')).toBeNull();
+  expectNoClosedDatabaseRead();
+
+  // Recovery from the same screen.
+  fireEvent.press(screen.getByLabelText('Athlete Athlete A, tap to switch'));
+  await settle();
+  expect(store().status).toBe('ready');
+  expect(store().getTrainingSupportDecision().status).toBe('available');
+  fireEvent.press(screen.getByLabelText('Show health and training support'));
+  await settle();
+  expect(screen.getByLabelText('Save support note')).toBeOnTheScreen();
+  expect(screen.getByText(/Note saved while ready/)).toBeOnTheScreen();
+  expectNoClosedDatabaseRead();
+
+  // Nothing reached A's support records while the database was closed.
+  expect(countIn(DB_A, 'health_support_note')).toBe(1);
+  expect(Number(drivers.get(DB_A).raw
+    .prepare('SELECT revision FROM health_support_profile').get().revision)).toBe(profileRevision);
+});
+
+// CodeRabbit on PR #17: a form opened while the database is closed must load
+// once that same athlete's database is ready, without being hidden and reopened,
+// and must not keep showing the unavailable error after it loads.
+test('a support form opened while the database is closed loads when that athlete becomes ready', async () => {
+  mockRegistry = twoAthleteRegistry();
+  await bootRealStore();
+  await mountProfile();
+  fireEvent.press(screen.getByLabelText('Coach mode, 2 athletes, collapsed'));
+
+  openFails.add(DB_B);
+  fireEvent.press(screen.getByLabelText('Athlete Athlete B, tap to switch'));
+  await settle();
+  expect(store().status).toBe('error');
+  expect(store().activeAthleteId).toBe(ATHLETE_B);
+
+  fireEvent.press(screen.getByLabelText('Show health and training support'));
+  await settle();
+  expect(screen.queryByLabelText('Save support note')).toBeNull();
+  expect(screen.getAllByText(SUPPORT_UNAVAILABLE_MESSAGE).length).toBeGreaterThan(0);
+
+  // Retry the same athlete: no athlete change, so the form is not remounted.
+  useStore.setState({ status: 'booting', error: null });
+  store().boot();
+  await settle();
+  expect(store().status).toBe('ready');
+  expect(store().activeAthleteId).toBe(ATHLETE_B);
+
+  expect(screen.getByLabelText('Hide health and training support')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Save support note')).toBeOnTheScreen();
+  expect(screen.queryByText(SUPPORT_UNAVAILABLE_MESSAGE)).toBeNull();
+  expectNoClosedDatabaseRead();
+});

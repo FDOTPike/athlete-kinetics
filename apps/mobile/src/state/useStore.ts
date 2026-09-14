@@ -41,6 +41,14 @@ import {
 } from './athleteRegistryCore';
 import { loadRegistry, saveRegistry } from './athleteRegistry';
 import {
+  createHealthSupportStore, SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE,
+  type SupportDetails, type SupportFacts, type SupportInstructionInput,
+} from './healthSupportStore';
+import type {
+  HealthSupportPreferenceKind, HealthSupportNoteKind, HealthSupportReviewState,
+  PersonalizedAdviceTarget, TrainingSupportDecision,
+} from '@ak/inference';
+import {
   inventoryFromRowCell,
   inventoryFromSnapshot,
   inventoryToSnapshot,
@@ -600,6 +608,19 @@ export interface ReturnCheckinState {
   readonly isDismissed: boolean;
 }
 interface KineticsStore {
+  healthSupportRevision: number;
+  getTrainingSupportDecision: (movementIds?: readonly number[]) => TrainingSupportDecision;
+  requireTrainingSupport: (operation: SupportOperation, movementIds: readonly number[] | undefined, targetIdentity: string) => boolean;
+  getHealthSupportFacts: () => SupportFacts;
+  getHealthSupportDetails: (athleteId: string) => SupportDetails;
+  refreshHealthSupport: () => void;
+  saveSupportPreference: (athleteId: string, kind: HealthSupportPreferenceKind, value: string, detail: string, revision: number) => void;
+  saveSupportNote: (athleteId: string, kind: HealthSupportNoteKind, text: string, noteId: string | undefined, revision: number) => void;
+  deleteSupportNote: (athleteId: string, id: string, revision: number) => void;
+  setSupportReviewState: (athleteId: string, value: HealthSupportReviewState, revision: number) => void;
+  saveSupportInstruction: (athleteId: string, input: SupportInstructionInput, revision: number) => void;
+  confirmSupportInstruction: (athleteId: string, id: string, instructionRevision: number, revision: number) => void;
+  deleteSupportInstruction: (athleteId: string, id: string, revision: number) => void;
   status: BootStatus;
   error: string | null;
   today: string;
@@ -967,11 +988,57 @@ interface KineticsStore {
 // current versions; older builds nest it under _array)
 // ---------------------------------------------------------------------------
 let db: DB | null = null;
+let dbAthleteId: string | null = null;
 let bootInFlight = false;
 const getDb = (): DB => {
   if (db === null) throw new Error('kinetics db not booted');
   return db;
 };
+const supportAdapter = (athleteId: string = useStore.getState().activeAthleteId): ReturnType<typeof createHealthSupportStore> => createHealthSupportStore(
+  { athleteId, db: getDb() },
+  () => db !== null && dbAthleteId !== null && useStore.getState().activeAthleteId === dbAthleteId
+    ? { athleteId: dbAthleteId, db } : null,
+);
+const movementSupportTargets = (ids?: readonly number[]): PersonalizedAdviceTarget[] => ids?.length
+  ? [...new Set(ids)].map((movementId) => ({ targetKind: 'movement', movementId }))
+  : [{ targetKind: 'all_prescription' }];
+const SUPPORT_ADVICE_KINDS = {
+  'block-generate': 'block', 'block-commit': 'block',
+  'routine-save': 'program', 'routine-freeze': 'program',
+  'session-start': 'session', 'session-start-commit': 'session', 'daily-prescription': 'session',
+  'rest-to-work': 'session', 'skip-rest': 'session', 'rest-override': 'session',
+  'select-slot': 'slot', 'skip-to-next-slot': 'slot', 'add-plan-slot': 'slot',
+  'log-set': 'slot', 'apre-next-week': 'slot',
+  'decline-substitution': 'movement_substitution', 'swap-movement': 'movement_substitution',
+  'substitution-preview': 'movement_substitution', 'day-swap': 'movement_substitution',
+} as const;
+type SupportOperation = keyof typeof SUPPORT_ADVICE_KINDS;
+/** The movement a runner control acts on now. Without a current slot there is
+ * no narrower target, so the check covers all prescription (fails closed). */
+const runnerCurrentMovementIds = (runner: Parameters<typeof currentRunnerSlot>[0] | null): readonly number[] | undefined => {
+  const slot = runner === null ? null : currentRunnerSlot(runner);
+  return slot === null ? undefined : [slot.movementId];
+};
+const supportMovementIdentity = (ids?: readonly number[]): string => {
+  const distinct = [...new Set(ids ?? [])].sort((a, b) => a - b);
+  if (distinct.length === 0) return 'all-prescription';
+  if (distinct.length <= 2) return `movement:${distinct.join(',')}`;
+  return `movement-set:${historyContentFingerprint(distinct.join(','))}`;
+};
+/** Content-free, reproducible identity for the factual guidance target. Entity
+ * IDs win whenever they exist; pre-insert targets use date + movement-set
+ * fingerprint and never a generated recommendation decision ID. */
+const supportDecision = (ids?: readonly number[], operation?: SupportOperation, targetIdentity?: string): TrainingSupportDecision => {
+  try {
+    const adapter = supportAdapter();
+    return operation === undefined ? adapter.evaluate(movementSupportTargets(ids))
+      : targetIdentity === undefined
+        ? { status: 'support_unavailable', holdIds: [] }
+        : adapter.recordDecision(movementSupportTargets(ids), SUPPORT_ADVICE_KINDS[operation], `${operation}:${targetIdentity}`, Date.now());
+  } catch { return { status: 'support_unavailable', holdIds: [] }; }
+};
+const supportMessage = (decision: TrainingSupportDecision): string => decision.status === 'support_unavailable'
+  ? SUPPORT_UNAVAILABLE_MESSAGE : SUPPORT_HELD_MESSAGE;
 const rowsOf = <T>(res: unknown): T[] => {
   const r = (res as { rows?: unknown }).rows;
   if (Array.isArray(r)) return r as T[];
@@ -2041,6 +2108,8 @@ const applyApreFinalization = (
     [sourcePlannedSessionId],
   ));
   for (const slot of sourceSlots) {
+    if (supportDecision([slot.movement_id], 'apre-next-week',
+      `planned-slot:${slot.planned_slot_id}:movement:${slot.movement_id}`).status !== 'available') continue;
     if (slot.one_rm_kg === null) continue;
     const bestReps = loggedSets
       .filter((loggedSet) => loggedSet.sourcePlannedSlotId === slot.planned_slot_id && loggedSet.movementId === slot.movement_id)
@@ -2249,6 +2318,51 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   movementPrefixes: [],
   athletes: [],
   activeAthleteId: 'default',
+  healthSupportRevision: 0,
+  getTrainingSupportDecision: (ids) => supportDecision(ids),
+  requireTrainingSupport: (operation, ids, targetIdentity) => {
+    const decision = supportDecision(ids, operation, targetIdentity);
+    if (decision.status === 'available') {
+      if (get().error === SUPPORT_HELD_MESSAGE || get().error === SUPPORT_UNAVAILABLE_MESSAGE) set({ error: null });
+      return true;
+    }
+    set({ error: supportMessage(decision), prescription: null, substitution: null });
+    return false;
+  },
+  getHealthSupportFacts: () => supportAdapter().facts(),
+  getHealthSupportDetails: (athleteId) => supportAdapter(athleteId).details(),
+  refreshHealthSupport: () => {
+    set({ healthSupportRevision: get().healthSupportRevision + 1, substitution: null });
+    get().computePrescription([]);
+  },
+  saveSupportPreference: (athleteId, kind, value, detail, revision) => {
+    supportAdapter(athleteId).savePreference(kind, value, detail, revision, Date.now());
+    get().refreshHealthSupport();
+  },
+  saveSupportNote: (athleteId, kind, text, noteId, revision) => {
+    supportAdapter(athleteId).saveNote(kind, text, noteId, revision, Date.now());
+    get().refreshHealthSupport();
+  },
+  deleteSupportNote: (athleteId, id, revision) => {
+    supportAdapter(athleteId).deleteNote(id, revision, Date.now());
+    get().refreshHealthSupport();
+  },
+  setSupportReviewState: (athleteId, value, revision) => {
+    supportAdapter(athleteId).setReviewState(value, revision, Date.now());
+    get().refreshHealthSupport();
+  },
+  saveSupportInstruction: (athleteId, input, revision) => {
+    supportAdapter(athleteId).saveInstruction(input, revision, Date.now());
+    get().refreshHealthSupport();
+  },
+  confirmSupportInstruction: (athleteId, id, instructionRevision, revision) => {
+    supportAdapter(athleteId).confirmInstruction(id, instructionRevision, revision, Date.now());
+    get().refreshHealthSupport();
+  },
+  deleteSupportInstruction: (athleteId, id, revision) => {
+    supportAdapter(athleteId).deleteInstruction(id, revision, Date.now());
+    get().refreshHealthSupport();
+  },
   advancedToolsUnlocked: false,
   onboarded: true,
 
@@ -2270,6 +2384,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         advancedToolsUnlocked: reg.advancedToolsUnlocked,
       });
       db = openKineticsDb(entry.dbName);
+      dbAthleteId = entry.id;
       migrate(db);
       // Catch-up materialization: idempotent upsert over the trailing 14 days so
       // today's state_vector row and the 14-day trend exist under one policy revision
@@ -2730,6 +2845,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   resolveSlotLoad: (input) => {
+    if (supportDecision([input.movementId]).status !== 'available') {
+      return { source: 'manual', initialLoadKg: null, advisoryKg: null, advisoryKind: null };
+    }
     const state = get();
     const latestCurrentSessionSet = state.session?.sets.reduce<LoggedSet | null>(
       (latest, candidate) => candidate.movement_id === input.movementId
@@ -2854,6 +2972,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   resolveGoalRung: (progressionGroup, today) => {
     const d = getDb();
+    const chainIds = rowsOf<{ movement_id: number }>(d.executeSync(
+      'SELECT movement_id FROM movement_progression WHERE progression_group=?', [progressionGroup],
+    )).map((row) => row.movement_id);
+    if (supportDecision(chainIds).status !== 'available') return null;
     const chain = rowsOf<{ name: string; progression_group: string; progression_rank: number }>(
       d.executeSync('SELECT m.name, p.progression_group, p.progression_rank FROM movement_progression p JOIN movement m ON m.movement_id = p.movement_id WHERE p.progression_group = ? ORDER BY p.progression_rank', [progressionGroup]),
     ).map((r) => ({ movementName: r.name, progressionGroup: r.progression_group, progressionRank: r.progression_rank }));
@@ -3319,6 +3441,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       programDays: shape.programDays,
       powerPreferredMovementNames: powerNames,
     });
+    const support = supportDecision(plan.sessions.flatMap((day) => day.slots.map((slot) => slot.movement_id)));
+    if (support.status !== 'available') throw new Error(supportMessage(support));
     return {
       objective: planningProfile.objective, startDate, requestedReviewDate: shape.requestedReviewDate,
       plannedEndDate: shape.plannedEndDate, plannedBlockCount: shape.plannedBlockCount,
@@ -3515,8 +3639,36 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       flawReport,
       powerPreferredMovementNames: powerNamesGenerate,
     });
+    const supportIds = plan.sessions.flatMap((day) => day.slots.map((slot) => slot.movement_id));
+    const candidateProgramId = pendingProgramCreation !== null
+      ? 'new'
+      : pendingProgramContinuation?.programId ?? get().program?.programId ?? 'none';
+    const candidateFingerprint = historyContentFingerprint(JSON.stringify({
+      startDate: plan.start_date,
+      schemaType: plan.schemaType,
+      macroBlockIndex: plan.macroBlockIndex,
+      sessions: plan.sessions.map((day) => ({
+        weekIndex: day.week_index,
+        dayIndex: day.day_index,
+        focus: day.focus,
+        phase: day.phase,
+        sessionDate: day.session_date,
+        slots: day.slots.map((slot) => ({
+          slotIndex: slot.slot_index,
+          movementId: slot.movement_id,
+          sets: slot.sets,
+          reps: slot.reps,
+          targetRpe: slot.target_rpe,
+          appliedPrefixes: slot.applied_prefixes ?? [],
+          autopilotDelta: slot.autopilotDelta ?? null,
+        })),
+      })),
+    }));
+    const candidateIdentity = `block-candidate:${plan.start_date}:${plan.schemaType}:p${candidateProgramId}:${candidateFingerprint}`;
+    if (!get().requireTrainingSupport('block-generate', supportIds, candidateIdentity)) return;
     d.executeSync('BEGIN');
     try {
+      if (!get().requireTrainingSupport('block-commit', supportIds, candidateIdentity)) throw new Error(get().error ?? SUPPORT_HELD_MESSAGE);
       let programId: number | null = pendingProgramContinuation?.programId ?? null;
       const programDraft = pendingProgramCreation;
       if (programDraft !== null) {
@@ -4026,6 +4178,20 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   saveRoutineTemplate: (input) => {
+    const routineIdentity = input.routineTemplateId === undefined
+      ? `routine-draft:${historyContentFingerprint(JSON.stringify({ schemaType: input.schemaType,
+          slots: input.slots.map((slot) => ({
+            dayIndex: slot.dayIndex ?? 1,
+            slotIndex: slot.slotIndex ?? 0,
+            movementId: slot.movementId,
+            role: slot.role,
+            sets: slot.sets ?? null,
+            reps: slot.reps ?? null,
+            targetRpe: slot.targetRpe ?? null,
+            preserveLegacyRoleAllowance: slot.preserveLegacyRoleAllowance ?? false,
+          })) }))}`
+      : `routine:${input.routineTemplateId}`;
+    if (!get().requireTrainingSupport('routine-save', input.slots.map((s) => s.movementId), routineIdentity)) throw new Error(get().error ?? SUPPORT_HELD_MESSAGE);
     const d = getDb();
     const { profile } = get();
     const name = input.name.trim();
@@ -4196,6 +4362,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const today = sessionDate ?? localToday();
     const template = get().routineTemplates.find((candidate) => candidate.routineTemplateId === routineTemplateId);
     if (template === undefined) throw new Error(`Routine template ${routineTemplateId} not found.`);
+    if (!get().requireTrainingSupport('routine-freeze', template.slots.map((s) => s.movementId),
+      `routine:${routineTemplateId}:day:${routineDayIndex}`)) throw new Error(get().error ?? SUPPORT_HELD_MESSAGE);
 
     const { profile, movements } = get();
     if (profile.training_age === 'beginner') {
@@ -5079,8 +5247,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       });
     }
 
+    const supportIds = sessionPlan.map((slot) => slot.movementId);
+    const sessionCandidateIdentity = planToConsume === null
+      ? `unplanned-session:${today}:${supportMovementIdentity(supportIds)}`
+      : `planned-session:${planToConsume.plannedSessionId}`;
+    if (!get().requireTrainingSupport('session-start', supportIds, sessionCandidateIdentity)) return;
     d.executeSync('BEGIN');
     try {
+      if (!get().requireTrainingSupport('session-start-commit', supportIds, sessionCandidateIdentity)) throw new Error(get().error ?? SUPPORT_HELD_MESSAGE);
       d.executeSync(
         'INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, ?, ?)',
         [today, startedAtMs],
@@ -5176,6 +5350,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const slotIndex = sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === sessionPlanSlotId);
     const slot = slotIndex >= 0 ? sessionPlan[slotIndex] : undefined;
     if (slot === undefined) return;
+    if (!get().requireTrainingSupport('select-slot', [slot.movementId],
+      `session:${session?.sessionId ?? 'draft'}:slot:${sessionPlanSlotId}:movement:${slot.movementId}`)) return;
     if (runner === null || session === null || sessionMode === null) {
       set({ activeSessionPlanSlotId: sessionPlanSlotId, activeMovementId: slot.movementId });
       return;
@@ -5223,6 +5399,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   advanceRunnerRest: () => {
+    const supportState = get();
+    if (!get().requireTrainingSupport('rest-to-work', runnerCurrentMovementIds(supportState.runner),
+      `session:${supportState.session?.sessionId ?? 'none'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
     const nextRunner = advanceSessionRunner(runner, { kind: 'REST_ELAPSED', atMs: Date.now() });
@@ -5241,6 +5420,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   skipRunnerRest: () => {
+    const supportState = get();
+    if (!get().requireTrainingSupport('skip-rest', runnerCurrentMovementIds(supportState.runner),
+      `session:${supportState.session?.sessionId ?? 'none'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
     const nextRunner = advanceSessionRunner(runner, { kind: 'SKIP_REST', atMs: Date.now() });
@@ -5259,6 +5441,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   setRunnerRestOverride: (seconds) => {
+    const supportState = get();
+    if (!get().requireTrainingSupport('rest-override', runnerCurrentMovementIds(supportState.runner),
+      `session:${supportState.session?.sessionId ?? 'none'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
     const nextRunner = advanceSessionRunner(runner, { kind: 'SET_REST_OVERRIDE', atMs: Date.now(), seconds });
@@ -5307,6 +5492,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   runnerDeclineSubstitution: () => {
+    const supportState = get();
+    if (!get().requireTrainingSupport('decline-substitution', runnerCurrentMovementIds(supportState.runner),
+      `session:${supportState.session?.sessionId ?? 'none'}:slot:${supportState.activeSessionPlanSlotId ?? 'none'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
     const nextRunner = advanceSessionRunner(runner, { kind: 'DECLINE_SUBSTITUTION', atMs: Date.now() });
@@ -5325,9 +5513,20 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   runnerSkipSlot: () => {
+    const supportState = get();
+    const skippedAtMs = Date.now();
+    const previewRunner = supportState.runner === null
+      ? null
+      : advanceSessionRunner(supportState.runner, { kind: 'SKIP_SLOT', atMs: skippedAtMs });
+    const destinationSlot = previewRunner === null ? null : currentRunnerSlot(previewRunner);
+    // Skipping the final slot completes the session: there is no destination to
+    // advise on, and ending must stay reachable under a hold.
+    const completesSession = previewRunner !== null && destinationSlot === null;
+    if (!completesSession && !get().requireTrainingSupport('skip-to-next-slot', destinationSlot === null ? undefined : [destinationSlot.movementId],
+      `session:${supportState.session?.sessionId ?? 'none'}:slot:${destinationSlot?.sessionPlanSlotId ?? 'complete'}`)) return;
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
-    const nextRunner = advanceSessionRunner(runner, { kind: 'SKIP_SLOT', atMs: Date.now() });
+    const nextRunner = advanceSessionRunner(runner, { kind: 'SKIP_SLOT', atMs: skippedAtMs });
     if (nextRunner === runner) return;
     const d = getDb();
     d.executeSync('BEGIN');
@@ -5362,6 +5561,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   addPlanSlot: (movementId) => {
     const state = get();
+    if (!get().requireTrainingSupport('add-plan-slot', [movementId],
+      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:new:movement:${movementId}`)) return;
     const { sessionPlan, prescription, today, session, movements, profile, runner } = state;
     // The legacy library picker stays outside Phase 17. Refusing late inserts
     // avoids creating a session slot that the durable runner cannot replay.
@@ -5437,6 +5638,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
     const replacement = movements.find((movement) => movement.movement_id === newMovementId);
     if (slot === undefined || replacement === undefined) return;
+    if (!get().requireTrainingSupport('swap-movement', [oldMovementId, newMovementId],
+      `session:${session?.sessionId ?? 'draft'}:slot:${slot.sessionPlanSlotId}:movement:${oldMovementId}->${newMovementId}`)) return;
     const accessContext = executionContextForState(state);
     if (accessContext === null) {
       set({ error: 'The active session access context cannot be verified. Reopen the session before editing it.' });
@@ -5533,6 +5736,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const { movements, profile, block } = state;
     const target = movements.find((m) => m.movement_id === targetMovementId);
     if (target === undefined) return;
+    const activeTargetSlot = state.activeSessionPlanSlotId !== null
+      ? state.sessionPlan.find((slot) => slot.sessionPlanSlotId === state.activeSessionPlanSlotId)
+      : undefined;
+    const targetSlot = activeTargetSlot?.movementId === targetMovementId
+      ? activeTargetSlot
+      : state.sessionPlan.find((slot) => slot.movementId === targetMovementId);
+    if (!get().requireTrainingSupport('substitution-preview', [targetMovementId],
+      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return;
     // Re-read today's niggles from 011 so a midnight crossing while the app sat
     // foregrounded (no AppState 'active' -> no rolloverDay) can't feed the
     // engine yesterday's niggles. set() is synchronous, so get().niggles below
@@ -5551,6 +5762,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       new Set(get().activePriorExperienceMovementIds),
       safetyExcludedMovementIdsFor(movements, profile, get().niggles),
     );
+    // Candidate publication is one preview operation: capture decisive support
+    // rows once, then evaluate every candidate in memory. Actual substitutions
+    // still re-check through requireTrainingSupport at their tap/commit boundary.
+    const supportSnapshot = supportAdapter().captureEvaluation();
     let futureSlots: FutureSlot[] = [];
     let currentDayIndex = 0;
     // Layer 2 (day-swap) needs the active block's later days. With no block,
@@ -5585,10 +5800,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
     const result = computeSubstitutions({
       target: toSubMovement(target, capabilityAvailable),
-      library: movements.map((movement) => toSubMovement(movement, capabilityAvailable)),
+      library: movements.filter((movement) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
+        .map((movement) => toSubMovement(movement, capabilityAvailable)),
       inventory: profile.equipment_inventory,
       niggles: get().niggles, // active niggles drive the guardrail + Layer 3
-      futureSlots,
+      futureSlots: futureSlots.filter((slot) => supportSnapshot.evaluate(movementSupportTargets([slot.movement.movement_id])).status === 'available'),
       currentDayIndex,
       trainingAge: profile.training_age, // experience-weighted severity thresholds
       accessContext,
@@ -5658,6 +5874,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       ? sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId)
       : sessionPlan.find((slot) => slot.movementId === targetMovementId);
     if (targetSlot === undefined) return;
+    if (!get().requireTrainingSupport('day-swap', [targetMovementId, option.movement_id],
+      `session:${session?.sessionId ?? 'draft'}:slot:${targetSlot.sessionPlanSlotId}:movement:${targetMovementId}->${option.movement_id}:planned-slot:${option.plannedSlotId}`)) return;
 
     const d = getDb();
     const futureSlotInfo = rowsOf<{
@@ -5844,6 +6062,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       if (activeSlot !== undefined && activeSlot.movementId === movementId) planSlot = activeSlot;
     }
     if (planSlot === undefined) planSlot = state.sessionPlan.find((slot) => slot.movementId === movementId);
+    if (!get().requireTrainingSupport('log-set', [movementId],
+      `session:${s.sessionId}:slot:${planSlot?.sessionPlanSlotId ?? 'unplanned'}:movement:${movementId}`)) return;
 
     const runnerCurrent = state.runner === null ? null : currentRunnerSlot(state.runner);
     if (state.runner !== null) {
@@ -6252,6 +6472,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().computePrescription([]);
   },
   computePrescription: (_patterns) => {
+    if (!get().requireTrainingSupport('daily-prescription', undefined, `session-date:${localToday()}`)) return;
     const { vector, profile, session } = get();
     // No readiness vector -> no adjustment; NEVER leave yesterday's on screen.
     if (vector === null) { set({ prescription: null }); return; }

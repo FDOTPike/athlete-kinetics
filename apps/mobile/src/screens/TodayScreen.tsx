@@ -40,6 +40,7 @@
 import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useStore } from '../state/useStore';
+import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
 import {
   deriveTodayState,
@@ -72,7 +73,17 @@ const READINESS_LABEL: Record<'OPTIMAL' | 'RECOVERY' | 'OVERREACHED', string> = 
   OVERREACHED: 'Recovery is the work',
 };
 
-export default function TodayScreen({
+export default function TodayScreen(props: TodayScreenProps): React.JSX.Element {
+  const state = useStore((s) => s);
+  const decision = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
+    : { status: 'support_unavailable' as const };
+  if (state.status !== 'booting' && decision.status !== 'available') return <TrainingSupportNotice
+    unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />;
+  return <AvailableTodayScreen {...props} />;
+}
+
+function AvailableTodayScreen({
   onOpenSession,
   onOpenPlan,
 }: TodayScreenProps): React.JSX.Element {

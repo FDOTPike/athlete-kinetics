@@ -93,7 +93,20 @@ interface RoutineTemplateBuilderProps {
   onCancel?: () => void;
 }
 
-export function RoutineTemplateBuilder({
+export function RoutineTemplateBuilder(props: RoutineTemplateBuilderProps): React.JSX.Element {
+  const state = useStore((s) => s);
+  const decision = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision() : { status: 'support_unavailable' as const };
+  if (decision.status !== 'available') return <View accessibilityRole="alert">
+    <Text style={{ color: theme.color.textHi }}>Health and training support: routine suggestions are on hold. Your saved routines remain available in history.</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel="Close routine builder" onPress={props.onCancel} style={{ minHeight: 56 }}>
+      <Text style={{ color: theme.color.textHi }}>Close</Text>
+    </Pressable>
+  </View>;
+  return <AvailableRoutineTemplateBuilder key={state.activeAthleteId} {...props} />;
+}
+
+function AvailableRoutineTemplateBuilder({
   initialTemplate,
   onSaved,
   onCancel,

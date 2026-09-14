@@ -27,7 +27,7 @@ describe('KeyboardAwareScrollView contract', () => {
       return [...source.matchAll(/<TextInput\b[\s\S]*?\/>/g)].map((match) => ({ file, tag: match[0] }));
     });
 
-    expect(inputTags).toHaveLength(28);
+    expect(inputTags).toHaveLength(29);
     for (const input of inputTags) {
       expect({ file: path.relative(srcRoot, input.file), tag: input.tag })
         .toEqual(expect.objectContaining({ tag: expect.stringMatching(/\bdisableFullscreenUI\b/) }));

@@ -34,7 +34,7 @@ function Probe({ onRef }) {
 let mockState;
 
 jest.mock('../../src/state/useStore', () => {
-  const useStoreImpl = (selector) => selector(mockState);
+  const useStoreImpl = (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState });
   useStoreImpl.getState = () => mockState;
   useStoreImpl.setState = () => {};
   return {
@@ -219,7 +219,7 @@ describe('Sol R4 F1: "Back to Today" actually returns to Today', () => {
     render(<AppShellTestHarness onBackState={(p) => seen.push(p)} />);
     fireEvent.press(screen.getByTestId('header-session'));
     expect(screen.getByTestId('session-screen-shown')).toBeOnTheScreen();
-    expect(screen.getByText('Session stopped safely.')).toBeOnTheScreen();
+    expect(screen.getByText('Session stopped.')).toBeOnTheScreen();
 
     fireEvent.press(screen.getByLabelText('Back to Today'));
 

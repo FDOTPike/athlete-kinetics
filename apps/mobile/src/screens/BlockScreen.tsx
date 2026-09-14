@@ -5,6 +5,7 @@
  * four-week trajectory (liquid calendar), and inline disclosures for management and context.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SELECTABLE_SCHEMA_TYPES, addDaysIso, targetLoadKg, splitExplainer, SPLIT_EXPLAINER_FOOTER, type BlockPlan, type SchemaType } from '@ak/inference';
 import {
@@ -173,7 +174,16 @@ function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
   });
 }
 
-export default function BlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX.Element {
+export default function BlockScreen(props: BlockScreenProps): React.JSX.Element {
+  const state = useStore((s) => s);
+  const decision = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision() : { status: 'support_unavailable' as const };
+  if (decision.status !== 'available') return <TrainingSupportNotice unavailable={decision.status === 'support_unavailable'}
+    onOpenSession={state.session !== null ? props.onSessionStarted : undefined} />;
+  return <AvailableBlockScreen key={state.activeAthleteId} {...props} />;
+}
+
+function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX.Element {
   const vector = useStore((s) => s.vector);
   // Read through the hook, not useStore.getState(): the component tests mock
   // the store with a bare selector function, which getState() would bypass.

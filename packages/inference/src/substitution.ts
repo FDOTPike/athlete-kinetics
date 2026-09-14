@@ -294,7 +294,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       rationale:
         `${m.name} (${m.difficulty}) substitutes ${input.target.name}` +
         (easier ? ' with reduced mechanical demand' : ' at matched difficulty, altered torque') +
-        (guarded ? '; cleared the injury guardrail' : ''),
+        (guarded ? '; Passes the app’s current reported-joint checks' : ''),
     });
   }
   layer1.sort(byRegression);

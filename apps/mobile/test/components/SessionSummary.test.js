@@ -36,7 +36,7 @@ import {
 let mockState;
 
 jest.mock('../../src/state/useStore', () => {
-  const useStoreImpl = (selector) => selector(mockState);
+  const useStoreImpl = (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState });
   useStoreImpl.getState = () => mockState;
   useStoreImpl.setState = () => {};
   return {

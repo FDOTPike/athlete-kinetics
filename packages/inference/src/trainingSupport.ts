@@ -18,11 +18,26 @@ const targetIdentifierMissing = (scope: HealthSupportScope): boolean =>
   || (scope.targetKind === 'activity_occurrence' && (scope.occurrenceId ?? null) === null)
   || (scope.targetKind === 'movement' && (scope.movementId ?? null) === null);
 
+// Which advice-target kinds an identified scope can reach: an activity
+// definition reaches its series and occurrences, a series its occurrences, and
+// an occurrence or a movement only its own kind. Every other pairing is disjoint.
+const COMPATIBLE_TARGET_KINDS: Readonly<Record<
+  'activity_definition' | 'activity_series' | 'activity_occurrence' | 'movement',
+  readonly PersonalizedAdviceTarget['targetKind'][]
+>> = {
+  activity_definition: ['activity_definition', 'activity_series', 'activity_occurrence'],
+  activity_series: ['activity_series', 'activity_occurrence'],
+  activity_occurrence: ['activity_occurrence'],
+  movement: ['movement'],
+};
+
 const sameTarget = (scope: HealthSupportScope, target: PersonalizedAdviceTarget): boolean => {
   if (scope.targetKind === 'all_prescription' || scope.targetKind === 'unresolved') return true;
   if (targetIdentifierMissing(scope)) return true;
   if (target.targetKind === 'all_prescription') return true;
-  if (scope.targetKind !== target.targetKind) return false;
+  if (!COMPATIBLE_TARGET_KINDS[scope.targetKind].includes(target.targetKind)) return false;
+  // Within a compatible hierarchy an absent identity on the target cannot prove
+  // disjointness, so it matches (holds).
   if (scope.targetKind === 'activity_definition') {
     return target.activityId === undefined || scope.activityId === target.activityId;
   }
@@ -51,7 +66,7 @@ export function evaluateTrainingSupport(input: {
   const matched = input.holds
     .filter((hold) => hold.state === 'held')
     .filter((hold) => hold.scopes.length === 0 || hold.scopes.some((scope) => sameTarget(scope, input.target)))
-    .sort((a, b) => a.holdId.localeCompare(b.holdId));
+    .sort((a, b) => a.holdId < b.holdId ? -1 : a.holdId > b.holdId ? 1 : 0);
 
   if (matched.length === 0) return { status: 'available', holdIds: [] };
   return {
