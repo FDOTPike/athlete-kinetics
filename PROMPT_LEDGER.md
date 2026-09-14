@@ -11111,3 +11111,45 @@ Recommended next step: give Opus one focused remediation round on this same bran
 - Numbering: Entry 0131. This branch ends at 0130; the merged base ends at
   0129; codex/wo07-live-hr-capability-audit carries only 0150; no local or
   remote ref uses 0131.
+
+### Output F(G(x))
+
+- Start: codex/ac-wo03-product-backup at 9d8407f (tree 0b85ed4), clean and level
+  with its upstream; PR #18 open with six unresolved CodeRabbit threads.
+- P1 leases: tryAcquireDataMutationLease claims a lease before the first await
+  and releases it when the operation settles; saveRegistry, every registry action
+  (switch, create, rename, delete with file removal, advanced tools, onboarding
+  name) and store boot hold one; boot rechecks authorization after
+  loadRegistry; backup, restore and startup recovery take the maintenance lock,
+  which is refused while a lease is active.
+- P1 recovery candidates: isWellFormedBackupContainer strictly decodes the
+  ciphertext and requires 700 bytes (GCM tag plus one minimum SQLite page);
+  reconciliation preserves an unselected well-formed candidate as
+  pikeMethods-recovery-current.pmbak.alternate-<sha256> instead of deleting it;
+  review tries the selected recovery then preserved candidates with the
+  password; a portable restore supersedes them only after its new recovery is
+  durable and before replacement.
+- P2: the RECOVERY NEEDED gate has one bounded Retry protected recovery action
+  that never bypasses startupSafe. The concurrent-WAL contract waits for a
+  committed batch, reports writer errors, always terminates the worker and
+  requires whole concurrent transactions. P3: NavigationShell mock resolves true
+  and startup is asserted.
+- Failing first on the prior code: 7 lease cases plus the saveRegistry case; 2
+  retry-gate cases; the strict container assertions; 23 of 70 publication
+  tests and 4 new store tests; the old concurrent-WAL contract passed with a
+  writer that inserted nothing.
+- Mutations: 12 review mutations (N01-N12), each restored by SHA-256 with the
+  worktree fingerprint unchanged. N10 (retry in-flight ref) was undetected in
+  the first run; a same-frame double-tap test was added and the re-run detected
+  it. All 12 are detected.
+- Commit 4bfbf6a (tree 30b9ae8): typecheck exit 0; git diff --check clean; 14
+  backup/lease/retry/shell/swap suites 171/171 before the added retry test
+  (retry gate then 3/3); verify:backup PASS; npm run verify:ci exit 0
+  (PREFLIGHT OK; Test Suites: 45 passed, 45 total; Tests: 706 passed, 706 total; verify:store SQL — 675/675 checks green; verify_training_support PASS). Migration 064 blob
+  69090f2 and the schema directory unchanged.
+- Docs: decision record updated; HANDOVER_2026-09-15_WO03B_PR18_REVIEW_REMEDIATION.md
+  added. Historical handovers unchanged.
+- The exact-tip QA APK is built from the commit that adds this output. Its
+  provenance, verify:qa-candidate result, emulator journeys, push, thread replies
+  and CI are recorded in the pull request and handback.
+- A fresh independent audit is required. MERGE / RELEASE / C6: NOT PERFORMED.
