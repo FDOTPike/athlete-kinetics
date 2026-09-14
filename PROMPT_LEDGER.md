@@ -10076,3 +10076,223 @@ IOS / PHYSICAL DEVICE: UNTESTED
   - `git diff --check` exit 0, including the new files.
   - Migration 064 blob `69090f2` is identical at HEAD and in the worktree, and the schema directory has no diff.
 - Not performed: push, PR, merge, rebase, tag, release, production signing and C6. Untested: iOS and physical-device behavior. Independent audit: required. The committed HEAD, QA APK provenance and emulator journeys are reported in the handback, outside this append-only entry, so no self-referential tracked edit invalidates the candidate they describe.
+
+---
+
+## Entry 0130 — 2026-09-15 · WO-03B integration and PR ownership: encrypted backup, replace-only restore, retained previous-data recovery
+
+### Input G(x)
+
+Owner directed (first message; its PR #17 precondition was then unmet, so the
+executor stopped without writing):
+
+`````text
+You are the independent integration and PR owner for Accessible Coach WO-03B: encrypted backup, replace-only restore, and retained previous-data recovery.
+
+PRECONDITION — PR #17
+
+Before touching the repository:
+
+1. Fetch origin.
+2. Inspect GitHub PR #17.
+3. Require PR #17 to be MERGED into codex/rpe-familiarisation.
+4. Require its final CI checks to be green.
+5. Verify its merged code includes the owner-authorized closure of:
+   - C4: runner support checks use the movement affected by the action;
+   - C6: workstation-specific paths removed from the identified handover/audit documents;
+   - sameTarget: target-kind compatibility with malformed/unresolved and missing-parent cases remaining fail-closed.
+
+If PR #17 is not merged, its CI is not green, or those changes are absent, STOP without writing anything and report the exact state.
+
+WORKTREE
+
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\ac-wo03-product-backup
+
+EXPECTED LOCAL STATE — VERIFY, DO NOT ASSUME
+
+Branch:
+codex/ac-wo03-product-backup
+
+Local HEAD:
+1d44acbfd7365767bcca83930d2f113fcc3b7944
+
+Local tree:
+82b323d21e0420b11800cc98912e522e8e4d0e70
+
+Known upstream state before this task:
+origin/codex/ac-wo03-product-backup at
+b92b382c488806bf41951545a894659d714d0289
+
+The local branch is intentionally two commits ahead of its upstream:
+
+408c1efc6f8cf60ae68bfe6fa4978b204a7cac17
+fix(backup): retain previous recovery and publish recovery crash-safely
+
+1d44acbfd7365767bcca83930d2f113fcc3b7944
+docs(backup): record WO-03B recovery-retention remediation
+
+These commits must not be reset, discarded, overwritten, squashed, or rebased away.
+
+STEP 0 — IDENTITY AND INSTRUCTIONS
+
+Verify absolute worktree path, branch, HEAD, tree, status, upstream, divergence, remotes, locks, and possible concurrent writers.
+
+Stop if:
+- the worktree is dirty;
+- the local commits are missing;
+- unrelated commits appeared;
+- another process is writing;
+- the remote was force-moved incompatibly.
+
+Read completely:
+
+- AGENT_WORKFLOW.md
+- PROMPT_LEDGER.md
+- docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md
+- docs/decisions/WO03_ENCRYPTED_BACKUP_AND_RESTORE.md
+- HANDOVER_2026-09-13_WO03B_OPUS_REMEDIATION.md
+- HANDOVER_2026-09-14_WO03B_RECOVERY_RETENTION_REMEDIATION.md
+- PR #17’s final diff and review disposition
+
+Treat all handover claims as untrusted until verified.
+
+After completing read-only identity checks, the first repository write must append this complete prompt verbatim to PROMPT_LEDGER.md. Determine the next unused entry number across both the branch and the newly merged integration base; do not assume a number.
+
+AUDIT THE LOCAL REMEDIATION
+
+Before integrating, independently inspect commits 408c1ef and 1d44acb.
+
+Confirm:
+
+- restoring the retained previous-data recovery never overwrites that recovery;
+- a portable restore publishes a new recovery crash-safely;
+- every publication interruption retains a recoverable older or newly verified archive;
+- replacement cannot begin before recovery publication is durable;
+- startup reconciliation is deterministic;
+- only exact cache artifact names are removed;
+- concurrent backup/restore actions are rejected synchronously;
+- plaintext snapshots are removed before the OS save flow;
+- authentication, KDF, size limits and Migration 064 remain unchanged.
+
+Reproduce focused regression and mutation evidence where practical. If a substantive defect is found, apply the smallest correction, add a prior-code-failing test and disclose that the candidate then requires a fresh independent audit.
+
+INTEGRATE THE CURRENT BASE
+
+Merge the newly updated origin/codex/rpe-familiarisation into codex/ac-wo03-product-backup using a normal merge commit.
+
+Do not rebase or rewrite the audited backup history.
+
+Resolve conflicts narrowly. Preserve:
+
+- every append-only ledger entry from both sides;
+- PR #17’s database-readiness and training-support corrections;
+- WO-03B’s backup maintenance lock and boot exclusion;
+- all athlete/activity/health-support Migration 064 data in backup and restore;
+- the two local recovery-retention remediation commits.
+
+Recheck integration-sensitive files including:
+
+- apps/mobile/src/App.tsx
+- apps/mobile/src/screens/ProfileScreen.tsx
+- apps/mobile/src/state/useStore.ts
+- apps/mobile/src/state/backupStore.ts
+- apps/mobile/src/state/healthSupportStore.ts
+- packages/inference/src/trainingSupport.ts
+- affected navigation, athlete-swap, health-support and backup tests
+
+BOUNDARIES
+
+Do not change:
+
+- Migration 064 or any existing migration;
+- backup container version;
+- AES-GCM or scrypt parameters;
+- password rules or size ceilings;
+- clinician policy or medical semantics;
+- progression/programming logic;
+- offline deterministic architecture.
+
+Do not add cloud backup, merge restore, password recovery, CSV restore, live monitoring or runtime networking.
+
+VERIFICATION
+
+Run at minimum:
+
+- git diff --check
+- npm run typecheck
+- npm run verify:backup
+- all BackupCrypto, BackupRestoreStore, BackupRecoveryMetadata, BackupRecoveryPublication, BackupRecoveryRetention, BackupSafetyBoundaries, BackupBootIntegration, BackupTransferPanel and AthleteRegistryRecoveryGate suites
+- HealthSupportStore, TrainingSupportBoundary, TrainingSupportEvidenceIdentity, AthleteSwapProfileRender and NavigationShell suites
+- npm run verify:ci
+
+Confirm Migration 064 remains byte-identical with blob:
+
+69090f214516fe2b3d0e31c082f7969b8889dc86
+
+ANDROID QUALIFICATION
+
+After all tracked changes are committed:
+
+1. Build an exact-tip QA APK using the repository’s established Android build route.
+2. Run npm run verify:qa-candidate.
+3. Use a disposable emulator to exercise:
+   - OS picker backup creation;
+   - OS picker backup opening;
+   - representative all-athlete restore including activity and health-support rows;
+   - retained previous-data recovery;
+   - invalid password/cancel path;
+   - greater-than-3-MiB backup open/preview.
+
+Record APK path, byte size, SHA-256, HEAD and tree externally or in the PR body. Do not make another tracked commit after building, because that would invalidate exact-tip provenance.
+
+If emulator evidence cannot be completed, report it as unverified. Do not silently substitute component tests for native picker evidence.
+
+DELIVERY
+
+When all required checks pass:
+
+1. Push only codex/ac-wo03-product-backup using a normal non-force push.
+2. Open a PR targeting codex/rpe-familiarisation.
+3. Clearly list the eight backup commits and the integration merge.
+4. Request @coderabbitai review manually because automatic reviews are disabled for this non-default base.
+5. Monitor CI and review findings.
+6. Reproduce and remediate confirmed in-scope findings.
+7. Stop when the PR is green and ready for independent review.
+
+Do not merge the PR yourself.
+
+FINAL REPORT
+
+Return:
+
+- PR #17 merge commit and verification;
+- starting and final branch/HEAD/tree;
+- audit findings and dispositions;
+- conflicts and their resolutions;
+- commits pushed;
+- focused and full test results;
+- APK provenance;
+- emulator evidence;
+- PR URL;
+- CI and CodeRabbit status;
+- tested, untested and deferred items.
+
+Explicitly state:
+
+MERGE / RELEASE / C6: NOT PERFORMED
+
+Never touch master/main, force-push, rewrite history, tag, release, sign production, or claim physical-device/iOS/C6 verification.
+`````
+
+Owner directed (continuation, after merging PR #17):
+
+`````text
+please continue next wo
+`````
+
+- Precondition: PR #17 merged by FDOTPike as 0d453f1e0d67ea3bd88484a355a732e8d4a8c2fd
+  (2026-09-14T17:00:24Z); its merged tree equals PR head c206697; final
+  PR-head checks (Verification suite; Android QA + debug APKs) succeeded; C4,
+  sameTarget and C6 are present in origin/codex/rpe-familiarisation.
+- Numbering: Entry 0130. This branch ends at 0122; the merged base ends at
+  0129; no local or remote ref uses 0130.
