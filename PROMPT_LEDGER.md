@@ -9812,3 +9812,267 @@ Run focused tests, typecheck, git diff --check, and npm run verify:ci before any
   deltas and native accessibility/device acceptance were not measured.
   Protected backup transfer/restore, clinical review and native QA remain deferred.
 - MERGE / RELEASE / C6: NOT PERFORMED.
+
+---
+
+## Entry 0122 — 2026-09-14 · WO-03B retained-recovery remediation (W1–W5) and exact-tip Android qualification
+
+### Input G(x)
+
+Owner directed:
+
+`````text
+You are the bounded implementation executor for WO-03B recovery-retention remediation.
+
+
+STEP 0 — FREEZE IDENTITY
+
+Work only in:
+
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\ac-wo03-product-backup
+
+Expected starting state:
+
+Branch: codex/ac-wo03-product-backup
+HEAD: b92b382c488806bf41951545a894659d714d0289
+Tree: 8a57f3186e960201c344d8b0ab5136fec5329afc
+Upstream divergence: 0 behind / 0 ahead
+Migration 064 blob:
+69090f214516fe2b3d0e31c082f7969b8889dc86
+
+Verify the absolute worktree, branch, HEAD, tree, status, upstream and divergence before writing. Stop if the branch moved, the tree is dirty, or another process is writing.
+
+Read the applicable repository instructions, then read:
+
+- PROMPT_LEDGER.md
+- docs/decisions/WO03_ENCRYPTED_BACKUP_AND_RESTORE.md
+- HANDOVER_2026-09-13_WO03B_OPUS_REMEDIATION.md
+- apps/mobile/src/state/backupStore.ts
+- apps/mobile/src/state/backupRecoveryMetadata.ts
+- apps/mobile/test/components/BackupRestoreStore.test.js
+- apps/mobile/test/components/BackupRecoveryMetadata.test.js
+
+Treat your previous audit as an allegation until reproduced. The first repository write after identity verification must append this complete execution prompt verbatim to PROMPT_LEDGER.md.
+
+BOUNDARIES
+
+Do not modify Migration 064, any schema, progression, programming, clinician policy, encryption format, scrypt parameters, size limits or network architecture.
+
+Remain offline and deterministic. Do not weaken authentication or encryption to improve emulator speed.
+
+Do not merge, push, force-push, rebase, tag, release, sign production, touch master/main or claim C6.
+
+OWNER RULINGS
+
+1. Track restore-preview provenance explicitly. Do not infer it from backup IDs. The pending restore must distinguish:
+
+   - portable backup;
+   - retained previous-data recovery.
+
+2. When confirming a retained previous-data recovery:
+
+   - do not overwrite or supersede that retained recovery before replacement;
+   - keep its encrypted bytes unchanged through ordinary failures and process death;
+   - use the existing durable replacement journal and rollback files for operation safety;
+   - after successful replacement, retaining that same recovery file is acceptable;
+   - do not silently create an automatic “redo” point.
+
+3. Show honest recovery-specific confirmation copy:
+
+   “This replaces current data with the previous recovery. It will not create another undo point.”
+
+4. A portable restore may supersede an older recovery only after the new current-data recovery has been sealed, authenticated and durably retained.
+
+REMEDIATION W1 — RETAINED-RECOVERY P1
+
+Reproduce both confirmed cases before changing production code:
+
+- low storage during replace after previewing retained recovery;
+- staged database hash mismatch after previewing retained recovery.
+
+Use distinct fixtures:
+
+- retained recovery archive A with two athletes;
+- current data B with three athletes.
+
+Prove the current code leaves current athlete data B unchanged but changes or destroys recovery A.
+
+Implement the smallest source-aware correction. Replace the global untyped `pendingArchive` concept with a bounded pending-restore record carrying authenticated archive and explicit source provenance.
+
+For retained-recovery confirmation:
+
+- skip creation/promotion of a replacement recovery file;
+- leave recovery A byte-identical;
+- run the normal confirmed replace transaction;
+- clear all pending archive/source state on success, cancellation and every error.
+
+Acceptance:
+
+- low-storage failure leaves current data B unchanged and recovery A byte-identical and decryptable;
+- staged-hash failure has the same result;
+- a successful confirmation installs A;
+- the retained encrypted file remains available;
+- no plaintext, journal, marker or temporary debris remains after settled success;
+- unresolved transaction recovery still blocks athlete-data boot.
+
+REMEDIATION W2 — CRASH-SAFE RECOVERY PROMOTION
+
+Remove the delete-before-move loss window for portable restores.
+
+Use a narrowly named same-directory previous/rotation artifact or an equivalently durable state machine. Required invariants matter more than helper names:
+
+- if a retained recovery existed before publication, every injected process-death boundary leaves at least one recoverable copy of either the old retained archive or the newly verified current-data archive;
+- never leave both copies absent;
+- never treat a filename alone as proof of validity;
+- startup deterministically reconciles interrupted promotion;
+- do not blindly discard the sole recovery candidate;
+- exact-name cleanup must never delete unrelated files;
+- after completed portable-restore recovery publication, the new recovery is authenticated at its durable path before replacement starts.
+
+Add a table-driven recovery-publication test covering every combination of final/new/previous files that the implementation can produce. Add failure injection at every copy, move, verification, removal and startup-reconciliation boundary.
+
+REMEDIATION W3 — SYNCHRONOUS ACTION GUARD
+
+Close the double-tap race caused by awaiting `actionCanProceed()` before setting `status: working`.
+
+Establish the in-flight state synchronously before the first await for:
+
+- create backup;
+- choose portable restore;
+- review previous recovery;
+- confirm restore.
+
+A second call must return without:
+
+- starting another KDF or picker;
+- attempting another replacement;
+- changing the first operation’s status/message;
+- re-enabling action controls prematurely.
+
+Add concurrent-invocation tests that prove exactly one operation executes. Mutation-check the guard by moving it back after the first await and proving the test fails.
+
+REMEDIATION W4 — ENCRYPTED CACHE CLEANUP
+
+Extend startup cache cleanup to the exact generated portable ciphertext pattern:
+
+ak-portable-[a-f0-9]{32}.pmbak
+
+Requirements:
+
+- only inspect the app cache directory;
+- remove the exact generated pattern;
+- retain unrelated `.pmbak`, malformed lookalikes and user cache files;
+- preserve the existing exact cleanup for `ak-backup-*` plaintext directories;
+- confirm removal or report the failure honestly;
+- add pure matching tests and a store-initialization regression test.
+
+Do not broaden cleanup with a loose wildcard.
+
+REMEDIATION W5 — DOCUMENTATION
+
+Correct `docs/decisions/WO03_ENCRYPTED_BACKUP_AND_RESTORE.md`:
+
+- remove the stale “independent re-review approved” status;
+- replace “boolean-checked” native move claims with postcondition-verified semantics;
+- document the source-aware retained-recovery ruling;
+- document the crash-safe recovery-publication invariant;
+- state that a previous-recovery restore does not create another undo point;
+- retain iOS, physical-device and C6 disclosures.
+
+Preserve the historical handover. Create a new dated remediation handover instead of rewriting historical evidence.
+
+Record these dispositions:
+
+- interrupted cleanup may roll back a restore that had not yet reached externally reported success: accepted transactional behavior, no product change;
+- providers without reliable size metadata remain rejected fail-closed;
+- emulator KDF latency is a performance observation, not authority to weaken cryptography.
+
+VALIDATION
+
+Run, at minimum:
+
+- focused backup-store and recovery-publication tests;
+- low-storage and staged-hash retained-recovery regressions;
+- recovery-publication process-death matrix;
+- double-invocation tests;
+- cache-cleanup tests;
+- npm run typecheck;
+- npm run verify:backup;
+- npm run verify:ci;
+- git diff --check;
+- Migration 064 blob-identity check.
+
+For every high-risk regression, prove non-vacuity by temporarily reverting or mutating the relevant protection, observing the intended test fail, then restoring exact bytes.
+
+Commit the code remediation and documentation/ledger work clearly without amending or rewriting history.
+
+EXACT-TIP ANDROID QUALIFICATION
+
+If all repository gates pass:
+
+1. Build a new QA APK from the committed clean HEAD using the repository’s existing QA build process.
+2. Run `npm run verify:qa-candidate`.
+3. Record APK path, byte length, SHA-256, HEAD, tree and clean-state provenance.
+4. Use only a disposable emulator.
+5. Exercise:
+
+   - normal small portable backup → preview → confirmed restore;
+   - create a retained recovery, review it and confirm it;
+   - hash the retained recovery before and after the recovery-sourced confirmation;
+   - verify the recovery-specific no-undo warning;
+   - verify no restore metadata/temp debris remains.
+
+Allow sufficient time for the deliberate scrypt work. Do not classify a slow operation as stalled unless it exceeds a recorded bound and has no terminal state.
+
+STOP CONDITION
+
+Do not push or open a PR. This is implementation, not independent approval.
+
+Return:
+
+WORKTREE:
+BRANCH:
+START HEAD/TREE:
+FINAL HEAD/TREE:
+COMMITS:
+FILES CHANGED:
+P1 REPRODUCED:
+P1 REMEDIATED:
+RECOVERY ROTATION MATRIX:
+DOUBLE-TAP RESULT:
+CACHE CLEANUP RESULT:
+MUTATION RESULTS:
+FOCUSED TESTS:
+VERIFY:BACKUP:
+VERIFY:CI:
+MIGRATION 064 IDENTITY:
+QA APK PATH/SIZE/SHA:
+EMULATOR JOURNEYS:
+WORKTREE CLEAN:
+UPSTREAM DIVERGENCE:
+INDEPENDENT AUDIT: REQUIRED
+PUSH / PR / MERGE / RELEASE / C6: NOT PERFORMED
+IOS / PHYSICAL DEVICE: UNTESTED
+`````
+
+### Output F(G(x))
+
+- Identity frozen before any write: worktree `.worktrees/ac-wo03-product-backup`, branch `codex/ac-wo03-product-backup`, HEAD `b92b382`, tree `8a57f31`, clean, upstream equal (0 behind / 0 ahead). No concurrent writer: only Codex and MCP runtimes and the adb daemon were running. Migration 064 blob `69090f2` stayed unchanged throughout. Appending this entry's input was the first repository write.
+- W1 P1 reproduced before any production change. Fixtures were a two-athlete retained recovery A and three-athlete current data B. Under low storage at replacement, and under a staged-database hash mismatch, B stayed byte-identical while the retained recovery was overwritten by a recovery of B. The same run showed a successful confirmation silently creating a new undo point, and a stale pending archive surviving a blocked confirmation.
+- W1: an explicit pending-restore record carries the authenticated archive and its `portable_backup` or `retained_recovery` provenance, which also appears on the preview. Confirming a retained recovery creates and promotes no recovery file, runs the journal-protected replacement, keeps recovery A byte-identical through failures and process death, and shows the owner-ruled no-undo copy. Pending state clears on success, cancellation and every error.
+- W2: the new `backupRecoveryPublication.ts` rotates the retained recovery to `.previous`, promotes the authenticated `.new`, re-authenticates at the durable path, and only then removes `.previous`, before replacement starts. Startup reconciliation restores a well-formed previous file, never removes the retained file, promotes a sole well-formed fresh file, and preserves everything beside a journal. Core-db gains a password-free `isWellFormedBackupContainer`. The metadata sweep no longer discards `.new` by name.
+- W3: all four actions claim an in-flight flag and `status: working` synchronously, before the first await. Cancellation is ignored while an action is in flight.
+- W4: startup removes only the cache names `ak-backup-[a-f0-9]{32}` and `ak-portable-[a-f0-9]{32}.pmbak`, confirms each removal, and reports an unconfirmed removal as itself while athlete data stays closed.
+- W5: the decision record is corrected: status, postcondition-verified moves and copies, the source-aware ruling, the publication invariant, the no-undo statement, the dispositions, and the iOS, physical-device and C6 disclosures. New handover: `HANDOVER_2026-09-14_WO03B_RECOVERY_RETENTION_REMEDIATION.md`. The historical handover is unchanged.
+- Tests added:
+  - `BackupRecoveryPublication.test.js`, 67 tests: a 27-row reconciliation table; death at every reconciliation boundary; publication death and torn-write, in-process failure and failed-abandonment matrices; and an enumeration proving which combinations are producible.
+  - `BackupRecoveryRetention.test.js`, 18 tests: the W1 regressions; retained and portable store-level process-death matrices; W2 rotation order and durable-path authentication; W3 double-invocation; and W4 cache cleanup.
+  - The panel and metadata tests and `verify:backup` were extended.
+- Non-vacuity, first mutation run: 8 runs used `-t` name filters that selected no test, and the store-level portable matrix did not fail under delete-before-move. Both defects are disclosed. The runner now treats zero selected tests as invalid, the matrix was strengthened, and mutation M04 was widened past a redundant journal re-check.
+- Non-vacuity, corrected run: all 17 mutations were detected by every run, and every target file was restored to its pre-mutation SHA-256.
+- Gates on the final code and test tree:
+  - `npm run verify:ci` exit 0: 23 gate headers including preflight and typecheck; components 42 suites / 665 tests; store SQL 675/675; pipeline 51 checks; `verify:backup` PASS. The FAIL lines in its log are the qa-artifact gate's deliberate negative-fixture self-tests.
+  - Pre-commit `npm run typecheck` exit 0.
+  - `git diff --check` exit 0, including the new files.
+  - Migration 064 blob `69090f2` is identical at HEAD and in the worktree, and the schema directory has no diff.
+- Not performed: push, PR, merge, rebase, tag, release, production signing and C6. Untested: iOS and physical-device behavior. Independent audit: required. The committed HEAD, QA APK provenance and emulator journeys are reported in the handback, outside this append-only entry, so no self-referential tracked edit invalidates the candidate they describe.
