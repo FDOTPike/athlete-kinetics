@@ -137,10 +137,11 @@ const loadCopyFor = (
   return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget);
 };
 
-const restSecondsFor = (rpe: number, age: string | undefined): number => {
+// Local rest when no runner owns the timer: the runner's RPE bands. Training
+// tier does not change rest (2026-09-15 tier-neutral rest ruling).
+const restSecondsFor = (rpe: number): number => {
   const base = rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
-  const multiplier = age === 'beginner' ? 0.75 : age === 'elite' ? 1.25 : 1;
-  return clamp(Math.round((base * multiplier) / 15) * 15, 45, 300);
+  return clamp(Math.round(base / 15) * 15, 45, 300);
 };
 
 const targetFor = (slot: PlanSlot): SlotTarget => {
@@ -429,7 +430,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
-    seconds: runner?.restSecondsTarget ?? restSecondsFor(safeRpe ?? currentSlot?.targetRpe ?? 8, profile.training_age),
+    seconds: runner?.restSecondsTarget ?? restSecondsFor(safeRpe ?? currentSlot?.targetRpe ?? 8),
     startedAtMs: runner?.restStartedAtMs ?? nowMs,
     slotId: currentSlot?.sessionPlanSlotId ?? -1,
   } : localRest;
@@ -718,7 +719,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
         startedAtMs: Date.now(),
-        seconds: restSecondsFor(safeRpe ?? currentSlot.targetRpe ?? 8, profile.training_age),
+        seconds: restSecondsFor(safeRpe ?? currentSlot.targetRpe ?? 8),
         slotId: currentSlot.sessionPlanSlotId,
       });
       else moveLegacyForward();

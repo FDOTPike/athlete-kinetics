@@ -7,6 +7,8 @@ import { resolveMovementAvailability as actualResolveMovementAvailability } from
 import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
 import SessionScreen from '../../src/screens/SessionScreen';
+import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
+import { restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
 let mockState;
 
@@ -1608,3 +1610,30 @@ test('a planned movement missing from the library fails the tier check closed', 
   expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
   expect(screen.queryByText('First movement')).toBeNull();
 });
+
+// ---------------------------------------------------------------------------
+// R5 (2026-09-15 tier-neutral rest ruling): when no runner owns the timer, the
+// local rest fallback uses the runner's RPE bands and ignores training tier.
+// ---------------------------------------------------------------------------
+test('R5 local rest fallback is identical for every tier and equals the runner rest for the same answer', () => {
+  const answers = [
+    ['0 clean reps left', 10], ['1 clean rep left', 9], ['2 clean reps left', 8],
+    ['3 clean reps left', 7], ['4+ clean reps left', 6], [null, null],
+  ];
+  const observed = new Map();
+  for (const tier of ['beginner', 'intermediate', 'advanced', 'elite']) {
+    for (const [answer, rpe] of answers) {
+      mockState = state({ runner: null, profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 } });
+      const view = render(<SessionScreen />);
+      if (answer !== null) fireEvent.press(screen.getByLabelText(answer));
+      fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+      expect(mockState.logSet.mock.calls[0][3]).toBe(rpe);
+      const seconds = screen.UNSAFE_getByType(RestTimerCard).props.totalSeconds;
+      expect(seconds).toBe(runnerRestSecondsFor({ targetRpe: 8 }, 'intermediate', rpe));
+      observed.set(answer, [...(observed.get(answer) ?? []), seconds]);
+      view.unmount();
+    }
+  }
+  expect([...observed.values()].map((values) => new Set(values).size)).toEqual([1, 1, 1, 1, 1, 1]);
+  expect([...observed.values()].map((values) => values[0])).toEqual([240, 240, 180, 120, 90, 180]);
+}, 60000);
