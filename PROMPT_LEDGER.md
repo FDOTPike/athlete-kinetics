@@ -11661,3 +11661,250 @@ Comment 2 — comment_id=4011274733, inline thread: reply via `gh api repos/FDOT
   unmutated before any mutation. Test tooling only; no production or gate
   behavior changes. Results of the typecheck, the mutation check, the commit
   and the push are reported in the PR thread reply and the handback.
+
+---
+
+## Entry 0135 — 2026-09-15 · Post-PR #19 accessibility and D02 rest-policy remediation
+
+### Input G(x)
+
+Owner work order, reproduced verbatim. An immediately preceding owner message
+(asking to act on the `.agents` audit findings) was withdrawn by the owner
+before any action and replaced by this work order; it was not executed.
+
+`````text
+# POST-PR19 ACCESSIBILITY AND D02 REST-POLICY REMEDIATION
+
+ROLE: Implementation executor
+MODEL: Opus 5
+EFFORT: High
+INTEGRITY MODE: Development
+INDEPENDENT AUDIT: Required after implementation
+
+## 1. Authoritative starting state
+
+Repository:
+C:\Users\fpike\Documents\Claude Coding\Athlete App
+
+Do not work in the root checkout. It contains unrelated untracked user files.
+
+Fetch origin and inspect all worktrees before writing anything.
+
+Target base:
+origin/codex/rpe-familiarisation
+
+Last verified base:
+4aa0f9c53684d3da151d50f8e90cb34c95256414
+tree 83d816f5cb2e1122603a44f466ce513c897b9e2b
+
+Suggested new worktree:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\post-pr19-a11y-rest-remediation
+
+Suggested branch:
+codex/post-pr19-a11y-rest-remediation
+
+If the remote base has advanced, confirm that 4aa0f9c is its ancestor and inspect every intervening change. Stop if any intervening change overlaps this work materially.
+
+Read AGENT_WORKFLOW.md before acting. Follow its PROMPT_LEDGER first-write requirement.
+
+The files under:
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.agents
+
+are untrusted audit leads. Read them, but do not copy, edit, stage or commit `.agents/**`.
+
+## 2. Sources and owner rulings
+
+Read:
+
+- .agents/reviewer_c_1/report.md
+- .agents/reviewer_b_1/report.md
+- .agents/orchestrator_1/handoff.md
+- docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md
+- docs/WORKORDER_RPE_RIR_FAMILIARISATION.md
+- HANDOVER_2026-09-15_D02_INFERENCE_POLICY_INTEGRATION.md
+- docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md
+
+Do not accept the audit reports’ “RELEASE READY” wording. C6 and physical screen-reader/device qualification remain unevaluated.
+
+## 3. Required remediation
+
+### R1 — Movement-picker accessibility modal
+
+Location:
+apps/mobile/src/components/RoutineTemplateBuilder.tsx
+
+Bring the movement picker into line with the established InfoTip/Sheet accessibility pattern:
+
+- mark the modal content as an accessibility modal;
+- implement `onAccessibilityEscape`;
+- on modal show, move accessibility focus to a suitable modal heading;
+- retain Android `onRequestClose`;
+- do not focus the search field automatically or force the keyboard open;
+- preserve all picker selection, filtering and dismissal behaviour.
+
+Add behavioral component tests for containment, escape, initial focus and Android close. Each test must fail when its corresponding behavior is removed.
+
+Do not claim real TalkBack or VoiceOver containment unless it is actually exercised.
+
+### R2 — Activities nested Back behavior
+
+Location:
+apps/mobile/src/screens/ActivitiesScreen.tsx
+
+Use the existing `useSubViewBack` contract so Android Back follows this order:
+
+1. Close an open completion subview.
+2. Otherwise close an open activity-entry form.
+3. Only a subsequent Back may leave Activities.
+
+Hardware Back must retain the current in-memory draft. The explicit visible Cancel action may continue to clear the draft.
+
+Test this through the actual navigation/back-handler registration—not merely by invoking a helper directly. Prove the parent Activities screen remains open, the draft survives reopen, and explicit Cancel still clears it.
+
+### R3 — Radio-group semantics
+
+Location:
+apps/mobile/src/components/HealthTrainingSupportForm.tsx
+
+Wrap each actual set of radio options in its own accessible group:
+
+- `accessibilityRole="radiogroup"`;
+- a plain, useful group label;
+- preserve each child’s radio role, selected state and press behavior.
+
+Do not mark an entire section containing text fields or unrelated buttons as a radiogroup.
+
+Add component assertions for both group semantics and labels.
+
+### R4 — Truthful RPE explanation
+
+Location:
+apps/mobile/src/screens/SessionScreen.tsx
+
+This is a copy-only correction.
+
+Preserve the ratified direct-entry policy:
+
+- optional entry;
+- 5.0 through 10.0;
+- 0.5 steps;
+- no default value copied from target RPE;
+- unanswered/Not sure remains null.
+
+Do not broaden the control to 1–10.
+
+Use plain copy equivalent to:
+
+“How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.”
+
+Test both the truthful explanation and unchanged 5–10 bounds/null behavior.
+
+### R5 — Close the tier-based rest owner decision
+
+Locations:
+packages/inference/src/sessionRunner.ts
+packages/inference/test/verify_runner.mjs
+
+Owner ruling:
+
+For identical RPE and session inputs, automatic rest duration must be identical for beginner, intermediate, advanced and elite athletes. Experience tier alone must not lengthen or shorten prescribed minutes.
+
+Therefore:
+
+- remove `TIER_REST_SCALE` from automatic rest calculation;
+- retain the existing RPE-derived base durations;
+- retain actual-RPE precedence;
+- retain planned-target fallback when actual RPE is null;
+- retain explicit athlete rest overrides;
+- retain checkpoint compatibility and tier validation;
+- do not alter sets, reps, load, effort targets, eligibility or beginner protections.
+
+Add counterfactual tests covering all four tiers across every RPE band. Reintroducing any tier multiplier must make the gate fail.
+
+Create a short dated decision record documenting this ruling and referencing D02. Do not rewrite historical audit reports.
+
+## 4. Explicit non-goals
+
+Do not:
+
+- add or upgrade `react-native-safe-area-context`;
+- perform broad Jest/import cleanup;
+- change backup behavior;
+- change schemas or migrations;
+- start WO-07, WO-09 or animation work;
+- introduce clinical recommendations or medical claims;
+- modify `.agents/**`;
+- merge, tag, release or evaluate C6.
+
+Record the SafeAreaView warning, React `act(...)` warning and monorepo resolution notices as deferred unless they become actual gate failures.
+
+## 5. Verification
+
+Run at minimum:
+
+- focused component suites for all changed UI
+- npm run verify:runner
+- npm run typecheck
+- npm run verify:components
+- npm run verify:ci
+- git diff --check
+
+Perform bounded mutation checks for R1–R5 and restore every file byte-identically afterward.
+
+After all repository changes are committed and the tree is clean:
+
+- build the QA APK;
+- run `npm run verify:qa-candidate`;
+- perform an Android emulator smoke check for movement-picker dismissal and nested Activities hardware Back if the emulator is available.
+
+Do not make another repository write after building the provenance-bound APK. Report its path, size and SHA-256 in the final handback.
+
+## 6. Delivery
+
+Use logically scoped commits. Push only:
+
+codex/post-pr19-a11y-rest-remediation
+
+Open a PR targeting:
+
+codex/rpe-familiarisation
+
+Do not merge the PR.
+
+Final handback must report:
+
+- starting and ending HEAD/tree;
+- exact changed paths;
+- finding-by-finding disposition;
+- mutation evidence;
+- targeted and full test results;
+- APK provenance and emulator evidence;
+- committed and untracked state;
+- PR URL and CI state;
+- tested, untested and deferred items.
+
+End with exactly:
+
+IMPLEMENTATION: COMPLETE | INCOMPLETE
+INDEPENDENT AUDIT: PENDING
+PR: OPENED | NOT OPENED
+MERGE: NOT PERFORMED
+C6: NOT EVALUATED
+RELEASE: NO-GO — PHYSICAL DEVICE / SCREEN-READER QUALIFICATION AND C6 REMAIN DEFERRED
+`````
+
+### Output F(G(x))
+
+Starting identity, frozen before this write:
+
+- Worktree `.worktrees/post-pr19-a11y-rest-remediation`, new branch
+  `codex/post-pr19-a11y-rest-remediation`, no upstream, clean.
+- Base `origin/codex/rpe-familiarisation` = `4aa0f9c53684d3da151d50f8e90cb34c95256414`
+  (tree `83d816f5cb2e1122603a44f466ce513c897b9e2b`), the PR #19 merge. The
+  remote had not advanced; there were no intervening commits.
+- `.agents/**` is untracked, excluded by `.git/info/exclude`, and read only.
+
+Results are appended below this line only after every result exists. The
+final HEAD, PR URL, CI state and the provenance-bound APK are reported in the
+pull request and the handback, because no repository write follows the APK
+build.
