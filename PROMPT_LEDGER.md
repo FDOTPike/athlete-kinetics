@@ -11908,3 +11908,33 @@ Results are appended below this line only after every result exists. The
 final HEAD, PR URL, CI state and the provenance-bound APK are reported in the
 pull request and the handback, because no repository write follows the APK
 build.
+
+Results (Entry 0135 closed after every pre-APK result below existed):
+
+- **Commits:**
+  - `9e15e01`: prompt record.
+  - `5dfb572`: R5, tier-neutral automatic rest and decision record.
+  - `6b6cebf`: R1, movement picker accessibility modal.
+  - `8b588d2`: R2, Activities nested hardware Back, plus the `useSubViewBack` order fix.
+  - `983d615`: R3, radio groups.
+  - `b1ade48`: R4, truthful effort copy.
+  - The handover and this closure follow in one documentation commit.
+- **Red first:**
+  - Every new check failed on the unfixed product (`9e15e01` plus tests only).
+  - The Profile-hosted R2 test still failed with only the Activities change, which proves the navigation ordering defect.
+  - The nested BackNavigation test failed on the pre-fix navigation file. That file was then restored byte-identical by SHA-256.
+- **Required scope details:**
+  - SessionScreen's own tier-scaled local rest fallback was also removed.
+  - A mid-rest checkpoint saved before the ruling (no override) still restores with its countdown.
+  - `useSubViewBack` registers once per activation, with a stable `registerSubViewBack`.
+  - Two `verify_runner` assertions that pinned tier-scaled rest now pin the ruling.
+- **Mutations:** 26/26 detected, each file restored to its pristine SHA-256, tracked-worktree fingerprint `38c2278a94291781` unchanged; 7 unmutated controls passed first (exit 0)
+- **Gates on `b1ade48`:**
+  - `git diff --check` (base..HEAD) exit 0, clean
+  - `npm run typecheck` exit 0
+  - `npm run verify:runner` exit 0 (20 checks)
+  - `npm run verify:components` exit 0 (46 passed, 46 total; 718 passed, 718 total)
+  - `npm run verify:ci` exit 0 (PREFLIGHT OK; 46 passed, 46 total; 718 passed, 718 total)
+- **Unchanged:** backup code, schemas and migrations (Migration 064 blob `69090f2`), `package.json` and the lockfile, native projects and `.agents/**`.
+- **Reported in the pull request and handback, not here:** the QA APK, `verify:qa-candidate`, the emulator smoke check, push, PR and CI state. No repository write follows the provenance-bound APK build.
+- **Tokens:** INDEPENDENT AUDIT: PENDING. MERGE: NOT PERFORMED. C6: NOT EVALUATED. RELEASE: NO-GO — PHYSICAL DEVICE / SCREEN-READER QUALIFICATION AND C6 REMAIN DEFERRED.
