@@ -9,7 +9,7 @@
  *
  * State safety: navigation only alters UI visibility/stack; logged training history and store state are untouched.
  */
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { BackHandler, PanResponder, Platform, View, StyleSheet, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
 
 /**
@@ -68,12 +68,14 @@ export function NavigationProvider({ children, initialTab = 'today' }: Navigatio
   const tabHistoryRef = useRef(tabHistory);
   tabHistoryRef.current = tabHistory;
 
-  const registerSubViewBack = (handler: BackHandlerFn): (() => void) => {
+  // Stable identity: re-rendering the provider must not re-register (and so
+  // reorder) the active sub-view handlers.
+  const registerSubViewBack = useCallback((handler: BackHandlerFn): (() => void) => {
     subViewHandlersRef.current.add(handler);
     return () => {
       subViewHandlersRef.current.delete(handler);
     };
-  };
+  }, []);
 
   const goBack = (): boolean => {
     // 1. Try active sub-view handlers in reverse registration order
@@ -144,18 +146,24 @@ export function useNavigation(): NavigationContextValue {
   return ctx ?? fallbackContext;
 }
 
-/** Hook to register a sub-view back handler when condition is active */
+/**
+ * Register a sub-view back handler while `condition` is active. The handler is
+ * registered once per activation and always calls the latest `handler`, so a
+ * re-render never moves an outer view's handler ahead of a nested view opened
+ * after it (handlers run newest activation first).
+ */
 export function useSubViewBack(condition: boolean, handler: () => void): void {
   const { registerSubViewBack } = useNavigation();
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
 
   useEffect(() => {
     if (!condition) return;
-    const unregister = registerSubViewBack(() => {
-      handler();
+    return registerSubViewBack(() => {
+      handlerRef.current();
       return true;
     });
-    return unregister;
-  }, [condition, handler, registerSubViewBack]);
+  }, [condition, registerSubViewBack]);
 }
 
 const styles = StyleSheet.create({

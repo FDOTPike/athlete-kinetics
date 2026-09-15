@@ -15,6 +15,12 @@ const preferenceOptions: Readonly<Record<HealthSupportPreferenceKind, readonly s
   rest: ['unanswered', 'need_reported', 'no_need_reported'],
 };
 const label = (value: string): string => value.replace(/_/g, ' ');
+/** Plain names for each set of radio options, announced for the radiogroup. */
+const preferenceGroupLabels: Readonly<Record<HealthSupportPreferenceKind, string>> = {
+  position: 'Position preference',
+  position_transitions: 'Position changes',
+  rest: 'Rest needs',
+};
 function Button({ title, onPress }: { title: string; onPress: () => void }): React.JSX.Element {
   return <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={styles.button}>
     <Text style={styles.text}>{title}</Text>
@@ -96,19 +102,24 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
       <Text style={styles.text}>Withdrawing your pause does not release an instruction review hold.</Text>
       {(Object.keys(preferenceOptions) as HealthSupportPreferenceKind[]).map((kind) => <View key={kind} style={styles.section}>
         <Text style={styles.title}>{label(kind)}</Text>
-        {preferenceOptions[kind].map((value) => <Pressable key={value} style={styles.button} accessibilityRole="radio"
-          accessibilityLabel={`${label(kind)}: ${label(value)}`}
-          accessibilityState={{ checked: (details.preferences.find((p) => p.preferenceKind === kind)?.reportedValue ?? 'unanswered') === value }}
-          onPress={() => save((r) => state.saveSupportPreference(athleteId, kind, value, preferenceDetail[kind], r))}>
-          <Text style={styles.text}>{label(value)}</Text></Pressable>)}
+        <View testID={`support-preference-${kind}-options`} style={styles.radioGroup}
+          accessibilityRole="radiogroup" accessibilityLabel={preferenceGroupLabels[kind]}>
+          {preferenceOptions[kind].map((value) => <Pressable key={value} style={styles.button} accessibilityRole="radio"
+            accessibilityLabel={`${label(kind)}: ${label(value)}`}
+            accessibilityState={{ checked: (details.preferences.find((p) => p.preferenceKind === kind)?.reportedValue ?? 'unanswered') === value }}
+            onPress={() => save((r) => state.saveSupportPreference(athleteId, kind, value, preferenceDetail[kind], r))}>
+            <Text style={styles.text}>{label(value)}</Text></Pressable>)}
+        </View>
         <Field title={`${label(kind)} details`} value={preferenceDetail[kind]} change={(value) => setPreferenceDetail((p) => ({ ...p, [kind]: value }))} multiline />
         <Button title={`Save ${label(kind)} details`} onPress={() => save((r) => state.saveSupportPreference(athleteId, kind,
           details.preferences.find((p) => p.preferenceKind === kind)?.reportedValue ?? 'unanswered', preferenceDetail[kind], r))} />
       </View>)}
       <Text style={styles.title}>Notes for your records</Text>
-      {noteKinds.map((kind) => <Pressable key={kind} style={styles.button} accessibilityRole="radio"
-        accessibilityLabel={`Note type: ${label(kind)}`} accessibilityState={{ checked: noteKind === kind }} onPress={() => setNoteKind(kind)}>
-        <Text style={styles.text}>{label(kind)}</Text></Pressable>)}
+      <View testID="support-note-kind-options" style={styles.radioGroup} accessibilityRole="radiogroup" accessibilityLabel="Note type">
+        {noteKinds.map((kind) => <Pressable key={kind} style={styles.button} accessibilityRole="radio"
+          accessibilityLabel={`Note type: ${label(kind)}`} accessibilityState={{ checked: noteKind === kind }} onPress={() => setNoteKind(kind)}>
+          <Text style={styles.text}>{label(kind)}</Text></Pressable>)}
+      </View>
       <Field title="Support note text" value={note} change={setNote} multiline />
       <Button title="Save support note" onPress={() => save((r) => { state.saveSupportNote(athleteId, noteKind, note, noteId, r); setNote(''); setNoteId(undefined); })} />
       {details.notes.map((n, index) => <View key={n.noteId} style={styles.section}>
@@ -185,6 +196,7 @@ export default function HealthTrainingSupportForm(): React.JSX.Element {
 }
 const styles = StyleSheet.create({
   section: { gap: 12, paddingVertical: 16 },
+  radioGroup: { gap: 12 },
   title: { color: theme.color.textHi, fontSize: 18, fontWeight: '600' },
   text: { color: theme.color.textHi, fontSize: 16, flexShrink: 1 },
   button: { minHeight: 56, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: theme.color.line },

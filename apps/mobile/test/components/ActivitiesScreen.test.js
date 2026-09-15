@@ -1,6 +1,8 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { BackHandler } from 'react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import ActivitiesScreen from '../../src/screens/ActivitiesScreen';
+import { NavigationProvider } from '../../src/navigation/navigation';
 
 let mockState;
 
@@ -18,6 +20,27 @@ const emptyLedger = {
   scheduledKnownMinutesPerWeek: 0,
   scheduledWithUnknownDuration: 0,
 };
+
+
+// R2: capture the hardwareBackPress listener NavigationProvider registers, then
+// press it the way Android does (newest listener first).
+function captureHardwareBack() {
+  const listeners = [];
+  const spy = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((eventName, listener) => {
+    if (eventName === 'hardwareBackPress') listeners.push(listener);
+    return { remove: () => { const index = listeners.indexOf(listener); if (index >= 0) listeners.splice(index, 1); } };
+  });
+  return {
+    press: () => {
+      let handled = false;
+      act(() => {
+        for (let index = listeners.length - 1; index >= 0 && !handled; index -= 1) handled = listeners[index]() === true;
+      });
+      return handled;
+    },
+    restore: () => spy.mockRestore(),
+  };
+}
 
 describe('WO-05 factual activities screen', () => {
   beforeEach(() => {
@@ -143,6 +166,77 @@ describe('WO-05 factual activities screen', () => {
     expect(mockState.setActivityOccurrenceState).toHaveBeenNthCalledWith(1, 'occurrence-1', 'missed');
     expect(mockState.setActivityOccurrenceState).toHaveBeenNthCalledWith(2, 'occurrence-1', 'cancelled');
     expect(mockState.endActivitySeries).toHaveBeenCalledWith('series-1');
+  });
+
+  test('R2 hardware Back closes the entry form without clearing its draft, and explicit Cancel still clears it', () => {
+    const onClose = jest.fn();
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      const defaultName = screen.getByLabelText('Activity name shown in the app').props.value;
+      fireEvent.changeText(screen.getByLabelText('Activity name shown in the app'), 'Rock climbing');
+      fireEvent.changeText(screen.getByLabelText('Whole activity duration in minutes'), '45');
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-entry-form')).toBeNull();
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      expect(onClose).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      expect(screen.getByLabelText('Activity name shown in the app').props.value).toBe('Rock climbing');
+      expect(screen.getByLabelText('Whole activity duration in minutes').props.value).toBe('45');
+
+      fireEvent.press(screen.getByRole('button', { name: 'CANCEL' }));
+      expect(screen.queryByTestId('activity-entry-form')).toBeNull();
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      expect(screen.getByLabelText('Activity name shown in the app').props.value).toBe(defaultName);
+      expect(screen.getByLabelText('Whole activity duration in minutes').props.value).toBe('');
+
+      fireEvent.press(screen.getByRole('button', { name: 'CANCEL' }));
+      expect(hardwareBack.press()).toBe(false);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(mockState.saveWeeklyActivity).not.toHaveBeenCalled();
+      expect(mockState.saveOneOffActivity).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+    }
+  });
+
+  test('R2 hardware Back closes an open completion view before the entry form and keeps its typed minutes for that entry', () => {
+    mockState.activityLedger = { ...emptyLedger, occurrences: [{
+        occurrenceId: 'occurrence-plan', activityId: 'activity-1', displayName: 'Walk',
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: 30, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      }] };
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={jest.fn()} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+      fireEvent.changeText(screen.getByLabelText('Actual activity duration in minutes'), '25');
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-completion-form')).toBeNull();
+      expect(screen.getByTestId('activity-entry-form')).toBeOnTheScreen();
+
+      fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+      expect(screen.getByLabelText('Actual activity duration in minutes').props.value).toBe('25');
+      fireEvent.press(within(screen.getByTestId('activity-completion-form')).getByRole('button', { name: 'CANCEL' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+      expect(screen.getByLabelText('Actual activity duration in minutes').props.value).toBe('');
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-completion-form')).toBeNull();
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-entry-form')).toBeNull();
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      expect(hardwareBack.press()).toBe(false);
+      expect(mockState.completeActivityOccurrence).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+    }
   });
 
   test('logging a planned activity never pre-fills its planned minutes as the actual measurement', () => {
