@@ -75,11 +75,15 @@ const pristine = new Map(files.map((file) => [file, sha256(readFileSync(build + 
 const worktreeBefore = fingerprint();
 
 // Control: unmutated R05 entry points must pass, so a mutant failure is caused by the mutant.
-for (const args of [blocksOnly, [testRoot + 'verify_pipeline.mjs']]) {
+for (const args of [
+  blocksOnly,
+  [testRoot + 'verify_blocks.mjs'],
+  [testRoot + 'verify_pipeline.mjs'],
+]) {
   const control = runNode(args);
   assert.equal(control.status, 0, `unmutated control must pass: ${args.at(-1)}\n${control.stdout}${control.stderr}`);
 }
-console.log('PASS control: unmutated R05 block and pipeline entry points pass');
+console.log('PASS control: unmutated R05 blocks, full verify_blocks.mjs and verify_pipeline.mjs pass');
 
 let detected = 0;
 for (const test of cases) {
