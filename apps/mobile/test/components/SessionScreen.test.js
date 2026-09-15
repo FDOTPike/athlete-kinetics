@@ -431,7 +431,7 @@ test('adjusting actual RPE marks and records the changed answer', () => {
 test('WO-02 labels athlete-reported RPE as Effort with the exact scale explanation while retaining strength-set RIR', () => {
   render(<SessionScreen />);
 
-  expect(screen.getByText('How hard did that feel? 1 is very easy. 10 is your hardest effort.')).toBeOnTheScreen();
+  expect(screen.getByText('How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.')).toBeOnTheScreen();
   expect(screen.getByText('How many more clean reps could you have completed?')).toBeOnTheScreen();
   fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
   expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
@@ -1609,6 +1609,37 @@ test('a planned movement missing from the library fails the tier check closed', 
 
   expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
   expect(screen.queryByText('First movement')).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// R4 (post-PR #19): the effort explanation must be truthful about both the
+// full 1-10 effort scale and the ratified 5-10 direct working-set entry. The
+// control itself is unchanged: optional, 5.0-10.0 in 0.5 steps, unanchored,
+// and unanswered stays null.
+// ---------------------------------------------------------------------------
+test('R4 explains the 1-10 effort scale truthfully and keeps direct working-set entry optional and bounded to 5-10', () => {
+  render(<SessionScreen />);
+  expect(screen.getByTestId('effort-scale-explanation').props.children).toBe('How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.');
+
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+  expect(screen.getAllByRole('button', { name: /^Effort \d+\.\d$/ }).map((node) => node.props.accessibilityLabel)).toEqual([
+    'Effort 5.0', 'Effort 5.5', 'Effort 6.0', 'Effort 6.5', 'Effort 7.0', 'Effort 7.5',
+    'Effort 8.0', 'Effort 8.5', 'Effort 9.0', 'Effort 9.5', 'Effort 10.0',
+  ]);
+
+  for (let press = 0; press < 12; press += 1) fireEvent.press(screen.getByLabelText('Decrease Effort'));
+  expect(screen.getAllByLabelText('Effort 5.0')).toHaveLength(2);
+  for (let press = 0; press < 12; press += 1) fireEvent.press(screen.getByLabelText('Increase Effort'));
+  expect(screen.getAllByLabelText('Effort 10.0')).toHaveLength(2);
+
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 10.0' }));
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
 });
 
 // ---------------------------------------------------------------------------

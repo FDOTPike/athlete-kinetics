@@ -1040,7 +1040,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           </View>
 
                           <Text style={styles.effortCue} testID="effort-scale-explanation">
-                            How hard did that feel? 1 is very easy. 10 is your hardest effort.
+                            How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.
                           </Text>
 
                           {/* Primary Unanchored RIR Question for rep-based work */}
