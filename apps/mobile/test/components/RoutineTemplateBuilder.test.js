@@ -1,10 +1,19 @@
 import React from 'react';
-import { Alert, StyleSheet } from 'react-native';
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { AccessibilityInfo, Alert, Modal, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { RoutineTemplateBuilder } from '../../src/components/RoutineTemplateBuilder';
 import { SELECTABLE_SCHEMA_TYPES } from '@ak/inference';
 
 let mockState;
+
+// R1 initial focus: React Native's jest Text is a mock component, so a Text ref
+// is not a host node and findNodeHandle cannot return a native tag. Keep the
+// jest renderer implementation by default; the focus test resolves the picker
+// heading instance to a tag.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => {
+  const actual = jest.requireActual('react-native/jest/mocks/RendererProxy');
+  return { ...actual, findNodeHandle: jest.fn((instance) => actual.findNodeHandle(instance)) };
+});
 
 jest.mock('../../src/state/useStore', () => ({
   useStore: (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState }),
@@ -202,6 +211,63 @@ describe('RoutineTemplateBuilder', () => {
     expect(screen.getByTestId('movement-picker-row-1')).toBeOnTheScreen();
     expect(screen.queryByTestId('movement-picker-row-2')).toBeNull();
     expect(screen.queryByTestId('movement-picker-row-3')).toBeNull();
+  });
+
+  // R1 (post-PR #19): the movement picker follows the InfoTip/Sheet accessibility
+  // modal pattern. These assert the React Native contract the app declares; they
+  // do not exercise a real TalkBack or VoiceOver session.
+  describe('R1 movement picker accessibility modal', () => {
+    const openPicker = () => fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
+    const visiblePickerModal = () => screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.visible === true);
+
+    test('R1 containment: the picker content is declared an accessibility modal around the card and its heading', () => {
+      render(<RoutineTemplateBuilder />);
+      openPicker();
+      const dialog = screen.getByTestId('movement-picker-dialog');
+      expect(dialog.props.accessibilityViewIsModal).toBe(true);
+      expect(within(dialog).getByTestId('movement-picker-card')).toBeOnTheScreen();
+      expect(within(dialog).getByRole('header', { name: 'Choose Movement' })).toBeOnTheScreen();
+    });
+
+    test('R1 escape: the screen-reader escape action closes the picker without selecting and resets its search', () => {
+      render(<RoutineTemplateBuilder />);
+      openPicker();
+      fireEvent.changeText(screen.getByTestId('movement-picker-search'), 'squat');
+      act(() => { screen.getByTestId('movement-picker-dialog').props.onAccessibilityEscape(); });
+      expect(screen.queryByTestId('movement-picker-card')).toBeNull();
+      openPicker();
+      expect(screen.getByTestId('movement-picker-search').props.value).toBe('');
+      expect(screen.getByTestId('movement-picker-row-1')).toBeOnTheScreen();
+    });
+
+    test('R1 initial focus: on show, accessibility focus moves to the picker heading and the search field is not focused', () => {
+      const { findNodeHandle } = jest.requireMock('react-native/Libraries/ReactNative/RendererProxy');
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      findNodeHandle.mockImplementation((instance) => (instance?.props?.testID === 'movement-picker-title' ? 4101 : null));
+      try {
+        render(<RoutineTemplateBuilder />);
+        openPicker();
+        expect(focus).not.toHaveBeenCalled();
+        act(() => { visiblePickerModal().props.onShow(); });
+        expect(focus).toHaveBeenCalledTimes(1);
+        expect(focus).toHaveBeenCalledWith(4101);
+        expect(screen.getByTestId('movement-picker-title').props.accessibilityRole).toBe('header');
+        expect(screen.getByTestId('movement-picker-search').props.autoFocus).not.toBe(true);
+      } finally {
+        focus.mockRestore();
+        findNodeHandle.mockImplementation((instance) => jest.requireActual('react-native/jest/mocks/RendererProxy').findNodeHandle(instance));
+      }
+    });
+
+    test('R1 Android close: the system back request closes the picker and resets its search', () => {
+      render(<RoutineTemplateBuilder />);
+      openPicker();
+      fireEvent.changeText(screen.getByTestId('movement-picker-search'), 'squat');
+      act(() => { visiblePickerModal().props.onRequestClose(); });
+      expect(screen.queryByTestId('movement-picker-card')).toBeNull();
+      openPicker();
+      expect(screen.getByTestId('movement-picker-search').props.value).toBe('');
+    });
   });
 
   test('search and live role-filtered counts stay independent', () => {

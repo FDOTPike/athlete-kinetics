@@ -6,10 +6,12 @@
  * resolving movement availability via capabilityResolver verdicts, and
  * composing/freezing sessions into planned_session/planned_slot.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Alert,
   FlatList,
+  findNodeHandle,
   Modal,
   Pressable,
   StyleSheet,
@@ -155,6 +157,14 @@ function AvailableRoutineTemplateBuilder({
 
   const [activeDay, setActiveDay] = useState(() => initialTemplate?.slots[0]?.dayIndex ?? 1);
   const [pickerSlotIndex, setPickerSlotIndex] = useState<number | null>(null);
+  // The movement picker follows the InfoTip accessibility-modal pattern: on show,
+  // screen-reader focus moves to the picker heading. The search field is not
+  // focused, so the keyboard stays closed until the athlete chooses to search.
+  const pickerTitleRef = useRef<React.ElementRef<typeof Text>>(null);
+  const focusPickerTitle = useCallback(() => {
+    const titleHandle = findNodeHandle(pickerTitleRef.current);
+    if (titleHandle !== null) AccessibilityInfo.setAccessibilityFocus(titleHandle);
+  }, []);
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerView, setPickerView] = useState<'available' | 'all'>('available');
   const [expandedMovementDetailId, setExpandedMovementDetailId] = useState<number | null>(null);
@@ -1063,13 +1073,27 @@ function AvailableRoutineTemplateBuilder({
         transparent
         animationType="fade"
         onRequestClose={closePicker}
+        onShow={focusPickerTitle}
         statusBarTranslucent
       >
-        <View style={styles.pickerOverlay}>
+        <View
+          testID="movement-picker-dialog"
+          style={styles.pickerOverlay}
+          accessibilityViewIsModal
+          onAccessibilityEscape={closePicker}
+        >
           <View testID="movement-picker-card" style={styles.pickerCard}>
             <View style={styles.pickerHeaderRow}>
               <View>
-                <Text style={styles.pickerTitle}>Choose Movement</Text>
+                <Text
+                  ref={pickerTitleRef}
+                  testID="movement-picker-title"
+                  accessible
+                  accessibilityRole="header"
+                  style={styles.pickerTitle}
+                >
+                  Choose Movement
+                </Text>
                 <Text style={styles.reasonText} accessibilityLabel={`${pickerCounts.available} available and ${pickerCounts.teaching} teaching only`}>
                   {pickerCounts.available} available · {pickerCounts.teaching} teaching only
                 </Text>
