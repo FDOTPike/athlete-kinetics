@@ -34,6 +34,7 @@
  * Run:  npm run verify:autopilot
  */
 import { createRequire } from 'node:module';
+import { verifyR05Blocks } from './verify_r05.mjs';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -111,6 +112,15 @@ const makeReport = (byPattern = {}, { guardrail = null } = {}) => {
 const NEUTRAL_PROFILE = prof();
 const GPP = 'gpp';
 const guard = (o) => ({ load_multiplier: 1, set_delta: 0, rpe_cap_max: 10, halt: false, follow_up: null, ...o });
+
+try {
+  verifyR05Blocks([
+    makeReport(),
+    makeReport({ squat: { phi: 0.9 } }),
+    makeReport({ squat: { phi: -0.9 } }),
+    makeReport({}, { guardrail: guard({ halt: true }) }),
+  ]);
+} catch (error) { check('R05 experience-only autopilot block workload', false, error.message); }
 
 // =============================================================================
 // [1] determinism + input purity (F and u)
