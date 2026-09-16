@@ -7,6 +7,8 @@ import { resolveMovementAvailability as actualResolveMovementAvailability } from
 import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
 import SessionScreen from '../../src/screens/SessionScreen';
+import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
+import { restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
 let mockState;
 
@@ -429,7 +431,7 @@ test('adjusting actual RPE marks and records the changed answer', () => {
 test('WO-02 labels athlete-reported RPE as Effort with the exact scale explanation while retaining strength-set RIR', () => {
   render(<SessionScreen />);
 
-  expect(screen.getByText('How hard did that feel? 1 is very easy. 10 is your hardest effort.')).toBeOnTheScreen();
+  expect(screen.getByText('How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.')).toBeOnTheScreen();
   expect(screen.getByText('How many more clean reps could you have completed?')).toBeOnTheScreen();
   fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
   expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
@@ -1608,3 +1610,61 @@ test('a planned movement missing from the library fails the tier check closed', 
   expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
   expect(screen.queryByText('First movement')).toBeNull();
 });
+
+// ---------------------------------------------------------------------------
+// R4 (post-PR #19): the effort explanation must be truthful about both the
+// full 1-10 effort scale and the ratified 5-10 direct working-set entry. The
+// control itself is unchanged: optional, 5.0-10.0 in 0.5 steps, unanchored,
+// and unanswered stays null.
+// ---------------------------------------------------------------------------
+test('R4 explains the 1-10 effort scale truthfully and keeps direct working-set entry optional and bounded to 5-10', () => {
+  render(<SessionScreen />);
+  expect(screen.getByTestId('effort-scale-explanation').props.children).toBe('How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.');
+
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+  expect(screen.getAllByRole('button', { name: /^Effort \d+\.\d$/ }).map((node) => node.props.accessibilityLabel)).toEqual([
+    'Effort 5.0', 'Effort 5.5', 'Effort 6.0', 'Effort 6.5', 'Effort 7.0', 'Effort 7.5',
+    'Effort 8.0', 'Effort 8.5', 'Effort 9.0', 'Effort 9.5', 'Effort 10.0',
+  ]);
+
+  for (let press = 0; press < 12; press += 1) fireEvent.press(screen.getByLabelText('Decrease Effort'));
+  expect(screen.getAllByLabelText('Effort 5.0')).toHaveLength(2);
+  for (let press = 0; press < 12; press += 1) fireEvent.press(screen.getByLabelText('Increase Effort'));
+  expect(screen.getAllByLabelText('Effort 10.0')).toHaveLength(2);
+
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 10.0' }));
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// R5 (2026-09-15 tier-neutral rest ruling): when no runner owns the timer, the
+// local rest fallback uses the runner's RPE bands and ignores training tier.
+// ---------------------------------------------------------------------------
+test('R5 local rest fallback is identical for every tier and equals the runner rest for the same answer', () => {
+  const answers = [
+    ['0 clean reps left', 10], ['1 clean rep left', 9], ['2 clean reps left', 8],
+    ['3 clean reps left', 7], ['4+ clean reps left', 6], [null, null],
+  ];
+  const observed = new Map();
+  for (const tier of ['beginner', 'intermediate', 'advanced', 'elite']) {
+    for (const [answer, rpe] of answers) {
+      mockState = state({ runner: null, profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 } });
+      const view = render(<SessionScreen />);
+      if (answer !== null) fireEvent.press(screen.getByLabelText(answer));
+      fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+      expect(mockState.logSet.mock.calls[0][3]).toBe(rpe);
+      const seconds = screen.UNSAFE_getByType(RestTimerCard).props.totalSeconds;
+      expect(seconds).toBe(runnerRestSecondsFor({ targetRpe: 8 }, 'intermediate', rpe));
+      observed.set(answer, [...(observed.get(answer) ?? []), seconds]);
+      view.unmount();
+    }
+  }
+  expect([...observed.values()].map((values) => new Set(values).size)).toEqual([1, 1, 1, 1, 1, 1]);
+  expect([...observed.values()].map((values) => values[0])).toEqual([240, 240, 180, 120, 90, 180]);
+}, 60000);

@@ -26,6 +26,7 @@ import {
 } from '../state/activityStore';
 import { useStore } from '../state/useStore';
 import { theme } from '../theme/theme';
+import { useSubViewBack } from '../navigation/navigation';
 
 const KIND_LABELS: Record<ActivityKindId, string> = {
   walking: 'Walking',
@@ -116,6 +117,11 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
   const [completionTarget, setCompletionTarget] = useState<ActivityOccurrenceFact | null>(null);
   const [completionDuration, setCompletionDuration] = useState('');
   const [completionEffort, setCompletionEffort] = useState('');
+  // Hardware Back closes a nested view without discarding what the athlete
+  // typed. A kept draft is restored only for the same entry; the visible
+  // Cancel still clears it.
+  const [entryDraftKept, setEntryDraftKept] = useState(false);
+  const [keptCompletionOccurrenceId, setKeptCompletionOccurrenceId] = useState<string | null>(null);
 
   const activeSeries = useMemo(
     () => ledger.series.filter((row) => row.effectiveEndDate === null),
@@ -123,6 +129,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
   );
 
   const resetForm = (): void => {
+    setEntryDraftKept(false);
     setActivityId(undefined);
     setSeriesId(undefined);
     setKindId('walking');
@@ -146,8 +153,15 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
     ledger.definitions.find((row) => row.activityId === id);
 
   const beginEditSeries = (row: ActivitySeriesFact): void => {
+    if (entryDraftKept && seriesId === row.seriesId) {
+      setEntryDraftKept(false);
+      setNotice(null);
+      setFormOpen(true);
+      return;
+    }
     const definition = definitionFor(row.activityId);
     if (definition === undefined) return;
+    setEntryDraftKept(false);
     setActivityId(definition.activityId);
     setSeriesId(row.seriesId);
     setKindId(definition.kindId);
@@ -247,6 +261,18 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
     }
   };
 
+  // Android hardware Back: close the completion view first, then the entry
+  // form; only a later Back (handled by the host) leaves Activities.
+  useSubViewBack(formOpen || completionTarget !== null, () => {
+    if (completionTarget !== null) {
+      setKeptCompletionOccurrenceId(completionTarget.occurrenceId);
+      setCompletionTarget(null);
+    } else {
+      setEntryDraftKept(true);
+      setFormOpen(false);
+    }
+  });
+
   return (
     <KeyboardAwareScrollView
       style={styles.screen}
@@ -284,7 +310,12 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
       {!formOpen && (
         <PrimaryButton
           label="ADD AN ACTIVITY"
-          onPress={() => { resetForm(); setNotice(null); setFormOpen(true); }}
+          onPress={() => {
+            if (!(entryDraftKept && seriesId === undefined)) resetForm();
+            setEntryDraftKept(false);
+            setNotice(null);
+            setFormOpen(true);
+          }}
           accessibilityLabel="Add an existing or one-off activity"
         />
       )}
@@ -521,11 +552,16 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
           {row.state === 'planned' && (
             <View>
               <SecondaryButton label="LOG ACTUAL COMPLETION" onPress={() => {
+                const keepDraft = keptCompletionOccurrenceId === row.occurrenceId;
                 setCompletionTarget(row);
+                setKeptCompletionOccurrenceId(null);
                 // Actual minutes are an observation. The plan is shown only as
-                // placeholder context so an untouched save stays unknown.
-                setCompletionDuration('');
-                setCompletionEffort('');
+                // placeholder context so an untouched save stays unknown. Values
+                // the athlete typed before a hardware Back return for that entry.
+                if (!keepDraft) {
+                  setCompletionDuration('');
+                  setCompletionEffort('');
+                }
                 setError(null);
               }} accessibilityLabel={`Log actual completion for ${row.displayName}`} />
               <View style={styles.chips}>
@@ -557,7 +593,12 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             placeholder="1 very easy · 10 hardest effort" placeholderTextColor={theme.color.textLow} />
           {error !== null && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
           <PrimaryButton label="SAVE ACTUAL ACTIVITY" onPress={finishCompletion} />
-          <QuietAction label="CANCEL" onPress={() => setCompletionTarget(null)} />
+          <QuietAction label="CANCEL" onPress={() => {
+            setCompletionTarget(null);
+            setKeptCompletionOccurrenceId(null);
+            setCompletionDuration('');
+            setCompletionEffort('');
+          }} />
         </View>
       )}
     </KeyboardAwareScrollView>

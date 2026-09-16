@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { BackHandler, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
@@ -46,6 +46,27 @@ const baseProfile = {
   mobility_limits: [],
   equipment_inventory: ['barbell', 'dumbbells', 'bench'],
 };
+
+
+// R2: capture the hardwareBackPress listener NavigationProvider registers, then
+// press it the way Android does (newest listener first).
+function captureHardwareBack() {
+  const listeners = [];
+  const spy = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((eventName, listener) => {
+    if (eventName === 'hardwareBackPress') listeners.push(listener);
+    return { remove: () => { const index = listeners.indexOf(listener); if (index >= 0) listeners.splice(index, 1); } };
+  });
+  return {
+    press: () => {
+      let handled = false;
+      act(() => {
+        for (let index = listeners.length - 1; index >= 0 && !handled; index -= 1) handled = listeners[index]() === true;
+      });
+      return handled;
+    },
+    restore: () => spy.mockRestore(),
+  };
+}
 
 describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   let deleteAthleteMock;
@@ -677,6 +698,58 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Back to athlete profile' }));
     expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
   });
+
+  test('R2 inside Profile, hardware Back closes Activities completion, then the entry form, keeps both drafts, and only then leaves Activities', () => {
+    mockState.activityLedger = { ...mockState.activityLedger, occurrences: [{
+        occurrenceId: 'occurrence-plan', activityId: 'activity-1', displayName: 'Walk',
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: 30, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      }] };
+    const hardwareBack = captureHardwareBack();
+    try {
+      const tree = () => (
+        <NavigationProvider initialTab="athlete">
+          <ProfileScreen />
+        </NavigationProvider>
+      );
+      const view = render(tree());
+      fireEvent.press(screen.getByRole('button', { name: 'Open your existing activities' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      fireEvent.changeText(screen.getByLabelText('Activity name shown in the app'), 'Rock climbing');
+      fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+      fireEvent.changeText(screen.getByLabelText('Actual activity duration in minutes'), '25');
+      // A later re-render of the Profile host (for example a store update) must
+      // not move its "close Activities" handler ahead of the nested views.
+      view.rerender(tree());
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-completion-form')).toBeNull();
+      expect(screen.getByTestId('activity-entry-form')).toBeOnTheScreen();
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-entry-form')).toBeNull();
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      expect(screen.getByLabelText('Activity name shown in the app').props.value).toBe('Rock climbing');
+      fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+      expect(screen.getByLabelText('Actual activity duration in minutes').props.value).toBe('25');
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activities-screen')).toBeNull();
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(mockState.saveOneOffActivity).not.toHaveBeenCalled();
+      expect(mockState.saveWeeklyActivity).not.toHaveBeenCalled();
+      expect(mockState.completeActivityOccurrence).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+    }
+  }, 30000);
 });
 
 // ---------------------------------------------------------------------------
