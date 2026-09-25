@@ -12008,4 +12008,31 @@ invent a workaround.
 
 ### Output
 
-- IN PROGRESS. Runtime: gpt-6-sol via Hermes (openai-codex).
+- **Implementation commits:** `75abb23e` (JS speech contract/control),
+  `b09948f7` (Android offline TTS), `278cc358` (Session/Library wiring).
+- **Verified source:** HEAD `278cc358b169300065064ff251450ed7307350a6`,
+  tree `514c5d32560ddc5b08b91e2f1c802063da8ca3ce`.
+- TurboModule codegen used; no fallback, audio file, npm/Gradle dependency,
+  network permission, network synthesis, iOS edit, migration, or policy edit.
+- Offline English voices only; one lazy native instance; sentence chunking;
+  utterance lifecycle; transient may-duck focus; shutdown on host pause/destroy.
+- Session SET UP/CUES/halt and Library cue/instruction controls wired. SET UP
+  includes displayed `coachingIntent` only when setup steps exist. Empty Library
+  sections expose no control. Logging a set and every owning-block teardown stop.
+- Pronunciation map: RPE, RIR, RDL, DB, KB, e.g. A replay of the current 63
+  migrations found zero current movement coaching records containing those whole
+  tokens; runtime UI/halt copy can still exercise them.
+- **Red evidence:** pronunciation mutation failed 2/8 tests; second-tap mutation
+  failed 1/3; pre-wiring screen/offline run failed 4 tests with 114 passing.
+- **Green evidence:** focused 6 suites / 132 tests; `npm run typecheck` before
+  each implementation commit; final `npm run verify:ci` exit 0 at the source
+  revision above (50 suites, 737 tests, all preceding gates green).
+- Standalone codegen generated the expected native spec. Local Gradle compilation
+  was not evidence because installed JDK 25/26 is incompatible with this
+  Gradle/Kotlin parser; `android-apk` CI is the authorized native compile proof.
+- Device speech, pronunciation, music ducking, TalkBack, lifecycle timing,
+  app-process RAM and latency remain **UNVERIFIED** pending Francis's checklist.
+- Full evidence and the all-UNVERIFIED checklist are in
+  `HANDOVER_2026-09-25_AC_WO11_SPOKEN_CUES.md`.
+- Runtime: gpt-6-sol via Hermes (openai-codex). Independent audit remains
+  pending; merge, auto-merge and release were not performed.
