@@ -19,3 +19,8 @@ test('does not replace parts of longer tokens or change unknown text', () => {
 test('strips bullets and speaks numbered steps without changing their numbers', () => {
   expect(toSpokenText('1. Brace.\n2. • Drive.\n• RPE 8.')).toBe('Step 1. Brace.\nStep 2. Drive.\nR P E 8.');
 });
+
+test('does not treat decimals as steps or consume the next line', () => {
+  expect(toSpokenText('2.5 kg jumps each week')).toBe('2.5 kg jumps each week');
+  expect(toSpokenText('1.\nBrace')).toBe('Step 1. \nBrace');
+});

@@ -44,3 +44,20 @@ test('stop clears selection and swallows native errors', async () => {
   expect(seen.at(-1)).toBe(null);
   unsubscribe();
 });
+
+test('a keyed stop cancels only its matching pending request', async () => {
+  let resolveAvailability;
+  native.isAvailable.mockReturnValueOnce(new Promise((resolve) => { resolveAvailability = resolve; }));
+  const cancelled = speak('a', 'First');
+  await stop('a');
+  resolveAvailability(true);
+  expect(await cancelled).toBe(false);
+  expect(native.speak).not.toHaveBeenCalled();
+
+  native.isAvailable.mockReturnValueOnce(new Promise((resolve) => { resolveAvailability = resolve; }));
+  const retained = speak('a', 'Second');
+  await stop('b');
+  resolveAvailability(true);
+  expect(await retained).toBe(true);
+  expect(native.speak).toHaveBeenCalledWith('Second', expect.any(String));
+});

@@ -6,6 +6,7 @@ const listeners = new Set<Listener>();
 let activeKey: string | null = null;
 let activeId: string | null = null;
 let sequence = 0;
+let pending: { key: string; request: number } | null = null;
 let subscribedModule: Spec | null = null;
 let eventSubscription: { remove(): void } | null = null;
 
@@ -45,9 +46,12 @@ export async function isSpeechAvailable(): Promise<boolean> {
 
 export async function speak(key: string, text: string): Promise<boolean> {
   const request = ++sequence;
+  pending = { key, request };
   try {
     const native = moduleOrNull();
-    if (native === null || !await native.isAvailable() || request !== sequence) return false;
+    const available = native !== null && await native.isAvailable();
+    if (pending?.request === request) pending = null;
+    if (!available || native === null || request !== sequence) return false;
     watch(native);
     const id = String(request);
     activeId = id;
@@ -55,6 +59,7 @@ export async function speak(key: string, text: string): Promise<boolean> {
     await native.speak(text, id);
     return request === sequence;
   } catch {
+    if (pending?.request === request) pending = null;
     if (request === sequence) {
       activeId = null;
       publish(null);
@@ -64,8 +69,12 @@ export async function speak(key: string, text: string): Promise<boolean> {
 }
 
 export async function stop(key?: string): Promise<void> {
-  if (key !== undefined && key !== activeKey) return;
-  ++sequence;
+  const pendingMatches = pending !== null && (key === undefined || key === pending.key);
+  const activeMatches = activeKey !== null && (key === undefined || key === activeKey);
+  if (!pendingMatches && !activeMatches) return;
+  if (pendingMatches || pending === null) ++sequence;
+  if (pendingMatches) pending = null;
+  if (!activeMatches) return;
   activeId = null;
   if (activeKey !== null) publish(null);
   try { await moduleOrNull()?.stop(); } catch { /* no native error reaches render */ }

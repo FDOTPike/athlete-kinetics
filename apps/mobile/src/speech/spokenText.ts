@@ -10,7 +10,7 @@ const pronunciation: Readonly<Record<string, string>> = {
 
 export function toSpokenText(displayed: string): string {
   return displayed
-    .replace(/(^|\n)(\s*)(\d+)\.\s*(?:•\s*)?/g, (_match, start: string, indent: string, number: string) =>
+    .replace(/(^|\n)([ \t]*)(\d+)\.(?!\d)[ \t]*(?:•[ \t]*)?/g, (_match, start: string, indent: string, number: string) =>
       `${start}${indent}Step ${number}. `)
     .replace(/(^|\n)(\s*)•\s*/g, '$1$2')
     .replace(/(^|[^\w])(?:RPE|RIR|RDL|DB|KB|e\.g\.)(?=$|[^\w])/gi,
