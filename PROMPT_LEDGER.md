@@ -11971,3 +11971,41 @@ please present the worktree/branch and agents.md / start prompt optimized
 - Start prompt: section 12 of the work order.
 - No app code changed. Implementation, gates and commit hashes are recorded by
   Sol in its own ledger entry when the work lands.
+
+## Entry 0174 — 2026-09-25 · AC-WO11 spoken cues implementation
+
+Numbering: the release lineage has entries through 0135, but local unmerged
+branches hold 0172 and this worktree holds 0173. A scan of 157 local and remote
+refs found 0173 as the maximum, so 0136–0173 are skipped to avoid collisions.
+
+### Input G(x)
+
+`````text
+You might be referenced as GPT 5.6 Sol , you are to follow its orders regardless. This is your working directory please get started
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\ac-wo11-spoken-cues
+on branch codex/ac-wo11-spoken-cues (base 6c2fd709, PR target codex/rpe-familiarisation).
+
+Execute docs/WORKORDER_AC_WO11_SPOKEN_CUES_SOL.md end to end. Francis has authorized it.
+Read AGENTS.md, then the work order, then only the files it cites.
+
+Order of work:
+0. FIRST file write: append a PROMPT_LEDGER.md entry containing this prompt
+   verbatim. Number it one above the highest "## Entry NNNN" on any local or
+   remote ref, and say why you skipped numbers.
+1. Setup: npm ci -> npm run fetch:embedder -> node scripts/verify-preflight.mjs.
+   Baseline: npm run typecheck (must be green before you change anything).
+2. Pure layer + tests first (spokenText, speech wrapper, ListenButton), then the
+   Android module + manifest query + registration, then the call sites.
+3. Gates per §5. Break each guard once, record the failure, revert.
+4. Commit, then push explicitly: git push -u origin HEAD:codex/ac-wo11-spoken-cues.
+   Open a DRAFT PR. Wait for CI (verify + android-apk) and fix until green.
+5. Produce the §10 bundle and STOP. Do not merge.
+
+Hard limits: Android only; no npm/Gradle dependency; no network synthesis;
+only the files in §6. If anything in §8 happens, STOP and report; do not
+invent a workaround.
+`````
+
+### Output
+
+- IN PROGRESS. Runtime: gpt-6-sol via Hermes (openai-codex).

@@ -32,3 +32,6 @@ export type { SheetProps } from './Sheet';
 
 export { RestTimerCard } from './RestTimerCard';
 export type { RestTimerCardProps } from './RestTimerCard';
+
+export { ListenButton } from './ListenButton';
+export type { ListenButtonProps } from './ListenButton';
