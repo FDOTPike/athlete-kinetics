@@ -3,9 +3,9 @@
 ## Frozen implementation
 
 - Branch: `codex/ac-wo11-spoken-cues`; base: `6c2fd7092baaf6f85e14cc4624974e83b2a1d6c8`.
-- Verified source HEAD: `278cc358b169300065064ff251450ed7307350a6`.
-- Verified source tree: `514c5d32560ddc5b08b91e2f1c802063da8ca3ce`.
-- Commits: `75abb23e` JS speech contract/control; `b09948f7` Android offline TTS; `278cc358` screen wiring.
+- Verified source HEAD: `e15c5796d7dc7060dce242708e3d71e68f417f31`.
+- Verified source tree: `a3dbede0e35336c8f02667ed9736643b085c85c4`.
+- Commits: `75abb23e` JS speech contract/control; `b09948f7` Android offline TTS; `278cc358` screen wiring; `e15c5796` generated-spec package fix and regression assertion.
 - TurboModule codegen was used; the interop fallback was not used.
 
 ## Delivered
@@ -25,9 +25,10 @@
   - Before screen/native wiring: 3 suites failed, 4 tests failed and 114 passed; both Session controls, the halt control, the Library controls, and the TTS manifest query were absent.
 - Restored focused gate: 6 suites passed, 132 tests passed.
 - `npm run typecheck`: exit 0 before each implementation commit.
-- `npm run verify:ci` at source HEAD/tree above: exit 0; 50 suites passed, 737 tests passed; preflight and every preceding gate passed.
+- `npm run verify:ci` at pre-remediation source commit `278cc358` / tree `514c5d32`: exit 0; 50 suites passed, 737 tests passed; preflight and every preceding gate passed.
 - Standalone React Native codegen completed and generated `NativeSpeechCueSpec` with the expected promise methods and event emitter.
 - Local Gradle compile was not evidence: the installed JDK reports 25.0.3/26.0.1 and this Gradle/Kotlin stack fails while parsing that Java version. The authorized `android-apk` CI job remains the compile proof.
+- First authorized CI run: the verification job passed all gates, seeder checks, and the Metro bundle; Android codegen then exposed one wrong default-package import before APK creation. Commit `e15c5796` removed that import, and the focused offline/native source contract (1 suite, 1 test) plus typecheck passed. The fix commit requires a fresh Android CI run; the PR check is the terminal compile record.
 - Existing Jest `act(...)`, SafeAreaView deprecation, and monorepo resolution notices remained non-failing and unchanged.
 
 ## Residual uncertainty
