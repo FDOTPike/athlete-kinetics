@@ -17,7 +17,9 @@ import {
   Chip,
   Stepper,
   RestTimerCard,
+  ListenButton,
 } from '../components/ui';
+import { stop as stopSpeech } from '../speech/speech';
 
 type SessionMode = 'guided' | 'self_directed';
 interface LocalRest { startedAtMs: number; seconds: number; slotId: number; }
@@ -385,6 +387,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const triageHalted = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
   const runnerComplete = runnerPhase === 'complete';
   const halted = runnerPhase === 'halted' || (!runnerComplete && triageHalted);
+  const haltReasonText = formatRunnerHaltReason(
+    runner?.haltReason,
+    lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : null,
+  );
   const complete = !halted && sessionPlan.length > 0 && (runnerComplete || allDone);
   const target = currentSlot === null ? null : targetFor(currentSlot);
   const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
@@ -715,6 +721,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     }
     const safeLoad = parsed;
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
+    void stopSpeech();
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
@@ -744,6 +751,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   const setup = lines(currentMovement?.instructions, 4);
   const cues = lines(currentMovement?.cues, 3);
+  const setupSpeechText = setup.length === 0 ? '' : [
+    currentMovement?.coachingIntent?.trim(),
+    ...setup.map((line, index) => `${index + 1}. ${line}`),
+  ].filter((line): line is string => line !== undefined && line.length > 0).join('\n');
+  const cueSpeechText = cues.map((line) => `• ${line}`).join('\n');
   const supportsBands = currentMovement?.supportedPrefixes?.includes('Banded') === true && bandLadder.length > 0;
   const runnerNext = runner === null ? null : nextRunnerWork(runner);
   const upcomingSlot = runnerNext !== null
@@ -775,11 +787,13 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           <View style={styles.haltCard} accessibilityRole="alert">
             <Text style={styles.haltTitle}>Stop training for today.</Text>
             <Text style={styles.haltBody}>
-              {formatRunnerHaltReason(
-                runner?.haltReason,
-                lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : null,
-              )}
+              {haltReasonText}
             </Text>
+            <ListenButton
+              speechKey="session-halt"
+              text={`Stop training for today.\n${haltReasonText}`}
+              label="halt message"
+            />
             <View style={{ marginTop: theme.space[4], alignSelf: 'stretch' }}>
               <SecondaryButton
                 label="Finish session"
@@ -1209,12 +1223,22 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               <View style={styles.copyGroup}>
                                 <Text style={styles.copyHeading}>SET UP</Text>
                                 {setup.map((line, index) => <Text key={`setup-${index}`} style={styles.copyLine}>{index + 1}. {line}</Text>)}
+                                <ListenButton
+                                  speechKey={`session-setup-${slot.sessionPlanSlotId}`}
+                                  text={setupSpeechText}
+                                  label="setup"
+                                />
                               </View>
                             )}
                             {cues.length > 0 && (
                               <View style={styles.copyGroup}>
                                 <Text style={styles.copyHeading}>CUES</Text>
                                 {cues.map((line, index) => <Text key={`cue-${index}`} style={styles.cueLine}>• {line}</Text>)}
+                                <ListenButton
+                                  speechKey={`session-cues-${slot.sessionPlanSlotId}`}
+                                  text={cueSpeechText}
+                                  label="cues"
+                                />
                               </View>
                             )}
                             {setup.length === 0 && cues.length === 0 && movement?.coachingIntent == null && (

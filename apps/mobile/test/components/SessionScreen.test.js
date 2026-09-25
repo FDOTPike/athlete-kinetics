@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet, TurboModuleRegistry } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
@@ -1668,3 +1668,58 @@ test('R5 local rest fallback is identical for every tier and equals the runner r
   expect([...observed.values()].map((values) => new Set(values).size)).toEqual([1, 1, 1, 1, 1, 1]);
   expect([...observed.values()].map((values) => values[0])).toEqual([240, 240, 180, 120, 90, 180]);
 }, 60000);
+
+describe('spoken coaching controls', () => {
+  const nativeSpeech = {
+    isAvailable: jest.fn(),
+    speak: jest.fn(),
+    stop: jest.fn(),
+    onSpeechEvent: jest.fn(() => ({ remove: jest.fn() })),
+  };
+
+  beforeEach(() => {
+    jest.spyOn(TurboModuleRegistry, 'get').mockReturnValue(nativeSpeech);
+    nativeSpeech.isAvailable.mockReset().mockResolvedValue(true);
+    nativeSpeech.speak.mockReset().mockResolvedValue(undefined);
+    nativeSpeech.stop.mockReset().mockResolvedValue(undefined);
+    nativeSpeech.onSpeechEvent.mockClear();
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  test('renders setup and cue controls and logging a set stops speech', async () => {
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('How and why, collapsed'));
+
+    const setupControl = await screen.findByLabelText('Read the setup aloud');
+    expect(await screen.findByLabelText('Read the cues aloud')).toBeOnTheScreen();
+
+    await act(async () => fireEvent.press(setupControl));
+    expect(nativeSpeech.speak).toHaveBeenCalledWith(
+      'Build a simple, repeatable pressing pattern.\nStep 1. Plant your feet\nStep 2. Brace your trunk',
+      expect.any(String),
+    );
+
+    fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+    expect(nativeSpeech.stop).toHaveBeenCalled();
+    expect(mockState.logSet).toHaveBeenCalled();
+  });
+
+  test('halt control speaks the displayed halt reason', async () => {
+    mockState = state({
+      runner: runner({ phase: 'halted', haltReason: 'safety' }),
+      lastTriage: {
+        kind: 'matched',
+        directive: { halt: true, vector: { coaching_cue: 'RPE 10. End the session.' } },
+      },
+    });
+    render(<SessionScreen />);
+
+    const haltControl = await screen.findByLabelText('Read the halt message aloud');
+    await act(async () => fireEvent.press(haltControl));
+    expect(nativeSpeech.speak).toHaveBeenCalledWith(
+      'Stop training for today.\nR P E 10. End the session.',
+      expect.any(String),
+    );
+  });
+});

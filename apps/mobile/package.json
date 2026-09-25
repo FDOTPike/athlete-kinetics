@@ -23,5 +23,13 @@
     "react-native-get-random-values": "^2.0.0",
     "react-native-health-connect": "^3.3.0",
     "zustand": "^5.0.0"
+  },
+  "codegenConfig": {
+    "name": "SpeechCueSpec",
+    "type": "modules",
+    "jsSrcsDir": "src/native",
+    "android": {
+      "javaPackageName": "com.athletekinetics.speech"
+    }
   }
 }

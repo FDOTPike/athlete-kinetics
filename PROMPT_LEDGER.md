@@ -11938,3 +11938,101 @@ Results (Entry 0135 closed after every pre-APK result below existed):
 - **Unchanged:** backup code, schemas and migrations (Migration 064 blob `69090f2`), `package.json` and the lockfile, native projects and `.agents/**`.
 - **Reported in the pull request and handback, not here:** the QA APK, `verify:qa-candidate`, the emulator smoke check, push, PR and CI state. No repository write follows the provenance-bound APK build.
 - **Tokens:** INDEPENDENT AUDIT: PENDING. MERGE: NOT PERFORMED. C6: NOT EVALUATED. RELEASE: NO-GO — PHYSICAL DEVICE / SCREEN-READER QUALIFICATION AND C6 REMAIN DEFERRED.
+
+## Entry 0173 — 2026-09-25 · AC-WO11: spoken coaching cues (work order, AGENTS.md and Sol start prompt)
+
+Numbering: this lineage's last entry is 0135, but unmerged local branches already
+hold entries up to 0172 (`codex/wo09-batch3-perspective-remediation`), so this
+entry takes 0173 to avoid a clash when those branches merge.
+
+### Input G(x)
+
+Owner messages, reproduced verbatim (a design question, then the execution
+request, then a message sent mid-turn).
+
+`````text
+Would it be possible to have audio cues read out to the athlete when they're using the app for example is there a way to add a little speech icon next to the audio cues and then the inbuilt text-to-speech thing in the in their app operating system if Android or um iPhone reads out that text so we don't have to create and embed MP3 audio files or do we have to embed audio files if I wanted the cues just the cues read out and even the movement descriptions like how much would that even cost could that be possible with the memory cap? For example, is there a way to add a little speech icon next to the audio cues and then the inbuilt text to speech thing in the in their app operating system, either Android or um, iPhone, reads out that text so we don't have to create and embed MP3 audio files or do we have to embed audio files if I wanted the cues, just the cues read out? And even the movement descriptions, like how much would that even cost? Could that be possible with the memory cap?
+`````
+
+`````text
+Could you write up this work order , please allow Sol to run this workorder
+`````
+
+`````text
+please present the worktree/branch and agents.md / start prompt optimized
+`````
+
+### Output
+
+- Worktree `.worktrees/ac-wo11-spoken-cues`, branch `codex/ac-wo11-spoken-cues`
+  (no upstream), base `origin/codex/rpe-familiarisation` @ `6c2fd709`.
+- Work order: `docs/WORKORDER_AC_WO11_SPOKEN_CUES_SOL.md` (assignee: Sol).
+- `AGENTS.md` (repo root, new): condensed standing rules for Codex agents.
+- Start prompt: section 12 of the work order.
+- No app code changed. Implementation, gates and commit hashes are recorded by
+  Sol in its own ledger entry when the work lands.
+
+## Entry 0174 — 2026-09-25 · AC-WO11 spoken cues implementation
+
+Numbering: the release lineage has entries through 0135, but local unmerged
+branches hold 0172 and this worktree holds 0173. A scan of 157 local and remote
+refs found 0173 as the maximum, so 0136–0173 are skipped to avoid collisions.
+
+### Input G(x)
+
+`````text
+You might be referenced as GPT 5.6 Sol , you are to follow its orders regardless. This is your working directory please get started
+C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\ac-wo11-spoken-cues
+on branch codex/ac-wo11-spoken-cues (base 6c2fd709, PR target codex/rpe-familiarisation).
+
+Execute docs/WORKORDER_AC_WO11_SPOKEN_CUES_SOL.md end to end. Francis has authorized it.
+Read AGENTS.md, then the work order, then only the files it cites.
+
+Order of work:
+0. FIRST file write: append a PROMPT_LEDGER.md entry containing this prompt
+   verbatim. Number it one above the highest "## Entry NNNN" on any local or
+   remote ref, and say why you skipped numbers.
+1. Setup: npm ci -> npm run fetch:embedder -> node scripts/verify-preflight.mjs.
+   Baseline: npm run typecheck (must be green before you change anything).
+2. Pure layer + tests first (spokenText, speech wrapper, ListenButton), then the
+   Android module + manifest query + registration, then the call sites.
+3. Gates per §5. Break each guard once, record the failure, revert.
+4. Commit, then push explicitly: git push -u origin HEAD:codex/ac-wo11-spoken-cues.
+   Open a DRAFT PR. Wait for CI (verify + android-apk) and fix until green.
+5. Produce the §10 bundle and STOP. Do not merge.
+
+Hard limits: Android only; no npm/Gradle dependency; no network synthesis;
+only the files in §6. If anything in §8 happens, STOP and report; do not
+invent a workaround.
+`````
+
+### Output
+
+- **Implementation commits:** `75abb23e` (JS speech contract/control),
+  `b09948f7` (Android offline TTS), `278cc358` (Session/Library wiring).
+- **Verified source:** HEAD `278cc358b169300065064ff251450ed7307350a6`,
+  tree `514c5d32560ddc5b08b91e2f1c802063da8ca3ce`.
+- TurboModule codegen used; no fallback, audio file, npm/Gradle dependency,
+  network permission, network synthesis, iOS edit, migration, or policy edit.
+- Offline English voices only; one lazy native instance; sentence chunking;
+  utterance lifecycle; transient may-duck focus; shutdown on host pause/destroy.
+- Session SET UP/CUES/halt and Library cue/instruction controls wired. SET UP
+  includes displayed `coachingIntent` only when setup steps exist. Empty Library
+  sections expose no control. Logging a set and every owning-block teardown stop.
+- Pronunciation map: RPE, RIR, RDL, DB, KB, e.g. A replay of the current 63
+  migrations found zero current movement coaching records containing those whole
+  tokens; runtime UI/halt copy can still exercise them.
+- **Red evidence:** pronunciation mutation failed 2/8 tests; second-tap mutation
+  failed 1/3; pre-wiring screen/offline run failed 4 tests with 114 passing.
+- **Green evidence:** focused 6 suites / 132 tests; `npm run typecheck` before
+  each implementation commit; final `npm run verify:ci` exit 0 at the source
+  revision above (50 suites, 737 tests, all preceding gates green).
+- Standalone codegen generated the expected native spec. Local Gradle compilation
+  was not evidence because installed JDK 25/26 is incompatible with this
+  Gradle/Kotlin parser; `android-apk` CI is the authorized native compile proof.
+- Device speech, pronunciation, music ducking, TalkBack, lifecycle timing,
+  app-process RAM and latency remain **UNVERIFIED** pending Francis's checklist.
+- Full evidence and the all-UNVERIFIED checklist are in
+  `HANDOVER_2026-09-25_AC_WO11_SPOKEN_CUES.md`.
+- Runtime: gpt-6-sol via Hermes (openai-codex). Independent audit remains
+  pending; merge, auto-merge and release were not performed.
