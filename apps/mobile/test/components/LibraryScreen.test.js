@@ -1,6 +1,6 @@
 import React from 'react';
-import { Linking, Platform, StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Linking, Platform, StyleSheet, TurboModuleRegistry } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import LibraryScreen from '../../src/screens/LibraryScreen';
 import { theme } from '../../src/theme/theme';
 
@@ -224,5 +224,47 @@ describe('LibraryScreen Phase 2a', () => {
     expect(screen.getByText('No matching movements')).toBeOnTheScreen();
     fireEvent.press(screen.getAllByLabelText('Clear search and filters')[0]);
     expect(screen.getByText('3 of 3 movements')).toBeOnTheScreen();
+  });
+
+  describe('spoken coaching controls', () => {
+    const nativeSpeech = {
+      isAvailable: jest.fn(),
+      speak: jest.fn(),
+      stop: jest.fn(),
+      onSpeechEvent: jest.fn(() => ({ remove: jest.fn() })),
+    };
+
+    beforeEach(() => {
+      jest.spyOn(TurboModuleRegistry, 'get').mockReturnValue(nativeSpeech);
+      nativeSpeech.isAvailable.mockReset().mockResolvedValue(true);
+      nativeSpeech.speak.mockReset().mockResolvedValue(undefined);
+      nativeSpeech.stop.mockReset().mockResolvedValue(undefined);
+      nativeSpeech.onSpeechEvent.mockClear();
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    test('renders controls for both populated detail sections', async () => {
+      render(<LibraryScreen initialMovementId={1} />);
+      const cuesControl = await screen.findByLabelText('Read the coaching cues aloud');
+      expect(await screen.findByLabelText('Read the execution instructions aloud')).toBeOnTheScreen();
+
+      await act(async () => fireEvent.press(cuesControl));
+      expect(nativeSpeech.speak).toHaveBeenCalledWith(
+        'Spread the floor with your feet.',
+        expect.any(String),
+      );
+    });
+
+    test('does not render a control for empty detail sections', async () => {
+      mockState.movements = sampleMovements.map((movement) => movement.movement_id === 1
+        ? { ...movement, cues: '', instructions: '' }
+        : movement);
+      render(<LibraryScreen initialMovementId={1} />);
+
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.queryByLabelText('Read the coaching cues aloud')).toBeNull();
+      expect(screen.queryByLabelText('Read the execution instructions aloud')).toBeNull();
+    });
   });
 });

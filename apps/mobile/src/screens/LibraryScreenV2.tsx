@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Chip, PrimaryButton, SecondaryButton } from '../components/ui';
+import { Chip, ListenButton, PrimaryButton, SecondaryButton } from '../components/ui';
 import { useSubViewBack } from '../navigation/navigation';
 import {
   formatTeachingOnlyReason,
@@ -312,6 +312,13 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
                     : 'Curated coaching cues are not yet recorded.'}
                 </Text>
               </View>
+              {selectedMovement.cues.trim().length > 0 && (
+                <ListenButton
+                  speechKey={`library-cues-${selectedMovement.movement_id}`}
+                  text={selectedMovement.cues}
+                  label="coaching cues"
+                />
+              )}
             </View>
             <View style={styles.sectionBlock}>
               <Text style={styles.sectionTitle}>Execution Instructions</Text>
@@ -320,6 +327,13 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
                   ? selectedMovement.instructions
                   : 'Curated execution instructions are not yet recorded.'}
               </Text>
+              {selectedMovement.instructions.trim().length > 0 && (
+                <ListenButton
+                  speechKey={`library-instructions-${selectedMovement.movement_id}`}
+                  text={selectedMovement.instructions}
+                  label="execution instructions"
+                />
+              )}
             </View>
             {externalFallback !== null ? (
               <SecondaryButton
