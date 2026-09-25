@@ -12,7 +12,6 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.module.annotations.ReactModule
-import com.facebook.fbreact.specs.NativeSpeechCueSpec
 import java.util.Locale
 
 @ReactModule(name = SpeechCueModule.NAME)

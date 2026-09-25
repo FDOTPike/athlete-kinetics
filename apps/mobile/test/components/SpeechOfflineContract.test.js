@@ -18,6 +18,8 @@ test('speech stays offline and Android can discover the local TTS service', () =
     .filter((name) => name.endsWith('.kt'))
     .map((name) => readFileSync(join(nativeDirectory, name), 'utf8'))
     .join('\n');
+  expect(kotlin).toContain('package com.athletekinetics.speech');
+  expect(kotlin).not.toContain('com.facebook.fbreact.specs.NativeSpeechCueSpec');
   expect(kotlin).not.toMatch(/KEY_FEATURE_NETWORK_SYNTHESIS|KEY_FEATURE_NETWORK_RETRIES_COUNT/);
   expect(kotlin).toContain('isNetworkConnectionRequired');
 });
