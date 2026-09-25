@@ -11938,3 +11938,36 @@ Results (Entry 0135 closed after every pre-APK result below existed):
 - **Unchanged:** backup code, schemas and migrations (Migration 064 blob `69090f2`), `package.json` and the lockfile, native projects and `.agents/**`.
 - **Reported in the pull request and handback, not here:** the QA APK, `verify:qa-candidate`, the emulator smoke check, push, PR and CI state. No repository write follows the provenance-bound APK build.
 - **Tokens:** INDEPENDENT AUDIT: PENDING. MERGE: NOT PERFORMED. C6: NOT EVALUATED. RELEASE: NO-GO — PHYSICAL DEVICE / SCREEN-READER QUALIFICATION AND C6 REMAIN DEFERRED.
+
+## Entry 0173 — 2026-09-25 · AC-WO11: spoken coaching cues (work order, AGENTS.md and Sol start prompt)
+
+Numbering: this lineage's last entry is 0135, but unmerged local branches already
+hold entries up to 0172 (`codex/wo09-batch3-perspective-remediation`), so this
+entry takes 0173 to avoid a clash when those branches merge.
+
+### Input G(x)
+
+Owner messages, reproduced verbatim (a design question, then the execution
+request, then a message sent mid-turn).
+
+`````text
+Would it be possible to have audio cues read out to the athlete when they're using the app for example is there a way to add a little speech icon next to the audio cues and then the inbuilt text-to-speech thing in the in their app operating system if Android or um iPhone reads out that text so we don't have to create and embed MP3 audio files or do we have to embed audio files if I wanted the cues just the cues read out and even the movement descriptions like how much would that even cost could that be possible with the memory cap? For example, is there a way to add a little speech icon next to the audio cues and then the inbuilt text to speech thing in the in their app operating system, either Android or um, iPhone, reads out that text so we don't have to create and embed MP3 audio files or do we have to embed audio files if I wanted the cues, just the cues read out? And even the movement descriptions, like how much would that even cost? Could that be possible with the memory cap?
+`````
+
+`````text
+Could you write up this work order , please allow Sol to run this workorder
+`````
+
+`````text
+please present the worktree/branch and agents.md / start prompt optimized
+`````
+
+### Output
+
+- Worktree `.worktrees/ac-wo11-spoken-cues`, branch `codex/ac-wo11-spoken-cues`
+  (no upstream), base `origin/codex/rpe-familiarisation` @ `6c2fd709`.
+- Work order: `docs/WORKORDER_AC_WO11_SPOKEN_CUES_SOL.md` (assignee: Sol).
+- `AGENTS.md` (repo root, new): condensed standing rules for Codex agents.
+- Start prompt: section 12 of the work order.
+- No app code changed. Implementation, gates and commit hashes are recorded by
+  Sol in its own ledger entry when the work lands.
