@@ -63,7 +63,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '061_autopilot_attribution_convergence.sql',
   '062_suspension_sidecar_immutability.sql',
   '063_movement_load_intent.sql',
-  '064_accessible_coach_support.sql'];
+  '064_accessible_coach_support.sql',
+  '065_session_preparation.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1689,7 +1690,8 @@ for (const target of ['movement_capability_family', 'movement_capability_attesta
   'clinician_instruction', 'clinician_instruction_revision',
   'health_support_hold', 'health_support_scope',
   'recommendation_support_record', 'recommendation_activity_basis',
-  'recommendation_hold_basis']) {
+  'recommendation_hold_basis',
+  'session_preparation', 'session_preparation_item']) {
   const db = freshDb();
   runMigrations(db, MIGRATIONS);
   const before = uv(db);
@@ -1750,11 +1752,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 63 files (slots 001-064, no 004) -> user_version 63. This count is
+    // 64 files (slots 001-065, no 004) -> user_version 64. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 064 (Accessible Coach shared contract).
-    check('fresh install reaches user_version 63 (63 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 63,
+    // silent one. Re-pinned for 065 (session preparation side-car).
+    check('fresh install reaches user_version 64 (64 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 64,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -2845,8 +2847,8 @@ const TRIGGERS_064 = [
 {
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
-  check('064 is the appended migration and completes the chain',
-    IDX_064 === MIGRATIONS.length - 1 && IDX_064 === 62 && uv(d) === 63,
+  check('064 remains at array index 62, never spliced, and the chain completes',
+    IDX_064 === 62 && uv(d) === MIGRATIONS.length,
     `index=${IDX_064} uv=${uv(d)}`);
   check('064 installs every shared table and enforcement trigger',
     TABLES_064.every((name) => d.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))
@@ -3249,7 +3251,7 @@ const TRIGGERS_064 = [
   const before = Number(upgrade.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c);
   runMigrations(upgrade, MIGRATIONS);
   check('064 clean upgrade preserves the existing 300-movement corpus and adds no inferred rows',
-    uv(upgrade) === 63
+    uv(upgrade) === MIGRATIONS.length
       && Number(upgrade.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c) === before
       && TABLES_064.every((name) => Number(upgrade.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
 }
@@ -3261,7 +3263,207 @@ for (const name of TRIGGERS_064) {
   const detected = sentinelsMissing(heal).includes(name);
   runMigrations(heal, MIGRATIONS);
   check(`064 ${name}: loss detected and self-healed`,
-    detected && triggerPresent(heal, name) && uv(heal) === 63);
+    detected && triggerPresent(heal, name) && uv(heal) === MIGRATIONS.length);
+}
+
+// --- 065 session preparation side-car ---------------------------------------
+// Preparation is durable athlete state bound to ONE live session. These checks
+// pin the properties the store relies on: nothing can be fabricated for a
+// finished session, a frozen protocol and a recorded outcome cannot be
+// rewritten, a reused session id cannot inherit an old protocol, and losing
+// any table or guard is detected and self-healed without touching history.
+console.log('[065] session preparation side-car');
+const IDX_065 = FILES.indexOf('065_session_preparation.sql');
+const TABLES_065 = ['session_preparation', 'session_preparation_item'];
+const TRIGGERS_065 = [
+  'trg_session_preparation_live_session_bi',
+  'trg_session_preparation_frozen_bu',
+  'trg_session_preparation_transition_bu',
+  'trg_session_preparation_item_frozen_bu',
+  'trg_session_preparation_item_open_bu',
+];
+const PROTOCOL_065 = JSON.stringify({ version: 1, items: [{ itemId: 'raise.easy_movement' }] });
+const insertPreparation = (db, sessionId, startedAtMs, instanceId = `instance-${sessionId}-${startedAtMs}`) =>
+  db.raw.prepare(`INSERT INTO session_preparation
+    (session_id, instance_id, session_started_at_ms, policy_id, policy_revision, protocol_version,
+     protocol_json, item_count, estimate_low_seconds, estimate_high_seconds, status, revision,
+     created_at_ms, updated_at_ms, finished_at_ms)
+    VALUES (?, ?, ?, 'ramp-general', 1, 1, ?, 1, 240, 300, 'pending', 1, ?, ?, NULL)`)
+    .run(sessionId, instanceId, startedAtMs, PROTOCOL_065, startedAtMs, startedAtMs);
+const insertPreparationItem = (db, sessionId) =>
+  db.raw.prepare(`INSERT INTO session_preparation_item
+    (session_id, item_index, item_id, item_revision, movement_id, prescribed_kind, prescribed_amount,
+     per_side, status, updated_at_ms)
+    VALUES (?, 0, 'raise.easy_movement', 1, NULL, 'time', 240, 0, 'pending', 1)`).run(sessionId);
+const liveSession = (db, startedAtMs) => {
+  db.raw.prepare("INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-10-02', ?)").run(startedAtMs);
+  return Number(db.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+};
+const refusedRaw = (fn) => { try { fn(); return false; } catch { return true; } };
+
+{
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  check('065 is appended after 064 and completes the chain',
+    IDX_065 === MIGRATIONS.length - 1 && IDX_065 === 63 && uv(d) === 64,
+    `index=${IDX_065} uv=${uv(d)}`);
+  check('065 installs both tables and all five guards',
+    TABLES_065.every((name) => d.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))
+      && TRIGGERS_065.every((name) => triggerPresent(d, name)));
+  check('065 fresh install fabricates no preparation record',
+    TABLES_065.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+
+  // A finished session (the shape of every completed, imported and demo row)
+  // can never acquire a preparation record.
+  d.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-09-01', 5000, 42.5)");
+  const finishedId = Number(d.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+  check('065 refuses a protocol for a FINISHED session (no fabricated history)',
+    refusedRaw(() => insertPreparation(d, finishedId, 5000)));
+  d.raw.exec("INSERT INTO session (micro_cycle_id, session_date) VALUES (NULL, '2026-09-02')");
+  const unstartedId = Number(d.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+  check('065 refuses a protocol for a session with no start time',
+    refusedRaw(() => insertPreparation(d, unstartedId, 0)));
+
+  const liveId = liveSession(d, 7000);
+  check('065 refuses a protocol bound to a different session start',
+    refusedRaw(() => insertPreparation(d, liveId, 6999)));
+  check('065 refuses a protocol that is not created pending at revision 1',
+    refusedRaw(() => d.raw.prepare(`INSERT INTO session_preparation
+      (session_id, instance_id, session_started_at_ms, policy_id, policy_revision, protocol_version,
+       protocol_json, item_count, estimate_low_seconds, estimate_high_seconds, status, revision,
+       created_at_ms, updated_at_ms, finished_at_ms)
+      VALUES (?, 'instance-completed', 7000, 'ramp-general', 1, 1, ?, 1, 240, 300, 'completed', 1, 7000, 7000, 7000)`)
+      .run(liveId, PROTOCOL_065)));
+  insertPreparation(d, liveId, 7000);
+  insertPreparationItem(d, liveId);
+  check('065 accepts a pending protocol for a live session',
+    Number(d.raw.prepare('SELECT COUNT(*) AS c FROM session_preparation').get().c) === 1
+      && Number(d.raw.prepare('SELECT COUNT(*) AS c FROM session_preparation_item').get().c) === 1);
+
+  check('065 the frozen protocol cannot be rewritten',
+    refused(d, `UPDATE session_preparation SET protocol_json = '{"version":1}', revision = revision + 1 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation SET instance_id = 'instance-other-x', revision = revision + 1 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation SET session_started_at_ms = 1, revision = revision + 1 WHERE session_id = ${liveId}`));
+  check('065 a write that does not advance the revision by exactly one is refused',
+    refused(d, `UPDATE session_preparation SET status = 'in_progress' WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation SET status = 'in_progress', revision = revision + 2 WHERE session_id = ${liveId}`));
+  check('065 the prescribed item cannot be rewritten',
+    refused(d, `UPDATE session_preparation_item SET prescribed_amount = 10 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation_item SET movement_id = 1 WHERE session_id = ${liveId}`));
+  check('065 an item record must say what happened (done needs the prescribed amount)',
+    refused(d, `UPDATE session_preparation_item SET status = 'done', performed_amount = 100, updated_at_ms = 2 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation_item SET status = 'skipped', updated_at_ms = 2 WHERE session_id = ${liveId}`));
+
+  d.executeSync(`UPDATE session_preparation SET status = 'in_progress', revision = revision + 1, updated_at_ms = 7001 WHERE session_id = ${liveId}`);
+  d.executeSync(`UPDATE session_preparation_item SET status = 'done', performed_amount = 240, updated_at_ms = 7002 WHERE session_id = ${liveId}`);
+  check('065 a started protocol never returns to pending',
+    refused(d, `UPDATE session_preparation SET status = 'pending', revision = revision + 1 WHERE session_id = ${liveId}`));
+  check('065 an outcome needs its finish time',
+    refused(d, `UPDATE session_preparation SET status = 'completed', revision = revision + 1 WHERE session_id = ${liveId}`));
+  d.executeSync(`UPDATE session_preparation SET status = 'completed', revision = revision + 1, updated_at_ms = 7003, finished_at_ms = 7003 WHERE session_id = ${liveId}`);
+  check('065 a recorded outcome is final',
+    refused(d, `UPDATE session_preparation SET status = 'skipped', revision = revision + 1 WHERE session_id = ${liveId}`));
+  check('065 item records close with their protocol',
+    refused(d, `UPDATE session_preparation_item SET status = 'modified', performed_amount = 100, updated_at_ms = 7004 WHERE session_id = ${liveId}`));
+  check('065 preparation never wrote a set_record row',
+    Number(d.raw.prepare('SELECT COUNT(*) AS c FROM set_record').get().c) === 0);
+
+  d.raw.exec(`DELETE FROM session WHERE session_id = ${liveId}`);
+  check('065 discarding the session removes its preparation (FK cascade)',
+    TABLES_065.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+}
+
+// Reused session id. session_id has no AUTOINCREMENT, so after the table is
+// emptied the next session gets the SAME id. With foreign keys OFF (the test
+// and recovery connections) the old protocol survives its session's delete —
+// and it must still be impossible for the new session to inherit it.
+{
+  const reuse = freshDb();
+  runMigrations(reuse, MIGRATIONS);
+  const firstId = liveSession(reuse, 1000);
+  insertPreparation(reuse, firstId, 1000, 'instance-first-session');
+  insertPreparationItem(reuse, firstId);
+  reuse.raw.exec('PRAGMA foreign_keys = OFF');
+  reuse.raw.exec('DELETE FROM session');
+  const secondId = liveSession(reuse, 2000);
+  const orphan = reuse.raw.prepare('SELECT instance_id, session_started_at_ms FROM session_preparation WHERE session_id = ?').get(secondId);
+  check('065 a reused session id exposes an orphan that is NOT bound to the new session',
+    secondId === firstId && orphan !== undefined && orphan.instance_id === 'instance-first-session'
+      && Number(orphan.session_started_at_ms) !== 2000,
+    `first=${firstId} second=${secondId}`);
+  const boundToLive = reuse.raw.prepare(`SELECT COUNT(*) AS c FROM session_preparation p
+    JOIN session s ON s.session_id = p.session_id AND s.started_at_ms = p.session_started_at_ms
+    WHERE p.session_id = ?`).get(secondId).c;
+  check('065 the binding read (session id AND start time) rejects the orphan', Number(boundToLive) === 0);
+  check('065 the orphan cannot be re-pointed at the new session',
+    refused(reuse, `UPDATE session_preparation SET session_started_at_ms = 2000, revision = revision + 1 WHERE session_id = ${secondId}`));
+  reuse.raw.exec(`DELETE FROM session_preparation_item WHERE session_id = ${secondId}`);
+  reuse.raw.exec(`DELETE FROM session_preparation WHERE session_id = ${secondId}`);
+  insertPreparation(reuse, secondId, 2000, 'instance-second-session');
+  check('065 after the explicit delete the new session gets its own protocol',
+    reuse.raw.prepare('SELECT instance_id FROM session_preparation WHERE session_id = ?').get(secondId).instance_id === 'instance-second-session');
+}
+
+// Upgrade from the shipped pre-065 state: existing sessions stay exactly as
+// they were and none of them acquires a preparation record.
+{
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_065);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min, session_rpe) VALUES (NULL, '2026-09-10', 1111, 55.5, 7.5)");
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-09-11', 2222)");
+  const before = JSON.stringify(upgrade.raw.prepare('SELECT * FROM session ORDER BY session_id').all());
+  check('065 pre-upgrade database is the 064 schema',
+    uv(upgrade) === IDX_065
+      && upgrade.raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name='session_preparation'").get() === undefined);
+  runMigrations(upgrade, MIGRATIONS);
+  check('065 clean upgrade reaches the latest version with no missing sentinel',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0,
+    `uv=${uv(upgrade)} missing=${sentinelsMissing(upgrade).join(',')}`);
+  check('065 upgrade leaves every existing session byte-identical',
+    JSON.stringify(upgrade.raw.prepare('SELECT * FROM session ORDER BY session_id').all()) === before);
+  check('065 upgrade fabricates no preparation for historical or in-progress sessions',
+    TABLES_065.every((name) => Number(upgrade.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+  runMigrations(upgrade, MIGRATIONS);
+  check('065 re-boot after upgrade is a no-op', uv(upgrade) === MIGRATIONS.length);
+}
+
+// Self-heal: each guard and each table, with a live protocol in place.
+for (const name of TRIGGERS_065) {
+  const heal = freshDb();
+  runMigrations(heal, MIGRATIONS);
+  const id = liveSession(heal, 3000);
+  insertPreparation(heal, id, 3000);
+  insertPreparationItem(heal, id);
+  const before = JSON.stringify(heal.raw.prepare('SELECT * FROM session_preparation').all());
+  heal.raw.exec(`DROP TRIGGER ${name}`);
+  const detected = sentinelsMissing(heal).includes(name);
+  runMigrations(heal, MIGRATIONS);
+  check(`065 ${name}: loss detected and self-healed without altering the protocol`,
+    detected && triggerPresent(heal, name) && uv(heal) === MIGRATIONS.length
+      && JSON.stringify(heal.raw.prepare('SELECT * FROM session_preparation').all()) === before);
+}
+
+{
+  // The replay-blocking case: the PARENT table is lost while the child's
+  // cross-table trigger survives. Without REPLAY_BLOCKING_TRIGGERS the full
+  // replay aborts inside the first ALTER TABLE ... RENAME.
+  const replay = freshDb();
+  runMigrations(replay, MIGRATIONS);
+  const sessionsBefore = Number(replay.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c);
+  replay.raw.exec('PRAGMA foreign_keys = OFF');
+  replay.raw.exec('DROP TABLE session_preparation');
+  replay.raw.exec('PRAGMA foreign_keys = ON');
+  const survives = triggerPresent(replay, 'trg_session_preparation_item_open_bu');
+  let healed = false;
+  let error = '';
+  try { runMigrations(replay, MIGRATIONS); healed = true; } catch (e) { error = String(e && e.message); }
+  check('065 losing session_preparation alone still self-heals (item trigger does not block the replay)',
+    survives && healed && sentinelsMissing(replay).length === 0 && uv(replay) === MIGRATIONS.length
+      && Number(replay.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c) === sessionsBefore,
+    error || `uv=${uv(replay)}`);
+  const runnerSrc065 = readFileSync(join(SCHEMA_DIR, '..', 'migrationRunner.ts'), 'utf-8');
+  check('065 the cross-table item trigger is on REPLAY_BLOCKING_TRIGGERS',
+    runnerSrc065.indexOf("'trg_session_preparation_item_open_bu',") > runnerSrc065.indexOf('REPLAY_BLOCKING_TRIGGERS'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

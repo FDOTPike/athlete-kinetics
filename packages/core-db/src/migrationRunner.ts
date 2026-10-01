@@ -250,6 +250,18 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'trigger', name: 'trg_health_support_hold_no_delete_held_bd' },     // 064
   { type: 'trigger', name: 'trg_health_support_hold_versioned_withdrawal_bu' }, // 064
   { type: 'trigger', name: 'trg_clinician_instruction_delete_bd' },           // 064
+  // 065 movement preparation. Both tables are durable athlete state. The five
+  // triggers are fail-closed invariants: losing the live-session guard would
+  // let a completed or demo session acquire a fabricated preparation record,
+  // and losing the frozen/transition guards would let a recorded outcome or a
+  // frozen protocol be rewritten after the fact.
+  { type: 'table', name: 'session_preparation' },                             // 065
+  { type: 'table', name: 'session_preparation_item' },                        // 065
+  { type: 'trigger', name: 'trg_session_preparation_live_session_bi' },       // 065
+  { type: 'trigger', name: 'trg_session_preparation_frozen_bu' },             // 065
+  { type: 'trigger', name: 'trg_session_preparation_transition_bu' },         // 065
+  { type: 'trigger', name: 'trg_session_preparation_item_frozen_bu' },        // 065
+  { type: 'trigger', name: 'trg_session_preparation_item_open_bu' },          // 065
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -313,6 +325,11 @@ const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
   'trg_activity_source_link_origin_consistency_bi', // 064 -> activity_occurrence
   // Deleting a clinician envelope names the later-in-064 scope/hold tables.
   'trg_clinician_instruction_delete_bd',      // 064 -> health_support_scope/hold
+  // Lives on session_preparation_item and names session_preparation, which is
+  // created at chain position 64 — after the rename point. If the parent table
+  // alone is lost, this surviving trigger would abort the replay's rename.
+  // (065's other triggers name only `session` (001) or their own table.)
+  'trg_session_preparation_item_open_bu',     // 065 -> session_preparation
 ];
 
 function dropReplayBlockingTriggers(db: MigrationDb): void {

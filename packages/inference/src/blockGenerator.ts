@@ -51,6 +51,18 @@ import { deriveControlAction, type ControlAction, type FlawReport } from './kine
 // capability ladder's own advancement policy, never restated here, so the
 // prescription and the criterion it must satisfy cannot drift apart.
 import { DEFAULT_ADVANCEMENT_POLICY } from './progressionEngine';
+// The one session-time contract: preparation is reserved first, and work, rest
+// and changeovers are estimated the same way for every planner.
+import {
+  SESSION_TIME_CONTRACT_VERSION,
+  describeSessionTimeConflict,
+  feasibleSessionAlternatives,
+  fitSessionToCap,
+  normalizedCapMin,
+  preparationPlanningMinutes,
+  slotBudgetForCap,
+  type SessionTimeAlternative,
+} from './sessionTimeBudget';
 
 // ---------------------------------------------------------------------------
 // Inputs / outputs (mirror the 007 block tables 1:1)
@@ -105,6 +117,12 @@ export interface GeneratorMovement {
    *  row where one exists, otherwise the imported default. Never restated as a
    *  literal here, so prescription and criterion cannot drift. */
   chainAdvancementReps?: number;
+  /** movement_time_policy for a time-based movement. The store freezes such a
+   *  slot with THIS policy's sets and seconds (not the generator's rep scheme),
+   *  so the session-time estimate must count it the same way: a 300-second
+   *  round is 300 seconds, not one repetition. Absent = repetition work
+   *  (legacy callers unchanged). */
+  timePolicy?: { readonly defaultSets: number; readonly targetSeconds: number };
 }
 
 /** Strictly bodyweight: the athlete's PLANNED implement for this slot is
@@ -169,6 +187,34 @@ export interface PlannedSessionPlan {
   slots: PlannedSlotPlan[];
 }
 
+/** How one planned session spends the athlete's session limit. */
+export interface PlannedSessionTime {
+  week_index: number;
+  day_index: number;
+  focus: BlockFocus;
+  /** Minutes reserved for preparation (never below the reviewed floor). */
+  preparationMin: number;
+  /** True when preparation was condensed to the floor to make the session fit. */
+  preparationCondensed: boolean;
+  /** Preparation + changeovers + work + rest. */
+  estimatedMin: number;
+  /** 1-based slot_index values whose sets were reduced to fit. */
+  trimmedSlotIndexes: number[];
+  feasible: boolean;
+  /** Minutes over the limit when the session does not fit; 0 otherwise. */
+  overByMin: number;
+}
+
+export interface BlockTimeBudget {
+  contractVersion: typeof SESSION_TIME_CONTRACT_VERSION;
+  capMin: number;
+  sessions: PlannedSessionTime[];
+  /** One plain-language sentence per distinct session shape that cannot fit. */
+  conflicts: string[];
+  /** Feasible choices for the athlete when a conflict exists. */
+  alternatives: SessionTimeAlternative[];
+}
+
 export interface BlockPlan {
   objective: Objective;
   start_date: string;
@@ -188,6 +234,9 @@ export interface BlockPlan {
   /** Movement patterns the autopilot's ControlAction adjusted (deduped, sorted);
    *  empty when no flaw report was supplied or nothing crossed the deadband. */
   autopilotAdjusted: string[];
+  /** Preparation, rest and changeovers counted inside the session limit. A
+   *  non-empty `conflicts` list means the block must not be committed as is. */
+  timeBudget: BlockTimeBudget;
 }
 
 export interface ProgramMovementPreference {
@@ -558,8 +607,8 @@ export const ROUND2_HYPERTROPHY_ROLE_SET_DELTA = -1;
  * Replaces the old `days < 3` screen heuristic with a pure computation over
  * the athlete's ACTUAL plan shape: counting the DISTINCT anchor PATTERNS —
  * squat, horizontal-push, hinge — the repeating week can carry, after the
- * DURATION shaping (slot budget = clamp(round(minutes / 22), 2, 5), the
- * generator's own law) has trimmed each focus's pattern menu.
+ * DURATION shaping (slotBudgetForCap, the generator's own law, which reserves
+ * preparation before counting movements) has trimmed each focus's pattern menu.
  *
  * The big three are three ROLES, not three occurrences of two patterns: an
  * all-lower schedule that carries squat+hinge on every day still cannot
@@ -591,8 +640,7 @@ export const strengthAnchorCapacity = (
   draftDays?: readonly DraftProgramDayFocus[],
 ): number => {
   void _dayIndicesFor;
-  const minutes = clamp(Math.round(profile.session_duration_cap_min), 15, 240);
-  const budget = clamp(Math.round(minutes / 22), 2, 5);
+  const budget = slotBudgetForCap(profile.session_duration_cap_min);
   const ANCHOR_PATTERNS: ReadonlySet<string> = new Set(['squat', 'push_h', 'hinge']);
   const carriesAnchor = new Set<string>();
   // Audit round 4 (P1): the DRAFT schedule wins when present; the persisted
@@ -624,8 +672,7 @@ export const strengthAnchorRoleNames = (
   focusesFor: (objective: Objective, frequency: number) => readonly BlockFocus[],
   draftDays?: readonly DraftProgramDayFocus[],
 ): readonly string[] => {
-  const minutes = clamp(Math.round(profile.session_duration_cap_min), 15, 240);
-  const budget = clamp(Math.round(minutes / 22), 2, 5);
+  const budget = slotBudgetForCap(profile.session_duration_cap_min);
   const carried = new Set<string>();
   const focuses = draftDays !== undefined && draftDays.length > 0
     ? draftDays.map((day) => day.focus)
@@ -783,9 +830,10 @@ export function generateBlock(input: BlockInput): BlockPlan {
     day_index: spread[i], focus, movement_preferences: [] as ProgramMovementPreference[],
   }));
   const equipPool = availableMovements(input.movements, profile.equipment_inventory);
-  // Session slot budget from the duration cap (~22 min per movement including
-  // rest), bounded to the planned_session shape the UI is built around.
-  const slotBudget = clamp(Math.round(profile.session_duration_cap_min / 22), 2, 5);
+  // Session slot budget from the duration cap, with preparation reserved
+  // first. The SAME helper feeds strengthAnchorCapacity/strengthAnchorRoleNames,
+  // so the setup warning and the generated week cannot disagree.
+  const slotBudget = slotBudgetForCap(profile.session_duration_cap_min);
 
   // Under Calibration Policy v1, rolling load is descriptive only and does not alter
   // block generation schedules. Peaking blocks always follow PHASE_BY_WEEK.
@@ -1206,6 +1254,79 @@ export function generateBlock(input: BlockInput): BlockPlan {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Session-time contract. Preparation, rest and changeovers are counted
+  // INSIDE the athlete's session limit. A session that is over is repaired in
+  // a fixed order — condense preparation to the reviewed floor, then trim sets
+  // (accessory slots first, never below the generator's own 2-set floor, never
+  // a deload below 1, never a sport round) — and anything that still does not
+  // fit is reported as a conflict instead of being quietly shipped.
+  // -------------------------------------------------------------------------
+  const capMin = normalizedCapMin(profile.session_duration_cap_min);
+  const movementById = new Map(input.movements.map((movement) => [movement.movement_id, movement]));
+  const sessionTimes: PlannedSessionTime[] = [];
+  const conflicts = new Set<string>();
+  let worstRequiredMin = 0;
+  for (const session of sessions) {
+    const deloadSession = session.phase === 'deload';
+    const fit = fitSessionToCap({
+      capMin,
+      preparationMin: preparationPlanningMinutes(capMin),
+      slots: session.slots.map((slot) => {
+        const movement = movementById.get(slot.movement_id);
+        const locomotion = movement?.pattern === 'locomotion';
+        const timePolicy = movement?.timePolicy;
+        if (timePolicy !== undefined) {
+          // Frozen by the store from the movement's own time policy; the
+          // generator's set count is not what the athlete will be shown, so it
+          // is neither used for the estimate nor trimmed.
+          return {
+            sets: timePolicy.defaultSets,
+            target: { kind: 'time' as const, seconds: timePolicy.targetSeconds },
+            targetRpe: slot.target_rpe,
+            minSets: timePolicy.defaultSets,
+            trimPriority: 1,
+            trimmable: false,
+          };
+        }
+        return {
+          sets: slot.sets,
+          target: { kind: 'reps' as const, reps: slot.reps },
+          targetRpe: slot.target_rpe,
+          minSets: Math.min(slot.sets, deloadSession ? 1 : 2),
+          trimPriority: slot.slot_index >= ACCESSORY_SLOT_FROM ? 0 : 1,
+          trimmable: !locomotion,
+        };
+      }),
+    });
+    for (const index of fit.trimmedSlotIndices) session.slots[index]!.sets = fit.sets[index]!;
+    if (fit.trimmedSlotIndices.length > 0) {
+      warnings.add(`${session.focus} week ${session.week_index}: sets reduced on ${fit.trimmedSlotIndices.length} movement${fit.trimmedSlotIndices.length === 1 ? '' : 's'} so the session fits ${capMin} minutes including ${fit.preparationMin} minutes of preparation`);
+    }
+    if (!fit.feasible) {
+      worstRequiredMin = Math.max(worstRequiredMin, fit.estimate.totalMin);
+      conflicts.add(describeSessionTimeConflict({
+        label: `The ${session.focus} session`,
+        capMin,
+        estimate: fit.estimate,
+        alternatives: feasibleSessionAlternatives({
+          capMin, requiredMin: fit.estimate.totalMin, weeklyFrequency: frequency,
+        }),
+      }));
+    }
+    sessionTimes.push({
+      week_index: session.week_index,
+      day_index: session.day_index,
+      focus: session.focus,
+      preparationMin: fit.preparationMin,
+      preparationCondensed: fit.preparationCondensed,
+      estimatedMin: fit.estimate.totalMin,
+      trimmedSlotIndexes: fit.trimmedSlotIndices.map((index) => session.slots[index]!.slot_index),
+      feasible: fit.feasible,
+      overByMin: fit.overByMin,
+    });
+  }
+
   return {
     objective: profile.objective,
     start_date: startDate,
@@ -1218,6 +1339,15 @@ export function generateBlock(input: BlockInput): BlockPlan {
     warnings: [...warnings].sort(),
     recovery,
     autopilotAdjusted: [...autopilotAdjusted].sort(),
+    timeBudget: {
+      contractVersion: SESSION_TIME_CONTRACT_VERSION,
+      capMin,
+      sessions: sessionTimes,
+      conflicts: [...conflicts].sort(),
+      alternatives: worstRequiredMin === 0 ? [] : [...feasibleSessionAlternatives({
+        capMin, requiredMin: worstRequiredMin, weeklyFrequency: frequency,
+      })],
+    },
   };
 }
 

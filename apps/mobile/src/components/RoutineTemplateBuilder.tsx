@@ -303,13 +303,10 @@ function AvailableRoutineTemplateBuilder({
           : []),
     });
     const activePrescriptions = stressPreview.prescriptions.filter((row) => row.dayIndex === activeDay);
-    const activeComposedMinutes = activePrescriptions.reduce((sum, row) => {
-      if (!row.included) return sum;
-      if (row.role === 'major') return sum + 3 + row.sets * 2.5;
-      if (row.role === 'supplementary') return sum + 2 + row.sets * 1.5;
-      if (row.role === 'conditional') return sum + 1.5 + row.sets * 1.25;
-      return sum + 1 + row.sets;
-    }, 0);
+    // The day's estimate already counts preparation, rest and changeovers
+    // (shared session-time contract); no private formula is kept here.
+    const activeComposedMinutes = stressPreview.dayTimes
+      .find((day) => day.dayIndex === activeDay)?.estimatedMin ?? 0;
     const alreadyConstrained = stressPreview.blockers.length > 0
       || activePrescriptions.some((row) => !row.included
         || row.adaptations.some((adaptation) => adaptation.startsWith('Dose bounded from')));
@@ -498,7 +495,9 @@ function AvailableRoutineTemplateBuilder({
       schemaType,
       objective: profile.objective,
       trainingAge: profile.training_age,
-      durationCapMin: Math.max(profile.session_duration_cap_min, 66),
+      // A single selection is never shed, so the real limit is passed: the
+      // default dose no longer needs a widened cap to survive.
+      durationCapMin: profile.session_duration_cap_min,
       baseRpeCap: profile.base_rpe_cap,
       availableMovementIds: availableSet,
     }).slots[0];

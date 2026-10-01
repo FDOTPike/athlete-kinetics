@@ -193,6 +193,34 @@ import {
 
 export type { MovementAvailability };
 export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
+import {
+  PREPARATION_FLOOR_MIN,
+  PREPARATION_HELD_MOVEMENT_IDS,
+  buildPreparationProtocol,
+  estimateSessionTime,
+  isTerminalPreparationStatus,
+  preparationItemJoints,
+  preparationPlanningMinutes,
+  resolvePreparationOutcome,
+  type PreparationOmissionReason,
+  type PreparationProtocol,
+} from '@ak/inference';
+import {
+  beginSessionPreparation,
+  deleteAllSessionPreparation,
+  deleteSessionPreparation,
+  finishSessionPreparation,
+  insertSessionPreparation,
+  preparationOpenForSession,
+  readPreparationSummary,
+  readSessionPreparation,
+  recordSessionPreparationItem,
+  stopOpenSessionPreparation,
+  type ActivePreparation,
+  type PreparationItemWrite,
+  type PreparationSummary,
+} from './preparationStore';
+export type { ActivePreparation, PreparationItemRecord, PreparationItemWrite, PreparationSummary } from './preparationStore';
 
 export const REASON_TEXT_MAP: Record<'tier' | 'equipment' | 'safety' | 'capability', string> = {
   tier: 'not for your experience level yet',
@@ -659,6 +687,11 @@ interface KineticsStore {
   runner: RunnerState | null;
   /** Frozen at session start; a preference change affects the next session. */
   sessionMode: SessionMode | null;
+  /** The live session's frozen preparation protocol and what the athlete has
+   *  recorded against it (065). Null when there is no session, or when the
+   *  session has no preparation record (one started before 065). A session
+   *  with an open protocol cannot log main-work sets. */
+  preparation: ActivePreparation | null;
   /** Open substitution sheet: the deterministic engine's 3-tier result for a
    *  SWAP target (null = closed). */
   substitution: { targetId: number; result: SubstitutionResult } | null;
@@ -896,6 +929,19 @@ interface KineticsStore {
   runnerDeclineSubstitution: () => void;
   runnerSkipSlot: () => void;
   runnerHalt: (reason?: RunnerHaltReason) => void;
+  /** Start working through the preparation protocol. `expectedRevision` is the
+   *  revision the screen rendered; a duplicate tap or stale screen is a no-op. */
+  beginPreparation: (expectedRevision: number) => void;
+  /** Record what actually happened for one preparation item. An item whose
+   *  movement or drill is restricted NOW (support hold, capability, niggle) is
+   *  recorded as withheld instead of performed. Never writes set_record. */
+  recordPreparationItem: (itemIndex: number, write: PreparationItemWrite, expectedRevision: number) => void;
+  /** Close preparation with a truthful outcome. 'finished' resolves to
+   *  completed (every item done as written) or modified; it is refused when
+   *  nothing was performed. 'skipped' resolves to modified if work was done. */
+  finishPreparation: (outcome: 'finished' | 'already_warm' | 'skipped', expectedRevision: number) => void;
+  /** What was recorded for a session's preparation; null = not recorded. */
+  loadSessionPreparation: (sessionId: number) => PreparationSummary | null;
   addPlanSlot: (movementId: number) => void;
   swapMovement: (oldMovementId: number, newMovementId: number) => void;
   /** Thumbs sentiment for a movement. NEUTRAL (0) DELETEs the row (the 010
@@ -1325,11 +1371,11 @@ const toSubMovement = (m: Movement, availableIds: ReadonlySet<number>): Substitu
 
 /** Resolve active niggles into movement-level safety exclusions using the same
  * pattern/joint map as substitutions. Safety remains an outer hard gate. */
-const safetyExcludedMovementIdsFor = (
-  movements: readonly Movement[],
+/** Joints with an active niggle at or above the athlete's triage threshold. */
+const activeNiggleJoints = (
   profile: UserProfile,
   niggles: readonly NiggleInput[],
-): ReadonlySet<number> => {
+): ReadonlySet<Joint> => {
   const injuredJoints = new Set<Joint>();
   const triageMin = EXPERIENCE_SEVERITY[profile.training_age].triageMin;
   for (const niggle of niggles) {
@@ -1338,6 +1384,15 @@ const safetyExcludedMovementIdsFor = (
     const joint = JOINTS.find((candidate) => candidate.toLowerCase() === key);
     if (joint !== undefined) injuredJoints.add(joint);
   }
+  return injuredJoints;
+};
+
+const safetyExcludedMovementIdsFor = (
+  movements: readonly Movement[],
+  profile: UserProfile,
+  niggles: readonly NiggleInput[],
+): ReadonlySet<number> => {
+  const injuredJoints = activeNiggleJoints(profile, niggles);
   if (injuredJoints.size === 0) return new Set<number>();
   return new Set(
     movements
@@ -1451,6 +1506,117 @@ const capabilityAvailableMovementIds = (
     .filter((row) => row.state === 'available')
     .map((row) => row.movementId),
 );
+
+export const PREPARATION_GATE_MESSAGE = 'Finish, skip or record your preparation before logging your first set.';
+
+/**
+ * Build the preparation protocol for a session that is about to start, from
+ * the SAME frozen plan and the SAME gates the main work passed: support holds,
+ * tier/equipment/capability access and niggle safety. A movement that fails
+ * any of them is handed to the policy as excluded, so it can never be
+ * rehearsed or ramped, and the policy lists it under "omitted" with the reason.
+ *
+ * Time: preparation is taken out of the athlete's session limit. When the
+ * frozen plan plus the full allowance does not fit, preparation is condensed —
+ * never below the reviewed floor — and when even the floor does not fit the
+ * plan is left exactly as it was frozen and the overage is stated.
+ */
+const buildSessionPreparationProtocol = (input: {
+  readonly d: DB;
+  readonly sessionPlan: readonly PlanSlot[];
+  readonly movements: readonly Movement[];
+  readonly profile: UserProfile;
+  readonly accessContext: ExecutableMovementAccessContext;
+  readonly capabilityAvailable: ReadonlySet<number>;
+  readonly niggles: readonly NiggleInput[];
+  readonly readinessReduced: boolean;
+}): PreparationProtocol => {
+  const { sessionPlan, movements, profile, accessContext, capabilityAvailable, niggles } = input;
+  const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
+  const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
+  let supportAvailable: (movementId: number) => boolean;
+  try {
+    const snapshot = supportAdapter().captureEvaluation();
+    supportAvailable = (movementId) => snapshot.evaluate(movementSupportTargets([movementId])).status === 'available';
+  } catch {
+    // Unreadable support state is not permission: nothing is rehearsed or ramped.
+    supportAvailable = () => false;
+  }
+  const excludedMovements = new Map<number, { reasonCode: PreparationOmissionReason; detail: string }>();
+  for (const slot of sessionPlan) {
+    if (excludedMovements.has(slot.movementId)) continue;
+    if (!supportAvailable(slot.movementId)) {
+      excludedMovements.set(slot.movementId, { reasonCode: 'support_hold', detail: 'it is on hold under your training support settings.' });
+    } else if (safetyExcluded.has(slot.movementId)) {
+      excludedMovements.set(slot.movementId, { reasonCode: 'safety', detail: 'it loads an area with an active niggle.' });
+    } else if (!permittedForProfile(byId.get(slot.movementId), profile, accessContext)
+        || !capabilityAvailable.has(slot.movementId)) {
+      excludedMovements.set(slot.movementId, { reasonCode: 'capability', detail: 'it is not currently available to you.' });
+    }
+  }
+  const capMin = profile.session_duration_cap_min;
+  const mainWorkMin = estimateSessionTime({
+    preparationMin: 0,
+    slots: sessionPlan.map((slot) => ({ sets: slot.plannedSets, target: slot.target, targetRpe: slot.targetRpe ?? 8 })),
+  }).totalMin;
+  const allowance = preparationPlanningMinutes(capMin);
+  const budgetMin = mainWorkMin + allowance <= capMin
+    ? allowance
+    : Math.max(PREPARATION_FLOOR_MIN, Math.min(allowance, Math.floor(capMin - mainWorkMin)));
+  const timeConflictNote = sessionPlan.length > 0 && mainWorkMin + PREPARATION_FLOOR_MIN > capMin
+    ? `This session is estimated at about ${Math.ceil(mainWorkMin + PREPARATION_FLOOR_MIN)} minutes including ${PREPARATION_FLOOR_MIN} minutes of preparation, which is over your ${capMin}-minute session limit. The plan was set earlier and has not been changed, and preparation has not been shortened below ${PREPARATION_FLOOR_MIN} minutes.`
+    : null;
+  return buildPreparationProtocol({
+    tier: profile.training_age,
+    accessContext,
+    slots: sessionPlan.flatMap((slot) => {
+      const movement = byId.get(slot.movementId);
+      return movement === undefined ? [] : [{
+        movementId: movement.movement_id,
+        movementName: movement.name,
+        pattern: movement.pattern as MovementPattern,
+        isCompound: movement.is_compound,
+        // Mirrors SessionScreen: only an explicit Bodyweight first implement is
+        // bodyweight evidence; anything else is treated as externally loaded.
+        externallyLoaded: movement.supportedPrefixes[0] !== 'Bodyweight',
+        target: slot.target,
+      }];
+    }),
+    excludedMovements,
+    restrictedJoints: [...activeNiggleJoints(profile, niggles)],
+    readinessReduced: input.readinessReduced,
+    budgetMin,
+    timeConflictNote,
+  });
+};
+
+/**
+ * Run one preparation write for the live session inside its own transaction,
+ * then re-read the durable row. The re-read happens whether or not the write
+ * applied, so a duplicate tap or a stale screen shows the athlete what is
+ * actually stored rather than an error.
+ */
+const mutatePreparation = (
+  expectedRevision: number,
+  write: (d: DB, preparation: ActivePreparation, nowMs: number) => boolean,
+): boolean => {
+  const { session, preparation } = useStore.getState();
+  if (session === null || preparation === null || preparation.sessionId !== session.sessionId) return false;
+  const d = getDb();
+  const nowMs = Date.now();
+  let applied = false;
+  d.executeSync('BEGIN');
+  try {
+    applied = expectedRevision === preparation.revision && write(d, preparation, nowMs);
+    d.executeSync('COMMIT');
+  } catch (error) {
+    try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
+    useStore.setState({ error: error instanceof Error ? error.message : String(error) });
+    applied = false;
+  }
+  useStore.setState({ preparation: readSessionPreparation(d, session.sessionId) });
+  return applied;
+};
 
 /** Before session start, mutations belong to today's performance context. Once
  * a session exists, its frozen context is the only authority. */
@@ -2275,7 +2441,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   vector: null, trend: [], session: null, prescription: null, returnCheckin: null,
   activityLedger: EMPTY_ACTIVITY_LEDGER,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
-  sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, substitution: null, niggles: [],
+  sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, preparation: null, substitution: null, niggles: [],
   activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
   block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [], pendingAutopilotAdjustments: [],
   // Suspension is per-athlete DURABLE state living in that athlete's own DB
@@ -2312,6 +2478,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   activeMovementId: null,
   runner: null,
   sessionMode: null,
+  preparation: null,
   substitution: null,
   niggles: [],
   activePriorExperienceMovementIds: [],
@@ -2644,6 +2811,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           },
           sessionPlan,
           sessionMode: restoredMode,
+          // The SAME frozen protocol and recorded items, read back by session
+          // id and start time. A session started before 065 has none and is
+          // not given one retroactively.
+          preparation: readSessionPreparation(db!, openSession.session_id),
           activeSessionAccessContext: restoredAccessContext,
           ...runnerSelection(restoredRunner),
         });
@@ -3505,6 +3676,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // L2(b): chain membership and the chain's own bar, as typed inputs.
       progressionGroup: chainInputs.get(m.movement_id)?.group,
       chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
+      // Session-time contract: a time-based slot is frozen from its own policy.
+      timePolicy: m.loggingMode === 'time' && m.timePolicy !== null ? m.timePolicy : undefined,
     }));
     // Program-owned macro position (AUD-GP-2): when a program exists, the
     // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
@@ -3639,6 +3812,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // L2(b): chain membership and the chain's own bar, as typed inputs.
       progressionGroup: chainInputs.get(m.movement_id)?.group,
       chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
+      // Session-time contract: a time-based slot is frozen from its own policy.
+      timePolicy: m.loggingMode === 'time' && m.timePolicy !== null ? m.timePolicy : undefined,
     }));
     // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
     // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate
@@ -3722,6 +3897,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       flawReport,
       powerPreferredMovementNames: powerNamesGenerate,
     });
+    // Session-time contract: a block whose sessions cannot fit preparation,
+    // rest and changeovers inside the session limit is not committed. The
+    // message names the conflict and the feasible options; nothing is dropped
+    // or shortened to make it pass.
+    if (plan.timeBudget.conflicts.length > 0) {
+      set({ error: plan.timeBudget.conflicts.join(' ') });
+      return;
+    }
     const supportIds = plan.sessions.flatMap((day) => day.slots.map((slot) => slot.movement_id));
     const candidateProgramId = pendingProgramCreation !== null
       ? 'new'
@@ -5330,7 +5513,20 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       });
     }
 
-    const supportIds = sessionPlan.map((slot) => slot.movementId);
+    // Preparation for THIS frozen plan, built before the transaction so the
+    // protocol and the session row are inserted together or not at all.
+    const todaysVector = prescription !== null && prescription.forDate === today ? prescription.vector : null;
+    const preparationProtocol = buildSessionPreparationProtocol({
+      d, sessionPlan, movements, profile,
+      accessContext: executionContext,
+      capabilityAvailable,
+      niggles: get().niggles,
+      readinessReduced: todaysVector !== null && (todaysVector.set_modifier < 0
+        || todaysVector.load_modifier < 1 || todaysVector.rpe_cap < profile.base_rpe_cap),
+    });
+    // Preparation drills answer to the same support decision as the main plan.
+    const supportIds = [...sessionPlan.map((slot) => slot.movementId),
+      ...preparationProtocol.items.flatMap((item) => item.movementId === null ? [] : [item.movementId])];
     const sessionCandidateIdentity = planToConsume === null
       ? `unplanned-session:${today}:${supportMovementIdentity(supportIds)}`
       : `planned-session:${planToConsume.plannedSessionId}`;
@@ -5382,6 +5578,16 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         { tier: profile.training_age, startedAtMs },
       );
       persistRunnerCheckpoint(d, sessionId, sessionMode, runner);
+      // Every live start path arrives here: planned, routine, free-form, sport
+      // day, guided and self-directed. The protocol is frozen in THIS
+      // transaction, so a session can never exist without it — including an
+      // empty free-form session, whose runner starts already 'complete'.
+      const preparation = insertSessionPreparation(d, {
+        sessionId,
+        startedAtMs,
+        instanceId: `prep-${sessionId}-${startedAtMs}-${Math.floor(Math.random() * 1e9).toString(36)}`,
+        protocol: preparationProtocol,
+      });
       for (const sl of updatedSessionPlan) {
         if (sl.provenanceKind === 'day_swapped' && sl.sourcePlannedSlotId !== null) {
           d.executeSync(
@@ -5410,6 +5616,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         session: { sessionId, date: today, startedAtMs, sets: [] },
         sessionPlan: updatedSessionPlan,
         sessionMode,
+        preparation,
         activeSessionAccessContext: executionContext,
         ...runnerSelection(runner),
       });
@@ -5627,20 +5834,100 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   runnerHalt: (reason = 'manual') => {
     const { session, runner, sessionMode } = get();
     if (session === null || runner === null || sessionMode === null) return;
-    const nextRunner = advanceSessionRunner(runner, { kind: 'HALT', atMs: Date.now(), reason });
-    if (nextRunner === runner) return;
+    const haltAtMs = Date.now();
+    const nextRunner = advanceSessionRunner(runner, { kind: 'HALT', atMs: haltAtMs, reason });
     const d = getDb();
+    // A halt also closes an open preparation protocol as "stopped" — even when
+    // the runner has nothing left to halt (an empty free-form session is
+    // already 'complete'), so stopping during preparation is always recorded.
+    const runnerChanged = nextRunner !== runner;
+    if (!runnerChanged && !preparationOpenForSession(d, session.sessionId)) return;
     d.executeSync('BEGIN');
     try {
-      persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+      if (runnerChanged) persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+      stopOpenSessionPreparation(d, session.sessionId, haltAtMs);
       d.executeSync('COMMIT');
     } catch (error) {
       try { d.executeSync('ROLLBACK'); } catch { /* no partial checkpoint */ }
       set({ error: error instanceof Error ? error.message : String(error) });
       return;
     }
-    set(runnerSelection(nextRunner));
+    set({
+      ...(runnerChanged ? runnerSelection(nextRunner) : {}),
+      preparation: readSessionPreparation(d, session.sessionId),
+    });
   },
+
+  beginPreparation: (expectedRevision) => {
+    mutatePreparation(expectedRevision, (d, preparation, nowMs) =>
+      beginSessionPreparation(d, preparation, expectedRevision, nowMs));
+  },
+
+  recordPreparationItem: (itemIndex, write, expectedRevision) => {
+    const state = get();
+    const { session, preparation } = state;
+    if (session === null || preparation === null || preparation.sessionId !== session.sessionId) return;
+    const item = preparation.protocol?.items[itemIndex];
+    let effective: PreparationItemWrite = write;
+    let restriction: string | null = null;
+    // Execution-time recheck. The protocol was frozen at session start; a hold,
+    // a capability change or a niggle reported since then must still stop the
+    // item from being performed. Skipping or substituting needs no recheck.
+    if (item !== undefined && (write.status === 'done' || write.status === 'modified')) {
+      get().refreshNiggles();
+      const live = get();
+      const restrictedJoints = activeNiggleJoints(live.profile, live.niggles);
+      if (item.movementId === null) {
+        if (preparationItemJoints(item.itemId).some((joint) => restrictedJoints.has(joint))) {
+          restriction = 'This preparation drill loads an area with an active niggle, so it is withheld.';
+        }
+      } else if (PREPARATION_HELD_MOVEMENT_IDS.has(item.movementId)) {
+        restriction = 'This movement is on hold, so its preparation is withheld.';
+      } else if (supportDecision([item.movementId]).status !== 'available') {
+        restriction = 'This movement is on hold under your training support settings, so its preparation is withheld.';
+      } else {
+        const accessContext = executionContextForState(live);
+        const verdict = accessContext === null ? undefined : capabilityMovementAvailability(
+          getDb(), live.movements, live.profile, accessContext,
+          new Set(live.activePriorExperienceMovementIds),
+          safetyExcludedMovementIdsFor(live.movements, live.profile, live.niggles),
+        ).find((candidate) => candidate.movementId === item.movementId);
+        // Fail closed: a missing verdict is unverifiable, not permission.
+        if (verdict?.state !== 'available') {
+          restriction = 'This movement is not currently available to you, so its preparation is withheld.';
+        }
+      }
+      if (restriction !== null) effective = { status: 'withheld', reasonCode: 'restricted_at_execution' };
+    }
+    const applied = mutatePreparation(expectedRevision, (d, current, nowMs) =>
+      recordSessionPreparationItem(d, current, expectedRevision, itemIndex, effective, nowMs));
+    if (applied && restriction !== null) set({ error: restriction });
+  },
+
+  finishPreparation: (outcome, expectedRevision) => {
+    const { session, preparation } = get();
+    if (session === null || preparation === null || preparation.sessionId !== session.sessionId) return;
+    if (isTerminalPreparationStatus(preparation.status)) return;
+    if (outcome === 'already_warm') {
+      mutatePreparation(expectedRevision, (d, current, nowMs) =>
+        finishSessionPreparation(d, current, expectedRevision, 'already_warm', nowMs));
+      return;
+    }
+    // The outcome is DERIVED from the recorded items so it cannot overstate
+    // what was done: "completed" only when every item was done as written.
+    // Items never recorded count as not performed.
+    const derived = resolvePreparationOutcome(preparation.items.map((item) =>
+      item.status === 'pending' ? 'skipped' : item.status));
+    if (outcome === 'finished' && derived === null) {
+      set({ error: 'Nothing in preparation is recorded as done. Choose "I am already warm" or "Skip preparation" instead.' });
+      return;
+    }
+    const resolved = derived ?? 'skipped';
+    mutatePreparation(expectedRevision, (d, current, nowMs) =>
+      finishSessionPreparation(d, current, expectedRevision, resolved, nowMs, true));
+  },
+
+  loadSessionPreparation: (sessionId) => readPreparationSummary(getDb(), sessionId),
 
   addPlanSlot: (movementId) => {
     const state = get();
@@ -5918,6 +6205,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       if (nextRunner !== null && state.session !== null && state.sessionMode !== null && nextRunner !== state.runner) {
         persistRunnerCheckpoint(d, state.session.sessionId, state.sessionMode, nextRunner);
       }
+      // A halt-level niggle stops the session, and with it any open preparation.
+      if (nextRunner !== null && state.session !== null && nextRunner.phase === 'halted') {
+        stopOpenSessionPreparation(d, state.session.sessionId, loggedAtMs);
+      }
       d.executeSync('COMMIT');
     } catch (error) {
       try { d.executeSync('ROLLBACK'); } catch { /* no partial safety report */ }
@@ -5927,6 +6218,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     set({
       niggles: [...state.niggles, { region, severity: safe }],
       ...(nextRunner !== null && nextRunner !== state.runner ? runnerSelection(nextRunner) : {}),
+      ...(state.session !== null ? { preparation: readSessionPreparation(d, state.session.sessionId) } : {}),
     });
     // A qualifying (but not halt-level) niggle immediately offers a route
     // around the movement. Halt-level reports block `logSet` at this boundary.
@@ -6128,6 +6420,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
     const movement = state.movements.find((m) => m.movement_id === movementId);
     if (movement === undefined) return;
+    // Store-boundary preparation gate. The database is the authority, not the
+    // screen or the in-memory copy: while this session's protocol has no
+    // outcome, no main-work set is written — whatever the runner phase is
+    // (an empty free-form session starts 'complete').
+    if (preparationOpenForSession(getDb(), s.sessionId)) {
+      set({ error: PREPARATION_GATE_MESSAGE });
+      return;
+    }
 
     let planSlot: PlanSlot | undefined;
     if (sessionPlanSlotId !== undefined) {
@@ -6474,6 +6774,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         // Parent-first keeps 026's immutable side-cars legal. The explicit
         // cleanup that follows also handles test/dev connections with FKs off.
         d.executeSync('DELETE FROM session WHERE session_id = ?', [activeSession.sessionId]);
+        // A discarded session takes its preparation with it. Named explicitly
+        // rather than left to the cascade: session ids are reused, and with
+        // foreign keys off a surviving protocol would sit under the next
+        // session's id.
+        deleteSessionPreparation(d, activeSession.sessionId);
         d.executeSync('DELETE FROM session_slot_target WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)', [activeSession.sessionId]);
         d.executeSync('DELETE FROM planned_slot_disposition WHERE session_id = ?', [activeSession.sessionId]);
         d.executeSync('DELETE FROM session_plan_slot WHERE session_id = ?', [activeSession.sessionId]);
@@ -6511,6 +6816,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
              verified = 1`,
           [activeSession.sessionId],
         );        d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [snapshot.sessionDate]);
+        // A session that finishes with preparation still open records it as
+        // stopped: no outcome is invented. Preparation rows are not sets, so
+        // nothing here reaches APRE or capability evidence.
+        stopOpenSessionPreparation(d, activeSession.sessionId, finalizedAtMs);
         applyApreFinalization(
           d,
           snapshot.originKind === 'planned' ? snapshot.sourcePlannedSessionId : null,
@@ -6544,6 +6853,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       activeMovementId: null,
       runner: null,
       sessionMode: null,
+      preparation: null,
       activeSessionAccessContext: null,
       substitution: null,
       movementAvailabilityRevision: get().movementAvailabilityRevision + 1,
@@ -6686,6 +6996,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         if (haltedRunner !== null && haltedRunner !== activeRunner && activeSession !== null && activeMode !== null) {
           persistRunnerCheckpoint(d, activeSession.sessionId, activeMode, haltedRunner);
         }
+        // A safety halt stops the session, and with it any open preparation —
+        // in the same transaction as the report, so a relaunch cannot reopen it.
+        if (auditHalt && activeSession !== null) {
+          stopOpenSessionPreparation(d, activeSession.sessionId, Date.now());
+        }
         d.executeSync('COMMIT');
       } catch (error) {
         try { d.executeSync('ROLLBACK'); } catch { /* safety report is atomic */ }
@@ -6694,6 +7009,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
       if (haltedRunner !== null && haltedRunner !== activeRunner) {
         set(runnerSelection(haltedRunner));
+      }
+      if (auditHalt && activeSession !== null && get().session?.sessionId === activeSession.sessionId) {
+        set({ preparation: readSessionPreparation(d, activeSession.sessionId) });
       }
       // Re-derive the operative prescription from persistence (single source
       // of truth; also sets lastTriage to the now-operative directive).
@@ -6727,6 +7045,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM movement_prior_experience');
       d.executeSync('DELETE FROM capability_session_evidence');
       d.executeSync('DELETE FROM set_target');
+      // 065 preparation, children first. Named explicitly for the same reason
+      // as planned_slot_load_intent below: session.session_id is reused once
+      // the table is empty, and an orphan surviving an FK-OFF reset would sit
+      // under a brand new session's id.
+      deleteAllSessionPreparation(d);
       d.executeSync('DELETE FROM session_runner_checkpoint');
       d.executeSync('DELETE FROM session_slot_target');
       d.executeSync('DELETE FROM planned_slot_disposition');
@@ -6825,6 +7148,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       oneRepMaxes: {},
       lastLoggedLoads: {},
       session: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null,
+      preparation: null,
       activeSessionAccessContext: null, activePriorExperienceMovementIds: [],
       movementAvailabilityRevision: get().movementAvailabilityRevision + 1,
       prescription: null, substitution: null, lastTriage: null, niggles: [],

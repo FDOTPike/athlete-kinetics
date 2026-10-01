@@ -1,7 +1,7 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
@@ -18,6 +18,8 @@ import {
   Stepper,
   RestTimerCard,
 } from '../components/ui';
+import { PreparationPanel } from '../components/PreparationPanel';
+
 
 type SessionMode = 'guided' | 'self_directed';
 interface LocalRest { startedAtMs: number; seconds: number; slotId: number; }
@@ -287,6 +289,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     advanceRunnerRest, skipRunnerRest, setRunnerRestOverride, runnerThumbsDown, runnerHalt, lastEndedSessionId,
     loadSessionOutcome, dismissOutcome,
   } = state;
+  // Preparation (065). Component tests drive this screen with partial store
+  // states, so an absent field reads as "no preparation recorded".
+  const preparation = state.preparation ?? null;
+  const { beginPreparation, recordPreparationItem, finishPreparation, loadSessionPreparation } = state;
   // W3 summary inputs, read at the data-access boundary; the summary itself is
   // shaped by the pure `buildSessionSummary` and renders without side effects.
   const { blockSessions: summaryBlockSessions, today: summaryToday, loadSessionSummaryFacts } = state;
@@ -370,6 +376,14 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
       return null;
     }
   }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday]);
+
+  // What was recorded for the just-ended session's preparation. null means
+  // nothing was recorded (a session from before preparation existed); the
+  // screen says so rather than implying a warm-up happened.
+  const preparationSummary = useMemo(() => {
+    if (lastEndedSessionId == null || typeof loadSessionPreparation !== 'function') return null;
+    try { return loadSessionPreparation(lastEndedSessionId); } catch { return null; }
+  }, [lastEndedSessionId, loadSessionPreparation]);
 
   const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
   const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
@@ -543,6 +557,23 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           {/* W3/R1: persisted facts only, below the status. Typed lines carry
               stable movement-based keys (D6); the no-next case renders the
               ratified fallback text (D4). */}
+          <View style={styles.summaryBlock} testID="session-preparation-summary">
+            <Text style={styles.summaryLine}>
+              {preparationSummary === null
+                ? 'Preparation: not recorded.'
+                : `Preparation: ${PREPARATION_STATUS_LABEL[preparationSummary.status].toLowerCase()}.`}
+            </Text>
+            {/* Work done beyond the written preparation is shown as work. */}
+            {preparationSummary !== null && preparationSummary.items.filter((item) => item.extraWork).map((item) => {
+              const prescribed = preparationSummary.protocol?.items[item.index];
+              const unit = prescribed === undefined ? '' : preparationDoseUnit(prescribed.dose) === 'seconds' ? ' seconds' : ' reps';
+              return (
+                <Text key={item.index} style={styles.summaryComparison} testID="session-preparation-extra-work">
+                  {`Extra work during preparation: ${prescribed?.title ?? item.itemId} — ${item.performedAmount ?? 0}${unit}.`}
+                </Text>
+              );
+            })}
+          </View>
           {summary !== null && (
             <View style={styles.summaryBlock} testID="session-summary">
               {summary.exerciseLines.map((line) => (
@@ -756,6 +787,38 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
       ? `${byId.get(upcomingSlot.movementId)?.name ?? 'Movement'} · ${targetText(upcomingSlot)}`
       : null;
 
+  // Preparation comes before the first working set on every start path. While
+  // the protocol has no outcome the main timeline is not offered at all — the
+  // store refuses a set in that state anyway. A halted session falls through
+  // to the halt card below (halting has already recorded preparation as stopped).
+  const preparationOpen = preparation !== null && preparation.sessionId === session.sessionId
+    && !isTerminalPreparationStatus(preparation.status);
+  if (preparationOpen && preparation !== null && !halted) {
+    return (
+      <View style={styles.screen}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Session preparation">
+          <View style={styles.header}>
+            <Text style={styles.wordmark}>pikeMethods</Text>
+            <Text style={styles.kicker}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
+            <Text style={styles.headerTitle}>Before your first set</Text>
+            <Text style={styles.headerMeta}>
+              {sessionPlan.length === 0
+                ? 'No movements are planned yet. Prepare first, then add your work.'
+                : `${sessionPlan.length} exercise${sessionPlan.length === 1 ? '' : 's'} planned after preparation.`}
+            </Text>
+          </View>
+          <PreparationPanel
+            preparation={preparation}
+            onBegin={beginPreparation}
+            onRecordItem={recordPreparationItem}
+            onFinish={finishPreparation}
+            onStopSession={() => { runnerHalt('manual'); endSession(); }}
+          />
+        </KeyboardAwareScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
@@ -767,6 +830,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           {!halted && !complete && (
             <Text style={styles.headerMeta}>
               {sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete`}
+            </Text>
+          )}
+          {preparation !== null && preparation.sessionId === session.sessionId && (
+            <Text style={styles.headerMeta} testID="session-preparation-status">
+              {`Preparation: ${PREPARATION_STATUS_LABEL[preparation.status].toLowerCase()}`}
             </Text>
           )}
         </View>
