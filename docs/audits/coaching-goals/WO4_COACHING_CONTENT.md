@@ -266,3 +266,17 @@ Full integrated `npm run verify:ci`:
 | Development lineage, final tip, separate clean checkout | exit 0 (25 gates there; 78 suites, 1710 tests) |
 | Published branch at its first published tip, hosted CI on pull request 25 | "Verification suite (23 gates + typecheck)" passed |
 | Published branch, local (this is the top of the stack) | exit 0 (23 gates; 55 suites, 877 tests) |
+
+## Review of pull request 25
+
+CodeRabbit raised one finding, in two parts. Both were checked and are valid.
+
+| Finding | Verdict | What was done |
+| --- | --- | --- |
+| Mutation C17 changes the backup schema contract, and the script did not rebuild the compiled backup verifier afterwards, so a mutated copy could be left behind. | **Valid** (harmless in practice, because `verify:backup` compiles before it runs, but a script that mutates should leave nothing behind). | The backup verifier output is rebuilt at the end, and a failed rebuild fails the run. The same was done in the WO2 and WO3 scripts, which have the same kind of mutation. |
+| The label of C5 said "media asset key"; the mutation changes a media `revision`. | **Valid.** | Relabelled to say what it does. |
+
+Reviews of the three earlier pull requests in the stack also changed things
+that live on this branch through the merges: the stricter negative-control
+harness and its exit status (re-run here in full: 17 of 17), and the re-pinned
+schema fingerprints. They are recorded in the work order 1 to 3 audit records.
