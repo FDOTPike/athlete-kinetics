@@ -1,4 +1,5 @@
 import { canonicalJson, type JsonValue } from './canonicalJson';
+import { BACKUP_SCHEMA_MIGRATION_SLOT, BACKUP_SCHEMA_USER_VERSION, backupSchemaContractFor } from './schemaContract';
 
 export const BACKUP_FORMAT = 'pikeMethods-encrypted-backup' as const;
 export const BACKUP_FORMAT_VERSION = 1 as const;
@@ -239,6 +240,18 @@ function validateArchive(value: unknown, crypto: BackupCryptoProvider): BackupAr
     || (value.previousSuccessfulBackupAt !== null && !isUtcTimestamp(value.previousSuccessfulBackupAt))
     || !isRecord(value.registry) || !Array.isArray(value.databases)
   ) throw new BackupContractError('invalid_archive', 'Authenticated backup contents are invalid.');
+  // The archive's declared schema must be one this build has an exact contract
+  // for. A newer or unknown schema fails closed here, before any database
+  // bytes are decoded, rather than being compared against the wrong table
+  // count and reported as corruption.
+  const schemaContract = backupSchemaContractFor(value.sourceSchemaVersion as number, value.sourceMigrationSlot as number);
+  if (schemaContract === null) {
+    if ((value.sourceSchemaVersion as number) > BACKUP_SCHEMA_USER_VERSION
+      || (value.sourceMigrationSlot as number) > BACKUP_SCHEMA_MIGRATION_SLOT) {
+      throw new BackupContractError('newer_version', 'This backup needs a newer version of pikeMethods.');
+    }
+    throw new BackupContractError('unsupported_version', 'This backup uses a database version this app cannot restore.');
+  }
   const registry = value.registry;
   if (!hasExactKeys(registry, ['version', 'activeId', 'advancedToolsUnlocked', 'athletes'])
     || registry.version !== 1 || typeof registry.activeId !== 'string'
@@ -282,7 +295,7 @@ function validateArchive(value: unknown, crypto: BackupCryptoProvider): BackupAr
       || snapshot.byteLength < 100 || snapshot.byteLength > MAX_DATABASE_BYTES
       || typeof snapshot.sha256Hex !== 'string' || !SHA256_HEX.test(snapshot.sha256Hex)
       || typeof snapshot.userVersion !== 'number' || !Number.isInteger(snapshot.userVersion) || snapshot.userVersion !== value.sourceSchemaVersion
-      || typeof snapshot.tableCount !== 'number' || !Number.isInteger(snapshot.tableCount) || snapshot.tableCount !== 104
+      || typeof snapshot.tableCount !== 'number' || !Number.isInteger(snapshot.tableCount) || snapshot.tableCount !== schemaContract.tableCount
       || typeof snapshot.databaseBase64 !== 'string' || snapshots.has(snapshot.athleteId)) {
       throw new BackupContractError('invalid_archive', 'Authenticated database inventory is invalid.');
     }

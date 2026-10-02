@@ -125,6 +125,11 @@ const startSessionWith = async (movementIds, { confirmPriorExperienceFor = [] } 
   });
 
   useStore.getState().startSession();
+  // Preparation gates the first set (work order 1, migration 065). These tests
+  // are about the ACCESS boundary, so preparation is given an outcome first;
+  // the preparation gate itself is covered in SessionPreparation.test.js.
+  useStore.getState().finishPreparation('already_warm', useStore.getState().preparation.revision);
+  expect(useStore.getState().preparation.status).toBe('already_warm');
   const state = useStore.getState();
   expect(state.error).toBeNull();
   expect(state.session).not.toBeNull();

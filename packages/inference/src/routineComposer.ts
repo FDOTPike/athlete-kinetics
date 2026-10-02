@@ -1,4 +1,5 @@
 import type { Objective, SchemaType, TrainingAge } from './types';
+import { PREPARATION_FLOOR_MIN, estimateSlotMinutes, preparationPlanningMinutes } from './sessionTimeBudget';
 
 export type RoutineRole = 'major' | 'supplementary' | 'accessory' | 'conditional';
 export interface RoutineSelection { readonly movementId: number; readonly role: RoutineRole; }
@@ -267,6 +268,9 @@ export function groupRoutineTemplateDays(
   return new Map(ordered.map((dayIndex) => [dayIndex, byDay.get(dayIndex)!]));
 }
 
+/** The pre-contract fixed role allowances, kept as each slot's reviewed
+ * MINIMUM so the shared estimate can only lengthen a day relative to the law
+ * it replaces, never shorten it. */
 const roleMinutes: Record<RoutineRole, number> = {
   major: 18, supplementary: 12, accessory: 8, conditional: 8,
 };
@@ -330,19 +334,38 @@ export function composeRoutine(input: ComposeRoutineInput): ComposedRoutine {
     const objectiveRepDelta = input.objective === 'strength' ? -1 : input.objective === 'hypertrophy' ? 1 : 0;
     const methodRepDelta = input.schemaType === 'WAVE' ? -1 : input.schemaType === 'APRE' ? 1 : 0;
     const methodRpeDelta = input.schemaType === 'APRE' ? -0.5 : input.schemaType === 'STEP' ? 0.25 : 0;
+    const sets = Math.max(1, Math.min(10, baseSets + ageSetDelta[input.trainingAge] + methodSetDelta));
+    const reps = Math.max(1, Math.min(100, baseReps + objectiveRepDelta + methodRepDelta));
+    const targetRpe = Math.max(5, Math.min(input.baseRpeCap, baseRpe + methodRpeDelta));
+    // Time is estimated on the TIER-NEUTRAL set count. A beginner's safety
+    // reduction must not buy back a movement an intermediate would have shed:
+    // experience changes the dose, never which selections survive the cap.
+    const tierNeutralSets = Math.max(1, Math.min(10, baseSets + methodSetDelta));
     candidates.push({
       ...selection,
       slotIndex: 0,
-      sets: Math.max(1, Math.min(10, baseSets + ageSetDelta[input.trainingAge] + methodSetDelta)),
-      reps: Math.max(1, Math.min(100, baseReps + objectiveRepDelta + methodRepDelta)),
-      targetRpe: Math.max(5, Math.min(input.baseRpeCap, baseRpe + methodRpeDelta)),
-      minutes: roleMinutes[selection.role],
+      sets,
+      reps,
+      targetRpe,
+      // Shared session-time contract: changeover + work + rest for this dose,
+      // from the estimator the block generator and the microcycle analysis use.
+      minutes: estimateSlotMinutes({
+        sets: tierNeutralSets,
+        target: { kind: 'reps', reps },
+        targetRpe,
+        minimumSeconds: roleMinutes[selection.role] * 60,
+      }),
     });
   }
 
   const included = new Set(candidates.map((_, index) => index));
-  const durationCap = Math.max(15, input.durationCapMin);
+  // Preparation is reserved out of the session limit first; it is condensed
+  // to the reviewed floor before any selected work is shed, never removed.
+  const sessionCap = Math.max(15, input.durationCapMin);
   let totalMinutes = candidates.reduce((total, candidate) => total + candidate.minutes, 0);
+  const planningPreparation = preparationPlanningMinutes(sessionCap);
+  const preparationMin = totalMinutes + planningPreparation <= sessionCap ? planningPreparation : PREPARATION_FLOOR_MIN;
+  const durationCap = sessionCap - preparationMin;
   // Preserve athlete-authored order and every selected major. A short cap sheds
   // accessory and supplementary work before complete microcycle analysis
   // adapts any major dose.
@@ -356,7 +379,7 @@ export function composeRoutine(input: ComposeRoutineInput): ComposedRoutine {
     }
   }
   if (totalMinutes > durationCap) {
-    warnings.push('Selected major movements exceed the session duration estimate; bounded-dose analysis must adapt their prescriptions.');
+    warnings.push(`Selected major movements exceed the session duration estimate once ${preparationMin} minutes of preparation are counted; bounded-dose analysis must adapt their prescriptions.`);
   }
 
   const slots = candidates

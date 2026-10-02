@@ -28,7 +28,8 @@ describe('KeyboardAwareScrollView contract', () => {
     });
 
     const backupInputs = inputTags.filter(({ file }) => path.basename(file) === 'BackupTransferPanel.tsx');
-    expect(inputTags).toHaveLength(29 + 2);
+    // +1: the preparation panel's "exercise you did instead" field (work order 1).
+    expect(inputTags).toHaveLength(30 + 2);
     expect(backupInputs).toHaveLength(2);
     expect(backupInputs.map(({ tag }) => tag)).toEqual(expect.arrayContaining([
       expect.stringContaining('accessibilityLabel="Backup password, at least 12 characters"'),
