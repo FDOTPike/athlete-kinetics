@@ -257,8 +257,12 @@ is claimed.
 | `npm run verify:blocks`, `verify:pipeline`, `verify:store`, `verify:demo`, `verify:db`, `verify:coach`, `verify:preparation` | exit 0 |
 | `ContentCorrectionV2.test.js` (real store: the screens receive exactly the staged text; history, PRs and logged sets for a corrected movement are untouched) | 7 passed |
 | `npm run verify:components` (78 suites, `--no-cache`) | 1710 of 1710 passed, exit 0 |
-| Negative controls (`scripts/coaching/negative-controls-wo4.mjs`) | 17 of 17 detected — `evidence/WO4_NEGATIVE_CONTROLS.md` |
+| Negative controls (`scripts/coaching/negative-controls-wo4.mjs`) | 17 of 17 detected, re-run in full with the stricter harness (a gate must pass unmutated and report a failure of its own) — `evidence/WO4_NEGATIVE_CONTROLS.md` |
 
-The full integrated `npm run verify:ci` is run in a separate clean checkout of
-the work order 4 commit; its exit code is recorded in the pull request and the
-final report.
+Full integrated `npm run verify:ci`:
+
+| Where | Result |
+| --- | --- |
+| Development lineage, final tip, separate clean checkout | exit 0 (25 gates there; 78 suites, 1710 tests) |
+| Published branch at its first published tip, hosted CI on pull request 25 | "Verification suite (23 gates + typecheck)" passed |
+| Published branch, local (this is the top of the stack) | exit 0 (23 gates; 55 suites, 877 tests) |

@@ -150,10 +150,31 @@ INSERT INTO discarded_provenance
   },
 ];
 
+// A mutation is "detected" only when (a) its gate passes WITHOUT the mutation
+// and (b) the mutated run reported a failure of its own. A gate that is already
+// broken, or one that dies without reporting anything, is not detection and is
+// reported as what it is.
+const baselineGate = new Map();
+const gatePassesUnmutated = (gate) => {
+  if (!baselineGate.has(gate)) baselineGate.set(gate, run(gate).status === 0);
+  return baselineGate.get(gate);
+};
+const failureEvidence = (output) => {
+  const lines = (output.match(/^\s*(?:FAIL|×|✕|ERROR)\s.*$/gm) ?? []).slice(0, 3).map((line) => line.trim().slice(0, 180));
+  if (lines.length > 0) return lines;
+  const other = output.match(/^.*(?:AssertionError|error TS\d+|stale:|Error:).*$/m)?.[0];
+  return other === undefined ? [] : [other.trim().slice(0, 180)];
+};
+
 const only = process.argv[2];
 const results = [];
 for (const mutation of mutations) {
   if (only !== undefined && !mutation.name.startsWith(`${only} `)) continue;
+  if (!gatePassesUnmutated(mutation.gate)) {
+    results.push({ name: mutation.name, outcome: 'GATE FAILS WITHOUT THE MUTATION' });
+    console.log(JSON.stringify(results.at(-1)));
+    continue;
+  }
   const original = fs.readFileSync(mutation.file, 'utf8');
   const occurrences = original.split(mutation.from).length - 1;
   if (occurrences !== 1) {
@@ -174,10 +195,20 @@ for (const mutation of mutations) {
   let result;
   try { result = run(mutation.gate); } finally { fs.writeFileSync(mutation.file, original); }
   const output = `${result.stdout}\n${result.stderr}`;
-  const failed = (output.match(/^\s*(?:FAIL|×|✕|ERROR)\s.*$/gm) ?? []).slice(0, 3).map((line) => line.trim().slice(0, 180));
-  const other = failed.length === 0 ? (output.match(/(?:stale|Error:|AssertionError|error TS\d+).*$/m)?.[0] ?? '').slice(0, 180) : '';
-  results.push({ name: mutation.name, outcome: result.status === 0 ? 'NOT DETECTED' : 'detected', exit: result.status, sample: failed, other });
+  const evidence = failureEvidence(output);
+  const outcome = result.status === 0 ? 'NOT DETECTED' : evidence.length === 0 ? 'FAILED WITH NO REPORTED CHECK' : 'detected';
+  results.push({ name: mutation.name, outcome, exit: result.status, sample: evidence });
   console.log(JSON.stringify(results.at(-1)));
 }
-run(MIG_BUILD);
+// The rebuilds restore the unmutated verifier outputs; a failed one is a failed run.
+const rebuilds = [];
+rebuilds.push(run(MIG_BUILD).status);
 console.log('SUMMARY', JSON.stringify(results.map((row) => [row.name, row.outcome])));
+// A run that did not detect everything, could not apply a mutation, matched no
+// mutation at all, or could not rebuild must not look like a pass to a caller.
+const undetected = results.filter((row) => row.outcome !== 'detected');
+const rebuildFailed = rebuilds.some((status) => status !== 0);
+if (results.length === 0 || undetected.length > 0 || rebuildFailed) {
+  console.error(`NEGATIVE CONTROLS FAILED: ${undetected.length} of ${results.length} not detected${rebuildFailed ? '; a rebuild failed' : ''}${results.length === 0 ? '; no mutation matched' : ''}`);
+  process.exitCode = 1;
+}
