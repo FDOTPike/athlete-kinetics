@@ -12045,4 +12045,71 @@ sorry for the interruption please start
 
 ### Output
 
-Pending — completed when the work orders land (see the end of this entry).
+Results (closed after every result below existed). Hosted CI and the
+CodeRabbit disposition follow this write and are reported in the pull
+requests and the handback.
+
+- **How it is published:** four stacked branches on
+  `origin/codex/rpe-familiarisation` (`6c2fd709`), one per work order:
+  `claude/coaching-wo1-preparation`, `claude/coaching-wo2-focus-goals`,
+  `claude/coaching-wo3-sport-programming`, `claude/coaching-wo4-coaching-content`.
+  The prerequisite lineage (285 commits and a 100-file overlay owned by other
+  lanes) was not pushed. See `docs/audits/coaching-goals/BASELINE.md`.
+- **Pull requests (stacked, none merged):**
+  [#22](https://github.com/FDOTPike/athlete-kinetics/pull/22) WO1,
+  [#23](https://github.com/FDOTPike/athlete-kinetics/pull/23) WO2,
+  [#24](https://github.com/FDOTPike/athlete-kinetics/pull/24) WO3,
+  [#25](https://github.com/FDOTPike/athlete-kinetics/pull/25) WO4.
+- **Published commits:**
+  - `52e60a01` WO1: movement preparation on every live session path (migration 065, session-time contract, backup contract registry).
+  - `9ac16482` WO1: gate-count fixture re-pin.
+  - `679e4242` WO1: record of how the work is published.
+  - `e5d31069` WO2: focus question, SMART goals, athlete-bound onboarding save (migration 066).
+  - `6b4a5d22` WO3: sport selection and goal-responsive programming (migration 067).
+  - `651b217f` WO3: test fix for three gaps the negative controls exposed.
+  - `71dd6b7b` WO3: review fix — a goal cannot newly prescribe a held movement.
+  - `23da0fd0` WO4: coaching text for 115 template movements (migration 068).
+- **Development lineage (local only, `codex/coaching-goals-sport-preparation`):**
+  - `56ddfb7d` prerequisite snapshot of the inherited overlay (not coaching work).
+  - `4b93af2b`, `b941d30c` WO1.
+  - `8febd22e` WO2.
+  - `b3b9aaf2`, `0ec8ba10`, `22d75e90` WO3 and its two fixes.
+  - `dd72f76c` WO4.
+  - `d94731d9` publication record.
+- **Gates on the final published tip `23da0fd0`:** `git diff --check` clean;
+  `npm run verify:ci` exit 0 (PREFLIGHT OK, typecheck, 23 gates; component
+  stage 55 suites, 877 of 877 tests, `--no-cache`); worktree clean afterwards.
+- **Gates on the final lineage tip `22d75e90`:** `npm run verify:ci` exit 0
+  (25 gates; 78 suites, 1710 of 1710 tests); worktree clean afterwards.
+- **Earlier integrated runs (lineage):** WO1 `b941d30c` exit 0 (73 suites,
+  1618 tests); WO2 `8febd22e` exit 0 (75, 1660); WO3 `b3b9aaf2` exit 0 (77,
+  1701). The baseline run before any coaching edit exited 1 on one suite,
+  contaminated by this executor writing the first coaching file during the
+  run; re-run in isolation it passed (BASELINE.md).
+- **Negative controls:** WO1 15 of 15, WO2 23 of 23, WO3 38 of 38, WO4 17 of
+  17 detected. WO3's first run detected 32 of 35; the three misses were test
+  weaknesses and are recorded with the fix.
+- **Independent review of the final diff** (store, block generator, migration
+  067, preparation compare-and-set, backup restore path; no additional model
+  agents): one engine defect found and fixed (`71dd6b7b`), one mis-indented
+  line. A defect in this executor's own evidence (a stale jest transform
+  cache pinned 799 mapping rows; the true count is 794) was found and
+  corrected during WO2 and is recorded in the WO2 audit record.
+- **Deliberately not done:** the incline-raise correction for movements 135
+  and 187 (animation lane; held, excluded from preparation drills and from
+  the emphasis); no frame, manifest, prompt or approval state was edited; 15
+  rows whose frames conflict with the source text and 11 rows with open
+  identity questions are left held (WO4 record); no display name changed.
+- **Release blockers:** the 115 corrected descriptions have no owner
+  approval (`pending_owner_review`); the prerequisite lineage must be
+  reconciled with these branches when its owners publish it; native-device
+  acceptance was not performed and is not claimed (desktop tests only).
+- **Disclosure:** during baseline setup `npm run fetch:embedder` (the
+  repository's own pinned, hash-verified bootstrap) downloaded four pinned
+  model files. Nothing else was downloaded; WO4's source text came from
+  this repository's git history.
+- **Tokens:** PR: OPENED (four, stacked). INDEPENDENT REVIEW: DONE (self,
+  no additional agents). CODERABBIT: REQUESTED — disposition in the pull
+  requests. MERGE: NOT PERFORMED. DEPLOY: NOT PERFORMED. RELEASE: NO-GO —
+  OWNER CONTENT APPROVAL, LINEAGE RECONCILIATION AND NATIVE-DEVICE
+  ACCEPTANCE REMAIN.
