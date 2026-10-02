@@ -13,6 +13,9 @@ const BUILD = 'npx tsc --strict --target es2020 --module commonjs --lib es2020 -
 const PURE = `${BUILD} && node packages/inference/test/verify_focus_goals.mjs`;
 const MIG_BUILD = 'npx tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/migrationRunner.ts';
 const MIG = `${MIG_BUILD} && node packages/core-db/test/verify_migrations.mjs`;
+// verify:backup compiles this output itself; rebuilt at the end so a mutated
+// schema contract never survives in the compiled copy.
+const BACKUP_BUILD = 'npx tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build/backup packages/core-db/src/backup/index.ts';
 const STORE = 'apps/mobile/src/state/useStore.ts';
 const SQL = 'packages/core-db/src/schema/066_focus_and_goals.sql';
 const PURE_SRC = 'packages/inference/src/focusGoals.ts';
@@ -285,6 +288,7 @@ const rebuilds = [];
 // Rebuild the unmutated verifier outputs.
 rebuilds.push(run(BUILD).status);
 rebuilds.push(run(MIG_BUILD).status);
+rebuilds.push(run(BACKUP_BUILD).status);
 console.log('SUMMARY', JSON.stringify(results.map((row) => [row.name, row.outcome])));
 // A run that did not detect everything, could not apply a mutation, matched no
 // mutation at all, or could not rebuild must not look like a pass to a caller.

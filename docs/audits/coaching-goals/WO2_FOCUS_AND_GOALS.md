@@ -158,7 +158,7 @@ All on desktop, Windows 11, Node 24, 2026-10-02.
 | `npm run typecheck` | exit 0 |
 | `npm run verify:migrations` (38 checks for 066: seed, provenance, guards, upgrade from 064/065, replay, self-heal) | exit 0 |
 | `npm run verify:backup` (v63, v64, v65 contract pins) | exit 0 |
-| `npm run verify:preparation` (now also `verify_focus_goals.mjs`, 61 checks) | exit 0 |
+| `npm run verify:preparation` (now also `verify_focus_goals.mjs`: 60 checks then, 64 after the review fixes; an earlier "61" in this row had counted the summary line) | exit 0 |
 | `npm run verify:store`, `verify:blocks`, `verify:pipeline` | exit 0 |
 | `npm run verify:components` (75 suites, `--no-cache`) | 1660 tests; 1656 passed on the first run, 4 failed in `BackupForwardRestore` on a wrong pin of mine (see below); the three work order 2 suites re-run `--no-cache` after the correction: 53 of 53 passed |
 | `FocusGoalStore.test.js` (real store, two athlete databases) | 25 passed |
