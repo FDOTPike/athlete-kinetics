@@ -20,13 +20,17 @@ const STORE = 'apps/mobile/src/state/useStore.ts';
 const SQL = 'packages/core-db/src/schema/067_sport_and_emphasis.sql';
 
 const mutations = [
+  // E1 mutates the ALLOCATION path. The same-pattern swap takes its candidates
+  // from the ranker's own gated list, so reading them from the whole library
+  // there is an equivalent mutant (the ranker already refused everything the
+  // gates refuse) and proves nothing.
   {
-    name: 'E1 the emphasis picks from the whole library instead of the gated pool',
+    name: 'E1 a spare or displaced slot is filled from the whole library instead of the gated pool',
     file: GEN,
-    from: `            const candidate = pool.find((entry) => entry.movement_id === id);
-            if (candidate === undefined || usedIds.has(id) || id === defaultChoice.movement_id) continue;`,
-    to: `            const candidate = input.movements.find((entry) => entry.movement_id === id);
-            if (candidate === undefined || usedIds.has(id) || id === defaultChoice.movement_id) continue;`,
+    from: `          const movement = pickEmphasisCandidate(pool, muscle, usedIds, emphasisIndex, loadedFirstEmphasis);
+          if (movement !== null) return { movement, muscle, goalLabel: null };`,
+    to: `          const movement = pickEmphasisCandidate(input.movements, muscle, usedIds, emphasisIndex, loadedFirstEmphasis);
+          if (movement !== null) return { movement, muscle, goalLabel: null };`,
     gate: PURE,
   },
   {
@@ -106,6 +110,13 @@ const mutations = [
     from: `    && candidate.pattern !== 'locomotion'
     && !PREPARATION_HELD_MOVEMENT_IDS.has(candidate.movement_id)`,
     to: `    && candidate.pattern !== 'locomotion'`,
+    gate: PURE,
+  },
+  {
+    name: 'E11b a held movement (135/187) can be swapped in for a default of the same pattern',
+    file: GEN,
+    from: `            if (PREPARATION_HELD_MOVEMENT_IDS.has(id)) continue;`,
+    to: '',
     gate: PURE,
   },
   {

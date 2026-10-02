@@ -85,7 +85,8 @@ const profile = (over = {}) => ({
 });
 const emphasisOf = (parts) => pe.buildProgramEmphasis({ focus: null, sport: null, workload: null, goalMovements: [], roles, ...parts });
 const plan = (prof, parts, extra = {}) => gen.generateBlock({
-  profile: prof, movements: extra.movements ?? movements, startDate: '2026-10-05', schemaType: 'LINEAR',
+  profile: prof, movements: extra.movements ?? movements, startDate: '2026-10-05', schemaType: extra.schemaType ?? 'LINEAR',
+  ...(extra.macroBlockIndex === undefined ? {} : { macroBlockIndex: extra.macroBlockIndex }),
   ...(parts === null ? {} : { emphasis: emphasisOf(parts) ?? undefined }),
   ...(extra.programDays === undefined ? {} : { programDays: extra.programDays }),
 });
@@ -324,6 +325,13 @@ console.log('[6] gates, explicit choices and main lifts outrank the emphasis');
     ![65, 134, 212, 216].some((id) => ids(gated).includes(id)) && names(day(gated, 2))[0] === 'Dumbbell Bench Press');
   check('and the report says no exercise passed the checks, instead of pretending',
     gated.emphasis.omitted.some((line) => /^No extra upper chest work: no exercise that trains upper chest directly passed/.test(line)));
+  const noArmWork = movements.map((m) => (primaryOf(m.movement_id).some((muscle) => ['biceps', 'triceps'].includes(muscle))
+    ? { ...m, capability_available_weight_room: false } : m));
+  const gatedAllocation = plan(profile(), { focus: fg.focusFromBundle('beach_muscles') }, { movements: noArmWork });
+  check('capability gate on allocation: no slot is given to an arm exercise the athlete is not cleared for',
+    !ids(gatedAllocation).some((id) => primaryOf(id).some((muscle) => ['biceps', 'triceps'].includes(muscle)))
+      && names(day(gatedAllocation, 2))[2] === 'Overhead Press'
+      && gatedAllocation.emphasis.omitted.filter((line) => /^No extra (biceps|triceps) work: no exercise/.test(line)).length === 2);
   const bodyweightOnly = plan(profile({ equipment_inventory: [] }), { focus: fg.focusFromBundle('beach_muscles') });
   check('equipment gate: with no equipment nothing that needs equipment is planned',
     ids(bodyweightOnly).every((id) => byId.get(id).required.length === 0));
@@ -498,6 +506,32 @@ console.log('[9] workload changes accessory dose and progression only');
   })();
   check('the hybrid tax and the sport workload cut are never added together (the larger applies)',
     hybridHigh.sessions.every((s, i) => s.slots.every((slot, j) => hybridBase.sessions[i].slots[j].sets - slot.sets <= 1)));
+  // A schema and macro phase where the hybrid tax itself is already taking a
+  // set off accessories: only then can "added" and "larger of" differ.
+  const taxed = [];
+  for (const schemaType of ['LINEAR', 'WAVE', 'STEP', 'APRE']) {
+    for (let macroBlockIndex = 1; macroBlockIndex <= 8; macroBlockIndex += 1) {
+      const cost = gen.schemaFatigueCost(schemaType, gen.macroPhaseOf(macroBlockIndex), false);
+      if (cost >= gen.HYBRID_TAX_THRESHOLD && cost < 1.5) taxed.push({ schemaType, macroBlockIndex });
+    }
+  }
+  check('a schema and phase exists where the hybrid tax is exactly one set', taxed.length > 0, JSON.stringify(taxed[0] ?? null));
+  const taxedCase = taxed[0];
+  const hybridWide = profile({ objective: 'hybrid', weekly_frequency: 5, session_duration_cap_min: 90 });
+  const untaxedReference = plan(hybridWide, null, { schemaType: 'LINEAR', macroBlockIndex: 1 });
+  const hybridTaxed = plan(hybridWide, null, taxedCase);
+  const withWorkload = (n) => {
+    const sport = sportOf('muay_thai', 'general_support', { practiceSessionsPerWeek: n, matchesPerWeek: 0 });
+    return plan(hybridWide, { sport, workload: workloadOf(sport) }, taxedCase);
+  };
+  const accessorySets = (block) => week(block).filter((s) => ['lower', 'upper', 'full'].includes(s.focus))
+    .flatMap((s) => s.slots.slice(2).map((slot) => slot.sets));
+  check('that case has accessory slots on strength days to tax',
+    accessorySets(hybridTaxed).length > 0 && accessorySets(untaxedReference).length === accessorySets(hybridTaxed).length);
+  check('where the hybrid tax already takes one set, a high sport week takes NO further set (larger of, not the sum)',
+    JSON.stringify(withWorkload(3).sessions) === JSON.stringify(hybridTaxed.sessions));
+  check('and a very high sport week takes exactly one more (two in total, not three), never below one',
+    accessorySets(withWorkload(5)).every((sets, i) => sets === Math.max(1, accessorySets(hybridTaxed)[i] - 1)));
 }
 
 // --- [10] time, determinism, held movements, honest report ------------------------------------------------
@@ -531,6 +565,25 @@ console.log('[10] time, determinism and honesty');
     primaryOf(187).includes('shoulders')
       && cases.every(({ base, focused }) => heldIds.every((id) => !ids(focused).includes(id) || ids(base).includes(id)))
       && heldIds.every((id) => !ids(shoulders).includes(id)));
+  // Make 135 and 187 the only movements that could serve a shoulders emphasis:
+  // the pool is the baseline plan's own movements minus every shoulder-primary
+  // one, plus the two held ids. A spare slot then exists on upper days (the
+  // overhead-press slot has nothing to fill it) and an isolation slot on lower
+  // days — the two places the emphasis could put them.
+  const longBaseline = plan(profile({ session_duration_cap_min: 90 }), null);
+  const baselineIds = new Set(longBaseline.sessions.flatMap((s) => s.slots.map((slot) => slot.movement_id)));
+  const cornered = movements.filter((m) => heldIds.includes(m.movement_id)
+    || (baselineIds.has(m.movement_id) && !primaryOf(m.movement_id).includes('shoulders')));
+  const shouldersOnly = { focus: fg.normalizeFocusSelection({ bundleId: null, muscles: ['shoulders'] }).selection };
+  const corneredPlan = plan(profile({ session_duration_cap_min: 90 }), shouldersOnly, { movements: cornered });
+  check('the cornered pool really offers only the two held movements for shoulders, and leaves a spare slot',
+    cornered.filter((m) => primaryOf(m.movement_id).includes('shoulders')).map((m) => m.movement_id).join(',') === '135,187'
+      && week(corneredPlan).some((s) => s.focus === 'upper' && s.slots.length < budget.slotBudgetForCap(90))
+      && week(corneredPlan).some((s) => s.slots.some((slot) => byId.get(slot.movement_id).pattern === 'isolation')));
+  check('even when they are the ONLY option, 135 and 187 are neither swapped in nor given a slot',
+    heldIds.every((id) => !corneredPlan.sessions.some((s) => s.slots.some((slot) => slot.movement_id === id))));
+  check('and the athlete is told no exercise passed the checks for that area',
+    corneredPlan.emphasis.omitted.some((line) => /^No extra shoulders work: no exercise that trains shoulders directly passed/.test(line)));
   const everyReport = cases.map(({ focused }) => reportText(focused)).join(' ');
   check('no report promises an outcome', !/guarantee|will prevent|will improve|you will reach|will make you/i.test(everyReport));
   check('every report line is a full sentence in plain language (no ids, no pattern codes)',

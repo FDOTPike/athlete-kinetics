@@ -144,7 +144,7 @@ All on desktop, Windows 11, Node 24, 2026-10-02.
 | Check | Result |
 | --- | --- |
 | `npm run typecheck` | exit 0 |
-| `npm run verify:preparation` (now also `verify_emphasis.mjs`: 91 checks on the real 300-movement library and its real muscle mapping) | exit 0 |
+| `npm run verify:preparation` (now also `verify_emphasis.mjs`: 98 checks on the real 300-movement library and its real muscle mapping) | exit 0 |
 | `npm run verify:blocks` — the whole pre-existing block suite, unchanged, proving the no-emphasis path is byte-identical | exit 0 |
 | `npm run verify:migrations` (24 checks for 067: side-car proof, guards, upgrade, self-heal) | exit 0 |
 | `npm run verify:backup` (v63–v66 contract pins) | exit 0 |
@@ -154,10 +154,18 @@ All on desktop, Windows 11, Node 24, 2026-10-02.
 | `SportScreens.test.js` (real store behind the real screens) | 14 passed |
 | `BackupForwardRestore.test.js` (v63, v64, v65 forward restore; 067 round trip) | 18 passed |
 
-Negative controls (`scripts/coaching/negative-controls-wo3.mjs`, 35 mutations)
-and the full integrated `verify:ci` are run in a separate clean checkout of
-this commit; their results are recorded in
-`evidence/WO3_NEGATIVE_CONTROLS.md` and in the final report.
+Full integrated `npm run verify:ci` in a separate clean checkout of the work
+order 3 commit on the development lineage: **exit 0** (all 25 gates there;
+component stage 77 suites, 1701 of 1701 tests). The run on the published
+branches (23 gates, fewer suites; see BASELINE.md) is given in the pull
+request.
+
+Negative controls (`scripts/coaching/negative-controls-wo3.mjs`): the first
+complete run detected 32 of 35. The three misses were weaknesses in the tests
+(one equivalent mutant, two scenarios no test exercised), not engine defects.
+`verify_emphasis.mjs` was strengthened, one mutation was corrected and one
+added, and the re-run detects 36 of 36. Both runs are recorded in
+`evidence/WO3_NEGATIVE_CONTROLS.md`. No engine source changed between them.
 
 ### What the real store showed that the pure verifier could not
 
