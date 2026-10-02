@@ -1,0 +1,1170 @@
+{
+  "schemaVersion": 1,
+  "correctionVersion": 2,
+  "mediaExcluded": true,
+  "fingerprintFields": [
+    "name",
+    "correction_version",
+    "supersedes_v2_sha256",
+    "changes"
+  ],
+  "ratificationState": "pending_owner_review",
+  "build": {
+    "applied_at_ms": 1790899200000,
+    "authored_on": "2026-10-02"
+  },
+  "evidenceRecordsSetSha256": "d082cef6bedb15fb7a4ee6eeedec2edca579f730308e0e70b52518961a8d430b",
+  "recordsSetSha256": "f15e25581b069075e4cdb5499c9f54ca473386fc8ff4e2c62191851900aff050",
+  "records": [
+    {
+      "name": "Alternate Hammer Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "fd90d16099f2fc0d2a85192df96ed130488018137f8e9ac51572d63e425d9e31",
+      "correction_sha256": "983bb2e88bd2502368d8ebcd165fd7a13a090f67040a5fbd66b0664c627c3c56",
+      "upstream_instructions_sha256": "40c6a299e2330feb812349dffdd1601d62bc6c0d84e7fdd27f519dbd629236b6",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Alternating Cable Shoulder Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "8d6f90cbb427dd25ae2d89751137659a329b81a85f461a59d9e5cf51e225a94c",
+      "correction_sha256": "432fd44b4653c4c7b908a89828c7b598bf787c48e9b182dedb461175f2226a17",
+      "upstream_instructions_sha256": "5bc67bf5f099b7107cabb615a97f7279475ce02ad42ae62191bea1b9d75e2023",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Alternating Floor Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "090a5672129607e274aab418b4fb46959cc949bd415acdbb422abb15c1e2dd91",
+      "correction_sha256": "63e44b71c7f1ace7855b7448f47b307e385479b789c5b1256a8201c90e76fb7f",
+      "upstream_instructions_sha256": "107c0a080863db730eeebd8ad583f66fdabcadb97c22c32fd040f1a5adc443ee",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Alternating Kettlebell Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "c28a96d8ddb0d150fe90915a47b6b8e8aa80ea77ca3f62795a9752201abe2b37",
+      "correction_sha256": "ff4715bd668dcd0ce342aef6ebac31cd3500b7cae48314a2b97fa00ebcdbd654",
+      "upstream_instructions_sha256": "3018a2f9a36e20694b35b01dc773b6c6f8c07e563be1f925093d6637026d2cdc",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Alternating Kettlebell Row",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "6ac8581f59a31d0f7186e36097ae13d6f22f030a55ff6c5575297fb606e92069",
+      "correction_sha256": "12926c20bb4ab8478d94075054e8536f8b0c4fb39f66a601144f8037fd6010e0",
+      "upstream_instructions_sha256": "678e62628b70f5e4a671f6b823e04a036966c92032e860e9f4d81052d2681be5",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Back Flyes - With Bands",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "5556551d8ee3b14b8b32651e270d72877cde4006e0dd203f1f1d6a3d3a0463a6",
+      "correction_sha256": "f16beaba7e4b84a4e9e602970dc1aeead84704e9782cf8e2910bb90c15be6f7d",
+      "upstream_instructions_sha256": "e9202304d1f2651d603f210e53f5272128675f59653f527f3f13400c01497cac",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Barbell Bench Press - Medium Grip",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "07bad4bdebf3d3400a99669ebb36776b9f87d0e2b4732d80460b06da8be6367b",
+      "correction_sha256": "c36054b866e510a856ef518b451f0f6ed8819ee3e6170454b81fe8004cd8b41b",
+      "upstream_instructions_sha256": "160f5f12fbaecb2a01117498d78d5bdb0178692dfd9dd31a7d2908c662aa5ff7",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Barbell Incline Bench Press - Medium Grip",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "2ad8d923d7eebd07a6936d96fcaa3c46a7db4e91a34d66037c03e5c72aef64fe",
+      "correction_sha256": "8fea83efd230eab309ab53dd4c4965bfc121d9204c90786bc3ef6bf54b04ee23",
+      "upstream_instructions_sha256": "8b4a113cd481c4fdcf5ac539b1e5232105f6919b619e4d874b856fdaefad9448",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Barbell Lunge",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "eea1f53a0decacf752219bfe38306ed232e2991d728915b23c1ba22619479639",
+      "correction_sha256": "b4a40330455d789fe414ca5a07ea477f8709a380f7f6fbc1f69f9c9a73ed1d51",
+      "upstream_instructions_sha256": "9f77ee7155352c96efadc29faf70d69d77885546a5dba21d5c4424b599865a0d",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Barbell Rollout from Bench",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "c84db2eb2ff55c62002cecaf1d32d936fd0e27a9bc32bc2b2180613dd52c1ca6",
+      "correction_sha256": "f9405bb77d9b2932fcc694bbcbebcdf9394645cf869143c6e208e728ce9d1556",
+      "upstream_instructions_sha256": "d8f64ddc540ddf4a8dd51a4678e54dc3e0d53ea3967d53bd09d150ac1b654229",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Barbell Squat To A Bench",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "af4bb3930f3f51308878385b082669d9a33019113ca9b35ad8f761c9ab768c43",
+      "correction_sha256": "6b1d5254f22e34e3cb151071a12868d44d85adb45deb6da908b3907e489f630c",
+      "upstream_instructions_sha256": "0c5315bf24d670c6543d871c4bb32da84bbd124b98c28b9c808952c35af924a9",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Bent Over Barbell Row",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "dab658b1fa3b0f57367d9d7371fde91ad045354eec3c9038a4a2570e0b4f42e6",
+      "correction_sha256": "7b83cfc2760a8242f6e5cfa038a9abd2cfb328e1109bfa1a1c3c0689c447e738",
+      "upstream_instructions_sha256": "2ba960393dffee801520e0baf6d7b5022c30883e668a7a98692a37157232756a",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Bent Over One-Arm Long Bar Row",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "dc351eb837c905a5fabc20b72523738e681110532886e42ac4e527100e42c68c",
+      "correction_sha256": "c95cf556f95717da8991c35ea307266e8b2dd35727c369cd3083b86e3ef49246",
+      "upstream_instructions_sha256": "2dab467a5acf08dae96e861d8fcfff391e66048384248a09c6832ef1d0a8a6a7",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Bent Over Two-Dumbbell Row",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "1fe9c9e3cfbcaa21c2df2b9101d672447db9520bb08138a350f74761248e656b",
+      "correction_sha256": "dd34af0e9edfd1196b4e03574ee44ad7dd9f0d13155d02a718b5da4b89053ef2",
+      "upstream_instructions_sha256": "04937184f6c49b012ee099226b047cd40b727c06251b6dcfb5fb18564c6d6ef6",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Bent Over Two-Dumbbell Row With Palms In",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "3428cef51c0bab46805ffe11348c305ca5df710f45a558666fee853cedf90670",
+      "correction_sha256": "48541795094ea24b93ffd2c5771e8aa16592511df15abeba4c492adba6d5d763",
+      "upstream_instructions_sha256": "14510f42878c7a2b5a661664d18485a8d4bbdfbf8f1347edce6b7cc4e0cfe84a",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Bent-Arm Barbell Pullover",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "04e0fc57c065e442d5374126e5cc7b430bad3f1732a10a23dd3891e5af07464b",
+      "correction_sha256": "fd73b8a844671caa1b80f2c7c6905f7aba3b655e3ced792693a76b3f566d6013",
+      "upstream_instructions_sha256": "cfb831a151e69446f5f3324c2474abf3b7d6cd8ffc9b3936ac7e6e4c4fcad562",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Body Tricep Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "3b8c1a52e15f9056310fe08bf95613521466c5014bcc024e9f013474495b2bc7",
+      "correction_sha256": "4fde4fc9a83557843be86c463e3000e05a7bb86a7ca7d46745433b805ffd4a7a",
+      "upstream_instructions_sha256": "3a4f39f17579d6ebd99e8e2a967c80b88f725a07edc9f488bf6037e7978cf231",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cable Incline Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "9beb44bd41ca478292db08d2913417d10a13eee9e7183dd82dd9a92003e38b31",
+      "correction_sha256": "239a44772e0ee8e292e9f4c589a8987ff40d5950777f9ba09ba2e3f9bc2e0cd9",
+      "upstream_instructions_sha256": "78255626898fb6be108cccd24def176613cf51da3f9279ab2f2d95248cf4f15a",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cable Lying Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "fbecf644b347a14e9e4dfad913aefa3dba778aaf2b4cebc11fcd611b8d119c51",
+      "correction_sha256": "cde27da676b229c1ff322f698d01d0c5fc0c615dd6deb5d96a81ee84aef00df9",
+      "upstream_instructions_sha256": "9ffa5a823685266ba407d24a73b509b5bfb170f114b5cf49d8f8d9c072ee817a",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cable Preacher Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "aedf8e405e01036f12ddb0d22e76c8817b17f8a98dedde4ba2fdd53b36c92ab6",
+      "correction_sha256": "ab65c17523862442e634918451f39945361adf37ae482d0cab3a8f7c1d871947",
+      "upstream_instructions_sha256": "3461dbb37bc5594c40d00377dcce426a3dba3490852c616f7e2e925ccc74cadd",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cable Russian Twists",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "2843aa29717c695edfb44af30a5d597959d2dc5d6a79029d1625cf332acbf9a9",
+      "correction_sha256": "e1f35282fda40304dcea30099c9c22b4a33742fd55315ff5b22ed67dbaec2a69",
+      "upstream_instructions_sha256": "04f3ff7bfdc0b0cbe35467b209e12a8a592f2ab127a9d3a85d003922c85e2a4e",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cable Seated Crunch",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "dfd6dde717e4650b44a3e3c34dcc9ec72a367beef2246ad12143f4513f5875de",
+      "correction_sha256": "af391ebf525a1477e59715744b0206ce2c626cf008fab4aad5bd1d159e35974f",
+      "upstream_instructions_sha256": "96a3828ef7cc978cd6a2a074547b7aab86a6c8b0f43c12e640c2d0fa62ad4e76",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cable Seated Lateral Raise",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "9fb6aab968c4cbd35ba6dd10216e9e56e24549d6e57061bea502a602df6b1e08",
+      "correction_sha256": "35b59b21f4610803d1fbfeb7f38401e0d304a4b30f155b444ce0d59277fd2c6f",
+      "upstream_instructions_sha256": "9d81031a1662acdb26c4bcedcf4ced0a84ea0df81eeef32d2be4ca39ac1a8b53",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cable Wrist Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "73f4ac7af45c7b1ece8fd350c3b654c9060e23a4a28fe855098af75f19e07d30",
+      "correction_sha256": "4c1bbbff856f0f6de51c13801f7db12e947c4c3fe14272206c4e05f8b4e3e427",
+      "upstream_instructions_sha256": "51986b1fbc608c5abd15e87a59073fd6ab129536e135260646e3fcf69e529a3b",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Clock Push-Up",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "da161309b1f76f40d33bfc752c7c2c59626afda729d2c5da2a7d733dd75ca431",
+      "correction_sha256": "98dfc34280fce2c9239a2f7d12e49fe5be3fd8635913ab4937c71aaa64bcd4dd",
+      "upstream_instructions_sha256": "706bea6fcb5279eb3888c7227052e04183145c34325312c49b545bcc573ce776",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Close-Grip EZ Bar Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "d544a783aba20c5c535e550fc42d273cd7b3f5786ba4d05c106603f8a48408e6",
+      "correction_sha256": "8ca91f37cc070afabebfcde978890023ae2b4e0fb72a63a706c933368e299170",
+      "upstream_instructions_sha256": "913aeec20234334937fa05eb311214ba072a6c62d6d369651d72e26d5e6da170",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Close-Grip EZ-Bar Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "8f176ddbad1f895858b2e8f82ff056b36ddacaadf13b3c23f95300237be1c819",
+      "correction_sha256": "679a70a2bdf9624260c1776c2410d39d525e241dbdf45ead99bd6ef1aeba295b",
+      "upstream_instructions_sha256": "d63f587e4c8dabf826a1262568e545789448ac9f71b8b994fb8a8f2a6e950a75",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Close-Grip Front Lat Pulldown",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "e7f223b2e90b5bcac7788a1c0f3eccb5ef848ae8979ad51ef1ade5b13a05deaa",
+      "correction_sha256": "8cb64a2903eab5dacafce3fe9e83a5834725f47aaf76ff2712b9fa0944de247b",
+      "upstream_instructions_sha256": "f736d73fd751891b7f6a21d73d1593eeaea7f5418059c01cdafd047638b64de5",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Close-Grip Push-Up off of a Dumbbell",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "b26b5077067bb156a26ff0fee618996ca6604b4c5ef8c8dcf1a41c0773cdfa97",
+      "correction_sha256": "cb655349b3edac72c2a493c906ca90e7111d36c54e20665da783ed741efba432",
+      "upstream_instructions_sha256": "f3867eef0bdb590e69a55ed962070a4cf4962ca024c6f253c0b1ba4772e2d98e",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Concentration Curls",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "b626ef2cc5b7c6a4444e9e98f0769ad4945da7508fe23aaccd943f2b7f451608",
+      "correction_sha256": "3668ceeb4031e64a07d398827cc6c10035f4722fd03adcfb755b8445eda1b412",
+      "upstream_instructions_sha256": "c7ed28ffb6820d4ceb7a50609b971f5809b620988649d995492b193dcef4ed9c",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cross Body Hammer Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "844b4ada124604b83b4de509d27dd5696398acbdf0c298b84093e37d02a08f65",
+      "correction_sha256": "e72dcef3a35654897c0fd168a0e099a5bba3905bb4d8fc85532e92ea0a6959cf",
+      "upstream_instructions_sha256": "d447c69be6b1e867320a08072d483bc0ae3f3de697a3f43ed7b09ff2f259d1c5",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Cross-Body Crunch",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "535ddd3edb85bd174e2626b23e603c9968e0ad2fe002bc85c3d514dfbb9597f8",
+      "correction_sha256": "48291c4b622360c84697a6b18ee0a9901e210edb55b9e959d19fd6ac1cff6a92",
+      "upstream_instructions_sha256": "0ad24ac0d8eb901f14d493e31ba289c8cd7db1c37fea3a409c9bf91ef65182ee",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Crunch - Hands Overhead",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "e70cb69b8a536bba641a5811a4cf825a5e7248cb724877e7afe380a75a0dc174",
+      "correction_sha256": "eacc443fa804479baa6c2366c2c32a50363466fed13e0821a3f6d92a219021f7",
+      "upstream_instructions_sha256": "a0483bc028449c6f1846d5bae48594ca3ced0d7f3c871f300ba8ec750936a8d0",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Deadlift with Bands",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "10baae01dcb638d4be29e5547b452ec2b809b00d4a4df867bcba8bbffe328ede",
+      "correction_sha256": "44e3ed41a440e9c079bdef24bd5719917bfb908eadbb346f14274ffcdc327706",
+      "upstream_instructions_sha256": "5281a713f2716acb9e6a609d949cc64e276fcd1b93d40fec8c0bba096ab61277",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Decline Close-Grip Bench To Skull Crusher",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "743fa032797bc17f4fcdc30f28242b223c80a5503746125c141c08ae5d30b598",
+      "correction_sha256": "038b88d5ae32fbf03e924776c3de8d42027714af5974afe5d7e32c3f4dd1b52c",
+      "upstream_instructions_sha256": "a1eba82336575ebf94aded0ad744bdfbcb2b7f82e7c729e1e618ce93177c1143",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Decline Dumbbell Flyes",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "34e5935309ec9d0a04aaf0ed6e117fbfaacf989305c1002f28beb4c6d6f6c910",
+      "correction_sha256": "92a34494768c3e78d9ad769a15486a0b7d0ffcf3effe9113ec74ecc070c68f0c",
+      "upstream_instructions_sha256": "f1bbbb6dd7f9f0fde38bdaabbc287055f52be378adb77a9269c8931c0f3bc738",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Decline Dumbbell Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "85b6199ea98038fb8f64d09cd276054a67dd8304b54bb61728b05f6702c8399a",
+      "correction_sha256": "7c7b22772ea6b1acd52ff70a5675ab4161e0e5891f49f4cf202ba7e77ecf25c1",
+      "upstream_instructions_sha256": "bba0a841bef4e7038170dc01bfb081a41c13e62dddd8b1a6df519f96fee946ae",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Decline EZ Bar Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "9b33146ccfbe3cb646b072db31eec32571b91ba696e0758de149edac7ca9d266",
+      "correction_sha256": "7c2fa43838fe96ab0fa237959774f1f795373041b068ef92c92b310f260f6615",
+      "upstream_instructions_sha256": "6b112eae40ac2e856e1057609e1a5144e4477fc34e3b13cfdb1878de52c26a43",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Decline Oblique Crunch",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "5acc318f5c7537f40b5a39bf2a7341b7576ff4272de3244c892c0bb97d6a700f",
+      "correction_sha256": "f7d8f16084a13816464b0f3b729e76f1004a812a2408d40c50dc742ef3b38ec2",
+      "upstream_instructions_sha256": "8970636ed32c64bf25cc3f477b1bdd8d4e069d38a31d33dd28add70d389193f4",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Decline Push-Up",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "1dc710084cb3f53182ca11557f02f8e4c03bd55a43dd37204a741d4505ea9ce6",
+      "correction_sha256": "e12c290861d3b20a7bb6e87d949b3c910f559f8b4743cebf5b953d2cdf3a7fb8",
+      "upstream_instructions_sha256": "0912bf638aaeb7ee95f6053c033e3418c76001770dd30b6d92b37771c5eabea8",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Decline Reverse Crunch",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "6d5e04edd62c3b0019ca65430bcfa144cec756dbfcf3e7888c16fae0731cb7ce",
+      "correction_sha256": "beb5ecdc74435df235a62e7c96902eed075429b9a7e9e62947982c6fa2b71dc5",
+      "upstream_instructions_sha256": "e9a70882922da716dad5ac87e8228fcea8e29990bcba99e55c5a2990a5d34a4d",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Dumbbell Bicep Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "90e455805722657be45b02b45b49941077fa9135963a05e7051ec8e255215bf2",
+      "correction_sha256": "6a819e9c8a4e3fd4410a98a9eed19bfa936b462aea0cc14e7dfe266fde614dd5",
+      "upstream_instructions_sha256": "ea387a9c69a0da54a70e56734afa1ea554fc9a4b237c4927b1d7f0c9efe771a8",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Dumbbell One-Arm Shoulder Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "9ccf566a1a27e98d01a0879ba82cbdebebb8106d206810adbe86ba086dd461f0",
+      "correction_sha256": "52b4d273854e86cc7c9709c8b562830cc8f79ca179ddcc8e8a8b4947d5c11d62",
+      "upstream_instructions_sha256": "ef86986e2973635b583fbf58af84980ca5451644887c741baa27dfda9b7f3d68",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Dumbbell Prone Incline Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "61d7436dfe0bce533e58de10a15c71728e5a6494c6e9e02430e33bf38d5fabf0",
+      "correction_sha256": "47452a4fd20796dd21944fbea062d7333abbf1ec9ba078a1174901e1e7fa2ce9",
+      "upstream_instructions_sha256": "fee1358ce60056cb46e512d042076e3951a8b6ecf71dd683d725a17eb3c3823f",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Dumbbell Seated One-Leg Calf Raise",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "5de4149383b3337303d83d0f5b5a47601182b1530c6b9e6f1a8133f14549a97a",
+      "correction_sha256": "561668fef745691e845ad1eabd3045d20f7dee3013f7ed7f3a28931031d282be",
+      "upstream_instructions_sha256": "c9d706b9b07fa208599892132beb1e837bd1e964ca550a744d66b9cd96823083",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Dumbbell Squat To A Bench",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "6176f4d6f7698a64c6aedc352a5a953e1e57c1f3d688c3d2e7eea1fea207db09",
+      "correction_sha256": "1b3a7baa79394ff98d3b2ab9b7df0a978616f2f1fd32dc545e99bbb594ba3bd7",
+      "upstream_instructions_sha256": "acfb40b2263c4fa8fa0372847c2c3e1df44cf35c4356ebae4b287f8dc0dcb88b",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "EZ-Bar Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "b6c1dfb5380436294ef597704372d05c3182dc7dc72319421d72490d22ec6592",
+      "correction_sha256": "81bb379e1803c994b4cdd15e67868d5ad6ce4702568e2d6efc33762960c5e1b7",
+      "upstream_instructions_sha256": "71d7193bbadcb8cbfe6339ec2f8500a995f4138722145d0cd2972b9fc0ac12f9",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Elevated Back Lunge",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "37d29f3faeb7bcb3c7a047e3695f6893289ed3f294d4447cdce62c1b04a70b74",
+      "correction_sha256": "a79cce0952d3e49a6d67a63a85a042d53c120de09e2d95fada9e1dcc71de670d",
+      "upstream_instructions_sha256": "027a531c95cb9171b2922b77f07a5655f6e022819e974f0d8eb5c748052fb7ae",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Elevated Cable Rows",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "ae5d3c3d0f4962963e3cf44e4b27df9b6136ae38bd1adaa4c5f965b3c4bd5e1b",
+      "correction_sha256": "6165e596401ad448514053a99e6e9d15c5e718780b794dcebbbc0661d8e21de4",
+      "upstream_instructions_sha256": "a59e134ee780a1f1a0a09c2224fb4db58ee94ee2c9248d6ef3c5b41ca6be209e",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Flat Bench Cable Flyes",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "b17afbb545dc1921b1c4749d34c9b22b1a09cb6ae3c705c32161e84cb74a1c73",
+      "correction_sha256": "93de66b253b22178a5c1fa20e57e5a4c84e2999f2c0438204b27ea5b96a9255b",
+      "upstream_instructions_sha256": "d5b614fd011d4b212de7861d223c419deb4adb90d7ab18035c72d111c50b5e55",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Floor Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "adba8597541caad99758658f9f40e1e76c1cb0d765384451c5603218ca12b247",
+      "correction_sha256": "276ac12ff86eafe62dffa025780633363427a14d851820035f9eab0545252328",
+      "upstream_instructions_sha256": "d611bcb382a0fd51bc3621766e49b52a440c8a20da5306077147b2464f232b0e",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Frog Sit-Ups",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "98fd1691c1ee270a91084328d0c08edc618f072474987761882e9bc09b854392",
+      "correction_sha256": "04f80d4364b1a9b8143cdb15078b579e98661fcf60a1a80060aea1abac8f9c8b",
+      "upstream_instructions_sha256": "841a8029e72e9fd0ffd03c05b0dd91f592a61c8204cf1a4c9645018e0bfdbd84",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Front Cable Raise",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "110dce053523b3b16ebe1ec8ce70b0952f777be3e58dc8d10cb40f6de6a24473",
+      "correction_sha256": "ba9385a68ece1512e07ed7b4dcd29bb001f3053b4762a299ee9ea187d794c8ab",
+      "upstream_instructions_sha256": "9fd4585d00fb95c91a18981ba17ccdc8685ffdf10e296e2ad0d02925355d925e",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Front Squat (Clean Grip)",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "6f2df1e1f0b258131c53cf5a04433f0f4b8fb8477987b532eab9bd4d4d3ad412",
+      "correction_sha256": "0b333e1816a7032aa155c7b98e2551d50f518c2a01714c6dbbdd80b52621c0cd",
+      "upstream_instructions_sha256": "ccd1cef63a9ca2f0f12cef69d0a243fe6f41241bbddc14c88176f8288ae35c56",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Full Range-Of-Motion Lat Pulldown",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "fa05c236caa50469e59e08fdc1cf7314cbef89c76204446b1bfbd750b67d1e86",
+      "correction_sha256": "f91ad5e56eda39c4bb62a8ef53bb9e108ada4eb084ff8f430ac6e8a6aa101320",
+      "upstream_instructions_sha256": "e286119187e7ba07dfc8f980d44b55cb9a6cdc45bb4892293f337eede57f3ecc",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Good Morning off Pins",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "1ab47f39c868e56026490fe7ab2bfa84e6cb783a8555716e7cb92a84adb49763",
+      "correction_sha256": "7d26e9d24328ecbdf2647636a5c0455434e37e844d837f1c0b03c2b77ec7c85d",
+      "upstream_instructions_sha256": "0ccaa0ff23d545428d18214507ab3e518503d4b1e8ea257caa16c84898cb8148",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Gorilla Chin/Crunch",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "618136672bfacf30ff19457e0623f4b36c2a12178efd509ec442d1a6622e237b",
+      "correction_sha256": "b7cdd7557250d0c778fd41b20947869a554935f2b21abb4a177e6c679c0edead",
+      "upstream_instructions_sha256": "71faae7a9561c7ed19d2566624729cd113962d27f293709fc0c928cbda4856bd",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "High Cable Curls",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "41db94ea710b710af07ca0ab7ef56e6a20727a6dbbfdab254bfc1d59546450ef",
+      "correction_sha256": "2f90bdd2d7fb2fa9ec40c668ba97dca8a72af4d02f3e1adeb4d4185c32a5b24b",
+      "upstream_instructions_sha256": "78e9697946db09df2252aa7446a24b872e745b72af5ca3c499d33ce8a14f41f3",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Incline Barbell Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "8c7b0a0fc02e1260605b27f602f76e402b6d35693e22ebb6fa2e0c05286107a6",
+      "correction_sha256": "e13c8abda2652d601cb93fa46e671eba9cca4d481a08068ffa324d451a5f665a",
+      "upstream_instructions_sha256": "e58530eb990082ee85a13af8c1241361ea8e471b0e8639fbcf800d14c82934a1",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Incline Cable Flye",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "099b349eb364464c0bafec8d4271f231f7e892592609125ef1623d40b297d2fe",
+      "correction_sha256": "65985ed39b8beb2c3174f535ef0647d66be2295fd2d1b5a1b10c6f203d24461d",
+      "upstream_instructions_sha256": "a4f2ed034e30d130eb744959accec803d0a9c05306395a8a7a3680f1fe0d7d75",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Incline Dumbbell Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "4d76fbb1c204f97eb203c71f502f9d1ef412a0bc2e40da33552d44af52b98b44",
+      "correction_sha256": "adef02778643ce04e804295277c21d4b11865cede653ed7ee19dbe337a307f82",
+      "upstream_instructions_sha256": "059f6fc0c91a717787e12a8b43e0c3453cf98b4eaf16a5acfe1e96f83c1bbddd",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Incline Dumbbell Flyes",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "c4cd1bc1651a5022b46be75606ecca64469c7c8bf87420015343200680c8031e",
+      "correction_sha256": "2a6302171baaa6763f401ccd6ac0aa0c168e7079ab33d33d850b4cce5e7dec1b",
+      "upstream_instructions_sha256": "8eec12813939ce20d653598ceedd9e86e4a9232e46eada7c57cbca7e66293400",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Incline Hammer Curls",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "f52a31b0fbe75a4cd8fd7023b4a759b8e3b740770992b002c0c847a935cd9ed9",
+      "correction_sha256": "5ef82e84bcd9af052bf31ce89413be32891b3e61c698de3136021fc2c26f6cb3",
+      "upstream_instructions_sha256": "167907790184ab62e98b9b8f43be853efae48f80becf472e31c17d4f09577f10",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Incline Push-Up Close-Grip",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "7ced08f5ccd3ff6d6e5f3e61c09a3eed147a9d4458c264b0e9d569ceb5e05eff",
+      "correction_sha256": "c86483676ff6fd6d2289c5c287a76ba4ca7b6ddfcc0d342846fa0406d9b5df56",
+      "upstream_instructions_sha256": "5bed45cae307d1eb531d7eedf9d581838b33618e8b1722ec2430f60bcf46046e",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Incline Push-Up Wide",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "ac1ac96ec22972fb15baa96941c2f91c5f30a1489cda9e1cada4e84e25114d1c",
+      "correction_sha256": "dca0fac88ae94dbac1589db72cd13f0aeda8736016285edf0e8ca36eb3f24441",
+      "upstream_instructions_sha256": "0c80945e3cefb80dfe3ebe23c480c96458eb10dbdd21391a993c5371116f9b66",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Internal Rotation with Band",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "c3a3df821701ac83d6273d99f346854213e8c5db4a53ea68a4238f749697894f",
+      "correction_sha256": "cc2b64ed829f63d5fdba8f066ca55b0ce8a057da8404e3b46f34810197d1f657",
+      "upstream_instructions_sha256": "bce3fb1c86aa041fbbfe4501863f966534cb5f78bf91d844384719f85a2dc6ce",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "JM Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "af689d681167bac9c140f4726f98eed7127ad98e0a5e34829edb77d31db1d829",
+      "correction_sha256": "24f065be646b01c266642daa84450db2a8b257186556eb479a8e816b9b9791e2",
+      "upstream_instructions_sha256": "26e0a154fed73f5fd39a4a4ed615c6d5b4061ab16fd0907bf41d154a93576563",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Jackknife Sit-Up",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "2b54b12fa7232c5d082da1345f761ad1cbae74e9252a797640ee1032716fd431",
+      "correction_sha256": "2e64ab2278e6f7b026c1847b6492bbaf248a2bd1f5a2240365a5b7cebc5c84cf",
+      "upstream_instructions_sha256": "2f3d6537ee6562733a1ed86be95cee0a162f66bb94521736fa04e5023f3a754f",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Kettlebell Arnold Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "d61a95470fe2a0ce7034db8fd76804ae4b68003d8ebe41206c8c0becf5ae6605",
+      "correction_sha256": "942137926a02dce419b57436284ca440e327d259d4cdf09b33f3ab1caa6af2ee",
+      "upstream_instructions_sha256": "7ffc44e40609fad3df36f23b4defc1a7f01b6a933bf309ab0859bd1fe4064a86",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Kettlebell Seesaw Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "7ef4f3e928a9e086165334c99079d6c1172fa5266a59fbcb482229acbcbc46f2",
+      "correction_sha256": "6f51e6087c2a75cc224c1bce80189f97e870f93562aa5d025fa78ac6de701536",
+      "upstream_instructions_sha256": "6ef04eec7bae0741603a9fa3120aa000a5118c1dcb3743c9801b3a539d954b34",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Kneeling Cable Crunch With Alternating Oblique Twists",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "8830c2ae50c2ffcdb4bd0b963fc3a60227cd5b6316e0f4b7b541d80d4b4ea943",
+      "correction_sha256": "648ac96dca6752b78c6849f1a25749c81057b19856c04838e470a3f693d62330",
+      "upstream_instructions_sha256": "7b661e0366dc613047c33321e939e7956aa8a7f66f82b8da93f7a0ca3b7ca0f6",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Kneeling Cable Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "61d4b281991db810fc37be8ad82c74597bb8d30f1d6c6e154fa4e107caddb45b",
+      "correction_sha256": "ed385260f01898fd16bc62b37d32ccc728116de6b9b35cac20dc7848f241c343",
+      "upstream_instructions_sha256": "3ff5a1be8bdcbb3eeabacb1bae612091f7f6d1820ee6e4c383150ceff16a02e2",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Lateral Raise - With Bands",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "e0c515fbf699e05c7cbda5b33fbd56977e3b8e114c1d68f2f2b68fcb37f07ec7",
+      "correction_sha256": "a02f74c1e1c2dc4aa6e267ede03dabb61762e101e989e9fcb7f492394f2d749b",
+      "upstream_instructions_sha256": "db1c262c4ec523021d185c16c2b90c8f6542b3a4e8a94a37627994f04a8643ed",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Low Cable Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "2a020733430a298b68a08084531ea9aecb7801e13eabd559fcb3be3aabeceb48",
+      "correction_sha256": "56033faf5f323a1a0775300fe3665dfe2c1881472eeb8413b5ba371f332a368c",
+      "upstream_instructions_sha256": "9b7f15dd4b6e394de6bacca530cd1836ec95f1a1ebdba1015d4d341aaea138e2",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Low Pulley Row To Neck",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "c6377fa82bd370c0978fc147605c2a41a39df608ffb1dca3a47d9d66104232f3",
+      "correction_sha256": "5eb45aefcb2ba0088871b909a3ec04a6522c2d0f8c0c2660ef35a0ccd10d09fc",
+      "upstream_instructions_sha256": "4ff86d47aa673d263f3d34820ef30ea6821718d88d4260b8dd98b0b4952619dc",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Lunge Pass Through",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "7933c49d828906125fda7a78af87211aa45be14243aeb25a6770d2b8097116bc",
+      "correction_sha256": "d1d1947a7471ac53fc7a88a518924695aeeb2f5d6fa2f1e084f02c3137667c95",
+      "upstream_instructions_sha256": "9155554efd6d173a3c2a2b4292e576739f3fccd006b60835e48a292bdb23e0c6",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Lying Cable Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "a3b0f1839171411b2b50b09bc76ffc98cdafef42aa6cb07c8ebb498497834b8c",
+      "correction_sha256": "5da37068ea959ca903c9b8fde9e496bbd3173418345d05fbeb418d647bd98d66",
+      "upstream_instructions_sha256": "0cd2ff70ca9dfc67e5951f6a4918a19e2de5a1373d0289bd84c65a09f0f71aab",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Lying Triceps Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "7974558e9f9e1b915e8a25df9b8bb8eccde161792bd9262f165809630c440d39",
+      "correction_sha256": "501fa45fbaac9840f33c452ab85aa650c577bdc40aa55d1ee8dc1d16bffdd5d5",
+      "upstream_instructions_sha256": "9067fff031763166a2bdc026079040b8aec35d485dec6f59913b10f75b95fb91",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "One Arm Dumbbell Bench Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "d0d6a83fc9f665cd708094d2259fe877b2329aa72f953c1dcba7b0927f58fe6c",
+      "correction_sha256": "7b5936fbdfeb17c02599586011c487fe3ad2113be47778d2dee724e95abc38b9",
+      "upstream_instructions_sha256": "907ce6306e69f599ff92a7fd665016091c423358c4c1ef7224c112db20f193d1",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "One-Arm High-Pulley Cable Side Bends",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "3496b8f9a157271639ec8525eac9172ab6c2c0442784de6a179e0812f956bfd0",
+      "correction_sha256": "6ced01e40af0b4894708514e7b9f790d534cbb2ed40b643539bf9733c7d0c4f8",
+      "upstream_instructions_sha256": "b9de7ec0848c7ee04844d5fdad6c23628399526c8cab3a42dfce3b3540e67256",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "One-Arm Kettlebell Floor Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "dc43704823fb67c5e3c7b739780b50ac1422344ea01c578a5c56fe02d40aa5c7",
+      "correction_sha256": "39e0ddafb98ac9f955e4389a72ff8f2ba4890994dcde53e3a425b44a1aa03c7e",
+      "upstream_instructions_sha256": "a2621618286ef9cd21ea0a5e2df380bb59f7db219eea2aa0b4c02fb51c742656",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Pallof Press With Rotation",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "42d9c32778c1e071e22930d00c19b2c116672ec32d8d80fa8810fcd0753b1b2c",
+      "correction_sha256": "69cd480344e0f7ef6d2d7fa7a272e04de0b07adbc23d8ffbdcd64dce664711b0",
+      "upstream_instructions_sha256": "7e2448f6c77dc493f5bf520a3755e6ae3a521159eed90423b27301e866f586fa",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Pin Presses",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "211efa5bcc93e24e84704a7c1f8cfc29b34412b412f2748b11ed48f9686e5e14",
+      "correction_sha256": "4806978501ff4b19a654cc8e407208516cb1892caea19055d8d5c30aeb65c92d",
+      "upstream_instructions_sha256": "743c175dba7da4b63e4ebe0e4d69248750e4a7854104952336f9ac60d2e26a72",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Push Up to Side Plank",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "7df0cf7f3d3371cbbc304958ad3ccf646bf82b02c580738d6f2904ced2d1084d",
+      "correction_sha256": "c043151f834bff21ffa7c6689ffa382f016ac6ad63942de4437ca30af6d79ff1",
+      "upstream_instructions_sha256": "f21820fc2f13fdf5b099c26e5bf194a8a994b13e5f28d178640327851a2bbafc",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Push-Up Wide",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "7144e1370acf56c4a57264efa6e2814ded6bd74b480f98a5c12d08f1a1f0ae6f",
+      "correction_sha256": "0ea26fe85b98cf6feedf17bd1f4fdf7cccd07a67cef64c2719109321c98eba78",
+      "upstream_instructions_sha256": "0900d5745391a20882eac3d9c71f77ac507ab0541f25398d66c76fe144ba9ffc",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Reverse Band Box Squat",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "c2c2833c2780b10d8cd577aca82071734b6c7c4b0c36560724c65bed6a7ba787",
+      "correction_sha256": "7be88a631a712355ef781bd1c17df78190fe2d6dcc427a53f60c18735318ec2c",
+      "upstream_instructions_sha256": "7c5145372643f44310ce6b553bee94492a97350e103aae54b6bbe4efd3e6fca8",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Reverse Band Deadlift",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "aa2a1f3022f5b81a77c4b62f7f439ed29d27cbeb17626a34e3472cc080da4b43",
+      "correction_sha256": "b5237479f4fd4b0525755dc7005a86f37fd774f949b2b78b176b3560a9200e0a",
+      "upstream_instructions_sha256": "a50703f6315845441401c0ac853d9ebe3c406fa8ae4f7ea7b0e2d7e37db0b290",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Reverse Band Sumo Deadlift",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "a7a7360933151d5cf3c2270527428dd9e41f23e277b0281b23a644324d6da705",
+      "correction_sha256": "d124d93c3b1349f30dd7b7c5414e976166f06ec4825e63bdd19f04f2f0517d43",
+      "upstream_instructions_sha256": "2760ae536b23f26f0fa578e83bc02fdbf4472f00eada956dfe371b68e008ea08",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Reverse Barbell Preacher Curls",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "9a8738fc3502b08ccd408189ce6e69f1082323cc9c8c838ee6c4a081cb3f5d1b",
+      "correction_sha256": "a26293eda58539ccf06a17533ff76f6b3c4de1fa42c3748fbe747fd3301cc60a",
+      "upstream_instructions_sha256": "989308a72968f01fd39d677800d57a12e38f5a32621ceeda0c98b2001fbee920",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Reverse Cable Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "dfeaa3ed2ec5e85ebc86f688c809ceaba005b11df1766d5dffb0c19c588bda51",
+      "correction_sha256": "ff304dbc94bd7e14e574cbdd5b2832cc253afe6783a25871e749f10ef33611a3",
+      "upstream_instructions_sha256": "271b551e5cc747af02ae587a39c6f787b4b5bb8dfab148f362abc32655d1654b",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Reverse Grip Triceps Pushdown",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "e78f5ce731a144bebfe06d39d6f05f6ff3357b1ed724f0d29087fa54312cf471",
+      "correction_sha256": "3c132876f1c927fcfc3cdbb3623eb4f0f779331629dff098eaa3f0ff08fd2800",
+      "upstream_instructions_sha256": "bcb879ccbe767f2ab59b0b748e4d6b12592d1e91309b443ba837c7ecf651c3a4",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Seated Bent-Over Rear Delt Raise",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "266e1bc7e779f4a6a7a4d226647ffc55b779a7a449af24e9fa6793ebf460941c",
+      "correction_sha256": "50943c8b8f37085ace45e56cc83a3f9cacd059c8b9b0b38a2bade95144463dec",
+      "upstream_instructions_sha256": "ec2d4a457be614700739fc3861937335199a05cbc11a00266eae12380e5a51a9",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Seated Cable Rows",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "3cb41a3720346a3f29714dc0666dbd7fac63736a396f613f635b40c85a1dcb9f",
+      "correction_sha256": "afe9ca5f8465652d011a1e532b65cdd6dc29a2881d92d63bc6322be044db72a4",
+      "upstream_instructions_sha256": "f64bbf6302157ce43bee18df2fe31dbb06464a62fee17eddceea3e31ed6fe3b1",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Seated Cable Shoulder Press",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "5df6880bb98f4c1fa5fa47cae8495f076dab43d70ba5373572ed751a9d28cac3",
+      "correction_sha256": "e498b354e3590a665bab07f977dcfa3e3afd54df1e95d226905afd1cb909573c",
+      "upstream_instructions_sha256": "dca6013d03419098333cf2a6cbad79e6db52a01c3f1b1eba16293b30aa523ba7",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Shoulder Press - With Bands",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "80813e06ffaf66fd31dff81dd217bb15d2b627f8f220e1d445b7b4e23c98652b",
+      "correction_sha256": "3fdd89fb167d8b4315e9ac3883e7b71c38eb2d5920f8d8604ec567c4583e4787",
+      "upstream_instructions_sha256": "998a0be1a8abbd5c8d25375ef7ca9596d671279754a9a4e294a439a7ce0cbdda",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Speed Box Squat",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "b7d2e750f2e3b6a8c741d7e0448f82c374149bd63939e4e029f76ac5208321be",
+      "correction_sha256": "cfef15d8c7c3f0f970948a2359bbb50462199a159244b611950e25d193a33d91",
+      "upstream_instructions_sha256": "c4b541b2332069fea57e8e3aac9757984cf88c7f1e2a2c5724a6a718ff962884",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Spider Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "95df3a845f6289e03140ed0cfdc52b00454fe0b63584fe4aa2ff3180549ff814",
+      "correction_sha256": "83ddbf234a555a16d3334450431b416016ef65b1b716f8b424c48248ac400dde",
+      "upstream_instructions_sha256": "b097edb1326d65f8d585074814f84a54d528ca5b0d46c48c2fc4cfafd6bec440",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Squat with Bands",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "6a764670a6265c62d8f6ddd3c19424297ec46b656316bf6a396a9f4038a4f71f",
+      "correction_sha256": "9482bae69699b32a150714f8b0f5f0dab671cab27f6cf05f4d73822946c68640",
+      "upstream_instructions_sha256": "67d6ff6550be3320c21d6b55201bddab4b987f86c95ded1ede5884084e225435",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Standing Biceps Cable Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "20f001b62e3f54492035d14df114f39a8157199bd43dc5f48097af0c3b159be1",
+      "correction_sha256": "a053907c2aee3315de43b5720f73aec9ab836cb9bcad2662527bb511fa5b8f2c",
+      "upstream_instructions_sha256": "838b524a6b16c99dc09c966b33632300b40e0e5edf5707a28ab5f853130cbbf9",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Standing Dumbbell Reverse Curl",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "cb1d113c2bbefd4ff4c9af6e2c1e5283ff1151670b09f0d413c84bf35b564c22",
+      "correction_sha256": "7d9feff5a6adb5d829f9eee91c48a6d5cc987c48d2d10edce3e11cc2c3b6a19a",
+      "upstream_instructions_sha256": "2fc6b1a2655c0e0257a592b474a050095abe53042fa7d51f4b00b2fca999826d",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Standing Dumbbell Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "98327acf9c3116d879afbf79872c3e46eebac27b3e6baa152cc375c340aede9f",
+      "correction_sha256": "d6f7c00b5f5ab9baeff625fbad6750e5366e9ffcc4fe4ca29ba20ef4bec3d748",
+      "upstream_instructions_sha256": "2069f60c5f107ea7020317d39945142ce777a397c79cdc19c7d6b8f28841cb6d",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Standing Overhead Barbell Triceps Extension",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "7bcd09d08f18531a545837e9ba3d27de886aca6454d3edf0aaab4b7ce4f39c77",
+      "correction_sha256": "315ad04f9a88f04e87c4de640005ce75158f7360681c74428aa7c2e0d16b8f05",
+      "upstream_instructions_sha256": "fd99779d94b98e6a8de454c2a72fc5eeda90ba35473715d91139ac43453b10bc",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Standing Rope Crunch",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "a838c5565e03f4522ef52691507cd7f70be162a46a1d4bf4b4d75bfcde71b102",
+      "correction_sha256": "23979df2d4b8851d84e3e4647083170f67f2b60c7fe9c1be35bd445440d78b15",
+      "upstream_instructions_sha256": "0f25b9ce5bc4ad29983af42a8c3a55cc6a3ae9edaf589dfbc2332d9d6dace67a",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Stiff Leg Barbell Good Morning",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "11fbe31eee0fd810d20cd72e4a4365e35b3e844237d0db1e161b485bbc1b83dc",
+      "correction_sha256": "d2072c507a629b321a0e364435c7e7db3f0872fff787769ae3b4b1acee60cb54",
+      "upstream_instructions_sha256": "f4baadd1c8073a10be92b5473a5677d35edc94e311e683b91d4f18083f5a067b",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Stiff-Legged Barbell Deadlift",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "0dae038f216036746b4488f1c3b5db9df5c34c00329b8e36106e50a17386fc80",
+      "correction_sha256": "e84bd29a0a62de08f38084a7e9f2a6f7d94450c2abcf2c0ff90b69dd3f090a8c",
+      "upstream_instructions_sha256": "b862fbf8b36dbb088600a6b2533d57597fcd752a4a8650e54148dc095433d739",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Sumo Deadlift with Bands",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "edc414051875b90ccab88a43552384ff9f752da3d17f0e95795fc20e4ef89bc1",
+      "correction_sha256": "eae92fe266e7f1995835de44352e58e367b3f11c37b0f212561a208e8280fc97",
+      "upstream_instructions_sha256": "1a7abb86a8d6c458c9a249c661249365c8fe64adbb8d3962e2f8455112d1d030",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Triceps Pushdown - Rope Attachment",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "593f83826d8a01077dcc3711df9a94d138033aaf81bdd7fa9cb84408165ff4b2",
+      "correction_sha256": "10c53514ee756ebf6d6ac95cf4581d93645f8fd397e1a863d5091f6c295bab64",
+      "upstream_instructions_sha256": "6cfd598469cc9c63bb2a01e9c3135265800722e8131a23755eee974938dab059",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Two-Arm Kettlebell Row",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "9064f7395c2fa023f0a2fd07ae1ef869a3128421195ccac19fb8f53d8112f0d9",
+      "correction_sha256": "2e99578adca1bc69faf307e6d396499ef806a4cd5e46ffbf2abda6134eef80ea",
+      "upstream_instructions_sha256": "1df96839e00d9579f1e7bf0f42a3110c8532cda4c38226154bce7bdf7b36c9a8",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Underhand Cable Pulldowns",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "8ddf30652527b526c67036ced372a59defcd1a6d534d7f68528c80d45e343f1d",
+      "correction_sha256": "0b51941b9b71f76097b6e31ff9db3a2d92c32667b723e673237038f0b920176a",
+      "upstream_instructions_sha256": "53d0dcaa0e2f9d83008ae23a0889e73282b8010192df86913590b63d3a9ca6a3",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Upright Barbell Row",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "453939161da3e2e276ae98191e74e366df62d7b51a577a450c5ce77290478970",
+      "correction_sha256": "49a0b143d24df8aef66c8c9211540f00dbc853f6f4158523436f6a87addd709e",
+      "upstream_instructions_sha256": "aed2ad893d147768dd286347a39a6ff6efd8cf249813f843b0a638ee4b6fa954",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Upright Cable Row",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "69992087d13ed55cb66580603de28def044c4071f37aa1f176e28e365909325c",
+      "correction_sha256": "a93e5116e04eed1ac3a17a1978aa76da533ae72c3ef5ecd383b2b03f5a3c6b99",
+      "upstream_instructions_sha256": "9321dce99ae7e62a59bd7bc520a388f0e549a61bc25ea12078639474e96a6aff",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Upright Row - With Bands",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "41a63c3eed7440baf20df54c6adb5ffcbabc7b17d4172363c6fb00f684c55112",
+      "correction_sha256": "ab39a89e9131e39b27b20c3efdbcc55b01e2c06098be2327e33d3416c6f2b61c",
+      "upstream_instructions_sha256": "5b3fd0ae82d1f33e3854d6541e5920468201f44053735c47b4d60113bdcdcd47",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "V-Bar Pullup",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "00c3a56f666de05970db370729f62a2f27b97819d428da1a15ad6f561dee414c",
+      "correction_sha256": "66f062c8643101f5802e4142cc182fcb1e3c8b43a385ce3639000b4cc4af117d",
+      "upstream_instructions_sha256": "3a042d4cced13c178a496f22ac4a732d64c46f01ace0cd9c03341a5804defa00",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Wide Stance Barbell Squat",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "8b0e76c7e43255128e3e49ff125e0985bd2d5465f8d3e3468b497b140ae99836",
+      "correction_sha256": "fd70964cf2561865bbdaa5772a9bf7c934e68c7c24b84af5aee9df4ecad7c1e0",
+      "upstream_instructions_sha256": "17fbcb8e3841eb91ee8a12427e0193a83bca63ab95c0788270b8af5e6d84e70e",
+      "changed_domains": [
+        "coaching"
+      ]
+    },
+    {
+      "name": "Wide-Grip Lat Pulldown",
+      "correction_version": 2,
+      "supersedes_v2_sha256": "5d1b7245b10c87a684d70147ed1c4548e91535ebcec5c4df0f9be634b7ed3fe0",
+      "correction_sha256": "22eee3050273cd4d23eadca8972d9e6c0a43651bfe1fbd3c6e0428c088fb36ea",
+      "upstream_instructions_sha256": "a8b4dfc4bb8afe5fd7e912c0e6e205ef192b27003fbe010389fb65a83d78a549",
+      "changed_domains": [
+        "coaching"
+      ]
+    }
+  ]
+}
