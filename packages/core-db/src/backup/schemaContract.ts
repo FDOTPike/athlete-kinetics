@@ -44,7 +44,7 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     migrationSlot: 65,
     tableCount: 106,
     objectCount: 181,
-    fingerprint: '17b90b6396b16acfd0ef6910751bccb00e1b109f94fe426ad511f9362dbb8ba3',
+    fingerprint: '3785bb0a5557dc3d488b5863e40602e17d0713575adb14c35fd6efeb54280198',
   },
   // Through 066_focus_and_goals — adds muscle groups, the movement muscle
   // mapping, the athlete's focus and SMART goals.
@@ -53,7 +53,7 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     migrationSlot: 66,
     tableCount: 114,
     objectCount: 198,
-    fingerprint: '158c306f0e25ffe6607dc4919302a3b272034dba8d1f040ba71a1e5607c37807',
+    fingerprint: '491c8ac536b220bacb3c61ef2979ced7b4a5515a0dad7c9f9adb72e68ddeb189',
   },
   // Through 067_sport_and_emphasis — adds the sport profile, the goal exercise
   // link and the frozen per-block emphasis explanation.
@@ -62,7 +62,7 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     migrationSlot: 67,
     tableCount: 117,
     objectCount: 203,
-    fingerprint: '147840e91129313ec7ce6690d8af0e0f774834219cfa9791be930831c4d1765e',
+    fingerprint: 'b2c6deabb8165cd6a2ebca99aa2744c3f10d7f20dd5f6680dcbcc24ae46ab500',
   },
 ];
 

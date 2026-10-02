@@ -3364,6 +3364,8 @@ const refusedRaw = (fn) => { try { fn(); return false; } catch { return true; } 
 
   d.executeSync(`UPDATE session_preparation SET status = 'in_progress', revision = revision + 1, updated_at_ms = 7001 WHERE session_id = ${liveId}`);
   d.executeSync(`UPDATE session_preparation_item SET status = 'done', performed_amount = 240, updated_at_ms = 7002 WHERE session_id = ${liveId}`);
+  check('065 a write that names only timestamps still has to advance the revision',
+    refused(d, `UPDATE session_preparation SET updated_at_ms = 7002 WHERE session_id = ${liveId}`));
   check('065 a started protocol never returns to pending',
     refused(d, `UPDATE session_preparation SET status = 'pending', revision = revision + 1 WHERE session_id = ${liveId}`));
   check('065 an outcome needs its finish time',
@@ -3371,6 +3373,10 @@ const refusedRaw = (fn) => { try { fn(); return false; } catch { return true; } 
   d.executeSync(`UPDATE session_preparation SET status = 'completed', revision = revision + 1, updated_at_ms = 7003, finished_at_ms = 7003 WHERE session_id = ${liveId}`);
   check('065 a recorded outcome is final',
     refused(d, `UPDATE session_preparation SET status = 'skipped', revision = revision + 1 WHERE session_id = ${liveId}`));
+  check('065 a recorded outcome accepts no further write, even under the same status',
+    refused(d, `UPDATE session_preparation SET finished_at_ms = 9000, updated_at_ms = 9000, revision = revision + 1 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation SET updated_at_ms = 9000 WHERE session_id = ${liveId}`)
+      && Number(d.raw.prepare('SELECT finished_at_ms AS f FROM session_preparation WHERE session_id = ?').get(liveId).f) === 7003);
   check('065 item records close with their protocol',
     refused(d, `UPDATE session_preparation_item SET status = 'modified', performed_amount = 100, updated_at_ms = 7004 WHERE session_id = ${liveId}`));
   check('065 preparation never wrote a set_record row',

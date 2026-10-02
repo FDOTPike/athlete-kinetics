@@ -19,5 +19,12 @@ Run 2026-10-02 with `node scripts/coaching/negative-controls-wo1.mjs`. Each muta
 | M13 a finished session may acquire preparation (live-session guard dropped) | detected | FAIL  065 refuses a protocol for a FINISHED session (no fabricated history)<br>FAIL  065 accepts a pending protocol for a live session |
 | M14 staged restore copies are not checked against their source schema fingerprint | detected | FAIL apps/mobile/test/components/BackupForwardRestore.test.js (53.828 s)<br>× a "v63" database with a dropped index is not the v63 schema and fails closed before any migration (5718 ms) |
 | M15 a migrated copy is accepted without matching the current schema | detected | FAIL apps/mobile/test/components/BackupForwardRestore.test.js (52.436 s)<br>× a v63 portable backup restores: validated as v63, forward-migrated in isolation, installed at the current schema (6135 ms) |
+| M16 a longer session is offered without planning the block at that length | detected | FAIL  the offered length is one at which the regenerated block has no conflict  [[{"kind":"extend_session","capMin":45}]]<br>FAIL  every conflict message names the verified length, never the derived one  [The conditioning session needs about 33 minutes (5 min preparation + 2<br>FAIL  every offer in the profile domain is longer than the current limit and fits when the block is planned as offered  [143 offers endurance f=6 cap= |
+| M17 the transition guard only fires when status or revision is named | detected | FAIL  065 a write that names only timestamps still has to advance the revision<br>FAIL  065 a recorded outcome accepts no further write, even under the same status |
+| M18 a recorded outcome can still be rewritten under the same status | detected | FAIL  065 a recorded outcome accepts no further write, even under the same status |
 
-15 of 15 mutations detected.
+18 of 18 mutations detected.
+
+M16–M18 were added with the fixes for the review of pull request 22 (see
+"Review of pull request 22" in `WO1_PREPARATION.md`); M1–M15 are from the
+original run.

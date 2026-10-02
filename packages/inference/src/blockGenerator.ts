@@ -84,12 +84,12 @@ import { DEFAULT_ADVANCEMENT_POLICY } from './progressionEngine';
 import {
   SESSION_TIME_CONTRACT_VERSION,
   describeSessionTimeConflict,
-  feasibleSessionAlternatives,
   fitSessionToCap,
   normalizedCapMin,
   preparationPlanningMinutes,
   slotBudgetForCap,
   type SessionTimeAlternative,
+  type SessionTimeEstimate,
 } from './sessionTimeBudget';
 
 // ---------------------------------------------------------------------------
@@ -840,6 +840,54 @@ const pickEmphasisCandidate = (
 // Generator
 // ---------------------------------------------------------------------------
 export function generateBlock(input: BlockInput): BlockPlan {
+  return planBlock(input, true);
+}
+
+/**
+ * The offers shown for a block whose sessions cannot fit the session limit.
+ *
+ * A longer session is not the same plan with more room: the generator gives it
+ * more movements and a larger preparation allowance. So an offer is VERIFIED —
+ * the block is planned again exactly as offered and the offer is made only
+ * when that plan has no time conflict of its own. Candidates are the lengths
+ * the athlete can actually choose (15-minute steps up to 240), smallest first.
+ * "Fewer, longer sessions" keeps the weekly training time and is verified the
+ * same way, on the default schedule for the smaller number of days.
+ */
+function verifiedSessionAlternatives(
+  input: BlockInput, capMin: number, requiredMin: number, frequency: number,
+): readonly SessionTimeAlternative[] {
+  const conflictFree = (candidate: BlockInput): boolean => {
+    try {
+      return planBlock(candidate, false).timeBudget.conflicts.length === 0;
+    } catch {
+      return false;
+    }
+  };
+  const first = Math.max(Math.ceil(requiredMin / 15) * 15, (Math.floor(capMin / 15) + 1) * 15);
+  for (let candidateCap = first; candidateCap <= 240; candidateCap += 15) {
+    if (!conflictFree({ ...input, profile: { ...input.profile, session_duration_cap_min: candidateCap } })) continue;
+    const offers: SessionTimeAlternative[] = [{ kind: 'extend_session', capMin: candidateCap }];
+    const fewerDays = Math.floor((frequency * capMin) / candidateCap);
+    if (fewerDays >= 1 && fewerDays < frequency) {
+      // The athlete's chosen days describe the CURRENT number of days; the
+      // offer is judged on the default schedule for the smaller number.
+      const { programDays: _programDays, ...withoutDays } = input;
+      if (conflictFree({
+        ...withoutDays,
+        profile: { ...input.profile, weekly_frequency: fewerDays, session_duration_cap_min: candidateCap },
+      })) {
+        offers.push({ kind: 'fewer_longer_sessions', weeklyFrequency: fewerDays, capMin: candidateCap });
+      }
+    }
+    return offers;
+  }
+  return [];
+}
+
+/** `verifyAlternatives` is false only for the re-plans made while verifying an
+ *  offer, so verification never recurses. */
+function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
   const { profile, startDate } = input;
   const schemaType: SchemaType = input.schemaType ?? 'LINEAR';
   const macroBlockIndex = clamp(Math.round(input.macroBlockIndex ?? 1), 1, MACRO_BLOCKS);
@@ -1555,6 +1603,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
   const movementById = new Map(input.movements.map((movement) => [movement.movement_id, movement]));
   const sessionTimes: PlannedSessionTime[] = [];
   const conflicts = new Set<string>();
+  const pendingConflicts: { label: string; estimate: SessionTimeEstimate }[] = [];
   let worstRequiredMin = 0;
   for (const session of sessions) {
     const deloadSession = session.phase === 'deload';
@@ -1597,14 +1646,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
     }
     if (!fit.feasible) {
       worstRequiredMin = Math.max(worstRequiredMin, fit.estimate.totalMin);
-      conflicts.add(describeSessionTimeConflict({
-        label: `The ${session.focus} session`,
-        capMin,
-        estimate: fit.estimate,
-        alternatives: feasibleSessionAlternatives({
-          capMin, requiredMin: fit.estimate.totalMin, weeklyFrequency: frequency,
-        }),
-      }));
+      pendingConflicts.push({ label: `The ${session.focus} session`, estimate: fit.estimate });
     }
     sessionTimes.push({
       week_index: session.week_index,
@@ -1617,6 +1659,17 @@ export function generateBlock(input: BlockInput): BlockPlan {
       feasible: fit.feasible,
       overByMin: fit.overByMin,
     });
+  }
+
+  // One verified set of offers for the whole block: every conflict message
+  // names the same options, and each option has been planned and found to fit.
+  const timeAlternatives = worstRequiredMin === 0 || !verifyAlternatives
+    ? []
+    : verifiedSessionAlternatives(input, capMin, worstRequiredMin, frequency);
+  for (const pending of pendingConflicts) {
+    conflicts.add(describeSessionTimeConflict({
+      label: pending.label, capMin, estimate: pending.estimate, alternatives: timeAlternatives,
+    }));
   }
 
   // Work order 3: say what the emphasis changed and what it could not.
@@ -1701,9 +1754,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
       capMin,
       sessions: sessionTimes,
       conflicts: [...conflicts].sort(),
-      alternatives: worstRequiredMin === 0 ? [] : [...feasibleSessionAlternatives({
-        capMin, requiredMin: worstRequiredMin, weeklyFrequency: frequency,
-      })],
+      alternatives: [...timeAlternatives],
     },
     ...(emphasisReport === undefined ? {} : { emphasis: emphasisReport }),
   };
