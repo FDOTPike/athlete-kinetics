@@ -61,8 +61,8 @@ unchanged, and the new verifier compares JSON). When present it changes:
 | Weekly allocation | One accessory slot a week per pattern may go to an emphasised muscle with no direct work yet. | Only the last accessory slot; the displaced movement must be trained another day; never the first two slots; nothing added beyond the slot budget. |
 | Goal exercise | The exercise a goal names takes its pattern's slot, or one spare accessory slot a week. | Only from the gated pool; below the athlete's explicit slot choice. |
 | Competition lifts | Powerlifting promotes squat, bench and deadlift as main lifts on any objective. | Loaded-first mode only (not beginners or rehab); gates apply. |
-| Dose | 3–4 sport sessions a week: one set off each accessory. 5+: two sets, never below one. | Strength days, weeks 1–3; never main lifts, never the deload. |
-| Progression | 5+ sport sessions: week 3 repeats week 2. | Nothing is ever raised. |
+| Dose | 3–4 sport sessions a week: one set off each accessory. 5+: two sets, never below one. | Strength days, weeks 1–3; never a set off a main lift, never the deload. |
+| Progression | 5+ sport sessions: week 3 repeats week 2, for every exercise including the main lifts. | Nothing is ever raised. |
 
 Safety, capability, equipment, tier and time are structurally ahead of all of
 it: the emphasis only ever reads the pool that has already passed them, and
@@ -160,12 +160,14 @@ Full integrated `npm run verify:ci`:
 | --- | --- |
 | Development lineage, the work order 3 commit, separate clean checkout | exit 0 (25 gates there; 77 suites, 1701 tests) |
 | Development lineage, with both later fixes | exit 0 (78 suites, 1710 tests) |
-| Published branch at its first published tip, hosted CI on pull request 24 | "Verification suite (23 gates + typecheck)" passed |
+| Published branch at its first published tip (`71dd6b7b`), hosted CI on pull request 24 | "Verification suite (23 gates + typecheck)" passed |
 | Top of the published stack (all four work orders), local | exit 0 (23 gates; 55 suites, 877 tests) |
 
 This branch's own tip was **not** run through the full local `verify:ci` on
-the published base; the hosted run on pull request 24 is that check
-(`claude/coaching-wo3-sport-programming`).
+the published base. The hosted result above is for the first published tip
+(`71dd6b7b`) only. Commits made after it are not verified by this record: the
+hosted run on the current tip of pull request 24 is the check for them, and
+this record does not claim its result.
 
 Negative controls (`scripts/coaching/negative-controls-wo3.mjs`): the first
 complete run detected 32 of 35. The three misses were weaknesses in the tests
@@ -183,7 +185,7 @@ covered by the others.
 
 The negative-control script was later made stricter (a gate must pass
 unmutated, and must report a failure of its own under the mutation) and
-re-run in full: 38 of 38 detected.
+re-run in full: 38 of 38 detected; with the control added for the review below, 39 of 39.
 
 ### What the real store showed that the pure verifier could not
 
@@ -194,3 +196,14 @@ the front squat is **not** planned for a new athlete, and the explanation
 says "it is not available to you right now". That is the gate working, and
 the store tests assert it. The store tests therefore compare plans with a
 control athlete (same profile, nothing set) instead of with fixed names.
+
+## Review of pull request 24
+
+CodeRabbit raised three findings. Each was checked against the code. All
+three were valid.
+
+| Finding | Verdict | What was done |
+| --- | --- | --- |
+| At five or more sport sessions the plan told the athlete "Your main lifts are unchanged", but the week-3 hold applies to every exercise, main lifts included. | **Valid: the sentence was false**, and it is frozen into the block's stored explanation. The behaviour is the intended one. | The text now says week 3 repeats week 2 for every exercise, main lifts included, and that the main lifts keep their exercises and their sets. The doc comment and the provenance document say the same. A new check asserts both the wording and the engine fact it describes. |
+| The negative-control script exited 0 when a control was not detected, an anchor was missing or a rebuild failed (rated major). | **Valid, in all four scripts.** | Each script now exits non-zero in those cases, and when no mutation matched. |
+| The record said the hosted run "is that check" for this branch, while the passing run it cited was for the first published tip. | **Valid.** | The hosted result is scoped to the tip it ran on; later commits are stated as not verified by this record. |

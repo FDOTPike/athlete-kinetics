@@ -330,6 +330,13 @@ const mutations = [
     to: `          report={null}`,
     gate: jest('SportScreens.test.js'),
   },
+  {
+    name: 'E36 a very full sport week is described as leaving the main lifts unchanged',
+    file: 'packages/inference/src/sportProfile.ts',
+    from: ` — for every exercise, your main lifts included. Your main lifts keep their exercises and their sets.`,
+    to: `. Your main lifts are unchanged.`,
+    gate: PURE,
+  },
 ];
 
 // A mutation is "detected" only when (a) its gate passes WITHOUT the mutation
@@ -379,7 +386,17 @@ for (const mutation of mutations) {
   results.push({ name: mutation.name, outcome, exit: result.status, sample: evidence });
   console.log(JSON.stringify(results.at(-1)));
 }
+// The rebuilds restore the unmutated verifier outputs; a failed one is a failed run.
+const rebuilds = [];
 // Rebuild the unmutated verifier outputs.
-run(BUILD);
-run(MIG_BUILD);
+rebuilds.push(run(BUILD).status);
+rebuilds.push(run(MIG_BUILD).status);
 console.log('SUMMARY', JSON.stringify(results.map((row) => [row.name, row.outcome])));
+// A run that did not detect everything, could not apply a mutation, matched no
+// mutation at all, or could not rebuild must not look like a pass to a caller.
+const undetected = results.filter((row) => row.outcome !== 'detected');
+const rebuildFailed = rebuilds.some((status) => status !== 0);
+if (results.length === 0 || undetected.length > 0 || rebuildFailed) {
+  console.error(`NEGATIVE CONTROLS FAILED: ${undetected.length} of ${results.length} not detected${rebuildFailed ? '; a rebuild failed' : ''}${results.length === 0 ? '; no mutation matched' : ''}`);
+  process.exitCode = 1;
+}

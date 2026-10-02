@@ -103,10 +103,13 @@ workload is sessions per week, with known minutes shown beside it.
 | 0 | none; the athlete is told how to add sessions |
 | 1–2 | none, and the plan says so |
 | 3–4 | one set fewer on each accessory of strength days (weeks 1–3) |
-| 5 or more | two sets fewer (never below one), and week 3 repeats week 2 |
+| 5 or more | two sets fewer on each accessory (never below one), and week 3 repeats week 2 for every exercise, main lifts included |
 
-Main lifts, the deload week, sport/conditioning days and movement selection
-are never changed by workload, and nothing is ever raised. With the hybrid
+Workload never takes a set off a main lift, never changes which movements are
+planned, and never touches the deload week or a sport/conditioning day. The
+one thing it does to the main lifts is the week-3 hold at five or more
+sessions: they repeat week 2 instead of stepping up, like the rest of the
+session. Nothing is ever raised. With the hybrid
 objective the larger of the hybrid tax and the workload cut applies; they are
 not added.
 

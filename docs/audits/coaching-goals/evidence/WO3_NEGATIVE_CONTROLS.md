@@ -44,8 +44,9 @@ A mutation is **detected** only when its gate passes without the mutation (each 
 | E33 "not sure" is sent to the store as zero | detected | FAIL apps/mobile/test/components/SportScreens.test.js (14.757 s)<br>× "another sport" is a supported answer in the athlete's own words (256 ms) |
 | E34 the sport screen is part of the interview for everyone | detected | FAIL apps/mobile/test/components/OnboardingFocusGoal.test.js (12.665 s)<br>× asks the exact question and starts from balanced whole body (4755 ms)<br>× focus only: eight screens, no target screen, and only the focus is saved (147 ms) |
 | E35 the program preview does not show the explanation | detected | FAIL apps/mobile/test/components/SportScreens.test.js (14.761 s)<br>× the program preview shows what focus and sport change, and what they cannot, before the plan is created (138 ms) |
+| E36 a very full sport week is described as leaving the main lifts unchanged | detected | FAIL  every effect explains itself and says truthfully what happens to the main lifts |
 
-38 of 38 mutations detected.
+39 of 39 mutations detected.
 
 ## What the first run found
 
@@ -57,7 +58,7 @@ The first complete run, on the work order 3 commit, detected 32 of 35. The three
 | E8 the hybrid tax and the sport workload cut are added together | NOT DETECTED | No test planned a block where both cuts were non-zero, so "larger of" and "sum" gave the same plan. | The verifier now plans a block that pays the hybrid tax and asserts that a high sport week takes no further set. |
 | E11 a held movement (135/187) can be newly prescribed by the emphasis | NOT DETECTED | In every tested pool a better candidate existed, so the held movements were never the engine's choice with or without the rule. | The verifier now corners the pool so 135 and 187 are the only candidates for the focus, and asserts they are neither swapped in nor given a slot and that the athlete is told nothing passed the checks. E11b covers the swap path separately. |
 
-Every row in the table above is from one later full run with the stricter harness, made after all of these fixes (E6 was re-run on its own once its anchor was repaired; see below).
+Every row in the table above is from one later full run with the stricter harness, made after all of these fixes (E6 was re-run on its own once its anchor was repaired, and E36 was added afterwards; see below).
 
 ## What the independent review found
 
