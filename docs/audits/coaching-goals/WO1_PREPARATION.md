@@ -127,3 +127,21 @@ No existing routine or pipeline assertion had to be loosened.
   animation lane's.
 - Sport-specific preparation (for example a Muay Thai or football warm-up) is
   added with sport selection in work order 3; this policy is the general one.
+
+## Review of pull request 22
+
+CodeRabbit reviewed the published branch and raised four findings. Each was
+checked against the code before anything was changed. All four were valid.
+
+| Finding | Verdict | What was done |
+| --- | --- | --- |
+| A longer session is offered from the current session's estimate, without planning the block at that length. | **Valid, and a real defect.** A probe over the profile domain on the real library found 540 of 1,287 offers were still infeasible once the block was planned as offered: a longer session gets more movements and a larger preparation allowance, and timed sport rounds cannot be trimmed. An athlete who followed the offer met a second refusal. | Offers are now verified: the block is planned at each selectable length, smallest first, and an offer is made only when that plan has no time conflict. "Fewer, longer sessions" is verified the same way. Every conflict message names the same verified options. A crossing fixture (30 to 45 minutes, where the session gains its second movement) and a domain-wide property check were added. The routine microcycle is unchanged: its content is the athlete's own and does not grow with the limit. |
+| The transition trigger fires only when a statement names `status` or `revision`, and lets a finished row take a new finish time. | **Valid.** The comment above the trigger promised more than it enforced. The store never does either thing, so no behaviour was wrong, but the database is the last guard and 065 can no longer be changed once it ships. | The trigger now fires on every update, requires the revision to advance by exactly one, and refuses any write to a row with a recorded outcome. The v64 schema fingerprint was re-pinned (065 has not shipped; no backup carries the old value). Two migration checks added. |
+| `AGENT_WORKFLOW.md` said 23 gates but listed 22. | **Valid.** | `preparation` added to the list, in `package.json` order. |
+| The ledger entry said 0192 follows 0191 "in every local/remote ref", which contradicts the published ledger ending at 0135. | **Valid.** | Reworded: the number is the development lineage's. |
+
+Negative controls M16–M18 cover the two code fixes: 18 of 18 detected.
+
+CodeRabbit's docstring-coverage warning (63%, threshold 80%) was not acted on:
+the repository has no such rule, and the functions it counts are documented
+where the intent is not obvious from the name.

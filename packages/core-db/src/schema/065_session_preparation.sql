@@ -124,10 +124,14 @@ END;
 
 -- Every accepted write advances the revision by exactly one, an outcome is
 -- final once recorded, and a started protocol never returns to pending.
+-- The guard fires on ANY update, whatever columns the statement names, so a
+-- write that touches only the timestamps cannot slip past it, and a row with
+-- a recorded outcome accepts no further write at all (not even a new finish
+-- time under the same status).
 CREATE TRIGGER IF NOT EXISTS trg_session_preparation_transition_bu
-BEFORE UPDATE OF status, revision ON session_preparation
+BEFORE UPDATE ON session_preparation
 WHEN NEW.revision <> OLD.revision + 1
-  OR (OLD.status NOT IN ('pending','in_progress') AND NEW.status <> OLD.status)
+  OR OLD.status NOT IN ('pending','in_progress')
   OR (OLD.status = 'in_progress' AND NEW.status = 'pending')
 BEGIN
   SELECT RAISE(ABORT, 'session_preparation: invalid status or revision transition');

@@ -72,8 +72,8 @@ npm run verify:release   # verify:ci + memory contract [A]/[D] + REAL candidate 
 ```
 verify:ci gates: db, demo, migrations, policy, blocks, autopilot,
 autopilot-counterexamples, biometrics, semantic, embedder, qa-artifact, store,
-coach, backup, memory-fixtures, progression, pipeline, runner, outcomes, library,
-coaching-content-generator, components (+ typecheck).
+coach, backup, memory-fixtures, progression, pipeline, runner, outcomes,
+preparation, library, coaching-content-generator, components (+ typecheck).
 verify:release adds: memory-contract ([A] ratified envelope, [D] measured device
 evidence, [G] evidence provenance — the packet must be re-derivable from its own
 sealed raw logcat/meminfo bytes, closing the fabricated-packet hole Hermes

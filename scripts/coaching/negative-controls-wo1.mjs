@@ -154,6 +154,31 @@ const mutations = [
     to: `    if (!quickCheck(handle)) throw new Error(failureMessage);`,
     gate: jest('BackupForwardRestore.test.js'),
   },
+  {
+    name: 'M16 a longer session is offered without planning the block at that length',
+    file: 'packages/inference/src/blockGenerator.ts',
+    from: `    if (!conflictFree({ ...input, profile: { ...input.profile, session_duration_cap_min: candidateCap } })) continue;`,
+    to: '',
+    gate: `${BUILD} && node packages/inference/test/verify_session_time.mjs`,
+  },
+  {
+    name: 'M17 the transition guard only fires when status or revision is named',
+    file: 'packages/core-db/src/schema/065_session_preparation.sql',
+    from: `BEFORE UPDATE ON session_preparation
+WHEN NEW.revision <> OLD.revision + 1`,
+    to: `BEFORE UPDATE OF status, revision ON session_preparation
+WHEN NEW.revision <> OLD.revision + 1`,
+    gate: MIG,
+  },
+  {
+    name: 'M18 a recorded outcome can still be rewritten under the same status',
+    file: 'packages/core-db/src/schema/065_session_preparation.sql',
+    from: `  OR OLD.status NOT IN ('pending','in_progress')
+  OR (OLD.status = 'in_progress' AND NEW.status = 'pending')`,
+    to: `  OR (OLD.status NOT IN ('pending','in_progress') AND NEW.status <> OLD.status)
+  OR (OLD.status = 'in_progress' AND NEW.status = 'pending')`,
+    gate: MIG,
+  },
 ];
 
 const only = process.argv[2];
