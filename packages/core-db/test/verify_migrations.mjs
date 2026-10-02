@@ -66,7 +66,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '064_accessible_coach_support.sql',
   '065_session_preparation.sql',
   '066_focus_and_goals.sql',
-  '067_sport_and_emphasis.sql'];
+  '067_sport_and_emphasis.sql',
+  '068_movement_content_correction_v2.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -726,9 +727,12 @@ const correctionSummary = (db) => db.raw.prepare(`
     (SELECT d.video_placeholder_uri FROM movement_detail d JOIN movement m USING(movement_id)
       WHERE m.name = 'Kettlebell Turkish Get-Up') AS canonicalTguUrl
 `).get();
+// 068 appends its own provenance at version 2 beside these, so on a complete
+// chain the table holds the 32 v1 rows plus the 115 v2 rows.
+const V2_CORRECTIONS = 115;
 const correctionComplete = (db) => {
   const s = correctionSummary(db);
-  return s.corrections === 32 && s.v1 === 32 && s.scoped === 2 && s.boards === 1
+  return s.corrections === 32 + V2_CORRECTIONS && s.v1 === 32 && s.scoped === 2 && s.boards === 1
     && s.tguPattern === 'rotation' && s.tguCategory === 'core'
     && s.canonicalTguUrl === 'https://www.youtube.com/watch?v=lpltjWHd0ek';
 };
@@ -1760,11 +1764,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 66 files (slots 001-067, no 004) -> user_version 66. This count is
+    // 67 files (slots 001-068, no 004) -> user_version 67. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 067 (sport profile and block emphasis).
-    check('fresh install reaches user_version 66 (66 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 66,
+    // silent one. Re-pinned for 068 (content correction v2).
+    check('fresh install reaches user_version 67 (67 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 67,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -3764,8 +3768,8 @@ const snapshot067 = (db) => JSON.stringify({
   applyRaw(before, MIGRATIONS, 0, IDX_067);
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
-  check('067 is appended after 066 and completes the chain',
-    IDX_067 === MIGRATIONS.length - 1 && IDX_067 === 65 && uv(d) === 66, `index=${IDX_067} uv=${uv(d)}`);
+  check('067 is appended directly after 066',
+    IDX_067 === 65 && FILES[IDX_067 - 1] === '066_focus_and_goals.sql' && uv(d) === MIGRATIONS.length, `index=${IDX_067} uv=${uv(d)}`);
   check('067 installs every table and the immutability guard',
     TABLES_067.every((name) => tableSql(d, name) !== undefined) && triggerPresent(d, 'trg_block_emphasis_immutable_bu'));
   check('067 fresh install records no sport, goal link or block explanation',
@@ -3902,6 +3906,117 @@ const snapshot067 = (db) => JSON.stringify({
       !runnerSrc067.slice(runnerSrc067.indexOf('const REPLAY_BLOCKING_TRIGGERS')).includes('trg_block_emphasis_immutable_bu')
         && !/training_block|athlete_goal\b/.test(MIGRATIONS[IDX_067].slice(MIGRATIONS[IDX_067].indexOf('CREATE TRIGGER'))));
   }
+}
+
+// --- 068 movement content correction v2 ----------------------------------------
+// Coaching text only, on 115 seeded movements, appended after every migration
+// that seeds or corrects movement text. These checks pin: what it may touch;
+// that it lands on upgrade and survives every replay; that movements 135 and
+// 187 are untouched; and that a database which skipped it is detected.
+console.log('[068] movement content correction v2');
+const IDX_068 = FILES.indexOf('068_movement_content_correction_v2.sql');
+const libraryText = (db) => new Map(db.raw.prepare(`
+  SELECT m.movement_id AS id, m.name, d.instructions, d.cues, i.coaching_intent AS intent
+  FROM movement m JOIN movement_detail d USING(movement_id)
+  LEFT JOIN movement_coaching_intent i USING(movement_id) ORDER BY m.movement_id`).all().map((row) => [row.id, row]));
+const libraryRest = (db) => JSON.stringify({
+  movement: db.raw.prepare('SELECT * FROM movement ORDER BY movement_id').all(),
+  detail: db.raw.prepare('SELECT movement_id, base_name, supported_prefixes, difficulty_rating, target_muscles, video_placeholder_uri FROM movement_detail ORDER BY movement_id').all(),
+  taxonomy: db.raw.prepare('SELECT * FROM movement_taxonomy ORDER BY movement_id').all(),
+  equipment: db.raw.prepare('SELECT * FROM movement_equipment ORDER BY movement_id, item').all(),
+  media: db.raw.prepare('SELECT * FROM movement_media ORDER BY movement_id').all(),
+  roles: db.raw.prepare('SELECT * FROM movement_muscle_role ORDER BY movement_id, muscle_group_id').all(),
+  v1: db.raw.prepare('SELECT * FROM movement_content_correction WHERE correction_version = 1 ORDER BY movement_id').all(),
+});
+const v2Rows = (db) => db.raw.prepare('SELECT movement_id FROM movement_content_correction WHERE correction_version = 2 ORDER BY movement_id').all().map((row) => row.movement_id);
+const isTemplate = (row) => row.instructions.startsWith(`Set up ${row.name} with `);
+
+{
+  const before = freshDb();
+  applyRaw(before, MIGRATIONS, 0, IDX_068);
+  const after = freshDb();
+  runMigrations(after, MIGRATIONS);
+  const textBefore = libraryText(before);
+  const textAfter = libraryText(after);
+  const changed = [...textAfter.values()].filter((row) => {
+    const old = textBefore.get(row.id);
+    return old.instructions !== row.instructions || old.cues !== row.cues || old.intent !== row.intent;
+  });
+  const corrected = new Set(v2Rows(after));
+  check('068 is appended after 067 and completes the chain',
+    IDX_068 === MIGRATIONS.length - 1 && IDX_068 === 66 && uv(after) === 67, `index=${IDX_068} uv=${uv(after)}`);
+  check('068 corrects exactly 115 movements and records each one at version 2',
+    corrected.size === V2_CORRECTIONS && changed.length === V2_CORRECTIONS && changed.every((row) => corrected.has(row.id)),
+    `provenance=${corrected.size} changed=${changed.length}`);
+  check('every corrected movement had the shared template before, and has specific text after',
+    changed.every((row) => isTemplate(textBefore.get(row.id)) && !isTemplate(row)));
+  check('every corrected movement changed all three coaching fields and none is left empty',
+    changed.every((row) => {
+      const old = textBefore.get(row.id);
+      return old.instructions !== row.instructions && old.cues !== row.cues && old.intent !== row.intent
+        && row.instructions.length > 60 && row.cues.length > 10 && row.intent.length > 10;
+    }));
+  check('068 writes coaching text ONLY: names, ids, aliases, difficulty, targets, taxonomy, equipment, media, muscle mapping and v1 provenance are byte-identical',
+    libraryRest(after) === libraryRest(before));
+  check('movements 135 and 187 are not touched (they belong to the animation lane)',
+    !corrected.has(135) && !corrected.has(187)
+      && JSON.stringify(textAfter.get(135)) === JSON.stringify(textBefore.get(135))
+      && JSON.stringify(textAfter.get(187)) === JSON.stringify(textBefore.get(187))
+      && /Incline Shoulder Raise/.test(textAfter.get(135).name) && /Incline Shoulder Raise/.test(textAfter.get(187).name));
+  check('no movement corrected by 049 is corrected again',
+    Number(after.raw.prepare(`SELECT COUNT(*) AS c FROM movement_content_correction a
+      JOIN movement_content_correction b USING(movement_id) WHERE a.correction_version = 1 AND b.correction_version = 2`).get().c) === 0);
+  check('the remaining template rows are exactly the ones deliberately held',
+    [...textAfter.values()].filter(isTemplate).length === 144 - V2_CORRECTIONS,
+    String([...textAfter.values()].filter(isTemplate).length));
+
+  // Upgrade from the shipped pre-068 state with athlete data in place.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_068);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-09-10', 1111, 55.5)");
+  const correctedId = [...corrected][0];
+  upgrade.raw.prepare('INSERT INTO set_record (session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (1, ?, 1, 8, 20, 7, 2222)').run(correctedId);
+  const history = () => JSON.stringify([upgrade.raw.prepare('SELECT * FROM session').all(), upgrade.raw.prepare('SELECT * FROM set_record').all()]);
+  const historyBefore = history();
+  runMigrations(upgrade, MIGRATIONS);
+  check('068 clean upgrade reaches the latest version with no missing sentinel',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0,
+    `uv=${uv(upgrade)} missing=${sentinelsMissing(upgrade).join(',')}`);
+  check('an upgraded database reads exactly the fresh-install text',
+    JSON.stringify([...libraryText(upgrade).values()]) === JSON.stringify([...textAfter.values()]));
+  check('logged history that references a corrected movement is untouched', history() === historyBefore);
+
+  // Replays.
+  const final = JSON.stringify([...textAfter.values()]);
+  runMigrations(after, MIGRATIONS);
+  check('068 is a no-op on a normal reboot', JSON.stringify([...libraryText(after).values()]) === final && v2Rows(after).length === V2_CORRECTIONS);
+  after.executeSync(`PRAGMA user_version = ${IDX_068};`);
+  runMigrations(after, MIGRATIONS);
+  check('068 replays idempotently from its own boundary (no duplicate provenance rows)',
+    JSON.stringify([...libraryText(after).values()]) === final && v2Rows(after).length === V2_CORRECTIONS && uv(after) === MIGRATIONS.length);
+  after.executeSync('PRAGMA user_version = 0;');
+  runMigrations(after, MIGRATIONS);
+  check('a full re-apply from 0 leaves the v2 text asserted last, not the template',
+    JSON.stringify([...libraryText(after).values()]) === final && v2Rows(after).length === V2_CORRECTIONS);
+
+  // Poisoned user_version: claims the latest chain while 068 never applied.
+  const poisoned = freshDb();
+  applyRaw(poisoned, MIGRATIONS, 0, IDX_068);
+  poisoned.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+  const detected = sentinelsMissing(poisoned).includes('movement_content_correction v2');
+  runMigrations(poisoned, MIGRATIONS);
+  check('a database that claims the latest version but never applied 068 is detected and healed',
+    detected && sentinelsMissing(poisoned).length === 0
+      && JSON.stringify([...libraryText(poisoned).values()]) === final);
+  // Lost provenance rows (text may or may not have survived): detected and re-applied.
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DELETE FROM movement_content_correction WHERE correction_version = 2 AND movement_id IN (SELECT movement_id FROM movement_content_correction WHERE correction_version = 2 LIMIT 3)');
+  const lostDetected = sentinelsMissing(lost).includes('movement_content_correction v2');
+  runMigrations(lost, MIGRATIONS);
+  check('lost v2 provenance rows are detected and restored exactly',
+    lostDetected && v2Rows(lost).length === V2_CORRECTIONS && sentinelsMissing(lost).length === 0
+      && JSON.stringify([...libraryText(lost).values()]) === final);
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

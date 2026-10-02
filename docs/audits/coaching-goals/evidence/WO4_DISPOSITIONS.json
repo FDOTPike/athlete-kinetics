@@ -1,0 +1,946 @@
+{
+  "generated_on": "2026-10-02",
+  "scope": "The 144 movement records whose coaching text was the shared \"Set up <name> with ...\" template (content review 2026-09-30, issue GENERIC_MOVEMENT_CONTENT).",
+  "counts": {
+    "held_codex_animation_dependency": 15,
+    "corrected": 115,
+    "codex_exclusive": 2,
+    "held_owner_question": 11,
+    "held_no_source": 1
+  },
+  "dispositions": [
+    {
+      "id": 125,
+      "name": "3/4 Sit-Up",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: sit all the way up, then lower only three-quarters of the way. Frames: curl up to about 45 degrees and lower fully."
+    },
+    {
+      "id": 126,
+      "name": "Alternate Hammer Curl",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 127,
+      "name": "Alternating Cable Shoulder Press",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 128,
+      "name": "Alternating Floor Press",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 129,
+      "name": "Alternating Kettlebell Press",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 130,
+      "name": "Alternating Kettlebell Row",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 131,
+      "name": "Back Flyes - With Bands",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 132,
+      "name": "Band Good Morning (Pull Through)",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: band looped around a post and around the neck, hinge to about 90 degrees. Frames: band held at the hips."
+    },
+    {
+      "id": 133,
+      "name": "Barbell Bench Press - Medium Grip",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 134,
+      "name": "Barbell Incline Bench Press - Medium Grip",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 135,
+      "name": "Barbell Incline Shoulder Raise",
+      "disposition": "codex_exclusive",
+      "detail": "Belongs exclusively to the animation lane (pending incline-raise correction). Not touched."
+    },
+    {
+      "id": 136,
+      "name": "Barbell Lunge",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 137,
+      "name": "Barbell Rollout from Bench",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 138,
+      "name": "Barbell Shrug Behind The Back",
+      "disposition": "held_owner_question",
+      "issues": [
+        "GENERIC_VARIANT_SETUP_MISSING"
+      ],
+      "questions": [
+        "Confirm the exact bar start position and intended range; preserve its separate ID from ID 82."
+      ]
+    },
+    {
+      "id": 140,
+      "name": "Barbell Squat To A Bench",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 141,
+      "name": "Bench Press - With Bands",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: band anchored under the bench, handles pressed with no bar. Frames: a barbell with a band looped over it."
+    },
+    {
+      "id": 142,
+      "name": "Bent Over Barbell Row",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 144,
+      "name": "Bent Over One-Arm Long Bar Row",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 145,
+      "name": "Bent Over Two-Arm Long Bar Row",
+      "disposition": "held_owner_question",
+      "issues": [
+        "EQUIPMENT_AND_LATERALITY_AMBIGUITY"
+      ],
+      "questions": [
+        "Confirm the long-bar anchor, resistance source and distinction from ID 144."
+      ]
+    },
+    {
+      "id": 146,
+      "name": "Bent Over Two-Dumbbell Row",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 147,
+      "name": "Bent Over Two-Dumbbell Row With Palms In",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 148,
+      "name": "Bent-Arm Barbell Pullover",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 152,
+      "name": "Body Tricep Press",
+      "disposition": "corrected",
+      "has_preview_frames": false,
+      "equipment_question": "Text needs a bar fixed in a rack; the equipment list has squat_rack but no barbell."
+    },
+    {
+      "id": 153,
+      "name": "Box Squat with Bands",
+      "disposition": "held_owner_question",
+      "issues": [
+        "EQUIPMENT_LIST_CONFLICT"
+      ],
+      "questions": [
+        "Confirm box support, load implement and band anchor/load direction; remove alternatives not part of this ID."
+      ]
+    },
+    {
+      "id": 155,
+      "name": "Cable Incline Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 156,
+      "name": "Cable Lying Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 157,
+      "name": "Cable One Arm Tricep Extension",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: single-handle underhand pushdown from a high pulley to the side. Frames: an overhead extension lowered behind the head."
+    },
+    {
+      "id": 158,
+      "name": "Cable Preacher Curl",
+      "disposition": "corrected",
+      "has_preview_frames": true,
+      "equipment_question": "Text needs a preacher bench; the equipment vocabulary has only \"bench\"."
+    },
+    {
+      "id": 160,
+      "name": "Cable Russian Twists",
+      "disposition": "corrected",
+      "has_preview_frames": false,
+      "equipment_question": "Text needs a stability ball; the equipment vocabulary has no such item."
+    },
+    {
+      "id": 161,
+      "name": "Cable Seated Crunch",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 162,
+      "name": "Cable Seated Lateral Raise",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 163,
+      "name": "Cable Shrugs",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: a bar on a low pulley held in front of the thighs. Frames: cable handles held at the sides."
+    },
+    {
+      "id": 164,
+      "name": "Cable Wrist Curl",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 165,
+      "name": "Calf Raise On A Dumbbell",
+      "disposition": "held_owner_question",
+      "issues": [
+        "DISPLAY_NAME_AND_EQUIPMENT_AMBIGUITY"
+      ],
+      "questions": [
+        "Confirm load placement, heel support and single-leg/two-leg execution before renaming or revising."
+      ]
+    },
+    {
+      "id": 166,
+      "name": "Clock Push-Up",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 167,
+      "name": "Close-Grip EZ Bar Curl",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 168,
+      "name": "Close-Grip EZ-Bar Press",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 169,
+      "name": "Close-Grip Front Lat Pulldown",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 170,
+      "name": "Close-Grip Push-Up off of a Dumbbell",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 171,
+      "name": "Concentration Curls",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 172,
+      "name": "Cross Body Hammer Curl",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 173,
+      "name": "Cross-Body Crunch",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 174,
+      "name": "Crunch - Hands Overhead",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 175,
+      "name": "Crunches",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: lying on the floor, feet on the floor or resting on a bench. Frames: lying on the bench."
+    },
+    {
+      "id": 176,
+      "name": "Deadlift with Bands",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 177,
+      "name": "Decline Close-Grip Bench To Skull Crusher",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 178,
+      "name": "Decline Dumbbell Flyes",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 179,
+      "name": "Decline Dumbbell Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 180,
+      "name": "Decline EZ Bar Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 181,
+      "name": "Decline Oblique Crunch",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 182,
+      "name": "Decline Push-Up",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 183,
+      "name": "Decline Reverse Crunch",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 186,
+      "name": "Dumbbell Bicep Curl",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 187,
+      "name": "Dumbbell Incline Shoulder Raise",
+      "disposition": "codex_exclusive",
+      "detail": "Belongs exclusively to the animation lane (pending incline-raise correction). Not touched."
+    },
+    {
+      "id": 189,
+      "name": "Dumbbell One-Arm Shoulder Press",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 190,
+      "name": "Dumbbell Prone Incline Curl",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 191,
+      "name": "Dumbbell Seated One-Leg Calf Raise",
+      "disposition": "corrected",
+      "has_preview_frames": true,
+      "equipment_question": "Text needs a low block for the foot; the equipment vocabulary has no such item."
+    },
+    {
+      "id": 192,
+      "name": "Dumbbell Squat To A Bench",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 193,
+      "name": "Dumbbell Tricep Extension -Pronated Grip",
+      "disposition": "held_owner_question",
+      "issues": [
+        "DISPLAY_PUNCTUATION",
+        "GRIP_VARIANT_UNSPECIFIED"
+      ],
+      "questions": [
+        "Confirm body position and pronated hand position; approve a name cleanup without changing ID 193."
+      ]
+    },
+    {
+      "id": 194,
+      "name": "Elevated Back Lunge",
+      "disposition": "corrected",
+      "has_preview_frames": false,
+      "equipment_question": "Text needs a low platform to step back from; the equipment vocabulary has no such item."
+    },
+    {
+      "id": 195,
+      "name": "Elevated Cable Rows",
+      "disposition": "corrected",
+      "has_preview_frames": false,
+      "equipment_question": "Text needs a low platform on the seat; the equipment vocabulary has no such item."
+    },
+    {
+      "id": 196,
+      "name": "Extended Range One-Arm Kettlebell Floor Press",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: same-side knee bent and crossed over the midline to extend the pressing range. Frames: an ordinary one-arm floor press."
+    },
+    {
+      "id": 197,
+      "name": "External Rotation",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: side-lying on a bench with a dumbbell, forearm rotating up to point at the ceiling. Frames: body position not side-lying; forearm rotating across the body with the elbow at the side."
+    },
+    {
+      "id": 198,
+      "name": "External Rotation with Cable",
+      "disposition": "held_owner_question",
+      "issues": [
+        "EQUIPMENT_NAME_CONFLICT"
+      ],
+      "questions": [
+        "Confirm whether bands are an intentional alternative on ID 198 or cable machine is the sole required implement."
+      ]
+    },
+    {
+      "id": 199,
+      "name": "EZ-Bar Curl",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 200,
+      "name": "Finger Curls",
+      "disposition": "held_owner_question",
+      "issues": [
+        "ACTION_CONTENT_MISMATCH"
+      ],
+      "questions": [
+        "Confirm finger-curl setup and range; provide owner-approved instructions that distinguish finger flexion from wrist curl."
+      ]
+    },
+    {
+      "id": 201,
+      "name": "Flat Bench Cable Flyes",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 203,
+      "name": "Floor Press",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 204,
+      "name": "Frog Sit-Ups",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 205,
+      "name": "Front Barbell Squat To A Bench",
+      "disposition": "held_owner_question",
+      "issues": [
+        "FRONT_RACK_ACTION_NOT_CAPTURED"
+      ],
+      "questions": [
+        "Confirm rack position, bar-to-bench interaction and intended range before authoring movement-specific steps."
+      ]
+    },
+    {
+      "id": 206,
+      "name": "Front Cable Raise",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 208,
+      "name": "Front Squat (Clean Grip)",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 209,
+      "name": "Full Range-Of-Motion Lat Pulldown",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 210,
+      "name": "Good Morning off Pins",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 211,
+      "name": "Gorilla Chin/Crunch",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 213,
+      "name": "High Cable Curls",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 214,
+      "name": "Hip Extension with Bands",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: band on one ankle, the straight leg moved back while holding a post (a standing kick-back). Frames: band around the hips and a two-leg hip hinge."
+    },
+    {
+      "id": 215,
+      "name": "Incline Barbell Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 216,
+      "name": "Incline Cable Chest Press",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: seated, elbows bent, handles pressed together straight in front. Frames: handles start over the upper chest and are lowered and pressed like a lying press."
+    },
+    {
+      "id": 217,
+      "name": "Incline Cable Flye",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 219,
+      "name": "Incline Dumbbell Curl",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 220,
+      "name": "Incline Dumbbell Flyes",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 221,
+      "name": "Incline Hammer Curls",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 222,
+      "name": "Incline Push-Up Close-Grip",
+      "disposition": "corrected",
+      "has_preview_frames": true,
+      "equipment_question": "Text needs a raised bar or platform for the hands; the equipment list is empty."
+    },
+    {
+      "id": 223,
+      "name": "Incline Push-Up Wide",
+      "disposition": "corrected",
+      "has_preview_frames": true,
+      "equipment_question": "Text needs a raised bar or platform for the hands; the equipment list is empty."
+    },
+    {
+      "id": 224,
+      "name": "Internal Rotation with Band",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 225,
+      "name": "Jackknife Sit-Up",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 227,
+      "name": "JM Press",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 228,
+      "name": "Kettlebell Arnold Press",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 230,
+      "name": "Kettlebell Seesaw Press",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 232,
+      "name": "Kneeling Cable Crunch With Alternating Oblique Twists",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 233,
+      "name": "Kneeling Cable Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 234,
+      "name": "Kneeling High Pulley Row",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: rope held in both hands, kneeling, pulled to the upper chest with the elbows out. Frames: half-kneeling single-arm row."
+    },
+    {
+      "id": 236,
+      "name": "Lateral Raise - With Bands",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 237,
+      "name": "Low Cable Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 238,
+      "name": "Low Pulley Row To Neck",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 239,
+      "name": "Lunge Pass Through",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 240,
+      "name": "Lying Cable Curl",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 242,
+      "name": "Lying Triceps Press",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 245,
+      "name": "Oblique Crunches",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: lying with the feet raised, one hand by the head, elbow to the opposite knee. Frames: knees rotated to one side."
+    },
+    {
+      "id": 246,
+      "name": "One Arm Dumbbell Bench Press",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 247,
+      "name": "One-Arm Dumbbell Row",
+      "disposition": "held_owner_question",
+      "issues": [
+        "SUPPORTED_ROW_VARIANT_UNSPECIFIED"
+      ],
+      "questions": [
+        "Confirm whether ID 247 is unsupported or bench-supported and whether it differs from ID 12. Retain both IDs until decided."
+      ]
+    },
+    {
+      "id": 248,
+      "name": "One-Arm High-Pulley Cable Side Bends",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 249,
+      "name": "One-Arm Kettlebell Floor Press",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 250,
+      "name": "One-Arm Kettlebell Swings",
+      "disposition": "held_no_source",
+      "detail": "No row with this exact name exists in the recovered upstream import, so there is no source to write from."
+    },
+    {
+      "id": 251,
+      "name": "Pallof Press With Rotation",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 252,
+      "name": "Pin Presses",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 253,
+      "name": "Preacher Hammer Dumbbell Curl",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: a dumbbell in each hand with the palms facing each other. Frames: a bar in an underhand grip."
+    },
+    {
+      "id": 254,
+      "name": "Push Up to Side Plank",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 255,
+      "name": "Push-Up Wide",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 256,
+      "name": "Reverse Band Box Squat",
+      "disposition": "corrected",
+      "has_preview_frames": false,
+      "equipment_question": "Text needs a box to sit back onto; the equipment list has no box or bench."
+    },
+    {
+      "id": 257,
+      "name": "Reverse Band Deadlift",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 258,
+      "name": "Reverse Band Sumo Deadlift",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 259,
+      "name": "Reverse Barbell Preacher Curls",
+      "disposition": "corrected",
+      "has_preview_frames": false,
+      "equipment_question": "Text needs a preacher bench; the equipment vocabulary has only \"bench\"."
+    },
+    {
+      "id": 260,
+      "name": "Reverse Cable Curl",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 262,
+      "name": "Reverse Grip Triceps Pushdown",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 263,
+      "name": "Rope Crunch",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: kneeling in front of the cable, rope held overhead. Frames: lying on the back holding the rope at the chest."
+    },
+    {
+      "id": 265,
+      "name": "Seated Bent-Over Rear Delt Raise",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 266,
+      "name": "Seated Cable Rows",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 267,
+      "name": "Seated Cable Shoulder Press",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 273,
+      "name": "Shotgun Row",
+      "disposition": "held_codex_animation_dependency",
+      "detail": "Upstream: single handle, one arm, split stance, palm turning up during the pull. Frames: two arms."
+    },
+    {
+      "id": 274,
+      "name": "Shoulder Press - With Bands",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 275,
+      "name": "Speed Box Squat",
+      "disposition": "corrected",
+      "has_preview_frames": false,
+      "equipment_question": "Text needs a box and a rack; the equipment list has bands and barbell only."
+    },
+    {
+      "id": 276,
+      "name": "Spider Curl",
+      "disposition": "corrected",
+      "has_preview_frames": false,
+      "equipment_question": "Text needs a preacher bench; the equipment vocabulary has only \"bench\"."
+    },
+    {
+      "id": 277,
+      "name": "Squat with Bands",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 278,
+      "name": "Standing Biceps Cable Curl",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 279,
+      "name": "Standing Cable Chest Press",
+      "disposition": "held_owner_question",
+      "issues": [
+        "POSSIBLE_DUPLICATE_NAME_IDENTITY"
+      ],
+      "questions": [
+        "Is ID 279 distinct from ID 83? State the difference or confirm a display alias while retaining both IDs."
+      ]
+    },
+    {
+      "id": 281,
+      "name": "Standing Dumbbell Reverse Curl",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 282,
+      "name": "Standing Dumbbell Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 283,
+      "name": "Standing Overhead Barbell Triceps Extension",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 285,
+      "name": "Standing Rope Crunch",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 287,
+      "name": "Stiff Leg Barbell Good Morning",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 288,
+      "name": "Stiff-Legged Barbell Deadlift",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 290,
+      "name": "Sumo Deadlift with Bands",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 291,
+      "name": "Trail Running/Walking",
+      "disposition": "held_owner_question",
+      "issues": [
+        "COMPOUND_CARDIO_NAME_AND_CONTENT_AMBIGUITY"
+      ],
+      "questions": [
+        "Define supported activity/session structure (trail run, walk or run/walk intervals) and cue scope. Should these be separate identities?"
+      ]
+    },
+    {
+      "id": 292,
+      "name": "Triceps Pushdown - Rope Attachment",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 293,
+      "name": "Two-Arm Kettlebell Row",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 294,
+      "name": "Underhand Cable Pulldowns",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    },
+    {
+      "id": 295,
+      "name": "Upright Barbell Row",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 296,
+      "name": "Upright Cable Row",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 297,
+      "name": "Upright Row - With Bands",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 298,
+      "name": "V-Bar Pullup",
+      "disposition": "corrected",
+      "has_preview_frames": true,
+      "equipment_question": "Text needs a V-handle hung over the bar; the equipment vocabulary has only pullup_bar."
+    },
+    {
+      "id": 299,
+      "name": "Wide Stance Barbell Squat",
+      "disposition": "corrected",
+      "has_preview_frames": false
+    },
+    {
+      "id": 300,
+      "name": "Wide-Grip Lat Pulldown",
+      "disposition": "corrected",
+      "has_preview_frames": true
+    }
+  ]
+}
