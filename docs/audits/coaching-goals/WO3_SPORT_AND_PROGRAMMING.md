@@ -144,7 +144,7 @@ All on desktop, Windows 11, Node 24, 2026-10-02.
 | Check | Result |
 | --- | --- |
 | `npm run typecheck` | exit 0 |
-| `npm run verify:preparation` (now also `verify_emphasis.mjs`: 98 checks on the real 300-movement library and its real muscle mapping) | exit 0 |
+| `npm run verify:preparation` (now also `verify_emphasis.mjs`: 101 checks on the real 300-movement library and its real muscle mapping) | exit 0 |
 | `npm run verify:blocks` — the whole pre-existing block suite, unchanged, proving the no-emphasis path is byte-identical | exit 0 |
 | `npm run verify:migrations` (24 checks for 067: side-car proof, guards, upgrade, self-heal) | exit 0 |
 | `npm run verify:backup` (v63–v66 contract pins) | exit 0 |
@@ -166,6 +166,13 @@ complete run detected 32 of 35. The three misses were weaknesses in the tests
 `verify_emphasis.mjs` was strengthened, one mutation was corrected and one
 added, and the re-run detects 36 of 36. Both runs are recorded in
 `evidence/WO3_NEGATIVE_CONTROLS.md`. No engine source changed between them.
+
+Independent review of the final diff then found one engine defect: a goal
+that named held movement 135 or 187 had it planned through the goal-exercise
+rule. Fixed (a held movement is skipped on both goal paths and the athlete is
+told it is on hold), with three new checks and two new mutations: 38 of 38
+detected. That fix is later than the `verify:ci` run above; the final
+integrated run is in the pull request and the final report.
 
 ### What the real store showed that the pure verifier could not
 

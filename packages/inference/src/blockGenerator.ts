@@ -1147,6 +1147,9 @@ export function generateBlock(input: BlockInput): BlockPlan {
         if (emphasisIndex === null || emphasisDay === null) return null;
         for (const [movementId, goalLabel] of goalLinks) {
           if (weekGoalPlaced.has(movementId) || usedIds.has(movementId)) continue;
+          // A movement whose identity is on hold is not newly prescribed, even
+          // when a goal names it.
+          if (PREPARATION_HELD_MOVEMENT_IDS.has(movementId)) continue;
           const movement = pool.find((candidate) => candidate.movement_id === movementId);
           if (movement === undefined || movement.pattern === 'locomotion') continue;
           // A pattern some session already schedules is filled there, by the
@@ -1382,10 +1385,12 @@ export function generateBlock(input: BlockInput): BlockPlan {
         // Work order 3: an exercise one of the athlete's goals names. It ranks
         // below their explicit choice for the slot and above every default,
         // and it comes from the SAME gated pool, so a goal never re-admits a
-        // movement a gate removed.
+        // movement a gate removed. A movement whose identity is on hold
+        // (135/187) is not newly prescribed by a goal either.
         const goalMovement = preferredMovement === undefined && goalLinks.size > 0
           ? pool.find((candidate) => candidate.pattern === pattern
-              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id))
+              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id)
+              && !PREPARATION_HELD_MOVEMENT_IDS.has(candidate.movement_id))
           : undefined;
         if (preferredMovement !== undefined) {
           for (const candidate of pool) {
@@ -1651,6 +1656,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
       }
       let gap: GoalMovementGap;
       if (movement === undefined) gap = 'unknown';
+      else if (PREPARATION_HELD_MOVEMENT_IDS.has(movementId)) gap = 'held';
       else if (goalDisplacedByOwnChoice.has(movementId)) gap = 'own_choice';
       else {
         // A movement whose pattern no session schedules can still be placed in

@@ -584,6 +584,19 @@ console.log('[10] time, determinism and honesty');
     heldIds.every((id) => !corneredPlan.sessions.some((s) => s.slots.some((slot) => slot.movement_id === id))));
   check('and the athlete is told no exercise passed the checks for that area',
     corneredPlan.emphasis.omitted.some((line) => /^No extra shoulders work: no exercise that trains shoulders directly passed/.test(line)));
+  // A goal that NAMES a held movement does not get it planned either. The
+  // baseline may already contain one by its own ranking; that is not a new
+  // prescription and is left alone.
+  const heldGoal = (id) => plan(profile({ session_duration_cap_min: 90 }),
+    { goalMovements: [{ movementId: id, goalLabel: 'Shoulder raise goal' }] });
+  const newlyHeld = heldIds.filter((id) => !baselineIds.has(id));
+  check('neither held movement is in the baseline plan, so a goal naming one would be a new prescription',
+    newlyHeld.length === heldIds.length, newlyHeld.join(','));
+  check('a goal that names 135 or 187 does not put it in the plan',
+    newlyHeld.every((id) => !heldGoal(id).sessions.some((s) => s.slots.some((slot) => slot.movement_id === id))));
+  check('and the athlete is told that exercise is on hold',
+    newlyHeld.every((id) => heldGoal(id).emphasis.omitted.some((line) =>
+      /^Your goal "Shoulder raise goal" names .+, but it is not in this plan: that exercise is on hold while its instructions are being corrected.$/.test(line))));
   const everyReport = cases.map(({ focused }) => reportText(focused)).join(' ');
   check('no report promises an outcome', !/guarantee|will prevent|will improve|you will reach|will make you/i.test(everyReport));
   check('every report line is a full sentence in plain language (no ids, no pattern codes)',

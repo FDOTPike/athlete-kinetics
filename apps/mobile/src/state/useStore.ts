@@ -2811,7 +2811,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().loadRoutineTemplates();
       get().refreshReturnCheckin();
       get().refreshFocusAndGoals();
-    get().refreshSport();
+      get().refreshSport();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
       // duration (endSession stamps duration or deletes empty shells).

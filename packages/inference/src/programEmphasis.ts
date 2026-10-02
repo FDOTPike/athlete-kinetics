@@ -303,7 +303,7 @@ export const describeEmphasisGap = (muscle: MuscleGroupId, gap: EmphasisGap, cap
   }
 };
 
-export type GoalMovementGap = 'unknown' | 'no_slot' | 'equipment' | 'tier' | 'capability' | 'own_choice';
+export type GoalMovementGap = 'unknown' | 'no_slot' | 'equipment' | 'tier' | 'capability' | 'own_choice' | 'held';
 
 export const describeGoalMovementPlaced = (movement: string, goal: string): string =>
   `${movement} is in your plan because of your goal "${goal}". It is never the first thing cut when a session is short.`;
@@ -315,6 +315,7 @@ export const describeGoalMovementGap = (movement: string, goal: string, gap: Goa
     case 'tier': return `${lead} it is above your current experience level.`;
     case 'capability': return `${lead} it is not available to you right now.`;
     case 'own_choice': return `${lead} you chose a different exercise for that slot, and your choice was kept.`;
+    case 'held': return `${lead} that exercise is on hold while its instructions are being corrected.`;
     case 'no_slot': return `${lead} no session in this plan has a place for that kind of movement.`;
     case 'unknown':
     default: return `${lead} the exercise is no longer in the library.`;

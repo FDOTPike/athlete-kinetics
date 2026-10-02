@@ -16,6 +16,8 @@ Run 2026-10-02 with `node scripts/coaching/negative-controls-wo3.mjs`. Each muta
 | E10 the goal exercise loses sets under a high sport week | detected | FAIL  the exercise a goal names keeps its full dose under a high sport week |
 | E11 a held movement (135/187) can be newly prescribed by the emphasis | detected | FAIL  even when they are the ONLY option, 135 and 187 are neither swapped in nor given a slot<br>FAIL  and the athlete is told no exercise passed the checks for that area |
 | E11b a held movement (135/187) can be swapped in for a default of the same pattern | detected | FAIL  even when they are the ONLY option, 135 and 187 are neither swapped in nor given a slot<br>FAIL  and the athlete is told no exercise passed the checks for that area |
+| E11c a goal that names a held movement (135/187) gets it planned in its pattern slot | detected | FAIL  a goal that names 135 or 187 does not put it in the plan<br>FAIL  and the athlete is told that exercise is on hold |
+| E11d a goal that names a held movement is reported with a wrong reason instead of the hold | detected | FAIL  and the athlete is told that exercise is on hold |
 | E12 the emphasis is applied on a sport or conditioning day | detected | FAIL  a conditioning or sport day is left alone |
 | E13 scheduled and stated sport sessions are added together | detected | FAIL  the Activities schedule is the evidence: it replaces the stated numbers, never adds to them<br>FAIL  known minutes are summed; an unknown duration stays unknown, not zero and not estimated<br>FAIL  three sessions in the Activities schedule outweigh one stated: the schedule decides |
 | E14 a competition date switches on the competition-lift promotion | detected | FAIL  for every sport, not only powerlifting: a competition date changes no session, set, rep or effort |
@@ -41,7 +43,7 @@ Run 2026-10-02 with `node scripts/coaching/negative-controls-wo3.mjs`. Each muta
 | E34 the sport screen is part of the interview for everyone | detected | FAIL apps/mobile/test/components/OnboardingFocusGoal.test.js (14.475 s)<br>× asks the exact question and starts from balanced whole body (5150 ms)<br>× focus only: eight screens, no target screen, and only the focus is saved (182 ms) |
 | E35 the program preview does not show the explanation | detected | FAIL apps/mobile/test/components/SportScreens.test.js (18.344 s)<br>× the program preview shows what focus and sport change, and what they cannot, before the plan is created (143 ms) |
 
-36 of 36 mutations detected.
+38 of 38 mutations detected.
 
 ## What the first run found
 
@@ -54,3 +56,14 @@ The first complete run, on the work order 3 commit, detected 32 of 35. The three
 | E11 a held movement (135/187) can be newly prescribed by the emphasis | NOT DETECTED | In every tested pool a better candidate existed, so the held movements were never the engine's choice with or without the rule. | The verifier now corners the pool so 135 and 187 are the only candidates for the focus, and asserts they are neither swapped in nor given a slot and that the athlete is told nothing passed the checks. E11b covers the swap path separately. |
 
 The four rows E1, E8, E11 and E11b in the table above are from the re-run against the strengthened verifier (`packages/inference/test/verify_emphasis.mjs`); the other rows are from the first run. No engine source changed between the two runs.
+
+## What the independent review found
+
+Reading the final diff before publication found one engine gap the controls
+above could not have found, because no test asked the question: **a goal that
+names movement 135 or 187 had that movement planned**, through the
+goal-exercise rule, even though the emphasis is documented as never newly
+prescribing a held movement. The engine now skips a held movement on both
+goal paths and tells the athlete the exercise is on hold. Three checks were
+added to `verify_emphasis.mjs` and two mutations (E11c, E11d) to this script.
+E11c failing under mutation is the proof that the defect was real.

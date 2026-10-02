@@ -120,6 +120,21 @@ const mutations = [
     gate: PURE,
   },
   {
+    name: 'E11c a goal that names a held movement (135/187) gets it planned in its pattern slot',
+    file: GEN,
+    from: `              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id)
+              && !PREPARATION_HELD_MOVEMENT_IDS.has(candidate.movement_id))`,
+    to: `              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id))`,
+    gate: PURE,
+  },
+  {
+    name: 'E11d a goal that names a held movement is reported with a wrong reason instead of the hold',
+    file: GEN,
+    from: `      else if (PREPARATION_HELD_MOVEMENT_IDS.has(movementId)) gap = 'held';`,
+    to: '',
+    gate: PURE,
+  },
+  {
     name: 'E12 the emphasis is applied on a sport or conditioning day',
     file: GEN,
     from: `      const emphasisDay: EmphasisDayRegion | null = emphasisIndex !== null && STRENGTH_FOCI.has(focus)
