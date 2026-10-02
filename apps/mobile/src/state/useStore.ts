@@ -221,6 +221,48 @@ import {
   type PreparationSummary,
 } from './preparationStore';
 export type { ActivePreparation, PreparationItemRecord, PreparationItemWrite, PreparationSummary } from './preparationStore';
+import {
+  MAX_ACTIVE_GOALS,
+  normalizeFocusSelection,
+  validateSmartGoal,
+  type FocusSelection,
+  type SmartGoalDraft,
+} from '@ak/inference';
+import {
+  deleteAllGoalObservations,
+  deleteGoalObservation,
+  insertAthleteGoal,
+  insertGoalObservation,
+  readAthleteFocus,
+  readAthleteGoals,
+  reviseAthleteGoal,
+  setAthleteGoalStatus,
+  writeAthleteFocus,
+  type GoalStatus,
+  type StoredFocus,
+  type StoredGoal,
+} from './focusGoalStore';
+export type { GoalStatus, StoredFocus, StoredGoal, StoredGoalObservation } from './focusGoalStore';
+
+/** Identifies the athlete and store context an onboarding draft was started
+ *  for. A draft may only be committed to exactly that athlete's database. */
+export interface OnboardingBinding {
+  readonly athleteId: string;
+  readonly contextRevision: number;
+}
+
+/** Everything the first-run interview collects beyond the profile fields. All
+ *  of it commits in the SAME transaction as the profile, or none of it does. */
+export interface OnboardingExtras {
+  /** Captured when the interview started (beginOnboardingDraft). */
+  readonly binding?: OnboardingBinding;
+  /** The answer to "Is there an area that you want to work on?". */
+  readonly focus?: { readonly bundleId: string | null; readonly muscles: readonly string[] };
+  /** A detailed goal, or null/absent when the athlete chose focus only. */
+  readonly goal?: SmartGoalDraft | null;
+}
+
+export const ONBOARDING_STALE_MESSAGE = 'This setup was started for a different athlete, so nothing was saved. Start the setup again for the athlete shown now.';
 
 export const REASON_TEXT_MAP: Record<'tier' | 'equipment' | 'safety' | 'capability', string> = {
   tier: 'not for your experience level yet',
@@ -912,7 +954,27 @@ interface KineticsStore {
     athleteName: string,
     loadPreference?: LoadPreference,
     loadPreferenceExplicit?: boolean,
+    extras?: OnboardingExtras,
   ) => void;
+  /** Capture who an onboarding draft is being written for. The interview keeps
+   *  this and hands it back to completeOnboarding, which refuses to save if the
+   *  active athlete or the store context has changed in between. */
+  beginOnboardingDraft: () => OnboardingBinding;
+  /** The athlete's saved focus (066); null until they have answered. */
+  focus: StoredFocus | null;
+  /** Every goal with its current definition and recorded observations. */
+  goals: StoredGoal[];
+  refreshFocusAndGoals: () => void;
+  /** Save the answer to the focus question. Returns false and sets `error`
+   *  when the selection is not valid. Never changes an existing plan. */
+  saveFocus: (input: { bundleId: string | null; muscles: readonly string[] }) => boolean;
+  /** Create a goal (no goalId) or edit one by APPENDING a revision. Earlier
+   *  revisions, observations and past plans are never rewritten. */
+  saveGoal: (draft: SmartGoalDraft, existing?: { goalId: string; expectedRevision: number }) => boolean;
+  setGoalStatus: (goalId: string, status: GoalStatus) => boolean;
+  /** Record one real measurement for a goal. Nothing is ever derived. */
+  recordGoalObservation: (goalId: string, observedOn: string, value: number) => boolean;
+  removeGoalObservation: (observationId: string) => void;
   /** Triage a free-text complaint with a forced 1-10 severity (Phase 12 Step
    *  5). The severity gates the matched guardrail by training age. */
   reportSubjective: (text: string, severity: number) => Promise<void>;
@@ -1037,6 +1099,19 @@ interface KineticsStore {
 let db: DB | null = null;
 let dbAthleteId: string | null = null;
 let bootInFlight = false;
+/**
+ * Advances whenever the athlete the store is bound to may change: an athlete
+ * switch, a new athlete, or the database being closed for a restore. Work that
+ * was started for one athlete (the onboarding interview) captures the value
+ * and refuses to write if it has moved on — including a switch away and back.
+ *
+ * PORT NOTE: the Health Connect ordering work, which is not published yet,
+ * introduces a counter with this same name and the same increment points for
+ * its own asynchronous guards. This is the minimal part of it that the
+ * onboarding binding needs, kept name-compatible so the two reconcile to one
+ * counter when that work lands.
+ */
+let athleteContextRevision = 0;
 /** Shown when a normal athlete-data action cannot take its mutation lease. */
 const DATA_LOCKED_MESSAGE = 'Athlete data is temporarily locked for backup or restore.';
 
@@ -1047,6 +1122,7 @@ export function closeStoreDatabaseForRestore(): void {
   db = null;
   dbAthleteId = null;
   bootInFlight = false;
+  athleteContextRevision += 1;
   useStore.setState({ status: 'booting' });
 }
 
@@ -2439,6 +2515,7 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
  *  reads the real value from the new file. */
 const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   vector: null, trend: [], session: null, prescription: null, returnCheckin: null,
+  focus: null, goals: [],
   activityLedger: EMPTY_ACTIVITY_LEDGER,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, preparation: null, substitution: null, niggles: [],
@@ -2463,6 +2540,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   today: localToday(),
   activityLedger: EMPTY_ACTIVITY_LEDGER,
   returnCheckin: null,
+  focus: null,
+  goals: [],
   vector: null,
   trend: [],
   movements: [],
@@ -2650,6 +2729,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().refreshActivityLedger();
       get().loadRoutineTemplates();
       get().refreshReturnCheckin();
+      get().refreshFocusAndGoals();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
       // duration (endSession stamps duration or deletes empty shells).
@@ -3408,6 +3488,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: DATA_LOCKED_MESSAGE });
       return;
     }
+    athleteContextRevision += 1;
     set({ status: 'booting', error: null });
     void (async () => {
       try {
@@ -3444,6 +3525,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: DATA_LOCKED_MESSAGE });
       return;
     }
+    athleteContextRevision += 1;
     set({ status: 'booting', error: null });
     void (async () => {
       try {
@@ -3547,7 +3629,166 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     })();
   },
 
-  completeOnboarding: (patch, athleteName, loadPreference, loadPreferenceExplicit) => {
+  beginOnboardingDraft: () => ({ athleteId: get().activeAthleteId, contextRevision: athleteContextRevision }),
+
+  refreshFocusAndGoals: () => {
+    const d = getDb();
+    set({ focus: readAthleteFocus(d), goals: readAthleteGoals(d) });
+  },
+
+  saveFocus: (input) => {
+    if (get().status !== 'ready') return false;
+    const normalized = normalizeFocusSelection(input);
+    if (!normalized.ok) {
+      set({ error: normalized.message });
+      return false;
+    }
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      writeAthleteFocus(d, normalized.selection, Date.now());
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ focus: readAthleteFocus(d), error: null });
+    return true;
+  },
+
+  saveGoal: (draft, existing) => {
+    if (get().status !== 'ready') return false;
+    const validated = validateSmartGoal(draft, localToday());
+    if (!validated.ok) {
+      set({ error: validated.errors[0]?.message ?? 'That goal is not complete yet.' });
+      return false;
+    }
+    if (existing === undefined
+        && get().goals.filter((goal) => goal.status === 'active').length >= MAX_ACTIVE_GOALS) {
+      set({ error: `You can keep up to ${MAX_ACTIVE_GOALS} active goals. Retire one before adding another.` });
+      return false;
+    }
+    const d = getDb();
+    const nowMs = Date.now();
+    let applied = true;
+    d.executeSync('BEGIN');
+    try {
+      if (existing === undefined) {
+        insertAthleteGoal(d, `goal-${nowMs}-${Math.floor(Math.random() * 1e9).toString(36)}`, validated.goal, nowMs);
+      } else {
+        applied = reviseAthleteGoal(d, existing.goalId, existing.expectedRevision, validated.goal, nowMs);
+      }
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ goals: readAthleteGoals(d), error: applied ? null : 'This goal changed since you opened it. Review it and try again.' });
+    return applied;
+  },
+
+  setGoalStatus: (goalId, status) => {
+    if (get().status !== 'ready') return false;
+    const d = getDb();
+    let applied = false;
+    d.executeSync('BEGIN');
+    try {
+      applied = setAthleteGoalStatus(d, goalId, status, Date.now());
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ goals: readAthleteGoals(d) });
+    return applied;
+  },
+
+  recordGoalObservation: (goalId, observedOn, value) => {
+    if (get().status !== 'ready') return false;
+    // Only a real, finite measurement on a real date that is not in the future.
+    // The date is typed by hand, so an impossible one (30 February) is ordinary
+    // input: it gets the same plain message, not the database's own error.
+    const realDate = (() => { try { isoUtcMs(observedOn); return true; } catch { return false; } })();
+    if (!Number.isFinite(value) || value < 0 || value > 100_000
+        || !realDate || observedOn > localToday()) {
+      set({ error: 'Enter the measurement and the date it was taken (today or earlier).' });
+      return false;
+    }
+    const d = getDb();
+    const nowMs = Date.now();
+    let applied = false;
+    d.executeSync('BEGIN');
+    try {
+      applied = insertGoalObservation(d, {
+        observationId: `obs-${nowMs}-${Math.floor(Math.random() * 1e9).toString(36)}`,
+        goalId, observedOn, value, nowMs,
+      });
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ goals: readAthleteGoals(d), error: applied ? null : get().error });
+    return applied;
+  },
+
+  removeGoalObservation: (observationId) => {
+    if (get().status !== 'ready') return;
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      deleteGoalObservation(d, observationId);
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    set({ goals: readAthleteGoals(d) });
+  },
+
+  completeOnboarding: (patch, athleteName, loadPreference, loadPreferenceExplicit, extras) => {
+    if (get().status !== 'ready') {
+      set({ error: 'Wait for the athlete to finish opening, then save their profile again.' });
+      return;
+    }
+    // The draft is bound to the athlete and store context it was started for.
+    // An athlete switch, a restore or any other context change while the
+    // interview was open invalidates it: the answers belong to someone else's
+    // setup and must not be written into the database that is open NOW.
+    const binding = extras?.binding;
+    if (binding !== undefined && (binding.athleteId !== get().activeAthleteId
+        || binding.contextRevision !== athleteContextRevision
+        || dbAthleteId !== binding.athleteId)) {
+      set({ error: ONBOARDING_STALE_MESSAGE });
+      return;
+    }
+    // Focus and goal are validated BEFORE anything is written, so an invalid
+    // answer cannot leave a completed profile with half its interview saved.
+    let focusSelection: FocusSelection | null = null;
+    if (extras?.focus !== undefined) {
+      const normalizedFocus = normalizeFocusSelection(extras.focus);
+      if (!normalizedFocus.ok) {
+        set({ error: normalizedFocus.message });
+        return;
+      }
+      focusSelection = normalizedFocus.selection;
+    }
+    const goalDraft = extras?.goal ?? null;
+    const validatedGoal = goalDraft === null ? null : validateSmartGoal(goalDraft, localToday());
+    if (validatedGoal !== null && !validatedGoal.ok) {
+      set({ error: validatedGoal.errors[0]?.message ?? 'That goal is not complete yet.' });
+      return;
+    }
+    if (validatedGoal !== null
+        && get().goals.filter((goal) => goal.status === 'active').length >= MAX_ACTIVE_GOALS) {
+      set({ error: `You can keep up to ${MAX_ACTIVE_GOALS} active goals. Retire one before adding another.` });
+      return;
+    }
     // ONE atomic save: profile fields + load preference commit in a SINGLE
     // SQLite transaction — no committed state may contain a completed
     // onboarding profile with the wrong tier default (WO §5). The stamp on
@@ -3586,6 +3827,12 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     try {
       persistProfileFields(d, merged);
       persistLoadPreferenceRow(d, pref, prefExplicit);
+      // Same transaction as the profile: the interview is saved whole or not at all.
+      const savedAtMs = Date.now();
+      if (focusSelection !== null) writeAthleteFocus(d, focusSelection, savedAtMs);
+      if (validatedGoal !== null && validatedGoal.ok) {
+        insertAthleteGoal(d, `goal-${savedAtMs}-${Math.floor(Math.random() * 1e9).toString(36)}`, validatedGoal.goal, savedAtMs);
+      }
       d.executeSync('COMMIT');
     } catch (e) {
       d.executeSync('ROLLBACK');
@@ -3597,6 +3844,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       loadPreference: pref,
       loadPreferenceExplicit: prefExplicit,
       onboarded: true,
+      focus: readAthleteFocus(d),
+      goals: readAthleteGoals(d),
     });
     if (get().prescription !== null) get().computePrescription([]);
     const releaseNameLease = tryAcquireDataMutationLease();
@@ -7041,6 +7290,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM history_import');
       d.executeSync('DELETE FROM import_readiness_daily');
       d.executeSync('DELETE FROM bodyweight_daily');
+      // Goal OBSERVATIONS are measurement history and go with it. The goals
+      // themselves and the focus are the athlete's stated intentions and are
+      // kept, like the rest of the profile.
+      deleteAllGoalObservations(d);
       d.executeSync('DELETE FROM movement_capability_attestation');
       d.executeSync('DELETE FROM movement_prior_experience');
       d.executeSync('DELETE FROM capability_session_evidence');
@@ -7164,6 +7417,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshProgram();
     get().refreshNiggles();
     get().refreshReturnCheckin();
+    get().refreshFocusAndGoals();
     // Re-read from the wiped file rather than trusting the set() above: this is
     // the same read every other surface here gets, and it is what makes the
     // in-memory value and the database agree after the wipe.

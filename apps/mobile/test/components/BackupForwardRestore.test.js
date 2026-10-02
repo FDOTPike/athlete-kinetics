@@ -16,6 +16,10 @@
  *     archive, an unknown or future schema — fails closed with live data
  *     byte-identical;
  *   - new 065 data round-trips through backup and restore;
+ *   - EVERY registered pre-upgrade schema restores, not only the first: a
+ *     backup made between two app updates (v64, ...) keeps its newer data;
+ *   - 066 focus, goals, goal revisions and measurements round-trip, and a
+ *     forward migration seeds the muscle mapping without inventing a focus;
  *   - an athlete file not opened since the update still backs up.
  *
  * The file-system, crypto and SQLite stand-ins are the same ones
@@ -256,11 +260,75 @@ const athleteData = (path) => {
 const preparationRows = (path) => {
   const db = open(path);
   try {
+    // A v63 database has no preparation tables at all.
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'session_preparation'").get() === undefined) {
+      return JSON.stringify({ preparation: [], items: [] });
+    }
     return JSON.stringify({
       preparation: db.prepare('SELECT * FROM session_preparation ORDER BY session_id').all(),
       items: db.prepare('SELECT * FROM session_preparation_item ORDER BY session_id, item_index').all(),
     });
   } finally { db.close(); }
+};
+const focusGoalRows = (path) => {
+  const db = open(path);
+  try {
+    return JSON.stringify({
+      focus: db.prepare('SELECT * FROM athlete_focus').all(),
+      focusMuscles: db.prepare('SELECT * FROM athlete_focus_muscle ORDER BY muscle_group_id').all(),
+      goals: db.prepare('SELECT * FROM athlete_goal ORDER BY goal_id').all(),
+      revisions: db.prepare('SELECT * FROM athlete_goal_revision ORDER BY goal_id, revision').all(),
+      observations: db.prepare('SELECT * FROM athlete_goal_observation ORDER BY observation_id').all(),
+    });
+  } finally { db.close(); }
+};
+const NO_FOCUS_OR_GOALS = JSON.stringify({ focus: [], focusMuscles: [], goals: [], revisions: [], observations: [] });
+const seedCounts = (path) => {
+  const db = open(path);
+  try {
+    return {
+      muscleGroups: Number(db.prepare('SELECT COUNT(*) AS c FROM muscle_group').get().c),
+      mappedMovements: Number(db.prepare('SELECT COUNT(DISTINCT movement_id) AS c FROM movement_muscle_role').get().c),
+      roles: Number(db.prepare('SELECT COUNT(*) AS c FROM movement_muscle_role').get().c),
+    };
+  } finally { db.close(); }
+};
+/** A live session with a part-recorded preparation protocol (065). */
+const seedPreparation = (db) => {
+  db.exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (77, NULL, '2026-10-02', 5000)");
+  db.prepare(`INSERT INTO session_preparation
+    (session_id, instance_id, session_started_at_ms, policy_id, policy_revision, protocol_version,
+     protocol_json, item_count, estimate_low_seconds, estimate_high_seconds, status, revision,
+     created_at_ms, updated_at_ms, finished_at_ms)
+    VALUES (77, 'prep-77-5000-roundtrip', 5000, 'ramp-general', 1, 1, ?, 2, 240, 330, 'pending', 1, 5000, 5000, NULL)`)
+    .run(JSON.stringify({ version: 1, note: 'frozen protocol bytes' }));
+  for (const [index, itemId] of [[0, 'raise.easy_movement'], [1, 'ramp.set_40']]) {
+    db.prepare(`INSERT INTO session_preparation_item
+      (session_id, item_index, item_id, item_revision, movement_id, prescribed_kind, prescribed_amount, per_side, status, updated_at_ms)
+      VALUES (77, ?, ?, 1, NULL, ?, ?, 0, 'pending', 5000)`).run(index, itemId, index === 0 ? 'time' : 'ramp', index === 0 ? 240 : 6);
+  }
+  db.exec("UPDATE session_preparation SET status = 'in_progress', revision = 2, updated_at_ms = 5001 WHERE session_id = 77");
+  db.exec("UPDATE session_preparation_item SET status = 'modified', performed_amount = 400, extra_work = 1, reason_code = 'athlete_choice', updated_at_ms = 5002 WHERE session_id = 77 AND item_index = 0");
+};
+/** An edited focus and a goal with two definitions and two measurements (066). */
+const seedFocusAndGoals = (db) => {
+  db.exec("INSERT INTO athlete_focus (focus_id, bundle_id, customised, movement_control, revision, updated_at_ms) VALUES (1, 'lower_body', 1, 0, 2, 6000)");
+  for (const muscle of ['glutes', 'hamstrings', 'core']) {
+    db.prepare('INSERT INTO athlete_focus_muscle (focus_id, muscle_group_id) VALUES (1, ?)').run(muscle);
+  }
+  db.exec("INSERT INTO athlete_goal (goal_id, status, current_revision, created_at_ms, updated_at_ms) VALUES ('goal-roundtrip-1', 'active', 1, 6000, 6000)");
+  const revision = db.prepare(`INSERT INTO athlete_goal_revision
+    (goal_id, revision, specific_outcome, metric_id, unit, measurement_method, baseline_known, baseline_value,
+     target_value, reason, requested_deadline, recorded_at_ms)
+    VALUES ('goal-roundtrip-1', ?, 'Squat 100 kg for 5 reps', 'load_kg', 'kg', 'Back squat, 5 reps to parallel', 1, 80, ?, 'private-reason: for football', ?, ?)`);
+  revision.run(1, 100, '2027-01-08', 6000);
+  const observation = db.prepare(`INSERT INTO athlete_goal_observation
+    (observation_id, goal_id, goal_revision, observed_on, value, unit, source, recorded_at_ms)
+    VALUES (?, 'goal-roundtrip-1', ?, ?, ?, 'kg', 'athlete_entered', ?)`);
+  observation.run('obs-roundtrip-1', 1, '2026-09-20', 82.5, 6100);
+  revision.run(2, 110, null, 6200);
+  db.exec("UPDATE athlete_goal SET current_revision = 2, updated_at_ms = 6200 WHERE goal_id = 'goal-roundtrip-1'");
+  observation.run('obs-roundtrip-2', 2, '2026-10-01', 87.5, 6300);
 };
 const snapshot = (athleteId, dbName, bytes, contract) => ({
   athleteId, dbName, byteLength: bytes.length, sha256Hex: mockCryptoProvider.sha256Hex(bytes),
@@ -324,24 +392,26 @@ beforeEach(() => {
 
 afterEach(() => rmSync(mockRoot, { recursive: true, force: true }));
 
-/** Seal a v63 archive of two athletes and select it as the portable backup. */
-async function selectLegacyBackup(mutate) {
+/** Seal a pre-upgrade archive (v63 unless told otherwise) of two athletes and
+ * select it as the portable backup. */
+async function selectLegacyBackup(mutate, contract = V63) {
   const defaultPath = join(incomingDir, 'athlete_kinetics.db');
   const alexPath = join(incomingDir, 'ak_athlete_a123.db');
-  makeDatabase(defaultPath, V63, 'legacy-default');
-  makeDatabase(alexPath, V63, 'legacy-alex');
+  makeDatabase(defaultPath, contract, 'legacy-default');
+  makeDatabase(alexPath, contract, 'legacy-alex');
   if (mutate !== undefined) mutate(defaultPath);
   const defaultBytes = new Uint8Array(readFileSync(defaultPath));
   const alexBytes = new Uint8Array(readFileSync(alexPath));
-  const sealed = await sealBackup(archiveOf(V63, incomingRegistry, [
-    snapshot('default', 'athlete_kinetics.db', defaultBytes, V63),
-    snapshot('a123', 'ak_athlete_a123.db', alexBytes, V63),
+  const sealed = await sealBackup(archiveOf(contract, incomingRegistry, [
+    snapshot('default', 'athlete_kinetics.db', defaultBytes, contract),
+    snapshot('a123', 'ak_athlete_a123.db', alexBytes, contract),
   ]), PASSWORD, mockCryptoProvider);
   writeFileSync(mockSelectedBackupPath, sealed);
   mockSelectedSize = statSync(mockSelectedBackupPath).size;
   return {
     sealed,
     data: { default: athleteData(defaultPath), alex: athleteData(alexPath) },
+    preparation: { default: preparationRows(defaultPath), alex: preparationRows(alexPath) },
     hashes: { default: mockCryptoProvider.sha256Hex(defaultBytes), alex: mockCryptoProvider.sha256Hex(alexBytes) },
   };
 }
@@ -353,8 +423,11 @@ function expectForwardRestored(legacy) {
     expect(describe_(path)).toEqual({ userVersion: CURRENT.userVersion, current: true, v63: false, quickCheck: 'ok' });
     // Every athlete row the backup held is still there, unchanged.
     expect(athleteData(path)).toBe(legacy.data[key]);
-    // The migration added tables; it did not invent preparation history.
-    expect(preparationRows(path)).toBe(JSON.stringify({ preparation: [], items: [] }));
+    // The migration added tables; it did not invent preparation history,
+    // a focus or a goal — and it did seed the muscle mapping the planner reads.
+    expect(preparationRows(path)).toBe(legacy.preparation[key]);
+    expect(focusGoalRows(path)).toBe(NO_FOCUS_OR_GOALS);
+    expect(seedCounts(path)).toEqual({ muscleGroups: 17, mappedMovements: 299, roles: 794 });
     // The installed file is the migrated copy, not the v63 bytes.
     expect(mockHashFile(path)).not.toBe(legacy.hashes[key]);
   }
@@ -513,20 +586,7 @@ test('backing up an athlete file that is still at v63 produces a current-schema 
 test('round trip at the current schema: a live session, its preparation protocol and item records survive backup and restore', async () => {
   const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
   const db = open(livePath);
-  db.exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (77, NULL, '2026-10-02', 5000)");
-  db.prepare(`INSERT INTO session_preparation
-    (session_id, instance_id, session_started_at_ms, policy_id, policy_revision, protocol_version,
-     protocol_json, item_count, estimate_low_seconds, estimate_high_seconds, status, revision,
-     created_at_ms, updated_at_ms, finished_at_ms)
-    VALUES (77, 'prep-77-5000-roundtrip', 5000, 'ramp-general', 1, 1, ?, 2, 240, 330, 'pending', 1, 5000, 5000, NULL)`)
-    .run(JSON.stringify({ version: 1, note: 'frozen protocol bytes' }));
-  for (const [index, itemId] of [[0, 'raise.easy_movement'], [1, 'ramp.set_40']]) {
-    db.prepare(`INSERT INTO session_preparation_item
-      (session_id, item_index, item_id, item_revision, movement_id, prescribed_kind, prescribed_amount, per_side, status, updated_at_ms)
-      VALUES (77, ?, ?, 1, NULL, ?, ?, 0, 'pending', 5000)`).run(index, itemId, index === 0 ? 'time' : 'ramp', index === 0 ? 240 : 6);
-  }
-  db.exec("UPDATE session_preparation SET status = 'in_progress', revision = 2, updated_at_ms = 5001 WHERE session_id = 77");
-  db.exec("UPDATE session_preparation_item SET status = 'modified', performed_amount = 400, extra_work = 1, reason_code = 'athlete_choice', updated_at_ms = 5002 WHERE session_id = 77 AND item_index = 0");
+  seedPreparation(db);
   db.close();
   const before = { athlete: athleteData(livePath), preparation: preparationRows(livePath) };
   expect(JSON.parse(before.preparation).items).toHaveLength(2);
@@ -550,5 +610,103 @@ test('round trip at the current schema: a live session, its preparation protocol
   expect(athleteData(livePath)).toBe(before.athlete);
   expect(preparationRows(livePath)).toBe(before.preparation);
   expect(describe_(livePath)).toMatchObject({ userVersion: CURRENT.userVersion, current: true });
+  expect(artifacts()).toEqual([]);
+});
+
+describe('every registered pre-upgrade schema restores, not only the first', () => {
+  const PRE_UPGRADE = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.slice(0, -1);
+
+  test('the registry is a contiguous chain ending at the current schema', () => {
+    expect(SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => contract.userVersion))
+      .toEqual(SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((_, index) => V63.userVersion + index));
+    expect(SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => contract.migrationSlot - contract.userVersion))
+      .toEqual(SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map(() => 1));
+    expect(SUPPORTED_BACKUP_SCHEMA_CONTRACTS[SUPPORTED_BACKUP_SCHEMA_CONTRACTS.length - 1]).toBe(CURRENT);
+    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test.each(PRE_UPGRADE.map((contract) => [contract.userVersion, contract]))(
+    'a v%i portable backup is validated as itself and installed at the current schema with its data intact',
+    async (_version, contract) => {
+      // A backup made after 065 shipped carries preparation records; they must
+      // survive the remaining forward migrations untouched.
+      const hasPreparation = contract.userVersion >= 64;
+      const legacy = await selectLegacyBackup(hasPreparation
+        ? (path) => { const db = open(path); try { seedPreparation(db); } finally { db.close(); } }
+        : undefined, contract);
+      if (hasPreparation) expect(JSON.parse(legacy.preparation.default).items).toHaveLength(2);
+      const built = open(join(incomingDir, 'athlete_kinetics.db'));
+      try { expect(matchesBackupSchemaContract(schemaObjects(built), contract, mockCryptoProvider)).toBe(true); } finally { built.close(); }
+
+      await useBackupStore.getState().chooseRestore(PASSWORD);
+      expect(useBackupStore.getState().status).toBe('preview');
+      expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(liveHash);
+      await useBackupStore.getState().confirmRestore(PASSWORD);
+      expect(useBackupStore.getState()).toMatchObject({ status: 'success' });
+      expectForwardRestored(legacy);
+    },
+  );
+
+  test.each(PRE_UPGRADE.slice(1).map((contract) => [contract.userVersion, contract]))(
+    'a v%i archive whose database is really one schema older is refused',
+    async (_version, contract) => {
+      const older = SUPPORTED_BACKUP_SCHEMA_CONTRACTS[SUPPORTED_BACKUP_SCHEMA_CONTRACTS.indexOf(contract) - 1];
+      const path = join(incomingDir, 'athlete_kinetics.db');
+      makeDatabase(path, older, 'mislabelled-older');
+      // Declared at the newer schema; the bytes are the older one with the newer version stamped on.
+      const stamped = open(path);
+      stamped.exec(`PRAGMA user_version=${contract.userVersion}`);
+      stamped.close();
+      const stampedBytes = new Uint8Array(readFileSync(path));
+      writeFileSync(mockSelectedBackupPath, await sealBackup(archiveOf(contract, liveRegistry,
+        [{ ...snapshot('default', 'athlete_kinetics.db', stampedBytes, contract) }]), PASSWORD, mockCryptoProvider));
+      mockSelectedSize = statSync(mockSelectedBackupPath).size;
+      await useBackupStore.getState().chooseRestore(PASSWORD);
+      if (useBackupStore.getState().status === 'preview') await useBackupStore.getState().confirmRestore(PASSWORD);
+      expect(useBackupStore.getState().status).toBe('error');
+      expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(liveHash);
+      expect(artifacts()).toEqual([]);
+    },
+  );
+});
+
+test('round trip at the current schema: focus, goals, every goal revision and every measurement survive backup and restore', async () => {
+  const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
+  const db = open(livePath);
+  seedFocusAndGoals(db);
+  db.close();
+  const before = { athlete: athleteData(livePath), focusGoals: focusGoalRows(livePath), seeds: seedCounts(livePath) };
+  expect(JSON.parse(before.focusGoals)).toMatchObject({ focus: [{ bundle_id: 'lower_body', revision: 2 }] });
+  expect(JSON.parse(before.focusGoals).revisions).toHaveLength(2);
+  expect(JSON.parse(before.focusGoals).observations).toHaveLength(2);
+
+  await useBackupStore.getState().createBackup(PASSWORD);
+  expect(useBackupStore.getState()).toMatchObject({ status: 'success' });
+  // The athlete's own words are inside the encrypted archive, never in the clear.
+  expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-reason');
+
+  // Lose the data, then restore. Deleting the goal is the one supported way
+  // to remove its revisions and measurements (they cascade with it).
+  const wipe = open(livePath);
+  wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;');
+  wipe.close();
+  expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
+  copyFileSync(mockSavedBackupPath, mockSelectedBackupPath);
+  mockSelectedSize = statSync(mockSelectedBackupPath).size;
+  useBackupStore.setState({ status: 'idle', message: null, preview: null });
+  await useBackupStore.getState().chooseRestore(PASSWORD);
+  expect(useBackupStore.getState().status).toBe('preview');
+  await useBackupStore.getState().confirmRestore(PASSWORD);
+  expect(useBackupStore.getState()).toMatchObject({ status: 'success' });
+
+  expect(focusGoalRows(livePath)).toBe(before.focusGoals);
+  expect(athleteData(livePath)).toBe(before.athlete);
+  expect(seedCounts(livePath)).toEqual(before.seeds);
+  // The restored file is the real current schema again, guards included.
+  expect(describe_(livePath)).toMatchObject({ userVersion: CURRENT.userVersion, current: true });
+  const restored = open(livePath);
+  try {
+    expect(() => restored.exec('UPDATE athlete_goal_revision SET target_value = 500')).toThrow(/immutable/);
+  } finally { restored.close(); }
   expect(artifacts()).toEqual([]);
 });

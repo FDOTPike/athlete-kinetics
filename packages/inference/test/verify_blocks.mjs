@@ -2409,7 +2409,8 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // daily upsert the DAO executes, so it carries unbound parameters. Section
   // [28] already excludes it; this block once counted it as a migration.
   // Migration 064 legitimately advanced the executable chain to 63 entries;
-  // 065 (session preparation side-car, no library rows) advances it to 64.
+  // 065 (session preparation side-car) and 066 (focus and goals) add no
+  // library rows and advance it to 65.
   const chain = readdirSync(SCHEMA_DIR)
     .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
     .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
@@ -2422,7 +2423,7 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // Pin the corpus itself, so a library change cannot move the figures below
   // without announcing itself.
   check('[F2-corpus] the shipped catalogue is the one being measured',
-    rows.length === 300 && chain.length === 64,
+    rows.length === 300 && chain.length === 65,
     `${rows.length} movements from ${chain.length} migrations`);
 
   // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against

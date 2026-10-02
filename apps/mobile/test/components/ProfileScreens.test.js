@@ -68,6 +68,20 @@ function captureHardwareBack() {
   };
 }
 
+// The focus screen (coaching work order 2) sits between goal and experience.
+// The tests in this file predate it and are about OTHER screens, so these two
+// helpers walk straight through it, leaving its default answer (balanced whole
+// body) in place. The focus and target screens themselves are covered in
+// OnboardingFocusGoal.test.js.
+const pressNext = () => {
+  fireEvent.press(screen.getByLabelText('Next'));
+  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Next'));
+};
+const pressBack = () => {
+  fireEvent.press(screen.getByLabelText('Back'));
+  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Back'));
+};
+
 describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   let deleteAthleteMock;
   let wipeBlockStateMock;
@@ -144,6 +158,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       advancedToolsUnlocked: false,
       setAdvancedToolsUnlocked: jest.fn(),
       completeOnboarding: jest.fn(),
+      beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(),
       loadRecentOutcomes: () => [
         { outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 },
@@ -278,21 +293,21 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByPlaceholderText('Your name')).toBeOnTheScreen();
 
     // Navigate to goal step
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
   });
 
   test('WO-02 uses supportive weight-loss and week-ceiling copy exactly', () => {
     render(<OnboardingScreen />);
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     expect(screen.getByLabelText(/WEIGHT-LOSS SUPPORT/)).toBeOnTheScreen();
     const goal = screen.getByRole('button', { name: /WEIGHT-LOSS SUPPORT\. Stay active/ });
     expect(StyleSheet.flatten(goal.props.style)).toMatchObject({ minHeight: 56, flex: 1 });
     expect(screen.getByText('WEIGHT-LOSS SUPPORT').props.numberOfLines).toBeUndefined();
     expect(screen.getByText('Stay active and keep your muscle').props.numberOfLines).toBeUndefined();
     expect(screen.queryByText(/fat[- ]loss/i)).toBeNull();
-    fireEvent.press(screen.getByLabelText('Next'));
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
+    pressNext();
     expect(screen.getByText('Choose a week that feels manageable. A realistic ceiling beats an optimistic one. You can change this later in Athlete Profile.')).toBeOnTheScreen();
   });
 
@@ -337,17 +352,17 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   test('WO-02 review uses scrollable sections and edit routing preserves the complete draft', () => {
     render(<OnboardingScreen />);
     fireEvent.changeText(screen.getByLabelText('Your name'), 'Ari');
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     fireEvent.press(screen.getByLabelText(/WEIGHT-LOSS SUPPORT/));
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. No equipment/ }));
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
 
     for (const heading of ['GOAL', 'EXPERIENCE', 'YOUR WEEK', 'EQUIPMENT', 'TRAINING SUPPORT']) {
       expect(screen.getByRole('header', { name: heading })).toBeOnTheScreen();
@@ -358,7 +373,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByLabelText('Edit experience'));
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: /EXPERIENCED\. 3\+ years/ }).props.accessibilityState.selected).toBe(true);
-    fireEvent.press(screen.getByLabelText('Back'));
+    pressBack();
     expect(screen.getByRole('button', { name: /WEIGHT-LOSS SUPPORT/ }).props.accessibilityState.selected).toBe(true);
   });
 
@@ -438,17 +453,17 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   });
 
   const advance = (count) => {
-    for (let i = 0; i < count; i += 1) fireEvent.press(screen.getByLabelText('Next'));
+    for (let i = 0; i < count; i += 1) pressNext();
   };
   const retreat = (count) => {
-    for (let i = 0; i < count; i += 1) fireEvent.press(screen.getByLabelText('Back'));
+    for (let i = 0; i < count; i += 1) pressBack();
   };
   // Round 2 (ledger 0060): the limitations screen requires an explicit
   // no/yes answer BEFORE NEXT enables — a full walk to review must answer
   // it. Helpers that pass through the limits screen press the explicit No.
   const advanceAnsweringLimits = (count, fromStep) => {
     for (let i = 0; i < count; i += 1) {
-      fireEvent.press(screen.getByLabelText('Next'));
+      pressNext();
       if (fromStep + i === 4) { // arriving at limits (0-based step 5)
         fireEvent.press(screen.getByLabelText('No, nothing to note'));
       }
@@ -569,35 +584,44 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     }
   });
 
-  // --- W2: the seven-screen first-run contract (WO §2.1) ---------------------
+  // --- The first-run screen contract ------------------------------------------
+  // WO §2.1 shortened the interview to seven screens. Coaching work order 2
+  // (owner-authorised, 2026-10-02) adds ONE screen for everyone — the focus
+  // question — so the flow is eight; a ninth appears only when the athlete says
+  // they have a specific target (covered in OnboardingFocusGoal.test.js).
 
-  test('first-run flow is at most seven screens and combines days with minutes (WO 2.1)', () => {
+  test('first-run flow is eight screens, asks the focus question third, and combines days with minutes', () => {
     render(<OnboardingScreen />);
-    expect(screen.getByLabelText('Step 1 of 7')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 1 of 8')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Next')); // goal
+    expect(screen.getByLabelText('Step 2 of 8')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Next')); // focus
+    expect(screen.getByLabelText('Step 3 of 8')).toBeOnTheScreen();
+    expect(screen.getByText('Is there an area that you want to work on?')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Next')); // experience
-    fireEvent.press(screen.getByLabelText('Next')); // logistics
+    expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
+    pressNext(); // logistics
     expect(screen.getByText('TRAINING DAYS PER WEEK')).toBeOnTheScreen();
     expect(screen.getByText('MINUTES IN A SESSION, TOPS')).toBeOnTheScreen();
     // The retired per-decision screens never appear anywhere in the flow.
     for (const retired of ['HOW HARD SHOULD HARD DAYS GET?', 'THE SCIENCE BITS', 'WHO PICKS THE WEIGHTS?', 'MAX SESSIONS IN ONE DAY', 'HOW LONG IS A SESSION?']) {
       expect(screen.queryByText(retired)).toBeNull();
     }
-    fireEvent.press(screen.getByLabelText('Next')); // equipment
+    pressNext(); // equipment
     // Round 2: NEXT is disabled on limitations until an explicit answer.
-    fireEvent.press(screen.getByLabelText('Next')); // limits
+    pressNext(); // limits
     expect(screen.getByLabelText('Next')).toBeDisabled();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     expect(screen.getByLabelText('Next')).not.toBeDisabled();
-    fireEvent.press(screen.getByLabelText('Next'));
-    expect(screen.getByLabelText('Step 7 of 7')).toBeOnTheScreen();
+    pressNext();
+    expect(screen.getByLabelText('Step 8 of 8')).toBeOnTheScreen();
   });
 
   test('limitations asks one explicit no/yes; yes reveals notes, no clears drafts, review discloses', () => {
     render(<OnboardingScreen />);
     advance(3); // -> logistics
-    fireEvent.press(screen.getByLabelText('Next')); // equipment
-    fireEvent.press(screen.getByLabelText('Next')); // limits
+    pressNext(); // equipment
+    pressNext(); // limits
     expect(screen.queryByLabelText('Past injuries, one per line as region colon note')).toBeNull();
     fireEvent.press(screen.getByLabelText('Yes, let me add notes'));
     expect(screen.getByLabelText('Past injuries, one per line as region colon note')).toBeOnTheScreen();
@@ -606,7 +630,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     // "No" is an explicit clearing of the draft notes, not a silent skip.
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     expect(screen.queryByLabelText('Past injuries, one per line as region colon note')).toBeNull();
-    fireEvent.press(screen.getByLabelText('Next')); // review
+    pressNext(); // review
     expect(screen.getByTestId('onboarding-summary-limits-row').props.children.join(''))
       .toBe('LIMITATIONS — none noted');
   });
@@ -624,8 +648,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       'ankle: limited dorsiflexion',
     );
 
-    fireEvent.press(screen.getByLabelText('Back'));
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressBack();
+    pressNext();
     expect(screen.getByLabelText('Past injuries, one per line as region colon note').props.value)
       .toBe('knee: old ACL');
     expect(screen.getByLabelText('Mobility limits, one per line as region colon note').props.value)
@@ -635,13 +659,13 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   test('nothing persists before Finish and back navigation keeps the draft', () => {
     mockState.completeOnboarding = jest.fn();
     render(<OnboardingScreen />);
-    fireEvent.press(screen.getByLabelText('Next')); // welcome -> goal
+    pressNext(); // welcome -> goal
     fireEvent.press(screen.getByLabelText(/ALL-ROUND FITNESS/));
-    fireEvent.press(screen.getByLabelText('Next')); // goal -> experience
+    pressNext(); // goal -> experience
     fireEvent.press(screen.getByRole('button', { name: /SOME MILEAGE\. 1–3 years/ }));
     expect(mockState.completeOnboarding).not.toHaveBeenCalled();
     // Android/back navigation walks the DRAFT back a step, keeping answers.
-    fireEvent.press(screen.getByLabelText('Back'));
+    pressBack();
     expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
     expect(screen.getByLabelText(/ALL-ROUND FITNESS/).props.accessibilityState.selected).toBe(true);
     expect(mockState.completeOnboarding).not.toHaveBeenCalled();
