@@ -46,6 +46,15 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 181,
     fingerprint: '17b90b6396b16acfd0ef6910751bccb00e1b109f94fe426ad511f9362dbb8ba3',
   },
+  // Through 066_focus_and_goals — adds muscle groups, the movement muscle
+  // mapping, the athlete's focus and SMART goals.
+  {
+    userVersion: 65,
+    migrationSlot: 66,
+    tableCount: 114,
+    objectCount: 198,
+    fingerprint: '158c306f0e25ffe6607dc4919302a3b272034dba8d1f040ba71a1e5607c37807',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

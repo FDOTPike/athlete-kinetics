@@ -262,6 +262,44 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'trigger', name: 'trg_session_preparation_transition_bu' },         // 065
   { type: 'trigger', name: 'trg_session_preparation_item_frozen_bu' },        // 065
   { type: 'trigger', name: 'trg_session_preparation_item_open_bu' },          // 065
+  // 066 focus and SMART goals. The three reference tables are SEEDED, so their
+  // sentinels check the rows, not just the table: an emptied muscle_group or
+  // movement_muscle_role would otherwise read as "this athlete has no focus
+  // mapping" at latest user_version. The five athlete tables are durable
+  // athlete state. The triggers are fail-closed: losing the revision or
+  // observation guards would let a recorded goal definition or measurement be
+  // rewritten after the fact.
+  { type: 'table', name: 'muscle_group' },                                    // 066
+  { type: 'table', name: 'muscle_group_alias' },                              // 066
+  { type: 'table', name: 'movement_muscle_role' },                            // 066
+  {
+    type: 'row',
+    name: 'muscle_group seed',                                                // 066
+    presenceSql: `SELECT 1 AS ok WHERE (SELECT COUNT(*) FROM muscle_group) = 17
+      AND (SELECT COUNT(*) FROM muscle_group_alias WHERE alias_kind = 'library_term') = 27`,
+  },
+  {
+    type: 'row',
+    name: 'movement_muscle_role seed',                                        // 066
+    presenceSql: `SELECT 1 AS ok WHERE NOT EXISTS (
+      SELECT 1 FROM movement_detail d
+      JOIN json_each(d.target_muscles) j
+      JOIN muscle_group_alias a ON a.alias = lower(trim(j.value)) AND a.alias_kind = 'library_term'
+      WHERE NOT EXISTS (SELECT 1 FROM movement_muscle_role r
+        WHERE r.movement_id = d.movement_id AND r.muscle_group_id = a.muscle_group_id))`,
+  },
+  { type: 'table', name: 'athlete_focus' },                                   // 066
+  { type: 'table', name: 'athlete_focus_muscle' },                            // 066
+  { type: 'table', name: 'athlete_goal' },                                    // 066
+  { type: 'table', name: 'athlete_goal_revision' },                           // 066
+  { type: 'table', name: 'athlete_goal_observation' },                        // 066
+  { type: 'trigger', name: 'trg_athlete_focus_muscle_limit_bi' },             // 066
+  { type: 'trigger', name: 'trg_athlete_goal_revision_immutable_bu' },        // 066
+  { type: 'trigger', name: 'trg_athlete_goal_revision_no_delete_bd' },        // 066
+  { type: 'trigger', name: 'trg_athlete_goal_revision_forward_bu' },          // 066
+  { type: 'trigger', name: 'trg_athlete_goal_observation_immutable_bu' },     // 066
+  { type: 'trigger', name: 'trg_athlete_goal_active_limit_bi' },              // 066
+  { type: 'trigger', name: 'trg_athlete_goal_active_limit_bu' },              // 066
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -330,6 +368,11 @@ const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
   // alone is lost, this surviving trigger would abort the replay's rename.
   // (065's other triggers name only `session` (001) or their own table.)
   'trg_session_preparation_item_open_bu',     // 065 -> session_preparation
+  // Lives on athlete_goal_revision and names athlete_goal, both created at
+  // chain position 65. If athlete_goal alone is lost, this surviving trigger
+  // would abort the replay's rename. (066's other triggers name only the table
+  // they live on.)
+  'trg_athlete_goal_revision_no_delete_bd',   // 066 -> athlete_goal
 ];
 
 function dropReplayBlockingTriggers(db: MigrationDb): void {

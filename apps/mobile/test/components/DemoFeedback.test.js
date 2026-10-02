@@ -49,6 +49,7 @@ const readinessState = (loadDemoAthlete) => ({
   boot: jest.fn(),
   refreshVector: jest.fn(),
   loadDemoAthlete,
+  beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
   resetTrainingData: jest.fn(),
   returnCheckin: null,
   confirmReturnCheckin: jest.fn(),

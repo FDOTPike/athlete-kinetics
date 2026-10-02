@@ -21,13 +21,18 @@ The candidate closes those gaps with authenticated AES-256-GCM/scrypt containers
 
 `backup_preferences.json` stores only the timestamp of the last portable backup whose OS save action returned success. It is operational UI state, is not athlete data, and is not part of the portable archive. The private `pikeMethods-recovery-current.pmbak`, restore journal, operation markers, rollback copies, and incoming files are recovery machinery rather than portable payload. Temporary plaintext snapshots exist only under narrowly named app-private cache directories (`ak-backup-<32 lowercase hex characters>`) and are cleaned on every reachable path; matching abandoned directories are swept before normal boot. Passwords, derived keys, decrypted archives, and private support prose are never written to diagnostics or metadata.
 
-## Final live durable tables: 106
+## Final live durable tables: 114
 
 The inventory comes from the complete migration chain and the recovery sentinels. Temporary replacement tables and the superseded `user_profile` table are listed separately below.
 
-### Athlete-owned profile, settings, declarations, and estimates (10)
+### Athlete-owned profile, settings, declarations, and estimates (15)
 
 - `athlete_profile` — active profile fields including goal, experience, availability, injury/mobility JSON, and equipment inventory.
+- `athlete_focus` — the answer to "Is there an area that you want to work on?": bundle of origin, whether it was edited, revision (066).
+- `athlete_focus_muscle` — the muscle groups actually selected, at most six (066).
+- `athlete_goal` — SMART goal envelope: status and current revision (066).
+- `athlete_goal_revision` — immutable goal definitions: outcome, measurement method and unit, baseline or explicit unknown, target, reason, requested deadline (066).
+- `athlete_goal_observation` — immutable measurements the athlete recorded for a goal; never derived (066).
 - `profile_slot` — named profile snapshots and active-slot identity.
 - `profile_ui_preference` — per-profile guided-detail preference.
 - `profile_load_preference` — per-profile automatic/manual load preference.
@@ -133,7 +138,11 @@ An in-progress runner checkpoint is durable. A backup policy must either include
 
 Some of these are derived or aggregated, but no verified full rebuild path exists for the complete set. Until rebuild equivalence is proven, a restorable backup must retain them. This group contains health information and requires the encryption decision in the WO-03 docket.
 
-### Bundled catalog, policy, taxonomy, and provenance (21)
+### Bundled catalog, policy, taxonomy, and provenance (24)
+
+- `muscle_group` — 17 canonical muscle-group ids with plain gym names (066).
+- `muscle_group_alias` — verified aliases: every library target-muscle term plus a short list of gym terms (066).
+- `movement_muscle_role` — the explicit primary/supporting mapping per movement id, with its provenance rule (066).
 
 - `movement`
 - `movement_equipment`
@@ -161,7 +170,7 @@ These rows are bundled/reference data rather than athlete-authored data. The can
 
 ## Non-table schema objects and superseded intermediates
 
-- Views `v_readiness_inputs` and `v_training_daily_all` contain no independent rows. Physical snapshots retain their definitions with the database, while the restore schema contract deliberately fingerprints the 181 durable table/index/trigger objects.
+- Views `v_readiness_inputs` and `v_training_daily_all` contain no independent rows. Physical snapshots retain their definitions with the database, while the restore schema contract deliberately fingerprints the 198 durable table/index/trigger objects.
 - Indexes and triggers are schema/invariant objects, not independent data sets. They are nevertheless included by the physical snapshot and verified exhaustively because omitting or mutating them could weaken restored invariants.
 - `user_profile` is created by 006, copied into `athlete_profile`, and dropped by 007; it is not live.
 - `movement_equipment_v049`, `movement_role_eligibility_v052`, `routine_template_slot_v052`, and `planned_slot_autopilot_061` are migration replacement tables renamed into their final names; their temporary names are not live data classes.

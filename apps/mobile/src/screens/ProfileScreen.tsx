@@ -29,6 +29,7 @@ import {
   type HistoryParseResult,
   type UserProfile,
 } from '@ak/inference';
+import { FocusGoalsPanel } from '../components/FocusGoalsPanel';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
@@ -414,6 +415,9 @@ export default function ProfileScreen(): React.JSX.Element {
         value={profile.objective}
         onSelect={(objective) => saveProfile({ objective })}
       />
+      {/* Work order 2: the focus question and SMART goals, reviewable and
+          editable here without rewriting any existing plan. */}
+      <FocusGoalsPanel />
       <ChipRow
         label="2 · TRAINING AGE"
         options={TRAINING_AGES}
