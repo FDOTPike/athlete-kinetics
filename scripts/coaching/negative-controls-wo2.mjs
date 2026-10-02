@@ -199,7 +199,7 @@ const mutations = [
     migrationSlot: 65,
     tableCount: 106,
     objectCount: 181,
-    fingerprint: '17b90b6396b16acfd0ef6910751bccb00e1b109f94fe426ad511f9362dbb8ba3',
+    fingerprint: '3785bb0a5557dc3d488b5863e40602e17d0713575adb14c35fd6efeb54280198',
   },`,
     to: '',
     gate: 'npm run verify:backup',
