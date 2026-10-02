@@ -60,11 +60,9 @@ So that coaching commits contain only coaching changes:
 3. **Coaching work** — every commit after `56ddfb7d` on
    `codex/coaching-goals-sport-preparation`.
 
-A pull request for the coaching work is opened against the prerequisite branch,
-so its diff shows only item 3. The prerequisite branch is not a claim that
-items 1 and 2 are merged anywhere: it exists so the dependency is visible and
-reviewable. Merging the coaching work requires the prerequisite lineage to be
-integrated first by its owners.
+The prerequisite branch is not a claim that items 1 and 2 are merged anywhere:
+it exists so the dependency is visible. It is local only and was not pushed —
+see "How the coaching work is published" below.
 
 ## Baseline checks (before any coaching edit)
 
@@ -95,3 +93,66 @@ anywhere. The coaching work takes the next unused filenames in order, starting
 with `065_session_preparation.sql`; the animation lane takes the next unused
 filename when its correction is approved. `user_version` counts entries, so
 either order of landing is safe as long as each lane appends.
+
+## How the coaching work is published
+
+The first plan was to open a pull request against the prerequisite branch, so
+its diff would show only item 3. That plan was dropped, for one reason:
+**pushing the prerequisite branch would publish items 1 and 2** — 285
+unpublished commits and an uncommitted overlay that belong to other lanes
+(the movement animation lane and its roughly 9,900 evidence files, and the
+architecture lane). Publishing another lane's unfinished work is not within
+this assignment's authority, and a pull request cannot be opened against a
+branch that is not on the remote.
+
+What was done instead:
+
+1. The coaching commits were **ported onto the newest published ancestor**,
+   `origin/codex/rpe-familiarisation` (`6c2fd709`), one commit per work
+   order, and pushed as four stacked branches:
+
+   | Branch | Base | Content |
+   | --- | --- | --- |
+   | `claude/coaching-wo1-preparation` | `codex/rpe-familiarisation` | work order 1 |
+   | `claude/coaching-wo2-focus-goals` | `claude/coaching-wo1-preparation` | work order 2 |
+   | `claude/coaching-wo3-sport-programming` | `claude/coaching-wo2-focus-goals` | work order 3 |
+   | `claude/coaching-wo4-coaching-content` | `claude/coaching-wo3-sport-programming` | work order 4 |
+
+   Each pull request shows exactly one work order. Nothing from items 1 or 2
+   is in any of them.
+
+2. The port was small because the coaching work and the unpublished lanes
+   barely overlap. Of the files the coaching work touches, these are the only
+   ones that differ between `6c2fd709` and the baseline, and each was
+   resolved by hand:
+
+   | File | Resolution on the port |
+   | --- | --- |
+   | `package.json`, `.github/workflows/ci.yml`, `AGENT_WORKFLOW.md`, `apps/mobile/test/verify_store_sql.mjs`, `tools/test_verify_ci_structure.mjs` | The published base runs 22 `verify:*` gates; the unpublished lineage runs 24 (two animation-evidence gates). `verify:preparation` is the 23rd on the port and the 25th on the lineage. |
+   | `apps/mobile/src/screens/SessionScreen.tsx` | The published base has no movement-preview component; the preparation changes are applied without that import. |
+   | `apps/mobile/src/state/useStore.ts` | The published base has no athlete-context revision counter (it arrives with the unpublished Health Connect ordering work). The onboarding binding needs one, so the port adds the minimal counter under the same name and with the same three increment points, with a note in the code. |
+   | `packages/core-db/test/verify_library.py` | The published file has no preview-manifest checks; the content-correction checks are applied to the published file. |
+   | `PROMPT_LEDGER.md` | The published ledger ends at Entry 0135. Entry 0192 is appended with a numbering note; entries 0136–0191 are not reproduced. |
+
+3. The full `verify:ci` was run on the ported tip, not assumed from the
+   lineage run. Both results are in the final report. Suite and test counts quoted
+   in the work-order records are from the development lineage, which also
+   carries other lanes’ suites; the counts for the published branches are
+   lower and are given in each pull request.
+
+Consequences, stated plainly:
+
+- **Two lineages now carry the coaching work**: the local stacked branch
+  `codex/coaching-goals-sport-preparation` (as developed, on the frozen
+  baseline) and the four published branches (as ported). They are the same
+  changes; the published ones are the reviewable ones.
+- **When the prerequisite lineage is published by its owners**, merging it
+  with the coaching work will conflict in exactly the files in the table
+  above, in exactly the ways described there. That reconciliation is a
+  release blocker and is theirs and the owner's to schedule; it is not
+  attempted here.
+- Migration filenames `065`–`068` are taken by the coaching work on the
+  published branches. The animation lane's proposed
+  `065_incline_scapular_coaching_correction.sql` must take the next unused
+  filename when it lands (`user_version` counts entries, so order of landing
+  is safe as long as each lane appends).

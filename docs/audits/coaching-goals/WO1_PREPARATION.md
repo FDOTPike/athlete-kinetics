@@ -113,7 +113,7 @@ Existing tests changed on purpose, and why:
 | --- | --- |
 | `SessionAccessBoundary`, `TrainingSupportBoundary`, `TrainingSupportEvidenceIdentity` | Their helpers start a session and log a set immediately. They now record preparation as *already warm* first; the gate itself is tested separately. |
 | `KeyboardLayout` | Text-input count 31 to 32 for the panel's "exercise you did instead" field, which carries the required `disableFullscreenUI`. |
-| `verify_migrations`, `verify_blocks`, `verify_pipeline`, `verify_backup_contract`, `verify_store_sql` | Deliberate version pins moved from 63 entries / 104 tables / 24 gates to 64 / 106 / 25. |
+| `verify_migrations`, `verify_blocks`, `verify_pipeline`, `verify_backup_contract`, `verify_store_sql` | Deliberate version pins moved from 63 entries / 104 tables / 22 gates to 64 / 106 / 23 on the published base (24 to 25 gates on the development lineage; see BASELINE.md). |
 | `verify_programQualityRound2 [P3]` | 15-minute anchor capacity 3 to 2, with a new 45-minute check. |
 
 No existing routine or pipeline assertion had to be loosened.
