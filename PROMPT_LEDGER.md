@@ -12113,3 +12113,25 @@ requests and the handback.
   requests. MERGE: NOT PERFORMED. DEPLOY: NOT PERFORMED. RELEASE: NO-GO —
   OWNER CONTENT APPROVAL, LINEAGE RECONCILIATION AND NATIVE-DEVICE
   ACCEPTANCE REMAIN.
+
+Addendum, same day — review of pull request 22 (CodeRabbit, four findings, all
+checked against the code and all valid):
+
+- **Real defect:** a longer session was offered from the current estimate
+  without planning the block at that length; 540 of 1,287 such offers in the
+  profile domain were themselves infeasible. Offers are now verified by
+  re-planning. **Hardening:** the preparation transition trigger fires on
+  every update and freezes a row with a recorded outcome; schema fingerprints
+  v64–v67 were re-pinned (nothing with the old values has shipped). Two
+  documentation fixes. Details: `docs/audits/coaching-goals/WO1_PREPARATION.md`.
+- **Commits:** `e2313473` on WO1, merged forward (`51320326`, `298c28ac`,
+  `aa8113f6`) with a fingerprint re-pin in each merge; `a80827da` and
+  `cb4f8cc5` update two negative-control anchors that quoted the old
+  fingerprints. No force-push, no rebase of published commits.
+- **Gates after the fixes:** `npm run verify:ci` exit 0 on `48d6694c`, the
+  top of the published stack (23 gates; 55 suites, 877 of 877 tests), and
+  exit 0 on the lineage tip `f9830327` (25 gates; 78 suites, 1710 of 1710).
+  WO1 negative controls: 18 of 18 detected. Hosted CI had passed on all four
+  branches at their first published tips.
+- This supersedes the gate lines above for the final tips; the commit lists
+  above are the first published state.
