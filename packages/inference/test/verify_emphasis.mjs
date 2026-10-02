@@ -210,9 +210,12 @@ console.log('[3] scheduled sport workload');
     effect(2).accessorySetCut === 0 && !effect(2).holdHardestWeek
       && effect(3).accessorySetCut === 1 && !effect(3).holdHardestWeek
       && effect(5).accessorySetCut === 2 && effect(5).holdHardestWeek);
-  check('every effect explains itself and says the main lifts are unchanged when it cuts anything',
+  check('every effect explains itself and says truthfully what happens to the main lifts',
     [0, 2, 3, 5].every((n) => /^Sport workload: /.test(effect(n).explanation))
-      && [3, 5].every((n) => /main lifts/i.test(effect(n).explanation)));
+      && /Your main lifts and the weekly progression are unchanged\./.test(effect(3).explanation)
+      // The week-3 hold applies to every slot, so "unchanged" would be false here.
+      && /for every exercise, your main lifts included\. Your main lifts keep their exercises and their sets\./.test(effect(5).explanation)
+      && !/main lifts are unchanged/i.test(effect(5).explanation));
   check('no cross-sport load score is computed: the workload carries sessions and minutes only',
     Object.keys(fromSchedule).sort().join(',') === 'description,knownMinutesPerWeek,sessionsPerWeek,source,tier,unknownDurationSessions,weekdays');
 }
@@ -477,6 +480,14 @@ console.log('[9] workload changes accessory dose and progression only');
     week(veryHigh, 3).every((s, i) => dose(s) === dose(week(veryHigh, 2)[i]))
       && week(gppBase, 3).some((s, i) => dose(s) !== dose(week(gppBase, 2)[i]))
       && JSON.stringify(week(veryHigh, 4)) === JSON.stringify(week(gppBase, 4)));
+  const mainDose = (session) => session.slots.slice(0, 2).map((slot) => `${slot.sets}x${slot.reps}@${slot.target_rpe}`).join(',');
+  check('the week-3 hold reaches the main lifts, which is why the explanation must say so',
+    strengthDays(veryHigh, 3).every((s, i) => mainDose(s) === mainDose(strengthDays(veryHigh, 2)[i]))
+      && strengthDays(gppBase, 3).some((s, i) => mainDose(s) !== mainDose(strengthDays(veryHigh, 3)[i]))
+      // and they keep their exercises and their sets in every week
+      && veryHigh.sessions.every((s, i) => s.slots.slice(0, 2).every((slot, j) =>
+        slot.movement_id === gppBase.sessions[i].slots[j].movement_id
+        && (s.week_index === 3 || slot.sets === gppBase.sessions[i].slots[j].sets))));
   check('nothing is ever RAISED by sport workload',
     [light, high, veryHigh].every((block) => block.sessions.every((s, i) => s.slots.every((slot, j) =>
       slot.sets <= gppBase.sessions[i].slots[j].sets && slot.target_rpe <= gppBase.sessions[i].slots[j].target_rpe))));

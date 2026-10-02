@@ -522,8 +522,11 @@ export interface SportWorkloadEffect {
 }
 
 /**
- * What the workload changes in a NEW block. Main lifts and the deload week
- * are never touched, and nothing here raises anything.
+ * What the workload changes in a NEW block. Sets come off accessories only,
+ * the main lifts keep their exercises and their sets, and the deload week is
+ * never touched. At the highest tier the week-3 step-up is withheld for the
+ * WHOLE session, main lifts included: they repeat week 2. Nothing here raises
+ * anything.
  */
 export function sportWorkloadEffect(workload: SportWorkload): SportWorkloadEffect {
   const lead = `Sport workload: ${workload.description}.`;
@@ -532,7 +535,7 @@ export function sportWorkloadEffect(workload: SportWorkload): SportWorkloadEffec
       return {
         accessorySetCut: 2,
         holdHardestWeek: true,
-        explanation: `${lead} That is a very full week, so each accessory exercise has two fewer sets and week 3 of the block repeats week 2 instead of stepping up. Your main lifts are unchanged.`,
+        explanation: `${lead} That is a very full week, so each accessory exercise has two fewer sets, and week 3 of the block repeats week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts keep their exercises and their sets.`,
       };
     case 'high':
       return {

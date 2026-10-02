@@ -171,12 +171,14 @@ Full integrated `npm run verify:ci`:
 | Where | Result |
 | --- | --- |
 | Development lineage, the work order 2 commit, separate clean checkout | exit 0 (25 gates there; 75 suites, 1660 tests) |
-| Published branch `claude/coaching-wo2-focus-goals` at its first published tip, hosted CI on pull request 23 | "Verification suite (23 gates + typecheck)" passed |
+| Published branch `claude/coaching-wo2-focus-goals` at its first published tip (`e5d31069`), hosted CI on pull request 23 | "Verification suite (23 gates + typecheck)" passed |
 | Top of the published stack (all four work orders), local | exit 0 (23 gates; 55 suites, 877 tests) |
 
 This branch's own tip was **not** run through the full local `verify:ci` on
-the published base; the hosted run on the pull request is that check, and the
-table above is not complete validation evidence without it.
+the published base. The hosted result above is for the first published tip
+(`e5d31069`) only. Commits made after it are not verified by this record: the
+hosted run on the current tip of pull request 23 is the check for them, and
+this record does not claim its result.
 
 ### A defect in my own evidence, found and corrected
 
