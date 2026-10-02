@@ -12,7 +12,7 @@
  *
  * Law: zero hex literals; selected = inverted fill, never chalk; 56pt targets.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   FOCUS_BUNDLES,
@@ -207,9 +207,86 @@ export const goalFieldsFromGoal = (goal: {
   deadlineText: goal.requestedDeadline ?? '',
 });
 
+/** Goals measured on an exercise. Only these are asked which exercise they
+ *  are about: a body-weight or tape-measure goal has no exercise to name. */
+export const GOAL_EXERCISE_METRICS: ReadonlySet<GoalMetricId> = new Set<GoalMetricId>(['load_kg', 'reps', 'time_seconds']);
+
+export interface ExerciseOption {
+  readonly movement_id: number;
+  readonly name: string;
+}
+
+export interface GoalExerciseLink {
+  readonly movements: readonly ExerciseOption[];
+  readonly movementId: number | null;
+  readonly onChange: (movementId: number | null) => void;
+}
+
+/** "Which exercise is this about?" — optional. Search by name, pick one. */
+export function GoalExerciseField({ movements, movementId, onChange }: GoalExerciseLink): React.JSX.Element {
+  const [query, setQuery] = useState('');
+  const linked = movementId === null ? undefined : movements.find((movement) => movement.movement_id === movementId);
+  const needle = query.trim().toLowerCase();
+  const matches = needle.length < 2
+    ? []
+    : movements.filter((movement) => movement.name.toLowerCase().includes(needle)).slice(0, 6);
+  return (
+    <View testID="goal-exercise">
+      <Text style={styles.label}>WHICH EXERCISE IS THIS ABOUT? (OPTIONAL)</Text>
+      {linked !== undefined ? (
+        <>
+          <Text style={styles.body} testID="goal-exercise-linked">{`Linked exercise: ${linked.name}`}</Text>
+          <QuietAction
+            label="Remove the link"
+            onPress={() => { onChange(null); setQuery(''); }}
+            accessibilityLabel={`Remove the link to ${linked.name}`}
+            testID="goal-exercise-remove"
+          />
+        </>
+      ) : (
+        <>
+          <TextInput
+            disableFullscreenUI
+            style={styles.input}
+            value={query}
+            onChangeText={setQuery}
+            maxLength={60}
+            autoCapitalize="none"
+            placeholder="Type part of the exercise name"
+            placeholderTextColor={theme.color.textLow}
+            accessibilityLabel="Search for the exercise this goal is about"
+            testID="goal-exercise-search"
+          />
+          <View style={styles.wrap}>
+            {matches.map((movement) => (
+              <Chip
+                key={movement.movement_id}
+                testID={`goal-exercise-option-${movement.movement_id}`}
+                label={movement.name.toUpperCase()}
+                selected={false}
+                onPress={() => onChange(movement.movement_id)}
+                accessibilityLabel={`This goal is about ${movement.name}`}
+                style={styles.wrapChip}
+              />
+            ))}
+          </View>
+          {needle.length >= 2 && matches.length === 0 && (
+            <Text style={styles.dim} testID="goal-exercise-none">No exercise in the library has that in its name.</Text>
+          )}
+        </>
+      )}
+      <Text style={styles.dim}>
+        When a goal names an exercise, a new plan includes it whenever your equipment and experience level allow, and tells you when they do not.
+      </Text>
+    </View>
+  );
+}
+
 export interface GoalEditorProps {
   fields: GoalFields;
   onChange: (next: GoalFields) => void;
+  /** When supplied, goals measured on an exercise can name that exercise. */
+  exercise?: GoalExerciseLink;
   /** Local date, YYYY-MM-DD, supplied by the caller. */
   today: string;
   trainingAge?: TrainingAge;
@@ -217,7 +294,7 @@ export interface GoalEditorProps {
   showAllErrors?: boolean;
 }
 
-export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors = false }: GoalEditorProps): React.JSX.Element {
+export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors = false, exercise }: GoalEditorProps): React.JSX.Element {
   const patch = (next: Partial<GoalFields>): void => onChange({ ...fields, ...next });
   const validation = validateSmartGoal(goalDraftFromFields(fields), today);
   const metric = GOAL_METRIC_INFO[fields.metricId];
@@ -296,6 +373,10 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
         testID="goal-method"
       />
       {fieldError('measurementMethod', fields.measurementMethod.length > 0)}
+
+      {exercise !== undefined && GOAL_EXERCISE_METRICS.has(fields.metricId) && (
+        <GoalExerciseField movements={exercise.movements} movementId={exercise.movementId} onChange={exercise.onChange} />
+      )}
 
       <Text style={styles.label}>WHERE ARE YOU NOW?</Text>
       <View style={styles.group}>
