@@ -12135,3 +12135,33 @@ checked against the code and all valid):
   branches at their first published tips.
 - This supersedes the gate lines above for the final tips; the commit lists
   above are the first published state.
+
+Addendum 2 — reviews of pull requests 23, 24 and 25 (CodeRabbit is limited to
+one review an hour on this repository, so the four reviews took most of a day):
+
+- **Totals:** 14 findings across the four pull requests (4, 6, 3, 1). Every
+  one was checked against the code; all 14 were valid; all are fixed, and each
+  thread was answered and resolved. Nothing was dismissed.
+- **Real defects found by review:** session-length offers that were not
+  verified (#22); goal progress that mixed measurements across an edit, so
+  90 kg could read as "90 reps — target reached" (#23); an impossible date
+  reaching the database and its raw error reaching the athlete (#23); a past
+  deadline described as "less than 4 weeks away" (#23); and a stored plan
+  explanation that said "Your main lifts are unchanged" when the week-3 hold
+  applies to them (#24).
+- **Evidence defects found by review:** the negative-control scripts counted
+  any non-zero exit as detection and exited 0 on failure. All four now
+  require the gate to pass unmutated, require a reported failure, exit
+  non-zero otherwise, and rebuild what they mutate. The full re-runs found one
+  stale anchor (E6), which means the earlier "38 of 38" for WO3 was assembled
+  from runs made before a later fix; it is repaired. Totals after full
+  re-runs with the stricter harness: WO1 18 of 18, WO2 26 of 26, WO3 39 of
+  39, WO4 17 of 17.
+- **Gates:** `npm run verify:ci` exit 0 on `cd9ea28b`, the last commit that is not
+  documentation only (23 gates; 55 suites, 878 of 878 tests; worktree clean).
+  Hosted CI was read as passed on `554de035` (#22), `d7e5c746` (#23) and
+  `9d9dde11` (#24). Anything pushed after those is covered only by the
+  hosted run on its own tip; this entry does not claim those results.
+- **Unchanged:** nothing merged, nothing deployed, no force-push, no rebase
+  of published commits, no billing change (the review limit was waited out).
+  The release blockers above stand.

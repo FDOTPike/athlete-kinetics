@@ -263,9 +263,13 @@ Full integrated `npm run verify:ci`:
 
 | Where | Result |
 | --- | --- |
-| Development lineage, final tip, separate clean checkout | exit 0 (25 gates there; 78 suites, 1710 tests) |
-| Published branch at its first published tip, hosted CI on pull request 25 | "Verification suite (23 gates + typecheck)" passed |
-| Published branch, local (this is the top of the stack) | exit 0 (23 gates; 55 suites, 877 tests) |
+| Development lineage, final tip `8779a193`, separate clean checkout | exit 0 (25 gates there; 78 suites, 1711 tests) |
+| Published branch at its first published tip (`23da0fd0`), hosted CI on pull request 25 | "Verification suite (23 gates + typecheck)" passed |
+| Published branch at `cd9ea28b`, the last commit before this record was closed, local (this is the top of the stack) | exit 0 (23 gates; 55 suites, 878 tests) |
+
+Commits after `cd9ea28b` on this branch are documentation only. The hosted run
+on the current tip of pull request 25 is the check for anything later, and this
+record does not claim its result.
 
 ## Review of pull request 25
 
