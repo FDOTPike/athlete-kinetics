@@ -244,6 +244,70 @@ const blockAt = (capMin, overrides = {}, movements = library) => generateBlock({
   });
   check('the offered 30-minute session really is feasible for the same plan',
     feasibleRun.timeBudget.conflicts.length === 0 && feasibleRun.timeBudget.sessions.every((session) => session.feasible));
+
+  // REGRESSION (review of pull request 22): an offer used to be derived from the
+  // CURRENT session's estimate. A longer session is planned afresh — more
+  // movements, a larger preparation allowance — so a derived offer could itself
+  // be infeasible. Here a 26-minute run and a timed carry cross the 30 -> 45
+  // threshold, where the session gains its second movement.
+  const crossingLibrary = library.map((movement) => movement.pattern === 'locomotion'
+    ? { ...movement, timePolicy: { defaultSets: 1, targetSeconds: 1560 } }
+    : movement.pattern === 'carry' ? { ...movement, timePolicy: { defaultSets: 3, targetSeconds: 240 } } : movement);
+  const conditioningDays = [{ day_index: 1, focus: 'conditioning' }, { day_index: 3, focus: 'conditioning' }, { day_index: 5, focus: 'conditioning' }];
+  const crossingAt = (capMin) => generateBlock({
+    profile: profileAt(capMin, { objective: 'endurance' }), movements: crossingLibrary, startDate: '2026-10-05', programDays: conditioningDays,
+  });
+  const crossing = crossingAt(30);
+  const worstMin = Math.max(...crossing.timeBudget.sessions.map((session) => session.estimatedMin));
+  const derived = time.feasibleSessionAlternatives({ capMin: 30, requiredMin: worstMin, weeklyFrequency: 3 })[0];
+  const offered = crossing.timeBudget.alternatives.find((offer) => offer.kind === 'extend_session');
+  check('crossing fixture: the 30-minute block does not fit, and the length derived from its estimate is 45',
+    crossing.timeBudget.conflicts.length > 0 && derived !== undefined && derived.capMin === 45, `worst=${worstMin}`);
+  check('crossing fixture: the block planned AT 45 minutes gains a movement and does not fit either',
+    crossingAt(45).timeBudget.conflicts.length > 0
+      && crossingAt(45).sessions[0].slots.length > crossing.sessions[0].slots.length);
+  check('the offered length is one at which the regenerated block has no conflict',
+    offered !== undefined && offered.capMin > 45 && crossingAt(offered.capMin).timeBudget.conflicts.length === 0,
+    JSON.stringify(crossing.timeBudget.alternatives));
+  check('and it is the smallest such length on the 15-minute stepper',
+    offered !== undefined && [...Array((offered.capMin - 45) / 15).keys()].every((step) =>
+      crossingAt(45 + step * 15).timeBudget.conflicts.length > 0));
+  check('every conflict message names the verified length, never the derived one',
+    offered !== undefined && crossing.timeBudget.conflicts.every((conflict) =>
+      conflict.includes(`Lengthen sessions to ${offered.capMin} minutes.`) && !conflict.includes('Lengthen sessions to 45 minutes.')),
+    crossing.timeBudget.conflicts[0]);
+
+  // The same property across the profile domain, for both libraries: whatever
+  // is offered has been planned and fits.
+  let offersChecked = 0;
+  let offerDetail = '';
+  for (const movements of [library, runLibrary, crossingLibrary]) {
+    for (const objective of ['strength', 'hypertrophy', 'gpp', 'endurance', 'hybrid']) {
+      for (const frequency of [2, 3, 4, 5, 6]) {
+        for (const capMin of [15, 30, 45, 60, 75, 90]) {
+          const profile = profileAt(capMin, { objective, weekly_frequency: frequency });
+          const plan = generateBlock({ profile, movements, startDate: '2026-10-05' });
+          for (const offer of plan.timeBudget.alternatives) {
+            offersChecked += 1;
+            const replanned = generateBlock({
+              profile: { ...profile, session_duration_cap_min: offer.capMin,
+                weekly_frequency: offer.kind === 'fewer_longer_sessions' ? offer.weeklyFrequency : frequency },
+              movements, startDate: '2026-10-05',
+            });
+            if (replanned.timeBudget.conflicts.length > 0 || offer.capMin <= capMin
+                || (offer.kind === 'fewer_longer_sessions' && offer.weeklyFrequency * offer.capMin > frequency * capMin)) {
+              offerDetail = `${objective} f=${frequency} cap=${capMin} offer=${JSON.stringify(offer)}`;
+            }
+          }
+          if (plan.timeBudget.conflicts.length === 0 && plan.timeBudget.alternatives.length > 0) {
+            offerDetail = `${objective} f=${frequency} cap=${capMin}: offers without a conflict`;
+          }
+        }
+      }
+    }
+  }
+  check('every offer in the profile domain is longer than the current limit and fits when the block is planned as offered',
+    offersChecked > 0 && offerDetail === '', `${offersChecked} offers ${offerDetail}`);
 }
 
 // --- [3] routine microcycle -------------------------------------------------
