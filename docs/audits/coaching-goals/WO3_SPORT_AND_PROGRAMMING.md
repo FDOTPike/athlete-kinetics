@@ -154,11 +154,18 @@ All on desktop, Windows 11, Node 24, 2026-10-02.
 | `SportScreens.test.js` (real store behind the real screens) | 14 passed |
 | `BackupForwardRestore.test.js` (v63, v64, v65 forward restore; 067 round trip) | 18 passed |
 
-Full integrated `npm run verify:ci` in a separate clean checkout of the work
-order 3 commit on the development lineage: **exit 0** (all 25 gates there;
-component stage 77 suites, 1701 of 1701 tests). The run on the published
-branches (23 gates, fewer suites; see BASELINE.md) is given in the pull
-request.
+Full integrated `npm run verify:ci`:
+
+| Where | Result |
+| --- | --- |
+| Development lineage, the work order 3 commit, separate clean checkout | exit 0 (25 gates there; 77 suites, 1701 tests) |
+| Development lineage, with both later fixes | exit 0 (78 suites, 1710 tests) |
+| Published branch at its first published tip, hosted CI on pull request 24 | "Verification suite (23 gates + typecheck)" passed |
+| Top of the published stack (all four work orders), local | exit 0 (23 gates; 55 suites, 877 tests) |
+
+This branch's own tip was **not** run through the full local `verify:ci` on
+the published base; the hosted run on pull request 24 is that check
+(`claude/coaching-wo3-sport-programming`).
 
 Negative controls (`scripts/coaching/negative-controls-wo3.mjs`): the first
 complete run detected 32 of 35. The three misses were weaknesses in the tests
@@ -171,8 +178,12 @@ Independent review of the final diff then found one engine defect: a goal
 that named held movement 135 or 187 had it planned through the goal-exercise
 rule. Fixed (a held movement is skipped on both goal paths and the athlete is
 told it is on hold), with three new checks and two new mutations: 38 of 38
-detected. That fix is later than the `verify:ci` run above; the final
-integrated run is in the pull request and the final report.
+detected. That fix is later than the first run in the table above and is
+covered by the others.
+
+The negative-control script was later made stricter (a gate must pass
+unmutated, and must report a failure of its own under the mutation) and
+re-run in full: 38 of 38 detected.
 
 ### What the real store showed that the pure verifier could not
 

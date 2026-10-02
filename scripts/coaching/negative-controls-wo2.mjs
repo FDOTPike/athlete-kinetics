@@ -81,8 +81,8 @@ const mutations = [
   {
     name: 'N7 a measurement dated in the future is accepted',
     file: STORE,
-    from: `        || !/^\\d{4}-\\d{2}-\\d{2}$/.test(observedOn) || observedOn > localToday()) {`,
-    to: `        || !/^\\d{4}-\\d{2}-\\d{2}$/.test(observedOn)) {`,
+    from: `        || !realDate || observedOn > localToday()) {`,
+    to: `        || !realDate) {`,
     gate: jest('FocusGoalStore.test.js'),
   },
   {
@@ -215,12 +215,55 @@ const mutations = [
       JOIN json_each(d.target_muscles) j`,
     gate: MIG,
   },
+  {
+    name: 'N24 progress counts measurements taken in another unit or metric',
+    file: PURE_SRC,
+    from: `      && (row.unit === undefined || row.unit === goal.unit)
+      && (row.metricId === undefined || row.metricId === goal.metricId))`,
+    to: `)`,
+    gate: PURE,
+  },
+  {
+    name: 'N25 a goal whose date has gone is described as "less than 4 weeks away"',
+    file: PURE_SRC,
+    from: `  if (daysToDeadline < 1) {`,
+    to: `  if (daysToDeadline < -100000) {`,
+    gate: PURE,
+  },
+  {
+    name: 'N26 an impossible calendar date reaches the database and its raw error reaches the athlete',
+    file: 'apps/mobile/src/state/useStore.ts',
+    from: `        || !realDate || observedOn > localToday()) {`,
+    to: `        || !/^\\d{4}-\\d{2}-\\d{2}$/.test(observedOn) || observedOn > localToday()) {`,
+    gate: jest('FocusGoalStore.test.js'),
+  },
 ];
+
+// A mutation is "detected" only when (a) its gate passes WITHOUT the mutation
+// and (b) the mutated run reported a failure of its own. A gate that is already
+// broken, or one that dies without reporting anything, is not detection and is
+// reported as what it is.
+const baselineGate = new Map();
+const gatePassesUnmutated = (gate) => {
+  if (!baselineGate.has(gate)) baselineGate.set(gate, run(gate).status === 0);
+  return baselineGate.get(gate);
+};
+const failureEvidence = (output) => {
+  const lines = (output.match(/^\s*(?:FAIL|×|✕|ERROR)\s.*$/gm) ?? []).slice(0, 3).map((line) => line.trim().slice(0, 180));
+  if (lines.length > 0) return lines;
+  const other = output.match(/^.*(?:AssertionError|error TS\d+|stale:|Error:).*$/m)?.[0];
+  return other === undefined ? [] : [other.trim().slice(0, 180)];
+};
 
 const only = process.argv[2];
 const results = [];
 for (const mutation of mutations) {
   if (only !== undefined && !mutation.name.startsWith(`${only} `)) continue;
+  if (!gatePassesUnmutated(mutation.gate)) {
+    results.push({ name: mutation.name, outcome: 'GATE FAILS WITHOUT THE MUTATION' });
+    console.log(JSON.stringify(results.at(-1)));
+    continue;
+  }
   const original = fs.readFileSync(mutation.file, 'utf8');
   const occurrences = original.split(mutation.from).length - 1;
   if (occurrences === 0 || (occurrences !== 1 && mutation.firstOnly !== true)) {
@@ -232,9 +275,9 @@ for (const mutation of mutations) {
   let result;
   try { result = run(mutation.gate); } finally { fs.writeFileSync(mutation.file, original); }
   const output = `${result.stdout}\n${result.stderr}`;
-  const failed = (output.match(/^\s*(?:FAIL|×|✕)\s.*$/gm) ?? []).slice(0, 3).map((line) => line.trim().slice(0, 160));
-  const compile = failed.length === 0 ? (output.match(/error TS\d+.*$/m)?.[0] ?? '').slice(0, 160) : '';
-  results.push({ name: mutation.name, outcome: result.status === 0 ? 'NOT DETECTED' : 'detected', exit: result.status, sample: failed, compile });
+  const evidence = failureEvidence(output);
+  const outcome = result.status === 0 ? 'NOT DETECTED' : evidence.length === 0 ? 'FAILED WITH NO REPORTED CHECK' : 'detected';
+  results.push({ name: mutation.name, outcome, exit: result.status, sample: evidence });
   console.log(JSON.stringify(results.at(-1)));
 }
 // Rebuild the unmutated verifier outputs.

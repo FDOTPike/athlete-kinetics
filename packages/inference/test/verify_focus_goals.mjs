@@ -188,6 +188,15 @@ console.log('[5] feasibility');
     all[2].kind === 'no_deadline' && all[2].weeksAvailable === null && /4-week plan review/.test(all[2].explanation));
   check('a deadline before the first review is not rushed or peaked for',
     all[3].kind === 'before_first_review' && all[3].weeksAvailable === 2 && /will not be rushed or peaked/.test(all[3].explanation));
+  const passed = assess({ ...goal, requestedDeadline: '2026-09-01' });
+  const dueToday = assess({ ...goal, requestedDeadline: TODAY });
+  check('a stored goal whose date has gone is told so, not that the date is "less than 4 weeks away"',
+    passed.kind === 'deadline_passed' && passed.changePerWeek === null && passed.weeksAvailable === 0
+      && /The date you chose \(2026-09-01\) has passed\. Edit the goal to choose a new date, or remove the deadline\./.test(passed.explanation)
+      && !/less than 4 weeks away/.test(passed.explanation)
+      && dueToday.kind === 'deadline_passed' && /is today/.test(dueToday.explanation));
+  check('a date one day ahead is still an ordinary short deadline',
+    assess({ ...goal, requestedDeadline: '2026-10-03' }).kind === 'before_first_review');
   check('the review horizon is four weeks and is separate from the goal deadline',
     fg.PLAN_REVIEW_WEEKS === 4 && strength.weeksAvailable !== fg.PLAN_REVIEW_WEEKS);
   check('gradual weight loss is recognised against the cited public-health guidance',
@@ -204,6 +213,16 @@ console.log('[5] feasibility');
 console.log('[6] progress from recorded observations only');
 {
   const goal = fg.validateSmartGoal(goodDraft, TODAY).goal;
+  const inKg = { unit: goal.unit, metricId: goal.metricId };
+  check('a measurement taken in another unit is left out of progress (the goal was edited to count something else)',
+    fg.goalProgress(goal, [{ observedOn: '2026-11-01', value: 12, unit: 'reps', metricId: 'reps' }]).kind === 'no_observations'
+      && fg.goalProgress(goal, [
+        { observedOn: '2026-10-20', value: 90, ...inKg },
+        { observedOn: '2026-11-01', value: 12, unit: 'reps', metricId: 'reps' },
+      ]).latest.value === 90);
+  check('a measurement of another metric in the SAME unit is left out too (body weight is not a lift)',
+    fg.goalProgress(goal, [{ observedOn: '2026-11-01', value: 101, unit: goal.unit, metricId: 'bodyweight_kg' }]).kind === 'no_observations'
+      && fg.goalProgress(goal, [{ observedOn: '2026-11-01', value: 101, ...inKg }]).kind === 'reached');
   const none = fg.goalProgress(goal, []);
   check('no observation means no progress is reported — nothing is inferred',
     none.kind === 'no_observations' && none.latest === null && none.fractionOfGap === null

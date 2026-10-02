@@ -138,9 +138,15 @@ export function readAthleteGoals(db: FocusGoalDb): StoredGoal[] {
   ));
   const observations = rowsOf<{
     observation_id: string; goal_id: string; goal_revision: number; observed_on: string; value: number; unit: string;
+    metric_id: string | null;
   }>(db.executeSync(
-    `SELECT observation_id, goal_id, goal_revision, observed_on, value, unit
-       FROM athlete_goal_observation ORDER BY goal_id, observed_on, recorded_at_ms, observation_id`,
+    // The metric comes from the revision the measurement was recorded against,
+    // so progress can leave out measurements of something the goal no longer
+    // tracks (two metrics can share a unit: lifted kilograms and body weight).
+    `SELECT o.observation_id, o.goal_id, o.goal_revision, o.observed_on, o.value, o.unit, r.metric_id
+       FROM athlete_goal_observation o
+       LEFT JOIN athlete_goal_revision r ON r.goal_id = o.goal_id AND r.revision = o.goal_revision
+      ORDER BY o.goal_id, o.observed_on, o.recorded_at_ms, o.observation_id`,
   ));
   return goals.map((row) => ({
     goalId: row.goal_id,
@@ -153,6 +159,7 @@ export function readAthleteGoals(db: FocusGoalDb): StoredGoal[] {
       observedOn: item.observed_on,
       value: item.value,
       unit: item.unit,
+      ...(item.metric_id === null ? {} : { metricId: item.metric_id }),
     })),
     createdAtMs: row.created_at_ms,
     updatedAtMs: row.updated_at_ms,

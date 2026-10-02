@@ -333,6 +333,29 @@ describe('goals are edited by appending, never by rewriting', () => {
   });
 });
 
+describe('progress uses only measurements of what the goal tracks now', () => {
+  test('after an edit to a different metric, earlier measurements stay on record but leave progress', () => {
+    expect(state().saveGoal(GOAL)).toBe(true);
+    const { goalId } = state().goals[0];
+    expect(state().recordGoalObservation(goalId, '2020-01-05', 90)).toBe(true);
+    // The same goal now counts repetitions instead of kilograms.
+    expect(state().saveGoal({
+      ...GOAL, metricId: 'reps', baselineKnown: true, baselineValue: 5, targetValue: 12,
+    }, { goalId, expectedRevision: 1 })).toBe(true);
+    const stored = state().goals[0];
+    expect(stored.goal).toMatchObject({ metricId: 'reps', unit: 'reps' });
+    // Nothing was deleted or rewritten: the kilogram measurement is still there,
+    // labelled with the metric it was recorded against.
+    expect(stored.observations).toMatchObject([{ value: 90, unit: 'kg', metricId: 'load_kg', goalRevision: 1 }]);
+    const { goalProgress } = require('@ak/inference');
+    // 90 kg is not "90 reps, target reached".
+    expect(goalProgress(stored.goal, stored.observations).kind).toBe('no_observations');
+    expect(state().recordGoalObservation(goalId, '2020-02-05', 8)).toBe(true);
+    const after = state().goals[0];
+    expect(goalProgress(after.goal, after.observations)).toMatchObject({ kind: 'moving_toward', latest: { value: 8 } });
+  });
+});
+
 describe('observations are real measurements only', () => {
   test('a future date, a non-number and an unknown goal record nothing', () => {
     expect(state().saveGoal(GOAL)).toBe(true);
@@ -342,6 +365,12 @@ describe('observations are real measurements only', () => {
     expect(state().recordGoalObservation(goalId, '2020-01-05', -1)).toBe(false);
     expect(state().recordGoalObservation(goalId, 'last week', 90)).toBe(false);
     expect(state().error).toMatch(/Enter the measurement and the date/);
+    // An impossible calendar date is ordinary typed input: same plain message,
+    // never the database's own constraint text.
+    useStore.setState({ error: null });
+    expect(state().recordGoalObservation(goalId, '2020-02-30', 90)).toBe(false);
+    expect(state().error).toBe('Enter the measurement and the date it was taken (today or earlier).');
+    expect(state().recordGoalObservation(goalId, '2021-13-01', 90)).toBe(false);
     expect(state().recordGoalObservation('goal-that-does-not-exist', '2020-01-05', 90)).toBe(false);
     expect(count('athlete_goal_observation')).toBe(0);
   });

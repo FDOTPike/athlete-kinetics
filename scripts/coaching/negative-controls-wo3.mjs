@@ -68,9 +68,9 @@ const mutations = [
     name: 'E6 a goal exercise is taken from outside the gated pool',
     file: GEN,
     from: `          ? pool.find((candidate) => candidate.pattern === pattern
-              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id))`,
+              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id)`,
     to: `          ? input.movements.find((candidate) => candidate.pattern === pattern
-              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id))`,
+              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id)`,
     gate: PURE,
   },
   {
@@ -332,10 +332,31 @@ const mutations = [
   },
 ];
 
+// A mutation is "detected" only when (a) its gate passes WITHOUT the mutation
+// and (b) the mutated run reported a failure of its own. A gate that is already
+// broken, or one that dies without reporting anything, is not detection and is
+// reported as what it is.
+const baselineGate = new Map();
+const gatePassesUnmutated = (gate) => {
+  if (!baselineGate.has(gate)) baselineGate.set(gate, run(gate).status === 0);
+  return baselineGate.get(gate);
+};
+const failureEvidence = (output) => {
+  const lines = (output.match(/^\s*(?:FAIL|×|✕|ERROR)\s.*$/gm) ?? []).slice(0, 3).map((line) => line.trim().slice(0, 180));
+  if (lines.length > 0) return lines;
+  const other = output.match(/^.*(?:AssertionError|error TS\d+|stale:|Error:).*$/m)?.[0];
+  return other === undefined ? [] : [other.trim().slice(0, 180)];
+};
+
 const only = process.argv[2];
 const results = [];
 for (const mutation of mutations) {
   if (only !== undefined && !mutation.name.startsWith(`${only} `)) continue;
+  if (!gatePassesUnmutated(mutation.gate)) {
+    results.push({ name: mutation.name, outcome: 'GATE FAILS WITHOUT THE MUTATION' });
+    console.log(JSON.stringify(results.at(-1)));
+    continue;
+  }
   const original = fs.readFileSync(mutation.file, 'utf8');
   let mutated = original;
   let anchorProblem = null;
@@ -353,9 +374,9 @@ for (const mutation of mutations) {
   let result;
   try { result = run(mutation.gate); } finally { fs.writeFileSync(mutation.file, original); }
   const output = `${result.stdout}\n${result.stderr}`;
-  const failed = (output.match(/^\s*(?:FAIL|×|✕)\s.*$/gm) ?? []).slice(0, 3).map((line) => line.trim().slice(0, 170));
-  const compile = failed.length === 0 ? (output.match(/error TS\d+.*$/m)?.[0] ?? '').slice(0, 170) : '';
-  results.push({ name: mutation.name, outcome: result.status === 0 ? 'NOT DETECTED' : 'detected', exit: result.status, sample: failed, compile });
+  const evidence = failureEvidence(output);
+  const outcome = result.status === 0 ? 'NOT DETECTED' : evidence.length === 0 ? 'FAILED WITH NO REPORTED CHECK' : 'detected';
+  results.push({ name: mutation.name, outcome, exit: result.status, sample: evidence });
   console.log(JSON.stringify(results.at(-1)));
 }
 // Rebuild the unmutated verifier outputs.
