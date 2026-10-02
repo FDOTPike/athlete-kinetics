@@ -225,8 +225,16 @@ import {
   MAX_ACTIVE_GOALS,
   normalizeFocusSelection,
   validateSmartGoal,
+  buildProgramEmphasis,
+  resolveSportWorkload,
+  validateSportProfile,
   type FocusSelection,
+  type GoalMovementLink,
+  type ProgramEmphasis,
   type SmartGoalDraft,
+  type SportProfile,
+  type SportProfileDraft,
+  type SportWorkload,
 } from '@ak/inference';
 import {
   deleteAllGoalObservations,
@@ -235,6 +243,7 @@ import {
   insertGoalObservation,
   readAthleteFocus,
   readAthleteGoals,
+  readMovementMuscleRoles,
   reviseAthleteGoal,
   setAthleteGoalStatus,
   writeAthleteFocus,
@@ -243,6 +252,21 @@ import {
   type StoredGoal,
 } from './focusGoalStore';
 export type { GoalStatus, StoredFocus, StoredGoal, StoredGoalObservation } from './focusGoalStore';
+import {
+  clearBlockEmphasis,
+  clearSportProfile,
+  deleteBlockEmphasisFor,
+  insertBlockEmphasis,
+  readBlockEmphasis,
+  readGoalMovementLinks,
+  readScheduledSportSessions,
+  readSportProfile,
+  setGoalMovementLink,
+  writeSportProfile,
+  type StoredBlockEmphasis,
+  type StoredSportProfile,
+} from './sportStore';
+export type { StoredBlockEmphasis, StoredSportProfile } from './sportStore';
 
 /** Identifies the athlete and store context an onboarding draft was started
  *  for. A draft may only be committed to exactly that athlete's database. */
@@ -260,6 +284,10 @@ export interface OnboardingExtras {
   readonly focus?: { readonly bundleId: string | null; readonly muscles: readonly string[] };
   /** A detailed goal, or null/absent when the athlete chose focus only. */
   readonly goal?: SmartGoalDraft | null;
+  /** The exercise that goal is about, when the athlete named one. */
+  readonly goalMovementId?: number | null;
+  /** The sport answer, or null/absent when the athlete plays no sport. */
+  readonly sport?: SportProfileDraft | null;
 }
 
 export const ONBOARDING_STALE_MESSAGE = 'This setup was started for a different athlete, so nothing was saved. Start the setup again for the athlete shown now.';
@@ -969,12 +997,34 @@ interface KineticsStore {
    *  when the selection is not valid. Never changes an existing plan. */
   saveFocus: (input: { bundleId: string | null; muscles: readonly string[] }) => boolean;
   /** Create a goal (no goalId) or edit one by APPENDING a revision. Earlier
-   *  revisions, observations and past plans are never rewritten. */
-  saveGoal: (draft: SmartGoalDraft, existing?: { goalId: string; expectedRevision: number }) => boolean;
+   *  revisions, observations and past plans are never rewritten.
+   *  `movementId` ties the goal to one exercise (null unties it; absent leaves
+   *  the link as it is). */
+  saveGoal: (
+    draft: SmartGoalDraft,
+    existing?: { goalId: string; expectedRevision: number },
+    movementId?: number | null,
+  ) => boolean;
   setGoalStatus: (goalId: string, status: GoalStatus) => boolean;
   /** Record one real measurement for a goal. Nothing is ever derived. */
   recordGoalObservation: (goalId: string, observedOn: string, value: number) => boolean;
   removeGoalObservation: (observationId: string) => void;
+  /** The athlete's sport answer (067); null when they play no sport. */
+  sport: StoredSportProfile | null;
+  /** Weekly sport workload as the NEXT block will see it: the Activities
+   *  schedule when it has sessions, otherwise the numbers stated with the
+   *  sport answer. The two are never added. */
+  sportWorkload: SportWorkload;
+  /** goal id -> the exercise that goal is about. */
+  goalMovements: Readonly<Record<string, number>>;
+  /** The frozen explanation of the ACTIVE block; null when it has none. */
+  blockEmphasis: StoredBlockEmphasis | null;
+  refreshSport: () => void;
+  /** Save the sport answer, or clear it with null. Never changes an existing
+   *  plan: it is read when the next block is created. */
+  saveSport: (draft: SportProfileDraft | null) => boolean;
+  /** Tie a goal to one exercise, or untie it with null. */
+  setGoalMovement: (goalId: string, movementId: number | null) => boolean;
   /** Triage a free-text complaint with a forced 1-10 severity (Phase 12 Step
    *  5). The severity gates the matched guardrail by training age. */
   reportSubjective: (text: string, severity: number) => Promise<void>;
@@ -1913,6 +1963,9 @@ const profileFromJsonString = (json: string): UserProfile => {
  *  report_severity) and niggles. set_record + the mech_daily triggers are
  *  untouched: logged training history is preserved. */
 const runBlockWipe = (d: DB, today: string): void => {
+  // Named explicitly: with foreign keys off the cascade would not run, and a
+  // block id is reused once its row is gone.
+  deleteBlockEmphasisFor(d, 'active');
   d.executeSync("DELETE FROM training_block WHERE status = 'active'");
   d.executeSync('DELETE FROM subjective_report WHERE date = ?', [today]);
   d.executeSync('DELETE FROM niggle WHERE reported_at_ms >= ?', [startOfTodayMs()]);
@@ -2513,9 +2566,33 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
  *  nothing bleeds across athletes (the re-boot re-hydrates all of it from the
  *  target file). `onboarded: true` here is the no-flash default; boot() then
  *  reads the real value from the new file. */
+/** No sport sessions scheduled or stated. */
+const NO_SPORT_WORKLOAD: SportWorkload = resolveSportWorkload({ scheduled: [], profile: null });
+
+/** Work order 3: everything the athlete has said about focus, goals, sport and
+ *  their weekly sport schedule, as the generator's additive side-car. It is
+ *  read from the DATABASE at generation time, never from screen state, so the
+ *  preview and the committed block cannot disagree. Null = nothing set = the
+ *  standard plan, byte-identical to the pre-emphasis generator. */
+const programEmphasisFor = (d: DB, startDate: string): ProgramEmphasis | null => {
+  const sport = readSportProfile(d);
+  const links = readGoalMovementLinks(d);
+  const goalMovements: GoalMovementLink[] = readAthleteGoals(d)
+    .filter((goal) => goal.status === 'active' && links.has(goal.goalId))
+    .map((goal) => ({ movementId: links.get(goal.goalId)!, goalLabel: goal.goal.specificOutcome }));
+  return buildProgramEmphasis({
+    focus: readAthleteFocus(d),
+    sport,
+    workload: resolveSportWorkload({ scheduled: readScheduledSportSessions(d, startDate), profile: sport }),
+    goalMovements,
+    roles: readMovementMuscleRoles(d),
+  });
+};
+
 const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   vector: null, trend: [], session: null, prescription: null, returnCheckin: null,
   focus: null, goals: [],
+  sport: null, sportWorkload: NO_SPORT_WORKLOAD, goalMovements: {}, blockEmphasis: null,
   activityLedger: EMPTY_ACTIVITY_LEDGER,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, preparation: null, substitution: null, niggles: [],
@@ -2542,6 +2619,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   returnCheckin: null,
   focus: null,
   goals: [],
+  sport: null,
+  sportWorkload: NO_SPORT_WORKLOAD,
+  goalMovements: {},
+  blockEmphasis: null,
   vector: null,
   trend: [],
   movements: [],
@@ -2730,6 +2811,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       get().loadRoutineTemplates();
       get().refreshReturnCheckin();
       get().refreshFocusAndGoals();
+    get().refreshSport();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
       // duration (endSession stamps duration or deletes empty shells).
@@ -3657,11 +3739,15 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     return true;
   },
 
-  saveGoal: (draft, existing) => {
+  saveGoal: (draft, existing, movementId) => {
     if (get().status !== 'ready') return false;
     const validated = validateSmartGoal(draft, localToday());
     if (!validated.ok) {
       set({ error: validated.errors[0]?.message ?? 'That goal is not complete yet.' });
+      return false;
+    }
+    if (typeof movementId === 'number' && !get().movements.some((movement) => movement.movement_id === movementId)) {
+      set({ error: 'That exercise is not in the library.' });
       return false;
     }
     if (existing === undefined
@@ -3674,11 +3760,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     let applied = true;
     d.executeSync('BEGIN');
     try {
+      const goalId = existing?.goalId ?? `goal-${nowMs}-${Math.floor(Math.random() * 1e9).toString(36)}`;
       if (existing === undefined) {
-        insertAthleteGoal(d, `goal-${nowMs}-${Math.floor(Math.random() * 1e9).toString(36)}`, validated.goal, nowMs);
+        insertAthleteGoal(d, goalId, validated.goal, nowMs);
       } else {
         applied = reviseAthleteGoal(d, existing.goalId, existing.expectedRevision, validated.goal, nowMs);
       }
+      // The exercise link is saved with the goal or not at all.
+      if (applied && movementId !== undefined) setGoalMovementLink(d, goalId, movementId, nowMs);
       d.executeSync('COMMIT');
     } catch (e) {
       try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
@@ -3686,7 +3775,70 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       return false;
     }
     set({ goals: readAthleteGoals(d), error: applied ? null : 'This goal changed since you opened it. Review it and try again.' });
+    get().refreshSport();
     return applied;
+  },
+
+  refreshSport: () => {
+    const d = getDb();
+    const sport = readSportProfile(d);
+    set({
+      sport,
+      sportWorkload: resolveSportWorkload({ scheduled: readScheduledSportSessions(d, localToday()), profile: sport }),
+      goalMovements: Object.fromEntries(readGoalMovementLinks(d)),
+    });
+  },
+
+  saveSport: (draft) => {
+    if (get().status !== 'ready') return false;
+    let profile: SportProfile | null = null;
+    if (draft !== null) {
+      const validated = validateSportProfile(draft, localToday());
+      if (!validated.ok) {
+        set({ error: validated.errors[0]?.message ?? 'That sport answer is not complete yet.' });
+        return false;
+      }
+      profile = validated.profile;
+    }
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      if (profile === null) clearSportProfile(d);
+      else writeSportProfile(d, profile, Date.now());
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ error: null });
+    get().refreshSport();
+    return true;
+  },
+
+  setGoalMovement: (goalId, movementId) => {
+    if (get().status !== 'ready') return false;
+    if (!get().goals.some((goal) => goal.goalId === goalId)) {
+      set({ error: 'That goal no longer exists.' });
+      return false;
+    }
+    if (movementId !== null && !get().movements.some((movement) => movement.movement_id === movementId)) {
+      set({ error: 'That exercise is not in the library.' });
+      return false;
+    }
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      setGoalMovementLink(d, goalId, movementId, Date.now());
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ error: null });
+    get().refreshSport();
+    return true;
   },
 
   setGoalStatus: (goalId, status) => {
@@ -3786,6 +3938,22 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: `You can keep up to ${MAX_ACTIVE_GOALS} active goals. Retire one before adding another.` });
       return;
     }
+    const goalMovementId = validatedGoal !== null && typeof extras?.goalMovementId === 'number'
+      ? extras.goalMovementId
+      : null;
+    if (goalMovementId !== null && !get().movements.some((movement) => movement.movement_id === goalMovementId)) {
+      set({ error: 'That exercise is not in the library.' });
+      return;
+    }
+    let sportProfile: SportProfile | null = null;
+    if (extras?.sport !== undefined && extras.sport !== null) {
+      const validatedSport = validateSportProfile(extras.sport, localToday());
+      if (!validatedSport.ok) {
+        set({ error: validatedSport.errors[0]?.message ?? 'That sport answer is not complete yet.' });
+        return;
+      }
+      sportProfile = validatedSport.profile;
+    }
     // ONE atomic save: profile fields + load preference commit in a SINGLE
     // SQLite transaction — no committed state may contain a completed
     // onboarding profile with the wrong tier default (WO §5). The stamp on
@@ -3827,8 +3995,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // Same transaction as the profile: the interview is saved whole or not at all.
       const savedAtMs = Date.now();
       if (focusSelection !== null) writeAthleteFocus(d, focusSelection, savedAtMs);
+      if (sportProfile !== null) writeSportProfile(d, sportProfile, savedAtMs);
       if (validatedGoal !== null && validatedGoal.ok) {
-        insertAthleteGoal(d, `goal-${savedAtMs}-${Math.floor(Math.random() * 1e9).toString(36)}`, validatedGoal.goal, savedAtMs);
+        const goalId = `goal-${savedAtMs}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+        insertAthleteGoal(d, goalId, validatedGoal.goal, savedAtMs);
+        if (goalMovementId !== null) setGoalMovementLink(d, goalId, goalMovementId, savedAtMs);
       }
       d.executeSync('COMMIT');
     } catch (e) {
@@ -3844,6 +4015,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       focus: readAthleteFocus(d),
       goals: readAthleteGoals(d),
     });
+    get().refreshSport();
     if (get().prescription !== null) get().computePrescription([]);
     const releaseNameLease = tryAcquireDataMutationLease();
     if (releaseNameLease === null) {
@@ -3937,11 +4109,13 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // undated one does. Dedicated competition preparation is deferred.
       : nextMacroPosition(d).macroBlockIndex;
     const effectiveProfile = { ...planningProfile, weekly_frequency: shape.days.length };
+    const previewEmphasis = programEmphasisFor(d, startDate);
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
       schemaType: input.schemaType, macroBlockIndex,
       programDays: shape.programDays,
       powerPreferredMovementNames: powerNames,
+      ...(previewEmphasis === null ? {} : { emphasis: previewEmphasis }),
     });
     const support = supportDecision(plan.sessions.flatMap((day) => day.slots.map((slot) => slot.movement_id)));
     if (support.status !== 'available') throw new Error(supportMessage(support));
@@ -4133,6 +4307,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       : null;
     const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
 
+    const blockEmphasisInput = programEmphasisFor(d, today);
     const plan = generateBlock({
       profile,
       movements: genMovements,
@@ -4142,6 +4317,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
       flawReport,
       powerPreferredMovementNames: powerNamesGenerate,
+      ...(blockEmphasisInput === null ? {} : { emphasis: blockEmphasisInput }),
     });
     // Session-time contract: a block whose sessions cannot fit preparation,
     // rest and changeovers inside the session limit is not committed. The
@@ -4220,6 +4396,15 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       // supposed to return to, and the next real continuation would collide
       // with it. The block is still fully attributed through
       // block_suspension_origin, so "trained around the injury" stays legible.
+      // Work order 3: freeze what the emphasis was and what it did, in the
+      // SAME transaction as the block, so the explanation can never describe
+      // a different plan than the one it sits beside. Cleared first, always:
+      // a stale record under a reused block id is by definition not this
+      // block's, and a block with no emphasis must not appear to have one.
+      clearBlockEmphasis(d, blockId);
+      if (blockEmphasisInput !== null && plan.emphasis !== undefined) {
+        insertBlockEmphasis(d, blockId, blockEmphasisInput, plan.emphasis, Date.now());
+      }
       const openAtGeneration = openSuspension(d);
       if (programId !== null && openAtGeneration === null) {
         linkTrainingBlockProgram(d, blockId, programId, pendingProgramContinuation?.sequenceIndex ?? 1);
@@ -4311,7 +4496,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       "SELECT block_id, start_date, objective, created_at_ms FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
     ))[0];
     if (blockRow === undefined) {
-      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, pendingAutopilotAdjustments: [], hasArchivedBlock });
+      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, pendingAutopilotAdjustments: [], hasArchivedBlock, blockEmphasis: null });
       return;
     }
     const metaRow = rowsOf<{
@@ -4408,6 +4593,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       blockSessions,
       todayPlan,
       pendingAutopilotAdjustments,
+      blockEmphasis: readBlockEmphasis(d, blockRow.block_id),
     });
   },
 
@@ -4963,6 +5149,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
           [today, profile.objective, Date.now()],
         );
         const blockId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        // An athlete-authored routine carries no generated emphasis; make sure
+        // a stale explanation under a reused block id is not shown beside it.
+        clearBlockEmphasis(d, blockId);
         // Continue the macrocycle. Freezing a template is not a reason to lose
         // the athlete's periodization position.
         const macro = nextMacroPosition(d);
@@ -7360,6 +7549,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       d.executeSync('DELETE FROM session_outcome');
       d.executeSync('DELETE FROM micro_cycle');
       d.executeSync('DELETE FROM macro_cycle');
+      deleteBlockEmphasisFor(d, 'all');
       d.executeSync('DELETE FROM training_block');
       // The 059 side-cars, AFTER every one of their parents is gone — the same
       // parent-first rule set_dose_target and session_outcome follow above.
@@ -7404,6 +7594,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       prescription: null, substitution: null, lastTriage: null, niggles: [],
       returnCheckin: null,
       block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
+      blockEmphasis: null,
       lastEndedSessionId: null,
       // The open episode was just deleted above; leaving the field set would
       // keep the UI showing a suspension card the database no longer backs.
@@ -7415,6 +7606,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     get().refreshNiggles();
     get().refreshReturnCheckin();
     get().refreshFocusAndGoals();
+    get().refreshSport();
     // Re-read from the wiped file rather than trusting the set() above: this is
     // the same read every other surface here gets, and it is what makes the
     // in-memory value and the database agree after the wipe.

@@ -65,7 +65,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '063_movement_load_intent.sql',
   '064_accessible_coach_support.sql',
   '065_session_preparation.sql',
-  '066_focus_and_goals.sql'];
+  '066_focus_and_goals.sql',
+  '067_sport_and_emphasis.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1697,7 +1698,8 @@ for (const target of ['movement_capability_family', 'movement_capability_attesta
   // cannot be dropped with foreign keys on; its loss is exercised in [066].
   'muscle_group_alias', 'movement_muscle_role',
   'athlete_focus', 'athlete_focus_muscle',
-  'athlete_goal', 'athlete_goal_revision', 'athlete_goal_observation']) {
+  'athlete_goal', 'athlete_goal_revision', 'athlete_goal_observation',
+  'athlete_sport_profile', 'athlete_goal_movement', 'block_emphasis']) {
   const db = freshDb();
   runMigrations(db, MIGRATIONS);
   const before = uv(db);
@@ -1758,11 +1760,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 65 files (slots 001-066, no 004) -> user_version 65. This count is
+    // 66 files (slots 001-067, no 004) -> user_version 66. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 066 (focus and SMART goals).
-    check('fresh install reaches user_version 65 (65 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 65,
+    // silent one. Re-pinned for 067 (sport profile and block emphasis).
+    check('fresh install reaches user_version 66 (66 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 66,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -3509,8 +3511,8 @@ const athleteSnapshot = (db) => JSON.stringify(Object.fromEntries(ATHLETE_TABLES
 {
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
-  check('066 is appended after 065 and completes the chain',
-    IDX_066 === MIGRATIONS.length - 1 && IDX_066 === 64 && uv(d) === 65,
+  check('066 is appended directly after 065',
+    IDX_066 === 64 && FILES[IDX_066 - 1] === '065_session_preparation.sql' && uv(d) === MIGRATIONS.length,
     `index=${IDX_066} uv=${uv(d)}`);
   check('066 installs every table and guard',
     [...SEED_TABLES_066, ...ATHLETE_TABLES_066].every((name) => d.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))
@@ -3721,6 +3723,178 @@ const athleteSnapshot = (db) => JSON.stringify(Object.fromEntries(ATHLETE_TABLES
     const runnerSrc066 = readFileSync(join(SCHEMA_DIR, '..', 'migrationRunner.ts'), 'utf-8');
     check('066 the cross-table revision trigger is on REPLAY_BLOCKING_TRIGGERS',
       runnerSrc066.indexOf("'trg_athlete_goal_revision_no_delete_bd',") > runnerSrc066.indexOf('REPLAY_BLOCKING_TRIGGERS'));
+  }
+}
+
+// --- 067 sport profile, goal exercise link, block emphasis record -------------
+// The sport objective is a side-car: athlete_profile.objective and the activity
+// kind list are byte-for-byte what they were. The block explanation is written
+// once and frozen. Everything self-heals without touching athlete rows.
+console.log('[067] sport profile and block emphasis');
+const IDX_067 = FILES.indexOf('067_sport_and_emphasis.sql');
+const TABLES_067 = ['athlete_sport_profile', 'athlete_goal_movement', 'block_emphasis'];
+const tableSql = (db, name) => db.raw.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(name)?.sql;
+const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+const insertSport = (db, columns = {}) => {
+  const row = {
+    sport_profile_id: 1, sport_id: 'basketball', other_sport_name: null, outcome_id: 'jump_higher',
+    experience_id: '2_to_5_years', practice_sessions_per_week: 2, matches_per_week: 1, typical_session_min: 90,
+    competition_date: null, revision: 1, updated_at_ms: 1000, ...columns,
+  };
+  const names = Object.keys(row);
+  db.raw.prepare(`INSERT INTO athlete_sport_profile (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})`).run(...Object.values(row));
+};
+const insertBlock = (db) => Number(db.raw.prepare("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2026-10-05', 'strength', 1000)").run().lastInsertRowid);
+const insertEmphasis = (db, blockId, inputs = '{"focus":"Lower body"}', report = '{"version":1,"applied":[],"omitted":[]}', version = 1) =>
+  db.raw.prepare('INSERT INTO block_emphasis (block_id, emphasis_version, inputs_json, report_json, created_at_ms) VALUES (?, ?, ?, ?, 2000)').run(blockId, version, inputs, report);
+const snapshot067 = (db) => JSON.stringify({
+  ...Object.fromEntries(TABLES_067.map((name) => [name, db.raw.prepare(`SELECT * FROM ${name} ORDER BY 1`).all()])),
+  goals: athleteSnapshot(db),
+  blocks: db.raw.prepare('SELECT * FROM training_block ORDER BY 1').all(),
+});
+
+{
+  const before = freshDb();
+  applyRaw(before, MIGRATIONS, 0, IDX_067);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  check('067 is appended after 066 and completes the chain',
+    IDX_067 === MIGRATIONS.length - 1 && IDX_067 === 65 && uv(d) === 66, `index=${IDX_067} uv=${uv(d)}`);
+  check('067 installs every table and the immutability guard',
+    TABLES_067.every((name) => tableSql(d, name) !== undefined) && triggerPresent(d, 'trg_block_emphasis_immutable_bu'));
+  check('067 fresh install records no sport, goal link or block explanation',
+    TABLES_067.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+  check('067 leaves the objective column and its CHECK exactly as they were (the sport is a side-car)',
+    tableSql(d, 'athlete_profile') === tableSql(before, 'athlete_profile')
+      && tableSql(d, 'training_block') === tableSql(before, 'training_block')
+      && throws(() => d.raw.exec("UPDATE athlete_profile SET objective = 'basketball'")));
+  check('067 leaves the activity kind list exactly as it was (a sport objective is not an activity kind)',
+    tableSql(d, 'activity_definition') === tableSql(before, 'activity_definition')
+      && tableSql(d, 'activity_series') === tableSql(before, 'activity_series')
+      && !/muay_thai|powerlifting|football_australian/.test(tableSql(d, 'activity_definition')));
+
+  // Sport profile.
+  insertSport(d);
+  check('067 one sport profile per athlete database', throws(() => insertSport(d, { sport_profile_id: 2 })) && throws(() => insertSport(d)));
+  d.raw.exec('DELETE FROM athlete_sport_profile');
+  check('067 only a known sport, outcome and experience band are accepted',
+    throws(() => insertSport(d, { sport_id: 'chess' })) && throws(() => insertSport(d, { outcome_id: 'win' }))
+      && throws(() => insertSport(d, { experience_id: 'forever' })));
+  check('067 "another sport" must be named, and a listed sport must not carry a free-text name',
+    throws(() => insertSport(d, { sport_id: 'other', outcome_id: 'general_support' }))
+      && throws(() => insertSport(d, { other_sport_name: 'Netball' }))
+      && !throws(() => insertSport(d, { sport_id: 'other', outcome_id: 'general_support', other_sport_name: 'Netball' })));
+  d.raw.exec('DELETE FROM athlete_sport_profile');
+  insertSport(d, { practice_sessions_per_week: null, matches_per_week: null, typical_session_min: null });
+  check('067 "not sure" is stored as NULL, never as zero',
+    d.raw.prepare('SELECT practice_sessions_per_week AS p, matches_per_week AS m, typical_session_min AS t FROM athlete_sport_profile').get().p === null);
+  d.raw.exec('DELETE FROM athlete_sport_profile');
+  check('067 workload numbers are bounded and a competition date must be a real date',
+    throws(() => insertSport(d, { practice_sessions_per_week: 15 })) && throws(() => insertSport(d, { matches_per_week: -1 }))
+      && throws(() => insertSport(d, { typical_session_min: 0 })) && throws(() => insertSport(d, { competition_date: '2027-02-30' }))
+      && !throws(() => insertSport(d, { competition_date: '2027-03-01' })));
+
+  // Goal exercise link.
+  insertGoal(d, 'goal-link-1');
+  d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-link-1', 1, 1000)");
+  const revisionsBefore = JSON.stringify(d.raw.prepare('SELECT * FROM athlete_goal_revision').all());
+  check('067 a goal links to at most one real exercise of a real goal',
+    throws(() => d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-link-1', 2, 1000)"))
+      && throws(() => d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-missing', 1, 1000)"))
+      && throws(() => d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-link-1', 999999, 1000)")));
+  d.raw.exec("UPDATE athlete_goal_movement SET movement_id = 2 WHERE goal_id = 'goal-link-1'");
+  d.raw.exec("DELETE FROM athlete_goal_movement WHERE goal_id = 'goal-link-1'");
+  check('067 changing or removing the link leaves the goal definition untouched',
+    JSON.stringify(d.raw.prepare('SELECT * FROM athlete_goal_revision').all()) === revisionsBefore
+      && Number(d.raw.prepare('SELECT COUNT(*) AS c FROM athlete_goal').get().c) === 1);
+  d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-link-1', 1, 1000)");
+  d.raw.exec("DELETE FROM athlete_goal WHERE goal_id = 'goal-link-1'");
+  check('067 deleting a goal removes its link with it',
+    Number(d.raw.prepare('SELECT COUNT(*) AS c FROM athlete_goal_movement').get().c) === 0);
+
+  // Block emphasis record.
+  const blockId = insertBlock(d);
+  check('067 a block explanation needs a real block, valid JSON objects and the known version',
+    throws(() => insertEmphasis(d, 424242)) && throws(() => insertEmphasis(d, blockId, 'not json'))
+      && throws(() => insertEmphasis(d, blockId, '[]')) && throws(() => insertEmphasis(d, blockId, '{}', '"text"'))
+      && throws(() => insertEmphasis(d, blockId, '{}', '{}', 2)));
+  insertEmphasis(d, blockId);
+  check('067 one explanation per block, and it is frozen once written',
+    throws(() => insertEmphasis(d, blockId))
+      && throws(() => d.raw.exec("UPDATE block_emphasis SET report_json = '{}'"))
+      && throws(() => d.raw.exec('UPDATE block_emphasis SET created_at_ms = 1')));
+  d.raw.prepare('DELETE FROM training_block WHERE block_id = ?').run(blockId);
+  check('067 the explanation goes when its block goes',
+    Number(d.raw.prepare('SELECT COUNT(*) AS c FROM block_emphasis').get().c) === 0);
+}
+
+// Upgrade from the shipped pre-067 state with athlete data in place.
+{
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_067);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-09-10', 1111, 55.5)");
+  insertGoal(upgrade, 'goal-upgrade-1');
+  insertBlock(upgrade);
+  const state = () => JSON.stringify({
+    session: upgrade.raw.prepare('SELECT * FROM session').all(),
+    profile: upgrade.raw.prepare('SELECT * FROM athlete_profile').all(),
+    goals: athleteSnapshot(upgrade),
+    blocks: upgrade.raw.prepare('SELECT * FROM training_block').all(),
+    seed: seedSnapshot(upgrade),
+  });
+  const before = state();
+  runMigrations(upgrade, MIGRATIONS);
+  check('067 clean upgrade reaches the latest version with no missing sentinel',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0,
+    `uv=${uv(upgrade)} missing=${sentinelsMissing(upgrade).join(',')}`);
+  check('067 upgrade leaves sessions, the profile, goals, blocks and the muscle mapping untouched', state() === before);
+  check('067 upgrade invents no sport, no goal link and no explanation for an existing block',
+    TABLES_067.every((name) => Number(upgrade.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+}
+
+// Self-heal with athlete rows in place.
+{
+  const seeded = () => {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    insertSport(db, { competition_date: '2027-03-01' });
+    insertGoal(db, 'goal-heal-67');
+    db.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-heal-67', 1, 1000)");
+    insertEmphasis(db, insertBlock(db));
+    return db;
+  };
+  {
+    const heal = seeded();
+    const before = snapshot067(heal);
+    heal.raw.exec('DROP TRIGGER trg_block_emphasis_immutable_bu');
+    const detected = sentinelsMissing(heal).includes('trg_block_emphasis_immutable_bu');
+    runMigrations(heal, MIGRATIONS);
+    check('067 a lost immutability guard is detected and restored; the full replay alters no athlete row',
+      detected && triggerPresent(heal, 'trg_block_emphasis_immutable_bu') && uv(heal) === MIGRATIONS.length
+        && snapshot067(heal) === before && throws(() => heal.raw.exec("UPDATE block_emphasis SET report_json = '{}'")));
+  }
+  for (const name of TABLES_067) {
+    const heal = seeded();
+    const keep = TABLES_067.filter((other) => other !== name);
+    const beforeOthers = JSON.stringify(keep.map((other) => heal.raw.prepare(`SELECT * FROM ${other} ORDER BY 1`).all()));
+    const goalsBefore = athleteSnapshot(heal);
+    heal.raw.exec('PRAGMA foreign_keys = OFF');
+    heal.raw.exec(`DROP TABLE ${name}`);
+    heal.raw.exec('PRAGMA foreign_keys = ON');
+    const detected = sentinelsMissing(heal).includes(name);
+    let error = '';
+    try { runMigrations(heal, MIGRATIONS); } catch (e) { error = String(e && e.message); }
+    check(`067 ${name}: loss detected and the table recreated, every other athlete row untouched`,
+      detected && error === '' && tableSql(heal, name) !== undefined && sentinelsMissing(heal).length === 0
+        && JSON.stringify(keep.map((other) => heal.raw.prepare(`SELECT * FROM ${other} ORDER BY 1`).all())) === beforeOthers
+        && athleteSnapshot(heal) === goalsBefore,
+      error);
+  }
+  {
+    const runnerSrc067 = readFileSync(join(SCHEMA_DIR, '..', 'migrationRunner.ts'), 'utf-8');
+    check('067 the block_emphasis guard names only its own table, so it needs no replay-blocking entry',
+      !runnerSrc067.slice(runnerSrc067.indexOf('const REPLAY_BLOCKING_TRIGGERS')).includes('trg_block_emphasis_immutable_bu')
+        && !/training_block|athlete_goal\b/.test(MIGRATIONS[IDX_067].slice(MIGRATIONS[IDX_067].indexOf('CREATE TRIGGER'))));
   }
 }
 

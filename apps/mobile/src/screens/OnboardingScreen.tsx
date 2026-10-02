@@ -50,6 +50,7 @@ import {
   type TrainingAge,
   type UserProfile,
   validateSmartGoal,
+  validateSportProfile,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
@@ -65,9 +66,18 @@ import {
   focusDraftSummary,
   goalDraftFromFields,
   localIsoToday,
+  GOAL_EXERCISE_METRICS,
   type FocusDraft,
   type GoalFields,
 } from '../components/FocusGoalFields';
+import {
+  EMPTY_SPORT_FIELDS,
+  SPORT_QUESTION,
+  SportEditor,
+  sportDraftFromFields,
+  sportFieldsSummary,
+  type SportFieldsState,
+} from '../components/SportFields';
 
 // ---------------------------------------------------------------------------
 // Copy: plain-language labels + one-liners for every enum the wizard shows.
@@ -148,7 +158,7 @@ const effortBlurb = (rpe: number): string => {
 };
 
 type StepKey =
-  | 'welcome' | 'goal' | 'focus' | 'target' | 'experience' | 'logistics' | 'equipment' | 'limits' | 'review';
+  | 'welcome' | 'goal' | 'focus' | 'sport' | 'target' | 'experience' | 'logistics' | 'equipment' | 'limits' | 'review';
 
 interface ChoiceRowProps {
   readonly label: string;
@@ -263,6 +273,11 @@ export default function OnboardingScreen(): React.JSX.Element {
   // The detailed target is optional. Off by default: focus alone is a complete answer.
   const [wantsTarget, setWantsTarget] = useState(false);
   const [goalFields, setGoalFields] = useState<GoalFields>(EMPTY_GOAL_FIELDS);
+  const [goalExerciseId, setGoalExerciseId] = useState<number | null>(null);
+  // The sport questions are asked only of an athlete who says they play one.
+  const [wantsSport, setWantsSport] = useState(false);
+  const [sportFields, setSportFields] = useState<SportFieldsState>(EMPTY_SPORT_FIELDS);
+  const movements = useStore((s) => s.movements) ?? [];
   const [saveAttempted, setSaveAttempted] = useState(false);
   const today = localIsoToday();
 
@@ -282,12 +297,13 @@ export default function OnboardingScreen(): React.JSX.Element {
     setLoadPreferenceExplicit(true);
   };
 
-  // Eight screens for every athlete; the detailed-target screen joins only
-  // when the athlete asked for it.
+  // Eight screens for every athlete; the sport screen and the detailed-target
+  // screen each join only when the athlete asked for them.
   const steps: StepKey[] = useMemo(
-    () => ['welcome', 'goal', 'focus', ...(wantsTarget ? ['target' as const] : []),
+    () => ['welcome', 'goal', 'focus', ...(wantsSport ? ['sport' as const] : []),
+      ...(wantsTarget ? ['target' as const] : []),
       'experience', 'logistics', 'equipment', 'limits', 'review'],
-    [wantsTarget],
+    [wantsSport, wantsTarget],
   );
   const step = steps[Math.min(stepIdx, steps.length - 1)];
   const isLast = step === 'review';
@@ -303,6 +319,17 @@ export default function OnboardingScreen(): React.JSX.Element {
     // Removing the screen leaves the index pointing at the next one.
     setWantsTarget(false);
     setGoalFields(EMPTY_GOAL_FIELDS);
+    setGoalExerciseId(null);
+  };
+  const sportValidation = useMemo(
+    () => validateSportProfile(sportDraftFromFields(sportFields), today),
+    [sportFields, today],
+  );
+  // Like the target: a started sport answer is finished or explicitly skipped.
+  const sportGateOpen = step === 'sport' && !sportValidation.ok;
+  const skipSport = (): void => {
+    setWantsSport(false);
+    setSportFields(EMPTY_SPORT_FIELDS);
   };
   // R5 (Round 2, ledger 0060): the limitations decision is REQUIRED. The
   // athlete cannot leave this screen — NEXT stays disabled — until they have
@@ -341,6 +368,8 @@ export default function OnboardingScreen(): React.JSX.Element {
         binding,
         focus: { bundleId: focus.bundleId, muscles: focus.muscles },
         goal: wantsTarget ? goalDraftFromFields(goalFields) : null,
+        goalMovementId: wantsTarget && GOAL_EXERCISE_METRICS.has(goalFields.metricId) ? goalExerciseId : null,
+        sport: wantsSport ? sportDraftFromFields(sportFields) : null,
       },
     );
   };
@@ -446,6 +475,17 @@ export default function OnboardingScreen(): React.JSX.Element {
               showMuscles={showFocusMuscles}
               onToggleMuscles={() => setShowFocusMuscles((visible) => !visible)}
             />
+            <Text style={styles.fieldLabel}>A SPORT? (OPTIONAL)</Text>
+            <Chip
+              testID="onboarding-wants-sport"
+              label="I PLAY OR COMPETE IN A SPORT — plan the gym around it"
+              selected={wantsSport}
+              onPress={() => setWantsSport((value) => !value)}
+              accessibilityLabel={wantsSport
+                ? 'I play or compete in a sport, selected. One more screen will ask about it.'
+                : 'I play or compete in a sport. Adds one screen.'}
+              style={styles.cardChip}
+            />
             <Text style={styles.fieldLabel}>A SPECIFIC TARGET? (OPTIONAL)</Text>
             <Chip
               testID="onboarding-wants-target"
@@ -463,10 +503,24 @@ export default function OnboardingScreen(): React.JSX.Element {
           </View>
         )}
 
+        {step === 'sport' && (
+          <View>
+            <Text style={styles.h2}>{SPORT_QUESTION.toUpperCase()}</Text>
+            <SportEditor fields={sportFields} onChange={setSportFields} today={today} />
+            <QuietAction
+              label="Skip this — plan general gym training"
+              onPress={skipSport}
+              accessibilityLabel="Skip the sport questions and plan general gym training"
+              testID="onboarding-skip-sport"
+            />
+          </View>
+        )}
+
         {step === 'target' && (
           <View>
             <Text style={styles.h2}>YOUR TARGET</Text>
-            <GoalEditor fields={goalFields} onChange={setGoalFields} today={today} trainingAge={draft.training_age} />
+            <GoalEditor fields={goalFields} onChange={setGoalFields} today={today} trainingAge={draft.training_age}
+              exercise={{ movements, movementId: goalExerciseId, onChange: setGoalExerciseId }} />
             <QuietAction
               label="Skip this — train with the focus only"
               onPress={skipTarget}
@@ -668,6 +722,13 @@ export default function OnboardingScreen(): React.JSX.Element {
                   </Text>
                 )}
               </ReviewSection>
+              {wantsSport && (
+                <ReviewSection
+                  heading="SPORT"
+                  description={sportFieldsSummary(sportFields)}
+                  onEdit={() => goTo('sport')}
+                />
+              )}
               <ReviewSection
                 heading="EXPERIENCE"
                 description={`${AGE_COPY[draft.training_age].label}. ${AGE_COPY[draft.training_age].blurb}`}
@@ -775,11 +836,18 @@ export default function OnboardingScreen(): React.JSX.Element {
           <PrimaryButton
             label="NEXT"
             onPress={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
-            disabled={limitsGateOpen || targetGateOpen}
+            disabled={limitsGateOpen || targetGateOpen || sportGateOpen}
             accessibilityLabel="Next"
           />
         )}
       </View>
+      {sportGateOpen && (
+        <View style={styles.limitsGateNotice}>
+          <Text style={styles.pDim} accessibilityLiveRegion="polite">
+            Finish the sport questions to continue, or choose "Skip this" to plan general gym training.
+          </Text>
+        </View>
+      )}
       {targetGateOpen && (
         <View style={styles.limitsGateNotice}>
           <Text style={styles.pDim} accessibilityLiveRegion="polite">

@@ -42,7 +42,35 @@ import { isDifficultyAllowed, type ExecutableMovementAccessContext } from './tie
 // passed the equipment, tier, safety, capability and attestation gates; it
 // can never re-admit a rejected candidate. Explicit athlete preferences keep
 // their separate, earlier precedence in the slot loop below.
-import { rankMovementsForPattern, type RankingCandidate, type RankingGate } from './movementRanking';
+import {
+  ANCHOR_MOVEMENT_NAMES,
+  rankMovementsForPattern,
+  type RankingCandidate,
+  type RankingGate,
+} from './movementRanking';
+// Work order 3: focus, goal, sport and scheduled sport workload arrive as one
+// additive side-car. It is consulted only AFTER every gate and every explicit
+// athlete choice, and only among movements that already passed them.
+import {
+  PROGRAM_EMPHASIS_VERSION,
+  describeCompetitionLifts,
+  describeEmphasisGap,
+  describeEmphasisSlot,
+  describeEmphasisSwap,
+  describeGoalMovementGap,
+  describeGoalMovementPlaced,
+  makeEmphasisIndex,
+  sportReportLines,
+  type EmphasisDayRegion,
+  type EmphasisIndex,
+  type EmphasisReport,
+  type GoalMovementGap,
+  type ProgramEmphasis,
+} from './programEmphasis';
+import { MUSCLE_GROUP_INFO, type MuscleGroupId } from './focusGoals';
+// Movements whose identity is on hold (135/187) are never newly prescribed by
+// the emphasis. The list is the preparation policy's, not a second copy.
+import { PREPARATION_HELD_MOVEMENT_IDS } from './preparationPolicy';
 // Phase 13 Step 4 — the Block Generator Intercept: the generator imports the
 // autopilot controller and applies its forward-looking corrections to the next
 // block (a recorded halt snaps the whole block to a recovery template).
@@ -237,6 +265,10 @@ export interface BlockPlan {
   /** Preparation, rest and changeovers counted inside the session limit. A
    *  non-empty `conflicts` list means the block must not be committed as is. */
   timeBudget: BlockTimeBudget;
+  /** What the focus, goal, sport and sport workload changed in this block and
+   *  what they could not change, in plain language. Present only when an
+   *  emphasis was supplied. */
+  emphasis?: EmphasisReport;
 }
 
 export interface ProgramMovementPreference {
@@ -279,6 +311,14 @@ export interface BlockInput {
    * every existing caller).
    */
   powerPreferredMovementNames?: readonly string[];
+
+  /**
+   * Work order 3: the athlete's focus, goal exercises, sport objective and
+   * scheduled sport workload (programEmphasis.ts). Absent ⇒ the block is
+   * byte-identical to the pre-emphasis generator. The persisted Objective is
+   * untouched: a sport never becomes an objective value.
+   */
+  emphasis?: ProgramEmphasis;
 }
 
 // ---------------------------------------------------------------------------
@@ -760,6 +800,42 @@ const pickScoped = (
   return best;
 };
 
+/** Patterns that train control of the trunk under load; preferred for the
+ *  core when the athlete's focus asks for movement control (posture). */
+const MOVEMENT_CONTROL_PATTERNS: ReadonlySet<MovementPattern> = new Set(['carry', 'rotation']);
+
+/**
+ * The exercise that gives one emphasised muscle direct work, from a pool that
+ * ALREADY passed equipment, tier and capability for the day. Deterministic:
+ * loaded before strictly bodyweight when the loaded-first law applies,
+ * control patterns first for a movement-control core emphasis, single-joint
+ * before compound (it fills an accessory slot), then stable id. Competition
+ * lifts are never used as accessories, a sport round is never used, and a
+ * movement whose identity is on hold is never newly prescribed.
+ */
+const pickEmphasisCandidate = (
+  pool: readonly GeneratorMovement[],
+  muscle: MuscleGroupId,
+  usedIds: ReadonlySet<number>,
+  index: EmphasisIndex,
+  loadedFirst: boolean,
+): GeneratorMovement | null => {
+  const candidates = pool.filter((candidate) =>
+    !usedIds.has(candidate.movement_id)
+    && candidate.pattern !== 'locomotion'
+    && !PREPARATION_HELD_MOVEMENT_IDS.has(candidate.movement_id)
+    && !ANCHOR_MOVEMENT_NAMES.includes(candidate.name)
+    && index.primaryFor(candidate.movement_id).includes(muscle));
+  const control = (candidate: GeneratorMovement): number =>
+    index.movementControl && muscle === 'core' && !MOVEMENT_CONTROL_PATTERNS.has(candidate.pattern) ? 1 : 0;
+  candidates.sort((a, b) =>
+    (loadedFirst ? Number(isPurelyBodyweight(a)) - Number(isPurelyBodyweight(b)) : 0)
+    || control(a) - control(b)
+    || Number(a.is_compound) - Number(b.is_compound)
+    || a.movement_id - b.movement_id);
+  return candidates[0] ?? null;
+};
+
 // ---------------------------------------------------------------------------
 // Generator
 // ---------------------------------------------------------------------------
@@ -834,6 +910,18 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // first. The SAME helper feeds strengthAnchorCapacity/strengthAnchorRoleNames,
   // so the setup warning and the generated week cannot disagree.
   const slotBudget = slotBudgetForCap(profile.session_duration_cap_min);
+  // How many strength days a week train each pattern. Work order 3 displaces
+  // a pattern for the emphasis only when another day still trains it.
+  const weeklyPatternDays = new Map<MovementPattern, number>();
+  /** Every pattern some session in the week has a slot for. */
+  const scheduledPatterns = new Set<MovementPattern>();
+  for (const day of schedule) {
+    for (const pattern of FOCUS_PATTERNS[day.focus].slice(0, slotBudget)) scheduledPatterns.add(pattern);
+    if (!STRENGTH_FOCI.has(day.focus)) continue;
+    for (const pattern of FOCUS_PATTERNS[day.focus].slice(0, slotBudget)) {
+      weeklyPatternDays.set(pattern, (weeklyPatternDays.get(pattern) ?? 0) + 1);
+    }
+  }
 
   // Under Calibration Policy v1, rolling load is descriptive only and does not alter
   // block generation schedules. Peaking blocks always follow PHASE_BY_WEEK.
@@ -874,10 +962,36 @@ export function generateBlock(input: BlockInput): BlockPlan {
   // give the branch any purpose. Recorded, not guessed at.
   const bodyweightDominant = input.movements.length > 0 && input.movements.every(isPurelyBodyweight);
   const fatigueCost = schemaFatigueCost(schemaType, macroPhase, bodyweightDominant);
-  const accessoryCut =
+  const hybridAccessoryCut =
     profile.objective === 'hybrid'
       ? fatigueCost >= 1.5 ? 2 : fatigueCost >= HYBRID_TAX_THRESHOLD ? 1 : 0
       : 0;
+
+  // Work order 3 — the emphasis side-car. With no emphasis every value below
+  // is inert and the block is byte-identical to the pre-emphasis generator.
+  const emphasis = input.emphasis ?? null;
+  const emphasisIndex = emphasis === null ? null : makeEmphasisIndex(emphasis);
+  const goalLinks = new Map((emphasis?.goalMovements ?? []).map((link) => [link.movementId, link.goalLabel]));
+  // Scheduled sport workload uses the SAME lever as the hybrid tax (whole sets
+  // off accessory slots of strength days). The larger of the two applies; they
+  // are never added, because the hybrid tax already assumes mat time.
+  const accessoryCut = Math.max(hybridAccessoryCut, emphasis?.workload?.accessorySetCut ?? 0);
+  // A very full sport week holds the block's third week at the second week's
+  // loading row instead of stepping up. Deload and main-lift selection are
+  // untouched.
+  const lastLoadingRow = emphasis?.workload?.holdHardestWeek === true ? 1 : 2;
+  const loadedFirstEmphasis = profile.training_age !== 'beginner' && profile.objective !== 'rehab';
+  const emphasisNotes: string[] = [];
+  const goalPlaced = new Set<number>();
+  const goalDisplacedByOwnChoice = new Set<number>();
+  /** Emphasised muscles that got direct work somewhere in the week. */
+  const emphasisCovered = new Set<MuscleGroupId>();
+  /** Emphasised muscles for which a gated exercise existed on some strength day. */
+  const emphasisCandidateSeen = new Set<MuscleGroupId>();
+  /** Emphasised muscles some strength day in the schedule can train. */
+  const emphasisDayExists = new Set<MuscleGroupId>();
+  /** `week:day:slot` of goal and emphasis slots — trimmed last, not first. */
+  const protectedSlots = new Set<string>();
 
   const warnings = new Set<string>();
   const sessions: PlannedSessionPlan[] = [];
@@ -894,7 +1008,12 @@ export function generateBlock(input: BlockInput): BlockPlan {
     const sessionPhase: BlockPhase = recovery ? 'deload' : phase;
     // Loading row: non-deload weeks advance through the schema's three-week
     // pattern in order (a shifted peak runs it across weeks 2-4).
-    const progIdx = clamp((peakShifted ? week - 2 : week - 1), 0, 2);
+    const progIdx = clamp((peakShifted ? week - 2 : week - 1), 0, lastLoadingRow);
+    // Emphasis bookkeeping restarts every week, so every week makes the same
+    // choices and a session slot keeps its identity across the block.
+    const weekCovered = new Set<MuscleGroupId>();
+    const weekDisplaced = new Set<MovementPattern>();
+    const weekGoalPlaced = new Set<number>();
     const wmod = SCHEMA_WEEKS[schemaType][progIdx as 0 | 1 | 2];
 
     for (const { focus, day_index: dayIndex, movement_preferences: preferences } of schedule) {
@@ -1006,107 +1125,69 @@ export function generateBlock(input: BlockInput): BlockPlan {
       // W3 ranking disclosures for this session (anchor substitutes and the
       // exact fallback reasons for strictly-bodyweight defaults).
       const sessionRankingNotes: Set<string> = new Set();
-      for (const [slotIdx, pattern] of patterns.entries()) {
-        const preferred = preferences.find((p) => p.pattern === pattern);
-        const preferredMovement = preferred === undefined
-          ? undefined
-          : pool.find((candidate) => candidate.movement_id === preferred.movement_id
-              && candidate.pattern === pattern && !usedIds.has(candidate.movement_id));
-        // Precedence is fixed: a valid explicit athlete preference ALWAYS wins,
-        // then a full-body-scoped candidate at this focus's scope slot, then
-        // the goal/tier ranking default (WO §2.4-2.6), then the legacy pick.
-        // pickScoped and rankMovementsForPattern run ONLY when no preference
-        // resolved, so an explicit carry preference is never overridden.
-        // NOTE the off-by-one: ProgramMovementPreference.slot_index is 1-based
-        // (1..5) while FOCUS_SCOPE_SLOT indexes FOCUS_PATTERNS 0-based — scope
-        // slot 4 corresponds to preference slot_index 5. Preferences are matched
-        // by PATTERN, not slot_index, so the two never need to be reconciled.
-        const scopeSlot = FOCUS_SCOPE_SLOT[focus];
-        const scopeMovement = preferredMovement === undefined && scopeSlot === slotIdx
-          ? pickScoped(pool, 'full_body', usedIds) ?? undefined
-          : undefined;
-        // W3: the pure ranking default. The ranker sees EVERY movement of the
-        // pattern WITH its gate report — equipment (outside equipPool), tier
-        // (outside tierPool), and the shared capability verdict — so a blocked
-        // anchor or a loaded rung removed by a gate is visible to it and the
-        // fallback reasons/substitute disclosures can name the gate. It
-        // re-checks every gate from raw inputs, so a rejected candidate is
-        // still never re-admitted.
-        const rankingCandidates: readonly RankingCandidate[] = input.movements
-          .filter((candidate) => candidate.pattern === pattern && !usedIds.has(candidate.movement_id))
-          .map((candidate) => {
-            const capOk = capabilityAvailableForContext(candidate, accessContext);
-            const equipOk = equipAvailableIds.has(candidate.movement_id);
-            const tierOk = tierAvailableIds.has(candidate.movement_id);
-            const excludedBy: RankingGate[] = [];
-            if (!equipOk) excludedBy.push('equipment');
-            if (!tierOk && equipOk) excludedBy.push('tier');
-            if (!capOk) excludedBy.push('capability');
-            return {
-              movementId: candidate.movement_id,
-              name: candidate.name,
-              difficulty: candidate.difficulty ?? 'Beginner',
-              required: candidate.required,
-              plannedImplement: candidate.plannedImplement,
-              capabilityAvailable: equipOk && tierOk && capOk,
-              excludedBy,
-              isCompound: candidate.is_compound,
-              beginnerOk: candidate.beginner_ok,
-              sportTracking: candidate.sportTracking,
-            };
-          });
-        const ranking = rankMovementsForPattern(rankingCandidates, {
-          trainingAge: profile.training_age,
-          objective: profile.objective,
-          inventory: profile.equipment_inventory,
-          preferredMovementIds: new Set<number>(),
-          accessContext,
-          powerPreferredMovementNames: input.powerPreferredMovementNames,
-        }, pattern, { accessorySlot: (slots.length + 1) >= ACCESSORY_SLOT_FROM });
-        const rankedDefault = ranking.movementId >= 0
-          ? pool.find((candidate) => candidate.movement_id === ranking.movementId) ?? null
-          : null;
-        const m = preferredMovement ?? scopeMovement ?? rankedDefault ?? pickForPattern(pool, pattern, usedIds);
-        if (preferred !== undefined && preferredMovement === undefined && m !== null) {
-          warnings.add(`${focus}: preferred ${pattern} movement unavailable; safe fallback used`);
+      // Work order 3: the emphasis applies on strength days only. A sport or
+      // conditioning day is the sport's own work and is left alone.
+      const emphasisDay: EmphasisDayRegion | null = emphasisIndex !== null && STRENGTH_FOCI.has(focus)
+        ? focus as EmphasisDayRegion
+        : null;
+      const sessionCovered = new Set<MuscleGroupId>();
+      const dayMuscles = emphasisDay === null || emphasisIndex === null ? [] : emphasisIndex.musclesForDay(emphasisDay);
+      for (const muscle of dayMuscles) {
+        emphasisDayExists.add(muscle);
+        if (emphasisIndex !== null && pickEmphasisCandidate(pool, muscle, usedIds, emphasisIndex, loadedFirstEmphasis) !== null) {
+          emphasisCandidateSeen.add(muscle);
         }
-        // W3 disclosure (WO §2.4): when the ranking default landed and an
-        // anchor was blocked, name the blocked anchor, its gate, and the
-        // loaded substitute; when the default is strictly bodyweight, name
-        // the gates that removed every loaded option.
-        if (m !== null && m.movement_id === ranking.movementId && ranking.substituteId !== null) {
-          sessionRankingNotes.add(`${focus}: ${ranking.substituteAnchorName} unavailable for ${pattern} (${(ranking.blockersById[ranking.substituteAnchorId ?? 0] ?? []).join('/')}); ${ranking.name} planned instead`);
+      }
+      /** What a spare or displaceable accessory slot on this day should go to:
+       *  first an exercise a goal names that no session has a pattern slot
+       *  for, then the first emphasised muscle this day can train that has
+       *  had no direct work yet this week. */
+      const nextEmphasisNeed = ():
+        { movement: GeneratorMovement; muscle: MuscleGroupId | null; goalLabel: string | null } | null => {
+        if (emphasisIndex === null || emphasisDay === null) return null;
+        for (const [movementId, goalLabel] of goalLinks) {
+          if (weekGoalPlaced.has(movementId) || usedIds.has(movementId)) continue;
+          const movement = pool.find((candidate) => candidate.movement_id === movementId);
+          if (movement === undefined || movement.pattern === 'locomotion') continue;
+          // A pattern some session already schedules is filled there, by the
+          // goal rule in the slot loop, not here.
+          if (scheduledPatterns.has(movement.pattern)) continue;
+          if (!emphasisIndex.fitsDay(movementId, emphasisDay)) continue;
+          return { movement, muscle: null, goalLabel };
         }
-        if (m !== null && m.movement_id === ranking.movementId && ranking.reason === 'bodyweight' && ranking.blockers.length > 0) {
-          sessionRankingNotes.add(`${focus}: ${ranking.name} planned — no loaded ${pattern} is available (blocked: ${ranking.blockers.join('/')})`);
+        for (const muscle of dayMuscles) {
+          if (weekCovered.has(muscle)) continue;
+          const movement = pickEmphasisCandidate(pool, muscle, usedIds, emphasisIndex, loadedFirstEmphasis);
+          if (movement !== null) return { movement, muscle, goalLabel: null };
         }
-        if (preferred !== undefined && preferredMovement === undefined && m === null) {
-          warnings.add(`${focus}: preferred ${pattern} movement unavailable; slot dropped`);
-        }
-        if (m === null) {
-          // Strictness over substitution across every gate: a pattern the
-          // inventory cannot support, one that only exists above the athlete's
-          // weight-room tier ceiling, or one whose remaining candidates are
-          // capability/niggle/attestation blocked, is dropped with a warning
-          // and never filled upward. (Audit F1: the previous ungated fallback
-          // could hand a beginner an Advanced movement.) The three warnings
-          // below are ordered narrowest-cause-last so the message names the
-          // gate that actually emptied the pool. On a conditioning/BJJ day the
-          // tier limb is unreachable by construction — the ceiling is removed
-          // there — so the message correctly attributes the drop to equipment
-          // or capability.
-          const equipmentCandidate = pickForPattern(equipPool, pattern, usedIds);
-          const tierCandidate = pickForPattern(tierPool, pattern, usedIds);
-          warnings.add(equipmentCandidate === null
-            ? `${focus}: no equipment-available movement for ${pattern}`
-            : tierCandidate === null
-              ? `${focus}: no tier-eligible movement for ${pattern}`
-              : `${focus}: no capability-available movement for ${pattern}`);
-          continue;
-        }
+        return null;
+      };
+      const slotReason = (need: { muscle: MuscleGroupId | null; goalLabel: string | null }):
+        { muscle: MuscleGroupId; origin: 'focus' | 'sport' } | { goalLabel: string } =>
+        need.muscle !== null
+          ? { muscle: need.muscle, origin: emphasisIndex?.originOf(need.muscle) ?? 'focus' }
+          : { goalLabel: need.goalLabel ?? '' };
+
+      // One planned slot: dose, loading class, autopilot correction, record.
+      const placeSlot = (m: GeneratorMovement): void => {
         usedIds.add(m.movement_id);
         const locomotion = m.pattern === 'locomotion';
         const slotIndex = slots.length + 1;
+        // Work order 3 bookkeeping: which emphasised muscles this slot trains
+        // directly, and whether it is trimmed last when a session is short.
+        const directMuscles = emphasisIndex?.primaryFor(m.movement_id) ?? [];
+        for (const muscle of directMuscles) {
+          sessionCovered.add(muscle);
+          weekCovered.add(muscle);
+          emphasisCovered.add(muscle);
+        }
+        if (goalLinks.has(m.movement_id)) {
+          goalPlaced.add(m.movement_id);
+          weekGoalPlaced.add(m.movement_id);
+        }
+        if (goalLinks.has(m.movement_id) || directMuscles.length > 0) {
+          protectedSlots.add(`${week}:${dayIndex}:${slotIndex}`);
+        }
         // The slot's dose role for the R2 hypertrophy rule: accessory slots
         // (slot_index >= ACCESSORY_SLOT_FROM) carry the role delta.
         roleAccessor = slotIndex >= ACCESSORY_SLOT_FROM;
@@ -1114,7 +1195,9 @@ export function generateBlock(input: BlockInput): BlockPlan {
         // sessions only, never below one working set, never on the deload.
         const taxed =
           !deload && accessoryCut > 0 && STRENGTH_FOCI.has(focus) &&
-          slotIndex >= ACCESSORY_SLOT_FROM && !locomotion;
+          slotIndex >= ACCESSORY_SLOT_FROM && !locomotion &&
+          // Work order 3: the exercise a goal names keeps its full dose.
+          !goalLinks.has(m.movement_id);
         // Option C routing (owner-ratified 2026-08-27): the dose is fixed per
         // session BEFORE the movement is known, so the loading class can only
         // be applied here, once `m` exists. A strictly bodyweight movement
@@ -1233,6 +1316,207 @@ export function generateBlock(input: BlockInput): BlockPlan {
           target_rpe: slotRpe,
           ...(autopilotDelta === undefined ? {} : { autopilotDelta }),
         });
+      };
+
+      for (const [slotIdx, pattern] of patterns.entries()) {
+        const preferred = preferences.find((p) => p.pattern === pattern);
+        const preferredMovement = preferred === undefined
+          ? undefined
+          : pool.find((candidate) => candidate.movement_id === preferred.movement_id
+              && candidate.pattern === pattern && !usedIds.has(candidate.movement_id));
+        // Precedence is fixed: a valid explicit athlete preference ALWAYS wins,
+        // then a full-body-scoped candidate at this focus's scope slot, then
+        // the goal/tier ranking default (WO §2.4-2.6), then the legacy pick.
+        // pickScoped and rankMovementsForPattern run ONLY when no preference
+        // resolved, so an explicit carry preference is never overridden.
+        // NOTE the off-by-one: ProgramMovementPreference.slot_index is 1-based
+        // (1..5) while FOCUS_SCOPE_SLOT indexes FOCUS_PATTERNS 0-based — scope
+        // slot 4 corresponds to preference slot_index 5. Preferences are matched
+        // by PATTERN, not slot_index, so the two never need to be reconciled.
+        const scopeSlot = FOCUS_SCOPE_SLOT[focus];
+        const scopeMovement = preferredMovement === undefined && scopeSlot === slotIdx
+          ? pickScoped(pool, 'full_body', usedIds) ?? undefined
+          : undefined;
+        // W3: the pure ranking default. The ranker sees EVERY movement of the
+        // pattern WITH its gate report — equipment (outside equipPool), tier
+        // (outside tierPool), and the shared capability verdict — so a blocked
+        // anchor or a loaded rung removed by a gate is visible to it and the
+        // fallback reasons/substitute disclosures can name the gate. It
+        // re-checks every gate from raw inputs, so a rejected candidate is
+        // still never re-admitted.
+        const rankingCandidates: readonly RankingCandidate[] = input.movements
+          .filter((candidate) => candidate.pattern === pattern && !usedIds.has(candidate.movement_id))
+          .map((candidate) => {
+            const capOk = capabilityAvailableForContext(candidate, accessContext);
+            const equipOk = equipAvailableIds.has(candidate.movement_id);
+            const tierOk = tierAvailableIds.has(candidate.movement_id);
+            const excludedBy: RankingGate[] = [];
+            if (!equipOk) excludedBy.push('equipment');
+            if (!tierOk && equipOk) excludedBy.push('tier');
+            if (!capOk) excludedBy.push('capability');
+            return {
+              movementId: candidate.movement_id,
+              name: candidate.name,
+              difficulty: candidate.difficulty ?? 'Beginner',
+              required: candidate.required,
+              plannedImplement: candidate.plannedImplement,
+              capabilityAvailable: equipOk && tierOk && capOk,
+              excludedBy,
+              isCompound: candidate.is_compound,
+              beginnerOk: candidate.beginner_ok,
+              sportTracking: candidate.sportTracking,
+            };
+          });
+        const ranking = rankMovementsForPattern(rankingCandidates, {
+          trainingAge: profile.training_age,
+          objective: profile.objective,
+          inventory: profile.equipment_inventory,
+          preferredMovementIds: new Set<number>(),
+          accessContext,
+          powerPreferredMovementNames: input.powerPreferredMovementNames,
+          ...(emphasis?.sport?.competitionLifts === true ? { promoteCompetitionLifts: true } : {}),
+        }, pattern, { accessorySlot: (slots.length + 1) >= ACCESSORY_SLOT_FROM });
+        const rankedDefault = ranking.movementId >= 0
+          ? pool.find((candidate) => candidate.movement_id === ranking.movementId) ?? null
+          : null;
+        // Work order 3: an exercise one of the athlete's goals names. It ranks
+        // below their explicit choice for the slot and above every default,
+        // and it comes from the SAME gated pool, so a goal never re-admits a
+        // movement a gate removed.
+        const goalMovement = preferredMovement === undefined && goalLinks.size > 0
+          ? pool.find((candidate) => candidate.pattern === pattern
+              && goalLinks.has(candidate.movement_id) && !usedIds.has(candidate.movement_id))
+          : undefined;
+        if (preferredMovement !== undefined) {
+          for (const candidate of pool) {
+            if (candidate.pattern === pattern && goalLinks.has(candidate.movement_id)
+                && candidate.movement_id !== preferredMovement.movement_id) {
+              goalDisplacedByOwnChoice.add(candidate.movement_id);
+            }
+          }
+        }
+        const defaultChoice = preferredMovement ?? goalMovement ?? scopeMovement ?? rankedDefault
+          ?? pickForPattern(pool, pattern, usedIds);
+        // Work order 3: the emphasis may swap the ranking DEFAULT for another
+        // movement of the same pattern that trains an emphasised muscle
+        // directly. It never touches an explicit choice, a goal exercise, a
+        // scoped pick, a main-lift anchor or its disclosed substitute, or a
+        // curated power rung; and it keeps the default's loading class and
+        // compound class, so loaded-first, the accessory role law and the
+        // bodybuilding exclusion all still hold.
+        let emphasisChoice: GeneratorMovement | null = null;
+        if (emphasis !== null && emphasisIndex !== null && emphasisDay !== null
+            && defaultChoice !== null && rankedDefault !== null
+            && defaultChoice.movement_id === rankedDefault.movement_id
+            && preferredMovement === undefined && goalMovement === undefined && scopeMovement === undefined
+            && ranking.reason !== 'anchor' && ranking.substituteId === null
+            && !(input.powerPreferredMovementNames ?? []).includes(defaultChoice.name)) {
+          let best = emphasisIndex.match(defaultChoice.movement_id, sessionCovered);
+          for (const id of ranking.rankedIds) {
+            const candidate = pool.find((entry) => entry.movement_id === id);
+            if (candidate === undefined || usedIds.has(id) || id === defaultChoice.movement_id) continue;
+            if (PREPARATION_HELD_MOVEMENT_IDS.has(id)) continue;
+            if (isPurelyBodyweight(candidate) !== isPurelyBodyweight(defaultChoice)) continue;
+            if (candidate.is_compound !== defaultChoice.is_compound) continue;
+            if (ANCHOR_MOVEMENT_NAMES.includes(candidate.name)) continue;
+            // A main lift (the first two slots) is only swapped for a movement
+            // that still trains what the main lift trains: an incline press
+            // may stand in for a flat press, but a glute-only variation never
+            // replaces the squat. Accessories carry no such obligation.
+            if ((slots.length + 1) < ACCESSORY_SLOT_FROM
+                && !emphasisIndex.keepsPrimaryWork(id, defaultChoice.movement_id)) continue;
+            const match = emphasisIndex.match(id, sessionCovered);
+            // Direct (primary) work only: ranks 0-3. A supporting role is not
+            // a reason to change the plan.
+            if (match.rank <= 3 && match.rank < best.rank) {
+              best = match;
+              emphasisChoice = candidate;
+            }
+          }
+          if (emphasisChoice !== null && best.muscle !== null && best.origin !== null) {
+            emphasisNotes.push(describeEmphasisSwap({
+              chosen: emphasisChoice.name, instead: defaultChoice.name,
+              muscle: best.muscle, origin: best.origin, emphasis,
+            }));
+          }
+        }
+        // Work order 3: weekly allocation. When an emphasised muscle this day
+        // can train has had no direct work yet this week, the LAST slot of the
+        // session — an accessory, never a main lift — is given to it, provided
+        // the movement it displaces is still trained on another day, has not
+        // already been displaced this week, and is not itself the session's
+        // only direct work for an emphasised muscle. Nothing is added to the
+        // session, so the time limit is unaffected.
+        const lastAccessorySlot = slotIdx === patterns.length - 1 && (slots.length + 1) >= ACCESSORY_SLOT_FROM;
+        const selected: GeneratorMovement | null = emphasisChoice ?? defaultChoice;
+        let displacement: ReturnType<typeof nextEmphasisNeed> = null;
+        if (emphasis !== null && emphasisIndex !== null && emphasisDay !== null && lastAccessorySlot
+            && selected !== null && preferredMovement === undefined && goalMovement === undefined
+            && !(ranking.reason === 'anchor' && selected.movement_id === ranking.movementId)
+            && emphasisIndex.primaryFor(selected.movement_id).every((muscle) => sessionCovered.has(muscle))
+            && (weeklyPatternDays.get(pattern) ?? 0) >= 2 && !weekDisplaced.has(pattern)) {
+          displacement = nextEmphasisNeed();
+          if (displacement !== null) {
+            weekDisplaced.add(pattern);
+            emphasisNotes.push(describeEmphasisSlot({
+              chosen: displacement.movement.name, displaced: selected.name, day: emphasisDay,
+              why: slotReason(displacement), emphasis,
+            }));
+          }
+        }
+        const m = displacement?.movement ?? selected;
+        if (preferred !== undefined && preferredMovement === undefined && m !== null) {
+          warnings.add(`${focus}: preferred ${pattern} movement unavailable; safe fallback used`);
+        }
+        // W3 disclosure (WO §2.4): when the ranking default landed and an
+        // anchor was blocked, name the blocked anchor, its gate, and the
+        // loaded substitute; when the default is strictly bodyweight, name
+        // the gates that removed every loaded option.
+        if (m !== null && m.movement_id === ranking.movementId && ranking.substituteId !== null) {
+          sessionRankingNotes.add(`${focus}: ${ranking.substituteAnchorName} unavailable for ${pattern} (${(ranking.blockersById[ranking.substituteAnchorId ?? 0] ?? []).join('/')}); ${ranking.name} planned instead`);
+        }
+        if (m !== null && m.movement_id === ranking.movementId && ranking.reason === 'bodyweight' && ranking.blockers.length > 0) {
+          sessionRankingNotes.add(`${focus}: ${ranking.name} planned — no loaded ${pattern} is available (blocked: ${ranking.blockers.join('/')})`);
+        }
+        if (preferred !== undefined && preferredMovement === undefined && m === null) {
+          warnings.add(`${focus}: preferred ${pattern} movement unavailable; slot dropped`);
+        }
+        if (m === null) {
+          // Strictness over substitution across every gate: a pattern the
+          // inventory cannot support, one that only exists above the athlete's
+          // weight-room tier ceiling, or one whose remaining candidates are
+          // capability/niggle/attestation blocked, is dropped with a warning
+          // and never filled upward. (Audit F1: the previous ungated fallback
+          // could hand a beginner an Advanced movement.) The three warnings
+          // below are ordered narrowest-cause-last so the message names the
+          // gate that actually emptied the pool. On a conditioning/BJJ day the
+          // tier limb is unreachable by construction — the ceiling is removed
+          // there — so the message correctly attributes the drop to equipment
+          // or capability.
+          const equipmentCandidate = pickForPattern(equipPool, pattern, usedIds);
+          const tierCandidate = pickForPattern(tierPool, pattern, usedIds);
+          warnings.add(equipmentCandidate === null
+            ? `${focus}: no equipment-available movement for ${pattern}`
+            : tierCandidate === null
+              ? `${focus}: no tier-eligible movement for ${pattern}`
+              : `${focus}: no capability-available movement for ${pattern}`);
+          continue;
+        }
+        placeSlot(m);
+      }
+      // Work order 3: a session with a free slot inside its budget takes one
+      // more exercise for an emphasised muscle that has had no direct work
+      // this week. Its time is checked below like every other slot.
+      if (emphasis !== null && emphasisIndex !== null && emphasisDay !== null
+          && slots.length > 0 && slots.length < slotBudget) {
+        const extra = nextEmphasisNeed();
+        if (extra !== null) {
+          emphasisNotes.push(describeEmphasisSlot({
+            chosen: extra.movement.name, displaced: null, day: emphasisDay,
+            why: slotReason(extra), emphasis,
+          }));
+          placeSlot(extra.movement);
+        }
       }
       if (slots.length === 0) {
         warnings.add(`${focus}: session dropped, no available movements at all`);
@@ -1294,7 +1578,10 @@ export function generateBlock(input: BlockInput): BlockPlan {
           target: { kind: 'reps' as const, reps: slot.reps },
           targetRpe: slot.target_rpe,
           minSets: Math.min(slot.sets, deloadSession ? 1 : 2),
-          trimPriority: slot.slot_index >= ACCESSORY_SLOT_FROM ? 0 : 1,
+          // A goal exercise or an emphasis slot is trimmed with the main
+          // lifts, after the other accessories.
+          trimPriority: slot.slot_index >= ACCESSORY_SLOT_FROM
+            && !protectedSlots.has(`${session.week_index}:${session.day_index}:${slot.slot_index}`) ? 0 : 1,
           trimmable: !locomotion,
         };
       }),
@@ -1327,6 +1614,70 @@ export function generateBlock(input: BlockInput): BlockPlan {
     });
   }
 
+  // Work order 3: say what the emphasis changed and what it could not.
+  let emphasisReport: EmphasisReport | undefined;
+  if (emphasis !== null && emphasisIndex !== null) {
+    const applied: string[] = [];
+    const omitted: string[] = [];
+    const nameOf = (id: number): string => movementById.get(id)?.name ?? `movement ${id}`;
+    const label = (muscle: MuscleGroupId): string => MUSCLE_GROUP_INFO[muscle].label.toLowerCase();
+    if (emphasis.focus !== null) applied.push(`Focus — ${emphasis.focus.description}.`);
+    const direct = emphasisIndex.muscles.filter((muscle) => emphasisCovered.has(muscle));
+    if (direct.length > 0) applied.push(`Trained directly every week: ${direct.map(label).join(', ')}.`);
+    applied.push(...emphasisNotes);
+    for (const muscle of emphasisIndex.muscles) {
+      if (emphasisCovered.has(muscle)) continue;
+      omitted.push(describeEmphasisGap(
+        muscle,
+        !emphasisDayExists.has(muscle) ? 'no_day' : !emphasisCandidateSeen.has(muscle) ? 'no_exercise' : 'no_room',
+        capMin,
+      ));
+    }
+    if (emphasis.sport?.competitionLifts === true) {
+      const planned = new Set(sessions.flatMap((session) => session.slots.map((slot) => nameOf(slot.movement_id))));
+      applied.push(...describeCompetitionLifts(ANCHOR_MOVEMENT_NAMES.filter((name) => planned.has(name)), []));
+      omitted.push(...describeCompetitionLifts([], ANCHOR_MOVEMENT_NAMES.filter((name) => !planned.has(name))));
+      if (!loadedFirstEmphasis) {
+        omitted.push('The competition lifts are not forced as main lifts for a new lifter or a return-to-training plan; the plan keeps its usual starting exercises.');
+      }
+    }
+    const patternsOf = (focus: BlockFocus): readonly MovementPattern[] => FOCUS_PATTERNS[focus].slice(0, slotBudget);
+    const equipIds = new Set(equipPool.map((movement) => movement.movement_id));
+    for (const [movementId, goalLabel] of goalLinks) {
+      const movement = movementById.get(movementId);
+      if (movement !== undefined && goalPlaced.has(movementId)) {
+        applied.push(describeGoalMovementPlaced(movement.name, goalLabel));
+        continue;
+      }
+      let gap: GoalMovementGap;
+      if (movement === undefined) gap = 'unknown';
+      else if (goalDisplacedByOwnChoice.has(movementId)) gap = 'own_choice';
+      else {
+        // A movement whose pattern no session schedules can still be placed in
+        // a spare accessory slot of a strength day, so it is judged against the
+        // strength days in that case.
+        const ownDays = schedule.filter((day) => patternsOf(day.focus).includes(movement.pattern));
+        const days = ownDays.length > 0 ? ownDays : schedule.filter((day) => STRENGTH_FOCI.has(day.focus));
+        const contexts = days.map((day) => accessContextForBlockFocus(day.focus));
+        if (days.length === 0) gap = 'no_slot';
+        else if (!equipIds.has(movementId)) gap = 'equipment';
+        else if (!contexts.some((context) => isDifficultyAllowed(
+          profile.training_age, movement.difficulty, movement.beginner_ok, context, movement.sportTracking,
+        ))) gap = 'tier';
+        else gap = contexts.some((context) => capabilityAvailableForContext(movement, context)) ? 'no_slot' : 'capability';
+      }
+      omitted.push(describeGoalMovementGap(movement?.name ?? 'an exercise', goalLabel, gap));
+    }
+    const fixed = sportReportLines(emphasis);
+    applied.push(...fixed.applied);
+    omitted.push(...fixed.omitted);
+    emphasisReport = {
+      version: PROGRAM_EMPHASIS_VERSION,
+      applied: [...new Set(applied)],
+      omitted: [...new Set(omitted)],
+    };
+  }
+
   return {
     objective: profile.objective,
     start_date: startDate,
@@ -1348,6 +1699,7 @@ export function generateBlock(input: BlockInput): BlockPlan {
         capMin, requiredMin: worstRequiredMin, weeklyFrequency: frequency,
       })],
     },
+    ...(emphasisReport === undefined ? {} : { emphasis: emphasisReport }),
   };
 }
 

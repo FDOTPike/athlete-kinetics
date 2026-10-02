@@ -55,6 +55,15 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 198,
     fingerprint: '158c306f0e25ffe6607dc4919302a3b272034dba8d1f040ba71a1e5607c37807',
   },
+  // Through 067_sport_and_emphasis — adds the sport profile, the goal exercise
+  // link and the frozen per-block emphasis explanation.
+  {
+    userVersion: 66,
+    migrationSlot: 67,
+    tableCount: 117,
+    objectCount: 203,
+    fingerprint: '147840e91129313ec7ce6690d8af0e0f774834219cfa9791be930831c4d1765e',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

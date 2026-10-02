@@ -300,6 +300,15 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'trigger', name: 'trg_athlete_goal_observation_immutable_bu' },     // 066
   { type: 'trigger', name: 'trg_athlete_goal_active_limit_bi' },              // 066
   { type: 'trigger', name: 'trg_athlete_goal_active_limit_bu' },              // 066
+  // 067 sport profile, goal exercise link and the frozen block explanation.
+  // All three hold athlete state that nothing else can rebuild: losing
+  // athlete_sport_profile would silently turn a sport athlete's next block
+  // into the standard plan, and losing block_emphasis (or its immutability
+  // guard) would lose or let someone rewrite the explanation of a frozen plan.
+  { type: 'table', name: 'athlete_sport_profile' },                           // 067
+  { type: 'table', name: 'athlete_goal_movement' },                           // 067
+  { type: 'table', name: 'block_emphasis' },                                  // 067
+  { type: 'trigger', name: 'trg_block_emphasis_immutable_bu' },               // 067
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
