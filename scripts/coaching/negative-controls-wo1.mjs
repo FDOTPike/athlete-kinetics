@@ -223,7 +223,17 @@ for (const mutation of mutations) {
   results.push({ name: mutation.name, outcome, exit: result.status, sample: evidence });
   console.log(JSON.stringify(results.at(-1)));
 }
+// The rebuilds restore the unmutated verifier outputs; a failed one is a failed run.
+const rebuilds = [];
 // Rebuild the unmutated verifier outputs.
-run(BUILD);
-run('npx tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/migrationRunner.ts');
+rebuilds.push(run(BUILD).status);
+rebuilds.push(run('npx tsc --strict --target es2020 --module commonjs --lib es2020 --outDir packages/core-db/test/.build packages/core-db/src/migrationRunner.ts').status);
 console.log('SUMMARY', JSON.stringify(results.map((row) => [row.name, row.outcome])));
+// A run that did not detect everything, could not apply a mutation, matched no
+// mutation at all, or could not rebuild must not look like a pass to a caller.
+const undetected = results.filter((row) => row.outcome !== 'detected');
+const rebuildFailed = rebuilds.some((status) => status !== 0);
+if (results.length === 0 || undetected.length > 0 || rebuildFailed) {
+  console.error(`NEGATIVE CONTROLS FAILED: ${undetected.length} of ${results.length} not detected${rebuildFailed ? '; a rebuild failed' : ''}${results.length === 0 ? '; no mutation matched' : ''}`);
+  process.exitCode = 1;
+}
