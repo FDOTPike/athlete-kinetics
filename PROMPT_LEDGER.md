@@ -11943,7 +11943,7 @@ Results (Entry 0135 closed after every pre-APK result below existed):
 
 ## Entry 0192 — Coaching, goals, sport and preparation takeover (Claude Code Desktop)
 
-2026-10-02. Executor: Claude Opus 5.5 (model id `claude-opus-5-5`) in Claude Code Desktop. Worktree `.worktrees/coaching-goals`, branch `codex/coaching-goals-sport-preparation`, stacked on the prerequisite branch `codex/coaching-goals-sport-preparation-baseline` (`56ddfb7d`: frozen HEAD `01023cf0` plus the inherited 100-file overlay, digest `2b979f5c…67900`, committed unchanged and labelled as not coaching work). Entry 0192 is the next number above 0191 in every local/remote ref and every sibling worktree overlay.
+2026-10-02. Executor: Claude Opus 5.5 (model id `claude-opus-5-5`) in Claude Code Desktop. Worktree `.worktrees/coaching-goals`, branch `codex/coaching-goals-sport-preparation`, stacked on the prerequisite branch `codex/coaching-goals-sport-preparation-baseline` (`56ddfb7d`: frozen HEAD `01023cf0` plus the inherited 100-file overlay, digest `2b979f5c…67900`, committed unchanged and labelled as not coaching work). Entry 0192 keeps the number it was given on that development lineage, where 0191 was the highest entry in use; on the published ledger it follows Entry 0135 (see the numbering note above).
 
 ### Input
 

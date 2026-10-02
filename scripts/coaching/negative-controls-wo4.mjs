@@ -143,7 +143,7 @@ INSERT INTO discarded_provenance
     migrationSlot: 68,
     tableCount: 117,
     objectCount: 203,
-    fingerprint: '147840e91129313ec7ce6690d8af0e0f774834219cfa9791be930831c4d1765e',
+    fingerprint: 'b2c6deabb8165cd6a2ebca99aa2744c3f10d7f20dd5f6680dcbcc24ae46ab500',
   },`,
     to: '',
     gate: 'npm run verify:backup',
