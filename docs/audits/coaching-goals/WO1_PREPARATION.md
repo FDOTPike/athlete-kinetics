@@ -140,7 +140,7 @@ checked against the code before anything was changed. All four were valid.
 | `AGENT_WORKFLOW.md` said 23 gates but listed 22. | **Valid.** | `preparation` added to the list, in `package.json` order. |
 | The ledger entry said 0192 follows 0191 "in every local/remote ref", which contradicts the published ledger ending at 0135. | **Valid.** | Reworded: the number is the development lineage's. |
 
-Negative controls M16–M18 cover the two code fixes: 18 of 18 detected.
+Negative controls M16–M18 cover the two code fixes. The script was later made stricter (reviews of pull requests 23 to 25) and re-run in full: 18 of 18 detected.
 
 CodeRabbit's docstring-coverage warning (63%, threshold 80%) was not acted on:
 the repository has no such rule, and the functions it counts are documented
