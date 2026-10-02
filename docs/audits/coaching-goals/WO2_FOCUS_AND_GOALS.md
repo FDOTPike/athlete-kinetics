@@ -164,10 +164,19 @@ All on desktop, Windows 11, Node 24, 2026-10-02.
 | `FocusGoalStore.test.js` (real store, two athlete databases) | 25 passed |
 | `OnboardingFocusGoal.test.js` (real store behind the real screens) | 12 passed |
 | `BackupForwardRestore.test.js` | 16 passed |
-| Negative controls | 23 of 23 detected — [evidence/WO2_NEGATIVE_CONTROLS.md](evidence/WO2_NEGATIVE_CONTROLS.md) |
+| Negative controls | 26 of 26 detected (23 at first; re-run with a stricter harness and three more mutations after review) — [evidence/WO2_NEGATIVE_CONTROLS.md](evidence/WO2_NEGATIVE_CONTROLS.md) |
 
-The full integrated `verify:ci` for this commit is run in a separate clean
-checkout and its exit code is recorded in the final report.
+Full integrated `npm run verify:ci`:
+
+| Where | Result |
+| --- | --- |
+| Development lineage, the work order 2 commit, separate clean checkout | exit 0 (25 gates there; 75 suites, 1660 tests) |
+| Published branch `claude/coaching-wo2-focus-goals` at its first published tip, hosted CI on pull request 23 | "Verification suite (23 gates + typecheck)" passed |
+| Top of the published stack (all four work orders), local | exit 0 (23 gates; 55 suites, 877 tests) |
+
+This branch's own tip was **not** run through the full local `verify:ci` on
+the published base; the hosted run on the pull request is that check, and the
+table above is not complete validation evidence without it.
 
 ### A defect in my own evidence, found and corrected
 
@@ -180,3 +189,20 @@ rows, not nine) and that the cached runs were the wrong ones. The pin and this
 document now say 794, the shared jest cache was cleared, and the negative
 controls run with `--no-cache`. CI already runs the component suite with
 `--no-cache`, which is why it caught this.
+
+## Review of pull request 23
+
+CodeRabbit raised six findings. Each was checked against the code. All six
+were valid.
+
+| Finding | Verdict | What was done |
+| --- | --- | --- |
+| Progress was computed from every measurement of a goal, including ones recorded before the goal was edited to measure something else. | **Valid, a real defect.** 90 kg recorded against a load goal would read as "90 reps — target reached" after the goal was changed to count repetitions. | Progress now uses only measurements recorded in the goal's current unit **and** metric (two metrics can share a unit: lifted kilograms and body weight). The metric comes from the revision each measurement was recorded against. Nothing is deleted: earlier measurements stay on record. |
+| An impossible calendar date (30 February) passed the store's check and reached the database, whose raw constraint text was then shown to the athlete. | **Valid.** The date is typed by hand. | The store validates the date as a real calendar date and gives its own plain message. |
+| A stored goal whose date had gone was described as "less than 4 weeks away". | **Valid.** Saving blocks a past date, but a stored goal outlives its date. | New assessment `deadline_passed`: says the date has passed (or is today) and to choose a new one or remove it. |
+| The negative-control script reported any non-zero exit as "detected". | **Valid, and it applied to all four scripts.** | Each distinct gate is run once unmutated and must pass; a mutated run counts only when the gate reported a failure of its own. All four scripts were changed and this one was re-run in full: 26 of 26. One mutation's anchor (N7) had to follow the date fix. |
+| A table row in the evidence file had unescaped pipes. | **Valid** — a bug in the script that wrote the file. | The file is regenerated with pipes escaped. |
+| This record deferred the `verify:ci` result to "the final report". | **Valid.** | The results are stated above, with what was and was not run for this branch. |
+
+New checks: four in `verify_focus_goals.mjs`, one new store test and one
+extended. New mutations N24–N26.

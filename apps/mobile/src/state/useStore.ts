@@ -3861,8 +3861,11 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   recordGoalObservation: (goalId, observedOn, value) => {
     if (get().status !== 'ready') return false;
     // Only a real, finite measurement on a real date that is not in the future.
+    // The date is typed by hand, so an impossible one (30 February) is ordinary
+    // input: it gets the same plain message, not the database's own error.
+    const realDate = (() => { try { isoUtcMs(observedOn); return true; } catch { return false; } })();
     if (!Number.isFinite(value) || value < 0 || value > 100_000
-        || !/^\d{4}-\d{2}-\d{2}$/.test(observedOn) || observedOn > localToday()) {
+        || !realDate || observedOn > localToday()) {
       set({ error: 'Enter the measurement and the date it was taken (today or earlier).' });
       return false;
     }
