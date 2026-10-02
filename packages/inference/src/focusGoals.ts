@@ -400,6 +400,7 @@ export function validateSmartGoal(draft: SmartGoalDraft, today: string): GoalVal
 
 export type GoalFeasibilityKind =
   | 'no_deadline'
+  | 'deadline_passed'
   | 'baseline_unknown'
   | 'before_first_review'
   | 'gradual_rate'
@@ -472,6 +473,15 @@ export function assessGoalFeasibility(
       explanation: `${gap} There is no deadline, so there is no weekly rate to judge. Your measurements will be shown at each ${PLAN_REVIEW_WEEKS}-week plan review.`,
     };
   }
+  // A stored goal outlives its date. Say so, instead of describing a date that
+  // has gone as "less than four weeks away".
+  const daysToDeadline = daysBetween(context.today, goal.requestedDeadline!);
+  if (daysToDeadline < 1) {
+    return {
+      ...base, weeksAvailable: 0, kind: 'deadline_passed', changePerWeek: null, totalChangeFraction,
+      explanation: `${gap} The date you chose (${goal.requestedDeadline}) ${daysToDeadline < 0 ? 'has passed' : 'is today'}. Edit the goal to choose a new date, or remove the deadline.`,
+    };
+  }
   if (weeksAvailable < PLAN_REVIEW_WEEKS) {
     return {
       ...base, kind: 'before_first_review', changePerWeek: null, totalChangeFraction,
@@ -504,6 +514,12 @@ export function assessGoalFeasibility(
 export interface GoalObservation {
   readonly observedOn: string;
   readonly value: number;
+  /** The unit and metric the measurement was recorded in. A goal can be edited
+   *  to measure something else; a measurement taken in another unit or metric
+   *  says nothing about the current target and is left out of progress.
+   *  Absent = recorded against the goal's current definition. */
+  readonly unit?: string;
+  readonly metricId?: string;
 }
 
 export type GoalProgressKind = 'no_observations' | 'baseline_only' | 'moving_toward' | 'no_change' | 'moving_away' | 'reached';
@@ -525,7 +541,9 @@ export interface GoalProgress {
  */
 export function goalProgress(goal: SmartGoal, observations: readonly GoalObservation[]): GoalProgress {
   const ordered = [...observations]
-    .filter((row) => isRealIsoDate(row.observedOn) && Number.isFinite(row.value))
+    .filter((row) => isRealIsoDate(row.observedOn) && Number.isFinite(row.value)
+      && (row.unit === undefined || row.unit === goal.unit)
+      && (row.metricId === undefined || row.metricId === goal.metricId))
     .sort((a, b) => a.observedOn.localeCompare(b.observedOn));
   const latest = ordered.length === 0 ? null : ordered[ordered.length - 1]!;
   const unit = goal.unit;
