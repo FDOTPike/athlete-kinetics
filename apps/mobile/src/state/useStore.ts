@@ -1313,6 +1313,9 @@ let embedder: Embedder | null = null;
 /** Health Connect bridge; null = device cannot serve biometrics (by design,
  *  nothing else in the app changes — subjective-triage-only routing). */
 let biometrics: BiometricsBridge | null = null;
+/** Upper bound on one native Health read (see syncBiometrics). Generous: a
+ *  week of compacted reads finishes in well under a second on device. */
+const BIOMETRICS_READ_TIMEOUT_MS = 30_000;
 /**
  * Health permission operations are ORDERED (reviewed async-ownership repair,
  * ported 2026-10-04). Every connect/request/disconnect starts a new revision
@@ -5466,7 +5469,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const contextRevision = athleteContextRevision;
     const athleteId = get().activeAthleteId;
     try {
-      const days = await bridge.readDaily(7);
+      // A native read that never settles must not hold the lease (and with it
+      // switch/create/backup/restore) forever: past the bound it counts as no
+      // data and any late result is discarded.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const read = await Promise.race([
+        bridge.readDaily(7),
+        new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), BIOMETRICS_READ_TIMEOUT_MS); }),
+      ]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+      if (read === null) return;
+      // Only the trailing week is written. The bridges read a slightly wider
+      // window, and its oldest day can hold a night truncated at the window
+      // edge, which must never overwrite a complete stored night.
+      const oldestWritten = demoDates(localToday(), 7)[0]!;
+      const days = read.filter((r) => r.date >= oldestWritten);
       if (biometricsPermissionOperation.revision !== permissionRevision
         || athleteContextRevision !== contextRevision
         || athleteId !== get().activeAthleteId || dbAthleteId !== athleteId
@@ -5486,9 +5502,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
             "INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source) VALUES (?, ?, ?, 'health_connect') ON CONFLICT(date) DO UPDATE SET rmssd_ms = excluded.rmssd_ms, resting_hr = COALESCE(excluded.resting_hr, resting_hr), source = excluded.source",
             [r.date, r.rmssdMs, r.restingHrBpm],
           );
-        } else if (r.restingHrBpm !== null) {
+        } else if (r.restingHrBpm !== null && restingHrSource === 'health_connect') {
           // RHR without HRV: hrv_daily requires rmssd_ms, so only an
-          // existing row can absorb it (no-op otherwise, by design).
+          // existing row can absorb it (no-op otherwise, by design). Health
+          // Connect only: hrv_daily rows are labelled Health Connect, and an
+          // Apple value must not be written under that label.
           d.executeSync(
             'UPDATE hrv_daily SET resting_hr = ? WHERE date = ?',
             [r.restingHrBpm, r.date],

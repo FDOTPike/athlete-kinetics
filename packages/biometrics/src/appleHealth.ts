@@ -133,7 +133,9 @@ const minutes = (ivs: readonly Interval[]): number => ivs.reduce((sum, iv) => su
  *   are resolved by precedence (deep > REM > core > unspecified asleep >
  *   awake) so no minute is counted twice.
  * - An episode with only "in bed" samples carries no stages, so aggregateDaily
- *   applies its conservative unstaged-efficiency estimate.
+ *   applies its conservative unstaged-efficiency estimate. An episode with
+ *   known stages keeps them all, so an awake-only night is 0 asleep minutes,
+ *   never an estimate.
  * - Malformed, zero-length, inverted or > 24 h samples are dropped.
  */
 export function appleSleepToRecords(samples: readonly AppleSleepSampleLike[]): SleepRecordLike[] {
@@ -178,12 +180,13 @@ export function appleSleepToRecords(samples: readonly AppleSleepSampleLike[]): S
     const start = Math.min(...chosen.map((s) => s.start));
     const end = Math.max(...chosen.map((s) => s.end));
     stages.sort((a, b) => (a.startTime < b.startTime ? -1 : a.startTime > b.startTime ? 1 : 0));
-    const hasAsleepStage = stages.some((st) => st.stage !== STAGE_AWAKE);
     records.push({
       startTime: new Date(start).toISOString(),
       endTime: new Date(end).toISOString(),
-      // Only awake samples and no asleep stage: treat as unstaged in-bed time.
-      ...(hasAsleepStage ? { stages } : {}),
+      // Any known stage — awake included — is real information and is kept:
+      // an awake-only night counts 0 asleep minutes, never an estimate. Only
+      // an episode with no stage at all (in-bed samples only) is unstaged.
+      ...(stages.length > 0 ? { stages } : {}),
     });
   }
   return records;

@@ -44,7 +44,7 @@ const evidence = Array.from({ length: 90 }, (_, index) => {
     setCount: index < 14 ? 2 : 0,
     bodyweightKg: index % 7 === 0 ? 82.5 : null,
     hrvRmssdMs: index % 2 === 0 ? 48 : null,
-    restingHr: null,
+    restingHr: index % 3 === 0 ? 52 : null,
     sleepMinutes: index % 3 === 0 ? 430 : null,
   };
 });
@@ -91,6 +91,8 @@ describe('Coach Verification Lab pure sandbox', () => {
       tonnageKg: 1400,
       bodyweightDays: 2,
       hrvDays: 7,
+      // Resting HR is counted on its own and never inflates the HRV count.
+      restingHrDays: 5,
       sleepDays: 5,
     });
   });

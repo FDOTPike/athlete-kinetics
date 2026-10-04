@@ -78,6 +78,8 @@ export interface EvidenceWindowSummary {
   readonly tonnageKg: number;
   readonly bodyweightDays: number;
   readonly hrvDays: number;
+  /** Days with a resting heart rate (counted apart from HRV: iOS has resting HR but no RMSSD). */
+  readonly restingHrDays: number;
   readonly sleepDays: number;
 }
 
@@ -373,7 +375,8 @@ function evidenceWindow(
     setCount: rows.reduce((sum, point) => sum + point.setCount, 0),
     tonnageKg: Math.round(rows.reduce((sum, point) => sum + point.tonnageKg, 0) * 10) / 10,
     bodyweightDays: rows.filter((point) => point.bodyweightKg !== null).length,
-    hrvDays: rows.filter((point) => point.hrvRmssdMs !== null || point.restingHr !== null).length,
+    hrvDays: rows.filter((point) => point.hrvRmssdMs !== null).length,
+    restingHrDays: rows.filter((point) => point.restingHr !== null).length,
     sleepDays: rows.filter((point) => point.sleepMinutes !== null).length,
   };
 }
@@ -415,6 +418,7 @@ export function serializeRedactedCoachReport(report: CoachVerificationReport): s
       tonnageKg: window.tonnageKg,
       bodyweightDays: window.bodyweightDays,
       hrvDays: window.hrvDays,
+      restingHrDays: window.restingHrDays,
       sleepDays: window.sleepDays,
     })),
     redaction: 'Names, free text, movement identifiers, database identifiers, dates, raw verdicts, and raw health readings omitted.',

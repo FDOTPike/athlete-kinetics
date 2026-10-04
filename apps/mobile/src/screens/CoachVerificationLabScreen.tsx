@@ -144,7 +144,7 @@ export default function CoachVerificationLabScreen({ onClose }: Props): React.JS
               <View>
                 <Text style={styles.detail}>{selectedEvidence.trainingDays} training days · {selectedEvidence.setCount} sets</Text>
                 <Text style={styles.detail}>{selectedEvidence.tonnageKg.toFixed(1)} kg recorded tonnage</Text>
-                <Text style={styles.detail}>Bodyweight {selectedEvidence.bodyweightDays} days · HRV {selectedEvidence.hrvDays} days · sleep {selectedEvidence.sleepDays} days</Text>
+                <Text style={styles.detail}>Bodyweight {selectedEvidence.bodyweightDays} days · HRV {selectedEvidence.hrvDays} days · resting HR {selectedEvidence.restingHrDays} days · sleep {selectedEvidence.sleepDays} days</Text>
               </View>
             )}
           </View>

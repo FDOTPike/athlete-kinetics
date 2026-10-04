@@ -17,6 +17,9 @@ import { useStore } from '../../src/state/useStore';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } from '../../src/state/dataMaintenanceLock';
+// A date inside the trailing week syncBiometrics writes (older days are the
+// read window's edge and are deliberately not written).
+const recentDate = (() => { const d = new Date(Date.now() - 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
 let mockDrivers;
 let mockRegistry;
 let mockRegistryLoadDelay;
@@ -101,7 +104,7 @@ test.each([false, true])('biometric sync ownership survives deferred read; switc
     expect(state().activeAthleteId).toBe('default');
     expect(state().error).toMatch(/still being saved/i);
   }
-  const date = '2026-09-01';
+  const date = recentDate;
   hold.resolve([{ date, rmssdMs: 73.125, restingHrBpm: 57, inBedMin: null, asleepMin: null, deepMin: null, remMin: null, lightMin: null }]);
   await pending;
   if (switchAthlete) {

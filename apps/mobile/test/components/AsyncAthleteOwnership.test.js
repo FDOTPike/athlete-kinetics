@@ -21,7 +21,10 @@ const B = 'athlete_b.db';
 const rows = (file, sql, ...params) => mockDrivers.get(file).raw.prepare(sql).all(...params);
 const settle = async () => { for (let n = 0; n < 8; n++) await new Promise(resolve => setImmediate(resolve)); };
 const deferred = () => { let resolve; let reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
-const day = { date: '2026-09-01', rmssdMs: 73.125, restingHrBpm: 57, inBedMin: null, asleepMin: null, deepMin: null, remMin: null, lightMin: null };
+// A date inside the trailing week syncBiometrics writes (older days are the
+// read window's edge and are deliberately not written).
+const recentDate = (() => { const d = new Date(Date.now() - 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+const day = { date: recentDate, rmssdMs: 73.125, restingHrBpm: 57, inBedMin: null, asleepMin: null, deepMin: null, remMin: null, lightMin: null };
 const configureHealth = async readDaily => {
   await state().connectBiometrics({ hasGrantedPermissions: async () => false, requestPermissions: async () => true, readDaily });
   useStore.setState({ biometricsStatus: 'ready' });

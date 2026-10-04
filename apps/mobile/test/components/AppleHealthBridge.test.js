@@ -14,7 +14,7 @@ import { appleHealthDaily, appleRestingHrToRecords, appleSleepDaily, appleSleepT
 import { biometricsCopy, providerForPlatform } from '../../src/state/biometricsCopy';
 import { biometricsProviderFor } from '@ak/biometrics';
 import { useStore } from '../../src/state/useStore';
-import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } from '../../src/state/dataMaintenanceLock';
+import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests, tryAcquireDataMutationLease } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 const mockHealthKit = {
@@ -131,6 +131,19 @@ describe('sleep normalization (pure)', () => {
     expect(daily[0].restingHrBpm).toBeNull();
   });
 
+  test('known awake time is never turned into estimated sleep (awake only, with and without in bed)', () => {
+    const awake = sample('2026-09-30T13:00:00Z', '2026-09-30T21:00:00Z', APPLE_SLEEP_VALUE.awake);
+    const inBed = sample('2026-09-30T13:00:00Z', '2026-09-30T21:00:00Z', APPLE_SLEEP_VALUE.inBed);
+    for (const samples of [[awake], [inBed, awake]]) {
+      const daily = appleSleepDaily(samples);
+      expect(daily).toHaveLength(1);
+      expect(daily[0]).toMatchObject({ inBedMin: 480, asleepMin: 0, deepMin: null, remMin: null, lightMin: null, rmssdMs: null, restingHrBpm: null });
+    }
+    // Partly awake, partly unstaged in bed: only the known stages count.
+    const partial = appleSleepDaily([inBed, sample('2026-09-30T13:00:00Z', '2026-09-30T14:00:00Z', APPLE_SLEEP_VALUE.awake)]);
+    expect(partial[0]).toMatchObject({ inBedMin: 480, asleepMin: 0 });
+  });
+
   test('malformed, inverted, zero-length, over-24h and unknown-value samples are dropped', () => {
     expect(appleSleepToRecords([
       sample('2026-09-30T13:00:00Z', '2026-09-30T13:00:00Z', APPLE_SLEEP_VALUE.asleepCore),
@@ -234,6 +247,17 @@ describe('bridge contract', () => {
     expect(await bridge.readDaily(7)).toEqual([]);
     expect(await bridge.hasGrantedPermissions()).toBe(false);
     expect(await bridge.requestPermissions()).toBe(false);
+  });
+
+  test('the production adapter reports an 8 h awake-only night as 0 asleep minutes (no fabricated sleep or HRV)', async () => {
+    Platform.OS = 'ios';
+    const bridge = await tryCreateAppleHealthBridge();
+    for (const values of [[APPLE_SLEEP_VALUE.awake], [APPLE_SLEEP_VALUE.inBed, APPLE_SLEEP_VALUE.awake]]) {
+      mockHealthKit.samples = values.map((value) => ({ startDate: at('2026-09-30T13:00:00Z'), endDate: at('2026-09-30T21:00:00Z'), value,
+        sourceRevision: { source: { bundleIdentifier: 'com.apple.health.watch' } } }));
+      const daily = await bridge.readDaily(7);
+      expect(daily).toEqual([expect.objectContaining({ inBedMin: 480, asleepMin: 0, rmssdMs: null, restingHrBpm: null })]);
+    }
   });
 
   test('one type failing (or empty) never sinks the other', async () => {
@@ -366,6 +390,55 @@ test('Health Connect resting HR on a day without HRV is kept too, and an undecla
   expect(useStore.getState().loadMeasuredHistory(14).find((row) => row.date === twoDaysAgo))
     .toMatchObject({ restingHr: 50, hrvRmssdMs: 60 });
   await useStore.getState().connectBiometrics(bridgeOf(undefined, [day(yesterday, null, 47)]));
+  expect(restingRows(db)).toEqual([]);
+  await useStore.getState().connectBiometrics(null);
+});
+
+test('iOS resting HR never rewrites a Health Connect hrv_daily row, and only the trailing week is written', async () => {
+  Platform.OS = 'ios';
+  const db = await bootFreshStore();
+  const yesterday = localDate(Date.now() - 86400000);
+  const tenDaysAgo = localDate(Date.now() - 10 * 86400000);
+  // History restored from an Android backup.
+  db.prepare("INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source) VALUES (?, 60, 50, 'health_connect')").run(yesterday);
+  const day = (date, restingHrBpm) => ({ date, rmssdMs: null, restingHrBpm, inBedMin: 400, asleepMin: 360, deepMin: null, remMin: null, lightMin: null });
+  await useStore.getState().connectBiometrics({
+    provider: 'apple_health', hasGrantedPermissions: async () => true, requestPermissions: async () => true,
+    // The oldest day stands for a night truncated at the read window's edge.
+    readDaily: async () => [day(tenDaysAgo, 58), day(yesterday, 53)],
+  });
+  expect(db.prepare('SELECT resting_hr, source FROM hrv_daily WHERE date = ?').get(yesterday)).toEqual({ resting_hr: 50, source: 'health_connect' });
+  expect(restingRows(db)).toEqual([{ date: yesterday, bpm: 53, source: 'apple_health' }]);
+  expect(db.prepare('SELECT date FROM sleep_daily').all()).toEqual([{ date: yesterday }]);
+  // Reads prefer the provenance-carrying table.
+  expect(useStore.getState().loadMeasuredHistory(14).find((row) => row.date === yesterday)).toMatchObject({ restingHr: 53 });
+  await useStore.getState().connectBiometrics(null);
+});
+
+test('a native Health read that never settles releases the data lease and writes nothing', async () => {
+  Platform.OS = 'ios';
+  const db = await bootFreshStore();
+  let reads = 0;
+  const hanging = {
+    provider: 'apple_health', hasGrantedPermissions: async () => true, requestPermissions: async () => true,
+    readDaily: () => { reads += 1; return reads === 1 ? Promise.resolve([]) : new Promise(() => {}); },
+  };
+  await useStore.getState().connectBiometrics(hanging);
+  expect(useStore.getState().biometricsStatus).toBe('ready');
+  jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
+  try {
+    const sync = useStore.getState().syncBiometrics();
+    await Promise.resolve();
+    // While the read is outstanding the lease is held: exclusive actions wait.
+    expect(tryAcquireDataMutationLease(true)).toBeNull();
+    jest.advanceTimersByTime(30_000);
+    await sync;
+  } finally {
+    jest.useRealTimers();
+  }
+  const release = tryAcquireDataMutationLease(true);
+  expect(release).not.toBeNull();
+  release();
   expect(restingRows(db)).toEqual([]);
   await useStore.getState().connectBiometrics(null);
 });
