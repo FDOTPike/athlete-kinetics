@@ -685,10 +685,10 @@ export function reverseLungeGeometry(phase: number, body: BodyParameters) {
   const joints: FigureJoints = { hd: [nk[0], nk[1] - 9], nk, hp,
     waist: [hp[0], nk[1] + 24 * 0.56], nArm, fArm, el, wr, ef, wf,
     nLeg, fLeg, kn: knee(nLeg, an), an, kf: knee(fLeg, af), af };
-  // Keep the existing5.4-unit foot and its ankle attachment. A native rounded
+  // Keep the existing 5.4-unit foot and its ankle attachment. A native rounded
   // View insets each cap centre along the diagonal; endpoint+radius is not
   // its painted sole. This toe rise makes the actual rounded end tangent at
-  // landing, with the same7-unit flight arc above the floor.
+  // landing, with the same 7-unit flight arc above the floor.
   const heelRise = 2.2 * step;
   const toeRise = heelRise / (1 - footWidth / (2 * 5.4));
   const frontFoot: readonly [CanonicalPoint, CanonicalPoint] = [an, [an[0] + 5.4, an[1]]];
