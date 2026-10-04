@@ -71,7 +71,7 @@ npm run verify:ci        # 24 gates + preflight + typecheck; semantic+embedder n
 npm run verify:release   # verify:ci + memory contract [A]/[D] + REAL candidate APK (owner-run)
 ```
 verify:ci gates: db, demo, migrations, policy, blocks, autopilot,
-autopilot-counterexamples, biometrics, semantic, embedder, qa-artifact, store,
+autopilot-counterexamples, biometrics, semantic, embedder, qa-artifact, native-config, store,
 coach, backup, memory-fixtures, progression, pipeline, runner, outcomes,
 preparation, library, coaching-content-generator, components (+ typecheck).
 verify:release adds: memory-contract ([A] ratified envelope, [D] measured device

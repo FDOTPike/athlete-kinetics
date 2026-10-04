@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege: no job pushes, comments or calls the API with this token.
+permissions:
+  contents: read
+
 env:
   # All pinned actions below are Node24-native majors, and runners default to
   # Node24 since 2026-06-16. This flag is now redundant belt-and-suspenders:
@@ -18,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Nothing later in the job needs authenticated Git.
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -72,6 +79,9 @@ jobs:
     needs: verify
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Nothing later in the job needs authenticated Git.
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -162,6 +172,9 @@ jobs:
       BUNDLE_ID: com.pikemethods.training
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Nothing later in the job needs authenticated Git.
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 24
