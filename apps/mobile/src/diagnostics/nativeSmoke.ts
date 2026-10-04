@@ -14,7 +14,9 @@
  *     routes to its own codebase entry (tokenizer + inference + routing);
  *   - the native CSPRNG the encrypted backup uses (mobileBackupCrypto.randomBytes,
  *     a direct RNGetRandomValues TurboModule call with no fallback) works;
- *   - the normal store boots to "ready" against a fresh install.
+ *   - the normal store boots to "ready" against a fresh install;
+ *   - this launch's device-backup exclusion of Documents and Library reported
+ *     'excluded' (the CI script then reads the real directory resource values).
  * The result is written to Documents/ak-native-smoke.json and logged with an
  * `[ak-native-smoke]` marker for the macOS CI job to collect. Content-free:
  * no athlete data is read or written.
@@ -25,6 +27,7 @@ import { BACKUP_SCHEMA_USER_VERSION, closeKineticsDb, migrate, openKineticsDb } 
 import { tryCreateDeviceEmbedder } from '../inference/deviceEmbedder';
 import { useStore } from '../state/useStore';
 import { mobileBackupCrypto } from '../state/backupCrypto';
+import { startupDeviceBackupExclusion } from '../state/deviceBackupPolicy';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 
@@ -108,6 +111,16 @@ export async function runNativeSmoke(): Promise<void> {
     if (a.every((x) => x === 0) || b.every((x) => x === 0)) throw new Error('all-zero random bytes');
     if (a.every((x, i) => x === b[i])) throw new Error('two draws were identical');
     return 'RNGetRandomValues via mobileBackupCrypto.randomBytes: 2 x 32 bytes, distinct';
+  });
+
+  // The app's own startup call (App.tsx), not a second call made for the test.
+  // The CI script independently reads the real directory resource values.
+  await step(checks, 'device backup exclusion at startup', async () => {
+    const pending = startupDeviceBackupExclusion();
+    if (pending === null) throw new Error('startup exclusion was never started');
+    const result = await pending;
+    if (result !== 'excluded') throw new Error(`result=${result}`);
+    return 'Documents and Library excluded at startup';
   });
 
   await step(checks, 'store boot', async () => {

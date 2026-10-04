@@ -32,6 +32,10 @@ const checks = [];
 const check = (name, ok, detail = '') => { checks.push({ name, ok: Boolean(ok), detail: String(detail) }); };
 
 const plist = JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', join(app, 'Info.plist')], { encoding: 'utf8' }));
+const executable = join(app, String(plist.CFBundleExecutable ?? ''));
+check('app executable present (not an empty bundle)', typeof plist.CFBundleExecutable === 'string'
+  && existsSync(executable) && statSync(executable).isFile() && statSync(executable).size > 100_000,
+  existsSync(executable) ? statSync(executable).size : 'missing');
 const bundle = join(app, 'main.jsbundle');
 check('Release JS bundle embedded', existsSync(bundle) && statSync(bundle).size > 1_000_000, existsSync(bundle) ? statSync(bundle).size : 'missing');
 const model = join(app, 'minilm.onnx');

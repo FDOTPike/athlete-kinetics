@@ -155,8 +155,11 @@ console.log('[N8] privacy manifest and device backup');
   const manifest = read('apps/mobile/ios/AthleteKinetics/PrivacyInfo.xcprivacy');
   check('privacy manifest declares no tracking', /<key>NSPrivacyTracking<\/key>\s*<false\/>/.test(manifest));
   check('Android device backup stays disabled', /android:allowBackup="false"/.test(read('apps/mobile/android/app/src/main/AndroidManifest.xml')));
-  check('iOS excludes app data directories from device backup at startup',
-    read('apps/mobile/src/App.tsx').includes('excludeAppDataFromDeviceBackup()'));
+  check('iOS excludes app data directories from device backup at startup and keeps the outcome',
+    read('apps/mobile/src/App.tsx').includes('startDeviceBackupExclusion()'));
+  check('the native smoke requires the startup exclusion result and CI reads the real resource values',
+    read('apps/mobile/src/diagnostics/nativeSmoke.ts').includes('startupDeviceBackupExclusion()')
+      && /isExcludedFromBackup/.test(read('tools/ios_simulator_smoke.sh')));
 }
 
 console.log('[N9] Xcode 26 / fmt consteval compatibility');

@@ -32,7 +32,7 @@ import { statusBarPaddingTop } from './layout/statusBarPadding';
 import { useBackupStore } from './state/backupStore';
 import { bootAfterSafeRecovery } from './state/backupStartup';
 import { authorizeAthleteDataBoot } from './state/dataMaintenanceLock';
-import { excludeAppDataFromDeviceBackup } from './state/deviceBackupPolicy';
+import { startDeviceBackupExclusion } from './state/deviceBackupPolicy';
 import { nativeSmokeRequested, runNativeSmoke } from './diagnostics/nativeSmoke';
 import { QuietAction } from './components/ui';
 
@@ -155,8 +155,9 @@ export function AppShell(): React.JSX.Element {
 
   useEffect(() => {
     // iOS: keep health databases, registry and recovery files out of iCloud
-    // device backup (Android: allowBackup="false"). Idempotent, never blocks.
-    void excludeAppDataFromDeviceBackup();
+    // device backup (Android: allowBackup="false"). Idempotent, never blocks;
+    // the outcome is kept and a failure is logged.
+    void startDeviceBackupExclusion();
     // CI-only: the macOS job launches the simulator build with -AKNativeSmoke 1.
     if (nativeSmokeRequested()) void runNativeSmoke();
     // Resolve an interrupted replace journal before any athlete database is

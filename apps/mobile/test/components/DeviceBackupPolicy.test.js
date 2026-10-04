@@ -2,7 +2,7 @@
  *  backup by excluding the two app-data DIRECTORIES (new and replaced files
  *  inherit it); Android relies on allowBackup="false"; failures never throw. */
 import { Platform } from 'react-native';
-import { excludeAppDataFromDeviceBackup } from '../../src/state/deviceBackupPolicy';
+import { excludeAppDataFromDeviceBackup, startDeviceBackupExclusion, startupDeviceBackupExclusion } from '../../src/state/deviceBackupPolicy';
 
 const mockExcluded = [];
 let mockFail = false;
@@ -31,4 +31,20 @@ test('a native failure is reported, never thrown', async () => {
   Platform.OS = 'ios';
   mockFail = true;
   await expect(excludeAppDataFromDeviceBackup()).resolves.toBe('failed');
+});
+
+test('the startup run keeps its outcome for the native smoke and logs a failure loudly', async () => {
+  Platform.OS = 'ios';
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    expect(await startDeviceBackupExclusion()).toBe('excluded');
+    expect(await startupDeviceBackupExclusion()).toBe('excluded');
+    expect(warn).not.toHaveBeenCalled();
+    mockFail = true;
+    expect(await startDeviceBackupExclusion()).toBe('failed');
+    expect(await startupDeviceBackupExclusion()).toBe('failed');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[ak-device-backup] failed'));
+  } finally {
+    warn.mockRestore();
+  }
 });

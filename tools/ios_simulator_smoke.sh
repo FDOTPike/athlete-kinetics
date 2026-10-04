@@ -65,6 +65,33 @@ else
   cp "$REPORT" "$OUT/native-smoke.json"
 fi
 
+# Real resource values of the app's own data directories, read back from the
+# simulator container on the host by Foundation (the same on-disk flag iOS
+# backup honours), after the app's startup exclusion ran. The raw extended
+# attributes are kept as evidence.
+if [ -z "$DATA" ]; then DATA=$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data 2>/dev/null || true); fi
+if [ -z "$DATA" ]; then echo "error: app data container not found" >&2; exit 1; fi
+cat > "$OUT/backup-exclusion.swift" <<'SWIFT'
+import Foundation
+var ok = true
+var rows: [String] = []
+for path in CommandLine.arguments.dropFirst() {
+  let url = URL(fileURLWithPath: path, isDirectory: true)
+  let excluded = (try? url.resourceValues(forKeys: [.isExcludedFromBackupKey]))?.isExcludedFromBackup
+  if excluded != true { ok = false }
+  rows.append("{\"path\":\"\(url.lastPathComponent)\",\"isExcludedFromBackup\":\(excluded.map { String($0) } ?? "null")}")
+}
+print("{\"schema\":\"ak.ios-backup-exclusion/1\",\"ok\":\(ok),\"directories\":[\(rows.joined(separator: ","))]}")
+exit(ok ? 0 : 1)
+SWIFT
+xattr -l "$DATA/Documents" "$DATA/Library" > "$OUT/backup-exclusion.xattr.txt" 2>&1 || true
+if xcrun swift "$OUT/backup-exclusion.swift" "$DATA/Documents" "$DATA/Library" > "$OUT/backup-exclusion.json"; then
+  echo "BACKUP EXCLUSION VERIFIED: $(cat "$OUT/backup-exclusion.json")"
+else
+  echo "error: Documents/Library are not excluded from backup: $(cat "$OUT/backup-exclusion.json")" >&2
+  exit 1
+fi
+
 node -e '
   const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
   for (const c of r.checks) console.log(`  ${c.ok ? "PASS" : "FAIL"}  ${c.name}  [${c.detail}]`);
