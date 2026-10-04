@@ -277,7 +277,9 @@ final class AthleteKineticsUITests: XCTestCase {
   /// never claim it can read. Then Coach Mode: a second athlete is added (own
   /// onboarding) and switching athletes never reopens the permission sheet.
   func test3_healthDenialAndAthleteSwitching() throws {
-    launch()
+    // -AKUITestTrace: the app logs which branch its permission flow took
+    // (content-free; captured from the system log by tools/ios_ui_tests.sh).
+    launch(["-AKUITestTrace", "1"])
     completeOnboarding("athlete A")
     openProfile()
     let idle = element(labelBeginsWith: "Apple Health is available.")
@@ -438,6 +440,12 @@ final class AthleteKineticsUITests: XCTestCase {
     XCTAssertFalse(ready.label.contains("unavailable"), "the first set cannot be logged: \(ready.label)")
     let firstLabel = ready.label
     ready.tap()
+    // A logged set starts the rest timer; the person may skip it.
+    let readyNow = element("Ready now, skip the rest timer")
+    if readyNow.waitForExistence(timeout: 10) {
+      log("rest timer shown after the set; skipped with Ready now")
+      reveal(readyNow, "Ready now"); readyNow.tap()
+    }
     let next = app.descendants(matching: .any)
       .matching(NSPredicate(format: "label BEGINSWITH 'Log set ' AND label != %@", firstLabel)).firstMatch
     wait(next, "the next set after logging the first")
@@ -457,6 +465,8 @@ final class AthleteKineticsUITests: XCTestCase {
     let resume = element("today-primary-resume")
     if resume.waitForExistence(timeout: 30) { resume.tap(); log("relaunch: Today offered Resume") }
     else { tap("header-session", "Workout (after relaunch)") }
+    let restAgain = element("Ready now, skip the rest timer")
+    if restAgain.waitForExistence(timeout: 5) { reveal(restAgain, "Ready now (after relaunch)"); restAgain.tap(); log("relaunch: rest timer skipped") }
     wait(element(labelBeginsWith: nextLabel), "the resumed session at the same next step after relaunch", timeout: 60)
     XCTAssertFalse(element(labelBeginsWith: firstLabel + ",").exists || element(firstLabel).exists,
                    "the logged first set was lost across the relaunch")

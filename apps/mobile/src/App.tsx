@@ -117,12 +117,21 @@ export function AppShell(): React.JSX.Element {
   // a gate — without a dismissal it hides the tab bar and strands the athlete
   // away from BlockScreen, routine templates, and the ATHLETE tab with no way
   // back (ProgramSetupScreen hides its own Cancel button when no onCancel is
-  // supplied). Dismissal is per-visit: it resets as soon as the athlete leaves
-  // the state, so archiving again re-offers setup.
+  // supplied). Dismissal is per-visit: it resets when the athlete really leaves
+  // the state (a block or program exists, so archiving again re-offers setup)
+  // or another athlete becomes active. A store reload is NOT leaving it:
+  // creating an encrypted backup closes and reopens the database (ready ->
+  // booting -> ready), and that must not pull the athlete off the screen they
+  // were on and back into setup.
   const [setupDismissed, setSetupDismissed] = useState(false);
+  const hasPlan = useStore((s) => s.status === 'ready' && (s.block !== null || s.program !== null));
+  const activeAthleteId = useStore((s) => s.activeAthleteId);
   useEffect(() => {
-    if (!programSetupPending) setSetupDismissed(false);
-  }, [programSetupPending]);
+    if (hasPlan) setSetupDismissed(false);
+  }, [hasPlan]);
+  useEffect(() => {
+    setSetupDismissed(false);
+  }, [activeAthleteId]);
   const showProgramSetup = programSetupPending && !setupDismissed;
   const { tab, setTab } = useNavigation();
   const boot = useStore((s) => s.boot);

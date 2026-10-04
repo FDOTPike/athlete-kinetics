@@ -45,6 +45,14 @@ jest.mock('../../src/state/useStore', () => {
 });
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({}), { virtual: true });
+// Only the shell's dismissal logic is under test when set-up is offered;
+// ProgramSetupScreen's own behaviour has its own suite.
+jest.mock('../../src/screens/ProgramSetupScreen', () => {
+  const { Pressable, Text } = require('react-native');
+  return { __esModule: true, default: ({ onCancel }) => (
+    <Pressable testID="program-setup-offer" onPress={onCancel}><Text>Cancel</Text></Pressable>
+  ) };
+});
 jest.mock('../../src/inference/deviceEmbedder', () => ({
   tryCreateDeviceEmbedder: jest.fn(() => Promise.resolve(null)),
 }));
@@ -473,4 +481,43 @@ test('startup follows the recovery result contract: initialize resolving true au
   expect(useBackupStore.getState().initialize).toHaveBeenCalledTimes(1);
   await expect(useBackupStore.getState().initialize.mock.results[0].value).resolves.toBe(true);
   expect(boot).toHaveBeenCalledTimes(1);
+});
+
+describe('a dismissed program set-up offer stays dismissed across a store reload', () => {
+  // Creating an encrypted backup closes and reopens the athlete database
+  // (status ready -> booting -> ready). That is not the athlete leaving the
+  // "no program" state, so the dismissal must survive it; a real plan, an
+  // athlete switch or archiving afterwards still re-offers set-up.
+  const noPlan = (overrides = {}) => state({ block: null, program: null, previewTrainingProgram: jest.fn(() => ({ preview: null })), ...overrides });
+
+  test('dismiss, reload, still on the app; a different athlete is offered set-up again', () => {
+    mockState = noPlan({ activeAthleteId: 'a' });
+    const { rerender } = render(<AppShellTestHarness />);
+    expect(screen.queryByTestId('shell-primary-tabs')).toBeNull();
+    fireEvent.press(screen.getByText('Cancel'));
+    expect(screen.getByTestId('shell-primary-tabs')).toBeOnTheScreen();
+
+    mockState = noPlan({ activeAthleteId: 'a', status: 'booting' });
+    rerender(<AppShellTestHarness />);
+    mockState = noPlan({ activeAthleteId: 'a' });
+    rerender(<AppShellTestHarness />);
+    expect(screen.getByTestId('shell-primary-tabs')).toBeOnTheScreen();
+    expect(screen.queryByText('Cancel')).toBeNull();
+
+    mockState = noPlan({ activeAthleteId: 'b' });
+    rerender(<AppShellTestHarness />);
+    expect(screen.queryByTestId('shell-primary-tabs')).toBeNull();
+  });
+
+  test('after a plan existed, archiving it re-offers set-up', () => {
+    mockState = noPlan({ activeAthleteId: 'a' });
+    const { rerender } = render(<AppShellTestHarness />);
+    fireEvent.press(screen.getByText('Cancel'));
+    mockState = state({ activeAthleteId: 'a' });
+    rerender(<AppShellTestHarness />);
+    expect(screen.getByTestId('shell-primary-tabs')).toBeOnTheScreen();
+    mockState = noPlan({ activeAthleteId: 'a' });
+    rerender(<AppShellTestHarness />);
+    expect(screen.queryByTestId('shell-primary-tabs')).toBeNull();
+  });
 });

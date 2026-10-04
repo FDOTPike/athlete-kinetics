@@ -41,6 +41,7 @@ import {
 } from './athleteRegistryCore';
 import { loadRegistry, saveRegistry } from './athleteRegistry';
 import { activeDataMutationLeaseCount, athleteDataBootAllowed, tryAcquireDataMutationLease } from './dataMaintenanceLock';
+import { uiTestTrace } from '../diagnostics/uiTestTrace';
 import {
   createHealthSupportStore, SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE,
   type SupportDetails, type SupportFacts, type SupportInstructionInput,
@@ -5404,6 +5405,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // Boot is READ-ONLY: already-granted -> sync; otherwise wait for the
       // athlete to tap CONNECT. No automatic permission sheet, ever.
       const granted = await bridge.hasGrantedPermissions();
+      uiTestTrace(`connect settled rev=${operation.revision} answered=${granted} owns=${ownsOperation()} current=${stillCurrent()}`);
       if (!ownsOperation()) return; // a newer connect/request/disconnect owns status
       if (!stillCurrent()) {
         // The athlete context moved on: this check settled for nobody. Leave it
@@ -5445,8 +5447,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const stillCurrent = () => ownsOperation()
       && operation.athleteContextRevision === athleteContextRevision
       && athleteId === get().activeAthleteId && biometrics === bridge && athleteDataBootAllowed();
+    uiTestTrace(`request start rev=${operation.revision}`);
     try {
       const granted = await bridge.requestPermissions();
+      uiTestTrace(`request settled rev=${operation.revision} granted=${granted} owns=${ownsOperation()} current=${stillCurrent()}`);
       if (!ownsOperation()) return;
       if (!stillCurrent()) {
         // Answered for an athlete who is no longer active: the result is not
@@ -5471,6 +5475,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       }
       biometricsPermissionOperation = { ...operation, pending: false };
       set({ biometricsStatus: 'denied' });
+    } finally {
+      uiTestTrace(`request done rev=${operation.revision} status=${get().biometricsStatus}`);
     }
   },
 
