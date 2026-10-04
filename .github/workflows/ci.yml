@@ -164,7 +164,7 @@ jobs:
     name: iOS unsigned simulator build + native smoke
     runs-on: macos-26
     needs: verify
-    timeout-minutes: 90
+    timeout-minutes: 150
     env:
       # Xcode/iOS SDK 26+ is the current App Store upload requirement. The job
       # selects the newest installed Xcode of this major and records it.
@@ -234,11 +234,43 @@ jobs:
           tools/ios_simulator_smoke.sh \
             apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
             "$BUNDLE_ID" ios-evidence
+      # The exact unsigned app the smoke ran, kept before the UI-test build
+      # below rebuilds the same product signed to run locally.
+      - name: Keep the smoked unsigned app
+        run: |
+          (cd apps/mobile/ios/build/Build/Products/Release-iphonesimulator && ditto -c -k --keepParent AthleteKinetics.app "$GITHUB_WORKSPACE/ios-evidence/AthleteKinetics-simulator-unsigned.zip")
+      # XCUITest needs a test runner and an app that carry their entitlements
+      # (HealthKit's real permission sheet only appears for an entitled app).
+      # On the simulator that is ad-hoc "sign to run locally" (identity "-"):
+      # no Apple team, certificate or profile is used or available here.
+      - name: Build the UI tests (simulator, ad-hoc signed to run locally)
+        working-directory: apps/mobile/ios
+        run: |
+          set -o pipefail
+          xcodebuild -workspace AthleteKinetics.xcworkspace -scheme AthleteKinetics \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build COMPILER_INDEX_STORE_ENABLE=NO \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
+            build-for-testing 2>&1 | tee ../../../ios-evidence/xcodebuild-uitests.log
+          APP=build/Build/Products/Release-iphonesimulator/AthleteKinetics.app
+          codesign -d --entitlements - --xml "$APP" > ../../../ios-evidence/uitest-app-entitlements.xml 2>&1 || true
+          if ! grep -q 'com.apple.developer.healthkit' ../../../ios-evidence/uitest-app-entitlements.xml; then
+            echo "::error title=ui tests::the UI-test app carries no HealthKit entitlement: $(tr '\n' ' ' < ../../../ios-evidence/uitest-app-entitlements.xml | cut -c1-500)"
+            exit 1
+          fi
+      - name: UI tests on the simulator (fails closed)
+        run: |
+          XCTESTRUN=$(ls apps/mobile/ios/build/Build/Products/*.xctestrun | head -1)
+          echo "xctestrun=$XCTESTRUN"
+          tools/ios_ui_tests.sh "$XCTESTRUN" \
+            apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
+            "$BUNDLE_ID" ios-evidence/ui-tests
       # Job logs and artifacts live in blob storage some reviewers cannot reach;
       # the decisive error lines are re-published as API-visible annotations.
       - name: Annotate the failure
         if: failure()
-        run: node tools/ci_annotate_failure.mjs ios-evidence/xcodebuild.log ios-evidence/console.log
+        run: node tools/ci_annotate_failure.mjs ios-evidence/xcodebuild.log ios-evidence/console.log ios-evidence/xcodebuild-uitests.log
       - name: Record source and toolchain identity
         if: always()
         run: |
@@ -254,7 +286,7 @@ jobs:
               podfileLockCommitted: sh("git ls-files apps/mobile/ios/Podfile.lock") !== "",
             }, null, 2));'
           cp apps/mobile/ios/Podfile.lock ios-evidence/ 2>/dev/null || true
-          if [ -d apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app ]; then
+          if [ ! -f ios-evidence/AthleteKinetics-simulator-unsigned.zip ] && [ -d apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app ]; then
             (cd apps/mobile/ios/build/Build/Products/Release-iphonesimulator && ditto -c -k --keepParent AthleteKinetics.app "$GITHUB_WORKSPACE/ios-evidence/AthleteKinetics-simulator-unsigned.zip")
           fi
       - uses: actions/upload-artifact@v6

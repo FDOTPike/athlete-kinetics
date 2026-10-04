@@ -1,0 +1,350 @@
+// AthleteKineticsUITests — real user-interaction checks on the Release
+// simulator build (CI: tools/ios_ui_tests.sh). They drive the shipped
+// JavaScript bundle through the UI exactly as a person would: onboarding, every
+// primary and header destination with Apple's accessibility audit, Dynamic
+// Type, Apple Health permission denial and athlete switching, and an encrypted
+// backup saved to and restored from Files. Each test launches a freshly
+// installed app (the script reinstalls between tests).
+//
+// Every observation is also printed as an `AKUI` line so CI can publish it as
+// an API-visible annotation; on failure the element tree is printed too.
+// Nothing here is a mock: these run against real UIKit, HealthKit's real
+// permission sheet and the real Files document picker. None of this is a
+// signed-device, motion or 4 GB-phone result.
+import XCTest
+
+final class AthleteKineticsUITests: XCTestCase {
+  private var app: XCUIApplication!
+
+  override func setUpWithError() throws {
+    continueAfterFailure = false
+    app = XCUIApplication()
+  }
+
+  override func tearDownWithError() throws {
+    if let run = testRun, run.failureCount > 0 {
+      log("FAIL-TREE \(name): \(app.debugDescription.prefix(8000))")
+      let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+      shot.name = "failure-\(name)"
+      shot.lifetime = .keepAlways
+      add(shot)
+    }
+  }
+
+  // MARK: - helpers
+
+  private func log(_ message: String) {
+    print("AKUI \(message.replacingOccurrences(of: "\n", with: " | "))")
+  }
+
+  /// Any element whose accessibility identifier (React Native testID) or label matches.
+  private func element(_ key: String) -> XCUIElement {
+    app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@ OR label == %@", key, key)).firstMatch
+  }
+
+  private func element(labelBeginsWith prefix: String) -> XCUIElement {
+    app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
+  }
+
+  private func element(labelContains text: String) -> XCUIElement {
+    app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+  }
+
+  @discardableResult
+  private func wait(_ el: XCUIElement, _ what: String, timeout: TimeInterval = 30,
+                    file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
+    if !el.waitForExistence(timeout: timeout) {
+      XCTFail("\(what) did not appear within \(Int(timeout)) s", file: file, line: line)
+    }
+    return el
+  }
+
+  /// Scroll until the element is hittable: down the page first, then back up.
+  private func reveal(_ el: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
+    wait(el, what, file: file, line: line)
+    var tries = 0
+    while !el.isHittable && tries < 15 { app.swipeUp(velocity: .slow); tries += 1 }
+    tries = 0
+    while !el.isHittable && tries < 30 { app.swipeDown(velocity: .slow); tries += 1 }
+    if !el.isHittable { XCTFail("\(what) never became hittable", file: file, line: line) }
+  }
+
+  private func tap(_ key: String, _ what: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
+    let el = element(key)
+    reveal(el, what ?? key, file: file, line: line)
+    el.tap()
+  }
+
+  /// Replaces the field's text, then submits (single-line fields blur on
+  /// return, so the keyboard never covers the next control).
+  private func enterText(into key: String, _ text: String) {
+    let el = element(key)
+    reveal(el, key)
+    el.tap()
+    let existing = (el.value as? String) ?? ""
+    if !existing.isEmpty {
+      el.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
+    }
+    el.typeText(text + "\n")
+  }
+
+  /// The label once it settles to one beginning with `prefix`.
+  @discardableResult
+  private func settledLabel(_ el: XCUIElement, beginsWith prefix: String, _ what: String,
+                            timeout: TimeInterval = 120) -> String {
+    let done = NSPredicate(format: "label BEGINSWITH %@", prefix)
+    let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: done, object: el)], timeout: timeout)
+    let label = el.exists ? el.label : "<absent>"
+    log("\(what): \(label.prefix(220))")
+    if result != .completed { XCTFail("\(what) did not become '\(prefix)…' within \(Int(timeout)) s; it read: \(label)") }
+    return label
+  }
+
+  private func launch(_ arguments: [String] = []) {
+    app.launchArguments = arguments
+    app.launch()
+    wait(element("shell-root"), "the app shell", timeout: 90)
+  }
+
+  /// The default eight-screen onboarding, through the real UI.
+  private func completeOnboarding(_ who: String) {
+    wait(element("Next"), "onboarding (\(who))", timeout: 60)
+    log("onboarding started (\(who)): progress=\(element(labelBeginsWith: "Step ").exists ? element(labelBeginsWith: "Step ").label : "-")")
+    for step in 1...6 { tap("Next", "Next (step \(step), \(who))") }
+    tap("No, nothing to note")
+    tap("Next", "Next to review (\(who))")
+    tap("START TRAINING")
+    // The program set-up offer is optional; this flow keeps it for later.
+    let cancel = element("Cancel")
+    if cancel.waitForExistence(timeout: 8) { cancel.tap(); log("program set-up offer: cancelled (\(who))") }
+    wait(element("shell-primary-tabs"), "the primary tabs after onboarding (\(who))", timeout: 60)
+    log("onboarding complete: \(who)")
+  }
+
+  private func openProfile() {
+    tap("header-athlete", "Profile")
+    wait(element("athlete-screen-shown"), "the Profile screen")
+  }
+
+  private func unlockAdvancedTools() {
+    if element("advanced-athlete-manager").exists { return }
+    let build = element("Build 0.1.0")
+    reveal(build, "the build label")
+    for _ in 1...7 { build.tap() }
+    wait(element("advanced-athlete-manager"), "the advanced athlete manager after the seven-tap gesture")
+  }
+
+  /// Expands Coach Mode and returns its label (with the athlete count).
+  private func expandCoachMode() -> String {
+    unlockAdvancedTools()
+    let coach = element(labelBeginsWith: "Coach mode,")
+    reveal(coach, "Coach mode")
+    if coach.label.hasSuffix("collapsed") { coach.tap() }
+    let label = settledLabel(coach, beginsWith: "Coach mode,", "Coach Mode", timeout: 10)
+    return label
+  }
+
+  private func healthPermissionButton(_ title: String) -> XCUIElement {
+    app.buttons.matching(NSPredicate(format: "label IN %@", [title, title.replacingOccurrences(of: "’", with: "'")])).firstMatch
+  }
+
+  // MARK: - tests
+
+  /// Onboarding, every primary and header destination, and Apple's
+  /// accessibility audit on each of them (all audit types).
+  func test1_onboardingNavigationAndAccessibility() throws {
+    launch()
+    completeOnboarding("first athlete")
+    var issues: [String] = []
+    let destinations: [(String, String, String)] = [
+      ("tab-today", "Today", "shell-primary-tabs"), ("tab-coach", "Plan", "shell-primary-tabs"),
+      ("tab-progress", "Progress", "progress-screen"), ("header-readiness", "Ready", "readiness-screen"),
+      ("header-session", "Workout", "session-screen-shown"), ("header-library", "Library", "library-list"),
+      ("header-athlete", "Profile", "athlete-screen-shown"),
+    ]
+    for (key, screen, marker) in destinations {
+      tap(key, screen)
+      wait(element(marker), "the \(screen) screen marker (\(marker))")
+      XCTAssertTrue(element(key).isSelected, "\(screen) control is not marked selected after tapping it")
+      log("visited \(screen)")
+      guard #available(iOS 17.0, *) else {
+        XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
+        return
+      }
+      issues += audit(screen)
+    }
+    XCTAssertTrue(issues.isEmpty, "accessibility audit found \(issues.count) issue(s); first: \(issues.first ?? "")")
+  }
+
+  @available(iOS 17.0, *)
+  private func audit(_ screen: String) -> [String] {
+    var issues: [String] = []
+    do {
+      try app.performAccessibilityAudit(for: .all) { issue in
+        let who = issue.element.map { "\($0.elementType.rawValue)|\($0.identifier)|\($0.label.prefix(80))" } ?? "-"
+        issues.append("\(screen) [\(issue.auditType.rawValue)] \(issue.compactDescription) @ \(who)")
+        return true // collect every issue; the caller fails the test if any exist
+      }
+    } catch {
+      issues.append("\(screen) audit did not complete: \(error)")
+    }
+    for issue in issues { log("A11Y \(issue)") }
+    log("a11y \(screen): \(issues.count) issue(s)")
+    return issues
+  }
+
+  /// Dynamic Type: the same text is laid out taller at an accessibility size.
+  func test2_dynamicTypeScalesText() throws {
+    launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"])
+    let regular = element("WHAT SHOULD I CALL YOU?")
+    wait(regular, "the onboarding name prompt (default size)", timeout: 60)
+    let regularHeight = regular.frame.height
+    app.terminate()
+    launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+    let large = element("WHAT SHOULD I CALL YOU?")
+    wait(large, "the onboarding name prompt (AX XXXL)", timeout: 60)
+    let largeHeight = large.frame.height
+    log("dynamic type: name prompt height \(regularHeight) pt at L, \(largeHeight) pt at AX XXXL")
+    XCTAssertGreaterThan(largeHeight, regularHeight * 1.5, "text did not scale with the accessibility text size")
+    XCTAssertTrue(element("Next").isHittable, "Next is unreachable at the largest text size")
+  }
+
+  /// Apple Health: the person declines on HealthKit's real sheet. The app must
+  /// never claim it can read. Then Coach Mode: a second athlete is added (own
+  /// onboarding) and switching athletes never reopens the permission sheet.
+  func test3_healthDenialAndAthleteSwitching() throws {
+    launch()
+    completeOnboarding("athlete A")
+    openProfile()
+    let idle = element(labelBeginsWith: "Apple Health is available.")
+    wait(idle, "the Apple Health 'available' wording before any request")
+    tap("Choose whether to share sleep and resting heart rate from Apple Health", "Apple Health CONNECT")
+    let dontAllow = healthPermissionButton("Don’t Allow")
+    wait(dontAllow, "HealthKit's permission sheet (Don't Allow)", timeout: 30)
+    log("health sheet shown: allow=\(healthPermissionButton("Allow").exists) dontAllow=true")
+    dontAllow.tap()
+    log("health sheet: tapped Don't Allow")
+    // HealthKit never tells an app that reading was denied, so the honest
+    // wording is 'requested' plus where to check — never 'connected'.
+    let hintA = settledLabel(element(labelBeginsWith: "Apple Health access requested"),
+                             beginsWith: "Apple Health access requested", "health wording after denial (A)", timeout: 30)
+    XCTAssertTrue(hintA.contains("does not tell apps whether you allowed reading"), "the denial-safe explanation is missing: \(hintA)")
+    for claim in ["Connected", "granted"] {
+      XCTAssertFalse(hintA.contains(claim), "after a denial the wording claimed access ('\(claim)'): \(hintA)")
+    }
+    XCTAssertFalse(dontAllow.exists, "the permission sheet stayed open")
+
+    let before = expandCoachMode()
+    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athletes"), "expected one athlete before adding: \(before)")
+    enterText(into: "New athlete's name", "UITest B")
+    tap("Add a new athlete")
+    completeOnboarding("athlete B")
+    openProfile()
+    XCTAssertFalse(healthPermissionButton("Don’t Allow").waitForExistence(timeout: 5),
+                   "a new athlete reopened the Health permission sheet")
+    let hintB = element(labelBeginsWith: "Apple Health")
+    wait(hintB, "athlete B's Apple Health wording")
+    log("health wording (B): \(hintB.label.prefix(160))")
+    XCTAssertFalse(hintB.label.contains("Connected"), "athlete B's wording claimed access: \(hintB.label)")
+
+    let afterAdd = expandCoachMode()
+    XCTAssertTrue(afterAdd.hasPrefix("Coach mode, 2 athletes"), "expected two athletes after adding: \(afterAdd)")
+    XCTAssertTrue(element("Athlete UITest B, active").exists, "the new athlete is not the active one")
+    let other = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "label BEGINSWITH 'Athlete ' AND label ENDSWITH ', tap to switch'")).firstMatch
+    reveal(other, "athlete A in the switcher")
+    let otherLabel = other.label
+    other.tap()
+    log("switched: \(otherLabel)")
+    wait(element("shell-root"), "the shell after switching back")
+    openProfile()
+    XCTAssertFalse(healthPermissionButton("Don’t Allow").waitForExistence(timeout: 5),
+                   "switching athlete reopened the Health permission sheet")
+    let hintBack = settledLabel(element(labelBeginsWith: "Apple Health access requested"),
+                                beginsWith: "Apple Health access requested", "health wording after switching back (A)", timeout: 30)
+    XCTAssertFalse(hintBack.contains("Connected"), "athlete A's wording claimed access after the switch: \(hintBack)")
+    let switched = expandCoachMode()
+    XCTAssertTrue(switched.hasPrefix("Coach mode, 2 athletes"), "an athlete was lost across the switch: \(switched)")
+    XCTAssertTrue(element("Athlete UITest B, tap to switch").exists, "athlete B is not listed as switchable after switching to A")
+  }
+
+  /// An encrypted backup saved to Files, a change, then a restore picked from
+  /// Files: the preview and the restored data are the earlier snapshot.
+  func test4_backupToFilesAndRestore() throws {
+    launch()
+    completeOnboarding("backup athlete")
+    openProfile()
+    let password = "correct horse battery staple"
+    enterText(into: "Backup password, at least 12 characters", password)
+    enterText(into: "Confirm backup password", password)
+    tap("create-backup-button", "CREATE ENCRYPTED BACKUP")
+    saveInFiles()
+    settledLabel(element("backup-status-message"), beginsWith: "Encrypted backup saved to the location you chose",
+                 "backup status after saving")
+
+    // A change after the backup: a second athlete (Coach Mode).
+    let before = expandCoachMode()
+    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athletes"), "expected one athlete at backup time: \(before)")
+    enterText(into: "New athlete's name", "After Backup")
+    tap("Add a new athlete")
+    completeOnboarding("athlete added after the backup")
+    openProfile()
+    XCTAssertTrue(expandCoachMode().hasPrefix("Coach mode, 2 athletes"), "the post-backup athlete was not added")
+
+    // Restore: the same password, pick the file in Files, preview, confirm.
+    enterText(into: "Backup password, at least 12 characters", password)
+    tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
+    pickBackupInFiles()
+    let databases = element(labelBeginsWith: "1 athlete database ")
+    wait(databases, "the preview's database count (one athlete at backup time)")
+    let names = element(labelBeginsWith: "Athletes: ")
+    wait(names, "the preview's athlete list")
+    log("restore preview: \(databases.label) / \(names.label)")
+    XCTAssertFalse(names.label.contains("After Backup"), "the preview lists an athlete created after the backup: \(names.label)")
+    tap("confirm-restore-button", "CONFIRM REPLACE ALL DATA")
+    settledLabel(element("backup-status-message"), beginsWith: "Restore complete.", "status after restore", timeout: 180)
+    wait(element("shell-root"), "the app after restore")
+    openProfile()
+    let after = expandCoachMode()
+    XCTAssertTrue(after.hasPrefix("Coach mode, 1 athletes"), "the restore did not bring back the one-athlete snapshot: \(after)")
+    XCTAssertFalse(element(labelContains: "After Backup").exists, "the athlete added after the backup survived the restore")
+  }
+
+  // MARK: - Files
+
+  private func onMyIPhone() {
+    let browse = app.buttons["Browse"]
+    if browse.waitForExistence(timeout: 10) && !browse.isSelected { browse.tap() }
+    let local = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "label == 'On My iPhone' OR label == 'On My iPad'")).firstMatch
+    wait(local, "Files' 'On My iPhone' location", timeout: 30)
+    local.tap()
+  }
+
+  private func saveInFiles() {
+    // UIDocumentPickerViewController (export, as a copy) into On My iPhone.
+    onMyIPhone()
+    for name in ["Save", "Move", "Done", "Open"] {
+      let b = app.buttons[name]
+      if b.waitForExistence(timeout: 5) && b.isEnabled {
+        b.tap()
+        log("files export: \(name)")
+        return
+      }
+    }
+    XCTFail("the Files export sheet had no enabled Save/Move action")
+  }
+
+  private func pickBackupInFiles() {
+    onMyIPhone()
+    let file = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "label BEGINSWITH 'pikeMethods-' AND NOT (label CONTAINS 'recovery')")).firstMatch
+    wait(file, "the saved backup file in Files", timeout: 30)
+    log("files import: picking \(file.label)")
+    file.tap()
+    let open = app.buttons["Open"]
+    if open.waitForExistence(timeout: 5) && open.isEnabled { open.tap() }
+    wait(element("restore-preview"), "the restore preview", timeout: 120)
+  }
+}

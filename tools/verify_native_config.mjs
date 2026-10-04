@@ -124,7 +124,11 @@ console.log('[N4] HealthKit entitlement, read-only');
 console.log('[N5] identity');
 {
   check('no React Native template bundle identifier', !pbx.includes('org.reactjs.native.example'));
-  const ids = [...new Set([...pbx.matchAll(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g)].map((m) => m[1]))];
+  // App-target configurations only; the UI-test runner (TEST_TARGET_NAME) has
+  // its own derived identifier, pinned in [N10].
+  const configs = [...pbx.matchAll(/isa = XCBuildConfiguration;[\s\S]*?\n\t\t\};/g)].map((m) => m[0]);
+  const bundleIds = (blocks) => [...new Set(blocks.flatMap((b) => [...b.matchAll(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g)].map((m) => m[1])))];
+  const ids = bundleIds(configs.filter((b) => !b.includes('TEST_TARGET_NAME')));
   check('one bundle identifier across configurations', ids.length === 1, ids.join(','));
   const androidId = read('apps/mobile/android/app/build.gradle').match(/applicationId "([^"]+)"/)?.[1];
   check('the iOS bundle identifier is the permanent Android application id', ids.length === 1 && ids[0] === androidId,
@@ -184,6 +188,34 @@ console.log('[N9] Xcode 26 / fmt consteval compatibility');
   if (fmtVersion !== undefined) {
     check('the installed React Native still pins the fmt version the patch is written for', fmtVersion === '11.0.2', fmtVersion);
   }
+}
+
+console.log('[N10] CI user-interaction tests (XCUITest)');
+{
+  const configs = [...pbx.matchAll(/isa = XCBuildConfiguration;[\s\S]*?\n\t\t\};/g)].map((m) => m[0]);
+  const testConfigs = configs.filter((b) => b.includes('TEST_TARGET_NAME = AthleteKinetics;'));
+  const testIds = [...new Set(testConfigs.flatMap((b) => [...b.matchAll(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g)].map((m) => m[1])))];
+  check('the UI-test target tests the app and has the app-derived runner identifier',
+    testConfigs.length === 2 && testIds.length === 1 && testIds[0] === 'com.pikemethods.training.uitests', testIds.join(','));
+  check('the UI-test target is a ui-testing bundle that compiles the suite',
+    pbx.includes('productType = "com.apple.product-type.bundle.ui-testing";')
+      && pbx.includes('AthleteKineticsUITests.swift in Sources'));
+  const scheme = read('apps/mobile/ios/AthleteKinetics.xcodeproj/xcshareddata/xcschemes/AthleteKinetics.xcscheme');
+  check('the shared scheme tests the UI-test target, not a missing template target',
+    scheme.includes('BlueprintName = "AthleteKineticsUITests"') && !scheme.includes('"AthleteKineticsTests"'));
+  const suite = read('apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift');
+  const runner = read('tools/ios_ui_tests.sh');
+  const tests = [...suite.matchAll(/func (test\w+)\(\)/g)].map((m) => m[1]);
+  check('every UI test in the suite is run by CI, none skipped',
+    tests.length >= 4 && tests.every((t) => runner.includes(`  ${t}\n`)) && !/XCTSkip|skipped = "YES"/.test(suite + scheme), tests.join(','));
+  check('the suite covers the audit, Dynamic Type, Health denial + switching and Files backup/restore',
+    suite.includes('performAccessibilityAudit(for: .all)') && suite.includes('UICTContentSizeCategoryAccessibilityXXXL')
+      && suite.includes('Don’t Allow') && suite.includes('Athlete UITest B, active')
+      && suite.includes('confirm-restore-button') && suite.includes('Restore complete.'));
+  const ci = read('.github/workflows/ci.yml');
+  check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
+    /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)
+      && ci.includes('tools/ios_ui_tests.sh') && runner.includes('exit "$FAILED"') && runner.includes('lsof -nP -a -i -p'));
 }
 
 console.log(`\n${fail === 0 ? 'NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)' : `${fail} NATIVE CONFIG CHECK(S) FAILED`}`);

@@ -20,18 +20,7 @@ trap 'code=$?; echo "::error title=native smoke::line $LINENO exit $code: $BASH_
 # supported (an arbitrary device type may not run on the newest runtime).
 # The full inventory is kept as evidence of what the runner offered.
 xcrun simctl list -j runtimes devicetypes > "$OUT/simctl-inventory.json"
-read -r RUNTIME DEVICE_TYPE < <(node -e '
-  let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
-    const rs=JSON.parse(s).runtimes.filter(r=>r.isAvailable&&r.platform==="iOS")
-      .sort((a,b)=>a.version.localeCompare(b.version,undefined,{numeric:true}));
-    if(!rs.length){console.error("no available iOS simulator runtime");process.exit(1);}
-    const rt=rs.at(-1);
-    const phones=(rt.supportedDeviceTypes||[]).filter(t=>/^iPhone/.test(t.name)&&t.productFamily!=="iPad");
-    const plain=phones.filter(t=>/^iPhone \d+( Pro)?$/.test(t.name));
-    const pick=(plain.length?plain:phones).at(-1);
-    if(!pick){console.error("runtime "+rt.identifier+" lists no supported iPhone");process.exit(1);}
-    process.stdout.write(rt.identifier+" "+pick.identifier+"\n");
-  });' < "$OUT/simctl-inventory.json")
+read -r RUNTIME DEVICE_TYPE < <(node tools/ios_sim_select.mjs "$OUT/simctl-inventory.json")
 echo "runtime=$RUNTIME deviceType=$DEVICE_TYPE"
 printf '{"runtime":"%s","deviceType":"%s"}\n' "$RUNTIME" "$DEVICE_TYPE" > "$OUT/simulator-selection.json"
 if ! UDID=$(xcrun simctl create ak-smoke-device "$DEVICE_TYPE" "$RUNTIME" 2> "$OUT/simctl-create.err"); then
