@@ -19,6 +19,8 @@
  *   [N6] Apple Health / Nitro autolink on iOS only; Health Connect Android only.
  *   [N7] the Archivo font shipped on iOS is the same hash-pinned file Android ships.
  *   [N8] privacy manifest present; Android device backup stays disabled.
+ *   [N9] Xcode 26 toolchain: the Podfile disables fmt's consteval for Apple
+ *        clang (fmtlib/fmt#4740) while React Native pins fmt 11.0.2.
  *
  * Run: npm run verify:native-config
  */
@@ -151,6 +153,19 @@ console.log('[N8] privacy manifest and device backup');
   check('Android device backup stays disabled', /android:allowBackup="false"/.test(read('apps/mobile/android/app/src/main/AndroidManifest.xml')));
   check('iOS excludes app data directories from device backup at startup',
     read('apps/mobile/src/App.tsx').includes('excludeAppDataFromDeviceBackup()'));
+}
+
+console.log('[N9] Xcode 26 / fmt consteval compatibility');
+{
+  const podfile = read('apps/mobile/ios/Podfile');
+  const fmtSpec = join(ROOT, 'node_modules', 'react-native', 'third-party-podspecs', 'fmt.podspec');
+  const fmtVersion = existsSync(fmtSpec) ? readFileSync(fmtSpec, 'utf8').match(/spec\.version = "([^"]+)"/)?.[1] : undefined;
+  const patched = /patch_fmt_consteval_for_apple_clang!\(installer\)/.test(podfile)
+    && podfile.includes("__apple_build_version__ < 14000029L'") && podfile.includes("version == '11.0.2'");
+  check('the Podfile post_install applies the fmt Apple clang consteval patch', patched);
+  if (fmtVersion !== undefined) {
+    check('the installed React Native still pins the fmt version the patch is written for', fmtVersion === '11.0.2', fmtVersion);
+  }
 }
 
 console.log(`\n${fail === 0 ? 'NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)' : `${fail} NATIVE CONFIG CHECK(S) FAILED`}`);

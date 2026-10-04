@@ -31,5 +31,36 @@ target 'AthleteKinetics' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    patch_fmt_consteval_for_apple_clang!(installer)
   end
+end
+
+# fmt 11.0.2 (pinned by React Native 0.81) enables consteval for Apple clang
+# >= 14. The stricter Apple clang in Xcode 26 rejects FMT_STRING call sites in
+# fmt's own format-inl.h ("call to consteval function ... is not a constant
+# expression", https://github.com/fmtlib/fmt/issues/4740). Upstream's fix is to
+# treat every Apple clang like Apple clang < 14 (FMT_USE_CONSTEVAL 0): fmt's
+# constexpr fallback is fully functional; only the compile-time format-string
+# check is lost. A -D flag cannot do this because base.h redefines the macro.
+# Scoped to exactly fmt 11.0.2 and exactly this one line; fails closed if the
+# line is not where it is expected. Remove once React Native pins a fixed fmt.
+def patch_fmt_consteval_for_apple_clang!(installer)
+  gate = '#elif defined(__apple_build_version__) && __apple_build_version__ < 14000029L'
+  patched = '#elif defined(__apple_build_version__)  // athlete-kinetics: fmtlib/fmt#4740'
+  fmt = installer.pod_targets.find { |target| target.pod_name == 'fmt' }
+  return if fmt.nil?
+  version = fmt.root_spec.version.to_s
+  unless version == '11.0.2'
+    Pod::UI.puts "fmt #{version}: Apple clang consteval patch not applied (written for 11.0.2 only)".yellow
+    return
+  end
+  base_h = File.join(installer.sandbox.pod_dir('fmt'), 'include', 'fmt', 'base.h')
+  text = File.read(base_h)
+  return if text.include?(patched)
+  unless text.scan(gate).length == 1
+    raise "fmt 11.0.2 base.h does not contain the expected Apple clang consteval gate exactly once; refusing to patch"
+  end
+  File.chmod(0644, base_h)
+  File.write(base_h, text.sub(gate, patched))
+  Pod::UI.puts 'fmt 11.0.2: FMT_USE_CONSTEVAL disabled for Apple clang (fmtlib/fmt#4740)'.green
 end
