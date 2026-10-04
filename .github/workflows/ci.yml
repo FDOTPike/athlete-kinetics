@@ -214,6 +214,21 @@ jobs:
             echo "::warning::Podfile.lock is not committed; resolving a new lock (uploaded as an artifact for review)."
             bundle exec pod install
           fi
+      # The source identity check needs to know exactly what pod install
+      # rewrote in tracked files (e.g. the project file or the aggregated
+      # privacy manifest), not just that the tree is dirty.
+      - name: Record tracked files changed by pod install
+        run: |
+          mkdir -p ios-evidence
+          git status --porcelain --untracked-files=no > ios-evidence/pod-install-tracked-status.txt
+          git diff > ios-evidence/pod-install-tracked.diff
+          if [ -s ios-evidence/pod-install-tracked-status.txt ]; then
+            echo "::notice title=pod install tracked changes::$(tr '\n' ' ' < ios-evidence/pod-install-tracked-status.txt | cut -c1-500) | $(git diff --stat | tail -1)"
+            git diff --unified=0 | grep -E '^[-+][^-+]' | head -40 | cut -c1-200 > ios-evidence/pod-install-tracked-excerpt.txt || true
+            echo "::notice title=pod install tracked diff excerpt::$(tr '\n' '~' < ios-evidence/pod-install-tracked-excerpt.txt | cut -c1-3000)"
+          else
+            echo "::notice title=pod install tracked changes::none — the tracked tree is unchanged by pod install"
+          fi
       - name: Build unsigned Release for the simulator
         working-directory: apps/mobile/ios
         run: |
@@ -254,11 +269,15 @@ jobs:
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
             build-for-testing 2>&1 | tee ../../../ios-evidence/xcodebuild-uitests.log
           APP=build/Build/Products/Release-iphonesimulator/AthleteKinetics.app
-          codesign -d --entitlements - --xml "$APP" > ../../../ios-evidence/uitest-app-entitlements.xml 2>&1 || true
-          if ! grep -q 'com.apple.developer.healthkit' ../../../ios-evidence/uitest-app-entitlements.xml; then
-            echo "::error title=ui tests::the UI-test app carries no HealthKit entitlement: $(tr '\n' ' ' < ../../../ios-evidence/uitest-app-entitlements.xml | cut -c1-500)"
+          # Simulator builds carry their entitlements (what the simulator
+          # enforces) in the __TEXT,__entitlements section, not the signature.
+          codesign -d --entitlements - --xml "$APP" > ../../../ios-evidence/uitest-app-signature-entitlements.xml 2>&1 || true
+          node ../../../tools/macho_entitlements.mjs "$APP/AthleteKinetics" > ../../../ios-evidence/uitest-app-entitlements.xml || true
+          if ! grep -q '<key>com.apple.developer.healthkit</key>' ../../../ios-evidence/uitest-app-entitlements.xml; then
+            echo "::error title=ui tests::the UI-test app carries no HealthKit entitlement in __TEXT,__entitlements: $(tr '\n' ' ' < ../../../ios-evidence/uitest-app-entitlements.xml | cut -c1-400) / signature: $(tr '\n' ' ' < ../../../ios-evidence/uitest-app-signature-entitlements.xml | cut -c1-300)"
             exit 1
           fi
+          echo "::notice title=ui tests entitlements::$(tr -d '\n\t' < ../../../ios-evidence/uitest-app-entitlements.xml | sed 's/.*<dict>/<dict>/' | cut -c1-400)"
       - name: UI tests on the simulator (fails closed)
         run: |
           XCTESTRUN=$(ls apps/mobile/ios/build/Build/Products/*.xctestrun | head -1)

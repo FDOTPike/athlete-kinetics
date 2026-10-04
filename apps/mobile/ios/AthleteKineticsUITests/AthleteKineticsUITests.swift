@@ -78,7 +78,7 @@ final class AthleteKineticsUITests: XCTestCase {
 
   /// Replaces the field's text, then submits (single-line fields blur on
   /// return, so the keyboard never covers the next control).
-  private func enterText(into key: String, _ text: String) {
+  private func enterText(into key: String, _ text: String, submit: Bool = true) {
     let el = element(key)
     reveal(el, key)
     el.tap()
@@ -86,7 +86,7 @@ final class AthleteKineticsUITests: XCTestCase {
     if !existing.isEmpty {
       el.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
     }
-    el.typeText(text + "\n")
+    el.typeText(submit ? text + "\n" : text)
   }
 
   /// The label once it settles to one beginning with `prefix`.
@@ -269,8 +269,9 @@ final class AthleteKineticsUITests: XCTestCase {
     XCTAssertTrue(element("Athlete UITest B, tap to switch").exists, "athlete B is not listed as switchable after switching to A")
   }
 
-  /// An encrypted backup saved to Files, a change, then a restore picked from
-  /// Files: the preview and the restored data are the earlier snapshot.
+  /// An encrypted backup saved to Files, a change, a cancelled Files sheet,
+  /// then a restore of the saved .pmbak picked in Files: the preview and the
+  /// restored data are the earlier snapshot.
   func test4_backupToFilesAndRestore() throws {
     launch()
     completeOnboarding("backup athlete")
@@ -292,8 +293,15 @@ final class AthleteKineticsUITests: XCTestCase {
     openProfile()
     XCTAssertTrue(expandCoachMode().hasPrefix("Coach mode, 2 athletes"), "the post-backup athlete was not added")
 
-    // Restore: the same password, pick the file in Files, preview, confirm.
+    // Restore. First the person backs out of the Files sheet: nothing changes.
     enterText(into: "Backup password, at least 12 characters", password)
+    tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
+    let cancel = app.buttons["Cancel"]
+    wait(cancel, "the Files sheet's Cancel", timeout: 30)
+    cancel.tap()
+    settledLabel(element("backup-status-message"), beginsWith: "Restore cancelled. Your data is unchanged.",
+                 "status after cancelling the Files sheet", timeout: 30)
+    // Then the same password, the saved .pmbak picked in Files, preview, confirm.
     tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
     pickBackupInFiles()
     let databases = element(labelBeginsWith: "1 athlete database ")
@@ -309,6 +317,58 @@ final class AthleteKineticsUITests: XCTestCase {
     let after = expandCoachMode()
     XCTAssertTrue(after.hasPrefix("Coach mode, 1 athletes"), "the restore did not bring back the one-athlete snapshot: \(after)")
     XCTAssertFalse(element(labelContains: "After Backup").exists, "the athlete added after the backup survived the restore")
+  }
+
+  /// A workout through the real session screen: start, skip preparation, log
+  /// the first set, leave the app and come back, then a cold relaunch resumes
+  /// the same session at the same next step (the logged set was kept).
+  func test5_workoutLogBackgroundAndRelaunch() throws {
+    launch()
+    completeOnboarding("workout athlete")
+    tap("header-session", "Workout")
+    tap("Start a new workout session")
+    let skip = element("preparation-skip")
+    if skip.waitForExistence(timeout: 20) { reveal(skip, "Skip preparation"); skip.tap(); log("preparation: skipped") }
+    else { log("preparation: not offered for this session") }
+    let first = element(labelBeginsWith: "Log set 1 for ")
+    wait(first, "the first set's Log set control", timeout: 30)
+    log("first set: \(first.label)")
+    if first.label.hasSuffix("enter a load first") {
+      enterText(into: "session-load-input", "20", submit: false)
+      let title = element("Your next step")
+      if title.exists && title.isHittable { title.tap() } // dismiss the number pad
+      log("load entered: 20 kg")
+    }
+    let reps = element("2 clean reps left")
+    if reps.waitForExistence(timeout: 5) { reveal(reps, "2 clean reps left"); reps.tap() }
+    let ready = element(labelBeginsWith: "Log set 1 for ")
+    reveal(ready, "Log set 1")
+    XCTAssertFalse(ready.label.contains("unavailable"), "the first set cannot be logged: \(ready.label)")
+    let firstLabel = ready.label
+    ready.tap()
+    let next = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "label BEGINSWITH 'Log set ' AND label != %@", firstLabel)).firstMatch
+    wait(next, "the next set after logging the first")
+    let nextLabel = next.label.components(separatedBy: ", unavailable")[0]
+    log("after logging: \(next.label)")
+
+    // Leave the app and return: the same step is still showing.
+    XCUIDevice.shared.press(.home)
+    sleep(3)
+    app.activate()
+    wait(element(labelBeginsWith: nextLabel), "the same next step after returning to the app")
+    log("background and return: kept \(nextLabel)")
+
+    // Cold relaunch: the session resumes with the first set kept.
+    app.terminate()
+    launch()
+    let resume = element("today-primary-resume")
+    if resume.waitForExistence(timeout: 30) { resume.tap(); log("relaunch: Today offered Resume") }
+    else { tap("header-session", "Workout (after relaunch)") }
+    wait(element(labelBeginsWith: nextLabel), "the resumed session at the same next step after relaunch", timeout: 60)
+    XCTAssertFalse(element(labelBeginsWith: firstLabel + ",").exists || element(firstLabel).exists,
+                   "the logged first set was lost across the relaunch")
+    log("relaunch: resumed at \(nextLabel)")
   }
 
   // MARK: - Files

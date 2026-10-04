@@ -18,6 +18,7 @@ TESTS=(
   test2_dynamicTypeScalesText
   test3_healthDenialAndAthleteSwitching
   test4_backupToFilesAndRestore
+  test5_workoutLogBackgroundAndRelaunch
 )
 mkdir -p "$OUT"
 trap 'code=$?; echo "::error title=ui tests::line $LINENO exit $code: $BASH_COMMAND"' ERR
