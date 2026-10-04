@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-10-04T20:08:31.5557896+11:00",
+  "processId": 18704,
+  "commandLine": "\"node\"   \"C:\\Users\\fpike\\.codex\\worktrees\\release-feature-audit-2026-10-04\\Athlete App\\node_modules\\.bin\\\\..\\jest\\bin\\jest.js\" --config apps/mobile/jest.config.js --runInBand --no-cache",
+  "startedAt": "2026-10-04T19:50:10.7048850+11:00",
+  "cpuSeconds": 1054.078125,
+  "workingSetBytes": 2677825536,
+  "reason": "More than 18 minutes without component log advancement; bounded root-owned aggregate run interrupted. Result incomplete, not passed or a fabricated test failure."
+}

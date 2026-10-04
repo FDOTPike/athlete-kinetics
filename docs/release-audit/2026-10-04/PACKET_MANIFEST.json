@@ -1,0 +1,123 @@
+{
+  "generatedAt": "2026-10-04T20:10:46.7291223+11:00",
+  "masterSource": "1da218d8b1886040dcf89e0d630581f7b33824d9",
+  "featureSource": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+  "referenceOnly": true,
+  "files": [
+    {
+      "path": "APP_QUALITY_AUDIT.md",
+      "bytes": 17469,
+      "sha256": "395c95ae5a78e3fca1c79f8258ab25d9b72a971e48ef45cd1319455a03d6ddce"
+    },
+    {
+      "path": "COMPONENT_GATE_OBSERVATION.md",
+      "bytes": 3341,
+      "sha256": "1c5e630bb008258e5f4603257927c54f6419f464e1d864feb2a205ee4c28fed4"
+    },
+    {
+      "path": "feature-ci-interruption.json",
+      "bytes": 601,
+      "sha256": "140754c7b66deb86492bfed70154d89d37e3ffda4c90e6ed8de2ee4126fd3013"
+    },
+    {
+      "path": "IOS_AUDIT.md",
+      "bytes": 15006,
+      "sha256": "06856515eca3f06984cf41ea30bed58b8e5a2a2795b4e5e4e0783f995233620a"
+    },
+    {
+      "path": "migration-upgrade-diagnostic-expanded.json",
+      "bytes": 9649,
+      "sha256": "9a32165871883b5f0e1f1bb8f171b139e52ce94404c195cd8e1336d7bf7b2918"
+    },
+    {
+      "path": "MOVEMENT_COMPLETION_WORK_ORDER.md",
+      "bytes": 4445,
+      "sha256": "880fc3b13bf06fabde1b242876240cbf0c108e372fe953edce309008f763011e"
+    },
+    {
+      "path": "MOVEMENT_RUNTIME_AUDIT.md",
+      "bytes": 14619,
+      "sha256": "bda84867b507902d30b9c8c9ee944467bd2c754f406cd4d4e66d915a73edd2bb"
+    },
+    {
+      "path": "MOVEMENT_TECHNIQUE_AUDIT.md",
+      "bytes": 34525,
+      "sha256": "a2063f4629a62510c656f2626acd9ee16ee02cb7d07c222984c49fdf05a4134a"
+    },
+    {
+      "path": "OPUS_AUTONOMOUS_RELEASE_WORK_ORDER.md",
+      "bytes": 15643,
+      "sha256": "6a4805573ae6cc8a0580e8031436675e44c436a7259903cc25f84cc9c5b518f8"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2110,
+      "sha256": "feff87fed3393b296434feb3346383f28456d06e2cfc9d05414d15da95dd8743"
+    },
+    {
+      "path": "references/apps__mobile__src__App.tsx.txt",
+      "bytes": 16351,
+      "sha256": "5936b1b9b6fda6cdc8d3a026577cd4bcc645f674bac6067623c9681335e4dcbf"
+    },
+    {
+      "path": "references/apps__mobile__src__state__backupStartup.ts.txt",
+      "bytes": 400,
+      "sha256": "cdb7b494265c27a47bb56e3f60f7fad010a3312fffdc33e0108ed0e04b87994b"
+    },
+    {
+      "path": "references/apps__mobile__src__state__dataMaintenanceLock.ts.txt",
+      "bytes": 2804,
+      "sha256": "2e2bcffd959dfc560165d19afb8c6a6edccabe424003ac0c03453b3c72ff0b89"
+    },
+    {
+      "path": "references/apps__mobile__src__state__useStore.ts.txt",
+      "bytes": 328077,
+      "sha256": "d976bd1a5df7999e3d23ff29aa4d16f7570110244773f11b06324d302a7566c5"
+    },
+    {
+      "path": "references/apps__mobile__test__components__AsyncAthleteOwnership.test.js.txt",
+      "bytes": 26523,
+      "sha256": "5e8cc61a5247876d0cdb3a5746847007b3d7ede5f0ab80e447ffb64f8ae6b3d9"
+    },
+    {
+      "path": "references/feature-async-boundary.test.js.txt",
+      "bytes": 6943,
+      "sha256": "239ac42a8c9d84ad27d263393b79f34c2cc87517c001d1d53a8f5f809cedefe6"
+    },
+    {
+      "path": "references/jest.feature-quality.config.cjs.txt",
+      "bytes": 624,
+      "sha256": "bedf4772e2c544a0581acfd09f647d618fa9f29d5effd2cbe33f307b8faba3a5"
+    },
+    {
+      "path": "references/migration-upgrade-diagnostic.cjs.txt",
+      "bytes": 5035,
+      "sha256": "80c5616e8e8d27ecb63f6882d97e2e87cd17b072f60ddc22b96baf613114e755"
+    },
+    {
+      "path": "references/nodeSqliteOpDriver.js.txt",
+      "bytes": 2577,
+      "sha256": "06e274fb62f13f016e21f0def71b29eb47690e6ea8651c5a437ac60675bef1ff"
+    },
+    {
+      "path": "references/README.md",
+      "bytes": 837,
+      "sha256": "8225d8b0a7a0cec6779551cbffa89a0c4b69b91e2a892be957340e14e5688e2e"
+    },
+    {
+      "path": "references/REFERENCE_MANIFEST.json",
+      "bytes": 2039,
+      "sha256": "949f06ba2520b9f735c53d5e542276b04d44674f50b8a0b00942721f124f9a66"
+    },
+    {
+      "path": "references/sqlRawTransformer.js.txt",
+      "bytes": 1131,
+      "sha256": "bb7919790cb0459f25572b0ac06fe0e1cfe38155458dc84191ea3e09b8a3f65b"
+    },
+    {
+      "path": "RELEASE_AUDIT_2026-10-04.md",
+      "bytes": 14587,
+      "sha256": "a7392c64bd3472e7eb5072d500c69fb0480a40e42dc0df641bf80928166e6f61"
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+/** Diagnostic audit harness: real store/migrations; synthetic deferred native IO.
+ * Fresh feature-branch12a diagnostic. No production fix.
+ */
+import { useStore } from 'C:/Users/fpike/.codex/worktrees/release-feature-audit-2026-10-04/Athlete App/apps/mobile/src/state/useStore';
+import { makeNodeSqliteDriver } from 'C:/Users/fpike/.codex/visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/nodeSqliteOpDriver';
+
+import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } from 'C:/Users/fpike/.codex/worktrees/release-feature-audit-2026-10-04/Athlete App/apps/mobile/src/state/dataMaintenanceLock';
+let mockDrivers;
+let mockRegistry;
+let mockRegistryLoadDelay;
+function mockDriverFor(name) {
+  if (!mockDrivers.has(name)) mockDrivers.set(name, makeNodeSqliteDriver());
+  return mockDrivers.get(name);
+}
+jest.mock('@op-engineering/op-sqlite', () => ({ open: ({ name }) => mockDriverFor(name) }));
+jest.mock('C:/Users/fpike/.codex/worktrees/release-feature-audit-2026-10-04/Athlete App/apps/mobile/src/state/athleteRegistry', () => ({
+  loadRegistry: async () => { const captured=mockRegistry; const hold=mockRegistryLoadDelay; mockRegistryLoadDelay=null; if(hold) await hold.promise; return captured; },
+  saveRegistry: async next => { mockRegistry = next; return true; },
+}));
+const state = () => useStore.getState();
+const rows = (file, sql, ...params) => mockDrivers.get(file).raw.prepare(sql).all(...params);
+const A = 'athlete_kinetics.db';
+const B = 'athlete_b.db';
+const settle = async () => { for (let n = 0; n < 4; n++) await new Promise(resolve => setImmediate(resolve)); };
+const deferred = () => { let resolve; let reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
+beforeEach(async () => {
+  resetDataMaintenanceLockForTests();
+  authorizeAthleteDataBoot();
+  mockDrivers = new Map();
+  mockRegistryLoadDelay = null;
+  mockRegistry = { version: 1, activeId: 'default', advancedToolsUnlocked: true, athletes: [
+    { id: 'default', name: 'Synthetic athlete A', dbName: A, createdAtMs: 0 },
+    { id: 'athlete-b', name: 'Synthetic athlete B', dbName: B, createdAtMs: 1 },
+  ] };
+  useStore.setState({ status: 'booting', error: null, activeAthleteId: 'default', session: null, runner: null, triaging: false });
+  state().setEmbedder(null);
+  state().boot();
+  await settle();
+  expect(state().status).toBe('ready');
+  state().loadDemoAthlete();
+  expect(state().vector).not.toBeNull();
+});
+
+test.each([false, true])('subjective report ownership survives deferred inference; switch=%s', async switchAthlete => {
+  const hold = deferred();
+  const started = jest.fn(() => hold.promise);
+  state().setEmbedder({ embed: started });
+  const beforeA = rows(A, 'SELECT * FROM subjective_report').length;
+  const pending = state().reportSubjective('chest pain', 10);
+  expect(started).toHaveBeenCalledTimes(1);
+  if (switchAthlete) {
+    state().switchAthlete('athlete-b');
+    await settle();
+    expect(state().activeAthleteId).toBe('athlete-b');
+    expect(state().status).toBe('ready');
+  }
+  // Native inference failure is a supported path: the keyword safety layer still runs.
+  hold.reject(new Error('synthetic native inference unavailable'));
+  await pending;
+  const aReports = rows(A, 'SELECT raw_text,halt FROM subjective_report').slice(beforeA);
+  const bReports = switchAthlete ? rows(B, 'SELECT raw_text,halt FROM subjective_report') : [];
+  console.log(JSON.stringify({ observation: 'subjective ownership', switchAthlete, activeAthlete: state().activeAthleteId, aReports, bReports, lastTriage: state().lastTriage?.kind }));
+  expect(bReports).toEqual([]);
+  if (!switchAthlete) expect(aReports).toEqual([{ raw_text: 'chest pain', halt: 1 }]);
+});
+
+test.each([false, true])('biometric sync ownership survives deferred read; switch=%s', async switchAthlete => {
+  const hold = deferred();
+  const readDaily = jest.fn(() => hold.promise);
+  // Connect without auto-sync, then explicitly mark the permission/status fixture ready.
+  await state().connectBiometrics({ hasGrantedPermissions: async () => false, readDaily });
+  useStore.setState({ biometricsStatus: 'ready' });
+  const pending = state().syncBiometrics();
+  expect(readDaily).toHaveBeenCalledTimes(1);
+  if (switchAthlete) {
+    state().switchAthlete('athlete-b');
+    await settle();
+    expect(state().activeAthleteId).toBe('athlete-b');
+    expect(state().status).toBe('ready');
+  }
+  const date = '2026-09-01';
+  hold.resolve([{ date, rmssdMs: 73.125, restingHrBpm: 57, inBedMin: null, asleepMin: null, deepMin: null, remMin: null, lightMin: null }]);
+  await pending;
+  const aRows = rows(A, 'SELECT date,rmssd_ms,source FROM hrv_daily WHERE date=?', date);
+  const bRows = switchAthlete ? rows(B, 'SELECT date,rmssd_ms,source FROM hrv_daily WHERE date=?', date) : [];
+  console.log(JSON.stringify({ observation: 'biometric ownership', switchAthlete, activeAthlete: state().activeAthleteId, aRows, bRows }));
+  expect(bRows).toEqual([]);
+  if (!switchAthlete) expect(aRows).toEqual([{ date, rmssd_ms: 73.125, source: 'health_connect' }]);
+});
+
+ test('older granted check cannot overwrite a newer explicit denial', async () => {
+ const hold=deferred(); const readDaily=jest.fn(async()=>[]);
+ const pending=state().connectBiometrics({hasGrantedPermissions:()=>hold.promise,requestPermissions:async()=>false,readDaily});
+ await state().requestBiometricsAccess(); expect(state().biometricsStatus).toBe('denied');
+ hold.resolve(true); await pending;
+ console.log(JSON.stringify({observation:'permission completion ordering',finalStatus:state().biometricsStatus,reads:readDaily.mock.calls.length}));
+ expect(state().biometricsStatus).toBe('denied'); expect(readDaily).not.toHaveBeenCalled();
+ });
+
+test('concurrent athlete renames preserve both changes', async()=>{
+ state().renameAthleteEntry('default','Renamed A'); state().renameAthleteEntry('athlete-b','Renamed B'); await settle();
+ console.log(JSON.stringify({observation:'concurrent registry writes',names:mockRegistry.athletes.map(a=>[a.id,a.name])}));
+ expect(mockRegistry.athletes.find(a=>a.id==='default').name).toBe('Renamed A'); expect(mockRegistry.athletes.find(a=>a.id==='athlete-b').name).toBe('Renamed B');
+});
+test('pending onboarding name remains assigned to its original athlete', async()=>{
+ const hold=deferred(); mockRegistryLoadDelay=hold; state().completeOnboarding({},'Onboarded A');
+ state().switchAthlete('athlete-b'); await settle(); expect(state().activeAthleteId).toBe('athlete-b');
+ hold.resolve(); await settle();
+ console.log(JSON.stringify({observation:'onboarding name ownership',active:state().activeAthleteId,registryActive:mockRegistry.activeId,names:mockRegistry.athletes.map(a=>[a.id,a.name])}));
+ expect(mockRegistry.athletes.find(a=>a.id==='athlete-b').name).toBe('Synthetic athlete B');
+ expect(mockRegistry.athletes.find(a=>a.id==='default').name).toBe('Onboarded A');
+});

@@ -1,0 +1,312 @@
+[
+  {
+    "label": "master-fresh",
+    "ok": true,
+    "state": {
+      "version": 34,
+      "fingerprint": "99c252688c0c4485ce714ea5c0a623033ddf493bdd7706f07c4e8d6fe6b6c38a",
+      "matchesCurrentBackupSchema": false,
+      "profiles": [
+        {
+          "profile_id": 1,
+          "objective": "gpp",
+          "updated_at_ms": 0
+        }
+      ],
+      "sessions": [],
+      "programs": [],
+      "suspensions": []
+    }
+  },
+  {
+    "label": "feature-fresh",
+    "ok": true,
+    "state": {
+      "version": 67,
+      "fingerprint": "b2c6deabb8165cd6a2ebca99aa2744c3f10d7f20dd5f6680dcbcc24ae46ab500",
+      "matchesCurrentBackupSchema": true,
+      "profiles": [
+        {
+          "profile_id": 1,
+          "objective": "gpp",
+          "updated_at_ms": 0
+        }
+      ],
+      "sessions": [],
+      "programs": [],
+      "suspensions": []
+    }
+  },
+  {
+    "label": "master34-to-feature67-blind-order",
+    "ok": true,
+    "before": {
+      "version": 34,
+      "fingerprint": "99c252688c0c4485ce714ea5c0a623033ddf493bdd7706f07c4e8d6fe6b6c38a",
+      "matchesCurrentBackupSchema": false,
+      "profiles": [
+        {
+          "profile_id": 1,
+          "objective": "hypertrophy",
+          "updated_at_ms": 99
+        }
+      ],
+      "sessions": [
+        {
+          "session_id": 999,
+          "session_date": "2026-10-04"
+        }
+      ],
+      "programs": [
+        {
+          "program_id": 999,
+          "objective": "hypertrophy",
+          "start_date": "2026-10-04"
+        }
+      ],
+      "suspensions": [
+        {
+          "episode_id": 999,
+          "reason": "life",
+          "frozen_macro_index": 3
+        }
+      ]
+    },
+    "after": {
+      "version": 67,
+      "fingerprint": "f27ba0ba94857b1c0d6fac87ae89feb8e6f745944665a32ab967b0b23cd944fa",
+      "matchesCurrentBackupSchema": false,
+      "profiles": [
+        {
+          "profile_id": 1,
+          "objective": "hypertrophy",
+          "updated_at_ms": 99
+        }
+      ],
+      "sessions": [
+        {
+          "session_id": 999,
+          "session_date": "2026-10-04"
+        }
+      ],
+      "programs": [
+        {
+          "program_id": 999,
+          "objective": "hypertrophy",
+          "start_date": "2026-10-04"
+        }
+      ],
+      "suspensions": [
+        {
+          "episode_id": 999,
+          "reason": "life",
+          "frozen_macro_index": 3
+        }
+      ]
+    },
+    "executed": [
+      "036_movement_media.sql",
+      "037_movement_library_v2_batch.sql",
+      "038_movement_library_v2_batch.sql",
+      "039_movement_library_v2_batch.sql",
+      "040_movement_library_v2_batch.sql",
+      "041_movement_library_v2_batch.sql",
+      "042_movement_library_v2_batch.sql",
+      "043_movement_library_v2_batch.sql",
+      "044_movement_library_v2_batch.sql",
+      "045_movement_library_v2_batch.sql",
+      "046_movement_library_v2_batch.sql",
+      "047_movement_library_v2_batch.sql",
+      "048_movement_library_v2_batch.sql",
+      "049_movement_content_correction_v1.sql",
+      "050_movement_role_convergence.sql",
+      "051_routine_access_context.sql",
+      "052_bounded_microcycle_roles.sql",
+      "053_routine_role_compatibility.sql",
+      "054_contract_cutoff_provenance.sql",
+      "055_return_checkin_ack.sql",
+      "056_movement_taxonomy_backfill.sql",
+      "057_block_meta_phase_invariant.sql",
+      "058_suspension_episode.sql",
+      "059_suspension_state_and_load_intent.sql",
+      "060_program_goal_tier_alignment.sql",
+      "061_autopilot_attribution_convergence.sql",
+      "062_suspension_sidecar_immutability.sql",
+      "063_movement_load_intent.sql",
+      "064_accessible_coach_support.sql",
+      "065_session_preparation.sql",
+      "066_focus_and_goals.sql",
+      "067_sport_and_emphasis.sql",
+      "068_movement_content_correction_v2.sql",
+      "001_mechanical_input.sql",
+      "002_telemetry.sql",
+      "003_state_vector.sql",
+      "005_subjective_report.sql",
+      "006_user_profile.sql",
+      "007_program_engine.sql",
+      "008_taxonomy.sql",
+      "009_periodization.sql",
+      "010_movement_library.sql",
+      "011_niggle_tracking.sql",
+      "012_report_severity.sql",
+      "013_profile_slot.sql",
+      "014_movement_prefixes.sql",
+      "015_set_prefix.sql",
+      "016_movement_library_seed.sql",
+      "017_movement_batch.sql",
+      "018_logging_modes.sql",
+      "019_movement_batch.sql",
+      "020_movement_batch.sql",
+      "021_taxonomy_corrections.sql",
+      "022_set_target.sql",
+      "023_phase17_session_foundation.sql",
+      "024_phase17_equipment_fixes.sql",
+      "025_movement_coaching_content.sql",
+      "026_phase18_session_outcome.sql",
+      "027_operational_safeguards.sql",
+      "028_capability_graph.sql",
+      "029_routine_history_analytics.sql",
+      "030_readiness_import_integration.sql",
+      "031_planned_session_method.sql",
+      "032_capability_content.sql",
+      "033_goal_program.sql",
+      "034_autopilot_attribution.sql",
+      "035_profile_load_preference.sql",
+      "036_movement_media.sql",
+      "037_movement_library_v2_batch.sql",
+      "038_movement_library_v2_batch.sql",
+      "039_movement_library_v2_batch.sql",
+      "040_movement_library_v2_batch.sql",
+      "041_movement_library_v2_batch.sql",
+      "042_movement_library_v2_batch.sql",
+      "043_movement_library_v2_batch.sql",
+      "044_movement_library_v2_batch.sql",
+      "045_movement_library_v2_batch.sql",
+      "046_movement_library_v2_batch.sql",
+      "047_movement_library_v2_batch.sql",
+      "048_movement_library_v2_batch.sql",
+      "049_movement_content_correction_v1.sql",
+      "050_movement_role_convergence.sql",
+      "051_routine_access_context.sql",
+      "052_bounded_microcycle_roles.sql",
+      "053_routine_role_compatibility.sql",
+      "054_contract_cutoff_provenance.sql",
+      "055_return_checkin_ack.sql",
+      "056_movement_taxonomy_backfill.sql",
+      "057_block_meta_phase_invariant.sql",
+      "058_suspension_episode.sql",
+      "059_suspension_state_and_load_intent.sql",
+      "060_program_goal_tier_alignment.sql",
+      "061_autopilot_attribution_convergence.sql",
+      "062_suspension_sidecar_immutability.sql",
+      "063_movement_load_intent.sql",
+      "064_accessible_coach_support.sql",
+      "065_session_preparation.sql",
+      "066_focus_and_goals.sql",
+      "067_sport_and_emphasis.sql",
+      "068_movement_content_correction_v2.sql"
+    ],
+    "schemaDifferences": [
+      {
+        "type": "table",
+        "name": "suspension_episode",
+        "fresh": [
+          "table",
+          "suspension_episode",
+          "suspension_episode",
+          "CREATE TABLE suspension_episode (\n  episode_id         INTEGER PRIMARY KEY,\n  started_at_ms      INTEGER NOT NULL CHECK (started_at_ms > 0),\n  -- NULL = currently suspended. Set once, by the athlete, on resume.\n  ended_at_ms        INTEGER CHECK (ended_at_ms IS NULL OR ended_at_ms >= started_at_ms),\n  -- Closed domain: free text cannot be reasoned about and will not stay clean.\n  -- 'life' is deliberate --- travel, work, bereavement. Restricting suspension\n  -- to injury would leave the commonest cause of a training gap still burning\n  -- the athlete's progression track, which is the bug this table exists to fix.\n  reason             TEXT NOT NULL CHECK (reason IN ('injury', 'illness', 'life')),\n  -- The macro position frozen at entry, mirroring the 009 block_meta domain.\n  frozen_macro_index INTEGER NOT NULL CHECK (frozen_macro_index BETWEEN 1 AND 8)\n) STRICT",
+          [
+            [
+              0,
+              "episode_id",
+              "INTEGER",
+              0,
+              null,
+              1
+            ],
+            [
+              1,
+              "started_at_ms",
+              "INTEGER",
+              1,
+              null,
+              0
+            ],
+            [
+              2,
+              "ended_at_ms",
+              "INTEGER",
+              0,
+              null,
+              0
+            ],
+            [
+              3,
+              "reason",
+              "TEXT",
+              1,
+              null,
+              0
+            ],
+            [
+              4,
+              "frozen_macro_index",
+              "INTEGER",
+              1,
+              null,
+              0
+            ]
+          ]
+        ],
+        "upgraded": [
+          "table",
+          "suspension_episode",
+          "suspension_episode",
+          "CREATE TABLE suspension_episode (\n  episode_id         INTEGER PRIMARY KEY,\n  started_at_ms      INTEGER NOT NULL CHECK (started_at_ms > 0),\n  ended_at_ms        INTEGER CHECK (ended_at_ms IS NULL OR ended_at_ms >= started_at_ms),\n  reason             TEXT NOT NULL CHECK (reason IN ('injury', 'illness', 'life')),\n  frozen_macro_index INTEGER NOT NULL CHECK (frozen_macro_index BETWEEN 1 AND 8)\n) STRICT",
+          [
+            [
+              0,
+              "episode_id",
+              "INTEGER",
+              0,
+              null,
+              1
+            ],
+            [
+              1,
+              "started_at_ms",
+              "INTEGER",
+              1,
+              null,
+              0
+            ],
+            [
+              2,
+              "ended_at_ms",
+              "INTEGER",
+              0,
+              null,
+              0
+            ],
+            [
+              3,
+              "reason",
+              "TEXT",
+              1,
+              null,
+              0
+            ],
+            [
+              4,
+              "frozen_macro_index",
+              "INTEGER",
+              1,
+              null,
+              0
+            ]
+          ]
+        ]
+      }
+    ]
+  }
+]

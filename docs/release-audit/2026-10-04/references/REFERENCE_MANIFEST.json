@@ -1,0 +1,42 @@
+[
+  {
+    "role": "reference only; port relevant accepted repair, never wholesale replace current feature source",
+    "dirty": true,
+    "sha256": "d976bd1a5df7999e3d23ff29aa4d16f7570110244773f11b06324d302a7566c5",
+    "source": "apps/mobile/src/state/useStore.ts",
+    "reference": "apps__mobile__src__state__useStore.ts.txt",
+    "head": "01023cf04eeb85b73004b92de11f64efa7350a1c"
+  },
+  {
+    "role": "reference only; port relevant accepted repair, never wholesale replace current feature source",
+    "dirty": true,
+    "sha256": "2e2bcffd959dfc560165d19afb8c6a6edccabe424003ac0c03453b3c72ff0b89",
+    "source": "apps/mobile/src/state/dataMaintenanceLock.ts",
+    "reference": "apps__mobile__src__state__dataMaintenanceLock.ts.txt",
+    "head": "01023cf04eeb85b73004b92de11f64efa7350a1c"
+  },
+  {
+    "role": "reference only; port relevant accepted repair, never wholesale replace current feature source",
+    "dirty": true,
+    "sha256": "cdb7b494265c27a47bb56e3f60f7fad010a3312fffdc33e0108ed0e04b87994b",
+    "source": "apps/mobile/src/state/backupStartup.ts",
+    "reference": "apps__mobile__src__state__backupStartup.ts.txt",
+    "head": "01023cf04eeb85b73004b92de11f64efa7350a1c"
+  },
+  {
+    "role": "reference only; port relevant accepted repair, never wholesale replace current feature source",
+    "dirty": true,
+    "sha256": "5936b1b9b6fda6cdc8d3a026577cd4bcc645f674bac6067623c9681335e4dcbf",
+    "source": "apps/mobile/src/App.tsx",
+    "reference": "apps__mobile__src__App.tsx.txt",
+    "head": "01023cf04eeb85b73004b92de11f64efa7350a1c"
+  },
+  {
+    "role": "reference only; port relevant accepted repair, never wholesale replace current feature source",
+    "dirty": true,
+    "sha256": "5e8cc61a5247876d0cdb3a5746847007b3d7ede5f0ab80e447ffb64f8ae6b3d9",
+    "source": "apps/mobile/test/components/AsyncAthleteOwnership.test.js",
+    "reference": "apps__mobile__test__components__AsyncAthleteOwnership.test.js.txt",
+    "head": "01023cf04eeb85b73004b92de11f64efa7350a1c"
+  }
+]
