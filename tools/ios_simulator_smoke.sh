@@ -12,20 +12,25 @@ set -euo pipefail
 APP="$1"; BUNDLE_ID="$2"; OUT="$3"
 TIMEOUT_S="${AK_SMOKE_TIMEOUT_S:-240}"
 mkdir -p "$OUT"
+# Any failing command is published as an API-visible annotation (job logs and
+# artifacts are not reachable from every reviewer environment).
+trap 'code=$?; echo "::error title=native smoke::line $LINENO exit $code: $BASH_COMMAND"' ERR
 
-RUNTIME=$(xcrun simctl list runtimes -j | node -e '
+# The newest available iOS runtime, and an iPhone that runtime itself lists as
+# supported (an arbitrary device type may not run on the newest runtime).
+read -r RUNTIME DEVICE_TYPE < <(xcrun simctl list runtimes -j | node -e '
   let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
     const rs=JSON.parse(s).runtimes.filter(r=>r.isAvailable&&r.platform==="iOS")
       .sort((a,b)=>a.version.localeCompare(b.version,undefined,{numeric:true}));
     if(!rs.length){console.error("no available iOS simulator runtime");process.exit(1);}
-    process.stdout.write(rs.at(-1).identifier);
+    const rt=rs.at(-1);
+    const phones=(rt.supportedDeviceTypes||[]).filter(t=>/^iPhone/.test(t.name)&&t.productFamily!=="iPad");
+    const plain=phones.filter(t=>/^iPhone \d+( Pro)?$/.test(t.name));
+    const pick=(plain.length?plain:phones).at(-1);
+    if(!pick){console.error("runtime "+rt.identifier+" lists no supported iPhone");process.exit(1);}
+    process.stdout.write(rt.identifier+" "+pick.identifier+"\n");
   });')
-DEVICE_TYPE=$(xcrun simctl list devicetypes -j | node -e '
-  let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
-    const ts=JSON.parse(s).devicetypes.filter(t=>/^iPhone \d+( Pro)?$/.test(t.name));
-    if(!ts.length){console.error("no iPhone device type");process.exit(1);}
-    process.stdout.write(ts.at(-1).identifier);
-  });')
+echo "runtime=$RUNTIME deviceType=$DEVICE_TYPE"
 UDID=$(xcrun simctl create ak-native-smoke "$DEVICE_TYPE" "$RUNTIME")
 cleanup() { xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
@@ -35,7 +40,7 @@ xcrun simctl boot "$UDID"
 xcrun simctl bootstatus "$UDID" -b
 xcrun simctl install "$UDID" "$APP"
 # Console capture runs in the background; the report file is the primary signal.
-xcrun simctl launch --console-pty --terminate-running-process "$UDID" "$BUNDLE_ID" -AKNativeSmoke 1 \
+xcrun simctl launch --console --terminate-running-process "$UDID" "$BUNDLE_ID" -AKNativeSmoke 1 \
   > "$OUT/console.log" 2>&1 &
 LAUNCH_PID=$!
 
@@ -59,6 +64,7 @@ if [ -z "$REPORT" ]; then
   else
     echo "error: no native smoke report within ${TIMEOUT_S}s" >&2
     tail -50 "$OUT/console.log" >&2 || true
+    tail -5 "$OUT/console.log" 2>/dev/null | cut -c1-400 | while IFS= read -r line; do echo "::error title=native smoke console::$line"; done
     exit 1
   fi
 else
@@ -95,6 +101,7 @@ fi
 node -e '
   const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
   for (const c of r.checks) console.log(`  ${c.ok ? "PASS" : "FAIL"}  ${c.name}  [${c.detail}]`);
+  for (const c of r.checks.filter((x) => !x.ok)) console.log(`::error title=native smoke check::${c.name}: ${String(c.detail).slice(0, 400)}`);
   if (r.schema !== "ak.native-smoke/1" || r.ok !== true) { console.error("NATIVE SMOKE FAILED"); process.exit(1); }
   console.log("NATIVE SMOKE PASSED");
 ' "$OUT/native-smoke.json"

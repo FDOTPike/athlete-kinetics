@@ -19,7 +19,10 @@ const out = [];
 for (const path of process.argv.slice(2)) {
   if (!existsSync(path)) continue;
   const lines = readFileSync(path, 'utf8').split('\n');
-  const errors = [...new Set(lines.filter((line) => /(^|\s)(fatal )?error:/i.test(line)).map((line) => line.trim()))];
+  // Compiler/linker diagnostics (path:line:col: error:) and tool errors at
+  // line start; not source excerpts that merely contain the word "error:".
+  const errors = [...new Set(lines.filter((line) => /:\d+:\d+: (fatal )?error:|^\s*(<unknown>:0: )?(fatal )?error:|^\s*\S+: error:|^xcodebuild: error/i.test(line)
+    && !/^\s*\d+ \|/.test(line)).map((line) => line.trim()))];
   for (const line of errors) out.push(`${path}: ${line}`.slice(0, 900));
   const failedAt = lines.findIndex((line) => line.includes('The following build commands failed:'));
   if (failedAt !== -1) out.push(`${path}: ${lines.slice(failedAt, failedAt + 8).map((line) => line.trim()).join(' | ')}`.slice(0, 900));
