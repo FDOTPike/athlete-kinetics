@@ -1,0 +1,9 @@
+{
+  "report": "acceptance-evidence/dot/technique-audit/INITIAL_TECHNIQUE_REVIEW.md",
+  "reportSha256": "29f0add7e56193b64230ee7e004a4d94d5d93f22081551ec6d157e60db3a77c2",
+  "evidence": "acceptance-evidence/dot/technique-audit/initial-technique-evidence.json",
+  "evidenceSha256": "d2724b89bb7a2e11c75fe7368dcc6be70e2e1f1d68297439414602d6aead3c0f",
+  "imagesActuallyViewed": 22,
+  "sourceInputsUnchanged": true,
+  "sourceFreezeReleased": true
+}

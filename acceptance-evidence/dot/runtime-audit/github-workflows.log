@@ -1,0 +1,3 @@
+{"id":293381077,"name":"CI","path":".github/workflows/ci.yml","state":"active"}
+{"id":295619024,"name":"Copilot","path":"dynamic/agents/copilot-pull-request-reviewer","state":"active"}
+{"id":293390943,"name":"Copilot cloud agent","path":"dynamic/copilot-swe-agent/copilot","state":"active"}

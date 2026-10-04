@@ -1,0 +1,608 @@
+{
+  "commit": "cad9de98fe9173a7533c294f7a62fd6ba9ea35b7",
+  "tree": "d430fad5a52c2970845844162637e2b213611278",
+  "files": 75,
+  "matches": 75,
+  "records": [
+    {
+      "path": ".gitattributes",
+      "expected": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da",
+      "actual": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da",
+      "committed": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da",
+      "bytes": 8,
+      "match": true
+    },
+    {
+      "path": "MOTION_1185_CI_SNAPSHOT.json",
+      "expected": "ae9ce0683cbbeb4f9f92fc5a2b5ff4c02d3a92b063b7e865134e6a65931f1b8b",
+      "actual": "ae9ce0683cbbeb4f9f92fc5a2b5ff4c02d3a92b063b7e865134e6a65931f1b8b",
+      "committed": "ae9ce0683cbbeb4f9f92fc5a2b5ff4c02d3a92b063b7e865134e6a65931f1b8b",
+      "bytes": 846,
+      "match": true
+    },
+    {
+      "path": "MOTION_PR28_SNAPSHOT.json",
+      "expected": "f52dfb3fd4f65b0cffada384a0a4d145364bd05c9bad6f79cebc1fa3b00b492e",
+      "actual": "f52dfb3fd4f65b0cffada384a0a4d145364bd05c9bad6f79cebc1fa3b00b492e",
+      "committed": "f52dfb3fd4f65b0cffada384a0a4d145364bd05c9bad6f79cebc1fa3b00b492e",
+      "bytes": 721,
+      "match": true
+    },
+    {
+      "path": "MOVEMENT_COMPLETION_WORK_ORDER.md",
+      "expected": "880fc3b13bf06fabde1b242876240cbf0c108e372fe953edce309008f763011e",
+      "actual": "880fc3b13bf06fabde1b242876240cbf0c108e372fe953edce309008f763011e",
+      "committed": "880fc3b13bf06fabde1b242876240cbf0c108e372fe953edce309008f763011e",
+      "bytes": 4445,
+      "match": true
+    },
+    {
+      "path": "OPUS_PR26_SNAPSHOT.json",
+      "expected": "b2736c26d14525d3eec120d6248fac2b74997970fcec73814fdcd6b7605e26cf",
+      "actual": "b2736c26d14525d3eec120d6248fac2b74997970fcec73814fdcd6b7605e26cf",
+      "committed": "b2736c26d14525d3eec120d6248fac2b74997970fcec73814fdcd6b7605e26cf",
+      "bytes": 1332,
+      "match": true
+    },
+    {
+      "path": "REVERSE_LUNGE_NATIVE_CONTACT_AFTER.log",
+      "expected": "c463e19fae227f495e351d05f01eb0518da4c097e6b67ac2034455400ae2e1f7",
+      "actual": "c463e19fae227f495e351d05f01eb0518da4c097e6b67ac2034455400ae2e1f7",
+      "committed": "c463e19fae227f495e351d05f01eb0518da4c097e6b67ac2034455400ae2e1f7",
+      "bytes": 556,
+      "match": true
+    },
+    {
+      "path": "REVERSE_LUNGE_NATIVE_CONTACT_BEFORE.log",
+      "expected": "873b11cccb756019fcb9614921295cf3ab248d837ffff8fb443497a57d3671f9",
+      "actual": "873b11cccb756019fcb9614921295cf3ab248d837ffff8fb443497a57d3671f9",
+      "committed": "873b11cccb756019fcb9614921295cf3ab248d837ffff8fb443497a57d3671f9",
+      "bytes": 3738,
+      "match": true
+    },
+    {
+      "path": "RUNTIME_RELEASE_INTEGRATION_V8_REVIEW.md",
+      "expected": "a8c993683c7d37119443f8b1e02aaae176e6dc012607acf975d5ecda6a4346d0",
+      "actual": "a8c993683c7d37119443f8b1e02aaae176e6dc012607acf975d5ecda6a4346d0",
+      "committed": "a8c993683c7d37119443f8b1e02aaae176e6dc012607acf975d5ecda6a4346d0",
+      "bytes": 14805,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/actual-rn-foot-styles.png",
+      "expected": "889ef8f3b2a14213e1bdadfaeba2e1388d263be4c22418b1b8aef52aebe885df",
+      "actual": "889ef8f3b2a14213e1bdadfaeba2e1388d263be4c22418b1b8aef52aebe885df",
+      "committed": "889ef8f3b2a14213e1bdadfaeba2e1388d263be4c22418b1b8aef52aebe885df",
+      "bytes": 13528,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/actual-rn-foot-styles.svg",
+      "expected": "94bee8939119083ed75bade84ffda87c6e4fedbb198012e24b13a00bfce4a1b4",
+      "actual": "94bee8939119083ed75bade84ffda87c6e4fedbb198012e24b13a00bfce4a1b4",
+      "committed": "94bee8939119083ed75bade84ffda87c6e4fedbb198012e24b13a00bfce4a1b4",
+      "bytes": 2037,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/adapt-component.mjs",
+      "expected": "1b0ff148d47649acafe62e3a893546d90a7e13f8a491dcc923fa48a6b34c53a2",
+      "actual": "1b0ff148d47649acafe62e3a893546d90a7e13f8a491dcc923fa48a6b34c53a2",
+      "committed": "1b0ff148d47649acafe62e3a893546d90a7e13f8a491dcc923fa48a6b34c53a2",
+      "bytes": 7091,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/adapt-math.mjs",
+      "expected": "aeb897494b77d40b0bf1b0cd9ef70b30a70cac8d71c41dd5da2297248e1159de",
+      "actual": "aeb897494b77d40b0bf1b0cd9ef70b30a70cac8d71c41dd5da2297248e1159de",
+      "committed": "aeb897494b77d40b0bf1b0cd9ef70b30a70cac8d71c41dd5da2297248e1159de",
+      "bytes": 3134,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/assets-after.json",
+      "expected": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+      "actual": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+      "committed": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+      "bytes": 227251,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/assets-before.json",
+      "expected": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+      "actual": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+      "committed": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+      "bytes": 227251,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/cache-and-dependency-diagnostic.json",
+      "expected": "700f8ef9031051065fe35464ec153d8dfab94ddca8264e4b2d35a06402970ba9",
+      "actual": "700f8ef9031051065fe35464ec153d8dfab94ddca8264e4b2d35a06402970ba9",
+      "committed": "700f8ef9031051065fe35464ec153d8dfab94ddca8264e4b2d35a06402970ba9",
+      "bytes": 1835,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/card-verifier-raw.log",
+      "expected": "4b074470a0206ed9199225e5ccd2f4ca546f999cc476e8a76b2dc484f9bd13f6",
+      "actual": "4b074470a0206ed9199225e5ccd2f4ca546f999cc476e8a76b2dc484f9bd13f6",
+      "committed": "4b074470a0206ed9199225e5ccd2f4ca546f999cc476e8a76b2dc484f9bd13f6",
+      "bytes": 2197,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/component-raw.log",
+      "expected": "50675869f98dd9a6127f37a0aa7e26b4f6e35edd5eb1fc651618007aa47a2a9f",
+      "actual": "50675869f98dd9a6127f37a0aa7e26b4f6e35edd5eb1fc651618007aa47a2a9f",
+      "committed": "50675869f98dd9a6127f37a0aa7e26b4f6e35edd5eb1fc651618007aa47a2a9f",
+      "bytes": 11571,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/component-results.json",
+      "expected": "78d0983733f9b286b717e554268bd6b35ea8698e2d7419e1e23c0204e1bf2ca3",
+      "actual": "78d0983733f9b286b717e554268bd6b35ea8698e2d7419e1e23c0204e1bf2ca3",
+      "committed": "78d0983733f9b286b717e554268bd6b35ea8698e2d7419e1e23c0204e1bf2ca3",
+      "bytes": 27724,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/component-targeted-raw.log",
+      "expected": "8b8800c70a7160a09322d55bd9300abfccee18d7a8a9bfe5ec4d3a6835a80eff",
+      "actual": "8b8800c70a7160a09322d55bd9300abfccee18d7a8a9bfe5ec4d3a6835a80eff",
+      "committed": "8b8800c70a7160a09322d55bd9300abfccee18d7a8a9bfe5ec4d3a6835a80eff",
+      "bytes": 733,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/component-targeted-results.json",
+      "expected": "a25d2db161af3a1a473653573a8418ff3f5057474eef907a02fce829b48b08d9",
+      "actual": "a25d2db161af3a1a473653573a8418ff3f5057474eef907a02fce829b48b08d9",
+      "committed": "a25d2db161af3a1a473653573a8418ff3f5057474eef907a02fce829b48b08d9",
+      "bytes": 1860,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/contact-jest-raw.log",
+      "expected": "046752798e3e613e7d11e5003f94a65638a5b3b73e24e5ce094afc6dc4f73a18",
+      "actual": "046752798e3e613e7d11e5003f94a65638a5b3b73e24e5ce094afc6dc4f73a18",
+      "committed": "046752798e3e613e7d11e5003f94a65638a5b3b73e24e5ce094afc6dc4f73a18",
+      "bytes": 5197,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/contact-jest-results.json",
+      "expected": "55caf5e98dd0d6bcbc26db5642032b9ce5a73aa86a0060f39517a9974c69d114",
+      "actual": "55caf5e98dd0d6bcbc26db5642032b9ce5a73aa86a0060f39517a9974c69d114",
+      "committed": "55caf5e98dd0d6bcbc26db5642032b9ce5a73aa86a0060f39517a9974c69d114",
+      "bytes": 9499,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/finish-freeze.mjs",
+      "expected": "9283d13b9cf26d7204d2cbe1284ac66bcfec56c65e2016f85e7eff40805af325",
+      "actual": "9283d13b9cf26d7204d2cbe1284ac66bcfec56c65e2016f85e7eff40805af325",
+      "committed": "9283d13b9cf26d7204d2cbe1284ac66bcfec56c65e2016f85e7eff40805af325",
+      "bytes": 4025,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/freeze-results.json",
+      "expected": "52aa3d75bdd6004cacffe040f4e987a352bd49fd650ca922db978ba91ed30768",
+      "actual": "52aa3d75bdd6004cacffe040f4e987a352bd49fd650ca922db978ba91ed30768",
+      "committed": "52aa3d75bdd6004cacffe040f4e987a352bd49fd650ca922db978ba91ed30768",
+      "bytes": 690,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/fresh-card-derivation/canonicalFigure.js",
+      "expected": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "actual": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "committed": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "bytes": 161885,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/fresh-card-derivation/derivation.js",
+      "expected": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "actual": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "committed": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "bytes": 34967,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/fresh-card-figure/canonicalFigure.js",
+      "expected": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "actual": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "committed": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "bytes": 161885,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/fresh-card-figure/derivation.js",
+      "expected": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "actual": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "committed": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "bytes": 34967,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/fresh-derivation/canonicalFigure.js",
+      "expected": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "actual": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "committed": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "bytes": 161885,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/fresh-derivation/derivation.js",
+      "expected": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "actual": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "committed": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "bytes": 34967,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/fresh-figure/canonicalFigure.js",
+      "expected": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "actual": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "committed": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1",
+      "bytes": 161885,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/fresh-figure/derivation.js",
+      "expected": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "actual": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "committed": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "bytes": 34967,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/git-status-after.txt",
+      "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actual": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "committed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/git-status-before.txt",
+      "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actual": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "committed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/github-ci-artifacts-final.json",
+      "expected": "e338fb10e6740e1e43cdbe137da3a22ec09f95d8097c5f247e751de5f81f87b4",
+      "actual": "e338fb10e6740e1e43cdbe137da3a22ec09f95d8097c5f247e751de5f81f87b4",
+      "committed": "e338fb10e6740e1e43cdbe137da3a22ec09f95d8097c5f247e751de5f81f87b4",
+      "bytes": 34,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/github-ci-jobs-final.json",
+      "expected": "42c58a34690644f3f1091a59f949d3d189fa0987ed449f44940dbeba8e381804",
+      "actual": "42c58a34690644f3f1091a59f949d3d189fa0987ed449f44940dbeba8e381804",
+      "committed": "42c58a34690644f3f1091a59f949d3d189fa0987ed449f44940dbeba8e381804",
+      "bytes": 9903,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/github-ci-runs-final.json",
+      "expected": "3dfdeea1c26ba0b2c09dc0f81a02c161285273866ce2907c81b2c00e25aa61e1",
+      "actual": "3dfdeea1c26ba0b2c09dc0f81a02c161285273866ce2907c81b2c00e25aa61e1",
+      "committed": "3dfdeea1c26ba0b2c09dc0f81a02c161285273866ce2907c81b2c00e25aa61e1",
+      "bytes": 374,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/github-ci-runs.json",
+      "expected": "4810a24e5189502fce8a97033b602441b879586fce561cf080f39b3f9aebbabf",
+      "actual": "4810a24e5189502fce8a97033b602441b879586fce561cf080f39b3f9aebbabf",
+      "committed": "4810a24e5189502fce8a97033b602441b879586fce561cf080f39b3f9aebbabf",
+      "bytes": 374,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/github-pr-snapshot.json",
+      "expected": "e0545938b01048f76cd7e9ae88a44b92542119216c83a26bc03fc0af9da8888b",
+      "actual": "e0545938b01048f76cd7e9ae88a44b92542119216c83a26bc03fc0af9da8888b",
+      "committed": "e0545938b01048f76cd7e9ae88a44b92542119216c83a26bc03fc0af9da8888b",
+      "bytes": 252,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/head-after.txt",
+      "expected": "7720a3ce8f612b0f5076ac44619ae3e190cd8109ab5ea7b6b1bedf8ee5168c02",
+      "actual": "7720a3ce8f612b0f5076ac44619ae3e190cd8109ab5ea7b6b1bedf8ee5168c02",
+      "committed": "7720a3ce8f612b0f5076ac44619ae3e190cd8109ab5ea7b6b1bedf8ee5168c02",
+      "bytes": 41,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/head-before.txt",
+      "expected": "7720a3ce8f612b0f5076ac44619ae3e190cd8109ab5ea7b6b1bedf8ee5168c02",
+      "actual": "7720a3ce8f612b0f5076ac44619ae3e190cd8109ab5ea7b6b1bedf8ee5168c02",
+      "committed": "7720a3ce8f612b0f5076ac44619ae3e190cd8109ab5ea7b6b1bedf8ee5168c02",
+      "bytes": 41,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/head-contact.test.js",
+      "expected": "3f7da873c56f9e443b9d4305595a84337765938b36d0a24af8d367c3fb9d9a03",
+      "actual": "3f7da873c56f9e443b9d4305595a84337765938b36d0a24af8d367c3fb9d9a03",
+      "committed": "3f7da873c56f9e443b9d4305595a84337765938b36d0a24af8d367c3fb9d9a03",
+      "bytes": 4794,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/integration-boundaries.json",
+      "expected": "99a88d8c8647fb0cb01f6a1c970a5b7a9dfb24bbd8a53bef2ce88119fe8c7b1d",
+      "actual": "99a88d8c8647fb0cb01f6a1c970a5b7a9dfb24bbd8a53bef2ce88119fe8c7b1d",
+      "committed": "99a88d8c8647fb0cb01f6a1c970a5b7a9dfb24bbd8a53bef2ce88119fe8c7b1d",
+      "bytes": 10634,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/jest-contact.config.cjs",
+      "expected": "0f596b83522a568631ff7cc7a418734bde22f52fc1f499e9c9e340d67fdc244f",
+      "actual": "0f596b83522a568631ff7cc7a418734bde22f52fc1f499e9c9e340d67fdc244f",
+      "committed": "0f596b83522a568631ff7cc7a418734bde22f52fc1f499e9c9e340d67fdc244f",
+      "bytes": 416,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/jest-lazy.config.cjs",
+      "expected": "cea59f1d91e9f1bd3d82f572e1f6293aa3ee3ae2200f9fb016ddac7710df61f4",
+      "actual": "cea59f1d91e9f1bd3d82f572e1f6293aa3ee3ae2200f9fb016ddac7710df61f4",
+      "committed": "cea59f1d91e9f1bd3d82f572e1f6293aa3ee3ae2200f9fb016ddac7710df61f4",
+      "bytes": 402,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/jest-runtime.config.cjs",
+      "expected": "1f09f4040de8174e06a563cfb4346ec5d886d540cb5d723a7cc67bcb9d7ddb21",
+      "actual": "1f09f4040de8174e06a563cfb4346ec5d886d540cb5d723a7cc67bcb9d7ddb21",
+      "committed": "1f09f4040de8174e06a563cfb4346ec5d886d540cb5d723a7cc67bcb9d7ddb21",
+      "bytes": 1035,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/kickback-runtime.test.js",
+      "expected": "0ba0d724083f698f2d0edd5cead4cc201a8cf21e987128cac2798cae7125532b",
+      "actual": "0ba0d724083f698f2d0edd5cead4cc201a8cf21e987128cac2798cae7125532b",
+      "committed": "0ba0d724083f698f2d0edd5cead4cc201a8cf21e987128cac2798cae7125532b",
+      "bytes": 9369,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/lazy52.initial.test.js.txt",
+      "expected": "76087fae277e4e38699ba6a017c414edc174a67983ed5e18cff9902a94f09e9c",
+      "actual": "76087fae277e4e38699ba6a017c414edc174a67983ed5e18cff9902a94f09e9c",
+      "committed": "76087fae277e4e38699ba6a017c414edc174a67983ed5e18cff9902a94f09e9c",
+      "bytes": 2894,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/lazy52.test.js",
+      "expected": "701b8f6f8249969ba9164da0f9976b8747d05c80faccfe892433d32ca4f4ec61",
+      "actual": "701b8f6f8249969ba9164da0f9976b8747d05c80faccfe892433d32ca4f4ec61",
+      "committed": "701b8f6f8249969ba9164da0f9976b8747d05c80faccfe892433d32ca4f4ec61",
+      "bytes": 2896,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/lazy84.test.js",
+      "expected": "94349741dfc007f4fff4fb28bb2f314c2a03153b322a8b14e23c02f26049a9d5",
+      "actual": "94349741dfc007f4fff4fb28bb2f314c2a03153b322a8b14e23c02f26049a9d5",
+      "committed": "94349741dfc007f4fff4fb28bb2f314c2a03153b322a8b14e23c02f26049a9d5",
+      "bytes": 2914,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/prepare-v8.mjs",
+      "expected": "34e31d2c28ec8e779358c3db83fd5c4f9835e6980e249bfcfa59001d15f83e1a",
+      "actual": "34e31d2c28ec8e779358c3db83fd5c4f9835e6980e249bfcfa59001d15f83e1a",
+      "committed": "34e31d2c28ec8e779358c3db83fd5c4f9835e6980e249bfcfa59001d15f83e1a",
+      "bytes": 5611,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/render-native-foot-styles.mjs",
+      "expected": "05e6e83ab797da33e90234ead8297c1741a3ae6724dcddb810c356763440df8a",
+      "actual": "05e6e83ab797da33e90234ead8297c1741a3ae6724dcddb810c356763440df8a",
+      "committed": "05e6e83ab797da33e90234ead8297c1741a3ae6724dcddb810c356763440df8a",
+      "bytes": 1844,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/reverse-continuity-raw.log",
+      "expected": "12440468a0456d715f38dd3d09c1261af80e3845073b1f7c69b5c043adf5abb1",
+      "actual": "12440468a0456d715f38dd3d09c1261af80e3845073b1f7c69b5c043adf5abb1",
+      "committed": "12440468a0456d715f38dd3d09c1261af80e3845073b1f7c69b5c043adf5abb1",
+      "bytes": 2275,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/reverse-continuity-results.json",
+      "expected": "9156bbc4a9593dcdae107306bcfea8525d04f7050fd965c209d524b7cfbaeb10",
+      "actual": "9156bbc4a9593dcdae107306bcfea8525d04f7050fd965c209d524b7cfbaeb10",
+      "committed": "9156bbc4a9593dcdae107306bcfea8525d04f7050fd965c209d524b7cfbaeb10",
+      "bytes": 2203,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/reverse-crop.test.js",
+      "expected": "f702754aa22daf6aa0115c66baa742bc27bd4b4ed72179673ccc53621dd3dc07",
+      "actual": "f702754aa22daf6aa0115c66baa742bc27bd4b4ed72179673ccc53621dd3dc07",
+      "committed": "f702754aa22daf6aa0115c66baa742bc27bd4b4ed72179673ccc53621dd3dc07",
+      "bytes": 5317,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/reverse-native-contact-results.json",
+      "expected": "02fd3448494df7774551456e1e02c2365194aec0470a7d5ea4e1c999f50b03da",
+      "actual": "02fd3448494df7774551456e1e02c2365194aec0470a7d5ea4e1c999f50b03da",
+      "committed": "02fd3448494df7774551456e1e02c2365194aec0470a7d5ea4e1c999f50b03da",
+      "bytes": 5913,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/reverse-native-contact.test.js",
+      "expected": "68c33f0ea549e10e8161d97882391c95d303b0c432c67725ae8eb156886ec393",
+      "actual": "68c33f0ea549e10e8161d97882391c95d303b0c432c67725ae8eb156886ec393",
+      "committed": "68c33f0ea549e10e8161d97882391c95d303b0c432c67725ae8eb156886ec393",
+      "bytes": 4733,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/reverse-runtime-measurements.json",
+      "expected": "1771e1df4c7e7f0f563d178d3079e74df4c67023d731d8f9fc0c7a892ebcd8c5",
+      "actual": "1771e1df4c7e7f0f563d178d3079e74df4c67023d731d8f9fc0c7a892ebcd8c5",
+      "committed": "1771e1df4c7e7f0f563d178d3079e74df4c67023d731d8f9fc0c7a892ebcd8c5",
+      "bytes": 87348,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/reverse-runtime.test.js",
+      "expected": "3e81ab63be920cd29fe84f74590f31bd33723da2d37c07e86b4d80a35fa34673",
+      "actual": "3e81ab63be920cd29fe84f74590f31bd33723da2d37c07e86b4d80a35fa34673",
+      "committed": "3e81ab63be920cd29fe84f74590f31bd33723da2d37c07e86b4d80a35fa34673",
+      "bytes": 10709,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/review-artifact-digests.json",
+      "expected": "624ae52ccdcb491014866973b9e858b4918dd5189ab5f2b1361f3ee73e52aee6",
+      "actual": "624ae52ccdcb491014866973b9e858b4918dd5189ab5f2b1361f3ee73e52aee6",
+      "committed": "624ae52ccdcb491014866973b9e858b4918dd5189ab5f2b1361f3ee73e52aee6",
+      "bytes": 20763,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/run-card-verifier.mjs",
+      "expected": "7547bcd82bb2046eb19fc16d0b4e0ee75a31d4b371ba856d08c4fdff881564f7",
+      "actual": "7547bcd82bb2046eb19fc16d0b4e0ee75a31d4b371ba856d08c4fdff881564f7",
+      "committed": "7547bcd82bb2046eb19fc16d0b4e0ee75a31d4b371ba856d08c4fdff881564f7",
+      "bytes": 484,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/runtime-reproductions.test.js",
+      "expected": "a82a6198ef4c60bc829d4cb0bed6e2b9bcfe3ffb422ff02a8a0a45f38acc08db",
+      "actual": "a82a6198ef4c60bc829d4cb0bed6e2b9bcfe3ffb422ff02a8a0a45f38acc08db",
+      "committed": "a82a6198ef4c60bc829d4cb0bed6e2b9bcfe3ffb422ff02a8a0a45f38acc08db",
+      "bytes": 4215,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/source-after.json",
+      "expected": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+      "actual": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+      "committed": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+      "bytes": 186801,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/source-before.json",
+      "expected": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+      "actual": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+      "committed": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+      "bytes": 186801,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/source-coverage-inventory.json",
+      "expected": "06faa3894b0a6334b35c0e7e9d52b5114e6a78292b92d55947585c873c0680d4",
+      "actual": "06faa3894b0a6334b35c0e7e9d52b5114e6a78292b92d55947585c873c0680d4",
+      "committed": "06faa3894b0a6334b35c0e7e9d52b5114e6a78292b92d55947585c873c0680d4",
+      "bytes": 578,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/supported-crop.test.js",
+      "expected": "c11b08e6a9e579e2265ad0d75b1cec64f7526c6d861509ad4fc1d231d67fad12",
+      "actual": "c11b08e6a9e579e2265ad0d75b1cec64f7526c6d861509ad4fc1d231d67fad12",
+      "committed": "c11b08e6a9e579e2265ad0d75b1cec64f7526c6d861509ad4fc1d231d67fad12",
+      "bytes": 5391,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/supported-math-raw.log",
+      "expected": "a3f39b115f80af1024c08f01817a345f944525f0f3a04c058e2ad2f23beec87d",
+      "actual": "a3f39b115f80af1024c08f01817a345f944525f0f3a04c058e2ad2f23beec87d",
+      "committed": "a3f39b115f80af1024c08f01817a345f944525f0f3a04c058e2ad2f23beec87d",
+      "bytes": 693,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/supported-math-results.json",
+      "expected": "4e1912877af37baf9747bf9bcf905fc167dc75340bbc3db91e4306c7d764783e",
+      "actual": "4e1912877af37baf9747bf9bcf905fc167dc75340bbc3db91e4306c7d764783e",
+      "committed": "4e1912877af37baf9747bf9bcf905fc167dc75340bbc3db91e4306c7d764783e",
+      "bytes": 20046,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/torso-girdle.test.js",
+      "expected": "affc980d8f09f2d148787380cbee1a0492bf814769100961e53d73dc70e2be39",
+      "actual": "affc980d8f09f2d148787380cbee1a0492bf814769100961e53d73dc70e2be39",
+      "committed": "affc980d8f09f2d148787380cbee1a0492bf814769100961e53d73dc70e2be39",
+      "bytes": 5072,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/verification-summary.json",
+      "expected": "62ec04c05521512386674755032b1db69bb79a10f3fc9f2402868f34349297b5",
+      "actual": "62ec04c05521512386674755032b1db69bb79a10f3fc9f2402868f34349297b5",
+      "committed": "62ec04c05521512386674755032b1db69bb79a10f3fc9f2402868f34349297b5",
+      "bytes": 53320,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/verify-cards-external.mjs",
+      "expected": "7d9fc08c74f1ef869605d716f75af04be6ec0ac9b92db22fe4fe983b4409b88f",
+      "actual": "7d9fc08c74f1ef869605d716f75af04be6ec0ac9b92db22fe4fe983b4409b88f",
+      "committed": "7d9fc08c74f1ef869605d716f75af04be6ec0ac9b92db22fe4fe983b4409b88f",
+      "bytes": 36487,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/verify-reverse-continuity.mjs",
+      "expected": "4ef6ed75594f19950b9ee0310bd9c41e0e84407674389521a9f38bd4ba856606",
+      "actual": "4ef6ed75594f19950b9ee0310bd9c41e0e84407674389521a9f38bd4ba856606",
+      "committed": "4ef6ed75594f19950b9ee0310bd9c41e0e84407674389521a9f38bd4ba856606",
+      "bytes": 3783,
+      "match": true
+    },
+    {
+      "path": "runtime-release-integration-v8/verify-supported.mjs",
+      "expected": "1141440c4f26d8756a42781e914cce073ef917ab77782cac73a9ae5d6877a9e4",
+      "actual": "1141440c4f26d8756a42781e914cce073ef917ab77782cac73a9ae5d6877a9e4",
+      "committed": "1141440c4f26d8756a42781e914cce073ef917ab77782cac73a9ae5d6877a9e4",
+      "bytes": 18976,
+      "match": true
+    },
+    {
+      "path": "TECHNIQUE_RELEASE_INTEGRATION_V8_EVIDENCE.json",
+      "expected": "4a0355b238d95528f23b0c17ce5a59e84ae9b2679b4a171cc5c5263d909700a4",
+      "actual": "4a0355b238d95528f23b0c17ce5a59e84ae9b2679b4a171cc5c5263d909700a4",
+      "committed": "4a0355b238d95528f23b0c17ce5a59e84ae9b2679b4a171cc5c5263d909700a4",
+      "bytes": 534490,
+      "match": true
+    },
+    {
+      "path": "TECHNIQUE_RELEASE_INTEGRATION_V8_REVIEW.md",
+      "expected": "895c9024fed947bb6dc52cae6d9a5c5433323027c234c3fdfaf21367216467bd",
+      "actual": "895c9024fed947bb6dc52cae6d9a5c5433323027c234c3fdfaf21367216467bd",
+      "committed": "895c9024fed947bb6dc52cae6d9a5c5433323027c234c3fdfaf21367216467bd",
+      "bytes": 10730,
+      "match": true
+    }
+  ]
+}

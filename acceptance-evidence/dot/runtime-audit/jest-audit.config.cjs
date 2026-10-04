@@ -1,0 +1,1 @@
+const root=require('node:path').resolve(__dirname,'../../..');const base=require(root+'/apps/mobile/jest.config.js');module.exports={...base,roots:[root+'/apps/mobile',__dirname],testMatch:[__dirname.replaceAll('\\','/')+'/*.test.js'],modulePaths:[root+'/node_modules']};
