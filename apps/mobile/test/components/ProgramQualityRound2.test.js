@@ -48,6 +48,20 @@ const previewFixture = (over = {}) => ({
 // ---------------------------------------------------------------------------
 // [R5] limitations gate
 // ---------------------------------------------------------------------------
+// The focus screen (coaching work order 2) sits between goal and experience.
+// The tests in this file predate it and are about OTHER screens, so these two
+// helpers walk straight through it, leaving its default answer (balanced whole
+// body) in place. The focus and target screens themselves are covered in
+// OnboardingFocusGoal.test.js.
+const pressNext = () => {
+  fireEvent.press(screen.getByLabelText('Next'));
+  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Next'));
+};
+const pressBack = () => {
+  fireEvent.press(screen.getByLabelText('Back'));
+  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Back'));
+};
+
 describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answer', () => {
   beforeEach(() => {
     mockState = {
@@ -60,6 +74,7 @@ describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answe
         progression_methodology: 'autoregulated', injury_flags: [], mobility_limits: [],
       },
       completeOnboarding: jest.fn(),
+      beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(() => 'loaded'),
       previewTrainingProgram: jest.fn(() => previewFixture()),
       createTrainingProgram: jest.fn(),
@@ -72,7 +87,7 @@ describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answe
 
   const toLimits = () => {
     render(<OnboardingScreen />);
-    for (let i = 0; i < 5; i += 1) fireEvent.press(screen.getByLabelText('Next'));
+    for (let i = 0; i < 5; i += 1) pressNext();
   };
 
   test('NEXT is disabled with an explanation until the athlete answers no/yes', () => {
@@ -87,9 +102,9 @@ describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answe
     expect(screen.getByLabelText('Next')).not.toBeDisabled();
 
     // Moving on and coming BACK preserves the explicit answer (draft/back law).
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     expect(screen.getByText('READY.')).toBeOnTheScreen();
-    fireEvent.press(screen.getByLabelText('Back'));
+    pressBack();
     expect(screen.getByLabelText('No, nothing to note').props.accessibilityState.selected).toBe(true);
     expect(screen.getByLabelText('Next')).not.toBeDisabled();
   });
@@ -102,7 +117,7 @@ describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answe
     expect(screen.getByLabelText('Past injuries, one per line as region colon note')).toBeOnTheScreen();
     expect(screen.getByLabelText('Next')).not.toBeDisabled();
     fireEvent.changeText(screen.getByLabelText('Past injuries, one per line as region colon note'), 'knee: old ACL');
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     expect(screen.getByText('READY.')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('START TRAINING'));
     expect(mockState.completeOnboarding).toHaveBeenCalledTimes(1);
@@ -111,7 +126,7 @@ describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answe
   test('an athlete who never reached the screen is unaffected: earlier steps keep NEXT enabled', () => {
     render(<OnboardingScreen />);
     // welcome/goal/experience/logistics/equipment all behave as before.
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
     expect(screen.getByLabelText('Next')).not.toBeDisabled();
   });
@@ -132,15 +147,16 @@ describe('Round 2 R6: the review screen discloses progression methodology', () =
         progression_methodology: 'autoregulated', injury_flags: [], mobility_limits: [],
       },
       completeOnboarding: jest.fn(),
+      beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(() => 'loaded'),
     };
   });
 
   test('the coach-defaults block names the progression methodology', () => {
     render(<OnboardingScreen />);
-    for (let i = 0; i < 5; i += 1) fireEvent.press(screen.getByLabelText('Next'));
+    for (let i = 0; i < 5; i += 1) pressNext();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     expect(screen.getByText('READY.')).toBeOnTheScreen();
     // Every text inside the coach-defaults block, joined (RNTL nests Text).
     const joinTexts = (node) => {

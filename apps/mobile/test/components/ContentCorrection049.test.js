@@ -213,6 +213,7 @@ describe('049 specialist equipment is explicit opt-in only', () => {
       renameAthleteEntry: jest.fn(),
       deleteAthlete: jest.fn(),
       completeOnboarding: jest.fn(),
+      beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(),
       loadRecentOutcomes: () => [],
     };

@@ -1,11 +1,16 @@
 /**
  * OnboardingScreen.tsx — first-run questionnaire, program-quality edition.
  *
- * The interview a real coach gives a new athlete, shortened to SEVEN screens
- * (work order §2.1): welcome, goal, experience, weekly logistics (days AND
- * session length together), equipment (presets first, customization collapsed
- * until asked), limitations (one explicit no/yes), review. Only five screens
- * ask a decision — welcome and review do not count.
+ * The interview a real coach gives a new athlete. EIGHT screens for everyone:
+ * welcome, goal, focus ("Is there an area that you want to work on?"),
+ * experience, weekly logistics (days AND session length together), equipment
+ * (presets first, customization collapsed until asked), limitations (one
+ * explicit no/yes), review. The focus screen was added deliberately by the
+ * owner (coaching work order 2, 2026-10-02) to the earlier seven-screen flow.
+ *
+ * One further screen appears ONLY when it is relevant: the detailed-target
+ * screen, shown when the athlete says they have a specific target. An athlete
+ * who skips it trains with the focus alone.
  *
  * The programming-science decisions that used to be screens (effort ceiling,
  * energy focus, load preference) ride the REVIEW screen as disclosed coach
@@ -44,6 +49,7 @@ import {
   type ProgressionMethod,
   type TrainingAge,
   type UserProfile,
+  validateSmartGoal,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
@@ -51,6 +57,17 @@ import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
+import {
+  BALANCED_FOCUS_DRAFT,
+  EMPTY_GOAL_FIELDS,
+  FocusPicker,
+  GoalEditor,
+  focusDraftSummary,
+  goalDraftFromFields,
+  localIsoToday,
+  type FocusDraft,
+  type GoalFields,
+} from '../components/FocusGoalFields';
 
 // ---------------------------------------------------------------------------
 // Copy: plain-language labels + one-liners for every enum the wizard shows.
@@ -131,7 +148,7 @@ const effortBlurb = (rpe: number): string => {
 };
 
 type StepKey =
-  | 'welcome' | 'goal' | 'experience' | 'logistics' | 'equipment' | 'limits' | 'review';
+  | 'welcome' | 'goal' | 'focus' | 'target' | 'experience' | 'logistics' | 'equipment' | 'limits' | 'review';
 
 interface ChoiceRowProps {
   readonly label: string;
@@ -205,7 +222,11 @@ function ReviewSection({ heading, description, onEdit, children }: ReviewSection
 // ---------------------------------------------------------------------------
 export default function OnboardingScreen(): React.JSX.Element {
   const completeOnboarding = useStore((s) => s.completeOnboarding);
+  const beginOnboardingDraft = useStore((s) => s.beginOnboardingDraft);
   const loadDemoAthlete = useStore((s) => s.loadDemoAthlete);
+  // A refused save must never be silent: the store explains why, and the
+  // review screen shows it once the athlete has tried to finish.
+  const storeError = useStore((s) => s.error);
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
 
@@ -231,6 +252,19 @@ export default function OnboardingScreen(): React.JSX.Element {
   // Set when a demo load was refused because real history exists; explains the
   // refusal and keeps the wizard on the current step.
   const [demoNotice, setDemoNotice] = useState<string | null>(null);
+  // The draft belongs to the athlete it was started for. Captured ONCE, when
+  // the interview opens, and handed back at completion: if the active athlete
+  // or the store context has changed meanwhile, the save is refused.
+  const [binding] = useState(() => beginOnboardingDraft());
+  // Focus: nothing is assumed about the athlete, so the starting answer is
+  // "balanced whole body" until they choose otherwise.
+  const [focus, setFocus] = useState<FocusDraft>(BALANCED_FOCUS_DRAFT);
+  const [showFocusMuscles, setShowFocusMuscles] = useState(false);
+  // The detailed target is optional. Off by default: focus alone is a complete answer.
+  const [wantsTarget, setWantsTarget] = useState(false);
+  const [goalFields, setGoalFields] = useState<GoalFields>(EMPTY_GOAL_FIELDS);
+  const [saveAttempted, setSaveAttempted] = useState(false);
+  const today = localIsoToday();
 
   useSubViewBack(stepIdx > 0, () => setStepIdx((i) => Math.max(0, i - 1)));
 
@@ -248,13 +282,28 @@ export default function OnboardingScreen(): React.JSX.Element {
     setLoadPreferenceExplicit(true);
   };
 
-  // Seven screens for EVERY athlete — the shortening is the point (WO §2.1).
+  // Eight screens for every athlete; the detailed-target screen joins only
+  // when the athlete asked for it.
   const steps: StepKey[] = useMemo(
-    () => ['welcome', 'goal', 'experience', 'logistics', 'equipment', 'limits', 'review'],
-    [],
+    () => ['welcome', 'goal', 'focus', ...(wantsTarget ? ['target' as const] : []),
+      'experience', 'logistics', 'equipment', 'limits', 'review'],
+    [wantsTarget],
   );
   const step = steps[Math.min(stepIdx, steps.length - 1)];
   const isLast = step === 'review';
+  const goTo = (key: StepKey): void => setStepIdx(Math.max(0, steps.indexOf(key)));
+  const goalValidation = useMemo(
+    () => validateSmartGoal(goalDraftFromFields(goalFields), today),
+    [goalFields, today],
+  );
+  // A started target must be finished or explicitly skipped: a half-written
+  // goal is never carried forward silently.
+  const targetGateOpen = step === 'target' && !goalValidation.ok;
+  const skipTarget = (): void => {
+    // Removing the screen leaves the index pointing at the next one.
+    setWantsTarget(false);
+    setGoalFields(EMPTY_GOAL_FIELDS);
+  };
   // R5 (Round 2, ledger 0060): the limitations decision is REQUIRED. The
   // athlete cannot leave this screen — NEXT stays disabled — until they have
   // explicitly chosen Yes or No. Silence is never an answer to a safety
@@ -282,11 +331,17 @@ export default function OnboardingScreen(): React.JSX.Element {
       });
 
   const finish = (): void => {
+    setSaveAttempted(true);
     completeOnboarding(
       { ...draft, injury_flags: parseNotes(injuryText), mobility_limits: parseNotes(mobilityText) },
       name.trim().length > 0 ? name : 'Athlete 1',
       loadPreference,
       loadPreferenceExplicit,
+      {
+        binding,
+        focus: { bundleId: focus.bundleId, muscles: focus.muscles },
+        goal: wantsTarget ? goalDraftFromFields(goalFields) : null,
+      },
     );
   };
 
@@ -299,7 +354,7 @@ export default function OnboardingScreen(): React.JSX.Element {
       return;
     }
     setDemoNotice(null);
-    completeOnboarding({}, name.trim().length > 0 ? name : 'Demo Athlete');
+    completeOnboarding({}, name.trim().length > 0 ? name : 'Demo Athlete', undefined, undefined, { binding });
   };
 
   const toggleEquipment = (item: EquipmentItem): void => {
@@ -380,6 +435,44 @@ export default function OnboardingScreen(): React.JSX.Element {
                 accessibilityLabel={`${OBJECTIVE_COPY[o].label}. ${OBJECTIVE_COPY[o].blurb}`}
               />
             ))}
+          </View>
+        )}
+
+        {step === 'focus' && (
+          <View>
+            <FocusPicker
+              value={focus}
+              onChange={setFocus}
+              showMuscles={showFocusMuscles}
+              onToggleMuscles={() => setShowFocusMuscles((visible) => !visible)}
+            />
+            <Text style={styles.fieldLabel}>A SPECIFIC TARGET? (OPTIONAL)</Text>
+            <Chip
+              testID="onboarding-wants-target"
+              label="I ALSO HAVE A SPECIFIC TARGET — a number and a date I want to reach"
+              selected={wantsTarget}
+              onPress={() => setWantsTarget((value) => !value)}
+              accessibilityLabel={wantsTarget
+                ? 'I have a specific target, selected. One more screen will ask for it.'
+                : 'I also have a specific target. Adds one screen.'}
+              style={styles.cardChip}
+            />
+            <Text style={styles.pDim}>
+              You can skip this and train with the focus only. A target can be added later in Athlete Profile.
+            </Text>
+          </View>
+        )}
+
+        {step === 'target' && (
+          <View>
+            <Text style={styles.h2}>YOUR TARGET</Text>
+            <GoalEditor fields={goalFields} onChange={setGoalFields} today={today} trainingAge={draft.training_age} />
+            <QuietAction
+              label="Skip this — train with the focus only"
+              onPress={skipTarget}
+              accessibilityLabel="Skip the detailed target and train with the focus only"
+              testID="onboarding-skip-target"
+            />
           </View>
         )}
 
@@ -557,31 +650,47 @@ export default function OnboardingScreen(): React.JSX.Element {
               <ReviewSection
                 heading="GOAL"
                 description={OBJECTIVE_COPY[draft.objective].label}
-                onEdit={() => setStepIdx(1)}
+                onEdit={() => goTo('goal')}
               />
+              <ReviewSection
+                heading="FOCUS"
+                description={focusDraftSummary(focus)}
+                onEdit={() => goTo('focus')}
+              >
+                {wantsTarget && goalValidation.ok && (
+                  <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
+                    {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
+                  </Text>
+                )}
+                {!wantsTarget && (
+                  <Text style={styles.reviewDescription} testID="onboarding-summary-target-row">
+                    No specific target — training with the focus only.
+                  </Text>
+                )}
+              </ReviewSection>
               <ReviewSection
                 heading="EXPERIENCE"
                 description={`${AGE_COPY[draft.training_age].label}. ${AGE_COPY[draft.training_age].blurb}`}
-                onEdit={() => setStepIdx(2)}
+                onEdit={() => goTo('experience')}
               />
               <ReviewSection
                 heading="YOUR WEEK"
                 description={`${draft.weekly_frequency} training days per week, up to ${draft.session_duration_cap_min} minutes each.`}
-                onEdit={() => setStepIdx(3)}
+                onEdit={() => goTo('logistics')}
               />
               <ReviewSection
                 heading="EQUIPMENT"
                 description={draft.equipment_inventory.length === 0
                   ? 'No equipment selected.'
                   : draft.equipment_inventory.map((item) => EQUIPMENT_LABEL[item]).join(', ')}
-                onEdit={() => setStepIdx(4)}
+                onEdit={() => goTo('equipment')}
               />
               <ReviewSection
                 heading="TRAINING SUPPORT"
                 description={(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
                   ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} limitation notes recorded for your reference.`
                   : 'No limitations noted. You can add or change these later.'}
-                onEdit={() => setStepIdx(5)}
+                onEdit={() => goTo('limits')}
               >
                 <Text style={styles.reviewSupportLine} testID="onboarding-summary-limits-row">
                   LIMITATIONS — {(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
@@ -642,6 +751,11 @@ export default function OnboardingScreen(): React.JSX.Element {
               accessibilityLabel="START TRAINING"
               style={styles.startBtn}
             />
+            {saveAttempted && typeof storeError === 'string' && storeError.length > 0 && (
+              <Text style={styles.p} accessibilityRole="alert" testID="onboarding-save-error">
+                {`Not saved. ${storeError}`}
+              </Text>
+            )}
           </View>
         )}
       </KeyboardAwareScrollView>
@@ -661,11 +775,18 @@ export default function OnboardingScreen(): React.JSX.Element {
           <PrimaryButton
             label="NEXT"
             onPress={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
-            disabled={limitsGateOpen}
+            disabled={limitsGateOpen || targetGateOpen}
             accessibilityLabel="Next"
           />
         )}
       </View>
+      {targetGateOpen && (
+        <View style={styles.limitsGateNotice}>
+          <Text style={styles.pDim} accessibilityLiveRegion="polite">
+            Finish the target to continue, or choose "Skip this" to train with the focus only.
+          </Text>
+        </View>
+      )}
       {limitsGateOpen && (
         <View style={styles.limitsGateNotice}>
           <Text style={styles.pDim} accessibilityLiveRegion="polite">
