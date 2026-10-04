@@ -123,16 +123,30 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   /// The default eight-screen onboarding, through the real UI.
-  private func completeOnboarding(_ who: String) {
+  private func completeOnboarding(_ who: String, createProgram: Bool = false) {
     wait(element("Next"), "onboarding (\(who))", timeout: 60)
     log("onboarding started (\(who)): progress=\(element(labelBeginsWith: "Step ").exists ? element(labelBeginsWith: "Step ").label : "-")")
     for step in 1...6 { tap("Next", "Next (step \(step), \(who))") }
     tap("No, nothing to note")
     tap("Next", "Next to review (\(who))")
     tap("START TRAINING")
-    // The program set-up offer is optional; this flow keeps it for later.
+    // The program set-up offer: accepted when the flow needs a plan,
+    // otherwise kept for later.
     let cancel = element("Cancel")
-    if cancel.waitForExistence(timeout: 8) { cancel.tap(); log("program set-up offer: cancelled (\(who))") }
+    if cancel.waitForExistence(timeout: 8) {
+      if createProgram {
+        let create = element("Create program")
+        reveal(create, "Create program (\(who))")
+        XCTAssertTrue(create.isEnabled, "Create program is disabled for a default onboarding (\(who))")
+        create.tap()
+        log("program set-up offer: created (\(who))")
+      } else {
+        cancel.tap()
+        log("program set-up offer: cancelled (\(who))")
+      }
+    } else if createProgram {
+      log("program set-up offer: not shown (\(who))")
+    }
     wait(element("shell-primary-tabs"), "the primary tabs after onboarding (\(who))", timeout: 60)
     log("onboarding complete: \(who)")
   }
@@ -278,6 +292,16 @@ final class AthleteKineticsUITests: XCTestCase {
     log("health sheet shown: allow=\(healthPermissionButton("Allow").exists) dontAllow=true")
     dontAllow.tap()
     log("health sheet: tapped Don't Allow")
+    // What the app shows over the next 45 s, each change recorded: tells an
+    // answer that never arrives from one that arrives and is then replaced.
+    let healthHint = element(labelBeginsWith: "Apple Health")
+    var seen = ""
+    for second in 0..<45 {
+      let now = healthHint.exists ? String(healthHint.label.prefix(60)) : "<absent>"
+      if now != seen { log("health hint t=\(second)s: \(now)"); seen = now }
+      if now.hasPrefix("Apple Health access requested") { break }
+      sleep(1)
+    }
     // HealthKit never tells an app that reading was denied, so the honest
     // wording is 'requested' plus where to check — never 'connected'.
     let hintA = settledLabel(element(labelBeginsWith: "Apple Health access requested"),
@@ -377,14 +401,29 @@ final class AthleteKineticsUITests: XCTestCase {
   /// the same session at the same next step (the logged set was kept).
   func test5_workoutLogBackgroundAndRelaunch() throws {
     launch()
-    completeOnboarding("workout athlete")
-    tap("header-session", "Workout")
-    tap("Start a new workout session")
+    completeOnboarding("workout athlete", createProgram: true)
+    tap("tab-today", "Today")
+    let planned = element("today-primary-start")
+    let unplanned = element("today-adhoc-session")
+    if planned.waitForExistence(timeout: 15) {
+      reveal(planned, "today's planned session"); planned.tap(); log("today: planned session started")
+    } else if unplanned.exists {
+      reveal(unplanned, "an unplanned session"); unplanned.tap(); log("today: unplanned session started (\(unplanned.label))")
+    } else {
+      log("today: no start control; workout tab used")
+      tap("header-session", "Workout")
+      tap("Start a new workout session")
+    }
     let skip = element("preparation-skip")
     if skip.waitForExistence(timeout: 20) { reveal(skip, "Skip preparation"); skip.tap(); log("preparation: skipped") }
     else { log("preparation: not offered for this session") }
     let first = element(labelBeginsWith: "Log set 1 for ")
-    wait(first, "the first set's Log set control", timeout: 30)
+    if !first.waitForExistence(timeout: 30) {
+      let empty = element("No movements are planned yet.")
+      log("session: no Log set control; empty plan shown=\(empty.exists)")
+      XCTFail("the first set's Log set control did not appear within 30 s")
+      return
+    }
     log("first set: \(first.label)")
     if first.label.hasSuffix("enter a load first") {
       enterText(into: "session-load-input", "20", submit: false)
@@ -441,6 +480,20 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func saveInFiles() {
+    // Encrypting the snapshot (scrypt) precedes the sheet: wait for the sheet
+    // or a final status, up to 3 minutes, recording the status as it goes.
+    let status = element("backup-status-message")
+    let deadline = Date().addingTimeInterval(180)
+    var lastStatus = ""
+    while Date() < deadline {
+      if ["Save", "Move", "Done", "Open", "Cancel"].contains(where: { app.buttons[$0].exists }) { break }
+      if status.exists && status.label != lastStatus {
+        lastStatus = status.label
+        log("backup status while waiting for the Files sheet: \(lastStatus.prefix(160))")
+        if !lastStatus.hasPrefix("Creating") { break }
+      }
+      sleep(2)
+    }
     // UIDocumentPickerViewController (export, as a copy) into On My iPhone.
     onMyIPhone()
     for name in ["Save", "Move", "Done", "Open"] {
@@ -451,6 +504,7 @@ final class AthleteKineticsUITests: XCTestCase {
         return
       }
     }
+    log("files export: no enabled action; status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-"); app{\(visibleLabels(app))}")
     XCTFail("the Files export sheet had no enabled Save/Move action")
   }
 

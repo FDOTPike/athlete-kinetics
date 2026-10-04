@@ -61,13 +61,24 @@ for test in "${TESTS[@]}"; do
   xcrun simctl uninstall "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
   xcrun simctl install "$UDID" "$APP"
   echo "== $test"
+  # System log for the app and HealthKit during the test (evidence for the
+  # permission flow; content-free system messages).
+  xcrun simctl spawn "$UDID" log stream --style compact --level debug \
+    --predicate 'process == "AthleteKinetics" OR process == "healthd" OR subsystem BEGINSWITH "com.apple.healthkit"' \
+    > "$OUT/$test.system.log" 2>&1 &
+  LOG_PID=$!
   # A failing test is reported once, by the annotator below (not the ERR trap).
   code=0
   xcodebuild test-without-building -xctestrun "$XCTESTRUN" \
     -destination "id=$UDID" -resultBundlePath "$OUT/$test.xcresult" \
     -only-testing:"AthleteKineticsUITests/AthleteKineticsUITests/$test" \
     > "$OUT/$test.log" 2>&1 || code=$?
+  kill "$LOG_PID" >/dev/null 2>&1 || true
   echo "$test exit=$code"
+  if [ "$code" -ne 0 ] && [ "$test" = test3_healthDenialAndAthleteSwitching ]; then
+    grep -iE 'authoriz|requestAuth|prompt|HKHealthStore|ak-health' "$OUT/$test.system.log" | tail -25 | cut -c1-240 > "$OUT/$test.health-excerpt.txt" || true
+    echo "::warning title=ui $test system log (HealthKit)::$(tr '\n' '~' < "$OUT/$test.health-excerpt.txt" | cut -c1-5500)"
+  fi
   [ "$code" -eq 0 ] || FAILED=1
   node tools/ios_ui_annotate.mjs "$test" "$code" "$OUT/$test.log"
   if [ -d "$OUT/$test.xcresult" ]; then
