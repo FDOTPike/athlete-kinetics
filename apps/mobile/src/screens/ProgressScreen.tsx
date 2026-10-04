@@ -88,7 +88,7 @@ export default function ProgressScreen(): React.JSX.Element {
             <ListRow
               key={row.date}
               label={row.date}
-              detail={`${Math.round(row.tonnageKg)} kg load · ${row.setCount} sets${row.bodyweightKg === null ? '' : ` · ${row.bodyweightKg.toFixed(1)} kg BW`}`}
+              detail={`${Math.round(row.tonnageKg)} kg load · ${row.setCount} sets${row.bodyweightKg === null ? '' : ` · ${row.bodyweightKg.toFixed(1)} kg BW`}${row.restingHr === null ? '' : ` · ${Math.round(row.restingHr)} bpm resting HR`}`}
             />
           ))
         )}

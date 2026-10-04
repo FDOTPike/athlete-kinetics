@@ -69,7 +69,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '063_movement_load_intent.sql',
   // 064 is the shared neutral activity/support persistence contract. Feature
   // adapters are separate modules, but the real store database must migrate it.
-  '064_accessible_coach_support.sql'];
+  '064_accessible_coach_support.sql',
+  // 069 adds resting_hr_daily, which the store writes on every biometrics sync,
+  // reads for measured history and empties on reset. It depends only on 001.
+  '069_resting_heart_rate.sql'];
 
 
 const db = new DatabaseSync(':memory:');

@@ -46,7 +46,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>pikeMethods reads your sleep from Apple Health, only if you choose to share it, to adjust how hard each session should be. It never writes to Apple Health. Your data stays on this device unless you export an encrypted backup yourself.</string>
+	<string>pikeMethods reads your sleep and resting heart rate from Apple Health, only if you choose to share them. Sleep adjusts how hard each session should be; resting heart rate is kept with your measured days. It never writes to Apple Health. Your data stays on this device unless you export an encrypted backup yourself.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Archivo-VariableFont_wdth,wght.ttf</string>

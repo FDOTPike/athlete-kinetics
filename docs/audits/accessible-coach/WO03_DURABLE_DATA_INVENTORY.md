@@ -21,7 +21,7 @@ The candidate closes those gaps with authenticated AES-256-GCM/scrypt containers
 
 `backup_preferences.json` stores only the timestamp of the last portable backup whose OS save action returned success. It is operational UI state, is not athlete data, and is not part of the portable archive. The private `pikeMethods-recovery-current.pmbak`, restore journal, operation markers, rollback copies, and incoming files are recovery machinery rather than portable payload. Temporary plaintext snapshots exist only under narrowly named app-private cache directories (`ak-backup-<32 lowercase hex characters>`) and are cleaned on every reachable path; matching abandoned directories are swept before normal boot. Passwords, derived keys, decrypted archives, and private support prose are never written to diagnostics or metadata.
 
-## Final live durable tables: 117
+## Final live durable tables: 118
 
 The inventory comes from the complete migration chain and the recovery sentinels. Temporary replacement tables and the superseded `user_profile` table are listed separately below.
 
@@ -121,7 +121,7 @@ These tables are athlete-owned health/schedule information. The candidate includ
 
 An in-progress runner checkpoint is durable. A backup policy must either include it consistently with its session graph or explicitly complete/cancel the session before snapshot; silently dropping it is not a faithful restore.
 
-### Imported history, readiness, health, and subjective state (15)
+### Imported history, readiness, health, and subjective state (16)
 
 - `history_import`
 - `history_import_session`
@@ -130,6 +130,7 @@ An in-progress runner checkpoint is durable. A backup policy must either include
 - `import_readiness_daily`
 - `bodyweight_daily`
 - `hrv_daily`
+- `resting_hr_daily` — resting heart rate per local date, independent of HRV; bpm, the service it was read from (`apple_health` or `health_connect`) and when it was last synced; a later read of the same date replaces it (069).
 - `sleep_daily`
 - `spo2_daily`
 - `spo2_sample`
@@ -173,7 +174,7 @@ These rows are bundled/reference data rather than athlete-authored data. The can
 
 ## Non-table schema objects and superseded intermediates
 
-- Views `v_readiness_inputs` and `v_training_daily_all` contain no independent rows. Physical snapshots retain their definitions with the database, while the restore schema contract deliberately fingerprints the 203 durable table/index/trigger objects.
+- Views `v_readiness_inputs` and `v_training_daily_all` contain no independent rows. Physical snapshots retain their definitions with the database, while the restore schema contract deliberately fingerprints the 204 durable table/index/trigger objects.
 - Indexes and triggers are schema/invariant objects, not independent data sets. They are nevertheless included by the physical snapshot and verified exhaustively because omitting or mutating them could weaken restored invariants.
 - `user_profile` is created by 006, copied into `athlete_profile`, and dropped by 007; it is not live.
 - `movement_equipment_v049`, `movement_role_eligibility_v052`, `routine_template_slot_v052`, and `planned_slot_autopilot_061` are migration replacement tables renamed into their final names; their temporary names are not live data classes.

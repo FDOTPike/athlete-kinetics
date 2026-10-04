@@ -22,6 +22,9 @@
  *     forward migration seeds the muscle mapping without inventing a focus;
  *   - 067 sport profile, goal exercise link and frozen block explanations
  *     round-trip, and a forward migration invents none of them;
+ *   - 069 resting heart rate (resting_hr_daily) round-trips, and a forward
+ *     migration keeps the backup's HRV/resting-HR history as it was and
+ *     invents no resting_hr_daily row;
  *   - 068 changes coaching text only (same schema fingerprint as v66): every
  *     forward restore ends with the corrected text, and athlete rows untouched;
  *   - an athlete file not opened since the update still backs up.
@@ -287,6 +290,18 @@ const sportRows = (path) => {
   } finally { db.close(); }
 };
 const NO_SPORT_OR_EMPHASIS = JSON.stringify({ sport: [], links: [], emphasis: [] });
+/** Wearable telemetry: HRV (with its legacy resting_hr column) and, from 069,
+ *  resting heart rate on its own. */
+const telemetryRows = (path) => {
+  const db = open(path);
+  try {
+    return JSON.stringify({
+      hrv: db.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
+      restingHr: hasTable(db, 'resting_hr_daily') ? db.prepare('SELECT * FROM resting_hr_daily ORDER BY date').all() : [],
+    });
+  } finally { db.close(); }
+};
+const seedLegacyHrv = (db) => db.exec("INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source) VALUES ('2026-09-02', 61.5, 52, 'health_connect')");
 /** Coaching-text state of the library (068): how many movements carry a v2
  *  correction, and how many still read the shared "Set up <name> with" template. */
 const coachingText = (path) => {
@@ -455,6 +470,7 @@ async function selectLegacyBackup(mutate, contract = V63) {
     preparation: { default: preparationRows(defaultPath), alex: preparationRows(alexPath) },
     focusGoals: { default: focusGoalRows(defaultPath), alex: focusGoalRows(alexPath) },
     sport: { default: sportRows(defaultPath), alex: sportRows(alexPath) },
+    telemetry: { default: telemetryRows(defaultPath), alex: telemetryRows(alexPath) },
     hashes: { default: mockCryptoProvider.sha256Hex(defaultBytes), alex: mockCryptoProvider.sha256Hex(alexBytes) },
   };
 }
@@ -474,6 +490,10 @@ function expectForwardRestored(legacy) {
     // A sport answer, goal exercise link and block explanation the backup held
     // are kept; none is invented where it held none.
     expect(sportRows(path)).toBe(legacy.sport[key]);
+    // HRV history (and its legacy resting_hr) is kept byte-for-byte; 069 adds
+    // an empty resting_hr_daily and copies or invents nothing into it.
+    expect(telemetryRows(path)).toBe(legacy.telemetry[key]);
+    expect(JSON.parse(telemetryRows(path)).restingHr).toEqual([]);
     // The forward migration brought the library text up to date: all 115 v2
     // corrections applied, only the deliberately held template rows remain.
     expect(coachingText(path)).toEqual({ v2Corrections: 115, templateRows: 29 });
@@ -677,7 +697,11 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     const v67 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 67);
     expect(v67.fingerprint).toBe(v66.fingerprint);
     expect([v67.migrationSlot, v66.migrationSlot]).toEqual([68, 67]);
-    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(4);
+    // 069 adds a table, so v68 has a fingerprint of its own.
+    const v68 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 68);
+    expect(v68.fingerprint).not.toBe(v67.fingerprint);
+    expect([v68.migrationSlot, v68.tableCount]).toEqual([69, v67.tableCount + 1]);
+    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(5);
   });
 
   test.each(PRE_UPGRADE.map((contract) => [contract.userVersion, contract]))(
@@ -690,18 +714,21 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
       const hasFocusGoals = contract.userVersion >= 65;
       // ... and after 067, a sport answer, a goal exercise and a block explanation.
       const hasSport = contract.userVersion >= 66;
-      const legacy = await selectLegacyBackup(hasPreparation
-        ? (path) => {
-          const db = open(path);
-          try {
-            seedPreparation(db);
-            if (hasFocusGoals) seedFocusAndGoals(db);
-            if (hasSport) seedSportAndEmphasis(db);
-          } finally { db.close(); }
-        }
-        : undefined, contract);
-      // Before the restore the backed-up library still reads the template everywhere.
-      expect(coachingText(join(incomingDir, 'athlete_kinetics.db'))).toEqual({ v2Corrections: 0, templateRows: 144 });
+      const legacy = await selectLegacyBackup((path) => {
+        const db = open(path);
+        try {
+          // Every backup-capable schema has hrv_daily; resting HR there sits beside RMSSD.
+          seedLegacyHrv(db);
+          if (hasPreparation) seedPreparation(db);
+          if (hasFocusGoals) seedFocusAndGoals(db);
+          if (hasSport) seedSportAndEmphasis(db);
+        } finally { db.close(); }
+      }, contract);
+      expect(JSON.parse(legacy.telemetry.default).hrv).toEqual([expect.objectContaining({ date: '2026-09-02', resting_hr: 52 })]);
+      // Before the restore the backed-up library reads the template everywhere,
+      // unless the backup was made after 068 shipped (v67 and later).
+      expect(coachingText(join(incomingDir, 'athlete_kinetics.db'))).toEqual(contract.userVersion >= 67
+        ? { v2Corrections: 115, templateRows: 29 } : { v2Corrections: 0, templateRows: 144 });
       if (hasSport) expect(JSON.parse(legacy.sport.default).emphasis).toHaveLength(1);
       if (hasPreparation) expect(JSON.parse(legacy.preparation.default).items).toHaveLength(2);
       if (hasFocusGoals) {
@@ -721,7 +748,7 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
   );
 
   test.each(PRE_UPGRADE.slice(1).map((contract) => [contract.userVersion, contract]))(
-    'a v%i archive whose database is really one schema older is refused',
+    'a v%i archive whose database is really one schema older is refused (or, where the two schemas are identical, healed to the current library)',
     async (_version, contract) => {
       const older = SUPPORTED_BACKUP_SCHEMA_CONTRACTS[SUPPORTED_BACKUP_SCHEMA_CONTRACTS.indexOf(contract) - 1];
       const path = join(incomingDir, 'athlete_kinetics.db');
@@ -736,6 +763,18 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
       mockSelectedSize = statSync(mockSelectedBackupPath).size;
       await useBackupStore.getState().chooseRestore(PASSWORD);
       if (useBackupStore.getState().status === 'preview') await useBackupStore.getState().confirmRestore(PASSWORD);
+      if (older.fingerprint === contract.fingerprint) {
+        // 068 changed coaching text only, so v66 and v67 are the same schema and
+        // the mislabel cannot be seen in it. What protects the athlete is the 068
+        // row sentinel: the forward migration detects the missing correction and
+        // re-applies it, so the installed file is the full current library.
+        expect(useBackupStore.getState().status).toBe('success');
+        const installed = join(mockLibraryDir, 'athlete_kinetics.db');
+        expect(describe_(installed)).toMatchObject({ userVersion: CURRENT.userVersion, current: true, quickCheck: 'ok' });
+        expect(coachingText(installed)).toEqual({ v2Corrections: 115, templateRows: 29 });
+        expect(artifacts()).toEqual([]);
+        return;
+      }
       expect(useBackupStore.getState().status).toBe('error');
       expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(liveHash);
       expect(artifacts()).toEqual([]);
@@ -743,15 +782,21 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
   );
 });
 
-test('round trip at the current schema: focus, goals, every revision and measurement, the sport answer, goal exercise and block explanation survive backup and restore', async () => {
+test('round trip at the current schema: focus, goals, every revision and measurement, the sport answer, goal exercise, block explanation and resting heart rate survive backup and restore', async () => {
   const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
   const db = open(livePath);
   seedFocusAndGoals(db);
   seedSportAndEmphasis(db);
+  seedLegacyHrv(db);
+  // Resting HR with no HRV beside it, from each service (069).
+  db.exec(`INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms) VALUES
+    ('2026-09-03', 54.5, 'apple_health', 8000), ('2026-09-04', 49, 'health_connect', 8100)`);
   db.close();
   const before = {
     athlete: athleteData(livePath), focusGoals: focusGoalRows(livePath), seeds: seedCounts(livePath), sport: sportRows(livePath),
+    telemetry: telemetryRows(livePath),
   };
+  expect(JSON.parse(before.telemetry).restingHr).toHaveLength(2);
   expect(JSON.parse(before.sport)).toMatchObject({ sport: [{ sport_id: 'other', revision: 3 }], links: [{ movement_id: 1 }] });
   expect(JSON.parse(before.sport).emphasis).toHaveLength(1);
   expect(JSON.parse(before.focusGoals)).toMatchObject({ focus: [{ bundle_id: 'lower_body', revision: 2 }] });
@@ -769,8 +814,10 @@ test('round trip at the current schema: focus, goals, every revision and measure
   // to remove its revisions and measurements (they cascade with it).
   const wipe = open(livePath);
   wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;'
-    + ' DELETE FROM athlete_sport_profile; DELETE FROM training_block;');
+    + ' DELETE FROM athlete_sport_profile; DELETE FROM training_block;'
+    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily;');
   wipe.close();
+  expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [] });
   expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
   // The goal link and the block explanation went with their parents.
   expect(sportRows(livePath)).toBe(NO_SPORT_OR_EMPHASIS);
@@ -784,6 +831,7 @@ test('round trip at the current schema: focus, goals, every revision and measure
 
   expect(focusGoalRows(livePath)).toBe(before.focusGoals);
   expect(sportRows(livePath)).toBe(before.sport);
+  expect(telemetryRows(livePath)).toBe(before.telemetry);
   expect(athleteData(livePath)).toBe(before.athlete);
   expect(seedCounts(livePath)).toEqual(before.seeds);
   // The restored file is the real current schema again, guards included.

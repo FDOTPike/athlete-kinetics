@@ -14,7 +14,8 @@
  *   [N3] Info.plist privacy: Health read usage text present, no write usage,
  *        no empty usage strings, display name, fonts.
  *   [N4] HealthKit entitlement wired on both configurations; read-only.
- *   [N5] identity: no React Native template bundle identifier.
+ *   [N5] identity: no React Native template bundle identifier; the iOS bundle
+ *        identifier equals the permanent Android application id.
  *   [N6] Apple Health / Nitro autolink on iOS only; Health Connect Android only.
  *   [N7] the Archivo font shipped on iOS is the same hash-pinned file Android ships.
  *   [N8] privacy manifest present; Android device backup stays disabled.
@@ -85,7 +86,8 @@ const plist = plistKeys(plistXml);
 console.log('[N3] Info.plist privacy and presentation');
 {
   const share = plist.get('NSHealthShareUsageDescription');
-  check('Health read usage description present and specific', typeof share === 'string' && share.length >= 40 && /sleep/i.test(share));
+  check('Health read usage description present and names both read types', typeof share === 'string' && share.length >= 40
+    && /sleep/i.test(share) && /resting heart rate/i.test(share));
   check('no Health write usage description (the app never writes to Health)', !plist.has('NSHealthUpdateUsageDescription'));
   const emptyUsage = [...plist.entries()].filter(([k, v]) => /UsageDescription$/.test(k) && (typeof v !== 'string' || v.trim() === '')).map(([k]) => k);
   check('no empty usage-description strings', emptyUsage.length === 0, emptyUsage.join(','));
@@ -105,7 +107,11 @@ console.log('[N4] HealthKit entitlement, read-only');
   check('both target configurations sign with the entitlements file',
     (pbx.match(/CODE_SIGN_ENTITLEMENTS = AthleteKinetics\/AthleteKinetics\.entitlements;/g) ?? []).length === 2);
   const apple = read('packages/biometrics/src/appleHealth.ts');
-  check('the adapter requests only sleep and shares nothing', /const READ_TYPES = \[SLEEP\] as const;/.test(apple) && !/toShare/.test(apple.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')));
+  check('the adapter requests only sleep and resting HR, and shares nothing',
+    /const READ_TYPES = \[SLEEP, RESTING_HR\] as const;/.test(apple)
+      && /const RESTING_HR = 'HKQuantityTypeIdentifierRestingHeartRate';/.test(apple)
+      && !/toShare/.test(apple.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')));
+  check('the adapter never requests an HRV type (HealthKit HRV is SDNN, not RMSSD)', !/HeartRateVariability/.test(apple));
 }
 
 console.log('[N5] identity');
@@ -113,6 +119,9 @@ console.log('[N5] identity');
   check('no React Native template bundle identifier', !pbx.includes('org.reactjs.native.example'));
   const ids = [...new Set([...pbx.matchAll(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g)].map((m) => m[1]))];
   check('one bundle identifier across configurations', ids.length === 1, ids.join(','));
+  const androidId = read('apps/mobile/android/app/build.gradle').match(/applicationId "([^"]+)"/)?.[1];
+  check('the iOS bundle identifier is the permanent Android application id', ids.length === 1 && ids[0] === androidId,
+    `${ids[0]} vs ${androidId}`);
   check('no development team is committed (owner-supplied at signing time)', !/DEVELOPMENT_TEAM = [A-Z0-9]{10};/.test(pbx));
 }
 

@@ -74,6 +74,15 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 203,
     fingerprint: 'b2c6deabb8165cd6a2ebca99aa2744c3f10d7f20dd5f6680dcbcc24ae46ab500',
   },
+  // Through 069_resting_heart_rate — adds resting_hr_daily, resting heart rate
+  // stored independently of HRV (one table, no index or trigger).
+  {
+    userVersion: 68,
+    migrationSlot: 69,
+    tableCount: 118,
+    objectCount: 204,
+    fingerprint: '33f76480826a0b81b0cd57ceb74294a441c1ffac71884dda95f90dd24fde5861',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

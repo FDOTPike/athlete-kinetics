@@ -67,7 +67,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '065_session_preparation.sql',
   '066_focus_and_goals.sql',
   '067_sport_and_emphasis.sql',
-  '068_movement_content_correction_v2.sql'];
+  '068_movement_content_correction_v2.sql',
+  '069_resting_heart_rate.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1764,11 +1765,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 67 files (slots 001-068, no 004) -> user_version 67. This count is
+    // 68 files (slots 001-069, no 004) -> user_version 68. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 068 (content correction v2).
-    check('fresh install reaches user_version 67 (67 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 67,
+    // silent one. Re-pinned for 069 (resting heart rate).
+    check('fresh install reaches user_version 68 (68 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 68,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -3943,8 +3944,9 @@ const isTemplate = (row) => row.instructions.startsWith(`Set up ${row.name} with
     return old.instructions !== row.instructions || old.cues !== row.cues || old.intent !== row.intent;
   });
   const corrected = new Set(v2Rows(after));
-  check('068 is appended after 067 and completes the chain',
-    IDX_068 === MIGRATIONS.length - 1 && IDX_068 === 66 && uv(after) === 67, `index=${IDX_068} uv=${uv(after)}`);
+  check('068 is appended after 067 and the chain completes',
+    IDX_068 === FILES.indexOf('067_sport_and_emphasis.sql') + 1 && IDX_068 === 66 && uv(after) === MIGRATIONS.length,
+    `index=${IDX_068} uv=${uv(after)}`);
   check('068 corrects exactly 115 movements and records each one at version 2',
     corrected.size === V2_CORRECTIONS && changed.length === V2_CORRECTIONS && changed.every((row) => corrected.has(row.id)),
     `provenance=${corrected.size} changed=${changed.length}`);
@@ -4017,6 +4019,78 @@ const isTemplate = (row) => row.instructions.startsWith(`Set up ${row.name} with
   check('lost v2 provenance rows are detected and restored exactly',
     lostDetected && v2Rows(lost).length === V2_CORRECTIONS && sentinelsMissing(lost).length === 0
       && JSON.stringify([...libraryText(lost).values()]) === final);
+}
+
+// =============================================================================
+// [069] resting heart rate independent of HRV
+// =============================================================================
+// Append-only: a new table, nothing existing changes. Proves it lands on a
+// fresh install and on a populated upgrade without inventing or moving data,
+// that readiness is untouched, that the table's domain is enforced, that its
+// rows survive every replay, and that a lost table is detected and rebuilt.
+console.log('[069] resting heart rate (resting_hr_daily)');
+const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
+{
+  check('069 is appended after 068 and completes the chain',
+    IDX_069 === IDX_068 + 1 && IDX_069 === MIGRATIONS.length - 1 && IDX_069 === 67, `index=${IDX_069}`);
+
+  const telemetry = (db) => JSON.stringify({
+    hrv: db.raw.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
+    sleep: db.raw.prepare('SELECT * FROM sleep_daily ORDER BY date').all(),
+    readiness: db.raw.prepare('SELECT * FROM v_readiness_inputs ORDER BY date').all(),
+  });
+  const rhrRows = (db) => db.raw.prepare('SELECT * FROM resting_hr_daily ORDER BY date').all();
+
+  // Populated pre-069 install: HRV with and without resting HR, and sleep.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_069);
+  upgrade.raw.exec(`INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source) VALUES
+    ('2026-09-28', 61.5, 52, 'health_connect'), ('2026-09-29', 58.0, NULL, 'health_connect');
+    INSERT INTO sleep_daily (date, in_bed_min, asleep_min) VALUES ('2026-09-29', 480, 420);`);
+  const before = telemetry(upgrade);
+  runMigrations(upgrade, MIGRATIONS);
+  check('a populated v67 install upgrades to the latest version with every sentinel present',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0, `uv=${uv(upgrade)}`);
+  check('the upgrade leaves HRV, sleep and readiness byte-identical (nothing moved, nothing recomputed)',
+    telemetry(upgrade) === before);
+  check('the upgrade invents no resting heart rate (the new table starts empty)', rhrRows(upgrade).length === 0);
+
+  // Domain: unit range, provenance and date shape are enforced by the schema.
+  const fresh = freshDb();
+  runMigrations(fresh, MIGRATIONS);
+  const insert = (date, bpm, source) => fresh.raw
+    .prepare('INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms) VALUES (?, ?, ?, 1)').run(date, bpm, source);
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  insert('2026-10-01', 54.5, 'apple_health');
+  insert('2026-10-02', 49, 'health_connect');
+  check('valid rows from either service are accepted without an RMSSD value', rhrRows(fresh).length === 2);
+  check('bpm outside 20..150 is rejected', rejects(() => insert('2026-10-03', 19.9, 'apple_health'))
+    && rejects(() => insert('2026-10-03', 150.1, 'apple_health')));
+  check('an unknown provenance is rejected', rejects(() => insert('2026-10-03', 55, 'wearable'))
+    && rejects(() => insert('2026-10-03', 55, null)));
+  check('a malformed date is rejected', rejects(() => insert('2026-1-3', 55, 'apple_health'))
+    && rejects(() => insert('03/10/2026', 55, 'apple_health')));
+  check('a second row for the same date is rejected (one value per day)', rejects(() => insert('2026-10-01', 60, 'health_connect')));
+  check('the table is STRICT (a text bpm is rejected, not coerced)', rejects(() => insert('2026-10-04', 'fifty', 'apple_health')));
+
+  // Replays keep the rows.
+  const kept = JSON.stringify(rhrRows(fresh));
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync(`PRAGMA user_version = ${IDX_069};`);
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync('PRAGMA user_version = 0;');
+  runMigrations(fresh, MIGRATIONS);
+  check('resting heart rate rows survive a reboot, a replay from 069 and a full re-apply from 0',
+    JSON.stringify(rhrRows(fresh)) === kept && uv(fresh) === MIGRATIONS.length);
+
+  // A database that claims the latest version but lost the table.
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DROP TABLE resting_hr_daily');
+  const detected = sentinelsMissing(lost).includes('resting_hr_daily');
+  runMigrations(lost, MIGRATIONS);
+  check('a lost resting_hr_daily table is detected and rebuilt by self-heal',
+    detected && sentinelsMissing(lost).length === 0 && rhrRows(lost).length === 0);
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

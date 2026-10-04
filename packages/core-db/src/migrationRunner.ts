@@ -320,6 +320,9 @@ export const SENTINELS: readonly MigrationSentinel[] = [
     presenceSql: `SELECT 1 AS ok WHERE
       (SELECT COUNT(*) FROM movement_content_correction WHERE correction_version = 2) = 115`,
   },
+  // 069 resting heart rate independent of HRV. Losing the table would make
+  // every later sync fail its write and drop the athlete's resting HR.
+  { type: 'table', name: 'resting_hr_daily' },                                // 069
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it

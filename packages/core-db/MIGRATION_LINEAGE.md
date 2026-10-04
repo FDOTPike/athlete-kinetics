@@ -15,8 +15,10 @@ files `001`–`033` are byte-identical. Only ordinal 34 diverges.
 
 ## The unified chain
 
-The feature order **is** the unified chain (67 entries; every later migration is
-appended after `068`). It was not reordered, and no shipped SQL file was edited.
+The feature order **is** the unified chain (67 entries at integration; every later
+migration is appended after `068`). It was not reordered, and no shipped SQL file
+was edited. The first later append is `069_resting_heart_rate` (ordinal 68): a new
+`resting_hr_daily` table only, recorded in the manifest like every other entry.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

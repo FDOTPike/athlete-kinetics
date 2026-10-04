@@ -5474,6 +5474,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         || get().biometricsStatus !== 'ready' || !athleteDataBootAllowed()) return;
       if (days.length === 0) return;
       const d = getDb();
+      // Provenance is the bridge's own declaration; an undeclared source
+      // stores no resting HR rather than a guessed one.
+      const restingHrSource = bridge.provider === 'apple_health' || bridge.provider === 'health_connect'
+        ? bridge.provider : null;
+      const syncedAtMs = Date.now();
       for (const r of days) {
         // One compacted row per day per table — raw ticks never reach SQLite.
         if (r.rmssdMs !== null) {
@@ -5487,6 +5492,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
           d.executeSync(
             'UPDATE hrv_daily SET resting_hr = ? WHERE date = ?',
             [r.restingHrBpm, r.date],
+          );
+        }
+        // Resting HR also lands in its own table (069), with or without HRV —
+        // the only place iOS resting HR can be kept. A later read of the same
+        // date replaces it; a date this read did not return is left alone.
+        if (r.restingHrBpm !== null && restingHrSource !== null) {
+          d.executeSync(
+            'INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET bpm = excluded.bpm, source = excluded.source, synced_at_ms = excluded.synced_at_ms',
+            [r.date, r.restingHrBpm, restingHrSource, syncedAtMs],
           );
         }
         if (r.inBedMin !== null && r.inBedMin > 0) {
@@ -5638,13 +5652,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
     `WITH dates(date) AS (
        SELECT date FROM v_training_daily_all UNION SELECT date FROM bodyweight_daily
        UNION SELECT date FROM hrv_daily UNION SELECT date FROM sleep_daily
+       UNION SELECT date FROM resting_hr_daily
      )
      SELECT dates.date, td.tonnage_kg, td.set_count, bw.weight_kg,
-            h.rmssd_ms, h.resting_hr, sl.asleep_min
+            h.rmssd_ms, COALESCE(rhr.bpm, h.resting_hr) AS resting_hr, sl.asleep_min
      FROM dates
      LEFT JOIN v_training_daily_all td USING (date)
      LEFT JOIN bodyweight_daily bw USING (date)
      LEFT JOIN hrv_daily h USING (date)
+     LEFT JOIN resting_hr_daily rhr USING (date)
      LEFT JOIN sleep_daily sl USING (date)
      ORDER BY dates.date DESC LIMIT ?`,
     [Math.round(clamp(limit, 1, 7300))],
@@ -7735,6 +7751,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM one_rep_max');
       d.executeSync('DELETE FROM return_checkin_ack');
       d.executeSync('DELETE FROM hrv_daily');
+      d.executeSync('DELETE FROM resting_hr_daily');
       d.executeSync('DELETE FROM sleep_daily');
       d.executeSync('DELETE FROM spo2_daily');
       d.executeSync('DELETE FROM spo2_sample');

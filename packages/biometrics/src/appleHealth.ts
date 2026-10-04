@@ -10,10 +10,12 @@
  *     hrv_daily.rmssd_ms and every stored baseline are RMSSD. SDNN is a
  *     different statistic, so storing it under rmssd_ms or normalizing it
  *     against RMSSD history would be wrong. iOS HRV stays unknown.
- *   - Resting HR: NOT requested. hrv_daily can only hold resting HR beside an
- *     RMSSD value (the existing store contract), so on iOS it could never be
- *     persisted; asking for it would request data the app does not use.
- *   Only the one type actually used is requested.
+ *   - Resting HR: read (HKQuantityTypeIdentifierRestingHeartRate, unit
+ *     count/min = beats per minute), one value per local date, and stored in
+ *     resting_hr_daily (069) — its own table, so it needs no RMSSD beside it.
+ *     It is kept in the athlete's measured days; it does not feed readiness
+ *     (readiness never read resting HR on either platform).
+ *   Only the two types actually used are requested.
  *
  * AUTHORIZATION SEMANTICS (HealthKit hides read decisions by design)
  *   HealthKit never reveals whether READ access was granted or denied: a
@@ -24,18 +26,26 @@
  *   - requestPermissions() is true when the request completed (answered), never
  *     because access is assumed. It opens the system sheet only from the
  *     explicit user action the store routes here.
- *   - readDaily() returns [] for no data, no access or any error.
- *   The ATHLETE screen words "ready" on iOS as "access requested; sleep appears
- *   when Health shares it" — never "connected" or "granted".
+ *   - readDaily() returns [] for no data, no access or any error, per type:
+ *     sleep can arrive without resting HR and the reverse. Neither absence is
+ *     reported as a denial, and the store never deletes a stored day because
+ *     a read came back empty.
+ *   The ATHLETE screen words "ready" on iOS as "access requested; sleep and
+ *   resting heart rate appear when Health shares them" — never "connected" or
+ *   "granted".
  *
  * GRACEFUL DEGRADATION: the native module is required inside the factory, the
  * factory returns null off iOS or when Health data is unavailable (e.g. iPad
  * without Health), and every method swallows native errors.
  */
-import { aggregateDaily, type DailyBiometrics, type SleepRecordLike, type SleepStageLike } from './aggregate';
+import { aggregateDaily, type DailyBiometrics, type RhrRecordLike, type SleepRecordLike, type SleepStageLike } from './aggregate';
 import type { BiometricsBridge } from './healthConnect';
 
 const SLEEP = 'HKCategoryTypeIdentifierSleepAnalysis';
+const RESTING_HR = 'HKQuantityTypeIdentifierRestingHeartRate';
+/** HealthKit's unit string for beats per minute. Requested explicitly, and any
+ *  sample reporting another unit is dropped rather than converted. */
+export const APPLE_RESTING_HR_UNIT = 'count/min';
 
 /** HKCategoryValueSleepAnalysis raw values (asleepUnspecified == legacy asleep). */
 export const APPLE_SLEEP_VALUE = {
@@ -185,11 +195,66 @@ const localDateOf = (iso: string): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-/** Pure: Apple sleep samples -> the same DailyBiometrics rows Android yields
- *  (rmssdMs and restingHrBpm always null on iOS; see the signal contract). */
-export function appleSleepDaily(samples: readonly AppleSleepSampleLike[]): DailyBiometrics[] {
-  return aggregateDaily([], [], appleSleepToRecords(samples), localDateOf);
+/** The fields of a HealthKit quantity sample this adapter reads. */
+export interface AppleQuantitySampleLike {
+  readonly startDate: Date | string;
+  readonly endDate: Date | string;
+  readonly quantity: number;
+  /** The unit the quantity is expressed in; must be count/min when present. */
+  readonly unit?: string;
+  readonly sourceId: string;
 }
+
+/**
+ * Normalize raw HealthKit resting-heart-rate samples into one record per local
+ * date (the date the sample STARTS on — HealthKit's daily resting HR spans the
+ * day it describes).
+ *
+ * - Several sources can write resting HR for the same day (a Watch and another
+ *   app); their values are not mixed. Per date ONE source is used: the one
+ *   with the most samples that day, ties broken by source id, so the choice is
+ *   deterministic. Its samples for that date are averaged by aggregateDaily.
+ * - A sample in any unit other than count/min, a non-finite value, a value
+ *   outside the stored 20..150 bpm domain, or an unreadable date is dropped.
+ */
+export function appleRestingHrToRecords(samples: readonly AppleQuantitySampleLike[]): RhrRecordLike[] {
+  const clean = samples
+    .map((s) => ({ start: toMs(s.startDate), quantity: s.quantity, unit: s.unit, sourceId: String(s.sourceId ?? '') }))
+    .filter((s) => Number.isFinite(s.start) && typeof s.quantity === 'number' && Number.isFinite(s.quantity)
+      && s.quantity >= 20 && s.quantity <= 150
+      && (s.unit === undefined || s.unit === APPLE_RESTING_HR_UNIT));
+  const byDate = new Map<string, Map<string, typeof clean>>();
+  for (const s of clean) {
+    const date = localDateOf(new Date(s.start).toISOString());
+    const sources = byDate.get(date) ?? new Map<string, typeof clean>();
+    sources.set(s.sourceId, [...(sources.get(s.sourceId) ?? []), s]);
+    byDate.set(date, sources);
+  }
+  const records: RhrRecordLike[] = [];
+  for (const sources of byDate.values()) {
+    const [, chosen] = [...sources.entries()]
+      .sort(([a, la], [b, lb]) => lb.length - la.length || (a < b ? -1 : a > b ? 1 : 0))[0]!;
+    for (const s of chosen) records.push({ time: new Date(s.start).toISOString(), beatsPerMinute: s.quantity });
+  }
+  return records;
+}
+
+/** Pure: Apple sleep and resting-HR samples -> the same DailyBiometrics rows
+ *  Android yields. rmssdMs is always null on iOS (see the signal contract). */
+export function appleHealthDaily(
+  sleepSamples: readonly AppleSleepSampleLike[],
+  restingHrSamples: readonly AppleQuantitySampleLike[],
+): DailyBiometrics[] {
+  return aggregateDaily([], appleRestingHrToRecords(restingHrSamples), appleSleepToRecords(sleepSamples), localDateOf);
+}
+
+/** Pure: sleep samples only (restingHrBpm null). */
+export function appleSleepDaily(samples: readonly AppleSleepSampleLike[]): DailyBiometrics[] {
+  return appleHealthDaily(samples, []);
+}
+
+type AppleSourceRevisionLike = { sourceRevision?: { source?: { bundleIdentifier?: string } } };
+const sourceIdOf = (s: AppleSourceRevisionLike): string => s.sourceRevision?.source?.bundleIdentifier ?? 'unknown';
 
 /** Minimal structural view of @kingstinct/react-native-healthkit (v16). */
 interface HealthKitModuleLike {
@@ -199,13 +264,17 @@ interface HealthKitModuleLike {
   queryCategorySamples(
     identifier: string,
     options: { limit: number; ascending?: boolean; filter?: { date?: { startDate?: Date; endDate?: Date } } },
-  ): Promise<readonly { startDate: Date; endDate: Date; value: number; sourceRevision?: { source?: { bundleIdentifier?: string } } }[]>;
+  ): Promise<readonly ({ startDate: Date; endDate: Date; value: number } & AppleSourceRevisionLike)[]>;
+  queryQuantitySamples(
+    identifier: string,
+    options: { limit: number; ascending?: boolean; unit?: string; filter?: { date?: { startDate?: Date; endDate?: Date } } },
+  ): Promise<readonly ({ startDate: Date; endDate: Date; quantity: number; unit?: string } & AppleSourceRevisionLike)[]>;
 }
 
 /** HKAuthorizationRequestStatus.unnecessary: the person has already answered. */
 const REQUEST_UNNECESSARY = 2;
-const READ_TYPES = [SLEEP] as const;
-/** Upper bound on samples per read; a week of multi-device sleep is far below it. */
+const READ_TYPES = [SLEEP, RESTING_HR] as const;
+/** Upper bound on samples per read; a week of multi-device sleep or resting HR is far below it. */
 const SAMPLE_LIMIT = 5000;
 
 export async function tryCreateAppleHealthBridge(): Promise<BiometricsBridge | null> {
@@ -216,6 +285,7 @@ export async function tryCreateAppleHealthBridge(): Promise<BiometricsBridge | n
     const hk = require('@kingstinct/react-native-healthkit') as HealthKitModuleLike;
     if (!hk.isHealthDataAvailable()) return null; // e.g. iPad without Health
     return {
+      provider: 'apple_health',
       hasGrantedPermissions: async (): Promise<boolean> => {
         try {
           return (await hk.getRequestStatusForAuthorization({ toRead: READ_TYPES })) === REQUEST_UNNECESSARY;
@@ -238,15 +308,18 @@ export async function tryCreateAppleHealthBridge(): Promise<BiometricsBridge | n
           // One extra day so a night that started before the window but ends
           // inside it is read whole.
           const startDate = new Date(endDate.getTime() - (Math.max(1, days) + 1) * 86_400_000);
-          const samples = await hk.queryCategorySamples(SLEEP, {
-            limit: SAMPLE_LIMIT, ascending: true, filter: { date: { startDate, endDate } },
-          });
-          return appleSleepDaily(samples.map((s) => ({
-            startDate: s.startDate,
-            endDate: s.endDate,
-            value: s.value,
-            sourceId: s.sourceRevision?.source?.bundleIdentifier ?? 'unknown',
-          })));
+          const filter = { date: { startDate, endDate } };
+          // Each type is read on its own: a failure (or no data, or no access —
+          // HealthKit does not say which) for one never sinks the other.
+          const [sleep, restingHr] = await Promise.all([
+            hk.queryCategorySamples(SLEEP, { limit: SAMPLE_LIMIT, ascending: true, filter }).catch(() => []),
+            hk.queryQuantitySamples(RESTING_HR, { limit: SAMPLE_LIMIT, ascending: true, unit: APPLE_RESTING_HR_UNIT, filter })
+              .catch(() => []),
+          ]);
+          return appleHealthDaily(
+            sleep.map((s) => ({ startDate: s.startDate, endDate: s.endDate, value: s.value, sourceId: sourceIdOf(s) })),
+            restingHr.map((s) => ({ startDate: s.startDate, endDate: s.endDate, quantity: s.quantity, unit: s.unit, sourceId: sourceIdOf(s) })),
+          );
         } catch {
           return [];
         }

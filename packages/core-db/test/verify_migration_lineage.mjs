@@ -89,8 +89,11 @@ console.log('[L1] frozen SQL bytes, ordinals and registry parity');
   check('master ordinal 34 is 058 and unified ordinal 34 is 035 (the one divergence)',
     MASTER_FILES[33] === '058_suspension_episode.sql' && UNIFIED_FILES[33] === '035_profile_load_preference.sql'
       && MASTER_FILES.slice(0, 33).every((file, i) => UNIFIED_FILES[i] === file));
-  check('unified chain is append-only after the integration point (058 at ordinal 57, 068 last)',
-    UNIFIED_FILES[56] === '058_suspension_episode.sql' && UNIFIED_FILES.at(-1) === '068_movement_content_correction_v2.sql');
+  // 068 was the last entry of the integrated chain; everything after it is a
+  // later append (069 resting heart rate first), never an insertion.
+  check('unified chain is append-only after the integration point (058 at ordinal 57, 068 at ordinal 67)',
+    UNIFIED_FILES[56] === '058_suspension_episode.sql' && UNIFIED_FILES[66] === '068_movement_content_correction_v2.sql'
+      && UNIFIED_FILES.slice(67).every((file) => Number(file.slice(0, 3)) > 68));
   const gateSource = readFileSync(join(CORE, 'test', 'verify_migrations.mjs'), 'utf8');
   const gateFiles = [...gateSource.match(/const FILES = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+\.sql)'/g)].map((m) => m[1]);
   check('verify_migrations.mjs FILES is exactly the production registry (closes the hand-copied-list gap)',

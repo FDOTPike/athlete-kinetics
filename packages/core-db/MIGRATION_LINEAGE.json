@@ -341,6 +341,11 @@
         "ordinal": 67,
         "file": "068_movement_content_correction_v2.sql",
         "sha256": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+      },
+      {
+        "ordinal": 68,
+        "file": "069_resting_heart_rate.sql",
+        "sha256": "e287343d328841e95d83fa94ae82257144d7b671ef9c877e5c602756f602dadd"
       }
     ]
   },

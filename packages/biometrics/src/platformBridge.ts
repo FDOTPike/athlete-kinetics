@@ -7,9 +7,9 @@
  * honour the same read-only, explicit-tap contract (BiometricsBridge).
  */
 import { tryCreateAppleHealthBridge } from './appleHealth';
-import { tryCreateHealthConnectBridge, type BiometricsBridge } from './healthConnect';
+import { tryCreateHealthConnectBridge, type BiometricsBridge, type BiometricsSource } from './healthConnect';
 
-export type BiometricsProvider = 'health_connect' | 'apple_health' | null;
+export type BiometricsProvider = BiometricsSource | null;
 
 /** Which service this platform would read, for honest UI wording. */
 export function biometricsProviderFor(os: string): BiometricsProvider {
