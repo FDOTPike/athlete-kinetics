@@ -180,7 +180,15 @@ test.each(['connect', 'request'].flatMap(operation => ['success', 'failure'].fla
   '%s permission %s cannot change a later context after %s', async (operation, outcome, change) => {
     const hold = deferred();
     const readDaily = jest.fn(async () => [day]);
-    const bridge = { hasGrantedPermissions: () => hold.promise, requestPermissions: () => hold.promise, readDaily };
+    // The held answer belongs to the ORIGINAL context only. Any later check is
+    // the new context's own (read-only) check and is left unanswered here, so
+    // what is asserted is exactly that the stale result changes nothing.
+    let grantChecks = 0;
+    const bridge = {
+      hasGrantedPermissions: () => { grantChecks += 1; return grantChecks === 1 ? hold.promise : new Promise(() => {}); },
+      requestPermissions: () => hold.promise,
+      readDaily,
+    };
     let pending;
     if (operation === 'connect') pending = state().connectBiometrics(bridge);
     else {
@@ -199,9 +207,14 @@ test.each(['connect', 'request'].flatMap(operation => ['success', 'failure'].fla
     const expected = state().biometricsStatus;
     if (outcome === 'success') hold.resolve(true); else hold.reject(new Error('synthetic permission failure'));
     await pending;
+    await settle();
     expect(state().biometricsStatus).toBe(expected);
     expect(readDaily).not.toHaveBeenCalled();
     expect(activeDataMutationLeaseCount()).toBe(0);
+    // A startup check that settled for nobody hands over to a read-only check
+    // for the current context (never after a disconnect).
+    // (A -> B -> A boots twice: one check per completed boot.)
+    if (operation === 'connect') expect(grantChecks).toBe({ replace: 1, aba: 3 }[change] ?? 2);
   });
 
 test('current permission success still syncs and initial boot context remains usable', async () => {
@@ -577,4 +590,83 @@ test('a daily read stays stale across denial then grant even when status returns
   await pending;
   expect(rows(A, 'SELECT rmssd_ms FROM hrv_daily WHERE date=?', day.date)).toEqual(before);
   expect(activeDataMutationLeaseCount()).toBe(0);
+});
+
+// Independent audit P2 (d9574bf): a startup grant check that settles after an
+// athlete switch used to leave the new athlete 'off' forever (no re-check, no
+// CONNECT, manual sync a no-op). The new athlete now gets its own read-only
+// check; nothing from the stale result crosses the athlete boundary.
+describe('permission handoff across an athlete switch', () => {
+  const healthBridge = ({ firstCheck, laterGrant, request }) => {
+    const reads = [];
+    const bridge = {
+      grantChecks: 0,
+      hasGrantedPermissions: jest.fn(() => { bridge.grantChecks += 1; return bridge.grantChecks === 1 ? firstCheck.promise : Promise.resolve(laterGrant); }),
+      requestPermissions: jest.fn(() => (request ? request.promise : Promise.resolve(true))),
+      readDaily: jest.fn(async () => { reads.push(state().activeAthleteId); return [day]; }),
+      reads,
+    };
+    return bridge;
+  };
+
+  test.each([[true, 'ready'], [false, 'idle']])('a stale grant (%s) is re-checked for the new athlete, whose own answer decides', async (granted, finalStatus) => {
+    const firstCheck = deferred();
+    const bridge = healthBridge({ firstCheck, laterGrant: granted });
+    const aBefore = rows(A, 'SELECT * FROM hrv_daily ORDER BY date');
+    expect(state().biometricsStatus).toBe('off');
+    const pending = state().connectBiometrics(bridge);
+    state().switchAthlete('athlete-b');
+    await settle();
+    expect(state().activeAthleteId).toBe('athlete-b');
+    firstCheck.resolve(true);
+    await pending;
+    await settle();
+    expect(state().biometricsStatus).toBe(finalStatus);
+    expect(bridge.grantChecks).toBe(2);
+    expect(bridge.requestPermissions).not.toHaveBeenCalled(); // never a sheet
+    // Reads only after B's own check said yes, and only into B.
+    expect(bridge.reads).toEqual(granted ? ['athlete-b'] : []);
+    expect(rows(A, 'SELECT * FROM hrv_daily ORDER BY date')).toEqual(aBefore);
+    expect(rows(B, 'SELECT date FROM hrv_daily WHERE date=?', day.date)).toEqual(granted ? [{ date: day.date }] : []);
+    // Manual sync is live for B when granted.
+    if (granted) {
+      await state().syncBiometrics();
+      expect(bridge.reads).toEqual(['athlete-b', 'athlete-b']);
+    }
+  });
+
+  test('an explicit request still open across a switch is not superseded; once answered, the new athlete gets a read-only check', async () => {
+    const firstCheck = deferred();
+    firstCheck.resolve(false);
+    const request = deferred();
+    const bridge = healthBridge({ firstCheck, laterGrant: true, request });
+    const aBefore = rows(A, 'SELECT * FROM hrv_daily ORDER BY date');
+    await state().connectBiometrics(bridge);
+    expect(state().biometricsStatus).toBe('idle');
+    const asking = state().requestBiometricsAccess();
+    state().switchAthlete('athlete-b');
+    await settle();
+    // The open request is left alone: no extra check while it is pending.
+    expect(bridge.grantChecks).toBe(1);
+    request.resolve(true);
+    await asking;
+    await settle();
+    expect(bridge.requestPermissions).toHaveBeenCalledTimes(1);
+    expect(bridge.grantChecks).toBe(2);
+    expect(state().biometricsStatus).toBe('ready');
+    expect(bridge.reads).toEqual(['athlete-b']);
+    expect(rows(A, 'SELECT * FROM hrv_daily ORDER BY date')).toEqual(aBefore);
+  });
+
+  test('a disconnect is never undone by a switch', async () => {
+    const firstCheck = deferred();
+    firstCheck.resolve(true);
+    const bridge = healthBridge({ firstCheck, laterGrant: true });
+    await state().connectBiometrics(bridge);
+    await state().connectBiometrics(null);
+    state().switchAthlete('athlete-b');
+    await settle();
+    expect(state().biometricsStatus).toBe('unavailable');
+    expect(bridge.grantChecks).toBe(1);
+  });
 });

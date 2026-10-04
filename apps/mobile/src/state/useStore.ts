@@ -2660,6 +2660,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
     biometricsBootSyncRevision = operation.revision;
     await get().syncBiometrics();
   };
+  /** A permission check (or explicit request) settled for an athlete context
+   *  that no longer exists, so nobody checked the CURRENT one. Once the current
+   *  context has fully booted, run one read-only check for it: never a sheet,
+   *  never a read before that context's own check says access is answered,
+   *  and nothing from the stale result carries across. Before boot completes,
+   *  handoffBiometricsAfterBoot does the same. */
+  const recheckBiometricsForCurrentContext = (bridge: BiometricsBridge): void => {
+    if (biometrics !== bridge || !athleteDataBootAllowed() || get().status !== 'ready') return;
+    void get().connectBiometrics(bridge);
+  };
   /** After a successful full hydration only. Never opens a permission sheet:
    *  an unfinished startup check (or one for an athlete placeholder the
    *  registry has since replaced) is re-checked read-only; a completed explicit
@@ -2669,9 +2679,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
   const handoffBiometricsAfterBoot = (): void => {
     const operation = biometricsPermissionOperation;
     const bridge = biometrics;
-    if (bridge === null || operation.athleteContextRevision !== athleteContextRevision
-      || !athleteDataBootAllowed() || get().status !== 'ready') return;
+    if (bridge === null || !athleteDataBootAllowed() || get().status !== 'ready') return;
     if (operation.intent === 'disconnect') return;
+    if (operation.athleteContextRevision !== athleteContextRevision) {
+      // The last check belonged to a previous athlete context. An explicit
+      // request still open there settles on its own (and then re-checks);
+      // anything else is re-checked read-only for this context.
+      if (!(operation.intent === 'request' && operation.pending)) void get().connectBiometrics(bridge);
+      return;
+    }
     if (operation.intent === 'request') {
       if (!operation.pending && operation.athleteId === get().activeAthleteId
         && get().biometricsStatus === 'ready') {
@@ -5392,9 +5408,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (!stillCurrent()) {
         // The athlete context moved on: this check settled for nobody. Leave it
         // pending (re-checked after the next successful boot) unless the context
-        // itself was replaced.
+        // itself was replaced — then the current context is re-checked.
         if (operation.athleteContextRevision !== athleteContextRevision) {
           biometricsPermissionOperation = { ...operation, pending: false };
+          recheckBiometricsForCurrentContext(bridge);
         }
         return;
       }
@@ -5410,6 +5427,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (!stillCurrent()) {
         if (operation.athleteContextRevision !== athleteContextRevision) {
           biometricsPermissionOperation = { ...operation, pending: false };
+          recheckBiometricsForCurrentContext(bridge);
         }
         return;
       }
@@ -5431,7 +5449,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const granted = await bridge.requestPermissions();
       if (!ownsOperation()) return;
       if (!stillCurrent()) {
+        // Answered for an athlete who is no longer active: the result is not
+        // applied here; the current athlete gets its own read-only check.
         biometricsPermissionOperation = { ...operation, pending: false };
+        recheckBiometricsForCurrentContext(bridge);
         return;
       }
       biometricsPermissionOperation = { ...operation, pending: false };
@@ -5445,6 +5466,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (!ownsOperation()) return;
       if (!stillCurrent()) {
         biometricsPermissionOperation = { ...operation, pending: false };
+        recheckBiometricsForCurrentContext(bridge);
         return;
       }
       biometricsPermissionOperation = { ...operation, pending: false };
