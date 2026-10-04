@@ -1,0 +1,1360 @@
+{
+  "metadata": {
+    "schema_version": 1,
+    "audit_kind": "independent_source_to_motion_completion_map_not_technique_approval",
+    "feature_commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+    "feature_branch": "origin/claude/coaching-wo4-coaching-content",
+    "legacy_local_root": "C:\\Users\\fpike\\.codex\\worktrees\\wo09-health-connect-ordering\\Athlete App",
+    "feature_root_read_only": "C:\\Users\\fpike\\.codex\\worktrees\\release-feature-audit-2026-10-04\\Athlete App",
+    "counts": {
+      "catalogue": 300,
+      "legacy_preview_records": 129,
+      "legacy_raw_frame_records": 123,
+      "legacy_derived_records": 3,
+      "legacy_existing_intentionally_unsuitable": 3,
+      "missing": 171,
+      "legacy_missing_exclusions": 2,
+      "missing_nonexcluded": 169,
+      "missing_beginner_nonexcluded": 52,
+      "physical_families_all_catalogue": 138,
+      "families_with_nonexcluded_missing": 106,
+      "source_holds_all_catalogue": 30,
+      "source_holds_nonexcluded_missing": 8,
+      "visible_approved_in_legacy": 0
+    },
+    "boundaries": [
+      "Full content is replayed from frozen committed12a migrations, not mutable live checkout.",
+      "Local129-record overlay is baseline only and was not committed on12a. Root may now be integrating it in a dirty checkout.",
+      "No app, asset, approval, equipment, catalogue identity, media status or global review fields modified.",
+      "Representability is a source-grounded engineering proposal. Geometry and rendered technique remain unapproved until exact implementation reviewed.",
+      "Legacy intentionally_unsuitable decisions are prototype format limits, except no single BJJ rep is defined. No blanket permanent exclusion applied to hard movements."
+    ],
+    "migration_hashes": {
+      "packages/core-db/src/schema/001_mechanical_input.sql": "ed47cecf5e94e21f2b4fd51dc19bf62e96ddfd2e6932a26f6f4795198bdc2818",
+      "packages/core-db/src/schema/002_telemetry.sql": "efc257a416d6dd98ac530269eeb6071cd6cc91fa2921cbaf3b8b5123ac589e85",
+      "packages/core-db/src/schema/003_state_vector.sql": "341b34b131a794a1345cc6b9ee6d49eb228410b8c0d13052a2b98fa58dacb733",
+      "packages/core-db/src/schema/005_subjective_report.sql": "bbd0e0d627dcd38946621835dadcccdcac8000fe78c43a8e288cb4a0e07e7b35",
+      "packages/core-db/src/schema/006_user_profile.sql": "8b1340d7e7c5da48fd21b20f3c7ba722301fc82cc8f7104e202b6f94cae81b74",
+      "packages/core-db/src/schema/007_program_engine.sql": "aabd5992b75d4eafac07fa560c99f032ad096b47b0731517ca076f695fb92a1a",
+      "packages/core-db/src/schema/008_taxonomy.sql": "68f3c395417679c05e1e08b834b4e931ded5d5f4b4720b0764537433a7959496",
+      "packages/core-db/src/schema/009_periodization.sql": "710a0680662941afeaf176003e97d80271951801a5554e5c9db39be63da74627",
+      "packages/core-db/src/schema/010_movement_library.sql": "f0161f239ef322219a79769baaafd8e211772a0fa2d9b52073b66d1618c73dba",
+      "packages/core-db/src/schema/011_niggle_tracking.sql": "68b50bc981754687066e87cf076340de3c07715e3817ec23c9a751f73a8c649f",
+      "packages/core-db/src/schema/012_report_severity.sql": "57099ce769915b5db0b11f1959c7034ec4bcc2707eb9336285c319f1e55254e3",
+      "packages/core-db/src/schema/013_profile_slot.sql": "10f47993b6b1f574054b4d3f99482359124aff2a343261d616f0cbac457dfbf7",
+      "packages/core-db/src/schema/014_movement_prefixes.sql": "d9fad2179e5eb8a1b8162e5b2afbf1fffc485dc6ff89b7e071322aa1ad93c728",
+      "packages/core-db/src/schema/015_set_prefix.sql": "c397883758dbe5c8b517f726b546443664203e031285db15256ed19128f57ac6",
+      "packages/core-db/src/schema/016_movement_library_seed.sql": "2b595f9474143febc9291fde4ae3eb8baaa5a537d4eafb79c54ae056f13c6328",
+      "packages/core-db/src/schema/017_movement_batch.sql": "7c09a62ffa2e96895d8f4fb04a67d5ce2c55a1b677637a034bbe442599fa13fc",
+      "packages/core-db/src/schema/018_logging_modes.sql": "807d5f9084b84106362ee84b095f78955103b541ed307dcf409adee1678134ed",
+      "packages/core-db/src/schema/019_movement_batch.sql": "2845f0fbec078de1be2aa51e57d9acb6206994dff72aa79d41eebed8e186dc57",
+      "packages/core-db/src/schema/020_movement_batch.sql": "799ea6f56808503ecb1c987f6cf2e31b55882460ca6b56ad03997bd3ff3c8252",
+      "packages/core-db/src/schema/021_taxonomy_corrections.sql": "f7dcd61d74ffdbd3dc5015909a2f85d44297c67a603279c75408e2122a69fdb3",
+      "packages/core-db/src/schema/022_set_target.sql": "c7aab1372d8406620ecb3c8f95a3313c7578a23e9cfeb81f3bd124253f3f41d5",
+      "packages/core-db/src/schema/023_phase17_session_foundation.sql": "de42af48c58a8b90ed981976ec7984baa988f0fd9d1e16c0451d600681572b4b",
+      "packages/core-db/src/schema/024_phase17_equipment_fixes.sql": "09750fc1dfa3caf6062c55fb5c1e64b04e7121f706100795931a03e858c41e96",
+      "packages/core-db/src/schema/025_movement_coaching_content.sql": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d",
+      "packages/core-db/src/schema/026_phase18_session_outcome.sql": "57d6b9b2ae95422afa0e9e1c61375adbff0945ecca01ac44c8328bca9b066542",
+      "packages/core-db/src/schema/027_operational_safeguards.sql": "3fff0fdb7c120d91ea177e37bd22f681bc5d7f24a6fa983f402e8a5d11ef108b",
+      "packages/core-db/src/schema/028_capability_graph.sql": "0d55ef1a5aeb55f9e977416c48a9f2538aef09897da94c32004138728fe08b75",
+      "packages/core-db/src/schema/029_routine_history_analytics.sql": "bb0172e41fb1e59a021953de70b0aa6a56a85d7a4b5edf4d1fcf9a238af4295e",
+      "packages/core-db/src/schema/030_readiness_import_integration.sql": "9ec9d84359cffab0faed03313d044c94b1acf7a59ab0058409799f705f773b02",
+      "packages/core-db/src/schema/031_planned_session_method.sql": "88197d48aa5140c4be61c8ba4680490eb8a74740dfcdd8d5089538f8ffe35779",
+      "packages/core-db/src/schema/032_capability_content.sql": "999bd9d1c436b1b13d81cec2a354d5e8afedc3854125d3eed226cba2e804e0c6",
+      "packages/core-db/src/schema/033_goal_program.sql": "ba5f4b7c3e05e845e48f20c52e4154e31ed7f624d1795f2a6ec294a51c038226",
+      "packages/core-db/src/schema/034_autopilot_attribution.sql": "0cb250e3158f7e7fe3c7dffc039b561edbb28491ffc6bc9c41148bd2ac13e500",
+      "packages/core-db/src/schema/035_profile_load_preference.sql": "07c2c0849fea9b3a2945f18f17b90c6bdf6fc655ee98544e7803d07edc5024c8",
+      "packages/core-db/src/schema/036_movement_media.sql": "3737214a6e806c1c66ce937da8167f265d492135ed51ddde7a2b6f97c593e6e2",
+      "packages/core-db/src/schema/037_movement_library_v2_batch.sql": "3b1bc496265d69284d18d88e175b254f71e9cd1cc869842bc813de8bb426d9d1",
+      "packages/core-db/src/schema/038_movement_library_v2_batch.sql": "9ad7c0ba7984e5838cd2abf78a6e0fdd13e4bec51da20cf4bca55db162e8c347",
+      "packages/core-db/src/schema/039_movement_library_v2_batch.sql": "b802c039c0a110d68d61f4fbb87f0df958c5c21bc19e78d0a234dc9a4e3ba983",
+      "packages/core-db/src/schema/040_movement_library_v2_batch.sql": "b36d8ecdc99234fc44db848da28725595cbc3e17abe17aaee8f52aa4a687539a",
+      "packages/core-db/src/schema/041_movement_library_v2_batch.sql": "f711dda0d0c4d69a2c7a6ca4f425f3ed40adb83ffc2c977c1a164c929858d76f",
+      "packages/core-db/src/schema/042_movement_library_v2_batch.sql": "57f9d16c875d934854f37d8739a8325d3525887550daaeccf189e168d1d6cbec",
+      "packages/core-db/src/schema/043_movement_library_v2_batch.sql": "cf1ca39f721d75c6991bafca26a92928d914366b98736df1dddcf537960e5d68",
+      "packages/core-db/src/schema/044_movement_library_v2_batch.sql": "7569e43e22957eb9ca3b0538825a17275d36321ab1f72cb67ec45c91d5365e1b",
+      "packages/core-db/src/schema/045_movement_library_v2_batch.sql": "7d453c939d8eee8f90fab08047a400e7d02d0f4d2a77d6432ab1ed84145354b1",
+      "packages/core-db/src/schema/046_movement_library_v2_batch.sql": "71f4cf40c7990aa84bb7f865ea924f73fbe2492f440698ff21db33458c81f6af",
+      "packages/core-db/src/schema/047_movement_library_v2_batch.sql": "c47f748b3ee0f3ef82b4f56334ec66b4463373ef4ed8594fe2ee56ecf6172551",
+      "packages/core-db/src/schema/048_movement_library_v2_batch.sql": "fb8fb05e083bd9fb95c252d389825a003e8693ae55c81f011dd57cac56ed83eb",
+      "packages/core-db/src/schema/049_movement_content_correction_v1.sql": "467950bc651fbf84fbb5dded0d99ad9797437431ddb718442cc573fc50042d68",
+      "packages/core-db/src/schema/050_movement_role_convergence.sql": "2a58ba551d56fc657e1f61577259f3e5eb7deda64ac34b32d383828854e71525",
+      "packages/core-db/src/schema/051_routine_access_context.sql": "117e896bc76cdd0641a76136e774b8ebd8683a2c3070fc8388ed8c13764077d2",
+      "packages/core-db/src/schema/052_bounded_microcycle_roles.sql": "2d86d7ac94d6f2f75ecbdd1dc19b4a515386d94d024b01239ceef9549791e756",
+      "packages/core-db/src/schema/053_routine_role_compatibility.sql": "5e2a522f9f2450a890ef97366a44be70aaf90b2dc5380630d51b5e5cac4bceb5",
+      "packages/core-db/src/schema/054_contract_cutoff_provenance.sql": "b0f1d00cd350c9307cbd9a40a343defcb60a1ed74129f70069ff0b6443ab70c0",
+      "packages/core-db/src/schema/055_return_checkin_ack.sql": "476f3ab5d8fc0c43276873e747c4d7975b3793f0f0077669d98d4df299a3f917",
+      "packages/core-db/src/schema/056_movement_taxonomy_backfill.sql": "2cb64589db95f66d6203fe2b0a1233d50d601dc1a782b2f5ba8ddc3d02e6ae19",
+      "packages/core-db/src/schema/057_block_meta_phase_invariant.sql": "33476b2f0404cd3e5c46ba1f0beb6309726a8cc2de81944f67f6e7ea1bc65c3d",
+      "packages/core-db/src/schema/058_suspension_episode.sql": "a91a4c146245e70ee8182c456483bcd94c1f0c34ac4d172c8a1486c99bc3fdca",
+      "packages/core-db/src/schema/059_suspension_state_and_load_intent.sql": "03fbd37fe1498c0f706e28e87a8b6e7271bc5c541babe3d2706ee69a8619c330",
+      "packages/core-db/src/schema/060_program_goal_tier_alignment.sql": "9c1a3d5ee10669538e12eff12d43f6fb62613e177d29c15bcdda9d96254a8313",
+      "packages/core-db/src/schema/061_autopilot_attribution_convergence.sql": "e8fa5e9efd3b77189cd59933575105aada0a4a79b3ad008c010dcc4379822f07",
+      "packages/core-db/src/schema/062_suspension_sidecar_immutability.sql": "b84d7d71aad57ea0754d6d5b44eac8c44d1f343b9d631e6e5af8621ffcf2de5c",
+      "packages/core-db/src/schema/063_movement_load_intent.sql": "8d4ebf9c9f36d735e763b449a702d1216a6a918b4933c1f4d8d3196688025a2c",
+      "packages/core-db/src/schema/064_accessible_coach_support.sql": "b141b149717fb2f26f585a67239fea05ab03220ab040d5d86500cf8c38022a8a",
+      "packages/core-db/src/schema/065_session_preparation.sql": "d04f4e30a886ec353a6ffc56bb3bbf929bb92f71eef183945b09c46c5422932d",
+      "packages/core-db/src/schema/066_focus_and_goals.sql": "52e16facdf5fe7d3e02b797b3b49d1bc430c79ca24e2a20cb836e09474aae5de",
+      "packages/core-db/src/schema/067_sport_and_emphasis.sql": "c9a2e33d12e0ee7fb43f7d1eb1d644881b91945a0dc14f591c7f56a4a37337ca",
+      "packages/core-db/src/schema/068_movement_content_correction_v2.sql": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+    },
+    "legacy_inputs": {
+      "manifest_sha256": "10ef1c176426cc8d50a2f1d83abef4b1baca57212b8afb84e8feb9ce0e723bdd",
+      "preview_index_sha256": "314e9898ffd8d95deecc0c35c830388d2c0894f571a3c2d5b2ecd0ed755e6cf1"
+    },
+    "prior_independent_audit": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\MOVEMENT_TECHNIQUE_AUDIT.md"
+  },
+  "source_map": "ALL_300_MOTION_MAP.json:movements indexed by id",
+  "first_and_beginner_batches": [
+    {
+      "batch": "R0-head-supported-raise",
+      "ids": [
+        143
+      ],
+      "acceptance_focus": "Independent fixed-elbow lateral arc and real forehead contact; regression110."
+    },
+    {
+      "batch": "R1-scapular-shrug",
+      "ids": [
+        82
+      ],
+      "acceptance_focus": "Straight arms, quiet legs/pelvis and >=1000ms top hold; regression53/138/163."
+    },
+    {
+      "batch": "R2-preacher-return",
+      "ids": [
+        92,
+        158,
+        253
+      ],
+      "acceptance_focus": "Full long-arm return, supported upper arms, correct implement/grip and slower controlled lowering;253 source setup confirmation before final signoff."
+    },
+    {
+      "batch": "B1-high-pulley-pushdown",
+      "ids": [
+        80,
+        262,
+        292
+      ],
+      "acceptance_focus": "Three grip/rope variants with identical supported-upper-arm principle and distinct equipment details."
+    },
+    {
+      "batch": "B1b-straight-arm-pulldown",
+      "ids": [
+        264
+      ],
+      "acceptance_focus": "Separate shoulder arc with straight elbows and actual high-cable rope, not an elbow pushdown alias."
+    },
+    {
+      "batch": "B2-bench-flyes",
+      "ids": [
+        49,
+        178,
+        220
+      ],
+      "acceptance_focus": "Three support angles, fixed elbow arcs and correct leg/head/feet contacts."
+    },
+    {
+      "batch": "B3a-lunge-and-kickback",
+      "ids": [
+        52,
+        84
+      ],
+      "acceptance_focus": "Reverse step/return and low-cuff hip extension are reviewed individually with distinct floor/anchor contacts."
+    },
+    {
+      "batch": "B3b-fixed-bar-body-motion",
+      "ids": [
+        66,
+        152
+      ],
+      "acceptance_focus": "Chest-to-bar row versus elbow-only body triceps press: same fixed bar principle, distinct source arm/trunk paths."
+    },
+    {
+      "batch": "B4-shoulder-raise",
+      "ids": [
+        50,
+        87,
+        206,
+        207,
+        236
+      ],
+      "acceptance_focus": "Front versus lateral, cable/band/DB and reclined support; preserve50 three-second return and207 locked elbows."
+    },
+    {
+      "batch": "B5-supported-rear-raise",
+      "ids": [
+        131,
+        162,
+        261
+      ],
+      "acceptance_focus": "Standing band anchor, seated crossed cable and chest-supported incline are distinct physical variants."
+    },
+    {
+      "batch": "B6-triceps-support",
+      "ids": [
+        155,
+        156,
+        179,
+        180,
+        237
+      ],
+      "acceptance_focus": "Five exact support/anchor/grip cases; isolate elbow action from shoulder arc."
+    },
+    {
+      "batch": "B7-supported-curls",
+      "ids": [
+        171,
+        219,
+        221,
+        276
+      ],
+      "acceptance_focus": "Thigh, reclined bench and preacher pad contacts; grips visibly distinct."
+    },
+    {
+      "batch": "B8-foot-floor-trunk",
+      "ids": [
+        37,
+        89,
+        150,
+        182
+      ],
+      "acceptance_focus": "Bench dip, low prone extension, pelvic raise and feet-elevated push-up each retain actual contact."
+    },
+    {
+      "batch": "B9-articulated-trunk",
+      "ids": [
+        72,
+        95,
+        99,
+        124,
+        181,
+        183,
+        232,
+        248,
+        285
+      ],
+      "acceptance_focus": "Spinal/pelvic flexion and rotation must be physically shown; arm/leg-only or rigid-torso aliases fail."
+    },
+    {
+      "batch": "B10-wrist-detail",
+      "ids": [
+        164,
+        268,
+        269
+      ],
+      "acceptance_focus": "Requires real wrist articulation and grip close-up; not full forearm movement."
+    },
+    {
+      "batch": "B11-rotation-and-upright",
+      "ids": [
+        139,
+        160,
+        272,
+        295,
+        297
+      ],
+      "acceptance_focus": "Lateral load shift/ball rotation and shoulder elevation paths need front/oblique evidence; source tilt and high upright endpoints independently reviewed."
+    },
+    {
+      "batch": "B12-source-resolution",
+      "ids": [
+        154,
+        200,
+        279
+      ],
+      "acceptance_focus": "Resolve contradictory/underspecified source, then author, with no approval from name inference."
+    }
+  ],
+  "remaining_117_non_beginner_missing_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    8,
+    13,
+    18,
+    23,
+    31,
+    33,
+    35,
+    36,
+    38,
+    41,
+    43,
+    45,
+    46,
+    47,
+    48,
+    56,
+    58,
+    61,
+    63,
+    64,
+    65,
+    67,
+    69,
+    71,
+    77,
+    78,
+    79,
+    81,
+    83,
+    85,
+    91,
+    93,
+    94,
+    96,
+    98,
+    101,
+    102,
+    104,
+    105,
+    107,
+    108,
+    109,
+    112,
+    119,
+    120,
+    121,
+    123,
+    129,
+    130,
+    136,
+    137,
+    140,
+    145,
+    148,
+    149,
+    151,
+    153,
+    165,
+    166,
+    170,
+    176,
+    177,
+    184,
+    188,
+    189,
+    190,
+    192,
+    194,
+    195,
+    201,
+    202,
+    203,
+    204,
+    205,
+    208,
+    209,
+    210,
+    211,
+    213,
+    215,
+    217,
+    228,
+    229,
+    230,
+    231,
+    233,
+    235,
+    239,
+    240,
+    241,
+    242,
+    243,
+    244,
+    249,
+    250,
+    252,
+    256,
+    257,
+    258,
+    259,
+    265,
+    271,
+    275,
+    277,
+    281,
+    288,
+    289,
+    290,
+    293,
+    296,
+    299
+  ],
+  "missing_169_by_family": [
+    {
+      "family_id": "back-rack-squat",
+      "ids": [
+        1,
+        123,
+        277,
+        299
+      ],
+      "review_views": "side plus front stance inset",
+      "constraints": "Fixed feet; bar on upper back; knees and hips flex together. Preserve stance/depth and ground-band anchors per ID."
+    },
+    {
+      "family_id": "front-rack-squat",
+      "ids": [
+        8,
+        208
+      ],
+      "review_views": "side plus front rack inset",
+      "constraints": "Front shoulder contact and high elbows remain stable; full-foot squat and stand."
+    },
+    {
+      "family_id": "front-rack-bench-squat",
+      "ids": [
+        205
+      ],
+      "review_views": "side",
+      "constraints": "Front rack and bench contact need an explicit touch versus seated-pause decision before authoring."
+    },
+    {
+      "family_id": "goblet-squat",
+      "ids": [
+        48
+      ],
+      "review_views": "side plus front load inset",
+      "constraints": "Foot pressure fixed; load stays at the source location: single goblet, two rack kettlebells, two side dumbbells, or low central load. Do not interchange them."
+    },
+    {
+      "family_id": "box-squat",
+      "ids": [
+        38,
+        153,
+        256,
+        275
+      ],
+      "review_views": "side plus anchor inset",
+      "constraints": "Box contact is deliberate seated pause, trunk stays braced. Bands must attach to actual ground/top anchors; 275 needs fast ascent and controlled descent."
+    },
+    {
+      "family_id": "bench-touch-squat",
+      "ids": [
+        140,
+        192
+      ],
+      "review_views": "side",
+      "constraints": "Touch bench lightly and reverse without resting; distinguish from box squat."
+    },
+    {
+      "family_id": "kneeling-hip-squat",
+      "ids": [
+        235
+      ],
+      "review_views": "side",
+      "constraints": "Knees remain planted; hips sit toward heels and extend to tall kneeling; no standing knee squat."
+    },
+    {
+      "family_id": "zercher-squat",
+      "ids": [
+        81
+      ],
+      "review_views": "side plus front load inset",
+      "constraints": "Bar contacts elbow crooks; preserve front load and prevent bar rolling."
+    },
+    {
+      "family_id": "jefferson-straddle-squat",
+      "ids": [
+        120
+      ],
+      "review_views": "oblique plus front",
+      "constraints": "Bar travels between legs with hands in front/behind and source stance; change orientation between sets, not every rep."
+    },
+    {
+      "family_id": "pistol-squat",
+      "ids": [
+        67
+      ],
+      "review_views": "side plus front balance inset",
+      "constraints": "One foot stays planted; free leg stays in front and clears ground; kettlebell at chest. Owned depth without free-foot support."
+    },
+    {
+      "family_id": "split-squat",
+      "ids": [
+        18
+      ],
+      "review_views": "side plus front",
+      "constraints": "Front foot fixed; rear toes on floor for 54 and rear foot on bench for 18. Preserve each support contact."
+    },
+    {
+      "family_id": "forward-lunge-return",
+      "ids": [
+        136
+      ],
+      "review_views": "side plus front",
+      "constraints": "Step forward, descend, push back to original stance. Source determines side order; 136 completes one side before switching."
+    },
+    {
+      "family_id": "reverse-lunge",
+      "ids": [
+        52,
+        194
+      ],
+      "review_views": "side plus front",
+      "constraints": "Step backward then return. 194 begins on low platform and rear foot steps off; cannot reuse level-floor contacts unchanged."
+    },
+    {
+      "family_id": "lateral-split-squat",
+      "ids": [
+        139
+      ],
+      "review_views": "front plus side",
+      "constraints": "Fixed wide stance, weight shifts laterally to bending lead knee; trailing leg remains long with slight bend."
+    },
+    {
+      "family_id": "step-up",
+      "ids": [
+        36,
+        56
+      ],
+      "review_views": "side plus front",
+      "constraints": "Lead foot stays fully on stable box; floor foot does not jump. 286 adds explicit free-knee raise, others finish ordinary stand."
+    },
+    {
+      "family_id": "lunge-hand-pass",
+      "ids": [
+        239
+      ],
+      "review_views": "oblique staged",
+      "constraints": "Lunge with contralateral lead leg; kettlebell passes under front thigh to the other hand, then return and alternate. Show continuous handoff without teleporting."
+    },
+    {
+      "family_id": "floor-deadlift",
+      "ids": [
+        2,
+        46,
+        176,
+        257
+      ],
+      "review_views": "side plus front anchor inset",
+      "constraints": "Bar starts on floor; arms remain long, bar close to legs, hips/knees extend together. 46 has raised feet; band direction differs in 176/257."
+    },
+    {
+      "family_id": "sumo-floor-deadlift",
+      "ids": [
+        78,
+        258,
+        290
+      ],
+      "review_views": "front plus side",
+      "constraints": "Wide feet, knees out, arms inside legs, close floor pull. 258 bands above; 290 short bands under feet."
+    },
+    {
+      "family_id": "behind-leg-hack-squat",
+      "ids": [
+        98
+      ],
+      "review_views": "side plus rear grip inset",
+      "constraints": "Bar begins behind calves and remains behind legs; do not depict conventional deadlift bar in front."
+    },
+    {
+      "family_id": "front-load-hip-hinge",
+      "ids": [
+        288
+      ],
+      "review_views": "side",
+      "constraints": "Soft knees remain at chosen angle, hips travel back with long trunk, front load close to legs. Preserve individual owned endpoint."
+    },
+    {
+      "family_id": "back-rack-good-morning",
+      "ids": [
+        61
+      ],
+      "review_views": "side plus anchor inset",
+      "constraints": "Hip hinge with bar on upper back or band at source shoulder/feet attachment; do not turn it into front-loaded deadlift."
+    },
+    {
+      "family_id": "pin-start-good-morning",
+      "ids": [
+        210
+      ],
+      "review_views": "side",
+      "constraints": "Bar initially rests on pins at stomach height with torso near horizontal; extend hips, return bar to pins and settle."
+    },
+    {
+      "family_id": "seated-good-morning",
+      "ids": [
+        271
+      ],
+      "review_views": "side",
+      "constraints": "Seat contact and feet remain fixed; hinge torso toward preset pins, pause just above rather than rest on them, return upright."
+    },
+    {
+      "family_id": "single-leg-hinge",
+      "ids": [
+        94
+      ],
+      "review_views": "side plus front balance inset",
+      "constraints": "Stance foot fixed, opposite-hand kettlebell hangs under shoulder; free leg extends backward, hips remain square."
+    },
+    {
+      "family_id": "ankle-cable-kickback",
+      "ids": [
+        84
+      ],
+      "review_views": "side plus front anchor",
+      "constraints": "Ankle cuff at low pulley, free hand supports balance; small working-leg hip extension with fixed pelvis/torso and controlled return."
+    },
+    {
+      "family_id": "kettlebell-swing",
+      "ids": [
+        250
+      ],
+      "review_views": "side",
+      "constraints": "Ballistic hip hinge; relaxed long arms follow bell. Source must specify grip, bell arc and endpoint; no slow squat/front raise alias."
+    },
+    {
+      "family_id": "bench-hip-thrust",
+      "ids": [
+        35
+      ],
+      "review_views": "side",
+      "constraints": "Upper back stays on bench; padded bar on hips; planted feet; hips extend to shoulders/knees level without lumbar overextension."
+    },
+    {
+      "family_id": "nordic-lower-hand-assisted",
+      "ids": [
+        23,
+        202
+      ],
+      "review_views": "side",
+      "constraints": "Knees padded, ankles secured; hips remain straight; body lowers as one lever from knees. Hands catch floor and visibly assist return."
+    },
+    {
+      "family_id": "nordic-band-assisted",
+      "ids": [
+        244
+      ],
+      "review_views": "side plus band anchor inset",
+      "constraints": "Secured ankles and fixed knee support; straight hips lower then return with a visible band assisting reversal. Resolve attachment and assistance vector."
+    },
+    {
+      "family_id": "ankle-raise-standing",
+      "ids": [
+        96,
+        165
+      ],
+      "review_views": "side plus foot inset",
+      "constraints": "Forefoot stays on support and heel moves via ankle; quiet knees/hips, top pause, controlled heel return. 165 support on versus load in hands remains unresolved."
+    },
+    {
+      "family_id": "flat-bench-press",
+      "ids": [
+        3,
+        43
+      ],
+      "review_views": "side plus front grip inset",
+      "constraints": "Supported upper back/feet; elbows bend and extend with load on intended press path. Preserve grip, single/bilateral load, touch point, and bands; 3 includes competition pause."
+    },
+    {
+      "family_id": "decline-bench-press",
+      "ids": [
+        45,
+        102
+      ],
+      "review_views": "side plus front grip inset",
+      "constraints": "Legs secured on decline bench; lower to source low-chest point and press; do not reuse flat bench angle."
+    },
+    {
+      "family_id": "incline-bench-press",
+      "ids": [
+        65
+      ],
+      "review_views": "side plus front grip inset",
+      "constraints": "Incline bench/head/feet support; loaded press with source angle, grip and shoulder/elbow path. 212/218 source identity currently duplicates."
+    },
+    {
+      "family_id": "floor-press",
+      "ids": [
+        203,
+        249
+      ],
+      "review_views": "side plus front grip inset",
+      "constraints": "Upper arms contact floor at bottom and pause as sourced; stable shoulders/hips. 128 alternating, 249 single kettlebell; 196 extended range is unresolved."
+    },
+    {
+      "family_id": "board-press",
+      "ids": [
+        151
+      ],
+      "review_views": "side plus front board inset",
+      "constraints": "Secured boards visibly sit on chest; bar touches board surface and pauses, then press. Board cannot be a floating marker."
+    },
+    {
+      "family_id": "pin-bench-press",
+      "ids": [
+        252
+      ],
+      "review_views": "side plus front rack inset",
+      "constraints": "Bar starts and finishes resting on actual rack pins at chosen height; full pause each rep; chest need not be touched."
+    },
+    {
+      "family_id": "press-extension-combination",
+      "ids": [
+        177
+      ],
+      "review_views": "side plus front elbow inset",
+      "constraints": "Each ID has a distinct staged elbow/shoulder sequence; 177 explicitly alternates a full decline press and skull-crusher. Do not collapse into ordinary bench press."
+    },
+    {
+      "family_id": "standing-cable-chest-press",
+      "ids": [
+        83,
+        279
+      ],
+      "review_views": "side plus front anchor inset",
+      "constraints": "Chest-height pulleys behind athlete; stable staggered stance and forward press; source 279 lacks this actual setup and conflicts with standing support."
+    },
+    {
+      "family_id": "push-up-floor",
+      "ids": [
+        170
+      ],
+      "review_views": "side plus front hand inset",
+      "constraints": "Rigid trunk, fixed hands/toes, chest lowers and elbows extend; 170 hands on end-standing dumbbell must show exact contact and stable base."
+    },
+    {
+      "family_id": "feet-elevated-push-up",
+      "ids": [
+        182
+      ],
+      "review_views": "side plus front",
+      "constraints": "Feet on bench, hands on floor; preserve both contacts and rigid trunk through full return."
+    },
+    {
+      "family_id": "pike-push-up",
+      "ids": [
+        69
+      ],
+      "review_views": "side plus front",
+      "constraints": "High hips form inverted V; head lowers just ahead of hands; do not drift into horizontal push-up."
+    },
+    {
+      "family_id": "wall-handstand-press",
+      "ids": [
+        63
+      ],
+      "review_views": "side plus front contact inset",
+      "constraints": "Hands floor, feet wall, head pad contact at bottom; overhead elbow extension with inverted body. Stage entry/exit separately."
+    },
+    {
+      "family_id": "wall-handstand-eccentric",
+      "ids": [
+        58
+      ],
+      "review_views": "side staged",
+      "constraints": "Controlled up-to-five-second descent to pad, then explicit rehearsed side exit and reset; no invented unassisted concentric return."
+    },
+    {
+      "family_id": "push-up-clock-travel",
+      "ids": [
+        166
+      ],
+      "review_views": "oblique staged/contact views",
+      "constraints": "Hands leave floor during push; short lateral step and slight body turn; land softly, reset line, traverse full circle. Requires ballistic contact phases."
+    },
+    {
+      "family_id": "parallel-bar-dip",
+      "ids": [
+        47
+      ],
+      "review_views": "side plus front",
+      "constraints": "Hands on two parallel bars, feet suspended; elbow flex to upper arms parallel and extend; no bench support alias."
+    },
+    {
+      "family_id": "bench-dip",
+      "ids": [
+        37
+      ],
+      "review_views": "side",
+      "constraints": "Hands on bench edge behind body, bent knees/floor feet; hips clear edge, elbows back, owned shoulder range and return."
+    },
+    {
+      "family_id": "fixed-bar-triceps-press",
+      "ids": [
+        152
+      ],
+      "review_views": "side",
+      "constraints": "Hands grip fixed chest-height rack bar; feet back; rigid trunk moves toward bar as elbows bend, extends away; shoulders remain stable."
+    },
+    {
+      "family_id": "overhead-press-standing",
+      "ids": [
+        4,
+        31,
+        41,
+        129,
+        189,
+        228,
+        230
+      ],
+      "review_views": "side plus front grip/anchor inset",
+      "constraints": "Braced standing or explicitly labelled seated source variant; load begins at shoulder and finishes overhead with long elbow. Rotation, bilateral/alternate/seesaw timing and pulley anchors are per ID."
+    },
+    {
+      "family_id": "overhead-press-seated",
+      "ids": [
+        229
+      ],
+      "review_views": "side plus front",
+      "constraints": "Seat/floor support and planted feet or wide floor legs fixed; source rack-to-overhead path and grip preserved. 229 is floor seated, not bench seated."
+    },
+    {
+      "family_id": "kettlebell-push-press",
+      "ids": [
+        85
+      ],
+      "review_views": "side plus front staged",
+      "constraints": "Short vertical dip, leg/hip drive, then overhead elbow lockout; rack reset before next rep. Do not replace with strict press."
+    },
+    {
+      "family_id": "overhead-loaded-squat",
+      "ids": [
+        105
+      ],
+      "review_views": "side plus front balance inset",
+      "constraints": "Locked overhead arm and bell remain stacked as legs squat; other arm forward, whole foot remains planted."
+    },
+    {
+      "family_id": "cuban-rotation-press",
+      "ids": [
+        101
+      ],
+      "review_views": "front plus side staged",
+      "constraints": "Elbows out at shoulder height, external-rotate forearms upward, then press; reverse distinct stages. Grip/axial rotation needs visible detail."
+    },
+    {
+      "family_id": "bent-press",
+      "ids": [
+        112
+      ],
+      "review_views": "oblique staged",
+      "constraints": "Bell stays positioned above while torso moves under, hips shift and elbow becomes long; stand under locked arm. Not a simple shoulder press."
+    },
+    {
+      "family_id": "pull-up",
+      "ids": [
+        6,
+        13,
+        71
+      ],
+      "review_views": "front plus side",
+      "constraints": "Fixed overhead hand grips, quiet full hang and source upper-chest/chin endpoint, controlled full return. 6 requires secured external load attachment."
+    },
+    {
+      "family_id": "chin-up-knee-crunch",
+      "ids": [
+        211
+      ],
+      "review_views": "front plus side staged",
+      "constraints": "Underhand pull and bent-knee crunch occur together; nose to bar/knees to chest, return full hang with knees still bent."
+    },
+    {
+      "family_id": "lat-pulldown",
+      "ids": [
+        108
+      ],
+      "review_views": "front plus side",
+      "constraints": "Thigh pads/seat/feet fixed; source handle/grip and high cable; elbows pull down/back then arms regain full overhead reach."
+    },
+    {
+      "family_id": "crossed-cable-pulldown",
+      "ids": [
+        209
+      ],
+      "review_views": "front plus side grip inset",
+      "constraints": "Opposite high handles cross overhead, sweep down while palms turn toward each other; full crossed return, not V-bar alias."
+    },
+    {
+      "family_id": "seated-cable-row",
+      "ids": [
+        195
+      ],
+      "review_views": "side plus front",
+      "constraints": "Feet braced, knees soft, upright quiet torso; low pulley to stomach, full arm reach. 195 seat platform must be shown."
+    },
+    {
+      "family_id": "bent-over-row",
+      "ids": [
+        5,
+        104,
+        107,
+        145,
+        293
+      ],
+      "review_views": "side plus front grip/anchor",
+      "constraints": "Quiet hinged torso; arms pull elbows back then regain long reach; implement, supinated/neutral grip and landmine pivot are explicit per-ID source requirements."
+    },
+    {
+      "family_id": "straddled-landmine-row",
+      "ids": [
+        79
+      ],
+      "review_views": "side plus front pivot",
+      "constraints": "Bar pivots from anchored landmine under straddled stance; fixed hinge and neutral handle pulls plates toward chest, long-arm floating-plate return."
+    },
+    {
+      "family_id": "alternating-floor-kettlebell-row",
+      "ids": [
+        130
+      ],
+      "review_views": "side plus front contact",
+      "constraints": "Hinged body, non-rowing kettlebell/hand contacts floor; row one bell and return it before other starts. Do not depict both as floating."
+    },
+    {
+      "family_id": "inverted-row",
+      "ids": [
+        66
+      ],
+      "review_views": "side plus front",
+      "constraints": "Hands fixed to hip-height bar, heels floor and trunk rigid; chest moves to bar then arms lengthen."
+    },
+    {
+      "family_id": "renegade-row",
+      "ids": [
+        93
+      ],
+      "review_views": "side plus front contact",
+      "constraints": "Wide-foot plank with one hand on stable dumbbell; alternate rowing arm to ribs, return load to floor; hips never twist."
+    },
+    {
+      "family_id": "standing-anchored-reverse-flye",
+      "ids": [
+        131
+      ],
+      "review_views": "front plus side anchor",
+      "constraints": "Arms long with fixed soft elbow; sweep horizontally apart toward shoulder plane from front handles. 131 standing band anchor is source-specific."
+    },
+    {
+      "family_id": "chest-supported-rear-raise",
+      "ids": [
+        188,
+        241,
+        261
+      ],
+      "review_views": "front plus side contact",
+      "constraints": "Chest supported on shallow incline (188), flat bench (241), or incline (261); fixed soft elbow, lateral arm arc to source parallel endpoint; 188/241 one-second hold."
+    },
+    {
+      "family_id": "seated-bent-rear-raise",
+      "ids": [
+        162,
+        265
+      ],
+      "review_views": "front plus side contact",
+      "constraints": "Seated forward hinge fixed; lateral sweep with soft elbow. 162 crossed low cable handles; 265 dumbbells start behind calves."
+    },
+    {
+      "family_id": "lateral-raise",
+      "ids": [
+        50,
+        236,
+        272
+      ],
+      "review_views": "front plus side",
+      "constraints": "Fixed soft elbow and quiet trunk; arms lift laterally to sourced shoulder endpoint. 236 bands under feet, 272 seated and current tilt cue needs technique review."
+    },
+    {
+      "family_id": "front-raise-standing",
+      "ids": [
+        87,
+        206
+      ],
+      "review_views": "side plus front",
+      "constraints": "Quiet standing trunk; soft fixed elbow, arm(s) in front to source shoulder endpoint. 206 one-arm low cable from behind, not dumbbell alias."
+    },
+    {
+      "family_id": "upright-row",
+      "ids": [
+        295,
+        296,
+        297
+      ],
+      "review_views": "front plus side shoulder/grip inset",
+      "constraints": "Hands/implement stay close to torso, elbows lead upward above hands toward source high endpoint. Bar versus low cable versus foot-anchored bands require different vectors and independent shoulder-ROM review."
+    },
+    {
+      "family_id": "front-raise-reclined",
+      "ids": [
+        207
+      ],
+      "review_views": "side plus front",
+      "constraints": "Supine/reclined bench 30–60 degrees, head supported; elbows straight, palms down, front arm raise slightly above shoulder level. Different from held prone 135/187."
+    },
+    {
+      "family_id": "prone-scapular-retraction",
+      "ids": [
+        243
+      ],
+      "review_views": "front plus side shoulder inset",
+      "constraints": "Chest on incline bench and elbows long; shoulder blades retract together then return. Do not turn into a curl, row or arm raise."
+    },
+    {
+      "family_id": "standing-curl",
+      "ids": [
+        184,
+        281
+      ],
+      "review_views": "front plus side grip inset",
+      "constraints": "Elbow flex/extend with quiet upper arms, except 184 drag curl elbows intentionally move backward with bar touching torso. Preserve underhand/overhand/neutral/alternate/cross-body grips."
+    },
+    {
+      "family_id": "zottman-curl",
+      "ids": [
+        109
+      ],
+      "review_views": "front plus side hand inset",
+      "constraints": "Supinated ascent, explicit pronation at top, pronated descent and bottom reset; not same grip throughout."
+    },
+    {
+      "family_id": "preacher-curl",
+      "ids": [
+        259,
+        276
+      ],
+      "review_views": "front plus side pad contact",
+      "constraints": "Upper arms fixed on pad, full natural long-arm start/return, shoulder quiet. Grip and cable/DB/bar distinct; 276 chest/stomach on angled side of preacher bench."
+    },
+    {
+      "family_id": "concentration-curl",
+      "ids": [
+        171
+      ],
+      "review_views": "side plus front contact",
+      "constraints": "Seated wide feet, back of upper arm on inner thigh; isolated elbow curl full long-arm return, then change sides."
+    },
+    {
+      "family_id": "prone-incline-curl",
+      "ids": [
+        190
+      ],
+      "review_views": "side plus front contact",
+      "constraints": "Chest on incline bench, shoulders near top, upper arms hang vertically and remain still; supinated dumbbell curl and full return."
+    },
+    {
+      "family_id": "seated-incline-curl",
+      "ids": [
+        219,
+        221
+      ],
+      "review_views": "side plus front hand inset",
+      "constraints": "Back supported incline, upper arms hang still; supinated for 219, neutral for 221; full natural elbow extension at return."
+    },
+    {
+      "family_id": "high-cable-curl",
+      "ids": [
+        213
+      ],
+      "review_views": "front plus side anchor",
+      "constraints": "Upper arms held out horizontally toward high pulleys; forearms curl handles to ears and extend back without shoulder movement."
+    },
+    {
+      "family_id": "supine-cable-curl",
+      "ids": [
+        240
+      ],
+      "review_views": "side plus front anchor",
+      "constraints": "Body on floor, feet braced and legs straight toward low pulley; upper arms quiet by torso, curl bar to chest then return."
+    },
+    {
+      "family_id": "triceps-pushdown",
+      "ids": [
+        80,
+        262,
+        292
+      ],
+      "review_views": "side plus front grip/anchor",
+      "constraints": "High pulley, upper arms pinned to ribs; forearms extend to thighs then controlled bend. Underhand 262 and spreading rope 292 must be visible."
+    },
+    {
+      "family_id": "supine-elbow-extension",
+      "ids": [
+        91,
+        156,
+        237,
+        242
+      ],
+      "review_views": "side plus front grip/anchor",
+      "constraints": "Flat support; upper arms fixed, forearms lower toward ears/forehead or right-angle low cable source, then extend. Do not rotate entire shoulder."
+    },
+    {
+      "family_id": "decline-elbow-extension",
+      "ids": [
+        179,
+        180
+      ],
+      "review_views": "side plus front grip",
+      "constraints": "Legs secured decline bench, upper arms fixed above chest; DB beside ears versus EZ bar to forehead, full controlled return."
+    },
+    {
+      "family_id": "incline-overhead-elbow-extension",
+      "ids": [
+        155,
+        215
+      ],
+      "review_views": "side plus front anchor",
+      "constraints": "Incline support, upper arms fixed close to head; elbow extension from behind head with source cable-high or barbell loading."
+    },
+    {
+      "family_id": "kneeling-bench-elbow-extension",
+      "ids": [
+        233
+      ],
+      "review_views": "side plus front contact",
+      "constraints": "Knees floor, head/back of upper arms contact transverse bench; high cable behind, extend forearms to horizontal and return."
+    },
+    {
+      "family_id": "incline-lat-arc-source-hold",
+      "ids": [
+        154
+      ],
+      "review_views": "side after source correction",
+      "constraints": "Overhead-to-thigh shoulder arc conflicts with instruction to hold upper arms stationary. Need decide intended fixed-elbow shoulder action versus elbow extension."
+    },
+    {
+      "family_id": "flat-bench-flye",
+      "ids": [
+        49,
+        201
+      ],
+      "review_views": "front plus side",
+      "constraints": "Supine flat support; fixed soft elbows, wide shoulder arc opening to owned stretch then hands meet over chest; 201 actual low cable anchors."
+    },
+    {
+      "family_id": "decline-bench-flye",
+      "ids": [
+        178
+      ],
+      "review_views": "front plus side",
+      "constraints": "Secured decline legs/support; fixed soft elbows and wide arc, hands meet over chest, controlled return."
+    },
+    {
+      "family_id": "incline-bench-flye",
+      "ids": [
+        217,
+        220
+      ],
+      "review_views": "front plus side",
+      "constraints": "Supported low incline, soft elbow fixed; wide arc to owned chest stretch then hands meet over chest/face as sourced; 217 low pulley vectors."
+    },
+    {
+      "family_id": "bent-arm-bar-pullover",
+      "ids": [
+        148
+      ],
+      "review_views": "side plus front grip",
+      "constraints": "Flat bench body supported, bar over chest; fixed bent elbows while shoulder arc carries bar behind head and back."
+    },
+    {
+      "family_id": "cross-bench-dumbbell-pullover",
+      "ids": [
+        149,
+        289
+      ],
+      "review_views": "side plus front support",
+      "constraints": "Only shoulders on perpendicular bench, hips low, feet floor; one DB both palms under end. 149 fixed bent elbows, 289 straight elbows throughout."
+    },
+    {
+      "family_id": "straight-arm-pulldown",
+      "ids": [
+        77,
+        264
+      ],
+      "review_views": "side plus front anchor",
+      "constraints": "High cable, slight standing hinge; arms sweep from overhead/front to thighs via shoulders, elbows fixed long/soft as sourced."
+    },
+    {
+      "family_id": "wrist-flexion",
+      "ids": [
+        164,
+        269
+      ],
+      "review_views": "side close-up plus grip",
+      "constraints": "Forearms supported thighs, wrists beyond knees; palms-up wrist flex and extended return; 164 bar low cable, 269 DB."
+    },
+    {
+      "family_id": "wrist-extension",
+      "ids": [
+        268
+      ],
+      "review_views": "side close-up plus grip",
+      "constraints": "Forearms supported, palms down; hand backs lift through wrist without lifting elbows; full controlled return."
+    },
+    {
+      "family_id": "finger-curl-source-hold",
+      "ids": [
+        200
+      ],
+      "review_views": "close-up after source correction",
+      "constraints": "Need decide finger opening/closing versus wrist curl; generic source currently offers either. Arm-only rig cannot show finger action."
+    },
+    {
+      "family_id": "floor-back-extension",
+      "ids": [
+        89
+      ],
+      "review_views": "side",
+      "constraints": "Prone floor; chest/arms/legs lift a few inches in low long arc and return. Avoid exaggerated lumbar hyperextension."
+    },
+    {
+      "family_id": "floor-trunk-curl",
+      "ids": [
+        95,
+        124,
+        150,
+        204
+      ],
+      "review_views": "side plus segmented trunk inset",
+      "constraints": "Exact per-ID spine/pelvis/leg action is required: full sit-up versus short curl, tuck/hip raise, overhead arms, jackknife or anchored Janda. Rigid torso pitch cannot substitute for spinal curling."
+    },
+    {
+      "family_id": "decline-trunk-curl",
+      "ids": [
+        119,
+        181
+      ],
+      "review_views": "side plus front for twist",
+      "constraints": "Legs secured, low back support; 119 short shoulder-blade curl, 181 adds one-side oblique turn; not full rigid sit-up."
+    },
+    {
+      "family_id": "reverse-crunch",
+      "ids": [
+        72,
+        99,
+        183
+      ],
+      "review_views": "side plus pelvis inset",
+      "constraints": "Pelvis rolls and tailbone lifts; knees travel toward ribs with quiet shoulders. 99 ankle low cable; 183 secured decline bench and source leg start."
+    },
+    {
+      "family_id": "hanging-leg-raise",
+      "ids": [
+        64
+      ],
+      "review_views": "side plus front grip",
+      "constraints": "Hands fixed high bar, arms long; legs lift to at least parallel within owned range plus pelvic curl, controlled dead-hang return."
+    },
+    {
+      "family_id": "kneeling-cable-crunch",
+      "ids": [
+        232
+      ],
+      "review_views": "side plus front for twist",
+      "constraints": "Knees floor and rope by ears, hips quiet; torso curls through spine. 232 normal/left/right sequential turns, 263 missing setup remains source hold."
+    },
+    {
+      "family_id": "standing-cable-crunch",
+      "ids": [
+        285
+      ],
+      "review_views": "side plus spine inset",
+      "constraints": "Back toward high pulley, rope across upper chest/shoulders; hips fixed, spine curls and returns. Do not use kneeling or hip hinge alias."
+    },
+    {
+      "family_id": "ball-supported-cable-rotation",
+      "ids": [
+        160
+      ],
+      "review_views": "oblique plus side",
+      "constraints": "Upper back supported on stability ball, hips raised, feet planted, arms over chest; thorax quarter-turn away from pulley and return while pelvis stays quiet."
+    },
+    {
+      "family_id": "cable-side-bend",
+      "ids": [
+        248
+      ],
+      "review_views": "front plus side",
+      "constraints": "Side-on high pulley, near hand fixed at shoulder/elbow at side; torso side-bends toward cable then returns upright without turning."
+    },
+    {
+      "family_id": "ab-wheel-rollout",
+      "ids": [
+        33,
+        137
+      ],
+      "review_views": "side plus front wheel/contact",
+      "constraints": "Kneeling support, bar rolls on floor while arms long and hips extend without sag; 137 knees on bench with bar on floor below bench end."
+    },
+    {
+      "family_id": "floor-kettlebell-clean",
+      "ids": [
+        121
+      ],
+      "review_views": "side plus front staged",
+      "constraints": "Bell begins on floor, close hip-driven rise, hand rolls through handle to rack without forearm impact, reverse to floor and reset."
+    },
+    {
+      "family_id": "turkish-get-up",
+      "ids": [
+        231
+      ],
+      "review_views": "multi-view staged",
+      "constraints": "Locked vertical bell arm throughout floor-to-elbow/hand-to-one-knee-to-standing stages and exact reverse. 68 specifies leg sweep; 231 lunge-style path must retain its own stage sequence."
+    }
+  ],
+  "legacy_exclusion_reassessment": [
+    {
+      "id": 7,
+      "decision": "truthful_activity_fallback",
+      "representation": "activity_fallback_no_single_rep_defined",
+      "cautions": "Keep the exact source setup, support, implement/grip, endpoint, cues and controlled return below. Membership in a shared family is not evidence of per-ID geometry equivalence."
+    },
+    {
+      "id": 27,
+      "decision": "author_draft_then_independent_technique_and_runtime_review",
+      "representation": "scoped_in_place_stride_demo_candidate",
+      "cautions": "Legacy exclusion was a three-frame format limitation. A named in-place stride demo is possible; distinguish stance and flight/contact phases."
+    },
+    {
+      "id": 68,
+      "decision": "author_draft_then_independent_technique_and_runtime_review",
+      "representation": "multi_stage_or_multiple_views_required",
+      "cautions": "Existing intentionally_unsuitable status belongs to limited prototype. Complex but representable in staged multi-view sequence; no completed review or approval implied."
+    },
+    {
+      "id": 70,
+      "decision": "author_draft_then_independent_technique_and_runtime_review",
+      "representation": "multi_stage_or_multiple_views_required",
+      "cautions": "Existing prototype exclusion does not mean impossible. Need continuous bar path and non-teleporting shoulder catch with changed elbow configuration."
+    },
+    {
+      "id": 291,
+      "decision": "hold_source_before_final_signoff",
+      "representation": "gait_mode_source_hold",
+      "cautions": "No blanket convenience exclusion: choose/label walking and/or running contact cycles and terrain limitations. Current source does not choose one."
+    }
+  ],
+  "existing_source_hold_ids": [
+    125,
+    132,
+    135,
+    138,
+    141,
+    157,
+    163,
+    175,
+    187,
+    193,
+    196,
+    197,
+    198,
+    214,
+    216,
+    234,
+    245,
+    247,
+    253,
+    263,
+    273
+  ],
+  "hard_owner_endpoint_holds": [
+    135,
+    187
+  ]
+}

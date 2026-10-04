@@ -1,0 +1,1 @@
+{"family":"trunk-flex@standing","entries":[{"movementId":68,"assetKey":"movement/kettlebell-turkish-get-up/demo/v1","name":"Kettlebell Turkish Get-Up","pattern":"rotation","status":"intentionally_unsuitable","reason":"A multi-stage movement with roughly seven distinct positions. Any three-frame reduction would omit the transitions that make it what it is."}]}

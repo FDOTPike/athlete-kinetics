@@ -1,0 +1,3396 @@
+{
+ "schemaVersion": 1,
+ "generatedBy": "tools/rendering/motion_families_classify.py",
+ "sourceOfRecord": "movement + movement_detail rows, migrations 010/016 and the v2 batches; cues and instructions, not the display name alone",
+ "summary": {
+  "movements": 174,
+  "families": 76,
+  "sharedFamilies": 38,
+  "singleFamilies": 38,
+  "movementsInSharedFamilies": 136,
+  "templatedInstructions": 93,
+  "boilerplateCues": 95,
+  "previewUnsuitable": 2,
+  "variantVerdicts": {
+   "needs-implement-geometry": 24,
+   "needs-offsets": 39,
+   "needs-own-frames": 32,
+   "reuse-unchanged": 3
+  },
+  "newMotionsToAuthor": 163
+ },
+ "unsuitableFor2DPreview": [
+  {
+   "id": 27,
+   "name": "Road Run",
+   "reason": "Cyclic locomotion: the body translates continuously, so no single frozen position represents the movement."
+  },
+  {
+   "id": 291,
+   "name": "Trail Running/Walking",
+   "reason": "Cyclic locomotion over changing ground: there is no fixed stance or body position to draw."
+  }
+ ],
+ "authoringNotes": [
+  {
+   "id": "supinated-curl-wrist",
+   "appliesTo": "grip_orientation == \"supinated\" AND action == \"elbow-flexion\"",
+   "appliesToMovements": [
+    34,
+    92,
+    158,
+    167,
+    171,
+    186,
+    199,
+    219,
+    276,
+    278
+   ],
+   "note": "At the peak of a supinated curl the pinky angles slightly toward the ear. The wrist rotation means the bell should read as a tilted bar, inner end higher than the outer end, mirrored between the arms \u2014 not perfectly flat."
+  }
+ ],
+ "families": [
+  {
+   "family": "elbow-flexion@standing",
+   "size": 11,
+   "view": "front",
+   "base": {
+    "id": 62,
+    "name": "Hammer Curl",
+    "alreadyAuthored": true,
+    "implements": [
+     "DB"
+    ],
+    "grip": "neutral",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 34,
+     "name": "Barbell Curl",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB",
+      "grip neutral -> default"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "front-view barbell"
+      ],
+      "offsets": [
+       "implement class handheld -> bar",
+       "grip neutral -> default",
+       "grip orientation neutral -> supinated"
+      ]
+     }
+    },
+    {
+     "id": 106,
+     "name": "Reverse Barbell Curl",
+     "implements": [
+      "BB"
+     ],
+     "grip": "pronated",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB",
+      "grip neutral -> pronated"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "front-view barbell"
+      ],
+      "offsets": [
+       "implement class handheld -> bar",
+       "grip neutral -> pronated",
+       "grip orientation neutral -> pronated"
+      ]
+     }
+    },
+    {
+     "id": 114,
+     "name": "Cable Hammer Curls - Rope Attachment",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "neutral",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable"
+      ]
+     }
+    },
+    {
+     "id": 126,
+     "name": "Alternate Hammer Curl",
+     "implements": [
+      "DB"
+     ],
+     "grip": "neutral",
+     "laterality": "alternating",
+     "differsFromBase": [
+      "laterality bilateral -> alternating"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> alternating (timing or arm count changes)",
+       "alternating arms (name-asserted)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 167,
+     "name": "Close-Grip EZ Bar Curl",
+     "implements": [
+      "BB"
+     ],
+     "grip": "close",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB",
+      "grip neutral -> close"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "front-view barbell"
+      ],
+      "offsets": [
+       "implement class handheld -> bar",
+       "grip neutral -> close",
+       "grip orientation neutral -> supinated",
+       "close grip (name-asserted)"
+      ]
+     }
+    },
+    {
+     "id": 172,
+     "name": "Cross Body Hammer Curl",
+     "implements": [
+      "DB"
+     ],
+     "grip": "neutral",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "crosses the midline (name-asserted)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 186,
+     "name": "Dumbbell Bicep Curl",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip neutral -> default"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip neutral -> default",
+       "grip orientation neutral -> supinated"
+      ]
+     }
+    },
+    {
+     "id": 199,
+     "name": "EZ-Bar Curl",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB",
+      "grip neutral -> default"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "front-view barbell"
+      ],
+      "offsets": [
+       "implement class handheld -> bar",
+       "grip neutral -> default",
+       "grip orientation neutral -> supinated"
+      ]
+     }
+    },
+    {
+     "id": 260,
+     "name": "Reverse Cable Curl",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "pronated",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Cable",
+      "grip neutral -> pronated"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable",
+       "grip neutral -> pronated",
+       "grip orientation neutral -> pronated"
+      ]
+     }
+    },
+    {
+     "id": 278,
+     "name": "Standing Biceps Cable Curl",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Cable",
+      "grip neutral -> default"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable",
+       "grip neutral -> default",
+       "grip orientation neutral -> supinated"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "horizontal-press@supine",
+   "size": 10,
+   "view": "side",
+   "base": {
+    "id": 86,
+    "name": "Dumbbell Floor Press",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 100,
+     "name": "Close-Grip Dumbbell Press",
+     "implements": [
+      "DB"
+     ],
+     "grip": "close",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> close"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> close",
+       "close grip (row)",
+       "implement at the chest (row)",
+       "two implements (row)"
+      ]
+     }
+    },
+    {
+     "id": 128,
+     "name": "Alternating Floor Press",
+     "implements": [
+      "KB"
+     ],
+     "grip": "default",
+     "laterality": "alternating",
+     "differsFromBase": [
+      "implement DB -> KB",
+      "laterality bilateral -> alternating"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> alternating (timing or arm count changes)",
+       "alternating arms (name-asserted)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 133,
+     "name": "Barbell Bench Press - Medium Grip",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> bar"
+      ]
+     }
+    },
+    {
+     "id": 141,
+     "name": "Bench Press - With Bands",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Banded"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class handheld -> band"
+      ]
+     }
+    },
+    {
+     "id": 168,
+     "name": "Close-Grip EZ-Bar Press",
+     "implements": [
+      "BB"
+     ],
+     "grip": "close",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB",
+      "grip default -> close"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> bar",
+       "grip default -> close",
+       "close grip (name-asserted)"
+      ]
+     }
+    },
+    {
+     "id": 185,
+     "name": "Dumbbell Bench Press with Neutral Grip",
+     "implements": [
+      "DB"
+     ],
+     "grip": "neutral",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> neutral"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> neutral",
+       "two implements (row)"
+      ]
+     }
+    },
+    {
+     "id": 196,
+     "name": "Extended Range One-Arm Kettlebell Floor Press",
+     "implements": [
+      "KB"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "implement DB -> KB",
+      "laterality bilateral -> unilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> unilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 227,
+     "name": "JM Press",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> bar"
+      ]
+     }
+    },
+    {
+     "id": 246,
+     "name": "One Arm Dumbbell Bench Press",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "laterality bilateral -> unilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> unilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    }
+   ]
+  },
+  {
+   "family": "trunk-flex@supine",
+   "size": 8,
+   "view": "side",
+   "base": {
+    "id": 72,
+    "name": "Reverse Crunch",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 95,
+     "name": "Sit-Up",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the base's own row is a pelvic curl, not the family's trunk action (name-asserted)",
+       "torso lifts first (row)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 99,
+     "name": "Cable Reverse Crunch",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Bodyweight -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class none -> cable"
+      ]
+     }
+    },
+    {
+     "id": 124,
+     "name": "Tuck Crunch",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the base's own row is a pelvic curl, not the family's trunk action (name-asserted)",
+       "torso lifts first (row)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 150,
+     "name": "Bent-Knee Hip Raise",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "reuse-unchanged",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 174,
+     "name": "Crunch - Hands Overhead",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the base's own row is a pelvic curl, not the family's trunk action (name-asserted)"
+      ],
+      "implementGeometry": [],
+      "offsets": [
+       "arms overhead (name-asserted)"
+      ]
+     }
+    },
+    {
+     "id": 175,
+     "name": "Crunches",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the base's own row is a pelvic curl, not the family's trunk action (name-asserted)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 263,
+     "name": "Rope Crunch",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Bodyweight -> Cable"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the base's own row is a pelvic curl, not the family's trunk action (name-asserted)"
+      ],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class none -> cable"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "horizontal-pull@standing",
+   "size": 7,
+   "view": "side",
+   "base": {
+    "id": 12,
+    "name": "Single-Arm Dumbbell Row",
+    "alreadyAuthored": true,
+    "implements": [
+     "DB",
+     "KB"
+    ],
+    "grip": "default",
+    "laterality": "unilateral"
+   },
+   "variants": [
+    {
+     "id": 22,
+     "name": "Cable Row",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB+KB -> Cable",
+      "laterality unilateral -> bilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality unilateral -> bilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable"
+      ]
+     }
+    },
+    {
+     "id": 30,
+     "name": "Band Row",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB+KB -> Banded",
+      "laterality unilateral -> bilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality unilateral -> bilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class handheld -> band"
+      ]
+     }
+    },
+    {
+     "id": 117,
+     "name": "Cable Rope Rear-Delt Rows",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB+KB -> Cable",
+      "laterality unilateral -> bilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality unilateral -> bilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable"
+      ]
+     }
+    },
+    {
+     "id": 238,
+     "name": "Low Pulley Row To Neck",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB+KB -> Cable",
+      "laterality unilateral -> bilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality unilateral -> bilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable"
+      ]
+     }
+    },
+    {
+     "id": 247,
+     "name": "One-Arm Dumbbell Row",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "implement DB+KB -> DB"
+     ],
+     "reuseVerdict": "reuse-unchanged",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 273,
+     "name": "Shotgun Row",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB+KB -> Cable",
+      "laterality unilateral -> bilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality unilateral -> bilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "vertical-pull@standing",
+   "size": 7,
+   "view": "front",
+   "base": {
+    "id": 21,
+    "name": "Lat Pulldown",
+    "alreadyAuthored": true,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 74,
+     "name": "Scapular Pull-Up",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> Bodyweight"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> none"
+      ]
+     }
+    },
+    {
+     "id": 103,
+     "name": "One Arm Lat Pulldown",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "laterality bilateral -> unilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> unilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 169,
+     "name": "Close-Grip Front Lat Pulldown",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "close",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> close"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> close",
+       "close grip (name-asserted)"
+      ]
+     }
+    },
+    {
+     "id": 294,
+     "name": "Underhand Cable Pulldowns",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "supinated",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> supinated"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> supinated"
+      ]
+     }
+    },
+    {
+     "id": 298,
+     "name": "V-Bar Pullup",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> Bodyweight"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> none"
+      ]
+     }
+    },
+    {
+     "id": 300,
+     "name": "Wide-Grip Lat Pulldown",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "wide",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> wide"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> wide",
+       "wide grip (name-asserted)"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "elbow-extension@standing-overhead",
+   "size": 5,
+   "view": "side",
+   "base": {
+    "id": 116,
+    "name": "Cable Rope Overhead Triceps Extension",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 157,
+     "name": "Cable One Arm Tricep Extension",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "laterality bilateral -> unilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> unilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 193,
+     "name": "Dumbbell Tricep Extension -Pronated Grip",
+     "implements": [
+      "DB"
+     ],
+     "grip": "pronated",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> DB",
+      "grip default -> pronated"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> handheld",
+       "grip default -> pronated"
+      ]
+     }
+    },
+    {
+     "id": 282,
+     "name": "Standing Dumbbell Triceps Extension",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> handheld"
+      ]
+     }
+    },
+    {
+     "id": 283,
+     "name": "Standing Overhead Barbell Triceps Extension",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> BB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> bar"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "shoulder-rotation@standing",
+   "size": 5,
+   "view": "side",
+   "base": {
+    "id": 32,
+    "name": "Band External Rotation",
+    "alreadyAuthored": false,
+    "implements": [
+     "Banded"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 115,
+     "name": "Cable Internal Rotation",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Banded -> Cable"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "rotation direction external -> internal",
+       "crosses the midline (row)"
+      ],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class band -> cable"
+      ]
+     }
+    },
+    {
+     "id": 197,
+     "name": "External Rotation",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Banded -> DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class band -> handheld"
+      ]
+     }
+    },
+    {
+     "id": 198,
+     "name": "External Rotation with Cable",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Banded -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class band -> cable"
+      ]
+     }
+    },
+    {
+     "id": 224,
+     "name": "Internal Rotation with Band",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "rotation direction external -> internal"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    }
+   ]
+  },
+  {
+   "family": "elbow-extension@standing-pushdown",
+   "size": 4,
+   "view": "side",
+   "base": {
+    "id": 80,
+    "name": "Triceps Pushdown",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 237,
+     "name": "Low Cable Triceps Extension",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the name asserts a low cable anchor, which the base does not draw"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 262,
+     "name": "Reverse Grip Triceps Pushdown",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "pronated",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> pronated"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> pronated"
+      ]
+     }
+    },
+    {
+     "id": 292,
+     "name": "Triceps Pushdown - Rope Attachment",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "rope attachment"
+      ],
+      "offsets": []
+     }
+    }
+   ]
+  },
+  {
+   "family": "hip-hinge@standing",
+   "size": 4,
+   "view": "side",
+   "base": {
+    "id": 88,
+    "name": "Dumbbell Romanian Deadlift",
+    "alreadyAuthored": true,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 97,
+     "name": "Band Good Morning",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Banded"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class handheld -> band"
+      ]
+     }
+    },
+    {
+     "id": 113,
+     "name": "Cable Deadlifts",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable"
+      ]
+     }
+    },
+    {
+     "id": 287,
+     "name": "Stiff Leg Barbell Good Morning",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> bar"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "horizontal-press@incline",
+   "size": 4,
+   "view": "side",
+   "base": {
+    "id": 134,
+    "name": "Barbell Incline Bench Press - Medium Grip",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 212,
+     "name": "Hammer Grip Incline DB Bench Press",
+     "implements": [
+      "DB"
+     ],
+     "grip": "neutral",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> DB",
+      "grip default -> neutral"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class bar -> handheld",
+       "grip default -> neutral",
+       "two implements (row)"
+      ]
+     }
+    },
+    {
+     "id": 216,
+     "name": "Incline Cable Chest Press",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class bar -> cable"
+      ]
+     }
+    },
+    {
+     "id": 218,
+     "name": "Incline Dumbbell Bench With Palms Facing In",
+     "implements": [
+      "DB"
+     ],
+     "grip": "neutral",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> DB",
+      "grip default -> neutral"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class bar -> handheld",
+       "grip default -> neutral",
+       "two implements (row)"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "horizontal-pull@bent-over",
+   "size": 4,
+   "view": "side",
+   "base": {
+    "id": 142,
+    "name": "Bent Over Barbell Row",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 144,
+     "name": "Bent Over One-Arm Long Bar Row",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "laterality bilateral -> unilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> unilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 146,
+     "name": "Bent Over Two-Dumbbell Row",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class bar -> handheld"
+      ]
+     }
+    },
+    {
+     "id": 147,
+     "name": "Bent Over Two-Dumbbell Row With Palms In",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class bar -> handheld"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "push-up@floor",
+   "size": 4,
+   "view": "side",
+   "base": {
+    "id": 16,
+    "name": "Push-up",
+    "alreadyAuthored": true,
+    "implements": [
+     "Bodyweight",
+     "Banded"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 60,
+     "name": "Feet-Elevated Push-Up",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Bodyweight+Banded -> Bodyweight"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the name asserts elevated feet, which the base does not draw"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 254,
+     "name": "Push Up to Side Plank",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Bodyweight+Banded -> Bodyweight"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the name asserts a side-plank shape, which the base does not draw"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 255,
+     "name": "Push-Up Wide",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "wide",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Bodyweight+Banded -> Bodyweight",
+      "grip default -> wide"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> wide"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "shrug@standing",
+   "size": 4,
+   "view": "side",
+   "base": {
+    "id": 53,
+    "name": "Dumbbell Shrug",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 82,
+     "name": "Barbell Shrug",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> bar"
+      ]
+     }
+    },
+    {
+     "id": 138,
+     "name": "Barbell Shrug Behind The Back",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> bar",
+       "implement behind the back (name-asserted)"
+      ]
+     }
+    },
+    {
+     "id": 163,
+     "name": "Cable Shrugs",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class handheld -> cable"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "trunk-flex@seated",
+   "size": 4,
+   "view": "side",
+   "base": {
+    "id": 125,
+    "name": "3/4 Sit-Up",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 161,
+     "name": "Cable Seated Crunch",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Bodyweight -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class none -> cable"
+      ]
+     }
+    },
+    {
+     "id": 225,
+     "name": "Jackknife Sit-Up",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the name asserts a jackknife (V) shape, which the base does not draw"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 226,
+     "name": "Janda Sit-Up",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "arms at the sides (row)"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "vertical-press@standing",
+   "size": 4,
+   "view": "side",
+   "base": {
+    "id": 127,
+    "name": "Alternating Cable Shoulder Press",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "alternating"
+   },
+   "variants": [
+    {
+     "id": 274,
+     "name": "Shoulder Press - With Bands",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> Banded",
+      "laterality alternating -> bilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality alternating -> bilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class cable -> band"
+      ]
+     }
+    },
+    {
+     "id": 280,
+     "name": "Standing Dumbbell Press",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> DB",
+      "laterality alternating -> bilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality alternating -> bilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> handheld"
+      ]
+     }
+    },
+    {
+     "id": 284,
+     "name": "Standing Palm-In One-Arm Dumbbell Press",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "implement Cable -> DB",
+      "laterality alternating -> unilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality alternating -> unilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> handheld",
+       "one implement (row)"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "elbow-flexion@preacher",
+   "size": 3,
+   "view": "front",
+   "base": {
+    "id": 92,
+    "name": "Preacher Curl",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 158,
+     "name": "Cable Preacher Curl",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class bar -> cable"
+      ]
+     }
+    },
+    {
+     "id": 253,
+     "name": "Preacher Hammer Dumbbell Curl",
+     "implements": [
+      "DB"
+     ],
+     "grip": "neutral",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> DB",
+      "grip default -> neutral"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class bar -> handheld",
+       "grip default -> neutral",
+       "grip orientation supinated -> neutral"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "hip-extension@standing",
+   "size": 3,
+   "view": "side",
+   "base": {
+    "id": 40,
+    "name": "Cable Pull-Through",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 132,
+     "name": "Band Good Morning (Pull Through)",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> Banded"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class cable -> band"
+      ]
+     }
+    },
+    {
+     "id": 214,
+     "name": "Hip Extension with Bands",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> Banded"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class cable -> band"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "push-up@incline",
+   "size": 3,
+   "view": "side",
+   "base": {
+    "id": 90,
+    "name": "Incline Push-Up",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 222,
+     "name": "Incline Push-Up Close-Grip",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "close",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> close"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> close",
+       "close grip (name-asserted)"
+      ]
+     }
+    },
+    {
+     "id": 223,
+     "name": "Incline Push-Up Wide",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "wide",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> wide"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> wide"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "squat@standing",
+   "size": 3,
+   "view": "side",
+   "base": {
+    "id": 14,
+    "name": "Goblet Squat",
+    "alreadyAuthored": true,
+    "implements": [
+     "DB",
+     "KB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 28,
+     "name": "Bodyweight Squat",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB+KB -> Bodyweight"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> none"
+      ]
+     }
+    },
+    {
+     "id": 55,
+     "name": "Dumbbell Squat",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB+KB -> DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement at the sides (row)"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "trunk-twist@supine",
+   "size": 3,
+   "view": "side",
+   "base": {
+    "id": 73,
+    "name": "Russian Twist",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 173,
+     "name": "Cross-Body Crunch",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "crosses the midline (name-asserted)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    },
+    {
+     "id": 245,
+     "name": "Oblique Crunches",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "the name asserts an oblique (side) line, which the base does not draw (the base's own row is seated, while the family's position is supine)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    }
+   ]
+  },
+  {
+   "family": "calf-raise@seated",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 111,
+    "name": "Barbell Seated Calf Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 191,
+     "name": "Dumbbell Seated One-Leg Calf Raise",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "implement BB -> DB",
+      "laterality bilateral -> unilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> unilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class bar -> handheld"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "calf-raise@standing",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 76,
+    "name": "Standing Dumbbell Calf Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 118,
+     "name": "Calf Raises - With Bands",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Banded"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class handheld -> band"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "carry@standing",
+   "size": 2,
+   "view": "front",
+   "base": {
+    "id": 19,
+    "name": "Farmer Carry",
+    "alreadyAuthored": true,
+    "implements": [
+     "DB",
+     "KB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 20,
+     "name": "Suitcase Carry",
+     "implements": [
+      "KB",
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB+KB -> KB+DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement beside the hip (row)",
+       "one implement (row)"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "elbow-extension@decline",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 179,
+    "name": "Decline Dumbbell Triceps Extension",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 180,
+     "name": "Decline EZ Bar Triceps Extension",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> BB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> bar"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "elbow-extension@incline",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 154,
+    "name": "Cable Incline Pushdown",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 155,
+     "name": "Cable Incline Triceps Extension",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [],
+     "reuseVerdict": "reuse-unchanged",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    }
+   ]
+  },
+  {
+   "family": "elbow-flexion@incline",
+   "size": 2,
+   "view": "front",
+   "base": {
+    "id": 219,
+    "name": "Incline Dumbbell Curl",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 221,
+     "name": "Incline Hammer Curls",
+     "implements": [
+      "DB"
+     ],
+     "grip": "neutral",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip default -> neutral"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip default -> neutral",
+       "grip orientation supinated -> neutral"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "front-raise@incline",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 135,
+    "name": "Barbell Incline Shoulder Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 187,
+     "name": "Dumbbell Incline Shoulder Raise",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class bar -> handheld"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "hip-extension@supine",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 29,
+    "name": "Glute Bridge",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight",
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 75,
+     "name": "Single-Leg Glute Bridge",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "unilateral",
+     "differsFromBase": [
+      "implement Bodyweight+BB -> Bodyweight",
+      "laterality bilateral -> unilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality bilateral -> unilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    }
+   ]
+  },
+  {
+   "family": "horizontal-pull@kneeling",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 122,
+    "name": "Kneeling Single-Arm High Pulley Row",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "unilateral"
+   },
+   "variants": [
+    {
+     "id": 234,
+     "name": "Kneeling High Pulley Row",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "laterality unilateral -> bilateral"
+     ],
+     "reuseVerdict": "needs-own-frames",
+     "rendererWork": {
+      "ownFrames": [
+       "laterality unilateral -> bilateral (timing or arm count changes)"
+      ],
+      "implementGeometry": [],
+      "offsets": []
+     }
+    }
+   ]
+  },
+  {
+   "family": "lunge@standing",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 51,
+    "name": "Dumbbell Lunge",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 286,
+     "name": "Step-up with Knee Raise",
+     "implements": [
+      "Bodyweight"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement DB -> Bodyweight"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class handheld -> none"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "pallof@standing",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 25,
+    "name": "Pallof Press",
+    "alreadyAuthored": false,
+    "implements": [
+     "Banded"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 251,
+     "name": "Pallof Press With Rotation",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Banded -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class band -> cable"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "rear-delt@bent-over",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 110,
+    "name": "Barbell Rear Delt Row",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 143,
+     "name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class bar -> handheld",
+       "two implements (row)"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "rear-delt@standing",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 24,
+    "name": "Band Pull-Apart",
+    "alreadyAuthored": false,
+    "implements": [
+     "Banded"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 159,
+     "name": "Cable Rear Delt Fly",
+     "implements": [
+      "Cable"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Banded -> Cable"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "cable handle/rope"
+      ],
+      "offsets": [
+       "implement class band -> cable"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "shoulder-raise@standing",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 206,
+    "name": "Front Cable Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 236,
+     "name": "Lateral Raise - With Bands",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> Banded"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class cable -> band"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "upright-row@standing",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 295,
+    "name": "Upright Barbell Row",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 297,
+     "name": "Upright Row - With Bands",
+     "implements": [
+      "Banded"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement BB -> Banded"
+     ],
+     "reuseVerdict": "needs-implement-geometry",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [
+       "band"
+      ],
+      "offsets": [
+       "implement class bar -> band"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "vertical-press@seated",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 267,
+    "name": "Seated Cable Shoulder Press",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 270,
+     "name": "Seated Dumbbell Press",
+     "implements": [
+      "DB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> DB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> handheld",
+       "two implements (row)"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "wrist-flexion@seated",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 268,
+    "name": "Seated Dumbbell Palms-Down Wrist Curl",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "pronated",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 269,
+     "name": "Seated Dumbbell Palms-Up Wrist Curl",
+     "implements": [
+      "DB"
+     ],
+     "grip": "supinated",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "grip pronated -> supinated"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "grip pronated -> supinated",
+       "grip orientation pronated -> supinated"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "wrist-flexion@standing",
+   "size": 2,
+   "view": "side",
+   "base": {
+    "id": 164,
+    "name": "Cable Wrist Curl",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": [
+    {
+     "id": 200,
+     "name": "Finger Curls",
+     "implements": [
+      "BB"
+     ],
+     "grip": "default",
+     "laterality": "bilateral",
+     "differsFromBase": [
+      "implement Cable -> BB"
+     ],
+     "reuseVerdict": "needs-offsets",
+     "rendererWork": {
+      "ownFrames": [],
+      "implementGeometry": [],
+      "offsets": [
+       "implement class cable -> bar"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "family": "back-extension@prone",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 89,
+    "name": "Floor Back Extension",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "dead-bug@supine",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 44,
+    "name": "Dead Bug",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "dip@seated-supported",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 37,
+    "name": "Bench Dip",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "elbow-extension@bodyweight-supported",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 152,
+    "name": "Body Tricep Press",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "elbow-extension@supine",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 156,
+    "name": "Cable Lying Triceps Extension",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "elbow-flexion@prone-supported",
+   "size": 1,
+   "view": "front",
+   "base": {
+    "id": 276,
+    "name": "Spider Curl",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "elbow-flexion@seated",
+   "size": 1,
+   "view": "front",
+   "base": {
+    "id": 171,
+    "name": "Concentration Curls",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "face-pull@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 59,
+    "name": "Face Pull",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable",
+     "Banded"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "flye@decline",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 178,
+    "name": "Decline Dumbbell Flyes",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "flye@incline",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 220,
+    "name": "Incline Dumbbell Flyes",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "flye@supine",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 49,
+    "name": "Dumbbell Flye",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "front-raise@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 87,
+    "name": "Dumbbell Front Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "glute-kickback@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 84,
+    "name": "Cable Glute Kickback",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "horizontal-press@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 279,
+    "name": "Standing Cable Chest Press",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "horizontal-pull@prone-supported",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 42,
+    "name": "Chest-Supported Dumbbell Row",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "horizontal-pull@seated",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 266,
+    "name": "Seated Cable Rows",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "horizontal-pull@supine",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 66,
+    "name": "Inverted Row",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "isolation-other@incline",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 207,
+    "name": "Front Incline Dumbbell Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "lateral-raise@seated",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 272,
+    "name": "Seated Side Lateral Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "lateral-raise@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 50,
+    "name": "Dumbbell Lateral Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "locomotion@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 27,
+    "name": "Road Run",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "locomotion@traveling",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 291,
+    "name": "Trail Running/Walking",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "lunge@reverse",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 52,
+    "name": "Dumbbell Reverse Lunge",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "lunge@split-stance",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 139,
+    "name": "Barbell Side Split Squat",
+    "alreadyAuthored": false,
+    "implements": [
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "lunge@traveling",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 17,
+    "name": "Walking Lunge",
+    "alreadyAuthored": true,
+    "implements": [
+     "Bodyweight",
+     "DB",
+     "BB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "plank@prone",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 26,
+    "name": "Plank",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "push-up@decline",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 182,
+    "name": "Decline Push-Up",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "rear-delt@supine",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 261,
+    "name": "Reverse Flyes",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "shoulder-raise@seated",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 162,
+    "name": "Cable Seated Lateral Raise",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "shoulder-raise@supine",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 131,
+    "name": "Back Flyes - With Bands",
+    "alreadyAuthored": false,
+    "implements": [
+     "Banded"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "squat@sumo-stance",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 57,
+    "name": "Dumbbell Sumo Squat",
+    "alreadyAuthored": false,
+    "implements": [
+     "DB"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "straight-arm-pulldown@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 264,
+    "name": "Rope Straight-Arm Pulldown",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "trunk-flex@decline",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 183,
+    "name": "Decline Reverse Crunch",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "trunk-flex@kneeling",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 232,
+    "name": "Kneeling Cable Crunch With Alternating Oblique Twists",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "alternating"
+   },
+   "variants": []
+  },
+  {
+   "family": "trunk-flex@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 285,
+    "name": "Standing Rope Crunch",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "trunk-side-bend@standing",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 248,
+    "name": "One-Arm High-Pulley Cable Side Bends",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "unilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "trunk-twist@decline",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 181,
+    "name": "Decline Oblique Crunch",
+    "alreadyAuthored": false,
+    "implements": [
+     "Bodyweight"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  },
+  {
+   "family": "trunk-twist@seated",
+   "size": 1,
+   "view": "side",
+   "base": {
+    "id": 160,
+    "name": "Cable Russian Twists",
+    "alreadyAuthored": false,
+    "implements": [
+     "Cable"
+    ],
+    "grip": "default",
+    "laterality": "bilateral"
+   },
+   "variants": []
+  }
+ ]
+}

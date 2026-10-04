@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Chip, PrimaryButton, SecondaryButton } from '../components/ui';
+import { MovementPreview } from '../components/movementPreview/MovementPreview';
 import { useSubViewBack } from '../navigation/navigation';
 import {
   formatTeachingOnlyReason,
@@ -321,6 +322,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
                   : 'Curated execution instructions are not yet recorded.'}
               </Text>
             </View>
+            <MovementPreview movement={selectedMovement} />
             {externalFallback !== null ? (
               <SecondaryButton
                 label="Watch movement demonstration ↗"
