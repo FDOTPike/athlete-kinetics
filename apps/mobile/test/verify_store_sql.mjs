@@ -429,9 +429,12 @@ const shapeStart = src.indexOf('const trainingProgramShape =');
 const shapeEnd = src.indexOf('/** Everything per-athlete', shapeStart);
 const shapeBody = src.slice(shapeStart, shapeEnd);
 check('date horizon rejects under 4 and over 32 weeks and rounds up to a complete block boundary',
-  shapeBody.includes('daysAway < 28 || daysAway > 224')
-    && shapeBody.includes('Math.ceil(daysAway / 28)')
-    && shapeBody.includes('plannedBlockCount * 28'),
+  // The arithmetic lives in @ak/inference normalizeProgramHorizon (behaviour
+  // verified in verify:blocks); the store must route through it and, when a
+  // program is active, measure from the stable anchor rather than today
+  // (master 7bebc15 behaviour preserved through the lineage integration).
+  shapeBody.includes('normalizeProgramHorizon(horizonAnchorDate, input.horizon)')
+    && previewProgramBody.includes('programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount)'),
 );
 const createStart = src.indexOf('createTrainingProgram: (input) => {');
 const createEnd = src.indexOf('rolloverDay: () => {', createStart);

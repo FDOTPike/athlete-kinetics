@@ -28,7 +28,8 @@ import { DatabaseSync } from 'node:sqlite';
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
   SCHEMA_FATIGUE_COST, MACRO_BLOCKS, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
-  programFocuses, programMacroIndex, datedProgramMacroAnchor, weeklyProgressionSummary } = require('./.build/blockGenerator.js');
+  programFocuses, programMacroIndex, datedProgramMacroAnchor, weeklyProgressionSummary,
+  normalizeProgramHorizon, programHorizonAnchor } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
 const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
@@ -1652,6 +1653,40 @@ console.log('[18] guided program macro-cycle ownership');
 // The scope axis exists because FOCUS_PATTERNS.full already holds five entries
 // and slotBudget caps at five: a full-body movement CANNOT be routed by adding
 // a pattern. These are the laws that axis has to satisfy.
+// --- [19] guided program review-horizon ownership (ported from master 7bebc15)
+console.log('[19] guided program review-horizon ownership');
+{
+  const initial = normalizeProgramHorizon('2026-08-03', { kind: 'weeks', blockCount: 4 });
+  check('four-block horizon normalizes to four complete 28-day blocks',
+    initial.plannedBlockCount === 4
+      && initial.plannedEndDate === addDaysIso('2026-08-03', 112)
+      && initial.requestedReviewDate === null);
+
+  const lateEnd = addDaysIso(initial.plannedEndDate, 7);
+  const stableAnchor = programHorizonAnchor(lateEnd, 4);
+  const unchanged = normalizeProgramHorizon(stableAnchor, { kind: 'weeks', blockCount: 4 });
+  const extended = normalizeProgramHorizon(stableAnchor, { kind: 'weeks', blockCount: 5 });
+  check('editing an existing program preserves a late-continuation anchor',
+    unchanged.plannedEndDate === lateEnd
+      && extended.plannedEndDate === addDaysIso(lateEnd, 28));
+
+  const dateHorizon = normalizeProgramHorizon('2026-08-03', {
+    kind: 'date', requestedReviewDate: '2026-09-01',
+  });
+  check('date horizon rounds upward to a complete four-week boundary',
+    dateHorizon.plannedBlockCount === 2
+      && dateHorizon.plannedEndDate === addDaysIso('2026-08-03', 56)
+      && dateHorizon.requestedReviewDate === '2026-09-01');
+
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  check('date horizon rejects under 4 and over 32 weeks',
+    rejects(() => normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2026-08-30' }))
+      && rejects(() => normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2027-03-16' }))
+      && !rejects(() => normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2027-03-15' })));
+  check('invalid calendar review date is rejected',
+    rejects(() => normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2026-02-30' })));
+}
+
 console.log('[7] full-body scope routing and specialist equipment');
 {
   const mv = (movement_id, name, pattern, over = {}) => ({

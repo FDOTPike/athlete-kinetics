@@ -750,6 +750,63 @@ export const addDaysIso = (iso: string, days: number): string => {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 };
 
+export type ProgramReviewHorizon =
+  | { kind: 'weeks'; blockCount: number }
+  | { kind: 'date'; requestedReviewDate: string };
+
+export interface NormalizedProgramHorizon {
+  requestedReviewDate: string | null;
+  plannedBlockCount: number;
+  plannedEndDate: string;
+}
+
+const exactIsoUtcMs = (value: string, label: string): number => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${label} must use YYYY-MM-DD.`);
+  const [year, month, day] = value.split('-').map(Number);
+  const ms = Date.UTC(year, month - 1, day);
+  if (new Date(ms).toISOString().slice(0, 10) !== value) throw new Error(`${label} is not valid.`);
+  return ms;
+};
+
+/** Normalize a 4-32 week review horizon against its stable program anchor.
+ *  The anchor may move when a late continuation preserves full four-week
+ *  blocks; future edits must reuse it rather than silently restarting the
+ *  total horizon from the edit date. (Ported from master 7bebc15.) */
+export const normalizeProgramHorizon = (
+  anchorDate: string,
+  horizon: ProgramReviewHorizon,
+): NormalizedProgramHorizon => {
+  const anchorMs = exactIsoUtcMs(anchorDate, 'Program anchor date');
+  if (horizon.kind === 'weeks') {
+    if (!Number.isInteger(horizon.blockCount) || horizon.blockCount < 1 || horizon.blockCount > 8) {
+      throw new Error('Choose a review horizon from 4 to 32 weeks.');
+    }
+    return {
+      requestedReviewDate: null,
+      plannedBlockCount: horizon.blockCount,
+      plannedEndDate: addDaysIso(anchorDate, horizon.blockCount * 28),
+    };
+  }
+  const reviewMs = exactIsoUtcMs(horizon.requestedReviewDate, 'Review date');
+  const daysAway = Math.floor((reviewMs - anchorMs) / 86400000);
+  if (daysAway < 28 || daysAway > 224) throw new Error('Review date must be 4 to 32 weeks away.');
+  const plannedBlockCount = Math.ceil(daysAway / 28);
+  return {
+    requestedReviewDate: horizon.requestedReviewDate,
+    plannedBlockCount,
+    plannedEndDate: addDaysIso(anchorDate, plannedBlockCount * 28),
+  };
+};
+
+/** Recover the stable review-horizon anchor from durable program state. */
+export const programHorizonAnchor = (plannedEndDate: string, plannedBlockCount: number): string => {
+  exactIsoUtcMs(plannedEndDate, 'Program end date');
+  if (!Number.isInteger(plannedBlockCount) || plannedBlockCount < 1 || plannedBlockCount > 8) {
+    throw new Error('Program block count is not valid.');
+  }
+  return addDaysIso(plannedEndDate, -plannedBlockCount * 28);
+};
+
 /** STRICT boolean equipment filter (boundary invariant 3). */
 export const availableMovements = (
   movements: readonly GeneratorMovement[],

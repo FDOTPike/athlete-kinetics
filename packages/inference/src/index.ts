@@ -113,6 +113,10 @@ export {
 export {
   defaultProgramDayIndices,
   addDaysIso,
+  normalizeProgramHorizon,
+  programHorizonAnchor,
+  type NormalizedProgramHorizon,
+  type ProgramReviewHorizon,
   accessContextForBlockFocus,
   availableMovements,
   BLOCK_WEEKS,

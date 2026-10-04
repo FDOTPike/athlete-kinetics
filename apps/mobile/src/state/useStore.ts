@@ -79,6 +79,8 @@ import {
 import {
   buildPatternWindow,
   addDaysIso,
+  normalizeProgramHorizon,
+  programHorizonAnchor,
   composeRoutineMicrocycle,
   contextualRoutineRoles,
   computeSubstitutions,
@@ -2507,25 +2509,17 @@ const isoUtcMs = (value: string): number => {
   return ms;
 };
 
-const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput, startDate: string) => {
+const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput, horizonAnchorDate: string) => {
   const selected = [...new Set(input.dayIndices)].sort((a, b) => a - b);
   if (selected.length < 1 || selected.length > 7
       || selected.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
     throw new Error('Choose between one and seven training days.');
   }
-  let plannedBlockCount: number;
-  let requestedReviewDate: string | null = null;
-  if (input.horizon.kind === 'weeks') {
-    plannedBlockCount = input.horizon.blockCount;
-    if (!Number.isInteger(plannedBlockCount) || plannedBlockCount < 1 || plannedBlockCount > 8) {
-      throw new Error('Choose a review horizon from 4 to 32 weeks.');
-    }
-  } else {
-    requestedReviewDate = input.horizon.requestedReviewDate;
-    const daysAway = Math.floor((isoUtcMs(requestedReviewDate) - isoUtcMs(startDate)) / 86400000);
-    if (daysAway < 28 || daysAway > 224) throw new Error('Review date must be 4 to 32 weeks away.');
-    plannedBlockCount = Math.ceil(daysAway / 28);
-  }
+  // The horizon is measured from the program's stable anchor, never from the
+  // edit date: editing an active program must not restart its review horizon
+  // (master 7bebc15 behaviour, preserved through the lineage integration).
+  const { plannedBlockCount, requestedReviewDate, plannedEndDate } =
+    normalizeProgramHorizon(horizonAnchorDate, input.horizon);
   const focuses = programFocuses(profile.objective, selected.length);
   const inputDaysMap = new Map(input.days?.map((d) => [d.dayIndex, d.focus]));
   const days: TrainingProgramDay[] = selected.map((dayIndex, i) => {
@@ -2557,7 +2551,7 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
   }));
   return {
     requestedReviewDate, plannedBlockCount,
-    plannedEndDate: addDaysIso(startDate, plannedBlockCount * 28),
+    plannedEndDate,
     days, movementPreferences, programDays,
   };
 };
@@ -4051,7 +4045,10 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const planningProfile = activeProgram === null ? profile
       : { ...profile, objective: activeProgram.objective };
     const startDate = localToday();
-    const shape = trainingProgramShape(planningProfile, input, startDate);
+    const horizonAnchorDate = activeProgram === null
+      ? startDate
+      : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
+    const shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
     const d = getDb();
     const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
