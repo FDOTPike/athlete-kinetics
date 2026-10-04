@@ -32,6 +32,45 @@ target 'AthleteKinetics' do
       # :ccache_enabled => true
     )
     patch_fmt_consteval_for_apple_clang!(installer)
+    make_glog_namespace_headers_textual!(installer)
+  end
+end
+
+# glog 0.3.5 (pinned by React Native 0.81) #includes glog/log_severity.h and
+# glog/vlog_is_on.h INSIDE `namespace google` (logging.h and raw_logging.h), so
+# those two are textual headers by design. React Native's glog podspec sets
+# DEFINES_MODULE, and CocoaPods' generated module map turns every header into
+# its own submodule. Swift/C++ interop (NitroModules, used by the Apple Health
+# binding) builds that module in C++ mode, and Clang rejects it: "import of
+# module 'glog.glog.log_severity' appears within namespace 'google'". The
+# generated map is replaced by an explicit one that keeps the three real
+# headers modular and marks the two namespace-included headers textual. No
+# glog source changes. Fails closed if the map or a header is not found.
+def make_glog_namespace_headers_textual!(installer)
+  return if installer.pod_targets.none? { |target| target.pod_name == 'glog' }
+  root = Pathname.new(installer.sandbox.root)
+  headers = root + 'Headers/Public/glog/glog'
+  modular = %w[logging.h raw_logging.h stl_logging.h]
+  textual = %w[log_severity.h vlog_is_on.h]
+  missing = (modular + textual).reject { |name| (headers + name).exist? }
+  raise "glog headers not found in #{headers}: #{missing.join(', ')}" unless missing.empty?
+  maps = (Dir.glob(root + 'Headers/Public/glog/*.modulemap') + Dir.glob(root + 'Target Support Files/glog/*.modulemap'))
+    .map { |path| File.realpath(path) }.uniq
+  raise 'glog module map not found; refusing to continue without the textual-header fix' if maps.empty?
+  maps.each do |map|
+    original = File.read(map)
+    next if original.include?('athlete-kinetics: glog textual headers')
+    Pod::UI.puts "glog module map #{map} (original):\n#{original}"
+    # Absolute paths: the map is reached through a symlink in Headers/Public
+    # as well as directly, and relative paths would resolve differently.
+    rel = File.realpath(headers.to_s)
+    lines = ['// athlete-kinetics: glog textual headers (see Podfile)', 'module glog {']
+    modular.each { |name| lines << "  header \"#{rel}/#{name}\"" }
+    textual.each { |name| lines << "  textual header \"#{rel}/#{name}\"" }
+    lines += ['  export *', '}', '']
+    File.chmod(0644, map)
+    File.write(map, lines.join("\n"))
+    Pod::UI.puts "glog module map #{map}: log_severity.h and vlog_is_on.h are now textual".green
   end
 end
 

@@ -20,7 +20,8 @@
  *   [N7] the Archivo font shipped on iOS is the same hash-pinned file Android ships.
  *   [N8] privacy manifest present; Android device backup stays disabled.
  *   [N9] Xcode 26 toolchain: the Podfile disables fmt's consteval for Apple
- *        clang (fmtlib/fmt#4740) while React Native pins fmt 11.0.2.
+ *        clang (fmtlib/fmt#4740) while React Native pins fmt 11.0.2, and makes
+ *        glog's namespace-included headers textual for Swift/C++ interop.
  *
  * Run: npm run verify:native-config
  */
@@ -163,6 +164,9 @@ console.log('[N9] Xcode 26 / fmt consteval compatibility');
   const patched = /patch_fmt_consteval_for_apple_clang!\(installer\)/.test(podfile)
     && podfile.includes("__apple_build_version__ < 14000029L'") && podfile.includes("version == '11.0.2'");
   check('the Podfile post_install applies the fmt Apple clang consteval patch', patched);
+  check('the Podfile post_install makes glog\'s namespace-included headers textual (Swift/C++ interop)',
+    /make_glog_namespace_headers_textual!\(installer\)/.test(podfile)
+      && /textual = %w\[log_severity\.h vlog_is_on\.h\]/.test(podfile));
   if (fmtVersion !== undefined) {
     check('the installed React Native still pins the fmt version the patch is written for', fmtVersion === '11.0.2', fmtVersion);
   }
