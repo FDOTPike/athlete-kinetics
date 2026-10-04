@@ -8,6 +8,11 @@ let mockState;
 jest.mock('@ak/inference', () => ({
   SCHEMA_TYPES: ['LINEAR', 'WAVE', 'STEP', 'APRE'],
   targetLoadKg: jest.fn(() => 42.5),
+  addDaysIso: jest.fn((iso, days) => {
+    const date = new Date(`${iso}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }),
 }));
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
@@ -160,6 +165,121 @@ test('COACH keeps the trajectory compact and expands a session only when its day
   expect(screen.getByLabelText('Manage current block')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Manage current block'));
   expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
+});
+
+test('COACH opens the Manage program editor and saves future preferences', () => {
+  const updateProgramPreferences = jest.fn(() => true);
+  const activeProgram = {
+    programId: 7,
+    objective: 'strength',
+    startDate: '2026-07-01',
+    horizonKind: 'weeks',
+    requestedReviewDate: null,
+    plannedEndDate: '2026-10-21',
+    plannedBlockCount: 4,
+    startingMacroBlockIndex: 1,
+    schemaType: 'LINEAR',
+    status: 'active',
+    currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'full' }],
+    movementPreferences: [],
+  };
+  const editorPreview = {
+    objective: 'strength',
+    startDate: TODAY,
+    requestedReviewDate: null,
+    plannedEndDate: '2026-10-21',
+    plannedBlockCount: 4,
+    schemaType: 'LINEAR',
+    days: activeProgram.days,
+    plan: {
+      objective: 'strength', start_date: TODAY, weeks: 4, schemaType: 'LINEAR',
+      macroBlockIndex: 2, macroPhase: 'gpp', peakShifted: false,
+      sessions: [], warnings: [], recovery: false, autopilotAdjusted: [],
+    },
+  };
+  mockState = baseState({
+    profile: {
+      objective: 'strength', training_age: 'beginner', weekly_frequency: 1,
+      equipment_inventory: [], base_rpe_cap: 9, session_duration_cap_min: 60,
+    },
+    program: activeProgram,
+    movements: [],
+    previewTrainingProgram: jest.fn(() => editorPreview),
+    updateProgramPreferences,
+    getMovementAvailabilityVerdicts: jest.fn(() => []),
+    previewNextProgramBlock: jest.fn(() => null),
+    continueTrainingProgram: jest.fn(),
+    archiveTrainingProgram: jest.fn(),
+  });
+
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText('Manage future program preferences'));
+  expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+  fireEvent.press(screen.getByText('Save future preferences'));
+  expect(updateProgramPreferences).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
+});
+
+test('COACH requires an explicit preview confirmation before continuing a goal program', () => {
+  const continueTrainingProgram = jest.fn();
+  const nextPlan = {
+    objective: 'strength', start_date: TODAY, weeks: 4, schemaType: 'WAVE',
+    macroBlockIndex: 2, macroPhase: 'gpp', peakShifted: false,
+    sessions: [{ week_index: 1, day_index: 1, focus: 'full', phase: 'accumulation', session_date: TODAY, slots: [] }],
+    warnings: ['full: preferred squat movement unavailable; safe fallback used'],
+    recovery: false, autopilotAdjusted: ['squat'],
+  };
+  mockState = baseState({
+    block: { blockId: 1, startDate: '2026-06-01', objective: 'strength', createdAtMs: 1 },
+    program: {
+      programId: 7, objective: 'strength', startDate: '2026-06-01',
+      horizonKind: 'weeks', requestedReviewDate: null, plannedEndDate: '2026-08-10',
+      plannedBlockCount: 2, startingMacroBlockIndex: 1, schemaType: 'WAVE',
+      status: 'active', currentSequenceIndex: 1,
+      days: [{ dayIndex: 1, focus: 'full' }], movementPreferences: [],
+    },
+    previewNextProgramBlock: jest.fn(() => nextPlan),
+    continueTrainingProgram,
+    archiveTrainingProgram: jest.fn(),
+  });
+
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText('Review program continuation'));
+  expect(mockState.previewNextProgramBlock).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('NEXT BLOCK PREVIEW')).toBeOnTheScreen();
+  expect(screen.getByText('full: preferred squat movement unavailable; safe fallback used')).toBeOnTheScreen();
+  expect(continueTrainingProgram).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByLabelText('Confirm and start next program block'));
+  expect(continueTrainingProgram).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText('NEXT BLOCK PREVIEW')).toBeNull();
+});
+
+test('COACH discloses a raised autopilot attribution on demand', () => {
+  const raisedSlot = { ...todaySlot, autopilot: { rpeDelta: 0.5, setDelta: 1, reason: 'raised' } };
+  mockState = baseState({
+    todayPlan: { ...todayPlan, slots: [raisedSlot] },
+    loadSessionSlots: jest.fn(() => [raisedSlot]),
+  });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
+  expect(screen.getByLabelText('Why Goblet Squat target changed')).toBeOnTheScreen();
+  expect(screen.queryByText('Nudged up — your recent sets felt easier than planned. RPE +0.5, +1 set.')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Why Goblet Squat target changed'));
+  expect(screen.getByText('Nudged up — your recent sets felt easier than planned. RPE +0.5, +1 set.')).toBeOnTheScreen();
+});
+
+test('COACH discloses a held-safety autopilot attribution on demand', () => {
+  const safetySlot = { ...todaySlot, autopilot: { rpeDelta: -0.5, setDelta: -1, reason: 'held_safety' } };
+  mockState = baseState({
+    todayPlan: { ...todayPlan, slots: [safetySlot] },
+    loadSessionSlots: jest.fn(() => [safetySlot]),
+  });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
+  fireEvent.press(screen.getByLabelText('Why Goblet Squat target changed'));
+  expect(screen.getByText('Held back — a recent safety signal limited this target. RPE -0.5, -1 set.')).toBeOnTheScreen();
 });
 
 test('COACH shows only exact finalized plan outcomes as Done or Stopped', () => {

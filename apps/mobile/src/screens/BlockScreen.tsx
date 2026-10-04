@@ -4,9 +4,9 @@
  * Coaching information is arranged around one immediate decision, a compact
  * four-week trajectory (liquid calendar), and inline disclosures for management and context.
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SCHEMA_TYPES, targetLoadKg, type SchemaType } from '@ak/inference';
+import { SCHEMA_TYPES, addDaysIso, targetLoadKg, type BlockPlan, type SchemaType } from '@ak/inference';
 import {
   useStore,
   type BlockSessionSummary,
@@ -15,6 +15,7 @@ import {
 } from '../state/useStore';
 import { RoutineTemplateBuilder } from '../components/RoutineTemplateBuilder';
 import { useSubViewBack } from '../navigation/navigation';
+import ProgramSetupScreen from './ProgramSetupScreen';
 import { theme } from '../theme/theme';
 import {
   PrimaryButton,
@@ -91,6 +92,57 @@ function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): strin
   }`;
 }
 
+/** Both attribution disclosures are a bare "·" glyph at theme.font.label, whose
+ *  laid-out box is far under theme.touch.min (56). Growing the Pressable to 56
+ *  would push a 56pt box into a text row that is otherwise label-height, so
+ *  extend the touchable region instead: 20pt on every side takes a ~16pt glyph
+ *  past the 56pt minimum without moving a single pixel of layout. */
+const ATTRIBUTION_HIT_SLOP = { top: 20, bottom: 20, left: 20, right: 20 } as const;
+
+const AUTOPILOT_BUDGET_NOTE ='Autopilot still eases effort and adjusts sets whenever your sessions call for it. Only upward RPE moves are rationed, and those grants are spent over the first five blocks of each cycle.';
+
+function autopilotExplanation(slot: TodaySlot): string | null {
+  if (slot.autopilot === undefined) return null;
+  const reason = slot.autopilot.reason === 'eased'
+    ? 'Eased off — your recent sets felt harder than planned.'
+    : slot.autopilot.reason === 'raised'
+      ? 'Nudged up — your recent sets felt easier than planned.'
+      : 'Held back — a recent safety signal limited this target.';
+  const changes = [
+    slot.autopilot.rpeDelta === 0 ? null : `RPE ${signed(slot.autopilot.rpeDelta)}`,
+    slot.autopilot.setDelta === 0
+      ? null
+      : `${signed(slot.autopilot.setDelta)} set${Math.abs(slot.autopilot.setDelta) === 1 ? '' : 's'}`,
+  ].filter((value): value is string => value !== null);
+  return `${reason} ${changes.join(', ')}.`;
+}
+
+function AutopilotAttribution({
+  slot,
+  expanded,
+  onPress,
+}: {
+  slot: TodaySlot;
+  expanded: boolean;
+  onPress: () => void;
+}): React.JSX.Element | null {
+  const explanation = autopilotExplanation(slot);
+  if (explanation === null) return null;
+  return (
+    <View style={styles.attribution}>
+      <Pressable
+        onPress={onPress}
+        hitSlop={ATTRIBUTION_HIT_SLOP}
+        accessibilityRole="button"
+        accessibilityLabel={`Why ${slot.movementName} target changed`}
+        accessibilityState={{ expanded }}
+      >
+        <Text style={styles.attributionMarker}>·</Text>
+      </Pressable>
+      {expanded && <Text style={styles.attributionText}>{explanation}</Text>}
+    </View>
+  );
+}
 function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
   return [1, 2, 3, 4].map((week) => {
     const inWeek = sessions.filter((session) => session.weekIndex === week);
@@ -106,6 +158,7 @@ function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
 
 export default function BlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX.Element {
   const vector = useStore((s) => s.vector);
+  const storeError = useStore((s) => s.error);
   const today = useStore((s) => s.today);
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
@@ -122,6 +175,14 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const generateNewBlock = useStore((s) => s.generateNewBlock);
   const loadSessionSlots = useStore((s) => s.loadSessionSlots);
   const reportSubjective = useStore((s) => s.reportSubjective);
+  const program = useStore((s) => s.program);
+  const previewNextProgramBlock = useStore((s) => s.previewNextProgramBlock);
+  const continueTrainingProgram = useStore((s) => s.continueTrainingProgram);
+  const archiveTrainingProgram = useStore((s) => s.archiveTrainingProgram);
+  const [editingProgram, setEditingProgram] = useState(false);
+  const [nextProgramPreview, setNextProgramPreview] = useState<BlockPlan | null>(null);
+  const [continuationError, setContinuationError] = useState<string | null>(null);
+  const [continuationPending, setContinuationPending] = useState(false);
   const startSession = useStore((s) => s.startSession);
 
   const routineTemplates = useStore((s) => s.routineTemplates) ?? [];
@@ -134,6 +195,8 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
+  const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
+  const [macroBudgetOpen, setMacroBudgetOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(block === null);
   const scrollRef = useRef<ScrollView>(null);
   const trajectorySectionY = useRef(0);
@@ -150,7 +213,26 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
 
+  // continueTrainingProgram reports every refusal through the store's `error`
+  // and returns without creating a block, so dismissing the preview card the
+  // moment the button is pressed would leave the athlete with no next block,
+  // no message, and nothing to retry. The store's post-call error is only
+  // observable on the NEXT render, so settle the confirmation here: close the
+  // card once the continuation actually landed, keep it up and surface the
+  // reason when it did not.
+  useEffect(() => {
+    if (!continuationPending) return;
+    setContinuationPending(false);
+    if (storeError !== null && storeError !== undefined) {
+      setContinuationError(storeError);
+      return;
+    }
+    setNextProgramPreview(null);
+  }, [continuationPending, storeError]);
+
   const hasSubView =
+    editingProgram ||
+    nextProgramPreview !== null ||
     detail !== null ||
     reportOpen ||
     confirmRegenerate ||
@@ -159,7 +241,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     confirmRoutineAction !== null;
 
   useSubViewBack(hasSubView, () => {
-    if (editingTemplate !== null) setEditingTemplate(null);
+    if (editingProgram) setEditingProgram(false);
+    else if (nextProgramPreview !== null) setNextProgramPreview(null);
+    else if (editingTemplate !== null) setEditingTemplate(null);
     else if (confirmRoutineAction !== null) setConfirmRoutineAction(null);
     else if (detail !== null) setDetail(null);
     else if (reportOpen) setReportOpen(false);
@@ -198,6 +282,16 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     }
   };
 
+  if (editingProgram) {
+    return (
+      <ProgramSetupScreen
+        editing
+        onComplete={() => setEditingProgram(false)}
+        onCancel={() => setEditingProgram(false)}
+      />
+    );
+  }
+
   if (editingTemplate !== null) {
     return (
       <RoutineTemplateBuilder
@@ -217,6 +311,11 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.bodyText}>
             Sync telemetry or load the demo athlete before asking Coach to adjust today's plan.
           </Text>
+          <SecondaryButton
+            label="Build a standalone routine"
+            onPress={() => setEditingTemplate('new')}
+            accessibilityLabel="Build a standalone routine template"
+          />
         </View>
       </View>
     );
@@ -226,6 +325,10 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
   const rows = weekRowsFor(blockSessions);
   const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
+  const programBlockExpired = program?.status === 'active' && block !== null
+    && today > addDaysIso(block.startDate, 27);
+  const continuationReviewDate = program?.status === 'active'
+    ? addDaysIso(today, (program.plannedBlockCount - program.currentSequenceIndex) * 28) : null;
 
   const openDetail = (summary: BlockSessionSummary): void => {
     if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
@@ -316,6 +419,20 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         </View>
       )}
 
+      {program != null && (
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>GOAL PROGRAM</Text>
+          <Text style={styles.cardTitle}>Block {program.currentSequenceIndex} of {program.plannedBlockCount}</Text>
+          <Text style={styles.bodyText}>Review boundary: {program.plannedEndDate}</Text>
+          {program.status === 'review_due' && (
+            <>
+              <Text style={styles.adjustedText}>Goal reassessment is due before another program starts.</Text>
+              <PrimaryButton label="Reassess goal" onPress={archiveTrainingProgram} accessibilityLabel="Archive completed program and reassess goal" />
+            </>
+          )}
+        </View>
+      )}
+
       {/* Today Focus Card */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
@@ -345,6 +462,16 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             <PrimaryButton label="Review safety report" onPress={() => setReportOpen(true)} accessibilityLabel="Review safety report" />
           ) : session !== null ? (
             <PrimaryButton label="Open active session" onPress={() => onSessionStarted?.()} accessibilityLabel="Open active session" />
+          ) : programBlockExpired ? (
+            <PrimaryButton
+              label={program != null && program.currentSequenceIndex >= program.plannedBlockCount ? 'Review goal' : 'Review next block'}
+              onPress={() => {
+                const preview = previewNextProgramBlock();
+                if (preview === null) continueTrainingProgram();
+                else setNextProgramPreview(preview);
+              }}
+              accessibilityLabel="Review program continuation"
+            />
           ) : todayPlan !== null ? (
             <PrimaryButton label="Start session" onPress={startPlannedSession} accessibilityLabel="Start session" />
           ) : block === null ? (
@@ -358,13 +485,43 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           )}
           {block !== null && (
             <SecondaryButton
-              label="Manage block"
-              onPress={openManageBlock}
-              accessibilityLabel="Manage current block"
+              label={program == null ? 'Manage block' : 'Manage program'}
+              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+              accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
             />
           )}
         </View>
       </View>
+
+      {nextProgramPreview !== null && (
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>NEXT BLOCK PREVIEW</Text>
+          <Text style={styles.cardTitle}>{SCHEMA_LABEL[nextProgramPreview.schemaType]} - {nextProgramPreview.macroPhase}</Text>
+          <Text style={styles.bodyText}>Starts today with {nextProgramPreview.sessions.filter((session) => session.week_index === 1).length} repeating training days.</Text>
+          {nextProgramPreview.warnings.map((warning) => (
+            <Text key={warning} style={styles.captionText}>{warning}</Text>
+          ))}
+          {program != null && continuationReviewDate !== null && continuationReviewDate !== program.plannedEndDate && (
+            <Text style={styles.adjustedText}>
+              Late confirmation moves the review boundary to {continuationReviewDate}, preserving four full weeks per remaining block.
+            </Text>
+          )}
+          {continuationError !== null && (
+            <Text style={styles.errorText}>{continuationError}</Text>
+          )}
+          {/* The preview is dismissed by the effect above, only once the
+              continuation has actually landed. */}
+          <PrimaryButton label="Confirm next block" onPress={() => {
+            setContinuationError(null);
+            setContinuationPending(true);
+            continueTrainingProgram();
+          }} accessibilityLabel="Confirm and start next program block" />
+          <SecondaryButton label="Not yet" onPress={() => {
+            setContinuationError(null);
+            setNextProgramPreview(null);
+          }} />
+        </View>
+      )}
 
       {/* Four-week trajectory Section */}
       <View
@@ -372,6 +529,20 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
       >
         <Text style={styles.sectionTitle}>Four-week trajectory</Text>
+        {blockMeta !== null && blockMeta.macroBlockIndex >= 6 && (
+          <View style={styles.blockAttribution}>
+            <Pressable
+              onPress={() => setMacroBudgetOpen((open) => !open)}
+              hitSlop={ATTRIBUTION_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="Why RPE is held steady"
+              accessibilityState={{ expanded: macroBudgetOpen }}
+            >
+              <Text style={styles.attributionMarker}>·</Text>
+            </Pressable>
+            {macroBudgetOpen && <Text style={styles.attributionText}>{AUTOPILOT_BUDGET_NOTE}</Text>}
+          </View>
+        )}
         {block === null ? (
           <View style={styles.emptyTrajectory}>
             <Text style={styles.bodyText}>No block is active yet.</Text>
@@ -457,6 +628,11 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                             <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
                             <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
                           </View>
+                          <AutopilotAttribution
+                            slot={slot}
+                            expanded={attributionSlotId === slot.plannedSlotId}
+                            onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
+                          />
                         </View>
                         {slot.overrideLoadKg !== null && (
                           <Chip label="SUBSTITUTED" selected={false} onPress={() => {}} />
@@ -515,6 +691,11 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   <View style={styles.slotMain}>
                     <Text style={styles.slotName}>{slot.movementName}</Text>
                     <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes)}</Text>
+                    <AutopilotAttribution
+                      slot={slot}
+                      expanded={attributionSlotId === slot.plannedSlotId}
+                      onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
+                    />
                   </View>
                 </View>
               ))}
@@ -570,6 +751,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           </View>
         </Disclosure>
 
+        {program == null && (
         <View
           testID="manage-block-section"
           onLayout={(event) => { manageSectionOffsetY.current = event.nativeEvent.layout.y; }}
@@ -649,33 +831,40 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               </View>
             )}
 
-            {(block === null || todayPlan === null) && !halted && session === null && (
-              <Disclosure label="Start without a planned session">
-                <View style={styles.disclosureContent}>
-                  {!confirmUnplannedStart ? (
-                    <>
-                      <Text style={styles.captionText}>
-                        This starts a session without the day's planned exercise order.
-                      </Text>
-                      <SecondaryButton
-                        label="Start an unplanned session"
-                        onPress={() => setConfirmUnplannedStart(true)}
-                        accessibilityLabel="Start an unplanned session"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
-                      <PrimaryButton label="Start unplanned session" onPress={startUnplannedSession} accessibilityLabel="Start unplanned session" />
-                      <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
-                    </>
-                  )}
-                </View>
-              </Disclosure>
-            )}
           </View>
         </Disclosure>
         </View>
+        )}
+
+        {/* Deliberately OUTSIDE the program gate above. "Manage block" is hidden
+            while a program is active, and freezeRoutineTemplateToPlannedSession
+            refuses to run then as well — so nesting the unplanned start inside
+            that gate left a program athlete on a rest day with no way to begin
+            an ad-hoc session at all. Only block regeneration is program-gated. */}
+        {(block === null || todayPlan === null) && !halted && session === null && (
+          <Disclosure label="Start without a planned session">
+            <View style={styles.disclosureContent}>
+              {!confirmUnplannedStart ? (
+                <>
+                  <Text style={styles.captionText}>
+                    This starts a session without the day's planned exercise order.
+                  </Text>
+                  <SecondaryButton
+                    label="Start an unplanned session"
+                    onPress={() => setConfirmUnplannedStart(true)}
+                    accessibilityLabel="Start an unplanned session"
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
+                  <PrimaryButton label="Start unplanned session" onPress={startUnplannedSession} accessibilityLabel="Start unplanned session" />
+                  <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
+                </>
+              )}
+            </View>
+          </Disclosure>
+        )}
 
         <Disclosure
           label="Something feels off"
@@ -838,6 +1027,13 @@ const styles = StyleSheet.create({
     ...theme.font.label,
     color: theme.color.textMid,
   },
+  errorText: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.color.textHi,
+    paddingLeft: theme.space[2],
+  },
   statusBadge: {
     borderWidth: 1,
     borderColor: theme.color.line,
@@ -986,6 +1182,27 @@ const styles = StyleSheet.create({
   slotTarget: {
     ...theme.font.label,
     color: theme.color.textMid,
+  },
+  attribution: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space[2],
+  },
+  attributionMarker: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    paddingHorizontal: theme.space[1],
+  },
+  attributionText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    flex: 1,
+  },
+  blockAttribution: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space[2],
+    marginTop: theme.space[1],
   },
   disclosureContent: {
     gap: theme.space[3],

@@ -40,11 +40,30 @@ import m029 from './schema/029_routine_history_analytics.sql';
 import m030 from './schema/030_readiness_import_integration.sql';
 import m031 from './schema/031_planned_session_method.sql';
 import m032 from './schema/032_capability_content.sql';
+import m033 from './schema/033_goal_program.sql';
+import m034 from './schema/034_autopilot_attribution.sql';
+// Current master does not yet carry 035-057. Migration 058 is dependency-free
+// and idempotent, so it can be appended now and safely replayed after any later
+// backfill of that gap.
+import m058 from './schema/058_suspension_episode.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
- *  shipped entry — add a new one. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032];
+ *  shipped entry — add a new one.
+ *
+ *  APPEND, NEVER INSERT — including when backfilling the 035-057 gap.
+ *  `user_version` is this array's INDEX, not the migration's file number:
+ *  applyFrom() starts at `user_version` and sets it to `v + 1` per entry. A
+ *  device that has run every entry above sits at user_version = 34. Splicing a
+ *  backfilled m035 in at index 33 (its "numeric" home, before m058) would
+ *  renumber m058 to index 34, and that device — already at 34 — would skip the
+ *  spliced migration forever while believing the chain is complete. Its only
+ *  rescue would be the SENTINELS self-heal, which is a safety net, not a
+ *  migration strategy. So 035-057 must be appended AFTER m058 whenever they
+ *  land, leaving this array's order permanently divergent from file-number
+ *  order. Idempotency is what makes that safe: order of application, not
+ *  numeric order, is the contract. */
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m058];
 
 export function migrate(db: DB): void {
   runMigrations(db, MIGRATIONS);

@@ -37,6 +37,20 @@ export const OBJECTIVES = [
 ] as const;
 export type Objective = (typeof OBJECTIVES)[number];
 
+/** Why a macro position is frozen (058, RR-02). */
+export const SUSPENSION_REASONS = ['injury', 'illness', 'life'] as const;
+export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
+
+/** One athlete-owned suspension episode. An open episode has no end time;
+ * `is_suspended` is derived rather than stored. */
+export interface SuspensionEpisode {
+  episode_id: number;
+  started_at_ms: number;
+  ended_at_ms: number | null;
+  reason: SuspensionReason;
+  frozen_macro_index: number;
+}
+
 export const TRAINING_AGES = ['beginner', 'intermediate', 'advanced', 'elite'] as const;
 export type TrainingAge = (typeof TRAINING_AGES)[number];
 

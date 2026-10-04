@@ -13,6 +13,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
@@ -41,6 +42,7 @@ const schemaFiles = [
   '030_readiness_import_integration.sql',
   '031_planned_session_method.sql',
   '032_capability_content.sql',
+  '033_goal_program.sql',
 ];
 
 for (const f of schemaFiles) {
@@ -296,13 +298,20 @@ check('freezing a routine template continues the macrocycle instead of rewinding
 });
 
 check('both block_meta writers share one macro-continuation helper', () => {
-  // One reader, one increment, one place to change it.
+  // One reader, one increment, one place to change it for the STANDALONE path.
   assert.ok(storeSource.includes('const nextMacroPosition = (d: DB)'),
     'nextMacroPosition helper must exist');
-  assert.equal((storeSource.match(/nextMacroPosition\(d\)/g) ?? []).length, 2,
-    'exactly two callers: generateNewBlock and the routine-template freeze');
   assert.equal((storeSource.match(/SELECT macro_block_index FROM block_meta/g) ?? []).length, 1,
     'the continuation query must live in exactly one place');
+  // The helper stays on the standalone path (generateNewBlock fallback +
+  // routine-template freeze). The guided-program path is program-owned and
+  // must NOT read the global cycle — pinned behaviorally in the
+  // macro-ownership contract in verify_store_sql.mjs and the persisted-DB
+  // program tests below.
+  assert.ok(storeSource.includes('pendingProgramContinuation !== null'),
+    'program continuation must branch away from the global cycle');
+  assert.ok(storeSource.includes('programMacroIndex('),
+    'program-owned derivation must be used for program blocks');
   assert.ok(!storeSource.includes("[blockId, 1, 'gpp', template.schemaType, 0]"),
     'the hardcoded macro position in the freeze path must be gone');
 });
@@ -331,3 +340,269 @@ console.log(`routine templates tests complete: ${pass} passed, ${fail} failed`);
 if (fail > 0) {
   process.exit(1);
 }
+
+// ---------------------------------------------------------------------------
+// Guided program creation and continuation — persisted-DB behavioral harness
+// (AUD-GP-2 / remediation task 2 / P2). Runs the SHARED PRODUCTION helpers
+// (packages/core-db/src/programTx.ts, compiled) — the exact functions the
+// Zustand store now calls — against a fresh node:sqlite database migrated
+// through 033. The test can no longer drift from production SQL: any change
+// to the program transaction is a change to the code under test.
+// ---------------------------------------------------------------------------
+{
+  const require2 = createRequire(import.meta.url);
+  const { programMacroIndex, macroPhaseOf } = require2(
+    join(ROOT, 'packages', 'inference', 'test', '.build', 'blockGenerator.js'),
+  );
+  const {
+    archiveActiveTrainingBlock,
+    insertTrainingProgram,
+    linkTrainingBlockProgram,
+    updateTrainingProgramEndDate,
+  } = require2(join(ROOT, 'packages', 'core-db', 'test', '.build', 'programTx.js'));
+
+  // node:sqlite adapter exposing the op-sqlite-shaped ExecDb surface the
+  // shared helper (and the store) speaks.
+  const makeExecDb = (raw) => ({
+    raw,
+    executeSync(sql, params) {
+      if (/^\s*SELECT/i.test(sql)) return { rows: raw.prepare(sql).all() };
+      if (params && params.length > 0) raw.prepare(sql).run(...params);
+      else raw.exec(sql);
+      return { rows: [] };
+    },
+  });
+
+  const pdb = makeExecDb(new DatabaseSync(':memory:'));
+  try { pdb.raw.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
+    pdb.raw.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+    pdb.raw.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+  }
+  for (const f of schemaFiles) {
+    pdb.raw.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+
+  // Seed what the store's creation path needs: one movement (for preference
+  // FK — migrations 016-020 already seed the library, so ignore duplicates)
+  // and one athlete_profile row.
+  pdb.raw.exec("INSERT OR IGNORE INTO movement (movement_id, name, pattern) VALUES (1, 'Back Squat', 'squat')");
+  pdb.raw.exec(`INSERT OR IGNORE INTO athlete_profile (profile_id, objective, training_age, weekly_frequency,
+             equipment_inventory, base_rpe_cap, session_duration_cap_min, updated_at_ms)
+            VALUES (1, 'strength', 'beginner', 3,
+             '[]', 9, 60, 0)`);
+
+  const pcheck = (label, fn) => {
+    try {
+      fn();
+      console.log(`  PASS  ${label}`);
+      pass += 1;
+    } catch (err) {
+      console.error(`  FAIL  ${label}: ${err.message}`);
+      fail += 1;
+    }
+  };
+
+  console.log('[guided program persisted-DB creation and continuation (shared helper)]');
+
+  // --- Creation (the store's generateNewBlock with pendingProgramCreation) ---
+  // The store anchors the FIRST program block at the athlete's global
+  // position (simulated here as 6) and stores it as starting_macro_block_index.
+  const programStart = 6;
+  const now = Date.now();
+  const programId = insertTrainingProgram(pdb, {
+    objective: 'strength',
+    startDate: '2026-08-03',
+    horizonKind: 'weeks',
+    requestedReviewDate: null,
+    plannedEndDate: '2026-09-28',
+    plannedBlockCount: 4,
+    startingMacroBlockIndex: programStart,
+    schemaType: 'LINEAR',
+    days: [{ dayIndex: 1, focus: 'full' }],
+    movementPreferences: [],
+    weeklyFrequency: 1,
+    now,
+  });
+
+  pcheck('creation stores the anchor macro position in the program row', () => {
+    const row = pdb.raw.prepare('SELECT starting_macro_block_index FROM training_program WHERE program_id = ?').get(programId);
+    assert.equal(row.starting_macro_block_index, programStart);
+  });
+
+  // --- Block linkage + program-owned macro progression through all 4 blocks ---
+  for (let sequenceIndex = 1; sequenceIndex <= 4; sequenceIndex += 1) {
+    const macroIndex = programMacroIndex(programStart, sequenceIndex);
+    const macroPhase = macroPhaseOf(macroIndex);
+
+    pdb.raw.exec(`INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2026-08-03', 'strength', ${now})`);
+    const blockId = pdb.raw.prepare('SELECT last_insert_rowid() AS id').get().id;
+    linkTrainingBlockProgram(pdb, blockId, programId, sequenceIndex);
+    pdb.raw.exec(
+      `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+       VALUES (${blockId}, ${macroIndex}, '${macroPhase}', 'LINEAR', 0)`,
+    );
+  }
+
+  pcheck('each generated block links to its program with the correct sequence index', () => {
+    const links = pdb.raw.prepare(
+      'SELECT sequence_index FROM training_block_program WHERE program_id = ? ORDER BY sequence_index',
+    ).all(programId);
+    assert.deepEqual(links.map((r) => r.sequence_index), [1, 2, 3, 4]);
+  });
+
+  pcheck('block_meta macro index matches the program-owned derivation for every block', () => {
+    const metas = pdb.raw.prepare(
+      `SELECT bm.macro_block_index, bm.macro_phase
+         FROM block_meta bm
+         JOIN training_block_program tbp ON tbp.block_id = bm.block_id
+        WHERE tbp.program_id = ? ORDER BY tbp.sequence_index`,
+    ).all(programId);
+    assert.deepEqual(metas.map((r) => r.macro_block_index), [6, 7, 8, 1],
+      'a program starting at macro 6 must run 6,7,8,1 (wrap), not inherit the global cycle');
+    assert.deepEqual(metas.map((r) => r.macro_phase), ['volume', 'peak', 'peak', 'gpp']);
+  });
+
+  pcheck('macro_phase stored in block_meta is macroPhaseOf(macro_block_index)', () => {
+    const metas = pdb.raw.prepare(
+      `SELECT bm.macro_block_index, bm.macro_phase
+         FROM block_meta bm
+         JOIN training_block_program tbp ON tbp.block_id = bm.block_id
+        WHERE tbp.program_id = ? ORDER BY tbp.sequence_index`,
+    ).all(programId);
+    for (const m of metas) {
+      assert.equal(m.macro_phase, macroPhaseOf(m.macro_block_index));
+    }
+  });
+
+  pcheck('continuation end-date update goes through the shared helper', () => {
+    updateTrainingProgramEndDate(pdb, programId, '2026-10-26', now);
+    const row = pdb.raw.prepare('SELECT planned_end_date FROM training_program WHERE program_id = ?').get(programId);
+    assert.equal(row.planned_end_date, '2026-10-26');
+  });
+
+  pcheck('archive-active-block helper only touches the active block', () => {
+    pdb.raw.exec(`INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2026-08-03', 'strength', ${now})`);
+    pdb.raw.exec("UPDATE training_block SET status = 'active' WHERE block_id = (SELECT MAX(block_id) FROM training_block)");
+    archiveActiveTrainingBlock(pdb);
+    const activeCount = pdb.raw.prepare("SELECT COUNT(*) AS c FROM training_block WHERE status = 'active'").get().c;
+    assert.equal(activeCount, 0, 'all active blocks archived');
+  });
+
+  pcheck('continuation carries the program anchor and ignores a moved global cycle', () => {
+    // Simulate the bug the fix removes: the GLOBAL cycle moved on (e.g. an
+    // interleaved standalone block) — continuation must NOT follow it.
+    pdb.raw.exec(`INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2026-08-03', 'strength', ${now})`);
+    const strayBlockId = pdb.raw.prepare('SELECT last_insert_rowid() AS id').get().id;
+    pdb.raw.exec(
+      `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+       VALUES (${strayBlockId}, 3, 'hypertrophy', 'LINEAR', 0)`,
+    );
+    const nextProgramIndex = programMacroIndex(programStart, 5); // 6 -> 2 (wrap)
+    assert.equal(nextProgramIndex, 2, 'program block 5 starting at 6 wraps to 2');
+    const stray = pdb.raw.prepare('SELECT macro_block_index FROM block_meta WHERE block_id = ?').get(strayBlockId);
+    assert.equal(stray.macro_block_index, 3, 'setup: the stray global block sits at 3');
+    assert.notEqual(nextProgramIndex, 3,
+      'continuation must NOT inherit the stray global position 3');
+  });
+
+  // --- Transaction-failure and rollback (through the shared helper) ---
+  pcheck('rollback after a mid-write failure leaves no partial program rows', () => {
+    const before = pdb.raw.prepare('SELECT COUNT(*) AS c FROM training_program').get().c;
+    let failure = null;
+    pdb.raw.exec('BEGIN');
+    try {
+      // Archive the committed program inside this transaction so the helper
+      // reaches its child writes instead of the one-active-program index.
+      pdb.raw.prepare("UPDATE training_program SET status = 'archived' WHERE program_id = ?").run(programId);
+      insertTrainingProgram(pdb, {
+        objective: 'strength',
+        startDate: '2026-10-01',
+        horizonKind: 'weeks',
+        requestedReviewDate: null,
+        plannedEndDate: '2026-11-26',
+        plannedBlockCount: 8,
+        startingMacroBlockIndex: 1,
+        schemaType: 'LINEAR',
+        days: [{ dayIndex: 1, focus: 'full' }],
+        // Program and day inserts succeed first; this missing movement makes
+        // the preference FK fail from inside the shared helper.
+        movementPreferences: [{
+          dayIndex: 1, slotIndex: 1, pattern: 'squat', movementId: 999999,
+        }],
+        weeklyFrequency: 1,
+        now,
+      });
+      assert.fail('the invalid preference FK should fail inside insertTrainingProgram');
+    } catch (error) {
+      failure = error;
+      pdb.raw.exec('ROLLBACK');
+    }
+    assert.match(String(failure?.message ?? failure), /FOREIGN KEY constraint failed/,
+      'the test must reach the preference child write');
+    const after = pdb.raw.prepare('SELECT COUNT(*) AS c FROM training_program').get().c;
+    assert.equal(after, before, 'the failed program row must not persist');
+    const previous = pdb.raw.prepare('SELECT status FROM training_program WHERE program_id = ?').get(programId);
+    assert.equal(previous.status, 'active', 'the pre-existing active program must be restored');
+    const orphanDays = pdb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM training_program_day WHERE program_id NOT IN (SELECT program_id FROM training_program)',
+    ).get().c;
+    assert.equal(orphanDays, 0, 'no orphan day rows after rollback');
+  });
+
+  pcheck('rollback preserves the previously committed program and block state', () => {
+    const programBefore = pdb.raw.prepare(
+      'SELECT status, planned_end_date FROM training_program WHERE program_id = ?',
+    ).get(programId);
+    const blocksBefore = pdb.raw.prepare(
+      'SELECT block_id, status FROM training_block ORDER BY block_id',
+    ).all();
+    let failedBlockId = null;
+    let reachedPostLinkFailure = false;
+    let failure = null;
+
+    pdb.raw.exec('BEGIN');
+    try {
+      // Mirror production continuation ordering, then fail after the link.
+      updateTrainingProgramEndDate(pdb, programId, '2026-12-21', now);
+      archiveActiveTrainingBlock(pdb);
+      pdb.raw.prepare(
+        "INSERT INTO training_block (start_date, objective, status, created_at_ms) VALUES (?, ?, 'active', ?)",
+      ).run('2026-11-23', 'strength', now);
+      failedBlockId = Number(pdb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+      linkTrainingBlockProgram(pdb, failedBlockId, programId, 5);
+      reachedPostLinkFailure = true;
+      pdb.raw.prepare(
+        'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) ' +
+        "VALUES (?, 9, 'gpp', 'LINEAR', 0)",
+      ).run(failedBlockId);
+      assert.fail('the invalid macro index should fail after the replacement block link');
+    } catch (error) {
+      failure = error;
+      pdb.raw.exec('ROLLBACK');
+    }
+
+    assert.equal(reachedPostLinkFailure, true, 'the test must reach the post-link failure point');
+    assert.match(String(failure?.message ?? failure), /CHECK constraint failed/,
+      'the claimed block_meta failure must trigger rollback');
+    const programRow = pdb.raw.prepare(
+      'SELECT status, planned_end_date FROM training_program WHERE program_id = ?',
+    ).get(programId);
+    assert.deepEqual(programRow, programBefore,
+      'the previous program status and end date must survive the rollback');
+    const blocksAfter = pdb.raw.prepare(
+      'SELECT block_id, status FROM training_block ORDER BY block_id',
+    ).all();
+    assert.deepEqual(blocksAfter, blocksBefore, 'all previous block statuses must survive the rollback');
+    const failedBlock = pdb.raw.prepare(
+      'SELECT block_id FROM training_block WHERE block_id = ?',
+    ).get(failedBlockId);
+    assert.equal(failedBlock, undefined, 'the replacement block must not persist');
+    const links = pdb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM training_block_program WHERE program_id = ?',
+    ).get(programId).c;
+    assert.equal(links, 4, 'the original program block links must survive the rollback');
+  });
+}
+
+console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
+process.exit(fail ? 1 : 0);
