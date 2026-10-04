@@ -330,10 +330,35 @@ function classifyLive() {
   return 'mixed';
 }
 
+/** The TEST's own verification opens (never the store's): the same crypto
+ *  stand-in without the KDF counter or gate, so verification can never perturb
+ *  what a test counts, memoized by (SHA-256 of the exact text, password).
+ *  openBackup is a pure function of those two inputs here, and the death-point
+ *  loops re-verify byte-identical recovery files dozens of times; decoding them
+ *  again inside jest's VM sandbox (~17x slower than plain Node for the Base64
+ *  loop) was a large share of this suite's runtime. Every product-path open
+ *  made by the store still runs in full. */
+const verifierCryptoProvider = {
+  ...mockCryptoProvider,
+  async deriveScryptKey(password, salt) {
+    return new Uint8Array(createHash('sha256').update(password).update(salt).digest());
+  },
+};
+const verifiedOpens = new Map();
+async function verifyOpen(text, password) {
+  const key = `${createHash('sha256').update(text).digest('hex')}\u0000${password}`;
+  let result = verifiedOpens.get(key);
+  if (result === undefined) {
+    result = await openBackup(text, password, verifierCryptoProvider);
+    verifiedOpens.set(key, result);
+  }
+  return result;
+}
+
 async function retainedRecovery(password = RECOVERY_PASSWORD) {
   const path = join(mockDocumentDir, RECOVERY_FILE);
   if (!existsSync(path)) return { sha256: null, athletes: 'absent' };
-  const opened = await openBackup(readFileSync(path, 'utf8'), password, mockCryptoProvider);
+  const opened = await verifyOpen(readFileSync(path, 'utf8'), password);
   return { sha256: mockHashFile(path), athletes: opened.ok ? athleteNames(opened.archive.registry) : `unopenable:${opened.code}` };
 }
 
@@ -383,6 +408,17 @@ function snapshotDirectories() {
     for (const name of readdirSync(directory)) files.set(`${directory}/${name}`, readFileSync(`${directory}/${name}`));
   }
   return files;
+}
+
+/** Byte-exact directory comparison via per-file SHA-256. Comparing the raw
+ *  Map<path, Buffer> with toEqual made jest walk multi-megabyte buffers element
+ *  by element (~2 minutes per assertion, the bulk of this suite's runtime and
+ *  the cause of its apparent stall in the 2026-10-04 audit). A digest map
+ *  asserts the same thing — every path present, every byte identical — and
+ *  names the exact path that changed. */
+function fileDigests(files) {
+  return Object.fromEntries([...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([path, bytes]) => [path, createHash('sha256').update(bytes).digest('hex')]));
 }
 
 function restoreDirectories(files) {
@@ -684,7 +720,7 @@ describe('W2 crash-safe recovery publication for portable restores', () => {
     const before = snapshotDirectories();
     await expect(restartApp()).resolves.toBe(false);
     expect(useBackupStore.getState().startupSafe).toBe(false);
-    expect(snapshotDirectories()).toEqual(before);
+    expect(fileDigests(snapshotDirectories())).toEqual(fileDigests(before));
   });
 
   test('process death at every file boundary always leaves an authenticated undo point for the data that survives', async () => {
@@ -707,11 +743,11 @@ describe('W2 crash-safe recovery publication for portable restores', () => {
         const path = join(mockDocumentDir, `${RECOVERY_FILE}${suffix}`);
         if (!existsSync(path)) continue;
         const text = readFileSync(path, 'utf8');
-        if ((await openBackup(text, RECOVERY_PASSWORD, mockCryptoProvider)).ok) {
+        if ((await verifyOpen(text, RECOVERY_PASSWORD)).ok) {
           found.push(`older recovery A${suffix}`);
           continue;
         }
-        const opened = await openBackup(text, PORTABLE_PASSWORD, mockCryptoProvider);
+        const opened = await verifyOpen(text, PORTABLE_PASSWORD);
         if (opened.ok && isDeepStrictEqual(athleteNames(opened.archive.registry), athleteNames(CURRENT_B))) {
           found.push(`recovery of B${suffix}`);
         }
@@ -953,7 +989,7 @@ describe('PR #18 review: ambiguous recovery candidates are preserved, not delete
     expect(useBackupStore.getState()).toMatchObject({ status: 'error', preview: null });
     expect(useBackupStore.getState().message).toMatch(/could not be opened/);
     expect(mockKdfCalls - kdfBefore).toBe(2);
-    expect(snapshotDirectories()).toEqual(before);
+    expect(fileDigests(snapshotDirectories())).toEqual(fileDigests(before));
   });
 
   test('a portable restore supersedes preserved candidates only after its new recovery is durable and before replacement', async () => {
