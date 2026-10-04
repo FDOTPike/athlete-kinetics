@@ -1,0 +1,147 @@
+{
+  "capturedAtUtc": "2026-10-04T14:31:04.707Z",
+  "cwd": "C:\\Users\\fpike\\.codex\\worktrees\\opus-integration-review-2026-10-04\\Athlete App",
+  "baseline": "55955f8e0dfd93df88824a192b53832b6adc4479",
+  "head": "cf4c221ef3993341f903a1d228e94d4893002081",
+  "tree": "4283c3acfad16d70e456c15645949dfdaa9ac7c7",
+  "trackedAndUntrackedStatus": "",
+  "diffStat": ".github/workflows/ci.yml                           | 13 ++++\n AGENT_WORKFLOW.md                                  |  2 +-\n apps/mobile/ios/AthleteKinetics/AppDelegate.swift  |  2 +-\n apps/mobile/ios/Podfile                            | 39 +++++++++++\n apps/mobile/src/App.tsx                            |  7 +-\n apps/mobile/src/diagnostics/nativeSmoke.ts         | 60 ++++++++++++----\n apps/mobile/src/state/deviceBackupPolicy.ts        | 21 +++++-\n .../test/components/DeviceBackupPolicy.test.js     | 18 ++++-\n tools/ci_annotate_failure.mjs                      |  5 +-\n tools/inspect_ios_app.mjs                          |  4 ++\n tools/ios_simulator_smoke.sh                       | 81 ++++++++++++++++++----\n tools/verify_native_config.mjs                     | 26 +++++--\n 12 files changed, 241 insertions(+), 37 deletions(-)",
+  "productComparisons": [
+    {
+      "path": "apps/mobile/src/state/useStore.ts",
+      "baselineSha256": "0bdbea5a175e7ec2c228585a0b5f9a71e766d110b420daf5614530c12bb364ae",
+      "currentSha256": "0bdbea5a175e7ec2c228585a0b5f9a71e766d110b420daf5614530c12bb364ae",
+      "equal": true
+    },
+    {
+      "path": "packages/biometrics/src/appleHealth.ts",
+      "baselineSha256": "ea8bce22ba4e0c684c0070528fbc1808eda8aaac9a0cdac06037e413bd8bb4ba",
+      "currentSha256": "ea8bce22ba4e0c684c0070528fbc1808eda8aaac9a0cdac06037e413bd8bb4ba",
+      "equal": true
+    },
+    {
+      "path": "packages/biometrics/src/aggregate.ts",
+      "baselineSha256": "17196631526bdabb61a8f86348087278cfdfc61613d4cf228244294baccb1d17",
+      "currentSha256": "17196631526bdabb61a8f86348087278cfdfc61613d4cf228244294baccb1d17",
+      "equal": true
+    },
+    {
+      "path": "apps/mobile/src/state/backupStore.ts",
+      "baselineSha256": "37a0a2b383a5b530976db71a8db6927714feddcb33176a615ef744b871894608",
+      "currentSha256": "37a0a2b383a5b530976db71a8db6927714feddcb33176a615ef744b871894608",
+      "equal": true
+    },
+    {
+      "path": "apps/mobile/src/state/backupCrypto.ts",
+      "baselineSha256": "1e51e3487858fe9a6c4f2dc43da63c96b445b9cf06efe94c1245cd5629748de8",
+      "currentSha256": "1e51e3487858fe9a6c4f2dc43da63c96b445b9cf06efe94c1245cd5629748de8",
+      "equal": true
+    },
+    {
+      "path": "packages/core-db/src/migrationRunner.ts",
+      "baselineSha256": "fef9851098b8c8ff9bcb446acb9ed77b5fd99f8c3b1054996240d7998568af58",
+      "currentSha256": "fef9851098b8c8ff9bcb446acb9ed77b5fd99f8c3b1054996240d7998568af58",
+      "equal": true
+    },
+    {
+      "path": "packages/core-db/src/backup/schemaContract.ts",
+      "baselineSha256": "b343259a388699476cd9196f08d15d5d7818299d8d3959510ce25fef65b4e04a",
+      "currentSha256": "b343259a388699476cd9196f08d15d5d7818299d8d3959510ce25fef65b4e04a",
+      "equal": true
+    },
+    {
+      "path": "packages/core-db/test/verify_migration_lineage.mjs",
+      "baselineSha256": "ccf9e7aaa6408d7ad008b5dae32d3d5f0deef2035929067b28102c3f3a7a440d",
+      "currentSha256": "ccf9e7aaa6408d7ad008b5dae32d3d5f0deef2035929067b28102c3f3a7a440d",
+      "equal": true
+    },
+    {
+      "path": "package-lock.json",
+      "baselineSha256": "9e02ca7f8c0f95ccbf0860d8ebeadaac64d016bcda3f978d7f39ff56d507f5cf",
+      "currentSha256": "9e02ca7f8c0f95ccbf0860d8ebeadaac64d016bcda3f978d7f39ff56d507f5cf",
+      "equal": true
+    }
+  ],
+  "changedFiles": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "65ed04e9f358adf2161e1fca82071aee74313d82359a3922f23fb02ff8c204e7"
+    },
+    {
+      "path": "AGENT_WORKFLOW.md",
+      "sha256": "e7b880c052070ef7ea5b0de8e41481f9b473fef79e520f2620e59717ae806839"
+    },
+    {
+      "path": "apps/mobile/ios/AthleteKinetics/AppDelegate.swift",
+      "sha256": "52b9ba39e405f7beadb7b0ae6f9ff49a7514e453aaf9621d70dbc81af1262e8b"
+    },
+    {
+      "path": "apps/mobile/ios/Podfile",
+      "sha256": "a4ea501f1c9cf1e63231ac493bc7b90af0fcfd891a211247ed39ca4ecf42effe"
+    },
+    {
+      "path": "apps/mobile/src/App.tsx",
+      "sha256": "e207181c1d37647f2e0679f10ab99c133b849e831b9e4a457e03878bfdf04d5d"
+    },
+    {
+      "path": "apps/mobile/src/diagnostics/nativeSmoke.ts",
+      "sha256": "38353ecc9662262a1ef49498ee2afa29d2a0ecb82a0e02322534a8857e9a0071"
+    },
+    {
+      "path": "apps/mobile/src/state/deviceBackupPolicy.ts",
+      "sha256": "b0f835fdde77a7790f07ed9fcc6ae833dcc84478b0a544ec00e145eeb5979dbb"
+    },
+    {
+      "path": "apps/mobile/test/components/DeviceBackupPolicy.test.js",
+      "sha256": "6e0de4af35f33a5b0f8431c24b2308c35a758131826eab9efbfe7b08d885465b"
+    },
+    {
+      "path": "tools/ci_annotate_failure.mjs",
+      "sha256": "5e6a6ba7f95d0e4e12b1cbd1e8792d17b4c2eea8c44e3aa4a1363eb979303028"
+    },
+    {
+      "path": "tools/inspect_ios_app.mjs",
+      "sha256": "a8f8b94d6d2fbe2ca0f51f64017cc2848d3319dfbddb0ff6a6e612e80f629b01"
+    },
+    {
+      "path": "tools/ios_simulator_smoke.sh",
+      "sha256": "53e559933c22fa586566f2760b72b8f921313db9bb28a373fd99d2ff54582404"
+    },
+    {
+      "path": "tools/verify_native_config.mjs",
+      "sha256": "fb5cb71e0a1e16e1b1eb98a555e483d5db7bafee5dae62a6641ba4823eb52cfb"
+    }
+  ],
+  "installedPicker": "12.0.2",
+  "evidence": [
+    {
+      "path": "app-boot-focused.log",
+      "sha256": "4beb8cd1200514b9677a3c904f15422277b759badb69d4b35d9928f2b6bda48c"
+    },
+    {
+      "path": "picker-native-boundary.log",
+      "sha256": "2964325cd70bc71dcf43d74370a68371589d08417520ec70d428acfcaf426e14"
+    },
+    {
+      "path": "picker-native-boundary.json",
+      "sha256": "52f1572a6048caaaec2a369a1856c904dc2d0c309d3d27083657ad805b4c40f5"
+    },
+    {
+      "path": "picker-native-boundary-probe.cjs",
+      "sha256": "cce2a5e95536e6ecf8536e5de066fefdf94f7f31e0b7df9bccd7dd415dbd6d15"
+    }
+  ],
+  "commands": [
+    {
+      "command": "node node_modules/jest/bin/jest.js --config apps/mobile/jest.config.js --runInBand --no-cache --runTestsByPath apps/mobile/test/components/DeviceBackupPolicy.test.js apps/mobile/test/components/NavigationShell.test.js apps/mobile/test/components/BackupRecoveryRetryGate.test.js",
+      "exitCode": 0,
+      "suitesPassed": 3,
+      "testsPassed": 30
+    },
+    {
+      "command": "node picker-native-boundary-probe.cjs <repo> <owned-output>",
+      "exitCode": 1,
+      "result": "Expected negative assertion: MIME string forwarded into iOS UTType(identifier) boundary; native UIKit unexecuted"
+    }
+  ]
+}

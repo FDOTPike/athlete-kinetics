@@ -100,6 +100,26 @@
       "sha256": "959413cd350275a2387b9a1956bd4fe50647b60adbd4a36a1f7fa85851aeb487"
     },
     {
+      "path": "opus-independent-review/recheck-cf4c221e/picker-native-boundary.json",
+      "bytes": 1057,
+      "sha256": "52f1572a6048caaaec2a369a1856c904dc2d0c309d3d27083657ad805b4c40f5"
+    },
+    {
+      "path": "opus-independent-review/recheck-cf4c221e/picker-native-boundary.log",
+      "bytes": 1512,
+      "sha256": "2964325cd70bc71dcf43d74370a68371589d08417520ec70d428acfcaf426e14"
+    },
+    {
+      "path": "opus-independent-review/recheck-cf4c221e/RECHECK_REPORT.md",
+      "bytes": 13836,
+      "sha256": "7454d3ed373da99fbad5040213b023a73bf3c970009239b378b58bdd2b2e2460"
+    },
+    {
+      "path": "opus-independent-review/recheck-cf4c221e/source-identity.json",
+      "bytes": 6711,
+      "sha256": "dec5356440c783c8bf02dc0ed8f4e6c6c87c488dd9943eca70ec2578cf3a8470"
+    },
+    {
       "path": "OPUS_AUTONOMOUS_RELEASE_WORK_ORDER.md",
       "bytes": 15643,
       "sha256": "6a4805573ae6cc8a0580e8031436675e44c436a7259903cc25f84cc9c5b518f8"
@@ -116,8 +136,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 2635,
-      "sha256": "8bc9d4cfe2ec90c85af5c7577701ce425b7e34e5cf9a9034564315d676cf6023"
+      "bytes": 3188,
+      "sha256": "658bdda4e1ed175b05f9cbb5984339f43e60b7cc1a76c1cf6c0c528bbf78738e"
     },
     {
       "path": "references/apps__mobile__src__App.tsx.txt",
@@ -160,6 +180,16 @@
       "sha256": "80c5616e8e8d27ecb63f6882d97e2e87cd17b072f60ddc22b96baf613114e755"
     },
     {
+      "path": "references/native/POD_LOCK_REFERENCE.md",
+      "bytes": 523,
+      "sha256": "c974e72b75bb844097d1eeeb25c7fc061fccd8f067bfa19bb0667370110ff626"
+    },
+    {
+      "path": "references/native/Podfile.lock.cf4c.txt",
+      "bytes": 74448,
+      "sha256": "7f8467d97ec7d58923b9448d677e753e89624d20ad0e3f3914ccb15d0fa9fd22"
+    },
+    {
       "path": "references/nodeSqliteOpDriver.js.txt",
       "bytes": 2577,
       "sha256": "06e274fb62f13f016e21f0def71b29eb47690e6ea8651c5a437ac60675bef1ff"
@@ -185,7 +215,7 @@
       "sha256": "38bd87a900e3d2f7c40fabb7f4e418746a00acbe7e817d7948ad9ac29500559e"
     }
   ],
-  "updatedAt": "2026-10-04T14:13:44.432300+00:00",
+  "updatedAt": "2026-10-04T14:45:46.009723+00:00",
   "currentOpusCoreSmokeAcceptedSource": "cf4c221ef3993341f903a1d228e94d4893002081",
   "currentMotionBoundedAuditSource": "510127dd54798ad7963139908a2207e73531d119"
 }

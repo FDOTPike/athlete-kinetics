@@ -1,0 +1,35 @@
+{
+  "sourceCommit": "cf4c221ef3993341f903a1d228e94d4893002081",
+  "scope": "Exact production pickerOpen declaration + actual installed pick.ts/fileTypes/errors, native boundary mocked only; no UIKit execution",
+  "pickerVersion": "12.0.2",
+  "observations": [
+    {
+      "platform": "ios",
+      "appPassedToNative": {
+        "mode": "import",
+        "allowMultiSelection": false,
+        "allowVirtualFiles": false,
+        "type": [
+          "application/octet-stream"
+        ]
+      },
+      "packageAllFilesType": "public.item",
+      "pickerCancelledWithoutCopy": true
+    },
+    {
+      "platform": "android",
+      "appPassedToNative": {
+        "mode": "import",
+        "allowMultiSelection": false,
+        "allowVirtualFiles": false,
+        "type": [
+          "application/octet-stream"
+        ]
+      },
+      "packageAllFilesType": "*/*",
+      "pickerCancelledWithoutCopy": true
+    }
+  ],
+  "nativeFactory": "types.compactMap { UTType($0) }",
+  "backupStoreSha256": "37a0a2b383a5b530976db71a8db6927714feddcb33176a615ef744b871894608"
+}
