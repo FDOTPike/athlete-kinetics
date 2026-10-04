@@ -64,6 +64,16 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 203,
     fingerprint: 'b2c6deabb8165cd6a2ebca99aa2744c3f10d7f20dd5f6680dcbcc24ae46ab500',
   },
+  // Through 068_movement_content_correction_v2 — coaching text only. No schema
+  // object changes, so the counts and the fingerprint equal the v66 entry's;
+  // the entry exists because a backup is identified by its version and slot.
+  {
+    userVersion: 67,
+    migrationSlot: 68,
+    tableCount: 117,
+    objectCount: 203,
+    fingerprint: 'b2c6deabb8165cd6a2ebca99aa2744c3f10d7f20dd5f6680dcbcc24ae46ab500',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

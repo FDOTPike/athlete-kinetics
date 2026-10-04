@@ -309,6 +309,17 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'athlete_goal_movement' },                           // 067
   { type: 'table', name: 'block_emphasis' },                                  // 067
   { type: 'trigger', name: 'trg_block_emphasis_immutable_bu' },               // 067
+  // 068 content correction v2 adds no table: it rewrites coaching text on 115
+  // seeded movements and appends their provenance at version 2. The provenance
+  // rows are the marker that it ran. Without this sentinel a database whose
+  // user_version claims the latest chain but never applied 068 would keep the
+  // shared "Set up <name> with" template with nothing to notice it.
+  {
+    type: 'row',
+    name: 'movement_content_correction v2',                                   // 068
+    presenceSql: `SELECT 1 AS ok WHERE
+      (SELECT COUNT(*) FROM movement_content_correction WHERE correction_version = 2) = 115`,
+  },
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it

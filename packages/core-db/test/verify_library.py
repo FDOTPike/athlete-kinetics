@@ -26,6 +26,10 @@ quarantine_doc = load("movement_quarantine.json")
 quarantine = quarantine_doc.get("entries", quarantine_doc.get("records", []))
 correction_overlay = load("movement_content_correction_v1.json")
 correction_manifest = load("movement_content_correction_v1_manifest.json")
+# Content correction v2 (068, coaching work order 4): coaching text only.
+correction_v2_overlay = load("movement_content_correction_v2.json")
+correction_v2_manifest = load("movement_content_correction_v2_manifest.json")
+upstream_evidence = load("movement_upstream_instructions.json")
 
 con = sqlite3.connect(":memory:")
 con.row_factory = sqlite3.Row
@@ -81,27 +85,35 @@ def assignment_hash(assignment):
 
 correction_records = correction_overlay["records"]
 correction_by_name = {record["name"]: record for record in correction_records}
+correction_v2_records = correction_v2_overlay["records"]
+correction_v2_by_name = {record["name"]: record for record in correction_v2_records}
 scope_assignments = correction_overlay["scopeAssignments"]
 
 print(f"SQLite {sqlite3.sqlite_version}")
 print("\n[1] append-only schema and exact target")
 schema_files = sorted(path for path in SCHEMA_DIR.glob("0*.sql") if not path.name.startswith("004"))
 correction_files = [path for path in schema_files if path.name.startswith("049")]
-# A second connection frozen at 048 is the correction baseline: every claim in
-# [7] is "live == baseline + declared changes", so collateral damage anywhere in
-# the 300-movement corpus is a failure, not an unnoticed drift.
+correction_v2_files = [path for path in schema_files if path.name.startswith("068")]
+# A second connection with NO correction migration is the correction baseline:
+# every claim in [7]/[8] is "live == baseline + declared changes", so collateral
+# damage anywhere in the 300-movement corpus is a failure, not an unnoticed
+# drift. Both correction migrations (049 and 068) are left out of it.
 base = sqlite3.connect(":memory:")
 base.row_factory = sqlite3.Row
 for path in schema_files:
-    if path in correction_files:
+    if path in correction_files or path in correction_v2_files:
         continue
     base.executescript(path.read_text(encoding="utf-8"))
 for _ in range(2):
     for path in schema_files:
         con.executescript(path.read_text(encoding="utf-8"))
 check("schema chain applies twice", True)
-check("049 is the only correction migration in the chain", len(correction_files) == 1,
+check("049 is the only v1 correction migration in the chain", len(correction_files) == 1,
       str([path.name for path in correction_files]))
+check("068 is the only v2 correction migration, and it runs after 049",
+      len(correction_v2_files) == 1
+      and schema_files.index(correction_v2_files[0]) > schema_files.index(correction_files[0]),
+      str([path.name for path in correction_v2_files]))
 con.execute("PRAGMA foreign_keys = ON")
 
 target_batches = target.get("batches", [])
@@ -223,6 +235,10 @@ def effective_coaching(name):
     record = correction_by_name.get(name)
     if record is not None and "coaching" in record["changes"]:
         coaching = {**coaching, **record["changes"]["coaching"]}
+    # 068 runs after 049; the two sets are disjoint (asserted in [7b]).
+    record_v2 = correction_v2_by_name.get(name)
+    if record_v2 is not None:
+        coaching = {**coaching, **record_v2["changes"]["coaching"]}
     return coaching
 
 def coaching_row(name, coaching):
@@ -252,7 +268,7 @@ for name in sorted(v2_names):
         bad_v2_assoc.append(name)
     if actual["video_placeholder_uri"] != "":
         bad_v2_url.append(name)
-check("176 v2 rows match their staged intent, steps, and cues merged with the 049 overlay",
+check("176 v2 rows match their staged intent, steps, and cues merged with the 049 and 068 overlays",
       not bad_v2_assoc, str(bad_v2_assoc[:3]))
 check("176 ORIGINAL v2 text-only fingerprints still reproduce from frozen staging",
       not bad_v2_hash, str(bad_v2_hash[:3]))
@@ -262,6 +278,9 @@ check("176 v2 rows contain no fabricated fallback URL", not bad_v2_url, str(bad_
 uncorrected = [name for name in sorted(correction_by_name)
                if coaching_row(name, staged_coaching(name)) == coaching_row(name, effective_coaching(name))]
 check("all 32 corrections change the shipped v2 coaching text", not uncorrected, str(uncorrected[:3]))
+uncorrected_v2 = [name for name in sorted(correction_v2_by_name)
+                  if coaching_row(name, staged_coaching(name)) == coaching_row(name, effective_coaching(name))]
+check("every v2 correction changes the shipped coaching text", not uncorrected_v2, str(uncorrected_v2[:3]))
 
 banned_claim = re.compile(r"\b(cure|heal(?:s|ing)?|guarantee|injury[- ]proof|prevent(?:s|ing)? injur|bulletproof|pain[- ]free|insurance|pays out|burn(?:s)? fat|melt|shred your|doctor|medical|prescription|diagnos|therap)\b", re.I)
 negative_cue = re.compile(r"\b(?:don't|do not|never|avoid|stop|no)\b", re.I)
@@ -478,6 +497,7 @@ check("no other rotation movement gained a scope row",
 provenance = {row["name"]: row for row in con.execute("""
   SELECT m.name, c.correction_version, c.correction_sha256, c.applied_at_ms
   FROM movement_content_correction c JOIN movement m USING(movement_id)
+  WHERE c.correction_version = 1
 """)}
 check("one provenance row per corrected movement, at version 1, hash-matched",
       set(provenance) == correction_set
@@ -486,7 +506,97 @@ check("one provenance row per corrected movement, at version 1, hash-matched",
               and provenance[r["name"]]["applied_at_ms"] == correction_overlay["build"]["applied_at_ms"]
               for r in correction_records))
 
-print("\n[8] domain-aware patch merge: live == pre-049 baseline + declared additive changes")
+print("\n[7b] content correction v2 contract (068): coaching text only, sourced, unratified")
+v2_names_corrected = [record["name"] for record in correction_v2_records]
+v2_set_corrected = set(v2_names_corrected)
+ANIMATION_LANE_NAMES = {"Barbell Incline Shoulder Raise", "Dumbbell Incline Shoulder Raise"}
+animation_lane_ids = sorted(row["movement_id"] for row in con.execute(
+    "SELECT movement_id FROM movement WHERE name IN (?, ?)", sorted(ANIMATION_LANE_NAMES)))
+check("the two animation-lane movements are ids 135 and 187", animation_lane_ids == [135, 187], str(animation_lane_ids))
+check("v2 overlay holds exactly 115 unique corrections",
+      len(v2_names_corrected) == 115 and len(v2_set_corrected) == 115, str(len(v2_names_corrected)))
+check("v2 corrections sit inside the 176 target, disjoint from the 124 legacy and from the 32 v1 corrections",
+      v2_set_corrected <= target_set and v2_set_corrected.isdisjoint(legacy_names)
+      and v2_set_corrected.isdisjoint(correction_set))
+check("movements 135 and 187 are NOT in the v2 correction (they belong to the animation lane)",
+      v2_set_corrected.isdisjoint(ANIMATION_LANE_NAMES))
+check("every v2 correction is coaching text only: intent, steps and cues, nothing else",
+      all(list(r["changes"]) == ["coaching"]
+          and list(r["changes"]["coaching"]) == ["coaching_intent", "setup_steps", "cues"]
+          for r in correction_v2_records))
+bad_v2_correction_hash = [r["name"] for r in correction_v2_records if correction_hash(r) != r["correction_sha256"]]
+check("every v2 correction_sha256 reproduces over {name, version, supersedes, changes}",
+      not bad_v2_correction_hash, str(bad_v2_correction_hash[:3]))
+bad_v2_supersede = [r["name"] for r in correction_v2_records
+                    if r["supersedes_v2_sha256"] != v2_hashes.get(r["name"]) or r["correction_version"] != 2]
+check("every v2 correction supersedes the exact shipped v2 fingerprint, at version 2",
+      not bad_v2_supersede, str(bad_v2_supersede[:3]))
+not_template = [r["name"] for r in correction_v2_records
+                if not (staged_coaching(r["name"])["setup_steps"] or [""])[0].startswith(f"Set up {r['name']} with ")]
+check("every v2 correction replaces the shared 'Set up <name> with' template and nothing else",
+      not not_template, str(not_template[:3]))
+still_template = [r["name"] for r in correction_v2_records
+                  if r["changes"]["coaching"]["setup_steps"][0].startswith(f"Set up {r['name']} with ")]
+check("no v2 replacement is itself the shared template", not still_template, str(still_template[:3]))
+evidence_by_name = {record["name"]: record for record in upstream_evidence["records"]}
+bad_evidence = [name for name, record in evidence_by_name.items()
+                if hashlib.sha256(record["instructions_raw"].encode("utf-8")).hexdigest() != record["instructions_sha256"]]
+check("every upstream evidence text matches its own hash", not bad_evidence, str(bad_evidence[:3]))
+check("the upstream evidence roll-up reproduces (a text cannot be added, removed or swapped undetected)",
+      compact_hash([[record["name"], record["instructions_sha256"]] for record in upstream_evidence["records"]])
+      == upstream_evidence["recordsSetSha256"]
+      and correction_v2_manifest["evidenceRecordsSetSha256"] == upstream_evidence["recordsSetSha256"])
+unsourced = [r["name"] for r in correction_v2_records
+             if r["name"] not in evidence_by_name
+             or r["source_ref"].get("upstream_instructions_sha256") != evidence_by_name[r["name"]]["instructions_sha256"]]
+check("every v2 correction points at an upstream evidence text for the same exact name",
+      not unsourced, str(unsourced[:3]))
+check("the upstream evidence excludes the two animation-lane movements and is public-domain sourced",
+      ANIMATION_LANE_NAMES.isdisjoint(evidence_by_name)
+      and upstream_evidence["source"]["dataset"] == "yuhonas/free-exercise-db"
+      and "Unlicense" in upstream_evidence["source"]["license"])
+v2_manifest_by_name = {record["name"]: record for record in correction_v2_manifest["records"]}
+check("v2 manifest records agree with the overlay on name, version, hash and evidence",
+      set(v2_manifest_by_name) == v2_set_corrected
+      and all(v2_manifest_by_name[r["name"]]["correction_sha256"] == r["correction_sha256"]
+              and v2_manifest_by_name[r["name"]]["correction_version"] == 2
+              and v2_manifest_by_name[r["name"]]["upstream_instructions_sha256"]
+              == r["source_ref"]["upstream_instructions_sha256"]
+              for r in correction_v2_records)
+      and correction_v2_manifest["recordsSetSha256"]
+      == compact_hash([r["correction_sha256"] for r in sorted(correction_v2_records, key=lambda r: r["name"])]))
+check("the v2 overlay declares media excluded and no media-shaped key appears in it",
+      correction_v2_overlay.get("mediaExcluded") is True
+      and not re.search(r"asset_?[Kk]ey|video_placeholder_uri|videoUrl|https?://",
+                        json.dumps([r["changes"] for r in correction_v2_records])))
+# Honesty about approval. v1 bound an owner approval to every record hash. v2
+# has NOT been approved: the gate requires the files to say so, and refuses a
+# set that claims approval without one bound to each record.
+ratification_state = correction_v2_overlay["ratification"]["state"]
+pending_ok = (ratification_state == "pending_owner_review"
+              and all(r.get("ratification") is None for r in correction_v2_records))
+approved_ok = (ratification_state == "owner_approved"
+               and all(isinstance(r.get("ratification"), dict)
+                       and r["ratification"].get("approver_role") == "owner"
+                       and r["ratification"].get("correction_sha256") == r["correction_sha256"]
+                       for r in correction_v2_records))
+check("v2 ratification is stated truthfully: pending owner review, or an owner approval bound to every hash",
+      (pending_ok or approved_ok) and correction_v2_manifest["ratificationState"] == ratification_state,
+      f"{ratification_state}; {sum(r.get('ratification') is None for r in correction_v2_records)} of 115 await owner approval")
+provenance_v2 = {row["name"]: row for row in con.execute("""
+  SELECT m.name, c.correction_version, c.correction_sha256, c.applied_at_ms
+  FROM movement_content_correction c JOIN movement m USING(movement_id)
+  WHERE c.correction_version = 2
+""")}
+check("one provenance row per v2-corrected movement, at version 2, hash-matched",
+      set(provenance_v2) == v2_set_corrected
+      and all(provenance_v2[r["name"]]["correction_sha256"] == r["correction_sha256"]
+              and provenance_v2[r["name"]]["applied_at_ms"] == correction_v2_overlay["build"]["applied_at_ms"]
+              for r in correction_v2_records))
+check("movement_content_correction holds exactly the 32 v1 and 115 v2 rows",
+      con.execute("SELECT COUNT(*) FROM movement_content_correction").fetchone()[0] == 32 + 115)
+
+print("\n[8] domain-aware patch merge: live == correction-free baseline + declared additive changes")
 
 def snapshot(connection):
     rows = {}
@@ -554,6 +664,9 @@ for name in sorted(names_db):
     record = correction_by_name.get(name)
     if record is not None:
         expected = apply_correction(expected, record)
+    record_v2 = correction_v2_by_name.get(name)
+    if record_v2 is not None:
+        expected = apply_correction(expected, record_v2)
     if name == "BJJ Sparring Round":
         expected["taxonomy"] = {
             "category": "cardio", "implement": "bodyweight", "family": "bjj_sparring_round"
@@ -562,10 +675,28 @@ for name in sorted(names_db):
         drift.append(name)
     if live_snapshot[name]["media"] != base_snapshot[name]["media"]:
         media_drift.append(name)
-check("every movement equals baseline + 049 merge + the declared 051 BJJ taxonomy completion",
+check("every movement equals baseline + 049 merge + 068 merge + the declared 051 BJJ taxonomy completion",
       not drift, str(drift[:3]))
-check("049 writes NO media: asset keys, statuses and revisions are byte-identical",
+check("049 and 068 write NO media: asset keys, statuses and revisions are byte-identical",
       not media_drift, str(media_drift[:3]))
+# 068 is coaching text only. For every movement it corrects, everything that is
+# not instructions, cues or coaching intent is byte-identical to the baseline;
+# and every movement it does NOT correct (135 and 187 included) is untouched by it.
+v2_collateral = [name for name in sorted(v2_set_corrected)
+                 if live_snapshot[name]["movement"] != base_snapshot[name]["movement"]
+                 or live_snapshot[name]["taxonomy"] != base_snapshot[name]["taxonomy"]
+                 or live_snapshot[name]["equipment"] != base_snapshot[name]["equipment"]
+                 or live_snapshot[name]["media"] != base_snapshot[name]["media"]
+                 or {k: v for k, v in live_snapshot[name]["detail"].items() if k not in ("instructions", "cues")}
+                 != {k: v for k, v in base_snapshot[name]["detail"].items() if k not in ("instructions", "cues")}]
+check("a v2 correction leaves name, pattern, difficulty, targets, taxonomy, equipment and media intact",
+      not v2_collateral, str(v2_collateral[:3]))
+animation_lane_drift = [name for name in sorted(ANIMATION_LANE_NAMES) if live_snapshot[name] != base_snapshot[name]]
+check("movements 135 and 187 are byte-identical to the correction-free baseline",
+      not animation_lane_drift, str(animation_lane_drift))
+ids_live = {row["name"]: row["movement_id"] for row in con.execute("SELECT name, movement_id FROM movement")}
+ids_base = {row["name"]: row["movement_id"] for row in base.execute("SELECT name, movement_id FROM movement")}
+check("every movement keeps its id and its name", ids_live == ids_base and len(ids_live) == 300)
 untouched_urls = [name for name in sorted(names_db)
                   if live_snapshot[name]["detail"]["video_placeholder_uri"]
                   != base_snapshot[name]["detail"]["video_placeholder_uri"]]

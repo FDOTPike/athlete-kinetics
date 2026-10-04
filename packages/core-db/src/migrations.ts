@@ -75,6 +75,7 @@ import m064 from './schema/064_accessible_coach_support.sql';
 import m065 from './schema/065_session_preparation.sql';
 import m066 from './schema/066_focus_and_goals.sql';
 import m067 from './schema/067_sport_and_emphasis.sql';
+import m068 from './schema/068_movement_content_correction_v2.sql';
 
 /** Ordered, append-only, and IDEMPOTENT by contract (IF NOT EXISTS /
  *  DROP+CREATE) — the self-heal path re-applies all of them. Never edit a
@@ -93,7 +94,7 @@ import m067 from './schema/067_sport_and_emphasis.sql';
  *  CHECK constraints (see 061's header), and editing it would neither reach an
  *  installed device nor renumber safely. Order of application, not numeric
  *  order, is the contract; idempotency is what makes that safe. */
-const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035, m036, m037, m038, m039, m040, m041, m042, m043, m044, m045, m046, m047, m048, m049, m050, m051, m052, m053, m054, m055, m056, m057, m058, m059, m060, m061, m062, m063, m064, m065, m066, m067];
+const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035, m036, m037, m038, m039, m040, m041, m042, m043, m044, m045, m046, m047, m048, m049, m050, m051, m052, m053, m054, m055, m056, m057, m058, m059, m060, m061, m062, m063, m064, m065, m066, m067, m068];
 
 
 export function migrate(db: DB): void {

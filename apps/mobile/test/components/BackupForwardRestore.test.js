@@ -22,6 +22,8 @@
  *     forward migration seeds the muscle mapping without inventing a focus;
  *   - 067 sport profile, goal exercise link and frozen block explanations
  *     round-trip, and a forward migration invents none of them;
+ *   - 068 changes coaching text only (same schema fingerprint as v66): every
+ *     forward restore ends with the corrected text, and athlete rows untouched;
  *   - an athlete file not opened since the update still backs up.
  *
  * The file-system, crypto and SQLite stand-ins are the same ones
@@ -285,6 +287,17 @@ const sportRows = (path) => {
   } finally { db.close(); }
 };
 const NO_SPORT_OR_EMPHASIS = JSON.stringify({ sport: [], links: [], emphasis: [] });
+/** Coaching-text state of the library (068): how many movements carry a v2
+ *  correction, and how many still read the shared "Set up <name> with" template. */
+const coachingText = (path) => {
+  const db = open(path);
+  try {
+    return {
+      v2Corrections: Number(db.prepare('SELECT COUNT(*) AS c FROM movement_content_correction WHERE correction_version = 2').get().c),
+      templateRows: Number(db.prepare("SELECT COUNT(*) AS c FROM movement m JOIN movement_detail d USING(movement_id) WHERE d.instructions LIKE 'Set up ' || m.name || ' with %'").get().c),
+    };
+  } finally { db.close(); }
+};
 /** A sport answer, a goal tied to an exercise, and one block with its frozen explanation (067). */
 const seedSportAndEmphasis = (db) => {
   db.exec(`INSERT INTO athlete_sport_profile
@@ -441,6 +454,7 @@ async function selectLegacyBackup(mutate, contract = V63) {
     data: { default: athleteData(defaultPath), alex: athleteData(alexPath) },
     preparation: { default: preparationRows(defaultPath), alex: preparationRows(alexPath) },
     focusGoals: { default: focusGoalRows(defaultPath), alex: focusGoalRows(alexPath) },
+    sport: { default: sportRows(defaultPath), alex: sportRows(alexPath) },
     hashes: { default: mockCryptoProvider.sha256Hex(defaultBytes), alex: mockCryptoProvider.sha256Hex(alexBytes) },
   };
 }
@@ -457,8 +471,12 @@ function expectForwardRestored(legacy) {
     expect(preparationRows(path)).toBe(legacy.preparation[key]);
     // Focus and goals the backup held are kept; none are invented where it held none.
     expect(focusGoalRows(path)).toBe(legacy.focusGoals[key]);
-    // No sport answer, goal exercise link or block explanation is invented.
-    expect(sportRows(path)).toBe(NO_SPORT_OR_EMPHASIS);
+    // A sport answer, goal exercise link and block explanation the backup held
+    // are kept; none is invented where it held none.
+    expect(sportRows(path)).toBe(legacy.sport[key]);
+    // The forward migration brought the library text up to date: all 115 v2
+    // corrections applied, only the deliberately held template rows remain.
+    expect(coachingText(path)).toEqual({ v2Corrections: 115, templateRows: 29 });
     expect(seedCounts(path)).toEqual({ muscleGroups: 17, mappedMovements: 299, roles: 794 });
     // The installed file is the migrated copy, not the v63 bytes.
     expect(mockHashFile(path)).not.toBe(legacy.hashes[key]);
@@ -654,7 +672,12 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect(SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => contract.migrationSlot - contract.userVersion))
       .toEqual(SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map(() => 1));
     expect(SUPPORTED_BACKUP_SCHEMA_CONTRACTS[SUPPORTED_BACKUP_SCHEMA_CONTRACTS.length - 1]).toBe(CURRENT);
-    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(3);
+    // 068 is text only: it shares the v66 schema fingerprint and is still its own contract.
+    const v66 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 66);
+    const v67 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 67);
+    expect(v67.fingerprint).toBe(v66.fingerprint);
+    expect([v67.migrationSlot, v66.migrationSlot]).toEqual([68, 67]);
+    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(4);
   });
 
   test.each(PRE_UPGRADE.map((contract) => [contract.userVersion, contract]))(
@@ -665,15 +688,21 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
       const hasPreparation = contract.userVersion >= 64;
       // A backup made after 066 shipped carries a focus and goals as well.
       const hasFocusGoals = contract.userVersion >= 65;
+      // ... and after 067, a sport answer, a goal exercise and a block explanation.
+      const hasSport = contract.userVersion >= 66;
       const legacy = await selectLegacyBackup(hasPreparation
         ? (path) => {
           const db = open(path);
           try {
             seedPreparation(db);
             if (hasFocusGoals) seedFocusAndGoals(db);
+            if (hasSport) seedSportAndEmphasis(db);
           } finally { db.close(); }
         }
         : undefined, contract);
+      // Before the restore the backed-up library still reads the template everywhere.
+      expect(coachingText(join(incomingDir, 'athlete_kinetics.db'))).toEqual({ v2Corrections: 0, templateRows: 144 });
+      if (hasSport) expect(JSON.parse(legacy.sport.default).emphasis).toHaveLength(1);
       if (hasPreparation) expect(JSON.parse(legacy.preparation.default).items).toHaveLength(2);
       if (hasFocusGoals) {
         expect(JSON.parse(legacy.focusGoals.default).revisions).toHaveLength(2);
