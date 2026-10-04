@@ -1,0 +1,2 @@
+# Preserve the exact bytes fingerprinted by the audit/reference manifests.
+* -text

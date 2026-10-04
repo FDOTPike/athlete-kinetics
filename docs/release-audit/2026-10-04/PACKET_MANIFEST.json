@@ -1,9 +1,14 @@
 {
-  "generatedAt": "2026-10-04T20:10:46.7291223+11:00",
+  "generatedAt": "2026-10-04T20:12:09.2407361+11:00",
   "masterSource": "1da218d8b1886040dcf89e0d630581f7b33824d9",
   "featureSource": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
   "referenceOnly": true,
   "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 83,
+      "sha256": "ee5a8503b0b9a8b55fd2abac1cde9e20a1cd01ef1e8d583f0f0e778176b127f3"
+    },
     {
       "path": "APP_QUALITY_AUDIT.md",
       "bytes": 17469,
