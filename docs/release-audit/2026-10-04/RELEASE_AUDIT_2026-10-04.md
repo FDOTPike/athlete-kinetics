@@ -19,6 +19,8 @@ PR22 was merged into codex/rpe-familiarisation; PR23 into WO1; PR24 into WO2; PR
 
 The existing source handoff references are exact text copies of the local accepted repair with SHA-256 manifest. They are for narrow porting: wholesale replacement would discard the completed feature branch's newer coaching behavior. Motion geometry/evidence remains a separate Codex lane.
 
+Cloud-accessible handoff has now been pushed: [audit/reference packet](https://github.com/FDOTPike/athlete-kinetics/tree/f7e14225b7bb112909944c64bd1afbf889686622/docs/release-audit/2026-10-04), branch codex/release-audit-opus-cloud-2026-10-04 at f7e14225b7bb112909944c64bd1afbf889686622. All24 packet-file hashes and all5 accepted repair reference hashes matched staged Git bytes; scoped attributes preserve exact bytes. The cloud accepted the follow-up containing this commit and the confirmed Apple/gate updates with ok:true. Documentation/reference files only were committed; no app code or migration was changed. The authoritative execution handoff is OPUS_CLOUD_HANDOFF_UPDATE.md beside this report.
+
 ## Blockers requiring engineering work
 
 | ID | Priority | Current blocker | Owner / evidence |
@@ -41,7 +43,7 @@ The existing source handoff references are exact text copies of the local accept
 | IOS-08 |P2 product readiness|Display/launch metadata remains scaffold branding.|Opus; retain approved pikeMethods design.|
 | IOS-09 |native acceptance missing|Backup CSPRNG/Files picker/path/recovery, crypto/export policy, full workouts/resume, offline boot, Health data/revocation, VoiceOver and large text lack iPhone proof.|Opus establishes native tests; owner/device/account acceptance remains external.|
 | SEC-01 |triage needed|Current audited lock reports66 vulnerable package entries:1critical,58high,6moderate,1low.|Opus classifies reachable build/runtime paths and applies compatible fixes; advisory counts are not proof of a mobile exploit.|
-| BUILD-01 |supply-chain readiness|Model fetch defaults to mutable main with no known artifact hashes.|Opus pins a trusted revision/hashes and proves model/vector/tokenizer equivalence.|
+| BUILD-01 |master integration gap|Master model fetch defaults to mutable main with no known artifact hashes. Feature12a already has an immutable revision and four mandatory artifact hashes.|Opus preserves/reuses feature embedder-integrity.mjs and proves model/vector/tokenizer byte equivalence on both native platforms.|
 | AND-01 |release prerequisite|Current Android Release uses public debug signing rather than a production upload key.|Opus prepares build; owner/key/store access provides final signing.|
 | QA-01 |release proof missing|No complete integrated cross-platform native/device acceptance packet.|Opus + independent reviewer; bind source, artifact, logs, build and install identities.|
 | QA-02 |gate incomplete|Feature verify:ci did not finish its backup-recovery component suite during a bounded run.|Opus diagnoses the suite without skipping it or manufacturing a pass; see COMPONENT_GATE_OBSERVATION.md.|
@@ -86,3 +88,13 @@ Independent app diagnostics: master7tests→2controlsPASS/5FAIL; feature7tests�
 Logs and machine-readable snapshots are retained beside this report. OPUS_AUTONOMOUS_RELEASE_WORK_ORDER.md was delivered to the real cloud session with ok:true, including the later concrete backup-fingerprint reproduction. No app source was changed, no existing dirty checkout was committed, and nothing was merged/published to stores during the audit.
 
 The cloud development workflow and account prerequisites were checked against [Anthropic cloud documentation](https://code.claude.com/docs/en/claude-code-on-the-web). The continuing local follow-up requires the computer and Codex app to remain running, as described in [OpenAI scheduled-task documentation](https://learn.chatgpt.com/docs/automations?surface=app).
+
+## Hourly follow-up — 4 October, approximately22:00 Sydney
+
+Existing cloud session inspected once through documented CLI teleport/export; the local copy was exited. Its imported assistant response metadata records736 assistant messages with model claude-opus-5-5, through09:49:33 UTC. This improves on the initial local-configuration-only model evidence. CLOUD_CHECK_2026-10-04_2154.json and CLOUD_PROGRESS_2026-10-04_2154.txt retain the exact observation.
+
+Opus reports committed R0 lineage/backup integration, R1 ownership/permission repairs and R2 iOS configuration/adapter/CI work. It reports78 targeted isolation tests passing with69 baseline failures,7 lineage-backup tests and58 component suites/963 tests passing (962seconds; retention suite679seconds). These remain reported cloud results until source, raw logs and exact final artifacts are pushed and independently reviewed. The GitHub branch/PR/run snapshot showed no new implementation branch or native CI run yet. No release acceptance or animation approval follows from those reports.
+
+Steering delivered to the same session: push an authorized reviewable WIP branch to enable Mac CI; retain pending checks explicitly; preserve feature12a's already-ratified model pins; correct the proposed sleep-only Apple adapter's omitted resting-HR capability. HealthKit provides restingHeartRate, while current hrv_daily.rmssd_ms NOT NULL and the store's RHR-only UPDATE path create an app storage limitation. Opus must handle supported RHR with compatibility/provenance proof rather than fabricating RMSSD or claiming HealthKit cannot provide it. [Apple resting-heart-rate reference](https://developer.apple.com/documentation/healthkit/hkquantitytypeidentifier/restingheartrate). See OPUS_STEERING_2026-10-04_2200.md and its delivery receipt.
+
+App source/native proof and independent review are still outstanding, so the subsequent motion implementation condition is not yet satisfied. Continue the existing hourly follow-up; Apple enrollment/signing and4GB owner acceptance retain their prior status.

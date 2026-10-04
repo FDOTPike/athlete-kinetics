@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T20:12:09.2407361+11:00",
+  "generatedAt": "2026-10-04T21:02:21.2928144+11:00",
   "masterSource": "1da218d8b1886040dcf89e0d630581f7b33824d9",
   "featureSource": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
   "referenceOnly": true,
@@ -13,6 +13,16 @@
       "path": "APP_QUALITY_AUDIT.md",
       "bytes": 17469,
       "sha256": "395c95ae5a78e3fca1c79f8258ab25d9b72a971e48ef45cd1319455a03d6ddce"
+    },
+    {
+      "path": "CLOUD_CHECK_2026-10-04_2154.json",
+      "bytes": 354,
+      "sha256": "43dd46c3f10cc6578d614ac041e1262a1dad0126ecc02815848afb254a609ff4"
+    },
+    {
+      "path": "cloud-steering-2026-10-04-2200.json",
+      "bytes": 138,
+      "sha256": "5c0645b2f4c5df3d94a5d7203caabc394ea641eab22cbf1b84b618d317b5b7c9"
     },
     {
       "path": "COMPONENT_GATE_OBSERVATION.md",
@@ -53,6 +63,11 @@
       "path": "OPUS_AUTONOMOUS_RELEASE_WORK_ORDER.md",
       "bytes": 15643,
       "sha256": "6a4805573ae6cc8a0580e8031436675e44c436a7259903cc25f84cc9c5b518f8"
+    },
+    {
+      "path": "OPUS_STEERING_2026-10-04_2200.md",
+      "bytes": 3152,
+      "sha256": "1bbd16d067d2049df8863c05ed2a4c155a64ca7d5edc370f9ce4b52cbac4f35a"
     },
     {
       "path": "README.md",
@@ -121,8 +136,8 @@
     },
     {
       "path": "RELEASE_AUDIT_2026-10-04.md",
-      "bytes": 14587,
-      "sha256": "a7392c64bd3472e7eb5072d500c69fb0480a40e42dc0df641bf80928166e6f61"
+      "bytes": 17487,
+      "sha256": "38bd87a900e3d2f7c40fabb7f4e418746a00acbe7e817d7948ad9ac29500559e"
     }
   ]
 }

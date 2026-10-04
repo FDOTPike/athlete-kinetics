@@ -1,0 +1,12 @@
+{
+  "cloudSession": "session_01DpTAicGC9rt7bPKRrJdjMX",
+  "source": "Documented CLI teleport copy of cloud history",
+  "models": [
+    "claude-opus-5-5"
+  ],
+  "assistantRecords": 736,
+  "firstTimestamp": "2026-10-04T08:38:52.829Z",
+  "lastTimestamp": "2026-10-04T09:49:33.064Z",
+  "gitHubImplementationPushed": false,
+  "independentlyAccepted": false
+}
