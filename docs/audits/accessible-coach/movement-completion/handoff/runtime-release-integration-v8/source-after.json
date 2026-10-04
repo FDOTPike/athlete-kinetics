@@ -1,0 +1,3246 @@
+[
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/.agents/rules/coding-rules-general.md",
+    "sha256": "b2a6bad63e2721c0c9610ec9fd2ea63bce0c039bc22325d69fd3c4104dacf8f6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/.github/workflows/ci.yml",
+    "sha256": "65ed04e9f358adf2161e1fca82071aee74313d82359a3922f23fb02ff8c204e7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/AGENT_WORKFLOW.md",
+    "sha256": "e7b880c052070ef7ea5b0de8e41481f9b473fef79e520f2620e59717ae806839"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/app/build.gradle",
+    "sha256": "b9df519f3be98e4d808a5909ef79121781ff0a9e0ccecc9f48bd2ff8bf9ea191"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/app/src/debug/AndroidManifest.xml",
+    "sha256": "1f821faf5e298d27e707ea8e74de88a5f4a63554b56242c7cbdf6e069084c0fc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/app/src/main/AndroidManifest.xml",
+    "sha256": "9716068868d5ce255ebc6fc423f6188e8f700ef1ee4a28d7cd2f507ce651a0af"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/app/src/main/res/drawable/rn_edit_text_material.xml",
+    "sha256": "738e3aaad53180caba1419a6d5db8465a0742662fe59a4bbaf05f1061cbc3390"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/app/src/main/res/values/strings.xml",
+    "sha256": "7c8212e781f063c575f2b2ea8dfd3905287f305c2e551333960560035394a571"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/app/src/main/res/values/styles.xml",
+    "sha256": "0f421dd24b8de63f7b73b98be3d51d841d024f5452ac1f70e4c2b33a62b64f68"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/build.gradle",
+    "sha256": "74ac4fe0180779bea86d2675a20a01e8f387c39cf1731fb0e2953032edff5f7d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/gradle.properties",
+    "sha256": "3929f4440d293d286ea7a3e92d2b1a5d318bd99641aadc90a6365260ac0fe34d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/gradle/wrapper/gradle-wrapper.properties",
+    "sha256": "7e0821d895908883350587c74476b717016ab416320c44dc82a10def916c6fb5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/android/settings.gradle",
+    "sha256": "adc1ec4418b38992bae401d4f9d2610231d07c8f65322cd234adedf454b6774e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/app.json",
+    "sha256": "ab79c61688bec7af44767292696311202d302483e9256ff361bf3eb3e9cbedf3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/assets/fonts/Archivo/OFL.txt",
+    "sha256": "2fe3204cbb62d3a6e8946b93cfa108d39ca33290038b51b4f9f5f0aea07d2f26"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/assets/fonts/Archivo/README.txt",
+    "sha256": "0b975219ccb414d0a59759f4d412984d87089a3d7ab56e6ec580405de19b949d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/babel.config.js",
+    "sha256": "62eb3dddb5b3c513f3c413202704700b3008a927f6a47de921b9e943906d1d79"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/Gemfile.lock",
+    "sha256": "2dba358917264eb235fa641cd21b6beccb6ab8998d51e05985d0dd7c92efa27e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/index.js",
+    "sha256": "cfbf495f77aa43f922da8e737a6f1fbb5b366e5195019e268ab20dce5ec992cd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/ios/AthleteKinetics.xcodeproj/project.pbxproj",
+    "sha256": "5f61fe27c127617f0ed8b9a7e97984f715904186e91cb7f5a1843d6c8c431b39"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/ios/AthleteKinetics/AppDelegate.swift",
+    "sha256": "52b9ba39e405f7beadb7b0ae6f9ff49a7514e453aaf9621d70dbc81af1262e8b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/ios/AthleteKinetics/AthleteKinetics.entitlements",
+    "sha256": "222793705e919e50e6f5f364ffcd199628897975f994418ddc819d0b71c29bf2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/ios/AthleteKinetics/Images.xcassets/AppIcon.appiconset/Contents.json",
+    "sha256": "8a18bd4a58344d5fd5ac8f51f2e1a4e3409b0c3e503ea4d0940399900aa9ffd8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/ios/AthleteKinetics/Images.xcassets/Contents.json",
+    "sha256": "991ae939fbd598450a066b66404e06c5ae9b7d37e9aa0026de9e318443ba46fb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/ios/AthleteKinetics/Info.plist",
+    "sha256": "6b57c6ece260d2872edd989fbab1d5c7ca477caebf9cf7fde039d0ddf4e89710"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/jest.config.js",
+    "sha256": "c1d5dbfeac1363649bbaff4a4f4010ea72b423ab5e3e6f5ce60eea4ed9a3a001"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/metro.config.js",
+    "sha256": "8662be2e4b5b2bb824091f3b5db956f22961c0d31cd3ec1eeab2349e3393fc0d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/package.json",
+    "sha256": "c63b93a75261aeab1e3cdd496967d5c68cebb2364dac3e5f68bd11edaf7b93c6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/react-native.config.js",
+    "sha256": "be62e132f16054a0c5352258864b60f9c9ffc2e967115f7d26550fbdaf95267a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/App.tsx",
+    "sha256": "e207181c1d37647f2e0679f10ab99c133b849e831b9e4a457e03878bfdf04d5d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/AppShellTestHarness.tsx",
+    "sha256": "c74e525b0751a6f9ea8c720603326dd74549fdbb9e0a44bab55144856d5f615c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/BackupTransferPanel.tsx",
+    "sha256": "fe92f419ab889d905db022c95e8909e551f04177a2ce9d893bba7a3091a89e9f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/EmphasisReportCard.tsx",
+    "sha256": "d064b09b397a89409768a5da02201e9b199c0784c681ab5d92ef5455114d9750"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/FocusGoalFields.tsx",
+    "sha256": "d2b7e489546e7e0d8834584e93937cb097519f7032b65b491917b77045be90f9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/FocusGoalsPanel.tsx",
+    "sha256": "61ec7c76e6795a02ec583a35ac9e7faf538554be7f1e360781dabd7b89c00c8b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/FocusPrimitives.tsx",
+    "sha256": "a6d5a3e484b181cce59843832cbc1719f97fbd2718214c5cfc1aab24f06998e0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/HealthTrainingSupportForm.tsx",
+    "sha256": "616948c5b1d364d73b8362aa629734e27320dbbb750e03169963c2b356177dc1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/InfoTip.tsx",
+    "sha256": "25234412c8fb9942ebb25555b076fa7f58f792d8a46ce7bd74c6af7b34418f8d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/KeyboardAwareScrollView.tsx",
+    "sha256": "9893862813820e9ba0a9e558e61001c1ff5fcfad4fd29cca5679c9de539e2d2a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+    "sha256": "8b2627a4421e39d2e5c4f66abbf87c682f089d66ea5799d304605d1b73c35d45"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/derivation.ts",
+    "sha256": "10689809b038fbdac8d327f98eb9462409467c869c7daffcaa1e207a7d5b2f02"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/calf-raise__seated.json",
+    "sha256": "a5505d974257a0cb3206dbb16e86f5b4eb5158b73316bc59c154863652c282fc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/calf-raise__standing.json",
+    "sha256": "48d8d9d37e5216d899e9d88c5e410341aad6a84880eae12a09ec805d5de5900f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/carry__standing.json",
+    "sha256": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/dead-bug__supine.json",
+    "sha256": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json",
+    "sha256": "53202d5bbade091d9651581c3d10e76a4ee6a75ef7105156bab2e160a4dadac9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json",
+    "sha256": "90f47cc370395e1f4f5865771042646b906d2900888920093ff62a1ef0d903c7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json",
+    "sha256": "0355638f947b68167280b6cbc4f88b38acd20bf9ce656d3af5abaacd1afa7e23"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json",
+    "sha256": "2210f422efd0319444802d2cd8efd468d83c8aa47ab4862762c760b64fb60d1c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/face-pull__standing.json",
+    "sha256": "5233dd4ac70c38daa6593f753c9db4468c3558cc00e70e8abe7d084060b2576a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/flye__decline.json",
+    "sha256": "60d0283ba05520d9d06d402b256c27a22a1abdf883af13161b86d46cbec12113"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/flye__incline.json",
+    "sha256": "784fef14e0ef35a4bfa3d466de46eff4e22c1e580951abb7afd2294673d9ca93"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/flye__supine.json",
+    "sha256": "4f288c187ed4fb70fd716de50598dee3fdfe2783628669fffef9ec8cf8576432"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/front-raise__incline.json",
+    "sha256": "1505c308d5616418497e2892b29cf65cb0d78388969ee26104af3bc9c8502710"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/glute-kickback__standing.json",
+    "sha256": "505e9b914ec3d576787f88564b17602315032990cdcf9d9d82e8a3bec7f10afc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/hip-extension__standing.json",
+    "sha256": "44c367c41f82abf647a5c1e345811d81de06ca12d0d7ce6b7fac16c4e4360e4e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/hip-extension__supine.json",
+    "sha256": "02801c78342ba895dcbad701795caacfdc024bc087e6161797f2e53bd9ec3aa4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/hip-hinge__standing.json",
+    "sha256": "6f6751402288cee90c3a9276d7dcfbf559beb2f520035aa62e74193b2b9ff6ab"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/horizontal-press__incline.json",
+    "sha256": "05c62c969d1c4523091218bf6e8bbf25aa3f466c14a1b13d188a50821b39b8ee"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/horizontal-press__supine.json",
+    "sha256": "f02b4ebdd05b9c1f357cd3cad8c69e43d21a6aa839fbaf5ca343905339f4e3b6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/horizontal-pull__bent-over.json",
+    "sha256": "78eee86c604524a3d53e405052883e28b14de1258b2749a356b20d0a9f412ffd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/horizontal-pull__kneeling.json",
+    "sha256": "65a767fcb91de0319482851a63c4015817ca6f20552fe0c4ebff8120b30b39e9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/horizontal-pull__prone-supported.json",
+    "sha256": "c1bcbcf65a9a102441077080a872b72fbf5d02713288a08ec6b91be89eea85f3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json",
+    "sha256": "a690cf1dc453f422f8592c44c5128145f167f1fe84d2d227fb81d66c7deb1146"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json",
+    "sha256": "9d5ae1ca045621f87d150913f9325718f00f5d1d870552278c443470c37eaa14"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/locomotion__standing.json",
+    "sha256": "8627d8fc74cda7e64ff7dccdf8b4d32e952dcc96e9a642473327490e2f9f112a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/lunge__reverse.json",
+    "sha256": "94d1b96239d8b96c0713fbd793c6ff8714b8e79787cd83c9db378d162234fa4e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/lunge__split-stance.json",
+    "sha256": "d0a6553ca3c4269ecc754cbe9e9e2964eeb6ae6d013ae2122bbbc964ddf39975"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/lunge__standing.json",
+    "sha256": "faae291edf7a3252d92a98d27193ae6273f66ccf2cdc683d46d01c3ac51e0d65"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/lunge__traveling.json",
+    "sha256": "642f640bf0ff77c2cc5ccfb61ed8ccd242e1495a5cc4f9702dd53cdaed6872c0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/pallof__standing.json",
+    "sha256": "ee1f09ddebd84c55a45a37312d588057a80eefcac2b5a3066e6266a0debb9928"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/plank__prone.json",
+    "sha256": "69f9360eadca89e88e85cef4f13794c8769e691933ab44abf69e7b42d4525eaa"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/push-up__floor.json",
+    "sha256": "fabcae79a82c0b5f6b0e4f263410b89f325755ee647cac34240d50e0313b44b0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/push-up__incline.json",
+    "sha256": "b239070a3cafbd399da04529c12e9005516e8f0d3633047779a597783638cd72"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/rear-delt__bent-over.json",
+    "sha256": "45079dda4fff3511b9b1a7c4326f8a2495fe73c0e6408a37c12061caadc34559"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/rear-delt__standing.json",
+    "sha256": "8c8d59f8f17c91e6e0c3c565daf45ae6bef85dc2ed9649ca0f829a5b3fff3faa"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/shoulder-rotation__standing.json",
+    "sha256": "e2d89e7ee72d58d876d79764ea6199b72949baae7f65f753a19e4bf2a8f8748d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/shrug__standing.json",
+    "sha256": "fe85f671fbe7184a93b3907d9ed667b001b4d6d8c79ac69086619b8de09585e6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/squat__standing.json",
+    "sha256": "66349c1d5f3b299174b0182ceca8de0084fa092ad7cef11bec730b2f9af942aa"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/squat__sumo-stance.json",
+    "sha256": "21dea099db7ccd83678a1e282ada75cf142bdc35ba5df8717151f3752fc46d03"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/straight-arm-pulldown__standing.json",
+    "sha256": "565c1f2ac2912469e0705dfe4092a2bfa793c34306b44aea4ffeb7778c16567d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/trunk-flex__seated.json",
+    "sha256": "ebaf8e879b4ab9f444f6eccf99aafab5dc24f702e7f2e42484f8d1ec873fef9d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/trunk-flex__standing.json",
+    "sha256": "645d759ac6cc21c737c75e3279302ec686839f8a2c0958f9c0ddff4c73f87794"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/trunk-flex__supine.json",
+    "sha256": "8d7390c4c69a33768dcd8cede309e948755a2a161852b1c8df17d8a7f3a150b9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/trunk-twist__supine.json",
+    "sha256": "0c2c206b11ab6c6680784d9d9815296fa805632718673a5237979239c6368f68"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/vertical-press__seated.json",
+    "sha256": "63bce93cd850a244a48192a2294d3f2584fd34c6054a19d258916805a9d08bcd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/vertical-press__standing.json",
+    "sha256": "6f8a0773a6c73f5f9914bb9c62c34ba88a97cb82645b7ecf8ed293a348dcfe44"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/families/vertical-pull__standing.json",
+    "sha256": "df9712df793faebf96ccde69b9bab7b084c49b30aa5f8839c79aad47a973d7f8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/familyLoaders.ts",
+    "sha256": "7fabec6b351ec48946676ec7d70d346c6e3a39f32e000df21f83a6b3d75437a3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/index.ts",
+    "sha256": "906bf76bf9afdace6798ce5360097d2ba73bbc6dab80d24dc5dc84955ac266b6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/manifest.ts",
+    "sha256": "eb0c03bfa345262357fea319923379d328bd9b0db9f69b4427d70f4c57bbc468"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/MovementPreview.tsx",
+    "sha256": "828033dcdb8cd4f62770584b7b0019bfeaca0822bb37ea099b92e40d5f923173"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/movementPreviewManifest.json",
+    "sha256": "41ea5f1cea3a6e918b50a3c9e1a22009402e57e3315134176d7ea4b3bf934771"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/playbackCoordinator.ts",
+    "sha256": "04530317f8ed5ac59f236c688628a96d4d84cc9d1c5e5a13f5a6489d90601f17"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/movementPreview/previewIndex.json",
+    "sha256": "d7b94a57668344bcc505251effef48c92a3d1c55d1a4b0251d99edf214e42c2e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/PreparationPanel.tsx",
+    "sha256": "f257fcf0e5094d4e9a42d658a09e04ab364bcb7256fab1406c3b55fa8ad6eea6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/RoutineTemplateBuilder.tsx",
+    "sha256": "e982c43ddd0759798f75b3016a635f9b825a0769ac889779fcdc614a77a10c1e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/SportFields.tsx",
+    "sha256": "9875819aca239dbfab8f60db644e0c745485952ec0369eaec101883bf5c5d893"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/SportPanel.tsx",
+    "sha256": "79fd208517fb154f33570c536b54660113efd0a82c23e5a5c5a76305a3b4e746"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/TrainingSupportNotice.tsx",
+    "sha256": "201087e871ab1503e89e60592c775e6dc91d6988db96bb3a499397ac485e4c61"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/Chip.tsx",
+    "sha256": "9f2c7fa044f252df5b2492cdb88a1fd461e6c6123c581e80a507363a75592e81"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/Disclosure.tsx",
+    "sha256": "b1772e2260cda396822fec94167db5fc02a0ea52d7c3c79ba1a483aa3dab464a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/index.ts",
+    "sha256": "dae3c2b0711aa5b2fada44314864c621e77af91c75b2538222050a0c00ab69c3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/ListRow.tsx",
+    "sha256": "d5a0b239a1c4bce669296bdc260d34b8fd48a885b5526593c047fe223aacbb15"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/motionDuration.ts",
+    "sha256": "8fd56170512e7a024be72bdb9021856e668ee51a78c4644bdb15ccad2733afac"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/PrimaryButton.tsx",
+    "sha256": "88deaef950de7a2fce0862aed23e2d6a157d131a1eaf1433998b02d1e1aeee0f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/QuietAction.tsx",
+    "sha256": "734ccb46e849786126f9643ad962295058f9714448768c7a74bf71e22df48d30"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/RestTimerCard.tsx",
+    "sha256": "8b91fe837eaeebafae12a02cbd1554eb4560577730d0f7c7b81d17382731a830"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/SecondaryButton.tsx",
+    "sha256": "71ea163bba44e0aaffb75ae14d301a52baefdbd97990e6dd9a0a4d3709102ef5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/Sheet.tsx",
+    "sha256": "c9fe2c69542ff88265b9382aba96bf36863602c8ac874313ad71414c7cf045eb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/Stepper.tsx",
+    "sha256": "acfce23bf6d5d0db2e0d224c49a025391779541dd9ebb9edef04e20dd862a9bb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/components/ui/TertiaryButton.tsx",
+    "sha256": "23d5d07072bd15b9bd141bca7f2ed982c348d5a4cb021ca4cf99d38dc960fc44"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/data/glossary.ts",
+    "sha256": "aeb1b8915ed96032cfd29f423176f3689b6646be7ad2b29999d697027f7a10ec"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/diagnostics/coachVerificationLab.ts",
+    "sha256": "6d7698e728c7f069bb8bf8b701131e0a63ad70ea64a27dfadc393aeeb2430ee1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/diagnostics/nativeSmoke.ts",
+    "sha256": "38353ecc9662262a1ef49498ee2afa29d2a0ecb82a0e02322534a8857e9a0071"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/inference/deviceEmbedder.ts",
+    "sha256": "7ed07b44b7c57c71fc4096f0362c212be9d3bd97ca09518b6a2fa46c0c4c42ec"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/layout/statusBarPadding.ts",
+    "sha256": "5718d3cf2dd1b3c6aeda46e93b749dac49f57d6588fb351a0e50c8045d6ee0cd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/navigation/navigation.tsx",
+    "sha256": "b482d2b60efafc1b1ffbc6932f7e5ff117df2744c4c82227d7dbf8e126958dad"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/ActivitiesScreen.tsx",
+    "sha256": "f66f14966b7b47c8de51539cb1ac3ce2f241475d37dcb46fad6a2d0ccc528291"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/BlockScreen.tsx",
+    "sha256": "9c6a75d5c8ad03cc05bcfb07ad4ae0eeb2221a565cee8a330d223193ae9b6a5e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/CoachVerificationLabScreen.tsx",
+    "sha256": "cb0f7e9e9429769ea52823f06429c6baee750ef4443a773c178624f5be3c3c3e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/GlossaryScreen.tsx",
+    "sha256": "f3249e5a6c93bec16baad7e5f1e3e4460e412d652dcd0cf164d30dbee1119446"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/LibraryScreen.tsx",
+    "sha256": "1b0f9899adfefd46e9390948581371276a97fc6622c19faca692492fcd7fd83f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/LibraryScreenV2.tsx",
+    "sha256": "867c9261059b870bc64d7031844293f1e0d4667ecf936e67fd5a5bb6b90a85b1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/NewBlockChooserScreen.tsx",
+    "sha256": "8cbe15290f218d902a991edbf777ac370aa5142af1554c6397898dcf272d1c69"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/OnboardingScreen.tsx",
+    "sha256": "7b1c0fdc8e3d0eafb990dcb73c703ff583ecbdd1e570e6ecf38d369743ff5fdf"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/ProfileScreen.tsx",
+    "sha256": "d5ce87208360b0356666ff2d742a706dab5589f6b26671d6bc1ee8f91d487bf9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/ProgramSetupScreen.tsx",
+    "sha256": "a76e9c26b50ad50e4a0400257a21ecae649c0c50cd961a4f5b40455e708a709c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/ProgressScreen.tsx",
+    "sha256": "0321ebacb16f4cc9520dea2aa1bc84ebed20b898ccdfc54ebd6746e4c3f93140"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/ReadinessScreen.tsx",
+    "sha256": "9c697df021035d65d61552af0daa73b10cb31aa4893c151241c9dddc8f5e014e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/SessionScreen.tsx",
+    "sha256": "d171880daaa8958ed42df944673bd7a11689b325b6be65b7706f64320bc843fe"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/screens/TodayScreen.tsx",
+    "sha256": "cb9977a2c8bab7b13997513628e8fbf353ad9238ec2f531c516daca74c6b26dc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/activityStore.ts",
+    "sha256": "b1e7afbca637acc99f2fc94df17e639f1ecd700a3e414e98fb6d64f5d537dc46"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/athleteRegistry.ts",
+    "sha256": "ba5c896ba2ccf4ef15bf32b0680ceec7947ecc6a82d5404ee3408b38874ffbcd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/athleteRegistryCore.ts",
+    "sha256": "d29380b9dbfae9592f89bb12757581e08ca1411da112768d1119da838e3aa2d0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/autopilotCopy.ts",
+    "sha256": "64af48fc64e1f3bbc091fcfc7e82b7e5743557029ed1117452636e70272feacb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/backupCrypto.ts",
+    "sha256": "1e51e3487858fe9a6c4f2dc43da63c96b445b9cf06efe94c1245cd5629748de8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/backupRecoveryMetadata.ts",
+    "sha256": "e5a2655dd06fd92ac662ba7b499d8b1d3c9ef8f781e675d37aedc72643ef2ce5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/backupRecoveryPublication.ts",
+    "sha256": "824ff53ab992044858e703778499da1e2d401d19f5004adb7cd23dd37a0f7fcc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/backupStartup.ts",
+    "sha256": "cdb7b494265c27a47bb56e3f60f7fad010a3312fffdc33e0108ed0e04b87994b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/backupStore.ts",
+    "sha256": "37a0a2b383a5b530976db71a8db6927714feddcb33176a615ef744b871894608"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/biometricsCopy.ts",
+    "sha256": "c5b1d9e3e5bcee7f43095b825aaade13a7a7e21393538c612227d043ed485c94"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/dataMaintenanceLock.ts",
+    "sha256": "d30e5d6fdf4139fa364cd081bafc3364283f6e788b95460a11a336a12bd11b0a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/deviceBackupPolicy.ts",
+    "sha256": "b0f835fdde77a7790f07ed9fcc6ae833dcc84478b0a544ec00e145eeb5979dbb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/equipmentInventory.ts",
+    "sha256": "b944acb2fa308405fb8d2800f0e1c9d35db9718d58c297e680f9c1faeece7767"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/focusGoalStore.ts",
+    "sha256": "3f40982a3ec19080d1ee2795ed907f58ed153e1447f500794e7a58d33424b62e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/healthSupportStore.ts",
+    "sha256": "959e2cf921549f04f135db502c2bd12512741ca9e8e6123034f63ca503081dcd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/loadPreferenceStore.ts",
+    "sha256": "5aca16795f3a286c63690930a3bb8a98b6a6cc2b56a81803112ada2f50a72c15"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/preparationStore.ts",
+    "sha256": "be8d32860e88d2d46dbdf84ca768be76ae6159e2e386d59e6cdb0221a4e39387"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/programDefaults.ts",
+    "sha256": "9b7f9d1aa3c89d110a3cd035bcfd9bcb1268b6f29b8b51eb43eb6df34ac5dc44"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/sessionSummary.ts",
+    "sha256": "a541f5ea3f25e0b798ed0aedee1cbb7db183fa3fe390f3d5ef2909a028c31444"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/sportStore.ts",
+    "sha256": "c9a3c95a6742586d5bf9cca1af3a3627991238d608d75a5df809d1466f114acc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/todayState.ts",
+    "sha256": "477dd88bd684ae48a016fd3afc62ee840d0968d7fc390f3a2556a0f59dd729f2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/state/useStore.ts",
+    "sha256": "0bdbea5a175e7ec2c228585a0b5f9a71e766d110b420daf5614530c12bb364ae"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/src/theme/theme.ts",
+    "sha256": "e00f74d671f3f9a2d3197182a45e98a1b6b6a56fd394120382422bcb6e855027"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/.build/athleteRegistryCore.js",
+    "sha256": "1891edccdab8988f33c53b5589e46aca6c7869e34b51806f9c67a8a742dc92f5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/ActivitiesScreen.test.js",
+    "sha256": "2a898a6400a2c26e4036106fbb0d9d98f93269d01946ffc93b1c9dccfbc724b5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/ActivitiesStore.test.js",
+    "sha256": "e6c40f14f4d11573ee5145aa83e0de31cf0cf946990dbaa21fee52046d400201"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/AppleHealthBridge.test.js",
+    "sha256": "bac81b788382977e936075f67576e025b0e8b8c9d9003039eb6357f70dfd84c5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/AsyncAthleteOwnership.test.js",
+    "sha256": "8ef641f61e6200c38e8a7d8265e37d4326e8507fa9bc708852a9cf8b909e2008"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/AsyncBoundaryReproduction.test.js",
+    "sha256": "3a57c43b406cafc230c175238dcb143b9bc5a2488d2a4320afa6df00c1682022"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/AthleteRegistryRecoveryGate.test.js",
+    "sha256": "11e4cacdde1a5f1b7e509b23cae99a8bcf4b680178fa21e80fab475cf6105a66"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/AthleteSwapProfileRender.test.js",
+    "sha256": "b8d115209de665dae448bbf999b55788c7eaee8ef87e80bc2bdefa0ac8ad4501"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackNavigation.test.js",
+    "sha256": "0804153aeb794ba15b9ef2e9841d14bb156b138725dcba622030d54ed095e312"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupBootIntegration.test.js",
+    "sha256": "19e159a2444d4e57abc1f2c437784d1f02934bf478fca02b022cdcc6a5896e0f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupCryptoHermes.test.js",
+    "sha256": "0200405764e14aeb5ee3c297210ed026a64c22fb04d3f5f1c919090ad488e1da"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupForwardRestore.test.js",
+    "sha256": "5181d5cf823a604e1ca9aa419c4238e95791841371f705228d9c2ec92a34facc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupLineageCompat.test.js",
+    "sha256": "393ab8cfb11fc9d2ced1df3d3591543696e2f28719a5036060f6843f40cc49d3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupMutationLease.test.js",
+    "sha256": "c6258c9a0924f1d752c4c68e021052444a27a64e2685f3464eb425e191face2b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupRecoveryIo.test.js",
+    "sha256": "2c164eb0e90a94902facb80fe1267408ae7d15ebe4b12752a6c16f23dbf96c85"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupRecoveryMetadata.test.js",
+    "sha256": "d84e9220b21334325867e1d6ba3968651f342d7c4064cdac7ca6bd4a93b0cbd7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupRecoveryPublication.test.js",
+    "sha256": "026545aa05aca5dab72bb6a378fa9b275acfe68bed10d6282d6b9ffdf042c1d2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupRecoveryRetention.test.js",
+    "sha256": "35e47f67c3de0f4abc33eb7b3424a2a7b1948d8f8287582dbb082a758ca7d5a3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupRecoveryRetryGate.test.js",
+    "sha256": "9a05766c7b583cf61aade663692ebe7cc32c0dd7e0c9476f3efd29970446f66c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupRestoreStore.test.js",
+    "sha256": "f33a3da0eb9d3cfc75aec60256d47ec559ddf10197823fb2162745680e72b5b7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupSafetyBoundaries.test.js",
+    "sha256": "23d21bd28ae4492bf2b5cb926dc913c27afa638096a69df8f5872f3ff0e2a12b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/BackupTransferPanel.test.js",
+    "sha256": "f620691ee7c4e046ca8c07ddaa22c2d7b4e2db7c76eabd2fb75e72d29e743c43"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/CoachVerificationLab.test.js",
+    "sha256": "614818dba6a996b2d5b926a080bee36adf4cf555e0a5cce3852cb0248da63b62"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/ContentCorrection049.test.js",
+    "sha256": "45cb4a3caa7156c4e6976c6107378e93377d716607f5e391921467883b1bdff8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/ContentCorrectionV2.test.js",
+    "sha256": "ee5fbe982ee59d1b9be4591fd1cfe870438575ef4adcaa01efc6efa239c48ea8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/DemoFeedback.test.js",
+    "sha256": "e661028260d415381a8e0afec81bf9c2c3b5e61cdc72b7018c24cc0dd597ea63"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/DemoLoadStore.test.js",
+    "sha256": "f9d4e22d43cbb637745b5696fd7d9199d679114d6cc24a8bb1e41aafefb70bd9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/DeviceBackupPolicy.test.js",
+    "sha256": "6e0de4af35f33a5b0f8431c24b2308c35a758131826eab9efbfe7b08d885465b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/FocusGoalStore.test.js",
+    "sha256": "cfeb680a02b278ba779a8a87d859d4db71f4bb20ff8449538291aff283f089e8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/FocusScreens.test.js",
+    "sha256": "5e2dc49a4fced22aa7441a3b2dbc5f4599ac58e601ecd27d9e77ffdf2d4b4d77"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/Glossary.test.js",
+    "sha256": "beef2267acb4e762b0f826f45e73a901f3e38c5e4a36ec2971ef300da7db76d0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/HealthSupportStore.test.js",
+    "sha256": "d7c1ad8de418028034c95892e3b811342a46417213ba68eeee90772c322ae518"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/HealthTrainingSupportForm.test.js",
+    "sha256": "f215e4ca165eedfaa363062160fc0ea9e87e59f7d7c9ae108ab866d771722bc7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/KeyboardLayout.test.js",
+    "sha256": "16738aefbe55c5b2623309f47db38dbe256ed5e5bdfe5f88f92db6111c35066a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/LearningLayer.test.js",
+    "sha256": "e16c93b3257e24380b18f09464586a51b611c20d06bee893f53af72549f3461d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/LibraryScreen.test.js",
+    "sha256": "981847fd54b928a54d8f75ec6740d91fff4943cd03d4c994ab29118a4da631a3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/LoadIntentDeclaration.test.js",
+    "sha256": "c3e8d69ab8388f4a34471bfda47a54e595351688ed56673dbb4780048df4f779"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/lungeContactProbe.js",
+    "sha256": "8cd7f7666993025ea9258a2ef79c1f849c66188c2e70c430452eea13545d1ede"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.adversarial.test.js",
+    "sha256": "82c28413b2d39e55776c06fe3ba429270f6fc34f20e8b6cb33b1e2dba4e1d870"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.approval.test.js",
+    "sha256": "1e9d017dce27c5fcbbe62ebb981b8b485e9f7204511a7c78e8ce7ab89977a422"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.batch3Perspective.test.js",
+    "sha256": "a144d86affc897d1e9e6657b7cabf03620ff1eef7fd5fc84042a4f11260d14ae"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.cableLow.test.js",
+    "sha256": "17692c67486eead8ce7a8f2d97e50b12d4f6b73bc4b356fd98e83df104bc5f81"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.canonical.test.js",
+    "sha256": "1bf229775c41c2c918cfc27bc0eef3f3697f62ffe83e084332cf898376c711f1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.canonicalNavigation.test.js",
+    "sha256": "e2ea8aac90337e7e2b6d6496fa4eb77c0cb70c7cf2dbe961911554a87a429764"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.captionIntegrity.test.js",
+    "sha256": "38280dfe9ab7a3826dae59562165adacf5935b4fab9799146691042cd13da114"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.challenger_m6_4.test.js",
+    "sha256": "649929783f588cffe2349f35b149047d2abd7bfbd8e1f22188d34823cf456a70"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.challenger_m7_1.test.js",
+    "sha256": "0265eb945adb35e86bffb9028126bff07427a0ef228bbcfd1ab1aa77c02b8178"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.derivation.test.js",
+    "sha256": "ca56a8666c27497a6a9b40c4218dae8892aa2c5c1d46a92f4e41db3fb08dd0d0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.flye.test.js",
+    "sha256": "089c5896801b1046d039c21676626da606aa36a5dce18e1439233854e8b3363a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.gripDelta.test.js",
+    "sha256": "b53b74c3b02e9776566a80f79884c9ae3644333e3bb85386a78cde1ab2e22e29"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.headSupport.test.js",
+    "sha256": "05a094f7cf09e1b4d79990fc4848121412e83ea3cb5f716531664a10ee1e3f8d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.jointOffsets.test.js",
+    "sha256": "70e804c13d097eb3b49677ba951792b20a37f45c199e2d3309947d76b7a374f3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.kickback.test.js",
+    "sha256": "4081502919c064dcf5b94134c8c942940b57ef3f160351485f4ecc2fe1b662b4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.layout.test.js",
+    "sha256": "80d521ecc2634ddf73a899f48cf9a85d69e19cc4df089cd7a5ca343401b5b443"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.lazyFamilyLoad.test.js",
+    "sha256": "aaa659c758051593d6db0d377e2b3c40190e256bb5506aa7ce7dbdefb3a4b6f1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.lifecycle_stress.test.js",
+    "sha256": "62df33209717efec982855ef26bd852719f7dda3f95ee48423d30e2057848c7f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.lungeContact.test.js",
+    "sha256": "fe2df46731741296ed22544ea9c6b562e64498017a359a03ff9b6c21dabb369c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.lungeContactMutation.test.js",
+    "sha256": "32c38b9bce4998e35913032db4b489f8f2a8811d8e211e1a97920560aa9d3471"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.lungeReducedMotion.test.js",
+    "sha256": "3a249d2b16b4ffc2c6e19b5ef43f1c2ed5d07f3f998c32893a88c321f52f0c7c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.manifestSplit.test.js",
+    "sha256": "6e6010c34100594d9b135f46bb7f3f77a9febefa786656107c4a5f7adf751c7f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.pushdown.test.js",
+    "sha256": "364958bd0d7e13fe6320034768e9ecf2674509f470a1ef5147b439325c90d98a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.reverseLunge.test.js",
+    "sha256": "309d0d1fd7e6ea4ae569ee7eef5914494c00ac867d0c102fd77af6d7fefcad34"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.ropeTension.test.js",
+    "sha256": "7ec966e64a60b661fe1f3a84247c309fd9033f6d3baf5632b42960b83b6089ce"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.runtimeRegression.test.js",
+    "sha256": "49a868b98e6300d74d773b309378155571ff71790a2cb80614283357d2006e3c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.straightArmPulldown.test.js",
+    "sha256": "ab127536a5e776af013c3fa82aed59fb08f702dda04f18d064f74e6fcddaa769"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.supportedGeometry.test.js",
+    "sha256": "68246cf3d6f04219752bee626c9f46c3372a2312437ce1593d29569d492a76b3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.test.js",
+    "sha256": "035a2620ad77aa418b336da0e16911c6f93b08ff1dd65b387a48ecf0185c8c66"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.torso.test.js",
+    "sha256": "eab598f53fd164fbc9b4a85eec60b03f213fe769f9fed88360f4c68a88243891"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/MovementPreview.walkingLunge.test.js",
+    "sha256": "d3d0fadf40218501e12d9e2e23da1b1a69270152beebc4e3e14c517ced3a65d8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/NavigationShell.test.js",
+    "sha256": "ede11769ae58f5f777b1739cdfedd3c57de1ab8ab870ea8ab44d5c4019a52e72"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/NewBlockChooserScreen.test.js",
+    "sha256": "41f4d5b8d488ddeccfb4c94b15fbcfc3831d2a80d76027560e7ac33e8305ad39"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/NextBlockPanel.test.js",
+    "sha256": "57b1f3a0c756242bbe7c289c3edbd9ab4426f9a18f6e279dbb22bf0f5ff577d6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/OnboardingFocusGoal.test.js",
+    "sha256": "3bd9dddbc44d29afddb5e39a09de1135b3cdb7463fd159c2900517a65f106522"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/PreparationPanel.test.js",
+    "sha256": "d3901fe93e09aa409ca32acead32f12a17f9e48e8a2777dc71563a3361c75642"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/previewManifest.js",
+    "sha256": "78a88ada7850a3c3276099076933c86c9ac297a0b6f4292e38025722ab428b12"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/ProfileScreens.test.js",
+    "sha256": "ed8c72316096332f3bfa926e9169450a7498a8ae024213ed287c1f1832fa8216"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/ProgramQualityRound2.test.js",
+    "sha256": "a66b133b0f6d30a1135b97ac454475eae28215084bbc6b0073edda87ed3e329c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/ProgramSetupScreen.test.js",
+    "sha256": "fe89b0bfbd72c5912c245dc747cbfdd61a61c9c6d1f23b6b9163b526f6010904"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/ProgressScreen.test.js",
+    "sha256": "3fd1fdbf8616fc636308b7b8b4ee681f4d8d0c10e79677750840ec76642c7ef1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/RoutineTemplateBuilder.test.js",
+    "sha256": "fcfe700a07b78b27845e7535036ff6b14014c6cec4358802960de2935266af20"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SessionAccessBoundary.test.js",
+    "sha256": "b074cd76b6baa6aa9d543470a2168d133295890d00c8052c14f69ed2ba393258"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SessionPreparation.test.js",
+    "sha256": "df043edafb219981e5e58c306b480a210e0c1e79088b04656abe430aba8fe868"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SessionPreparationScreen.test.js",
+    "sha256": "03b441d417aad4d5b75a22f67f753cca64597ec4d1fc663fc024b19d5aec9af0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SessionScreen.test.js",
+    "sha256": "c970a9428c9dbba293fa8bcb5b3b244f0a3de324cb739e7299e38b0a501bdeb8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SessionSummary.test.js",
+    "sha256": "cd15c7b9598b7cf87bc9ba9258ddd37a0b779e244430af4d413681fe19161a95"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SportEmphasisStore.test.js",
+    "sha256": "0bd2e2dabb03ffd32ab6f3c55cba3a805149be372bd4392e0225c5dc4340c235"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SportScreens.test.js",
+    "sha256": "cc6f10c6bd751975fa939aba361f1cb6ff582af332d24ee3a6fc3f9332f081f3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SuspensionLifecycle.test.js",
+    "sha256": "59553bc95bbd612592d12ea91a9d73454a1f710468a2deff9e5af44094c66148"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/SuspensionResetAndSwitch.test.js",
+    "sha256": "04532b177e05c11a66a8da52bf699f10bb9653ddf91caadb43c346b2254445ee"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/TodayScreen.test.js",
+    "sha256": "7cc87c8af746b85a4cf896176ff642622c00f79b4423885429039874505989f0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/TodaySpine.test.js",
+    "sha256": "41fa82557db3b07183549829888ca475ae139b149999da0327a2a07c651c325d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/TrainingSupportBoundary.test.js",
+    "sha256": "79710ea6d8448bbb36e7b68dc77f83eaa4f6afa54725272a6b3262177fd7b907"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/TrainingSupportEvidenceIdentity.test.js",
+    "sha256": "8cef424a0caf9d1fb71092d68eb5c11f16f292eb4e6e0448b49de252b11b6675"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/components/UIComponents.test.js",
+    "sha256": "089bbd73fefd1e516865f4604e1029da6064a944fc997b7e9cac9fa191ba9a3b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/fixtures/torso-front-baseline.json",
+    "sha256": "d2e07bf4634769b9343ed240cb32f1304ad5a9e2c37f3d0009779cf4bb8513a1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/helpers/nodeSqliteOpDriver.js",
+    "sha256": "06e274fb62f13f016e21f0def71b29eb47690e6ea8651c5a437ac60675bef1ff"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/sqlRawTransformer.js",
+    "sha256": "bb7919790cb0459f25572b0ac06fe0e1cfe38155458dc84191ea3e09b8a3f65b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/verify_coach.mjs",
+    "sha256": "b4554ae3dc32f4ebb66fa3a1a4f7a1fc39eb2fec9752edc7e6de153d7af3e8b8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/verify_routine_templates.mjs",
+    "sha256": "aaf126ab60b9c33556cfbdf593c57ec4271074575aaa65f8ee14759ecf1d9ff9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/test/verify_store_sql.mjs",
+    "sha256": "b21a159fe37c79b29635f39c76cfa45a47668c44de50fa7cd5bd5e158927e099"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/apps/mobile/tsconfig.json",
+    "sha256": "fa7f11952d48713aaa79f9b51a8504baf5198197d33db3b29d66ebb2e16fc288"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/AUDIT_REPORT.md",
+    "sha256": "6538eee0b4bd6ccd3ecb6f5fd2fc6247af6d079fa83f5b1ce35aff6fe074c2a9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/CHIEF_ORCHESTRATOR_MANDATE_SOL.md",
+    "sha256": "a71f1fc5ba18200d0cacc35ddd5e7df3042b21be0f7139e37ac7cdbaa9db42e1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/DEEPSEEK_KINEMATIC_AUTOPILOT_PROMPT.md",
+    "sha256": "097ef0145bc7fad7060bc4e4777ac4fa0545ac12a38ddc5024e7bbe668b2bc7b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/DESIGN_BRIEF_pikeMethods.md",
+    "sha256": "7dcc9c4a4df1935c55d20861bfb3b8b066235cdfdde0be1c83e8660d8d3ca54c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/DEVIATION_LOG.md",
+    "sha256": "d40275a0a76ee1e59c3502b32d892052409450f370143d3a4c7888811126e9b3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AK_HISTORY_V1.md",
+    "sha256": "019ba3f75256d90c1755b87a9bedb0c789a9a8fe98f5f8d914a8163e08b8479f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/ANALYSIS_history_file_input.md",
+    "sha256": "9a75cafd1d6cf26d2259fb6163ccf53b23a06f9088cf39d71adbde1fd70320d7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/ANALYSIS_ios_biometrics_gap.md",
+    "sha256": "11c4a0c5dc24eed8c774898b7219d491ef8af13a4bc51285a615d3cf5ab5c820"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/ANALYSIS_linear_scheme_progression_defect.md",
+    "sha256": "53c66535353218d6f64eff2f5b1ed159882e580ae092ad291a01f30dc96a7b58"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_architecture_review_8b4e75b.md",
+    "sha256": "99a94ac7464582ccbdd87e786fb972e5b3da3d4112de405d5422e7c84cb69592"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_C1_2026-07-30.md",
+    "sha256": "7a9ba227715eab94e4cfe04681eb4ab2e04df2a34eb321b8314390106b0a4e7a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_C2_2026-07-30.md",
+    "sha256": "68670aca696b3cabe3aae85056b0fcf480e9188bc934c355cafd62d6bea08a9c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_C3_2026-07-30.md",
+    "sha256": "62f94b6846b613e5f3852e1d6b50825131e17a76337e49c89765a0f53544a387"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_C4_2026-07-30.md",
+    "sha256": "fa5549026156813f94121a978d367db2e411ee9d21d70982996211354b2048f9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_C5_R1_2026-07-30.md",
+    "sha256": "ee702b10e20a7cd068d32867acca9dc5636b2a722ee9d740f89999ff01d6be65"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_C6_R2_2026-07-30.md",
+    "sha256": "6994f6d280a3b46b046733e94bf33d6168017f24ad5aa99f9a4cdf208ff5fc51"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_C6A_authority_2026-07-30.md",
+    "sha256": "b936e6cb3d35a7b22dd1379906f3ef2ee4a1770b113742c6f460eaf216efa055"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/AUDIT_C6B_2026-07-30.md",
+    "sha256": "a8d51bfa6f586994850fd11be5f837f30a7c9789d3babc6545ae49e2bd64acf5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/MOVEMENT_COMPLETION_STATUS.md",
+    "sha256": "a8d78ecec64216044aef48a81dcaf971b2eeadd39d4074ab3f0a1916a38fb1aa"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+    "sha256": "2828f8ad4798ef8fa4fe8de036df1101798ef9d59370f21b43d515072a8b9e64"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/ASSET_BUDGET_DECISION.md",
+    "sha256": "b5f079aabc8c790d5c10df39e0a2f1c075c199129a8dc2ac1a395d914ad434c8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/FIRST_BATCH_GEOMETRY_PLAN.md",
+    "sha256": "b49b4859f32a73553eb72c8b6081e61aaf0115b380b920c41555b2cfe79445f5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/FLYE_SOURCE_BINDINGS.json",
+    "sha256": "f1156cba45162d32b682bc9ba3975c694214a69ded70f48c79c89f16e9cf647b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/IMPLEMENTATION_STATUS.md",
+    "sha256": "e2bc7df86f68d05eba9a6e001d9f6bdb06715d44afe48ef1194d62a91c6afd12"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/KICKBACK_SOURCE_BINDING.json",
+    "sha256": "8180ce3b835e0078fe1a2973d0e8f6a629c89e44e731d8c07943e4b9a774e865"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/MOTION_COMPLETION_AUDIT.md",
+    "sha256": "c5c262786a6cf239d3e4b9219aa2738cbe264bc82b35ed26875e266d97d8c824"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/ORDERED_BACKLOG.json",
+    "sha256": "63cb52df20e9705d8a0149f9483ba53ec1c59b26f53d741568ddbdf252ba7270"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/PUSHDOWN_SOURCE_BINDINGS.json",
+    "sha256": "6f5af502fe9ffd6437712a99da08f51b6782844c1bc20a202541e3fb31404b39"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/REVERSE_LUNGE_SOURCE_BINDING.json",
+    "sha256": "c6f4ba5255395c7f888a3505f0a23839dbade35c6adc50b46a3f6f8481241e7a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/movement-completion/STRAIGHT_ARM_SOURCE_BINDING.json",
+    "sha256": "4f8d273bf0b1c500b1e7db233a6728e2682cb25844a0dd8dc34f9dd1ee7108b3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/OPUS5_INDEPENDENT_AUDIT_2026-09-13.md",
+    "sha256": "e345f68f4606023e0091d84ed3236cd3edd91d6e4265d73e1656b46f0613d349"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/ORCHESTRATOR_EXECUTION_PLAN.md",
+    "sha256": "ea87ad6d74a2a05ec6ae60bd290c14ecc6a9fe231a8b5f08807b7c8972359a34"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO01_INPUT_INVENTORY.md",
+    "sha256": "8a343b949240929b36ec9af90b5e491a1a26fe4cbff9f9dc34cd31d13c57f94d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO02_ONBOARDING_HANDOVER_2026-09-12.md",
+    "sha256": "18b81244d03ef41e01d3fb0f7199221a8564017e9d6c508f90e18e23160a93ae"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO03_BACKUP_DECISION_DOCKET.md",
+    "sha256": "73705ce7efb8d3be01040d1b64fc3895ad7e787cd2ffa0eff1c7f7a0d792495a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO03_DURABLE_DATA_INVENTORY.md",
+    "sha256": "56ab43334cc5e56c274715d21f293cc40ebe64d6b7c07da65f6b3ba98df804fb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO06_CLINICAL_CONTRACT_REVIEW.md",
+    "sha256": "ed6aa6b63f9b311f2df87612cc151b39416648b552723e04a5580fbac536f731"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO06_IMPLEMENTATION_EVIDENCE_2026-09-13.md",
+    "sha256": "d8770b6134e15a741f34c20197b70eb08ccef4fdf36079bbbcbf1d13ddc74d59"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO08_ACTIVITY_MOVEMENT_COVERAGE.md",
+    "sha256": "14c6b7c30e03a3110db9fc51e1adf9d8168a66382be526467a00a3ce069d36b3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO09_MOTION_FAMILIES_FLAT.json",
+    "sha256": "6b80ba3a0c0e33423a23d5aab8150fbf014691a9ee1ca79daf02282021d11e39"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO09_MOTION_FAMILIES.json",
+    "sha256": "88bdfb19500746a7a04f5073b2f3e220892eb301f42bb0c8054b55a8e83efc0d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/accessible-coach/WO09_MOVEMENT_CATALOGUE.json",
+    "sha256": "b01c6f0d418db717bbbe06e7e94b6602accd96195ebe3eb99f4cba6cb25fe2ad"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md",
+    "sha256": "516417cdbcdb9920dd83e8f25a87c32ec297e0f759b1330efb11c2a55856419a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/BASELINE.md",
+    "sha256": "06fb8e32c81324e8ab5705b0dbb1cda68701422e589a33dbc155653ab25e0de3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/evidence/WO1_NEGATIVE_CONTROLS.md",
+    "sha256": "d8fd19a993fec8ce3fced760fd3f6ef0eda73745b8b9989cb8081078763a9417"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/evidence/WO2_NEGATIVE_CONTROLS.md",
+    "sha256": "c82cccceb65bb264358b1f545661559b98b6ee6d01a85428be95f5419a0f96f8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/evidence/WO3_NEGATIVE_CONTROLS.md",
+    "sha256": "050c484225b72bc650682e5536a0e53e7f4cf08b8ec797e9d83fcd28c579f566"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/evidence/WO4_DISPOSITIONS.json",
+    "sha256": "0f28b959adef6211e95542e91d1909b94451f190a61804851f849188c3b0f3a3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/evidence/WO4_NEGATIVE_CONTROLS.md",
+    "sha256": "fae2fa4e3e907b5356374efad5bb292f5239a06bd1d306670e6f60baf3de5d6a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/WO1_PREPARATION.md",
+    "sha256": "d5c31c738338303d01e12170d13c3d911962991b4c516e33d08a62d24b9fb45a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/WO2_FOCUS_AND_GOALS.md",
+    "sha256": "608a01a125449b8602d00b912c37cf4a496a61fc3cc712a12e043bb3f343a2fc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/WO3_SPORT_AND_PROGRAMMING.md",
+    "sha256": "75bae85de47ac3848d98796e13a38a3ddfa3293f3cc39ccc669e8d7e5853cca1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/coaching-goals/WO4_COACHING_CONTENT.md",
+    "sha256": "813b2344a45aa2eb00c8a089a8fcb51aacc1c285c2e6e8d453f37ed290104bd9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md",
+    "sha256": "284f86ffe702a12faead4c776503cda40cb3e10b879dc8c023b618ebbfa09114"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/phase-2a-movement-library/OPUS_AUDIT_PROMPT.md",
+    "sha256": "95d5785eb79bdc70df272d84217ab0a4a203ef22bd1d4bf431725e6cf575fbda"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/phase-2a-movement-library/README.md",
+    "sha256": "46933df0b4e888c957c31a3759da6902da138276fc51dd5e20b613b9a81d1beb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/pre-release-coach-verification-lab/CLAUDE_CODE_AUDIT_HANDOVER.md",
+    "sha256": "9a7bdb768bf49f3aeeb124b29de5ffe0f8720d80f72e53089ace6b043768d5c5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/EXECUTOR_HANDOFF_R2.md",
+    "sha256": "4b4c569bd1869c3b8b1ee1ec6f1a3993e521e8ec3f91c3194b4a233220113b7b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/EXECUTOR_HANDOFF.md",
+    "sha256": "be87d25c1ad01abe133d19f117afa2677409e2c54fca656478a31ee8314dc45f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/GENERATED_PROGRAM_MATRIX.md",
+    "sha256": "d08557a0c1bf4aaccb33fa2d1d8b0ca555c12af839b3559739f5cdaa6fc22514"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/matrix_harness.mjs",
+    "sha256": "0f6ee6bc5ac17ecb0a91f8340d6739090d76f6c7ae280d1e93a16bf3565e2397"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/OWNER_DECISIONS_AND_LIMITATIONS.md",
+    "sha256": "8457c49b0e3943e38ebbed7f94beebb5502693653c89c483fcc79da83838aa2b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/reviews/round-3-reviewer-a.txt",
+    "sha256": "f6efa4be22b1958142a085d325d7df16d6ef4f06d5b7e13d3eb4cfb9d11a7aa5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/reviews/round-3-reviewer-b.txt",
+    "sha256": "9ff5f446764da920fcc7bbb8991da2a098a58877cf95a47796e4e38aafb741df"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/TEST_EVIDENCE_R2.md",
+    "sha256": "7491ee16d7e688c7418c5dc76e058cea1a4b87156c3b9c091a21789062b11489"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/program-quality-remediation/TEST_EVIDENCE.md",
+    "sha256": "274f3480c35c8f3922e4ca7e33a7439184fca88b85651886cc8bdf22147d2f26"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/antigravity/HANDBACK_ISOLATED_QA.md",
+    "sha256": "96d9ff8c5cf22bb6196fa28f6ac5d184c151bfa03050c006cf0f102f90b39410"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/antigravity/HANDBACK_LIVE_SESSION_EVIDENCE.md",
+    "sha256": "3bab3f48f8a4ece02cb88a310dc729060076b949d0e61341ee1cae08b31a6d79"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/antigravity/WORKORDER_LIVE_SESSION_EVIDENCE.md",
+    "sha256": "88342f0e22cb08123f58c7d6f9b1e50db804fd9dac74e1004645d1ae4e06e156"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/antigravity/WORKORDER_UNATTENDED_ISOLATED_QA.md",
+    "sha256": "81dc90bc34211a1b884e1dc4f8795aeb3bb08e01028a53b279716d9e1484eb33"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/codex/CLOSEOUT_AND_PR_PREPARATION.md",
+    "sha256": "8dc0584f8b229af66db5c0c2cdf5badc21c449895bb7d9a004a2643ad9ecd139"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/CODEX_REVIEW_AND_OPUS_NEXT_STEPS.md",
+    "sha256": "dddd8c8a5798c0f7029aba1e21dce1f64501a6ec15c557566a959314c9dee3ec"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/FREEZE_INVENTORY_W1.json",
+    "sha256": "7b49374146c2573c9d6ed539066fbc95ca7310f84c52a718b41768780018dede"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/FREEZE_INVENTORY_W2.json",
+    "sha256": "8fef8466a4058243c0db2f1e5caf90634a6915e53205fc50fc9c4c3089637661"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/OWNER_LANDING_DECISION.md",
+    "sha256": "4ce045aca837800c4a86ec45085002213a3c3dd0bad8c080734904593ba516eb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/POST_MERGE_STATE_C_DATA_INTEGRITY_HANDBACK.md",
+    "sha256": "f72df10e5a5efeb627548ca5c07640d182b02a561342a789f85661c3fce9fdb5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W1_EXECUTOR.md",
+    "sha256": "7948ee92fbdf59225d797c8edd99a097de3a5b8b10573d09b180432ffaa7adaf"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W1_OPUS_AUDIT_R2.md",
+    "sha256": "a6cdd20844bc8c80a275e5db7acac633976f9f402caf775978e2cd4abc708442"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W1_OPUS_AUDIT.md",
+    "sha256": "cc75da5bd6e93736d29e1140678a876e00326dc5e9881fc0cc66f223d512f616"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W2_EXECUTOR_R1_SUPERSEDED.md",
+    "sha256": "78b150801c20623e70dd06ae8a18121350f33e99df930e56cd8f08023f8026fa"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W2_EXECUTOR.md",
+    "sha256": "6d91bf6cb1215834d9884c75952fb4cd57e7158f73dac55aaa8298e69567a9a6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W2_OPUS_AUDIT_R2.md",
+    "sha256": "1c430695851cce9f86e97a22d9f7ef139e5ea8866c971a205a1f5ad1ced333b7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W2_OPUS_AUDIT_R3.md",
+    "sha256": "7fdb2baefc6d9e493f1f4ffeccccca0042469f0cb809953594adc8084aec0cba"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W2_OPUS_AUDIT.md",
+    "sha256": "091f1a9d26bf64800b7ab3409790eca131128d7407b0e07abc10816c982138f6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W3_INTEGRATION_PACKET.md",
+    "sha256": "4bfd1f443a7f635969928f6823fb7ca3645a65c3914886b656d1ab640ffb34fb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W3_OPUS_AUDIT_R2.md",
+    "sha256": "f8ecaea60bde19c32e6e0c20c17cb8f56720c8535e8ac21455a0f94a81b290bb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W3_OPUS_AUDIT.md",
+    "sha256": "e0cfc9c9d5c2d0a4ee8ecd9ad93e749fd750af0ff63b45a4e181d8059a1c88e3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W4_C6_RELEASE_PREPARATION.md",
+    "sha256": "86fbcc4c3f4d2d3186e978f8b8084db347a8987ead2cdc251d1900645e154f0a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/W4_W5_CODEX_REVIEW.md",
+    "sha256": "f7041027bb429bdd99107bea2dd9aad1c56e0ee22314f67c52a814872feec3c5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/continuation/WORKORDER_OPUS_W2_PATH_A_CLOSEOUT.md",
+    "sha256": "4edbbfdfcc6de1eda6846b82e37e61549086d40de2acbe651fbde12e72cd4d93"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md",
+    "sha256": "e50c0d7829681c5429f624e7d554c445b4ae9c8fd3db2a5964de301ee29c7add"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/opus/OPUS_INDEPENDENT_AUDIT.md",
+    "sha256": "a4adb29e875d5a4605bf7073aaf5d5e0df83396d0e932b293a1f0ff084b70dac"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/opus/OPUS_REAUDIT_ROUND3.md",
+    "sha256": "a82949c4fe48f393eb287da8e55deba87c79d5a740cd2dabb84a17bf18cd2e82"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/opus/PIXEL9PRO_SMOKE_REPORT.md",
+    "sha256": "69a6a5ded76488c88c2cb445785d412ece460c0cd3537093a79cb91b5d8731d7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-1/reconciliation.md",
+    "sha256": "c3d275d8327194b7b2a6ceb56492b19303a656c78ef7f8b148a10e5e2712927f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-1/reviewer-a.md",
+    "sha256": "ffeb6db992f718776c05bdb4f72a767e305e75fd1c846f3a2154509151a00449"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-1/reviewer-b.md",
+    "sha256": "cbdce7499cecfe11c497169e8a3eb3da17d7fc0f1f56cad0ebb76c9d72a46a51"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-1/sentinel.md",
+    "sha256": "3a5a852cf190bd9864cae4a0f7ccf0c65d62b91eafaa4fe635fe07b7a9d63c0c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-2/reconciliation.md",
+    "sha256": "e8e344685ca3a3297c2d66bd93d4fefac1aab818d23b90e05ca4371e76a5bbcb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-2/reviewer-a.md",
+    "sha256": "83ab4edf64e8b01737c9e627f4099ef6cd0a9c03caaf97b5fe6bb8c205db37fc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-2/reviewer-b.md",
+    "sha256": "0a480460643e12b2aa8f926bab19e1e4c3d93abadf98c9a3c80de3eaca4c9880"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-2/sentinel.md",
+    "sha256": "96abef61045c07b2f28ac2ebcd924600f21f0b6db065ede481878c931a661522"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-3/reconciliation.md",
+    "sha256": "fef107d812d08ca90a647129af0a1867cd3865405ebcbd2da2661a6c12fc0e56"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-3/reviewer-a.md",
+    "sha256": "d0cd1a6e47d5b16a968cfba7b96bcb862b48a4fcbf9aaeb650a47433fee9dd93"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-3/reviewer-b.md",
+    "sha256": "db9673126f4f942317d003767ce04c83712d062162ba6e8998f59fea329f9b7e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/rpe-familiarisation/team-preview/round-3/sentinel.md",
+    "sha256": "dbc7f2f588cbafa8e4966040b870eeed197e6007ab4b04325a39246ede44c43e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-data-integrity/team-preview/round-1/reconciliation.md",
+    "sha256": "61ed3ea2c2ca5f99f98a7489989c6b8f2136544e0ddf576bf80d83022a5ca04d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-data-integrity/team-preview/round-1/reviewer-gemini.md",
+    "sha256": "e07a01e68c59749f15959f8cdd5b12e00d2076c109ef0325e7c5b3759b769622"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-data-integrity/team-preview/round-2/reconciliation.md",
+    "sha256": "21ddbe87f70e3fae554f4eda638b0a6a35e1b3fc82507ddc532cc79ce891cb30"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-data-integrity/team-preview/round-2/reviewer-gemini.md",
+    "sha256": "64126b41000d0c425b190007c2b9bf884a1663a4ad60ca9ebce1ce6b1444526f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/LEDGER_LINEAGE_CROSSWALK.md",
+    "sha256": "c73354c8ef244abac72c6599da9c3ae954178ce4ad58f97a5b3ae5ba974fb959"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/lineage/PROMPT_LEDGER_AUDIT_LINEAGE_1A878602.md",
+    "sha256": "1a8786020be1eef107a1b3c8b6e1d02ff7826b688e67789adaf1414bc8e5c3b0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-10-reviewer-a.txt",
+    "sha256": "8cfd115316e688a6fb09d5eff414cfeb1c5536e3c55029f18ee841e108cda8b7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-10-reviewer-b.txt",
+    "sha256": "5c0d379a962adcd66f8b05ef942b980c5f90866c481aa3fa1bc71f19f111256c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-11-reviewer-a.txt",
+    "sha256": "cbb591c0c25208cf057358d32c58e3d5dd19893c63dae5f97d6c5bf737a7c9c8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-11-reviewer-b.txt",
+    "sha256": "59add926b8220a8b925091a86f3b5b4665873f1fbf683b968926dab7f114c282"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-12-reviewer-a.txt",
+    "sha256": "1c92ac028b154e5b559b5757732fb7f2254cef70599694b93d065ee6aed1accf"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-12-reviewer-b.txt",
+    "sha256": "a918228459973797d4279e163b1a0dc9c2046a008fa8c98aff832d2043e3283e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-13-reviewer-a.txt",
+    "sha256": "36c6420f29ed48e403056fbe3f116365cac9863b51f904b477e98f9637e2b153"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-13-reviewer-b.txt",
+    "sha256": "12cfdae76d18c4aec348f0437210cb0c8b21f395d1ce146ecd2f4678ec639d1d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-2-reviewer-a.txt",
+    "sha256": "af4026fbd2150f6b91b4f732fc62279b8ca273d230130eabdcf14ebd404a332c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-2-reviewer-b.txt",
+    "sha256": "ca790dc24d54725e2f577ecd2d3df6e10e33cc581039d4c1fe70126aa205a17f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-3-reviewer-a.txt",
+    "sha256": "38cbfaa73a6708ea4fce16f817a3c296da9e1eaa5c6780b6381e056b595e5a46"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-3-reviewer-b.txt",
+    "sha256": "cc9b90e70cf0f6956ce54388a1c2d27a7248b2306f1ad8856b055d87234c4346"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-4-reviewer-a.txt",
+    "sha256": "06f48d477a2efed6d85321b9e97054af98b3b1621827e089924abb4059b1e32c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-4-reviewer-b.txt",
+    "sha256": "c5a8251bf60caed98abaa52b8f7c816102f3f98b90c5535da28f1ff3f8edfe21"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-5-reviewer-a.txt",
+    "sha256": "ac2115f895943ca1a35da0c216a86deab0a210b26315d2ee6a236620d3148530"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-5-reviewer-b.txt",
+    "sha256": "90c038bad381bc32d419c58d066c0782e56f57e4dd1203b07d93be55f76b6370"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-6-reviewer-a.txt",
+    "sha256": "4fccef03119022a945614f932426557530b6cbb8c6acf0d36b9c561df013c1e4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-6-reviewer-b.txt",
+    "sha256": "edab047e3cbdde8ea776e6754617e084fcd260d0f44a1f91060809cc66d1aa2c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-7-reviewer-a.txt",
+    "sha256": "2a946b704b27095c6a08edf647291551a22b66458c4663d1b40f58aa0b2769fc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-7-reviewer-b.txt",
+    "sha256": "d30b6129d49680900a37eed9898df1af11e800b7071458687ac015c02f5d90f3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-8-reviewer-b.txt",
+    "sha256": "6526579bbdaaed4fe2b9458fee2ff8de2ff9512bd73cc479eecc77c399d85791"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-9-reviewer-a.txt",
+    "sha256": "c6b017b41eda6ca61583796bb4f40ab466499b07a4e8749f105ebfdacf53d839"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/audits/state-c-release-readiness/reviews/round-9-reviewer-b.txt",
+    "sha256": "805b729458ff52d84d101094e8cbf14c3b8eb0a8b7ee2cc87405add901481844"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/BRIEF_progression_control_safety.md",
+    "sha256": "6228daeffd70ed6fef94808e233d371b7ca48628e9a77fe8b68addca5f1ee734"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/coaching/PREPARATION_PROVENANCE.md",
+    "sha256": "5f134c2bea4538ad380542b090e2b62c0473b0992f908922cfd9c4397fd5f05b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/coaching/SPORT_PROGRAMMING_PROVENANCE.md",
+    "sha256": "868aa1a4fa511e7240c1bb5de4f0a1ff9aa08e51f914f3b1ca8767dc34e271e6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/ACCESSIBLE_COACH_ASTRA_OWNER_RULINGS_2026-09-13.md",
+    "sha256": "aa398c1d7b973d6b9c3407546b5fc14306e0308f3669f72a24968e1c89de6bb1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/ACCESSIBLE_COACH_CHECKPOINT_2026-09-12.md",
+    "sha256": "b99d083c57e00603a22cc08acdcbca54cbafdd2184c1ce2c1bc0f908a887f95f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/ACCESSIBLE_COACH_SHARED_CONTRACT_DOCKET.md",
+    "sha256": "124eca8faf0e4dbc3298ff752f1f70b4226eb364b8ba6c6362677475ca9e0ae7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/CALIBRATION_POLICY_V1.md",
+    "sha256": "72ea1b24953cc0d226ced595d17be8c25bdb35cf4918af8bf278094ca9cbd58c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/coach-verification-lab.md",
+    "sha256": "fe7e2367abf9f651a7a59aa3f6d841ae5b18a5341f0d57e0def9704935a9ab07"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/FOUR_LIFT_EQUIVALENT_VOLUME.md",
+    "sha256": "30814f02484af70344be66420c6fadd5a77753ba983e8b5d1b9bb33652405885"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md",
+    "sha256": "f555819892a66d06de22517093abe8de6b1f2df935c453079d249dee71bef9ca"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md",
+    "sha256": "4a3f05d779bc491fc01f762e046121fc49941d4bdf0bb8e1cf774885e45e689c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/REST_DURATION_TIER_NEUTRAL_2026-09-15.md",
+    "sha256": "cac4e496652073d747c0548efb0294f5c48b9d377607c5bf4b8f25c83341638d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/ROUTINE_BOUNDED_MICROCYCLE_POLICY.md",
+    "sha256": "b3faae7e35cf686f2d43f3a771eb80096fb95f817d5d58a11e51fe1c53efe356"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/ROUTINE_MAJOR_SUPPORT_POLICY.md",
+    "sha256": "03c5d23431d22c31a7daa4093ae77cf31ed0ca5da1f1a8e69b6852e2dc22f146"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/TRAINING_PROGRESSION_LAYERS.md",
+    "sha256": "c2da7d839403e48e1bc6d2e32b18aab6ac3e4fa59fbd263ac2b5e60f3168b1f4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/TRAINING_STRUCTURE_CONVENTIONS.md",
+    "sha256": "bd10081939be28b3ba5f42b624e8ddb13f7452f54cb968eda5b6ff848bb0d364"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/decisions/WO03_ENCRYPTED_BACKUP_AND_RESTORE.md",
+    "sha256": "db6b4d12747b215a85c45b30698e3c2509e82c349fd914639952b77db5477244"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/HANDOVER_TEAM_PREVIEW_PROGRAM_QUALITY_AUDIT.md",
+    "sha256": "170fa501e82ff8d9721cd77e9d4d8242f4b60257e669510df20db6f4f8eca29f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/Kinematic_Autopilot_Derivation.md.txt",
+    "sha256": "1363b5567aefaf2f8595e0bc46832979086b629ca9de840cad3d9f36412b68d9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/PARKED_RR03_taper_and_microcycle_architecture.md",
+    "sha256": "2a9e270fc05f1f15d6ef39aa8fbc164b2b985f2084d3e30ade211283be1f12d6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/PRE_RELEASE_ANDROID.md",
+    "sha256": "ef29903f131a822b34bb4cb70561ca5f9d6063fb42e92b70593d35134b70955f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/PROGRAM_QUALITY_REMEDIATION_SEQUENCE.md",
+    "sha256": "c7f0775e66d7a50b06ce5f65b4db33a5917e38b7a98b5826287c5c4836593c31"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/PROMPT_Sol_autopilot_stability.md",
+    "sha256": "9dfc6f0d9083ca57e7687f260fedefd34edf669b894b2ce7d609404f3a10ef56"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/PROPOSAL_experience_tiered_load_selection.md",
+    "sha256": "4c57f9581fa46e1dd2122a548f39faa0a3483101ed5816ec632f7a704146fc35"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/PROPOSAL_suspended_state_trigger.md",
+    "sha256": "fb16b0578f7e33ab9584f181a794bcd4a30e59f1a75e7958cd7e0fe6fc9ea5af"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/release/DEPENDENCY_AUDIT_2026-10-04.md",
+    "sha256": "e5835ba589c767f1e7c1ce0d6f9ee387880599bf7041445a4d435dfb5704dfdd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/release/RELEASE_STATUS_2026-10-04.md",
+    "sha256": "668f33f7c2d3ae62cb71f12393d134183c0478084fa9f19ad71d0bbcc71b0b2c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/accessible-coach/WO04_EVIDENCE_REGISTER.md",
+    "sha256": "f67e83b67b9993a0e62175eb3edeaf07a3b3827b08bd11076909fa923ae0441a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/accessible-coach/WO04_PERSONA_POLICY_AUDIT.md",
+    "sha256": "535d018a54845ebbaa91682265a504ec1d636a08b0805ee411ef1ad3f1336afb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/accessible-coach/WO04_POLICY_DECISION_DOCKET.md",
+    "sha256": "b36ae636af1cd2d351978568968d5bfaeb1a5618365819c15b060cda04fde270"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/accessible-coach/WO04_SOURCE_TO_RULE_MATRIX.md",
+    "sha256": "dba3df366f2c397e66a5973042d189eb070898e67b128d84a008f20a6321f66f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/AUDIT_REPORT.md",
+    "sha256": "e473ab3afa6620796f7a840929129f2f3276f7fba2b52bbecf39d9d1c790f897"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/calculations/DERIVATIONS.md",
+    "sha256": "956a7aee7f7b3c951394dc85bd7372f05ec90b227a2b0c71538023d3a5b79351"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/checkpoints/Q1_LOCKED.md",
+    "sha256": "02f54db753282397215259262aa35ab42b1b1e523d7e82d718c920c547e84f1d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/checkpoints/Q2_LOCKED.md",
+    "sha256": "aebad295ff74ff1ab3f055b6e1a2b13bf4f75a4fd90e3b7ee3769b258a83492c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/checkpoints/Q3_LOCKED.md",
+    "sha256": "f64a03a01ae06acfb608905674f18d9aa98909dee71129fec824aa18b2d733d8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/checkpoints/Q4_LOCKED.md",
+    "sha256": "bc105de6cd21cdc8242ab3d44bbc8bed4d8430b94b268c409cf4e5b4fa54e818"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/checkpoints/Q5_LOCKED.md",
+    "sha256": "1f22207d4d61fe00f6c68726561ed71ff643cb6817ddc2119f40f0169c808cb7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/checkpoints/Q6_LOCKED.md",
+    "sha256": "34076cfd66c63f1f80a6663b37eb28bef7213059c56db8b437d89025dabe13ed"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/checkpoints/Q7_LOCKED.md",
+    "sha256": "7d7d662d82b909911f2a2b0d25e7cf67485ef50141242f24dfdc1093acf97eff"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/checkpoints/Q8_LOCKED.md",
+    "sha256": "ccd302b7fd81f92b5978b04bf26b942182acea8b6ff87be4f8d3331686c30845"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/inputs/evidence_review_strength_progression.md",
+    "sha256": "ba371600e7e83986b7fb1f17c9b47de13c1c381ce066320fa4de6f4c9b3affed"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/inputs/HANDOVER_20260826_RESEARCH_AGENT.txt",
+    "sha256": "76b50db1b253ed2d8bf812bd3da241caafbf70f7d8372a261a3b9e477e34ae56"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/inputs/HERMES_RESEARCH_BRIEF_progression_measurement.md",
+    "sha256": "d2be5ffff60140c177d1253289272c45e50be1fde1d5d5b6fc4e5ad584a54a57"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/inputs/progression_measurement_evidence_review.md",
+    "sha256": "19a93435fb0d5c15c7e23ae06c1a32c4fbd5c7af89a1e8ffcd9cc49a80d21035"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/OPUS_RECONCILIATION.md",
+    "sha256": "df2685bfe3b13b6c21536068f9ebe0968b12c9418841ed8bf1508bb985cff9ec"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/PROCESS_ASSURANCE_APPENDIX.md",
+    "sha256": "27c39b7292b0ff2e4c489ccdea38518739d5b46f44b796a3137402e7f3b2416f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/RUN_MANIFEST.json",
+    "sha256": "d864e590a7478ac3daa3c904b2cf0567ce758004f2cc79bf4ea92ae3fc57ee85"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/source_metadata.json",
+    "sha256": "7ed7a7c488b28bb32a43dac0ca5686b718057f2af5ea6db794610729dd17a2a2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/VERDICT_LOCK.json",
+    "sha256": "86d5abbf295bc31cbd159bafb9815d70b3ac90fa6cda03b69f4c571b76d754cf"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/progression-terra-2026-08-26/workorder.md",
+    "sha256": "9c456d7202091bb2834f6df0d058220455493897639ba36a159cea3d4b8e7c71"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/audits/README.md",
+    "sha256": "2e7e217801897a50378a99745a03a8b58c065b455494c51340de3eb108305d08"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/research/PROGRESSION_MEASUREMENT_EVIDENCE_BASELINE.md",
+    "sha256": "42a5e54b3425cbecf4f492d5df5d7b18093ee88026e25c6761cb17011a9130b3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/REVIEW_neo_plan_2026-07-30.md",
+    "sha256": "7ff2a40bdee6c5c0ab8f5d8c035a4b81ffe48235b955f1b95d7874f68aa3f31e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/SPEC_FOUR_MODE_LOAD_KIMI.md",
+    "sha256": "9b9a1c5652aafcf1bfcade2b10443efab747b393d9cad145145dbb4847719003"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/SWEEP_completion_action_2026-07-31.md",
+    "sha256": "ec19bb85de20b2f1412483ab74effc2723b55ef53adf4b6b838d8689c12b0701"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WO_FOUR_MODE_LOAD.md",
+    "sha256": "0a3f209073e0b421aff0c7f9db153155a9a4b00eecab148116fac3c2a3f0bc52"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md",
+    "sha256": "c49440de1592f1372de8570bcd38e10c8701de2200925197c07db3eb421cb498"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_ADVANCED_BIOMETRIC_RPE_DISCOVERY.md",
+    "sha256": "c9415784d2a6727c0dea9a0f1556f49357a334f1ea2c2f1b143728130e969084"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_autopilot_stability_remediation.md",
+    "sha256": "042698f2cc81d57d86fc549a1434ccc904836a0f2e7162225bd287a17cc5e344"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_GEMINI_OPUS_THREE_DAY_CONTINUATION.md",
+    "sha256": "6e37e00b0b8467870f8a14f7fb77d0d19e9293c16a0856950a1129f0856beacf"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_GLM53_AUDIT_SYNTHESIS_CONTINUATION.md",
+    "sha256": "72e1166b1c44564c2fc799621d5cd9512b8c8c65e7b7318331c0d80f38104338"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_MASTER_AUDIT_SYNTHESIS_REMEDIATION.md",
+    "sha256": "687617d9e6dfa7222d6cfd85fc25978caa92303109031ac0ed771bec2d20f2ec"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_OPUS_INDEPENDENT_AUDIT_RPE_RIR_FAMILIARISATION.md",
+    "sha256": "ad113e1b61bcdd5383befb72a67e8b85665ed7eec53a37d7833e458305c36a96"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_PROGRAM_QUALITY_AND_INTAKE_REMEDIATION.md",
+    "sha256": "80d0f5e596a875915dfb6c2a746669f10040e3d64adff363cd22f080fe3136a4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_RPE_RIR_FAMILIARISATION.md",
+    "sha256": "be32a6293e3809b096ff92464a2059fc32c7d870afe1aed60ac6716dc64b7d71"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_Sol_autopilot_stability.md",
+    "sha256": "dcfe3106c382f34bbbb2170a5ce0b6ff3cd9948d5eb1c69dc475be219b09699d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_Sol_C4_and_remediation.md",
+    "sha256": "55deef7d0c8cc5da7a5c79c0d0222c7dd38c3d5dc6a815815745011272db97e7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_Sol_C6B_authority_3.md",
+    "sha256": "d507f1908bbea0d4332969acb21bb6a22cf08ea998f232c8e9909d29162ddc95"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_Sol_completion_vs_prescription_observer.md",
+    "sha256": "3f4b56520451a36eb1cfcce9bfdd8a4dc549603554e57c3e0dfd68ef6bea3aca"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_Sol_R1a_C5_amendment.md",
+    "sha256": "29de390a1acccdb25be311868543b6d661ce230ba5a0af1a30dd74366228dc47"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_Sol_RPE_preseed_fix.md",
+    "sha256": "cbd42fa507bf5996562112a4485657b285b979cf985017a0945fb11452f333a5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/docs/WORKORDER_STATE_C_RELEASE_READINESS.md",
+    "sha256": "5f30f32e426596764f253e9629a836b7781b622e6adeed852de1392431b57d7b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-07-13_P16.md",
+    "sha256": "a7ece50ab19ef4516be327c441c83b43307f228ca4ff1825da4808dad9b98e6f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-07-14_OVERNIGHT.md",
+    "sha256": "0afbfcd6253103c552af7bd2551cf1842013b9613a8d18a555bc3658a3a58110"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-07-30_R1a_C5.md",
+    "sha256": "a07d8beda001c111d7de481ecba8197de3305569629f6aa01522e13d685a887f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-08-09_PHASE_2A_MOVEMENT_LIBRARY.md",
+    "sha256": "a79445620e463381411eda9522d59150f712d6510080f177efc6b40138f29d2c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-08-13_BOUNDED_MICROCYCLE_AUDIT_REMEDIATION.md",
+    "sha256": "326e32f52d9c0c857ea42b2b364b4c6b96bae35388513ea1c8984215e553d0c8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-08-13_BOUNDED_MICROCYCLE.md",
+    "sha256": "3f49c636d4edda1a5d958333a421a3a7d98cb371a3b5345f344a422465f75491"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-08-13_EMBEDDER_SUPPLY_CHAIN_PIN_AUDIT_CORRECTION.md",
+    "sha256": "6db0e51a9bee01f5e039d6a8f9839ec5340acf36a64267bd50d4f6819ef4b91f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-08-13_EMBEDDER_SUPPLY_CHAIN_PIN.md",
+    "sha256": "69fbdfe6de3a0a9b709eff111ff8d9bfbba63ae8dd57f18b26189f2690865986"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-08-13_ROUTINE_CONTRACT_CUTOFF.md",
+    "sha256": "56dc0270c05794945838a62396d3cd4b973e3664d09aae4aee7c1861d80fab4e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-08-14_FINAL_AUDIT_RPE_CORRECTION.md",
+    "sha256": "1d47e71f4ad4625335ce1f66aa2489e2b4fcf01452b312edc38f48319fe0b33e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-08-27_SOL.md",
+    "sha256": "43ec442d8ff0d155cf8f42e2b4793b99a81c09da580d62f57fedb550a7b48730"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-12_ACCESSIBLE_COACH_INTEGRATION.md",
+    "sha256": "48bf8d83d1d04d9aca2bcb2e364b186d8884db9fae059d3f2b5e58e4da3daec4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-12_WO01_KEYBOARD.md",
+    "sha256": "9288ff538d61cfa859e1c379fde3b19a7d538f9be97db1ba248d1e9a06d311e3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-12_WO03_BACKUP.md",
+    "sha256": "44c96203c3f89c1f0c26c351c736dab52624a653453cbc1bde8717121248b893"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-12_WO04_EVIDENCE.md",
+    "sha256": "68ca5e08b36ef941c1f25feb87805074782fdf0af85eabbb88f19c088bcabcbe"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-12_WO06_CLINICAL_DESIGN.md",
+    "sha256": "6dd4a9716ecc98902413aabeac34825608be45a536ee66ce6e80d3a8014b1831"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-12_WO08_INVENTORY.md",
+    "sha256": "8d3f397844003e32a87e5b1ff82205fcbf446d04262adaa26acc159b9af9697f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-13_ACCESSIBLE_COACH_MIGRATION_064.md",
+    "sha256": "6346afb27c7d9111af65f5d739ec49f22e42aa8b10cb7a47fd615439a9ae3e3a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-13_ACCESSIBLE_COACH_WO05.md",
+    "sha256": "70c778ec65393e8637e35a86aaeef12532e6c0138f9047f0a63384adde78838e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-13_WO03B_OPUS_REMEDIATION.md",
+    "sha256": "d59a8017637729b0d9ac284f4fb10025fc0f2a629e71c8d92b7a8b4051dc6d86"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-13_WO06_TRAINING_SUPPORT.md",
+    "sha256": "6cd4fb7d1a49db1ec938612ba0b4addc6f8eb98b2560977d3643cd355ef1035b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-14_WO03B_RECOVERY_RETENTION_REMEDIATION.md",
+    "sha256": "067c985641a666c7373d2197cc97bd00c30225989e6dcef534d831fec98c04eb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-15_D02_INFERENCE_POLICY_INTEGRATION.md",
+    "sha256": "417e9949886b5ed23cca1634593d454fbc6c3c094ed2bd618d51570c9eb57138"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-15_POST_PR19_A11Y_REST_REMEDIATION.md",
+    "sha256": "4c709ba91247d5082eab96d44792fa5ffcd95b0d4db2fc1acaa829c75c73d9fe"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_2026-09-15_WO03B_PR18_REVIEW_REMEDIATION.md",
+    "sha256": "4cc7bf287fee343dcc79d0ff7736f666d5cca0dd03f8ff4b210482ea6a64e2c8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/HANDOVER_WO-UI-2_to_4_for_Fable.md",
+    "sha256": "b72a81a0a5792e3985400b70700c7491339582e14ad9fbb42a94f208305096d6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/IDEA.md",
+    "sha256": "26741668686684dd0dc4c11792bf95c34e583ab5fb5d833669c713e360870916"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/LOGGING_MODES_DESIGN.md",
+    "sha256": "8193a0d4b1b041f255de7b1aa4bfbe195a284c4d9b26d0d9ea02fc7e1dbc11a6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/MASTER_AUDIT_SYNTHESIS.md",
+    "sha256": "96de2cb87f830f658e64dd7733d25ce86a6910fbae75cc6ce348e005c4b3be17"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/package-lock.json",
+    "sha256": "9e02ca7f8c0f95ccbf0860d8ebeadaac64d016bcda3f978d7f39ff56d507f5cf"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/package.json",
+    "sha256": "73a0a05ddafdd87a1f9bb6f5ce6305d2a4ed6857e8650e2dd4b648a9b63b0353"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/biometrics/package.json",
+    "sha256": "605e90d0ce591489c98a884f9587a9234bf869a1c92e4b9b40e9d6fd0879643e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/biometrics/src/aggregate.ts",
+    "sha256": "17196631526bdabb61a8f86348087278cfdfc61613d4cf228244294baccb1d17"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/biometrics/src/appleHealth.ts",
+    "sha256": "ea8bce22ba4e0c684c0070528fbc1808eda8aaac9a0cdac06037e413bd8bb4ba"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/biometrics/src/healthConnect.ts",
+    "sha256": "b61ccade325e75ff320cfa597733ff5fb95f29ff54d9a1fb3e93d14c6643b046"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/biometrics/src/index.ts",
+    "sha256": "49dd98200a232948fe08a89e110c9e51b563d9146760aee5362bbedd713cb777"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/biometrics/src/platformBridge.ts",
+    "sha256": "0c9674cdc8d796f4a15bb8c26fa929c4b4662655e1ab31229419f314e9c852c5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/biometrics/test/verify_biometrics.mjs",
+    "sha256": "6f31157dceafd5635b0826a98226b330bf5994f0d68051ff6f2f846196ed504e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/MIGRATION_LINEAGE.json",
+    "sha256": "1f69966e247185de793967de93922ac35c6b8791279f7385cb5d4989c5413cb2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/MIGRATION_LINEAGE.md",
+    "sha256": "d5d9655dccec4ca0e1764678d46e0a3368de8f61313283676c7c06c9f7696a51"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/backup/canonicalJson.ts",
+    "sha256": "e21d1e8da94dd12f61488648eb501343795c37954a2482b73019e3d26a4c09c7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/backup/contract.ts",
+    "sha256": "e6ce16eaebfeda60f845d53049819073de1d89e27ced1da4e39944b95e6ecf29"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/backup/index.ts",
+    "sha256": "3c1b5b54b3bc0047fe9468d9d8d11557e3d8ad74bfd23067f090d786c8a11359"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/backup/replacement.ts",
+    "sha256": "5783ef47de10e3bf1f389eb75510ccd69604062428d827e213a9ecb9b51ed3e9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/backup/restoreModel.ts",
+    "sha256": "9abc37c801ecf6e72b899139809b7d089913fc400aa73e0a511988f6a33673e1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/backup/schemaContract.ts",
+    "sha256": "b343259a388699476cd9196f08d15d5d7818299d8d3959510ce25fef65b4e04a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/demoData.ts",
+    "sha256": "a2d53febc93ac74c969456a8c5a46e7d41dfc2a3fb37cdbc40c277c6d5a9cdda"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/index.ts",
+    "sha256": "e7cda4a5a54a6d38c3d61a34157265715cca7b0a43bec7603aaea20a6aa1f77e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/migrationRunner.ts",
+    "sha256": "fef9851098b8c8ff9bcb446acb9ed77b5fd99f8c3b1054996240d7998568af58"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/migrations.ts",
+    "sha256": "a53aec2320cb27de1e735c5d3df2467801a82315004a9043f345b6c9611f8898"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/pragmas.ts",
+    "sha256": "cd0d32b1803d175803afafda4b7824f8d8ffabdad4021274ec73b55378de0d6c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/programTx.ts",
+    "sha256": "d84013ab70c909e9557ba0b06b94a7a0244d81befd2947021f4e8ec8540b797f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/001_mechanical_input.sql",
+    "sha256": "ed47cecf5e94e21f2b4fd51dc19bf62e96ddfd2e6932a26f6f4795198bdc2818"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/002_telemetry.sql",
+    "sha256": "efc257a416d6dd98ac530269eeb6071cd6cc91fa2921cbaf3b8b5123ac589e85"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/003_state_vector.sql",
+    "sha256": "341b34b131a794a1345cc6b9ee6d49eb228410b8c0d13052a2b98fa58dacb733"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/004_state_vector_materialize.sql",
+    "sha256": "098f24ba3c66ea80de69ec2ef30ad88c982f48a936c250ea01bbf627459312b6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/005_subjective_report.sql",
+    "sha256": "bbd0e0d627dcd38946621835dadcccdcac8000fe78c43a8e288cb4a0e07e7b35"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/006_user_profile.sql",
+    "sha256": "8b1340d7e7c5da48fd21b20f3c7ba722301fc82cc8f7104e202b6f94cae81b74"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/007_program_engine.sql",
+    "sha256": "aabd5992b75d4eafac07fa560c99f032ad096b47b0731517ca076f695fb92a1a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/008_taxonomy.sql",
+    "sha256": "68f3c395417679c05e1e08b834b4e931ded5d5f4b4720b0764537433a7959496"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/009_periodization.sql",
+    "sha256": "710a0680662941afeaf176003e97d80271951801a5554e5c9db39be63da74627"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/010_movement_library.sql",
+    "sha256": "f0161f239ef322219a79769baaafd8e211772a0fa2d9b52073b66d1618c73dba"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/011_niggle_tracking.sql",
+    "sha256": "68b50bc981754687066e87cf076340de3c07715e3817ec23c9a751f73a8c649f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/012_report_severity.sql",
+    "sha256": "57099ce769915b5db0b11f1959c7034ec4bcc2707eb9336285c319f1e55254e3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/013_profile_slot.sql",
+    "sha256": "10f47993b6b1f574054b4d3f99482359124aff2a343261d616f0cbac457dfbf7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/014_movement_prefixes.sql",
+    "sha256": "d9fad2179e5eb8a1b8162e5b2afbf1fffc485dc6ff89b7e071322aa1ad93c728"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/015_set_prefix.sql",
+    "sha256": "c397883758dbe5c8b517f726b546443664203e031285db15256ed19128f57ac6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/016_movement_library_seed.sql",
+    "sha256": "2b595f9474143febc9291fde4ae3eb8baaa5a537d4eafb79c54ae056f13c6328"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/017_movement_batch.sql",
+    "sha256": "7c09a62ffa2e96895d8f4fb04a67d5ce2c55a1b677637a034bbe442599fa13fc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/018_logging_modes.sql",
+    "sha256": "807d5f9084b84106362ee84b095f78955103b541ed307dcf409adee1678134ed"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/019_movement_batch.sql",
+    "sha256": "2845f0fbec078de1be2aa51e57d9acb6206994dff72aa79d41eebed8e186dc57"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/020_movement_batch.sql",
+    "sha256": "799ea6f56808503ecb1c987f6cf2e31b55882460ca6b56ad03997bd3ff3c8252"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/021_taxonomy_corrections.sql",
+    "sha256": "f7dcd61d74ffdbd3dc5015909a2f85d44297c67a603279c75408e2122a69fdb3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/022_set_target.sql",
+    "sha256": "c7aab1372d8406620ecb3c8f95a3313c7578a23e9cfeb81f3bd124253f3f41d5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/023_phase17_session_foundation.sql",
+    "sha256": "de42af48c58a8b90ed981976ec7984baa988f0fd9d1e16c0451d600681572b4b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/024_phase17_equipment_fixes.sql",
+    "sha256": "09750fc1dfa3caf6062c55fb5c1e64b04e7121f706100795931a03e858c41e96"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/025_movement_coaching_content.sql",
+    "sha256": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/026_phase18_session_outcome.sql",
+    "sha256": "57d6b9b2ae95422afa0e9e1c61375adbff0945ecca01ac44c8328bca9b066542"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/027_operational_safeguards.sql",
+    "sha256": "3fff0fdb7c120d91ea177e37bd22f681bc5d7f24a6fa983f402e8a5d11ef108b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/028_capability_graph.sql",
+    "sha256": "0d55ef1a5aeb55f9e977416c48a9f2538aef09897da94c32004138728fe08b75"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/029_routine_history_analytics.sql",
+    "sha256": "bb0172e41fb1e59a021953de70b0aa6a56a85d7a4b5edf4d1fcf9a238af4295e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/030_readiness_import_integration.sql",
+    "sha256": "9ec9d84359cffab0faed03313d044c94b1acf7a59ab0058409799f705f773b02"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/031_planned_session_method.sql",
+    "sha256": "88197d48aa5140c4be61c8ba4680490eb8a74740dfcdd8d5089538f8ffe35779"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/032_capability_content.sql",
+    "sha256": "999bd9d1c436b1b13d81cec2a354d5e8afedc3854125d3eed226cba2e804e0c6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/033_goal_program.sql",
+    "sha256": "ba5f4b7c3e05e845e48f20c52e4154e31ed7f624d1795f2a6ec294a51c038226"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/034_autopilot_attribution.sql",
+    "sha256": "0cb250e3158f7e7fe3c7dffc039b561edbb28491ffc6bc9c41148bd2ac13e500"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/035_profile_load_preference.sql",
+    "sha256": "07c2c0849fea9b3a2945f18f17b90c6bdf6fc655ee98544e7803d07edc5024c8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/036_movement_media.sql",
+    "sha256": "3737214a6e806c1c66ce937da8167f265d492135ed51ddde7a2b6f97c593e6e2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/037_movement_library_v2_batch.sql",
+    "sha256": "3b1bc496265d69284d18d88e175b254f71e9cd1cc869842bc813de8bb426d9d1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/038_movement_library_v2_batch.sql",
+    "sha256": "9ad7c0ba7984e5838cd2abf78a6e0fdd13e4bec51da20cf4bca55db162e8c347"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/039_movement_library_v2_batch.sql",
+    "sha256": "b802c039c0a110d68d61f4fbb87f0df958c5c21bc19e78d0a234dc9a4e3ba983"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/040_movement_library_v2_batch.sql",
+    "sha256": "b36d8ecdc99234fc44db848da28725595cbc3e17abe17aaee8f52aa4a687539a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/041_movement_library_v2_batch.sql",
+    "sha256": "f711dda0d0c4d69a2c7a6ca4f425f3ed40adb83ffc2c977c1a164c929858d76f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/042_movement_library_v2_batch.sql",
+    "sha256": "57f9d16c875d934854f37d8739a8325d3525887550daaeccf189e168d1d6cbec"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/043_movement_library_v2_batch.sql",
+    "sha256": "cf1ca39f721d75c6991bafca26a92928d914366b98736df1dddcf537960e5d68"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/044_movement_library_v2_batch.sql",
+    "sha256": "7569e43e22957eb9ca3b0538825a17275d36321ab1f72cb67ec45c91d5365e1b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/045_movement_library_v2_batch.sql",
+    "sha256": "7d453c939d8eee8f90fab08047a400e7d02d0f4d2a77d6432ab1ed84145354b1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/046_movement_library_v2_batch.sql",
+    "sha256": "71f4cf40c7990aa84bb7f865ea924f73fbe2492f440698ff21db33458c81f6af"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/047_movement_library_v2_batch.sql",
+    "sha256": "c47f748b3ee0f3ef82b4f56334ec66b4463373ef4ed8594fe2ee56ecf6172551"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/048_movement_library_v2_batch.sql",
+    "sha256": "fb8fb05e083bd9fb95c252d389825a003e8693ae55c81f011dd57cac56ed83eb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/049_movement_content_correction_v1.sql",
+    "sha256": "467950bc651fbf84fbb5dded0d99ad9797437431ddb718442cc573fc50042d68"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/050_movement_role_convergence.sql",
+    "sha256": "2a58ba551d56fc657e1f61577259f3e5eb7deda64ac34b32d383828854e71525"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/051_routine_access_context.sql",
+    "sha256": "117e896bc76cdd0641a76136e774b8ebd8683a2c3070fc8388ed8c13764077d2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/052_bounded_microcycle_roles.sql",
+    "sha256": "2d86d7ac94d6f2f75ecbdd1dc19b4a515386d94d024b01239ceef9549791e756"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/053_routine_role_compatibility.sql",
+    "sha256": "5e2a522f9f2450a890ef97366a44be70aaf90b2dc5380630d51b5e5cac4bceb5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/054_contract_cutoff_provenance.sql",
+    "sha256": "b0f1d00cd350c9307cbd9a40a343defcb60a1ed74129f70069ff0b6443ab70c0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/055_return_checkin_ack.sql",
+    "sha256": "476f3ab5d8fc0c43276873e747c4d7975b3793f0f0077669d98d4df299a3f917"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/056_movement_taxonomy_backfill.sql",
+    "sha256": "2cb64589db95f66d6203fe2b0a1233d50d601dc1a782b2f5ba8ddc3d02e6ae19"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/057_block_meta_phase_invariant.sql",
+    "sha256": "33476b2f0404cd3e5c46ba1f0beb6309726a8cc2de81944f67f6e7ea1bc65c3d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/058_suspension_episode.sql",
+    "sha256": "a91a4c146245e70ee8182c456483bcd94c1f0c34ac4d172c8a1486c99bc3fdca"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/059_suspension_state_and_load_intent.sql",
+    "sha256": "03fbd37fe1498c0f706e28e87a8b6e7271bc5c541babe3d2706ee69a8619c330"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/060_program_goal_tier_alignment.sql",
+    "sha256": "9c1a3d5ee10669538e12eff12d43f6fb62613e177d29c15bcdda9d96254a8313"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/061_autopilot_attribution_convergence.sql",
+    "sha256": "e8fa5e9efd3b77189cd59933575105aada0a4a79b3ad008c010dcc4379822f07"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/062_suspension_sidecar_immutability.sql",
+    "sha256": "b84d7d71aad57ea0754d6d5b44eac8c44d1f343b9d631e6e5af8621ffcf2de5c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/063_movement_load_intent.sql",
+    "sha256": "8d4ebf9c9f36d735e763b449a702d1216a6a918b4933c1f4d8d3196688025a2c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/064_accessible_coach_support.sql",
+    "sha256": "b141b149717fb2f26f585a67239fea05ab03220ab040d5d86500cf8c38022a8a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/065_session_preparation.sql",
+    "sha256": "d04f4e30a886ec353a6ffc56bb3bbf929bb92f71eef183945b09c46c5422932d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/066_focus_and_goals.sql",
+    "sha256": "52e16facdf5fe7d3e02b797b3b49d1bc430c79ca24e2a20cb836e09474aae5de"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/067_sport_and_emphasis.sql",
+    "sha256": "c9a2e33d12e0ee7fb43f7d1eb1d644881b91945a0dc14f591c7f56a4a37337ca"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/068_movement_content_correction_v2.sql",
+    "sha256": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/schema/069_resting_heart_rate.sql",
+    "sha256": "e287343d328841e95d83fa94ae82257144d7b671ef9c877e5c602756f602dadd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/src/types/sql.d.ts",
+    "sha256": "ca88524db779d3a19cd49bf25755d219d5c2ac4864946ba5fdacbfed6867dc2e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/capability_content.json",
+    "sha256": "eb207f0e2c312a49c967a55d9440b283f243e1ec7142ba27dd5cdbadb212bdfe"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/DATASET_LICENSE.txt",
+    "sha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/library_target_v1.json",
+    "sha256": "3cd61e7c8576369a0c51c57f2ba735da7fcec022c3d2d525207a029f73cf535b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_coaching_intent_manifest.json",
+    "sha256": "b4744e9d0d8a007127724bcb270ca9cf7cc8205628b785339254f12c0b616c74"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_coaching_intent_v2_manifest.json",
+    "sha256": "875f18ef5808ade63bf167c53366c0ffa37268577d8360842ede2e379a76463a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_coaching_intent_v2.json",
+    "sha256": "fd1d866fac351e6e5690c22d5a9b99dc3759e3c90023fb6c7531dfa4f04d7895"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_coaching_intent.json",
+    "sha256": "f83853281878f92ee9e8cdb634c506ecf37f7612458da59cf59ba48e7c6edd42"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_content_correction_v1_manifest.json",
+    "sha256": "65bec2a95c05ce152c9e478d93faf6009694ea4fabefafd7d5b01135fad02572"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_content_correction_v1.json",
+    "sha256": "e1c23416594c08e076a619ae49ec1e1caaa66ce13c7b91a8c52ccdcd8af650f4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_content_correction_v2_manifest.json",
+    "sha256": "6ca112eaa1b6369da0b28c45fe979665e7980b9633492b89d56d06a85bc0e114"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_content_correction_v2.json",
+    "sha256": "6f3103ed7910584eac0b38a36651857e80a1e09625ca28c440fbaec854651b23"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_import.json",
+    "sha256": "64bb31e29390a5a3c64aea17e855b1338b5762780d5259667b2cc4e39633313c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_media_manifest.json",
+    "sha256": "f5603fc16b4be026646fea32007695edf765c55d6715b9f0e91a887d0ab086f3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_quarantine.json",
+    "sha256": "e379ef1acedc16a506f59dd8a3d89d1c5ac90878d5868f2ebbaa9e995b62bfb5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/movement_upstream_instructions.json",
+    "sha256": "6c28b044d749272135157e83fe00c006c9e8de1f58766acdc77f294307330e3e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/staging/seeded_manifest.json",
+    "sha256": "4424911ed15ec335d74317a0022c87ef0c5853205fabe5d435cc4c465eb5d421"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/test/backup/verify_backup_contract.mjs",
+    "sha256": "1ae86ce4fdb15f60a7bc8c30f3c999c2c0da0d6ab9d6f748becb80e1b3ec4037"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/test/fixtures/lineage/master-1da218d/034_autopilot_attribution.sql",
+    "sha256": "34c01e37a778e22487fa77c4c833a7883b1886e40f21fc4c93602556357b4ac2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/test/fixtures/lineage/master-1da218d/058_suspension_episode.sql",
+    "sha256": "4452ae33971ccc8deb1acdc36a2d5cc68141b86eb8d2dcf5ca051398e00d2200"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/test/fixtures/lineage/master-1da218d/migrations.master.ts.txt",
+    "sha256": "e930e424d4484d02003512ea691de22f5fa749d86f675abb45e2e4f49c3575e5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/test/verify_demo_path.mjs",
+    "sha256": "f1e123d06767f33f9d940556df3af973ea46dba44533cf56c71b3ecc7a065fef"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/test/verify_migration_lineage.mjs",
+    "sha256": "ccf9e7aaa6408d7ad008b5dae32d3d5f0deef2035929067b28102c3f3a7a440d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/core-db/test/verify_migrations.mjs",
+    "sha256": "f874dd3e849915862b53e7364557b67542d04ba30690387cd96e467d8e690545"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/assets/minilm/tokenizer.min.json",
+    "sha256": "ed2e443c24f234f62dd05a039ca0c489d8d1a7039f1f42fc876aaae9cb32cff6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/assets/phrase-codebase.json",
+    "sha256": "6c1b4cb78e9ad77f46b16c79a81ab9436cefbeba3084b01173149b0b59d59124"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/assets/phrase-codebase.vectors.json",
+    "sha256": "053aabf5c80cebc4a9f06b7b387700d18984074586bfb53c37f80a5ceba3bd39"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/accessibleCoachContract.ts",
+    "sha256": "ddd0059d1d2b15935cf31bb0f82520443a15c8848fe744fb6fe4479d7c0a12d6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/activityOccurrences.ts",
+    "sha256": "3eb2c1b99aa49dce0008d40ebffee96a080da30dbcacc1246d1250405862ace3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/autopilotProjection.ts",
+    "sha256": "6718fbb5ee53cfb56ff90408cd8bbb8a2ce244ff3dd9612bb878f45edd242e32"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/blockGenerator.ts",
+    "sha256": "40dd7f89427ec480c12674f803c3c3537851d61854461080d80f43053847a61f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/capabilityResolver.ts",
+    "sha256": "a8f92286759d6b2081363d6dd92dfd63fa08081b58da534bef02cf8ca6dad9d9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/chainProjection.ts",
+    "sha256": "48ee9c1e9e3f6addebf3c6408a79b4e5b34984121897b13cf04084036fd1f0dd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/completionAction.ts",
+    "sha256": "758086fbf7b9bef08d8a0c4629fbdc2306bb7b67b531e0ed4295a02e73234537"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/conditionEngine.ts",
+    "sha256": "5955d6db299a92394f74bb7a04149f6cb25cef5ad94bff45be1d80a6fff33968"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/derivePrescription.ts",
+    "sha256": "addea8e0e3278a4d308e8cfc65128fd9e5211d307d67f1db2e99e5ad1dad742c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/e1rm.ts",
+    "sha256": "69fcf376144d14a0d9968e905867f478fbd1f59c157ba07c0db5a73772247ef9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/effortCues.ts",
+    "sha256": "6e6cae7efb8b93e7c440382d8a7d5d5061770337d9978a4e860bdcbb7f9cb817"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/focusGoals.ts",
+    "sha256": "35332faf9453577a0111cea4d41eccd2d1f59739c5de50ee3e2ceebf8f8278fe"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/historyImport.ts",
+    "sha256": "9e265df41d47c689dec14abc66cbff7fa30887fbde297315be3610c6f52b53fc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/index.ts",
+    "sha256": "eb4ecfac51aa121c413deb1844f361cbbb92150cfd911f96cf4b340cc0afe01d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/kinematicAutopilot.ts",
+    "sha256": "f3eb8c8886ecfff6d6ee12f5ff50dbcd828317c5557a56341be7d644210ba34a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/loadSelection.ts",
+    "sha256": "4193e7fa433bfb1c4e1968f67fb2779c7704fc31a1c8a20a692358fd9a4ae401"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/movementRanking.ts",
+    "sha256": "6c500aa719c696a8befd6481f899f21cd938fa5dcc6f0346111b1e7d5d7fc7dc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/outputSchema.ts",
+    "sha256": "41bd8e947afa26008726ce76ade2997f2d0e4a7e08f061a168c4cca1e0846f62"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/pickerTiering.ts",
+    "sha256": "558d2ba174736c31e2237386239c95023599df229ac1b694f163e342220e545a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/policyReference.ts",
+    "sha256": "cfc9015091e861c19229f0471b6ec580e4c05e53593bccb1eeb65a7b567601a5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/preparationPolicy.ts",
+    "sha256": "35f3dd1ef9433ec1f4970546ebf44c7b11b054027506de5b64ee584367786eb9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/prescribe.ts",
+    "sha256": "4d5685ef5d8578a64d27ebd59672e6b3897e91cff89e630f119c0853e92e8c62"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/profileLimits.ts",
+    "sha256": "0c2c7d58abe5fe0ad4768402225e455edaed2b7b8df9ac2890c2ca176661342b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/programEmphasis.ts",
+    "sha256": "7377029583c2d80af527ed3d897b7f4420af2fcf055b5789adaf55933aba683f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/progressionEngine.ts",
+    "sha256": "ff5259c573f1efcc6cf72b2e4bba00dcb825fe5a87f8c60aa8327d5419f0b174"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/returnFromLayoff.ts",
+    "sha256": "7571e3242b114934adc58c0959b5c6b5102cbc1e59ff6089da8d6e03dd594ea5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/routineComposer.ts",
+    "sha256": "419720e62575728a5fbbbfb30e72f6cdeb569cee34e16c4c1ca56b7dc27a5b1c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/routineMicrocycle.ts",
+    "sha256": "cd54fd3ba332b8b303e1a6ca15787f9409289837dc8976bf6bdd7f0a60d5ac44"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/semantic/codebase.ts",
+    "sha256": "3b1dd6a752dc12b794da2ce4e1973867a3f8835e5f3b71204aae2521333a2743"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/semantic/cosine.ts",
+    "sha256": "2719aa33d4520be24a0344f4ec2d71c5af4fb3b943b4dc962707f7c3b0b6e9c9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/semantic/embedder.ts",
+    "sha256": "367e2a4d7f9377a70bff73aa7f49721cce84be0c4e44d04874940b07fa06a8e1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/semantic/onnxEmbedder.ts",
+    "sha256": "fdde67506d954454423b2f1b1170c4e10e0e52f26dcfe75f3fa1d7db316478bc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/semantic/redFlag.ts",
+    "sha256": "ca4efc24e10860c56be8b88c91ef2f963c65779c0b7e3143d59a33fda318fcc1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/semantic/triage.ts",
+    "sha256": "04da42a28e924be459bae353692173cbb22086eede91f39c2f862919dd7b83cc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/semantic/wordpiece.ts",
+    "sha256": "991b0e05ea32da7f57f2d741fd1bdacf130069cf6a42c9ddd73ec1235606e032"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/sessionOutcome.ts",
+    "sha256": "348daf86b95cfbe686829e80bab5b904e84dacf9337a8afd0c9a7dedde14836f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/sessionRunner.ts",
+    "sha256": "71a340aaf828af37055f737d48c55d492a6a6975612ccf3c243f715c8ff59af9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/sessionTimeBudget.ts",
+    "sha256": "32d5cc8ac3a700485a54c4465c88daae9459efed56055f42009725d47b11c0be"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/sportProfile.ts",
+    "sha256": "ada2ede3f95dd2505c52c6c100a6546cd8a3e6822a6ed5f89ae613d595e3205d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/substitution.ts",
+    "sha256": "7bd56b0a132b6e58f02741633e8b6b2548ccd106eb64ca344f4584d865888280"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/tierPolicy.ts",
+    "sha256": "1980503eb013130860cc77f884a8cbf944336ccd847e42f1d81f39f685bd34fe"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/trainingSupport.ts",
+    "sha256": "49474072facee4454c929bcdaf92d6e9be97ed299428422c2e1d4adf69850672"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/src/types.ts",
+    "sha256": "dc7d00ae8a8d8b9f949f30222be55d48c045abd2e7b4e4970936e23fe35a8508"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/capture_d02.cjs",
+    "sha256": "a0acec0e94fedc04ee69c929a844a6de0067eb7017cc1cb122fc3ed455330f3e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/compare_d02.mjs",
+    "sha256": "dad17af7d348220f698ea70a0b6965eaaed327d18f1aba57ae14b083e00ffd02"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/D02_EVIDENCE.md",
+    "sha256": "f04ca4a93fe172868c668f865e0e1e91ea693d32d7b6607dcd44520679ec2595"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/mutation_check_r05.mjs",
+    "sha256": "c41c676815dc8dd3f474fb633db9f282ab37dc6704b035d769f78726cd6ad0a6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_activity_occurrences.mjs",
+    "sha256": "7e2846d3db8e4982b8c03d310bc4c9a9b9a95e6fe9d023fbde33816990089541"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_autopilot_counterexamples.ts",
+    "sha256": "f435a5d31e0ef02125eef764d244a15acec69e0f4e1012644400b4a361c73fb7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_autopilot.mjs",
+    "sha256": "5a8c40bdca24b98900d5b2187719dbaaac4ec17be7b818f3800116f78457d58e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_blocks.mjs",
+    "sha256": "c30130fe7a13100f0bfae5c4210825643b0c176af458f5ba624cc01781253ed6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_completion_action.mjs",
+    "sha256": "5004f70667b919a1f76a6ba3f28703854718f4dea5c2216c47e8482ffe8e78c0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_d02.mjs",
+    "sha256": "03183e95b3afd9e640dbb7d2737c81487ac03c456d3d48510f34a1fe8e6c7ccb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_effort_cues.mjs",
+    "sha256": "1166152fef0b5217d264f626fe5a11b9871c024cefd746f1124346e069ef0cb9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_embedder_integrity.mjs",
+    "sha256": "6c101a0c008eb93ded629ee33f1ed5ac40b8b5df782b13f10e8e6d6b693f0cde"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_embedder.mjs",
+    "sha256": "b2e877adbf6ce52f2f9977e9d43c817fe781b5000253848d8cea42fc99897c3d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_emphasis.mjs",
+    "sha256": "28b50cd775b9be5999a0774bd2cdf7cc3b6ff416516ee22bfe0a8b3b87a8fff6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_focus_goals.mjs",
+    "sha256": "6f4645f7c31ff2e6ebf433d52c590e03af484552f423ecc81891c324de4ec0e4"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_lazy_lifecycle.mjs",
+    "sha256": "cf7a84b1be58bb69ac948889c132e3753f962126b682ce6f25f9c2c61cd2c5c6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_load_selection.mjs",
+    "sha256": "a26147e9445279116399d2bad329e468d367ee050fb50728dd9d94a5126adfb8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_longitudinal_bounds.mjs",
+    "sha256": "600ab232076873f053dc4b4e47af258d462932ac55ec39a97e6359648cc2cfd9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_movementRanking.mjs",
+    "sha256": "7597a53be049c6604223bac222b094311923ea0576216e8d658bb470e183ec41"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_outcomes.mjs",
+    "sha256": "58c6910e7fef97535bb9bce815bea7befee5805e01a0869e5a1d24c3994b41f7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_pipeline.mjs",
+    "sha256": "2be76ce3f58e534825bb51dda312a618d64b0e8b91bd4aa005dc2853bd512de7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_policy.mjs",
+    "sha256": "14035b2ac4f611421cb489530d413743cc192719880687c24315e85606339238"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_preparation.mjs",
+    "sha256": "6ec457b7ee81c7836a403c9580751fab6a89a4bf7996a023ffcc7b24123a84fb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_programQualityRound2.mjs",
+    "sha256": "0bca134e5fc9eedf4d81cf6b690d0e5b0a4ff5084f6f66098b98ce1bb022711c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_progression.mjs",
+    "sha256": "68b9368a1f9e7c8c922f22620e191c59f2090a8bafc9dbc091f1122c522398d7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_r05.mjs",
+    "sha256": "684c2c4f53d48331f34e81fc5347f0140c8498ab0d6acd01a185fa9baede5aca"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_runner.mjs",
+    "sha256": "bdcd405933a3abac80fb5317de891b616b09f5a1acea7bad89199bf8dca40587"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_semantic.mjs",
+    "sha256": "bd011e473397c3c2ac5eeca8ec367a1b09df0a1eac041ada0978ca624e96598c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_session_time.mjs",
+    "sha256": "7206596a057da61f7e09f0d8330af3d66138679c56df51454b754eb26443b342"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/packages/inference/test/verify_training_support.mjs",
+    "sha256": "2d2c7287af336366cd36bb4c998cb14b07292449f1530c7b7169c23a98154a81"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/PHASE19_RUN_LOG.md",
+    "sha256": "dbedd1423110a574be611ff875cd0e8ff31da0071b13ea5d4232763d23595b1a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/crash.txt",
+    "sha256": "b858dc9e2c1ddf9d042dfc96b0a840ea370dc6d097671445a19dbbe0fe63f938"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/crash.utf8.txt",
+    "sha256": "ce19539698545e627fc3154db0565e970c31c0b6d360dbd1e687531c56626274"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/Fable_Crash_Fix_Prompt.txt",
+    "sha256": "448d71ea8e9c6ffdb31e3c4514459972f7582dba7b680c2a0984449bd69dc063"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/Fables Phase's generation.txt",
+    "sha256": "f1f57765742856bcf01004fb1a8d94b23dd7b6f55ef541731d91629a3df64e7b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/Gemini_Handover_Crash_Fix.txt",
+    "sha256": "53ebcf0b26dbc0eed01323a049d8173abd01d25f2fe5ca9af02e247893f7130d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/Gemini_Handover_Phase11_Step1.txt",
+    "sha256": "35357d621e3b47eaa8e00258a0db0ebeb900d9312c9bfb76db1ec599382cc0ce"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/Gemini_Handover_Phase8.txt",
+    "sha256": "b404afcbf05e8d9bb796d04f0d61d6e0711d589ff94efa0ebeb3a16fcedacdb2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/Gemini_Handover_Phase9.txt",
+    "sha256": "9244694cd9c44acca065bf59dedac4cf24bc36de2465a10da2cdcde4f1e980c9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/Gemini_Handover_Template.txt",
+    "sha256": "f251fca2ecb5f2c6574239a0b378902874d0f97224e1ca04d18685e180eea255"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/HANDOVER_2026-07-12_P15.md",
+    "sha256": "0a07e9623edc465573e38d2197f22c9579600bc463a41a33cac746b8666e9309"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/PHASE_PLAN_rev4_FORGE.md",
+    "sha256": "0eb9b196ec5feabb330cd7294f214a9a4aebd155ffe94481e032abc1b04ee933"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/Phase9_Design.md",
+    "sha256": "bc297757db31c46aa2132f96bd02a627dc6c6af4e7dc7ed9c69e04c9d997241a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/Project Overview/Phase manager/update.txt",
+    "sha256": "edb306a9e0df7edc0a9a8623799da2540889711444ae21c1214d1623c26d1414"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/PROMPT_LEDGER.md",
+    "sha256": "94595f971dcb229e032a3f22ca0189f15d5f341866ac028d2653feff1efcbbc7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/QUARANTINE_TRIAGE_2026-07-14.md",
+    "sha256": "7c87c1f47732ac4497957c98d8091d23e01b7c4a4008a5cc233c7049cf7e5283"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/react-native.config.js",
+    "sha256": "1892ff6d49362f50c3215c791257381ee24f885d4cc947f40471481fa33d0f49"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/README.md",
+    "sha256": "68db4ac83af52ce8ee9d6a7dce3ee9d841f41e92e2a593af9e2ff6367fa77c30"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/RELEASE_READINESS.md",
+    "sha256": "b3efc10ef6db54627357186a51e45e7a6bcc8b1bcaa10b46ad8f4685c739fd03"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/research_packet.md",
+    "sha256": "4db5d8f52fb4cf8040d4497cf09ff1ab6fa39b573b3ea83b4607def37721071d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/bench-cosine.mjs",
+    "sha256": "5a2bb2bd7d1cd834b2fdd36c7cf5b6a5e51909d5d20d3f6c823bcf64ca4b6088"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/coaching/negative-controls-wo1.mjs",
+    "sha256": "220a3a7cea20cfd92f06da01ffd7600d107a838bbb98c35486a5c7d3f2701795"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/coaching/negative-controls-wo2.mjs",
+    "sha256": "ae4cca66c2950b8534f8f366d9babf50bf8fbfbe50b480658dbf36b7bc1e4753"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/coaching/negative-controls-wo3.mjs",
+    "sha256": "4334ce89be36e1dc7d125ec11d0270b4fa4854385bc8287db809f45a016fe654"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/coaching/negative-controls-wo4.mjs",
+    "sha256": "d35682f6067e42a76b4638e27bfc07c1ff3264a84eed1aa0c152b1e7dfc6e8d0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/embed-codebase.mjs",
+    "sha256": "d429bf8f63ae75bb2420604887e110d8f2c1161ac26696300d8358b7c354a0ba"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/embedder-integrity.mjs",
+    "sha256": "b2f50cbb0eb859490c7fd342d3a844528542ba8a8e974a25334dca30e34a8614"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/export_movement_library.mjs",
+    "sha256": "07375d4f7503a583fac9687c86d3bdcc22b95088c2b13dd338690f4f9f4e0a51"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/fetch-embedder.mjs",
+    "sha256": "c41388d024c4aab282ef32576db994434f5e3c442ac1942bc950221de12064b5"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/generate-batch-migration.mjs",
+    "sha256": "906f401d647954e6ec5093bd0d658e6bb33a7e37204b5715718a5c597e71f1b9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/generate-capability-migration.mjs",
+    "sha256": "d50991003fe737826628f3795aeb832dd6913a0ac8253c2a0da9259af105cc09"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/generate-coaching-intent-migration.mjs",
+    "sha256": "c42cf5a5e61b6b495068a5d0f6883458fba716122394501a37118bfb692558c2"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/generate-content-correction-v2.mjs",
+    "sha256": "360a1d267bb8d25a05b3b3421a331bfb10a845b5fef7a06e61db816a8cdced22"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/generate-library-correction.mjs",
+    "sha256": "360697b5288aa268d2e8ee4fb64477fb9a251d35a19d5690fde15dccf8affc99"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/generate-library-migration.mjs",
+    "sha256": "f03faa58b7f11066383e711528c05e89c9a9bf46b436c95201f4d6a69e14279f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/generate-library-v2.mjs",
+    "sha256": "df66d9c400447f8a7c2a142c1636bd3fbc0d59b35b2eadc214352b9a4bee3242"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/import-movements.mjs",
+    "sha256": "662f823b29b8a654c5588a739638093f57a8b658d4ee88406816bc86112e28a0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/library-target-v1.mjs",
+    "sha256": "8ee09d10438f412e7d17494a3902f1d76928ea2ad03c27ca749d7a7d04b34514"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/py.mjs",
+    "sha256": "1db03e84c01c84b28f3503734084447ab3ff7f9de7d13a48bc9b74a938fe32e6"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/seed-db.ts",
+    "sha256": "dc6e1878ccfe3861e446c1277568f28ae9d09410dd75f50c974e0bf7e6d6adcc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/stage-native-embedder.mjs",
+    "sha256": "8242ab54ab3c2661dc6694e4d448f2ade57587b564a0915e4d1c35dfefb63204"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/test-capability-migration-generator.mjs",
+    "sha256": "9ac0a4e82a871ac0fcc5dd268f4efb8e8ddf9fbc05216d102c07ed79ec3dd4c3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/test-coaching-content-generator.mjs",
+    "sha256": "47934fab0ecf62375c956100cd78f307ede1eb92f3a16daa47065d86f7f6ee5b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/test-content-correction-v2-generator.mjs",
+    "sha256": "873653c3ab65c14ed5ffa349a58b18545e29ce5cec5fea76ad91b995f4b44545"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/test-library-correction-generator.mjs",
+    "sha256": "2ac476f77198c24841d31ad1ab595c19226ad51af11b9c8aa00bd7d15857527d"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/test-library-v2-generator.mjs",
+    "sha256": "2eace13ecd2630d9a137590ff50174178affef25214b72941d166fcd5cd1ee2e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/scripts/verify-preflight.mjs",
+    "sha256": "23ed3fcfd6203f43ec0cafb8d769fa7a522d3b65b80d34d3bb6b1ea8aef51dce"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/test/results/p15_local_gates_2026-07-12.md",
+    "sha256": "aadd6fd809922d1921f8f2c6f2819c565ee0f17df91d8117d32dca12f3c24b16"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/antigravity/README.md",
+    "sha256": "a23073de8e3a68b0ef28a4a46ea064d7fd2d9a96c71c7b5f738d80bd20eb9d77"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/antigravity/requirements.txt",
+    "sha256": "17738030c4b04fd9519a98176870a728a74fc131354a87b13d8257f0fc8c88b9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/audit/state-c-release-fingerprint.json",
+    "sha256": "c985b4706e633a582e0db4c6a5405d1e039d7ac0ca8db4a26c2f657d394dbe23"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/audit/verify_state_c_release_evidence.mjs",
+    "sha256": "2e63a190c77778ceb86524471d848526254be05da99451a3168c46c03c686344"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/C3_CORRECTED_CLASSIFIER_FOLLOWUP.md",
+    "sha256": "6f95e09612bb18ca5289e79da4af8cee87c263b24b0745df7edd607853de92cf"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/C6_POST_AUDIT_AUTHORITY_SENSITIVITY.md",
+    "sha256": "a730c51ba8f7350fb008e76e084cb1865abdab386666748e83341c601b2b92f8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/C6B_AUTHORITY_3_RESULTS.md",
+    "sha256": "7c2f342d70764c4c98dee0d2b86ad548c355d2cb76a8234c631ea547b50e0b82"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/CHECKPOINT_C1.md",
+    "sha256": "c852812281519723a14375082188c79a726f09396a998f9b2b7f2b6e18f0f749"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/CHECKPOINT_C2.md",
+    "sha256": "4faa07f0b7e19805f84e171d36295dd9a08ee3b0be131c6ddd5a8d6861103faa"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/CHECKPOINT_C3.md",
+    "sha256": "0640ec5b16db04466b9587e940f4be74c9ec2913d69bbb23059f1f3cabd6d381"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/CHECKPOINT_C4.md",
+    "sha256": "c688a64268af6f2e3f5ca7ec711941dd232c38aa87c92c0475a7e99b28cd5731"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/CHECKPOINT_C5.md",
+    "sha256": "a79a3176979a5367b3feb509ba92d6fe776b57b529472498154f9a52619c57fd"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/CHECKPOINT_C6.md",
+    "sha256": "f7f711d2a13965bb13a724c268eb696a6730cbf1aa9a6f97b881f4b519087e64"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/CHECKPOINT_C6A.md",
+    "sha256": "aa58f2d268ba3aa82601e468b87d457e32c55d9c084e10c3c5ec4ac7247c7ea1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/CHECKPOINT_C6B.md",
+    "sha256": "4f8b1dfc8f408a6a3f8f6c6440e6d9a3f687a3d7acacbc9eab2d5e0419831f46"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/closedLoop.ts",
+    "sha256": "971eb2cd23f43f95d631f74766eeeefca7c89a8f92cf6df7ed1ad6634fcd56ab"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/DERIVATION_C2.md",
+    "sha256": "d42f7e380eaeb3c0e3e5953bbc6f34beeadfb0d9730964b8ba5e0401f06a96a8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/deriveBoundary.ts",
+    "sha256": "3e55dd46815dcff1eaadea9517d3c777631f871a49de5a91aa898c2bdc9371a7"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/HANDOVER_2026-07-30_R2_C6.md",
+    "sha256": "4673386f267c596a4572ecd6b4ae05f004145f9ce542765da56dbe93ec49c635"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/HANDOVER_2026-08-14_LONGITUDINAL_BOUNDS.md",
+    "sha256": "6c72c005155f761cb5830bc7d2452842ca04b0107ca94116a8922f65c824897b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/OPUS_REVIEW_C2.md",
+    "sha256": "9337ee07ef3c81103005df00330e23f3b34b0abc7d39aabe26b2acf2266f2d75"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/plantConstants.ts",
+    "sha256": "93c05e0552454004c2922f67b42bde92b997e496c2dfef20b4f141148c4ef460"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/PROPOSAL_autopilot_stability_counterexample.md",
+    "sha256": "1010c109c5b2af58237e4d8d0f159afada40183a1b39723578b6e0c67d735cde"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/R2_PHASE_ANALYSIS_C6.md",
+    "sha256": "695c6b118773193e43f8a86a47013e3c4aba5d8da1b47723ee03809a216847ff"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/R2_PIN_RECOMPUTE_C6.md",
+    "sha256": "642ec3b7ab68c2a7ec097d267eb8a478e0355dd2f86ae7ce79e3e1bb11391796"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/RATIFICATION_C5_R1A.md",
+    "sha256": "4369b76e9f52c1c41b61f07602d8cd8a73446bbadcd13384d6d1edcdc43cd50b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/REMEDIATION_R1_C5.md",
+    "sha256": "db7183f84226d1515ee69f53d21ec74c8b2fb491048c9e4f99936d6ffb686963"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/REMEDIATION_R1A_C5.md",
+    "sha256": "3bf91e7dbdd2ab397188f800135acc418011020ea94411d4d699c180cec8d2bc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/REMEDIATION_R2_C6.md",
+    "sha256": "a0fa15d57b6ac1273fd1cfd508910e337a668e40e029b0ba17b0108ea8667995"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/runAuthorityC6B.mjs",
+    "sha256": "738bc767f9bb4deb98cc797214c734a06a331d10ad0abd7e6962fe7a7450c83f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/runAuthoritySensitivity.mjs",
+    "sha256": "4c94ff49ad66e284a650cff75ae52525db0e45fdcf381e177198e2534746a433"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/runC3Corrected.mjs",
+    "sha256": "7810dfbe1b03e93e32604716996c9505fc9feaee451e0b1cc1848a7dffe61db9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/runSweep.ts",
+    "sha256": "7762f9351f19b539ae81242b4f8f078ea9eaff3dbcc85924ab218911498e2b8f"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/autopilot-sim/SWEEP_C3.md",
+    "sha256": "c51140cfef851924b5cffbdfe4c5edffd1f3f2dc84b7d3882f5d776747604334"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/ci_annotate_failure.mjs",
+    "sha256": "5e6a6ba7f95d0e4e12b1cbd1e8792d17b4c2eea8c44e3aa4a1363eb979303028"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/inspect_ios_app.mjs",
+    "sha256": "a8f8b94d6d2fbe2ca0f51f64017cc2848d3319dfbddb0ff6a6e612e80f629b01"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/audit.mjs",
+    "sha256": "c6d717a051b8a8905ec538f1c4ae336c7c9fae35552b086d568ca4b7377b9d23"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/budget.json",
+    "sha256": "3d68ea062017bb72343dd820e940802ec142b79dea6eae91c7528247ad2adde3"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/evidence_provenance.mjs",
+    "sha256": "9a7fe6bcf00eba0f7b157a009e2bdfc2dbbdc0cecdfd4ec828baa38b908e4007"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/lifecycle_correlator.mjs",
+    "sha256": "8f7d6f8a7f11bb2a2a3b3e5d70eef5cdae2297646eee132d31deb5a59f0d3539"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/meminfo_harness.mjs",
+    "sha256": "fe2e43fbb381a148b763e41cf92755282aa94b5b2b153b1a3673b6c85d620438"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/meminfo_parser.mjs",
+    "sha256": "c4d1e0653700aa4444123051e9784c83f8159df5e77376bdb448821d882c6604"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/memory_gate.mjs",
+    "sha256": "50a8983f6c257beb196879f96e677dbd7e88be1381e9e05cbf0677e6ade5f2ac"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/test_lifecycle_correlator.mjs",
+    "sha256": "94942027f3c8d3b22aada1c298285c7a8c0edde2e19a350938de84c52963c2f1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/test_meminfo_parser.mjs",
+    "sha256": "f7e58a40159d87599f5fcf219bfb0c6535fe690dc4dd34149befe896139bd34b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/memory-audit/test_memory_gate.mjs",
+    "sha256": "2c4118222c6e612f8d8a4f1f16463bdb5ea5f99571b03b0d2b755946c127cd1b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/author_flye_motion.mjs",
+    "sha256": "8ff85f3d458d0030c35770e48c9797db406292be2f37fed5d217fdad40511d9a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/author_kickback_motion.mjs",
+    "sha256": "fa5f89efc24cdaf697617d3400bc28c750a7489ca7b458035fcddae2a71f0776"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/author_pushdown_motion.mjs",
+    "sha256": "404eea029b4edec52915b61d14ff9ddf5e16f317b0dbcfff1d803286924738ae"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/author_reverse_lunge_motion.mjs",
+    "sha256": "d2677caddc13629b889b1a720e049f8253d45ad07da19a31fa2901a26932d5b1"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/author_straight_arm_pulldown.mjs",
+    "sha256": "6cc9904ca805d4a0355d6813c77ba16fa78e07f71ad769bbbfd914369cbbf5cb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/lib/canonicalSvg.mjs",
+    "sha256": "0c6a0d6a0c51a1f4fa49633082ae77f8b4b6bb2330bceb280e6a73471eb974ff"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/lib/derivation.mjs",
+    "sha256": "6d7b64e144bff12dad37f70aabc0c5417e08266a6f0a48d9521babd488f48557"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/lib/draftInput.mjs",
+    "sha256": "ea50b169cc6763dbc13d9bae5a4fb45c1fde642dfcdf48b2a457b30eaedd4215"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/lib/evidenceCard.mjs",
+    "sha256": "2c113ac18f3b868ebbc1b308b3f545390bd64b9d9e089ff06f5040186904ac63"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/lib/previewData.mjs",
+    "sha256": "8c53908d1e04726761133c954760481bc007aca2db542b5cbfc3a05ea5491590"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/lib/textFit.mjs",
+    "sha256": "ea2b59124de57df68008c8684d341edef1052f56141182eec62d5ebce4e4edf8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/render_manifest_evidence.mjs",
+    "sha256": "552c47c50042e6a68a46445bbe922d1976c0d7635c1980fb0751c694dee496b8"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/render_motion_cycle.mjs",
+    "sha256": "5e5f091261326f87ccbc408f62a23792fd2c03a0b208e78b8e5220589948fdda"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/render_movement_evidence.mjs",
+    "sha256": "a1860171c717c1a6d57a02b51ee344966d67fa5f15457daaf17440a246144f22"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/repair_motion_crops.mjs",
+    "sha256": "c191fe9cf054daeace413fbfab1586bb5ef193548c44cac9ab9dba1cd8a4e3ff"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/repair_supported_motion.mjs",
+    "sha256": "46a4088003479feb1bddabc2a3319e8c257a11658e48d16d55f69c4789e4181a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/test_native_border_bounds.mjs",
+    "sha256": "6298fea94c3dfeaf5e07a6aa139b953d26371f3dd1f0f2471b9916c0dc596c65"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/test_verify_movement_evidence.mjs",
+    "sha256": "bea4a205603ab5a0c4696ba5266d423ddafb24093175e73a22e6d1430cdc16f9"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/verify_movement_evidence.mjs",
+    "sha256": "d4118bf706ddae5a6bac729219ee0ec558fea0d2c7285fccf14c3975d7ec8647"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/verify_preview_storage.mjs",
+    "sha256": "9193c6cc1e13cca65a6dc49367e7ea5d4ece88cbb71b068c8adf29e71700fb86"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/rendering/wo09_split_preview_manifest.mjs",
+    "sha256": "9caf080d678c92ed0973b582d406e7394e1e57f0b7dc560f609aa2701e146f1c"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/test_verify_ci_structure.mjs",
+    "sha256": "5e5551eee77b5e4a50d09fe8edc522eb4c0c73d1d909c07599f19126d43f770a"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/test_verify_install_scripts.mjs",
+    "sha256": "1699319c6d6b2a6f3e26fab9ade732ceb269c94da8656c051ca518e45bb2ed86"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/test_verify_qa_artifact.mjs",
+    "sha256": "a5b922a607ab5f3857ca0426782d6eaa43b59a7f8830fe0a27a9120e31177fd0"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/verify_ci_structure.mjs",
+    "sha256": "3f46aa82253fa3111c03477ac91d45c46a699702c15c858b76d8baa8a64379fc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/verify_install_scripts.mjs",
+    "sha256": "0a3367ebeae8fbfc89099dbe7c50abb39016831f248233074e77105f7207aafc"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/verify_native_config.mjs",
+    "sha256": "fb5cb71e0a1e16e1b1eb98a555e483d5db7bafee5dae62a6641ba4823eb52cfb"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/tools/verify_qa_artifact.mjs",
+    "sha256": "d1753831efa026b23f7958ff5f36bed4f36355233fd24d27ac5945e3a605917b"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/VIDEO_TRIAGE_REPORT_2026-07-16.json",
+    "sha256": "796fb5ae34a747443f4dd233024a16d3240b8286823f8bcac39c557ba44a2804"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/WO_UI_3_4_punchlist.md",
+    "sha256": "a8f3d5bf2344d13e341efe547bfaffb92b291129b5396cf553cd0b945ceb743e"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/WO_UI_5b.md",
+    "sha256": "bb27eabafda1fd6eb66770f2ff91b4c1b8cc3e7b6dce7bfdd964e077201a7766"
+  },
+  {
+    "path": "C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App/WO_UI_SKIN.md",
+    "sha256": "29f826df28b55d030edc42e9d010d5dd06f8741484634a34e521eea91a567e3f"
+  }
+]

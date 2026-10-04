@@ -1,0 +1,20 @@
+{
+  "sourceCommit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+  "entries": 138,
+  "familyFiles": 47,
+  "statuses": {
+    "covered": 3,
+    "pending": 132,
+    "intentionally_unsuitable": 3
+  },
+  "nonUnsuitableRecords": 135,
+  "sourceCoveredIds": [
+    28,
+    16,
+    88
+  ],
+  "techniqueReview": {
+    "status": "pending",
+    "detail": "Positions were authored against this repository's own curated instructions and cues. No qualified strength or clinical professional has reviewed them. Nothing here is medical, injury-prevention or technique-certification advice."
+  }
+}

@@ -1,0 +1,3782 @@
+[
+  {
+    "body": "neutral",
+    "time": 0,
+    "phase": 0,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": -2.842170943040401e-14,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 33,
+    "phase": 0.002688888888888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 0.15670096283730572,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 66,
+    "phase": 0.010755555555555556,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 0.6266983689755818,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 99,
+    "phase": 0.0242,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 1.409043170575643,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 132,
+    "phase": 0.043022222222222226,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 2.500048743589957,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 165,
+    "phase": 0.06722222222222221,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.890158184150181,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 198,
+    "phase": 0.0968,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 5.559648352114976,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 231,
+    "phase": 0.13175555555555554,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 7.473353922073699,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 264,
+    "phase": 0.1720888888888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 9.57477548923174,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 297,
+    "phase": 0.21780000000000002,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 11.780199542979659,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 330,
+    "phase": 0.26888888888888884,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 13.973799917057619,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 363,
+    "phase": 0.3253555555555555,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 16.00508053744406,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 396,
+    "phase": 0.3872,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 17.690392453851985,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 429,
+    "phase": 0.4544222222222222,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 18.820503077894188,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 462,
+    "phase": 0.5263111111111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 19.177076532337168,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 495,
+    "phase": 0.5950000000000001,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 18.689877758970738,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 528,
+    "phase": 0.6583111111111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 17.552309060171638,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 561,
+    "phase": 0.7162444444444445,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 15.978257361558377,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 594,
+    "phase": 0.7688,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 14.159402699210716,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 627,
+    "phase": 0.8159777777777778,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 12.2556509447451,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 660,
+    "phase": 0.8577777777777778,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 10.392167270701322,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 693,
+    "phase": 0.8942,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 8.661007879206238,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 726,
+    "phase": 0.9252444444444444,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 7.125531617173351,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 759,
+    "phase": 0.9509111111111112,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 5.8261244110352095,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 792,
+    "phase": 0.9712,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 4.786163282398803,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 825,
+    "phase": 0.986111111111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 4.017505945560032,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 858,
+    "phase": 0.9956444444444444,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.525078367590197,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 891,
+    "phase": 0.9998,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.3103355735640605,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 924,
+    "phase": 1.0014222222222222,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 957,
+    "phase": 1.0080222222222222,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 990,
+    "phase": 1.02,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1023,
+    "phase": 1.0373555555555556,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1056,
+    "phase": 1.0600888888888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1089,
+    "phase": 1.0882,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1122,
+    "phase": 1.121688888888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1155,
+    "phase": 1.1605555555555556,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1188,
+    "phase": 1.2048,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1221,
+    "phase": 1.2544222222222223,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1254,
+    "phase": 1.3094222222222223,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1287,
+    "phase": 1.3698,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1320,
+    "phase": 1.4355555555555557,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1353,
+    "phase": 1.5066444444444445,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1386,
+    "phase": 1.5768,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1419,
+    "phase": 1.6415777777777778,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1452,
+    "phase": 1.7009777777777777,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1485,
+    "phase": 1.755,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1518,
+    "phase": 1.8036444444444444,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1551,
+    "phase": 1.8469111111111112,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1584,
+    "phase": 1.8848,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1617,
+    "phase": 1.9173111111111112,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1650,
+    "phase": 1.9444444444444444,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1683,
+    "phase": 1.9662,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1716,
+    "phase": 1.9825777777777778,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1749,
+    "phase": 1.993577777777778,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1782,
+    "phase": 1.9992,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1815,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1848,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1881,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1914,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1947,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 1980,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2013,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2046,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2079,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2112,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2145,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2178,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2211,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2244,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2277,
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2310,
+    "phase": 2.000138888888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2343,
+    "phase": 2.0025680555555554,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2376,
+    "phase": 2.0080222222222224,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2409,
+    "phase": 2.016501388888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2442,
+    "phase": 2.0280055555555556,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2475,
+    "phase": 2.0425347222222223,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2508,
+    "phase": 2.060088888888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2541,
+    "phase": 2.0806680555555555,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2574,
+    "phase": 2.1042722222222223,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2607,
+    "phase": 2.130901388888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2640,
+    "phase": 2.1605555555555553,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2673,
+    "phase": 2.1932347222222224,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2706,
+    "phase": 2.228938888888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2739,
+    "phase": 2.2676680555555557,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2772,
+    "phase": 2.309422222222222,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2805,
+    "phase": 2.354201388888889,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2838,
+    "phase": 2.4020055555555553,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2871,
+    "phase": 2.452834722222222,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2904,
+    "phase": 2.5066444444444445,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2937,
+    "phase": 2.5597652777777777,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 2970,
+    "phase": 2.609861111111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3003,
+    "phase": 2.6569319444444446,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3036,
+    "phase": 2.7009777777777777,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3069,
+    "phase": 2.741998611111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3102,
+    "phase": 2.779994444444444,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3135,
+    "phase": 2.8149652777777776,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3168,
+    "phase": 2.846911111111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3201,
+    "phase": 2.8758319444444442,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3234,
+    "phase": 2.901727777777778,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3267,
+    "phase": 2.924598611111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3300,
+    "phase": 2.9444444444444446,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3333,
+    "phase": 2.9612652777777777,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3366,
+    "phase": 2.975061111111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3399,
+    "phase": 2.9858319444444446,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3432,
+    "phase": 2.993577777777778,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3465,
+    "phase": 2.998298611111111,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3498,
+    "phase": 2.9999944444444444,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": 3531,
+    "phase": 3.002372839506173,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.4226220867384427,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3564,
+    "phase": 3.0101135802469137,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.8225547529042387,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3597,
+    "phase": 3.023232098765432,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 4.499451744732454,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3630,
+    "phase": 3.041728395061728,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 5.449869279404851,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3663,
+    "phase": 3.0656024691358024,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 6.664717423573194,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3696,
+    "phase": 3.0948543209876545,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 8.125030830799005,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3729,
+    "phase": 3.129483950617284,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 9.796744038158806,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3762,
+    "phase": 3.1694913580246915,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 11.624822095355597,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3795,
+    "phase": 3.2148765432098765,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 13.52735598369975,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3828,
+    "phase": 3.2656395061728394,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 15.390569890570276,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3861,
+    "phase": 3.32178024691358,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 17.066076130949966,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3894,
+    "phase": 3.383298765432099,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 18.37209037403221,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3927,
+    "phase": 3.450195061728395,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 19.100576626682113,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3960,
+    "phase": 3.5219753086419754,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 19.035794037765385,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 3993,
+    "phase": 3.5909901234567903,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 18.13960396907993,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4026,
+    "phase": 3.654627160493827,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 16.61520987441986,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4059,
+    "phase": 3.7128864197530866,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 14.677358618291294,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4092,
+    "phase": 3.765767901234568,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 12.519425238991943,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4125,
+    "phase": 3.8132716049382713,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 10.303382314633836,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4158,
+    "phase": 3.8553975308641975,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 8.156490869161559,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4191,
+    "phase": 3.8921456790123456,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 6.172708152444159,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4224,
+    "phase": 3.923516049382716,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 4.416976483964589,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4257,
+    "phase": 3.9495086419753087,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 2.930902580828672,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4290,
+    "phase": 3.9701234567901236,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 1.7387306831144542,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4323,
+    "phase": 3.9853604938271605,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 0.852875551840043,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4356,
+    "phase": 3.9952197530864195,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 0.27857273676389127,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": 4389,
+    "phase": 3.999701234567901,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 0.0174114110301673,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 0,
+    "phase": 0,
+    "frontGapDp": 0,
+    "rearGapDp": 0,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 33,
+    "phase": 0.002688888888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 0.15744040728176856,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 66,
+    "phase": 0.010755555555555556,
+    "frontGapDp": 0,
+    "rearGapDp": 0.6296561467533763,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 99,
+    "phase": 0.0242,
+    "frontGapDp": 0,
+    "rearGapDp": 1.4156981705757232,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 132,
+    "phase": 0.043022222222222226,
+    "frontGapDp": 0,
+    "rearGapDp": 2.5118798547011068,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 165,
+    "phase": 0.06722222222222221,
+    "frontGapDp": 0,
+    "rearGapDp": 3.9086442952613254,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 198,
+    "phase": 0.0968,
+    "frontGapDp": 0,
+    "rearGapDp": 5.586268352114985,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 231,
+    "phase": 0.13175555555555554,
+    "frontGapDp": 0,
+    "rearGapDp": 7.509586699851525,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 264,
+    "phase": 0.1720888888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 9.622099933676225,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 297,
+    "phase": 0.21780000000000002,
+    "frontGapDp": 0,
+    "rearGapDp": 11.84009454297967,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 330,
+    "phase": 0.26888888888888884,
+    "frontGapDp": 0,
+    "rearGapDp": 14.047744361502083,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 363,
+    "phase": 0.3253555555555555,
+    "frontGapDp": 0,
+    "rearGapDp": 16.0945533152219,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 396,
+    "phase": 0.3872,
+    "frontGapDp": 0,
+    "rearGapDp": 17.796872453852046,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 429,
+    "phase": 0.4544222222222222,
+    "frontGapDp": 0,
+    "rearGapDp": 18.945469189005337,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 462,
+    "phase": 0.5263111111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 19.321812087892738,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 495,
+    "phase": 0.5950000000000001,
+    "frontGapDp": 0,
+    "rearGapDp": 18.853502758970762,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 528,
+    "phase": 0.6583111111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 17.73334461572719,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 561,
+    "phase": 0.7162444444444445,
+    "frontGapDp": 0,
+    "rearGapDp": 16.17522458378062,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 594,
+    "phase": 0.7688,
+    "frontGapDp": 0,
+    "rearGapDp": 14.370822699210748,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 627,
+    "phase": 0.8159777777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 12.480044833633997,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 660,
+    "phase": 0.8577777777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 10.628056159590273,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 693,
+    "phase": 0.8942,
+    "frontGapDp": 0,
+    "rearGapDp": 8.906912879206232,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 726,
+    "phase": 0.9252444444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 7.379973839395603,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 759,
+    "phase": 0.9509111111111112,
+    "frontGapDp": 0,
+    "rearGapDp": 6.087624966590823,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 792,
+    "phase": 0.9712,
+    "frontGapDp": 0,
+    "rearGapDp": 5.053243282398881,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 825,
+    "phase": 0.986111111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 4.2886865011155635,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 858,
+    "phase": 0.9956444444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.7988805898123985,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 891,
+    "phase": 0.9998,
+    "frontGapDp": 0,
+    "rearGapDp": 3.585280573564063,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 924,
+    "phase": 1.0014222222222222,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 957,
+    "phase": 1.0080222222222222,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 990,
+    "phase": 1.02,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1023,
+    "phase": 1.0373555555555556,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1056,
+    "phase": 1.0600888888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1089,
+    "phase": 1.0882,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1122,
+    "phase": 1.121688888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1155,
+    "phase": 1.1605555555555556,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1188,
+    "phase": 1.2048,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1221,
+    "phase": 1.2544222222222223,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1254,
+    "phase": 1.3094222222222223,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1287,
+    "phase": 1.3698,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1320,
+    "phase": 1.4355555555555557,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1353,
+    "phase": 1.5066444444444445,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1386,
+    "phase": 1.5768,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1419,
+    "phase": 1.6415777777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1452,
+    "phase": 1.7009777777777777,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1485,
+    "phase": 1.755,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1518,
+    "phase": 1.8036444444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1551,
+    "phase": 1.8469111111111112,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1584,
+    "phase": 1.8848,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1617,
+    "phase": 1.9173111111111112,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1650,
+    "phase": 1.9444444444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1683,
+    "phase": 1.9662,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1716,
+    "phase": 1.9825777777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1749,
+    "phase": 1.993577777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1782,
+    "phase": 1.9992,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1815,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1848,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1881,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1914,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1947,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 1980,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2013,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2046,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2079,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2112,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2145,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2178,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2211,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2244,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2277,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2310,
+    "phase": 2.000138888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2343,
+    "phase": 2.0025680555555554,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2376,
+    "phase": 2.0080222222222224,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2409,
+    "phase": 2.016501388888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2442,
+    "phase": 2.0280055555555556,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2475,
+    "phase": 2.0425347222222223,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2508,
+    "phase": 2.060088888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2541,
+    "phase": 2.0806680555555555,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2574,
+    "phase": 2.1042722222222223,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2607,
+    "phase": 2.130901388888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2640,
+    "phase": 2.1605555555555553,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2673,
+    "phase": 2.1932347222222224,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2706,
+    "phase": 2.228938888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2739,
+    "phase": 2.2676680555555557,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2772,
+    "phase": 2.309422222222222,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2805,
+    "phase": 2.354201388888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2838,
+    "phase": 2.4020055555555553,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2871,
+    "phase": 2.452834722222222,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2904,
+    "phase": 2.5066444444444445,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2937,
+    "phase": 2.5597652777777777,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 2970,
+    "phase": 2.609861111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3003,
+    "phase": 2.6569319444444446,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3036,
+    "phase": 2.7009777777777777,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3069,
+    "phase": 2.741998611111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3102,
+    "phase": 2.779994444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3135,
+    "phase": 2.8149652777777776,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3168,
+    "phase": 2.846911111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3201,
+    "phase": 2.8758319444444442,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3234,
+    "phase": 2.901727777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3267,
+    "phase": 2.924598611111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3300,
+    "phase": 2.9444444444444446,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3333,
+    "phase": 2.9612652777777777,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3366,
+    "phase": 2.975061111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3399,
+    "phase": 2.9858319444444446,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3432,
+    "phase": 2.993577777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3465,
+    "phase": 2.998298611111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3498,
+    "phase": 2.9999944444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": 3531,
+    "phase": 3.002372839506173,
+    "frontGapDp": 0,
+    "rearGapDp": 3.6969695558742615,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3564,
+    "phase": 3.0101135802469137,
+    "frontGapDp": 0,
+    "rearGapDp": 4.094773518336353,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3597,
+    "phase": 3.023232098765432,
+    "frontGapDp": 0,
+    "rearGapDp": 4.768062917571996,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3630,
+    "phase": 3.041728395061728,
+    "frontGapDp": 0,
+    "rearGapDp": 5.713393970762922,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3663,
+    "phase": 3.0656024691358024,
+    "frontGapDp": 0,
+    "rearGapDp": 6.921676744560926,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3696,
+    "phase": 3.0948543209876545,
+    "frontGapDp": 0,
+    "rearGapDp": 8.373945892527388,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3729,
+    "phase": 3.129483950617284,
+    "frontGapDp": 0,
+    "rearGapDp": 10.036135951739112,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3762,
+    "phase": 3.1694913580246915,
+    "frontGapDp": 0,
+    "rearGapDp": 11.853211971898872,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3795,
+    "phase": 3.2148765432098765,
+    "frontGapDp": 0,
+    "rearGapDp": 13.74326493431704,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3828,
+    "phase": 3.2656395061728394,
+    "frontGapDp": 0,
+    "rearGapDp": 15.592519026372742,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3861,
+    "phase": 3.32178024691358,
+    "frontGapDp": 0,
+    "rearGapDp": 17.252586563048737,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3894,
+    "phase": 3.383298765432099,
+    "frontGapDp": 0,
+    "rearGapDp": 18.54168321353839,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3927,
+    "phase": 3.450195061728395,
+    "frontGapDp": 0,
+    "rearGapDp": 19.251772984706804,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3960,
+    "phase": 3.5219753086419754,
+    "frontGapDp": 0,
+    "rearGapDp": 19.167250827888864,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 3993,
+    "phase": 3.5909901234567903,
+    "frontGapDp": 0,
+    "rearGapDp": 18.252081685129326,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4026,
+    "phase": 3.654627160493827,
+    "frontGapDp": 0,
+    "rearGapDp": 16.710187405284074,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4059,
+    "phase": 3.7128864197530866,
+    "frontGapDp": 0,
+    "rearGapDp": 14.75631485285922,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4092,
+    "phase": 3.765767901234568,
+    "frontGapDp": 0,
+    "rearGapDp": 12.58383906615245,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4125,
+    "phase": 3.8132716049382713,
+    "frontGapDp": 0,
+    "rearGapDp": 10.354732623275822,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4158,
+    "phase": 3.8553975308641975,
+    "frontGapDp": 0,
+    "rearGapDp": 8.196256548173892,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4191,
+    "phase": 3.8921456790123456,
+    "frontGapDp": 0,
+    "rearGapDp": 6.202368090715794,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4224,
+    "phase": 3.923516049382716,
+    "frontGapDp": 0,
+    "rearGapDp": 4.438009570384395,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4257,
+    "phase": 3.9495086419753087,
+    "frontGapDp": 0,
+    "rearGapDp": 2.94478770428546,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4290,
+    "phase": 3.9701234567901236,
+    "frontGapDp": 0,
+    "rearGapDp": 1.7469467324972356,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4323,
+    "phase": 3.9853604938271605,
+    "frontGapDp": 0,
+    "rearGapDp": 0.856901416037573,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4356,
+    "phase": 3.9952197530864195,
+    "frontGapDp": 0,
+    "rearGapDp": 0.2798873046651522,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": 4389,
+    "phase": 3.999701234567901,
+    "frontGapDp": 0,
+    "rearGapDp": 0.017493571523999663,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 0,
+    "phase": 0,
+    "frontGapDp": 0,
+    "rearGapDp": 0,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 33,
+    "phase": 0.002688888888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 0.15596151839289973,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 66,
+    "phase": 0.010755555555555556,
+    "frontGapDp": 0,
+    "rearGapDp": 0.6237405911978158,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 99,
+    "phase": 0.0242,
+    "frontGapDp": 0,
+    "rearGapDp": 1.4023881705756764,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 132,
+    "phase": 0.043022222222222226,
+    "frontGapDp": 0,
+    "rearGapDp": 2.4882176324788645,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 165,
+    "phase": 0.06722222222222221,
+    "frontGapDp": 0,
+    "rearGapDp": 3.871672073039093,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 198,
+    "phase": 0.0968,
+    "frontGapDp": 0,
+    "rearGapDp": 5.5330283521149966,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 231,
+    "phase": 0.13175555555555554,
+    "frontGapDp": 0,
+    "rearGapDp": 7.437121144295986,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 264,
+    "phase": 0.1720888888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 9.52745104478737,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 297,
+    "phase": 0.21780000000000002,
+    "frontGapDp": 0,
+    "rearGapDp": 11.720304542979704,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 330,
+    "phase": 0.26888888888888884,
+    "frontGapDp": 0,
+    "rearGapDp": 13.899855472613211,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 363,
+    "phase": 0.3253555555555555,
+    "frontGapDp": 0,
+    "rearGapDp": 15.91560775966633,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 396,
+    "phase": 0.3872,
+    "frontGapDp": 0,
+    "rearGapDp": 17.583912453852037,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 429,
+    "phase": 0.4544222222222222,
+    "frontGapDp": 0,
+    "rearGapDp": 18.695536966783095,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 462,
+    "phase": 0.5263111111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 19.032340976781654,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 495,
+    "phase": 0.5950000000000001,
+    "frontGapDp": 0,
+    "rearGapDp": 18.52625275897077,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 528,
+    "phase": 0.6583111111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 17.371273504616113,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 561,
+    "phase": 0.7162444444444445,
+    "frontGapDp": 0,
+    "rearGapDp": 15.781290139336193,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 594,
+    "phase": 0.7688,
+    "frontGapDp": 0,
+    "rearGapDp": 13.947982699210769,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 627,
+    "phase": 0.8159777777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 12.03125705585623,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 660,
+    "phase": 0.8577777777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 10.156278381812484,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 693,
+    "phase": 0.8942,
+    "frontGapDp": 0,
+    "rearGapDp": 8.415102879206273,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 726,
+    "phase": 0.9252444444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 6.871089394951184,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 759,
+    "phase": 0.9509111111111112,
+    "frontGapDp": 0,
+    "rearGapDp": 5.564623855479681,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 792,
+    "phase": 0.9712,
+    "frontGapDp": 0,
+    "rearGapDp": 4.519083282398867,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 825,
+    "phase": 0.986111111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.7463253900045004,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 858,
+    "phase": 0.9956444444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.2512761453679957,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 891,
+    "phase": 0.9998,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0353905735640865,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 924,
+    "phase": 1.0014222222222222,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 957,
+    "phase": 1.0080222222222222,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 990,
+    "phase": 1.02,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1023,
+    "phase": 1.0373555555555556,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1056,
+    "phase": 1.0600888888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1089,
+    "phase": 1.0882,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1122,
+    "phase": 1.121688888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1155,
+    "phase": 1.1605555555555556,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1188,
+    "phase": 1.2048,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1221,
+    "phase": 1.2544222222222223,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1254,
+    "phase": 1.3094222222222223,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1287,
+    "phase": 1.3698,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1320,
+    "phase": 1.4355555555555557,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1353,
+    "phase": 1.5066444444444445,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1386,
+    "phase": 1.5768,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1419,
+    "phase": 1.6415777777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1452,
+    "phase": 1.7009777777777777,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1485,
+    "phase": 1.755,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1518,
+    "phase": 1.8036444444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1551,
+    "phase": 1.8469111111111112,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1584,
+    "phase": 1.8848,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1617,
+    "phase": 1.9173111111111112,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1650,
+    "phase": 1.9444444444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1683,
+    "phase": 1.9662,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1716,
+    "phase": 1.9825777777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1749,
+    "phase": 1.993577777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1782,
+    "phase": 1.9992,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1815,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1848,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1881,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1914,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1947,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 1980,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2013,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2046,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2079,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2112,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2145,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2178,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2211,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2244,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2277,
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2310,
+    "phase": 2.000138888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2343,
+    "phase": 2.0025680555555554,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2376,
+    "phase": 2.0080222222222224,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2409,
+    "phase": 2.016501388888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2442,
+    "phase": 2.0280055555555556,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2475,
+    "phase": 2.0425347222222223,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2508,
+    "phase": 2.060088888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2541,
+    "phase": 2.0806680555555555,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2574,
+    "phase": 2.1042722222222223,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2607,
+    "phase": 2.130901388888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2640,
+    "phase": 2.1605555555555553,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2673,
+    "phase": 2.1932347222222224,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2706,
+    "phase": 2.228938888888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2739,
+    "phase": 2.2676680555555557,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2772,
+    "phase": 2.309422222222222,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2805,
+    "phase": 2.354201388888889,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2838,
+    "phase": 2.4020055555555553,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2871,
+    "phase": 2.452834722222222,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2904,
+    "phase": 2.5066444444444445,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2937,
+    "phase": 2.5597652777777777,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 2970,
+    "phase": 2.609861111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3003,
+    "phase": 2.6569319444444446,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3036,
+    "phase": 2.7009777777777777,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3069,
+    "phase": 2.741998611111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3102,
+    "phase": 2.779994444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3135,
+    "phase": 2.8149652777777776,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3168,
+    "phase": 2.846911111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3201,
+    "phase": 2.8758319444444442,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3234,
+    "phase": 2.901727777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3267,
+    "phase": 2.924598611111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3300,
+    "phase": 2.9444444444444446,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3333,
+    "phase": 2.9612652777777777,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3366,
+    "phase": 2.975061111111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3399,
+    "phase": 2.9858319444444446,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3432,
+    "phase": 2.993577777777778,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3465,
+    "phase": 2.998298611111111,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3498,
+    "phase": 2.9999944444444444,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": 3531,
+    "phase": 3.002372839506173,
+    "frontGapDp": 0,
+    "rearGapDp": 3.148274617602681,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3564,
+    "phase": 3.0101135802469137,
+    "frontGapDp": 0,
+    "rearGapDp": 3.550335987472181,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3597,
+    "phase": 3.023232098765432,
+    "frontGapDp": 0,
+    "rearGapDp": 4.230840571892969,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3630,
+    "phase": 3.041728395061728,
+    "frontGapDp": 0,
+    "rearGapDp": 5.186344588046893,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3663,
+    "phase": 3.0656024691358024,
+    "frontGapDp": 0,
+    "rearGapDp": 6.407758102585603,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3696,
+    "phase": 3.0948543209876545,
+    "frontGapDp": 0,
+    "rearGapDp": 7.876115769070651,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3729,
+    "phase": 3.129483950617284,
+    "frontGapDp": 0,
+    "rearGapDp": 9.557352124578586,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3762,
+    "phase": 3.1694913580246915,
+    "frontGapDp": 0,
+    "rearGapDp": 11.396432218812407,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3795,
+    "phase": 3.2148765432098765,
+    "frontGapDp": 0,
+    "rearGapDp": 13.311447033082516,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3828,
+    "phase": 3.2656395061728394,
+    "frontGapDp": 0,
+    "rearGapDp": 15.188620754767811,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3861,
+    "phase": 3.32178024691358,
+    "frontGapDp": 0,
+    "rearGapDp": 16.879565698851252,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3894,
+    "phase": 3.383298765432099,
+    "frontGapDp": 0,
+    "rearGapDp": 18.20249753452606,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3927,
+    "phase": 3.450195061728395,
+    "frontGapDp": 0,
+    "rearGapDp": 18.94938026865745,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3960,
+    "phase": 3.5219753086419754,
+    "frontGapDp": 0,
+    "rearGapDp": 18.904337247641962,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 3993,
+    "phase": 3.5909901234567903,
+    "frontGapDp": 0,
+    "rearGapDp": 18.02712625303053,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4026,
+    "phase": 3.654627160493827,
+    "frontGapDp": 0,
+    "rearGapDp": 16.520232343555676,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4059,
+    "phase": 3.7128864197530866,
+    "frontGapDp": 0,
+    "rearGapDp": 14.598402383723396,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4092,
+    "phase": 3.765767901234568,
+    "frontGapDp": 0,
+    "rearGapDp": 12.455011411831435,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4125,
+    "phase": 3.8132716049382713,
+    "frontGapDp": 0,
+    "rearGapDp": 10.252032005991907,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4158,
+    "phase": 3.8553975308641975,
+    "frontGapDp": 0,
+    "rearGapDp": 8.116725190149225,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4191,
+    "phase": 3.8921456790123456,
+    "frontGapDp": 0,
+    "rearGapDp": 6.143048214172609,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4224,
+    "phase": 3.923516049382716,
+    "frontGapDp": 0,
+    "rearGapDp": 4.395943397544869,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4257,
+    "phase": 3.9495086419753087,
+    "frontGapDp": 0,
+    "rearGapDp": 2.9170174573719123,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4290,
+    "phase": 3.9701234567901236,
+    "frontGapDp": 0,
+    "rearGapDp": 1.730514633731758,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4323,
+    "phase": 3.9853604938271605,
+    "frontGapDp": 0,
+    "rearGapDp": 0.8488496876425415,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4356,
+    "phase": 3.9952197530864195,
+    "frontGapDp": 0,
+    "rearGapDp": 0.2772581688627156,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": 4389,
+    "phase": 3.999701234567901,
+    "frontGapDp": 0,
+    "rearGapDp": 0.017329250536391783,
+    "heelLiftExpected": true,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": "authored-0",
+    "phase": 0,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": -2.842170943040401e-14,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "neutral",
+    "time": "authored-1",
+    "phase": 1,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": "authored-2",
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": "authored-3",
+    "phase": 2,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": "authored-4",
+    "phase": 3,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": 3.299999999999983,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "neutral",
+    "time": "authored-5",
+    "phase": 4,
+    "frontGapDp": -2.842170943040401e-14,
+    "rearGapDp": -2.842170943040401e-14,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": "authored-0",
+    "phase": 0,
+    "frontGapDp": 0,
+    "rearGapDp": 0,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "male",
+    "time": "authored-1",
+    "phase": 1,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": "authored-2",
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": "authored-3",
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": "authored-4",
+    "phase": 3,
+    "frontGapDp": 0,
+    "rearGapDp": 3.5749999999999886,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "male",
+    "time": "authored-5",
+    "phase": 4,
+    "frontGapDp": 0,
+    "rearGapDp": 0,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": "authored-0",
+    "phase": 0,
+    "frontGapDp": 0,
+    "rearGapDp": 0,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  },
+  {
+    "body": "female",
+    "time": "authored-1",
+    "phase": 1,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": "authored-2",
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": "authored-3",
+    "phase": 2,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": "authored-4",
+    "phase": 3,
+    "frontGapDp": 0,
+    "rearGapDp": 3.0250000000000057,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": true
+  },
+  {
+    "body": "female",
+    "time": "authored-5",
+    "phase": 4,
+    "frontGapDp": 0,
+    "rearGapDp": 0,
+    "heelLiftExpected": false,
+    "rearToeContactExpected": false
+  }
+]

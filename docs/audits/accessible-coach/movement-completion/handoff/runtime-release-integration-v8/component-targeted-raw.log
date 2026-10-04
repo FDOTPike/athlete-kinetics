@@ -1,0 +1,11 @@
+PASS ../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js
+  √ actual52 remains pending and default review gate prevents family-loader invocation (1147 ms)
+  √ hypothetical covered52 uses one lazy loader, cached identity and all media gates (17 ms)
+  √ malformed52 rl fails at its lazy covered-family boundary (42 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        3.085 s
+Ran all test suites.
+Test results written to: ..\..\..\visualizations\2026\10\04\01a10600-ce62-7120-b660-90110f93f889\audit\motion-completion\runtime-release-integration-v8\component-targeted-results.json

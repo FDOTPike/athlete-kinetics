@@ -1,0 +1,51 @@
+{
+  "sourceCommit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+  "caches": [
+    {
+      "path": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "exists": true,
+      "sha256": "8b2627a4421e39d2e5c4f66abbf87c682f089d66ea5799d304605d1b73c35d45",
+      "mtimeMs": 1791124220310.8115
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/derivation.ts",
+      "exists": true,
+      "sha256": "10689809b038fbdac8d327f98eb9462409467c869c7daffcaa1e207a7d5b2f02",
+      "mtimeMs": 1791115199246.6848
+    },
+    {
+      "path": "tools/rendering/.build/canonicalFigure.js",
+      "exists": true,
+      "sha256": "241f45b7ff1548066fdf6fc3f79223240122dc776ae699ab350024e4739d0cc5",
+      "mtimeMs": 1791116380969.2715
+    },
+    {
+      "path": "tools/rendering/.build-derivation/canonicalFigure.js",
+      "exists": true,
+      "sha256": "241f45b7ff1548066fdf6fc3f79223240122dc776ae699ab350024e4739d0cc5",
+      "mtimeMs": 1791116384991.4553
+    },
+    {
+      "path": "tools/rendering/.build-derivation/derivation.js",
+      "exists": true,
+      "sha256": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b",
+      "mtimeMs": 1791116385015.9722
+    }
+  ],
+  "installedMetadata": {
+    "compared": 795,
+    "unknown": [],
+    "mismatches": []
+  },
+  "runtimeVersions": {
+    "react": "19.1.4",
+    "react-native": "0.81.6",
+    "jest": "29.7.0",
+    "typescript": "5.9.3",
+    "sharp": "0.32.6",
+    "@testing-library/react-native": "13.3.3"
+  },
+  "verifierOriginalSha256": "d4118bf706ddae5a6bac729219ee0ec558fea0d2c7285fccf14c3975d7ec8647",
+  "externalVerifierSha256": "7d9fc08c74f1ef869605d716f75af04be6ec0ac9b92db22fe4fe983b4409b88f",
+  "adaptation": "Frozen production imports and distinct external fresh-card compiler directories. Card thresholds and validation logic unchanged."
+}

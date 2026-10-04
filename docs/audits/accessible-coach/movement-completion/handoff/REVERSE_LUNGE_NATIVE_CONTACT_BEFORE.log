@@ -1,0 +1,67 @@
+FAIL test/components/MovementPreview.reverseLungeNativeContact.test.js (6.449 s)
+  × 52 actual rounded RN feet contact the native ground after landing (neutral) (1758 ms)
+  × 52 actual rounded RN feet contact the native ground after landing (male) (30 ms)
+  × 52 actual rounded RN feet contact the native ground after landing (female) (27 ms)
+
+  ● 52 actual rounded RN feet contact the native ground after landing (neutral)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.299999999999983
+
+      37 |       const bottom=foot.top+foot.height/2+(foot.width/2-r)*Math.abs(Math.sin(theta))+(foot.height/2-r)*Math.abs(Math.cos(theta))+r;
+      38 |       const gap=floor.top-bottom;
+    > 39 |       expect(gap).toBeGreaterThanOrEqual(-.05);expect(Math.abs(gap)).toBeLessThan(.05);
+         |                                                                      ^
+      40 |     }
+      41 |     fireEvent.press(screen.getByTestId('movement-preview-control'));
+      42 |     act(()=>jest.runAllTicks());expect(jest.getTimerCount()).toBe(0);expect(isPlaybackActive()).toBe(false);
+
+      at toBeLessThan (test/components/MovementPreview.reverseLungeNativeContact.test.js:39:70)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● 52 actual rounded RN feet contact the native ground after landing (male)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.5749999999999886
+
+      37 |       const bottom=foot.top+foot.height/2+(foot.width/2-r)*Math.abs(Math.sin(theta))+(foot.height/2-r)*Math.abs(Math.cos(theta))+r;
+      38 |       const gap=floor.top-bottom;
+    > 39 |       expect(gap).toBeGreaterThanOrEqual(-.05);expect(Math.abs(gap)).toBeLessThan(.05);
+         |                                                                      ^
+      40 |     }
+      41 |     fireEvent.press(screen.getByTestId('movement-preview-control'));
+      42 |     act(()=>jest.runAllTicks());expect(jest.getTimerCount()).toBe(0);expect(isPlaybackActive()).toBe(false);
+
+      at toBeLessThan (test/components/MovementPreview.reverseLungeNativeContact.test.js:39:70)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● 52 actual rounded RN feet contact the native ground after landing (female)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.0250000000000057
+
+      37 |       const bottom=foot.top+foot.height/2+(foot.width/2-r)*Math.abs(Math.sin(theta))+(foot.height/2-r)*Math.abs(Math.cos(theta))+r;
+      38 |       const gap=floor.top-bottom;
+    > 39 |       expect(gap).toBeGreaterThanOrEqual(-.05);expect(Math.abs(gap)).toBeLessThan(.05);
+         |                                                                      ^
+      40 |     }
+      41 |     fireEvent.press(screen.getByTestId('movement-preview-control'));
+      42 |     act(()=>jest.runAllTicks());expect(jest.getTimerCount()).toBe(0);expect(isPlaybackActive()).toBe(false);
+
+      at toBeLessThan (test/components/MovementPreview.reverseLungeNativeContact.test.js:39:70)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 3 total
+Snapshots:   0 total
+Time:        7.413 s
+Ran all test suites matching /MovementPreview.reverseLungeNativeContact/i.
