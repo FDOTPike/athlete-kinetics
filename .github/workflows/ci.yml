@@ -230,7 +230,7 @@ jobs:
               const d = require("fs").readFileSync("ios-evidence/pod-install-tracked.diff", "utf8");
               const esc = (t) => t.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
               const parts = []; for (let i = 0; i < d.length; i += 3500) parts.push(d.slice(i, i + 3500));
-              parts.slice(0, 8).forEach((p, i) => console.log(`::notice title=pod install diff ${i + 1}/${parts.length}::${esc(p)}`));
+              parts.slice(0, 8).forEach((p, i) => console.log(`::notice title=pod install diff ${i + 1}/${parts.length}::${esc(p)}`));'
           else
             echo "::notice title=pod install tracked changes::none — the tracked tree is unchanged by pod install"
           fi

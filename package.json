@@ -40,7 +40,7 @@
     "verify:memory-fixtures": "node tools/memory-audit/test_meminfo_parser.mjs && node tools/memory-audit/test_lifecycle_correlator.mjs && node tools/memory-audit/test_memory_gate.mjs",
     "verify:memory-contract": "node tools/memory-audit/audit.mjs",
     "verify:memory": "npm run verify:memory-fixtures && npm run verify:memory-contract",
-    "verify:qa-artifact": "node tools/test_verify_qa_artifact.mjs && node tools/test_verify_ci_structure.mjs && node tools/test_verify_install_scripts.mjs",
+    "verify:qa-artifact": "node tools/test_verify_qa_artifact.mjs && node tools/test_verify_ci_structure.mjs && node tools/test_verify_install_scripts.mjs && node tools/verify_workflow_shell.mjs",
     "verify:native-config": "node tools/verify_native_config.mjs",
     "verify:qa-candidate": "node tools/verify_qa_artifact.mjs apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk",
     "verify:library": "node scripts/py.mjs packages/core-db/test/verify_library.py",
