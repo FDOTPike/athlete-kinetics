@@ -1,0 +1,72 @@
+{
+  "sourceCommit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+  "checked": 12003,
+  "motions": [
+    {
+      "body": "neutral",
+      "phaseSamples": 4001,
+      "lengthError": 2.1316282072803006e-14,
+      "connectionError": 0,
+      "frontGapError": 0,
+      "rearPenetration": 0,
+      "rearContactGapBoxUnits": 1.3200000000000074,
+      "rearContactGapDp": 3.3000000000000185,
+      "kneeHoverBoxUnits": 3.4180044229494877,
+      "maxBoundaryJump": 1.2158174549356042e-10,
+      "maxKneeBearingStepDegreesPerPhase001": 1.095472576934151,
+      "minimumRearLiftBoxUnits": 1.184076216789407,
+      "closed": true
+    },
+    {
+      "body": "male",
+      "phaseSamples": 4001,
+      "lengthError": 1.7763568394002505e-14,
+      "connectionError": 0,
+      "frontGapError": 0,
+      "rearPenetration": 0,
+      "rearContactGapBoxUnits": 1.4300000000000068,
+      "rearContactGapDp": 3.575000000000017,
+      "kneeHoverBoxUnits": 3.1820015718353694,
+      "maxBoundaryJump": 1.2158174549356042e-10,
+      "maxKneeBearingStepDegreesPerPhase001": 1.1078155447413542,
+      "minimumRearLiftBoxUnits": 1.1896862167894113,
+      "closed": true
+    },
+    {
+      "body": "female",
+      "phaseSamples": 4001,
+      "lengthError": 2.1316282072803006e-14,
+      "connectionError": 0,
+      "frontGapError": 0,
+      "rearPenetration": 0,
+      "rearContactGapBoxUnits": 1.2099999999999937,
+      "rearContactGapDp": 3.0249999999999844,
+      "kneeHoverBoxUnits": 3.6540100562953093,
+      "maxBoundaryJump": 1.2158174549356042e-10,
+      "maxKneeBearingStepDegreesPerPhase001": 1.0829855364436682,
+      "minimumRearLiftBoxUnits": 1.1784662167893885,
+      "closed": true
+    }
+  ],
+  "errors": [
+    {
+      "type": "actual-rounded-rear-foot-floor-gap",
+      "body": "neutral",
+      "gapBoxUnits": 1.3200000000000074,
+      "gapDp": 3.3000000000000185
+    },
+    {
+      "type": "actual-rounded-rear-foot-floor-gap",
+      "body": "male",
+      "gapBoxUnits": 1.4300000000000068,
+      "gapDp": 3.575000000000017
+    },
+    {
+      "type": "actual-rounded-rear-foot-floor-gap",
+      "body": "female",
+      "gapBoxUnits": 1.2099999999999937,
+      "gapDp": 3.0249999999999844
+    }
+  ],
+  "pass": false
+}

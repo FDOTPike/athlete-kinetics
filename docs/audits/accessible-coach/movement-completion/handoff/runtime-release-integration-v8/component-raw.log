@@ -1,0 +1,58 @@
+PASS ../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-runtime.test.js (10.19 s)
+PASS ../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-crop.test.js (6.52 s)
+PASS ../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/runtime-reproductions.test.js
+FAIL ../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js
+  ● actual52 remains pending and default review gate prevents family-loader invocation
+
+    TypeError: Object.rlys is not a function
+
+      1 | const root='C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App';
+      2 | const key='lunge__reverse',id=52;
+    > 3 | function fresh(callback,covered=false,malformed=false){jest.isolateModules(()=>{const table=require(root+'/apps/mobile/src/components/movementPreview/familyLoaders').FAMILY_LOADERS;const spies=Object.rlys(table).map(k=>[k,jest.spyOn(table,k)]);const source=require(root+'/apps/mobile/src/components/movementPreview/families/lunge__reverse.json');if(covered){const fixture=JSON.parse(JSON.stringify(source));fixture.entries.forEach(e=>e.status='covered');if(malformed)fixture.entries[0].frames[0].joints.rl='bad';spies.find(([k])=>k===key)[1].mockImplementation(()=>fixture);}try{callback(require(root+'/apps/mobile/src/components/movementPreview/manifest'),spies,source);}finally{spies.forEach(([,s])=>s.mockRestore());}});}
+        |                                                                                                                                                                                                         ^
+      4 | const subject=assetKey=>({movement_id:id,name:'Renamed on purpose',media:{assetKey,status:'ready'}});
+      5 | test('actual52 remains pending and default review gate prevents family-loader invocation',()=>fresh((m,spies,source)=>{const s=subject(source.entries[0].assetKey);expect(source.entries[0].status).toBe('pending');expect(m.resolveMovementPreview(s)).toBeNull();expect(spies.every(([,s])=>s.mock.calls.length===0)).toBe(true);expect(m.resolveMovementPreview(s,{status:'complete'})).toBeNull();expect(spies.filter(([,s])=>s.mock.calls.length)).toHaveLength(1);expect(spies.find(([k])=>k===key)[1]).toHaveBeenCalledTimes(1);expect(m.loadPreviewFamily(key)).toBe(m.loadPreviewFamily(key));}));
+      6 | test('hypothetical covered52 uses one lazy loader, cached identity and all media gates',()=>fresh((m,spies,source)=>{const asset=source.entries[0].assetKey,s=subject(asset),entry=m.resolveMovementPreview(s,{status:'complete'});expect(entry.movementId).toBe(id);expect(entry.frames[0].joints.rl).toBe(0);expect(m.resolveMovementPreview({...s,name:'Another rename'},{status:'complete'})).toBe(entry);for(const altered of [{...s,media:{assetKey:'wrong',status:'ready'}},{...s,media:{assetKey:asset,status:'planned'}},{...s,media:{assetKey:asset,status:'external_fallback'}},{...s,media:null},{...s,movement_id:999999}])expect(m.resolveMovementPreview(altered,{status:'complete'})).toBeNull();expect(m.resolveMovementPreview(s,{status:'pending'})).toBeNull();expect(m.resolveMovementPreview({...s,media:{asset_key:asset,status:'ready'}},{status:'complete'})).toBe(entry);expect(spies.filter(([,s])=>s.mock.calls.length)).toHaveLength(1);expect(spies.find(([k])=>k===key)[1]).toHaveBeenCalledTimes(1);expect(source.entries[0].status).toBe('pending');},true));
+
+      at rlys (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:3:201)
+      at isolateModules (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:3:61)
+      at Object.fresh (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:5:95)
+
+  ● hypothetical covered52 uses one lazy loader, cached identity and all media gates
+
+    TypeError: Object.rlys is not a function
+
+      1 | const root='C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App';
+      2 | const key='lunge__reverse',id=52;
+    > 3 | function fresh(callback,covered=false,malformed=false){jest.isolateModules(()=>{const table=require(root+'/apps/mobile/src/components/movementPreview/familyLoaders').FAMILY_LOADERS;const spies=Object.rlys(table).map(k=>[k,jest.spyOn(table,k)]);const source=require(root+'/apps/mobile/src/components/movementPreview/families/lunge__reverse.json');if(covered){const fixture=JSON.parse(JSON.stringify(source));fixture.entries.forEach(e=>e.status='covered');if(malformed)fixture.entries[0].frames[0].joints.rl='bad';spies.find(([k])=>k===key)[1].mockImplementation(()=>fixture);}try{callback(require(root+'/apps/mobile/src/components/movementPreview/manifest'),spies,source);}finally{spies.forEach(([,s])=>s.mockRestore());}});}
+        |                                                                                                                                                                                                         ^
+      4 | const subject=assetKey=>({movement_id:id,name:'Renamed on purpose',media:{assetKey,status:'ready'}});
+      5 | test('actual52 remains pending and default review gate prevents family-loader invocation',()=>fresh((m,spies,source)=>{const s=subject(source.entries[0].assetKey);expect(source.entries[0].status).toBe('pending');expect(m.resolveMovementPreview(s)).toBeNull();expect(spies.every(([,s])=>s.mock.calls.length===0)).toBe(true);expect(m.resolveMovementPreview(s,{status:'complete'})).toBeNull();expect(spies.filter(([,s])=>s.mock.calls.length)).toHaveLength(1);expect(spies.find(([k])=>k===key)[1]).toHaveBeenCalledTimes(1);expect(m.loadPreviewFamily(key)).toBe(m.loadPreviewFamily(key));}));
+      6 | test('hypothetical covered52 uses one lazy loader, cached identity and all media gates',()=>fresh((m,spies,source)=>{const asset=source.entries[0].assetKey,s=subject(asset),entry=m.resolveMovementPreview(s,{status:'complete'});expect(entry.movementId).toBe(id);expect(entry.frames[0].joints.rl).toBe(0);expect(m.resolveMovementPreview({...s,name:'Another rename'},{status:'complete'})).toBe(entry);for(const altered of [{...s,media:{assetKey:'wrong',status:'ready'}},{...s,media:{assetKey:asset,status:'planned'}},{...s,media:{assetKey:asset,status:'external_fallback'}},{...s,media:null},{...s,movement_id:999999}])expect(m.resolveMovementPreview(altered,{status:'complete'})).toBeNull();expect(m.resolveMovementPreview(s,{status:'pending'})).toBeNull();expect(m.resolveMovementPreview({...s,media:{asset_key:asset,status:'ready'}},{status:'complete'})).toBe(entry);expect(spies.filter(([,s])=>s.mock.calls.length)).toHaveLength(1);expect(spies.find(([k])=>k===key)[1]).toHaveBeenCalledTimes(1);expect(source.entries[0].status).toBe('pending');},true));
+
+      at rlys (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:3:201)
+      at isolateModules (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:3:61)
+      at Object.fresh (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:6:93)
+
+  ● malformed52 ke fails at its lazy covered-family boundary
+
+    TypeError: Object.rlys is not a function
+
+      1 | const root='C:/Users/fpike/.codex/worktrees/movement-pushdown-2026-10-04/Athlete App';
+      2 | const key='lunge__reverse',id=52;
+    > 3 | function fresh(callback,covered=false,malformed=false){jest.isolateModules(()=>{const table=require(root+'/apps/mobile/src/components/movementPreview/familyLoaders').FAMILY_LOADERS;const spies=Object.rlys(table).map(k=>[k,jest.spyOn(table,k)]);const source=require(root+'/apps/mobile/src/components/movementPreview/families/lunge__reverse.json');if(covered){const fixture=JSON.parse(JSON.stringify(source));fixture.entries.forEach(e=>e.status='covered');if(malformed)fixture.entries[0].frames[0].joints.rl='bad';spies.find(([k])=>k===key)[1].mockImplementation(()=>fixture);}try{callback(require(root+'/apps/mobile/src/components/movementPreview/manifest'),spies,source);}finally{spies.forEach(([,s])=>s.mockRestore());}});}
+        |                                                                                                                                                                                                         ^
+      4 | const subject=assetKey=>({movement_id:id,name:'Renamed on purpose',media:{assetKey,status:'ready'}});
+      5 | test('actual52 remains pending and default review gate prevents family-loader invocation',()=>fresh((m,spies,source)=>{const s=subject(source.entries[0].assetKey);expect(source.entries[0].status).toBe('pending');expect(m.resolveMovementPreview(s)).toBeNull();expect(spies.every(([,s])=>s.mock.calls.length===0)).toBe(true);expect(m.resolveMovementPreview(s,{status:'complete'})).toBeNull();expect(spies.filter(([,s])=>s.mock.calls.length)).toHaveLength(1);expect(spies.find(([k])=>k===key)[1]).toHaveBeenCalledTimes(1);expect(m.loadPreviewFamily(key)).toBe(m.loadPreviewFamily(key));}));
+      6 | test('hypothetical covered52 uses one lazy loader, cached identity and all media gates',()=>fresh((m,spies,source)=>{const asset=source.entries[0].assetKey,s=subject(asset),entry=m.resolveMovementPreview(s,{status:'complete'});expect(entry.movementId).toBe(id);expect(entry.frames[0].joints.rl).toBe(0);expect(m.resolveMovementPreview({...s,name:'Another rename'},{status:'complete'})).toBe(entry);for(const altered of [{...s,media:{assetKey:'wrong',status:'ready'}},{...s,media:{assetKey:asset,status:'planned'}},{...s,media:{assetKey:asset,status:'external_fallback'}},{...s,media:null},{...s,movement_id:999999}])expect(m.resolveMovementPreview(altered,{status:'complete'})).toBeNull();expect(m.resolveMovementPreview(s,{status:'pending'})).toBeNull();expect(m.resolveMovementPreview({...s,media:{asset_key:asset,status:'ready'}},{status:'complete'})).toBe(entry);expect(spies.filter(([,s])=>s.mock.calls.length)).toHaveLength(1);expect(spies.find(([k])=>k===key)[1]).toHaveBeenCalledTimes(1);expect(source.entries[0].status).toBe('pending');},true));
+
+      at rlys (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:3:201)
+      at isolateModules (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:3:61)
+      at Object.fresh (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/lazy52.test.js:7:69)
+
+Test Suites: 1 failed, 3 passed, 4 total
+Tests:       3 failed, 18 passed, 21 total
+Snapshots:   0 total
+Time:        17.904 s
+Ran all test suites.
+Test results written to: ..\..\..\visualizations\2026\10\04\01a10600-ce62-7120-b660-90110f93f889\audit\motion-completion\runtime-release-integration-v8\component-results.json

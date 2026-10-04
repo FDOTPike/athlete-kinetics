@@ -1,0 +1,331 @@
+{
+  "sourceCommit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+  "scope": "Independent external V8 runtime review; later 0ad repair is parent-reported and has no independent acceptance.",
+  "files": [
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\RUNTIME_RELEASE_INTEGRATION_V8_REVIEW.md",
+      "bytes": 14805,
+      "sha256": "a8c993683c7d37119443f8b1e02aaae176e6dc012607acf975d5ecda6a4346d0"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\actual-rn-foot-styles.png",
+      "bytes": 13528,
+      "sha256": "889ef8f3b2a14213e1bdadfaeba2e1388d263be4c22418b1b8aef52aebe885df"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\actual-rn-foot-styles.svg",
+      "bytes": 2037,
+      "sha256": "94bee8939119083ed75bade84ffda87c6e4fedbb198012e24b13a00bfce4a1b4"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\adapt-component.mjs",
+      "bytes": 7091,
+      "sha256": "1b0ff148d47649acafe62e3a893546d90a7e13f8a491dcc923fa48a6b34c53a2"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\adapt-math.mjs",
+      "bytes": 3134,
+      "sha256": "aeb897494b77d40b0bf1b0cd9ef70b30a70cac8d71c41dd5da2297248e1159de"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\assets-after.json",
+      "bytes": 227251,
+      "sha256": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\assets-before.json",
+      "bytes": 227251,
+      "sha256": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\cache-and-dependency-diagnostic.json",
+      "bytes": 1835,
+      "sha256": "700f8ef9031051065fe35464ec153d8dfab94ddca8264e4b2d35a06402970ba9"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\card-verifier-raw.log",
+      "bytes": 2197,
+      "sha256": "4b074470a0206ed9199225e5ccd2f4ca546f999cc476e8a76b2dc484f9bd13f6"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\component-raw.log",
+      "bytes": 11571,
+      "sha256": "50675869f98dd9a6127f37a0aa7e26b4f6e35edd5eb1fc651618007aa47a2a9f"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\component-results.json",
+      "bytes": 27724,
+      "sha256": "78d0983733f9b286b717e554268bd6b35ea8698e2d7419e1e23c0204e1bf2ca3"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\component-targeted-raw.log",
+      "bytes": 733,
+      "sha256": "8b8800c70a7160a09322d55bd9300abfccee18d7a8a9bfe5ec4d3a6835a80eff"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\component-targeted-results.json",
+      "bytes": 1860,
+      "sha256": "a25d2db161af3a1a473653573a8418ff3f5057474eef907a02fce829b48b08d9"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\contact-jest-raw.log",
+      "bytes": 5197,
+      "sha256": "046752798e3e613e7d11e5003f94a65638a5b3b73e24e5ce094afc6dc4f73a18"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\contact-jest-results.json",
+      "bytes": 9499,
+      "sha256": "55caf5e98dd0d6bcbc26db5642032b9ce5a73aa86a0060f39517a9974c69d114"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\finish-freeze.mjs",
+      "bytes": 4025,
+      "sha256": "9283d13b9cf26d7204d2cbe1284ac66bcfec56c65e2016f85e7eff40805af325"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\freeze-results.json",
+      "bytes": 690,
+      "sha256": "52aa3d75bdd6004cacffe040f4e987a352bd49fd650ca922db978ba91ed30768"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\fresh-card-derivation\\canonicalFigure.js",
+      "bytes": 161885,
+      "sha256": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\fresh-card-derivation\\derivation.js",
+      "bytes": 34967,
+      "sha256": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\fresh-card-figure\\canonicalFigure.js",
+      "bytes": 161885,
+      "sha256": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\fresh-card-figure\\derivation.js",
+      "bytes": 34967,
+      "sha256": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\fresh-derivation\\canonicalFigure.js",
+      "bytes": 161885,
+      "sha256": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\fresh-derivation\\derivation.js",
+      "bytes": 34967,
+      "sha256": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\fresh-figure\\canonicalFigure.js",
+      "bytes": 161885,
+      "sha256": "38b35112109c574a962caf0fc14b885c7c6a63c313ae0599dc19f83fd996faf1"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\fresh-figure\\derivation.js",
+      "bytes": 34967,
+      "sha256": "d285c4253e8db64371a535d91c498e4ec43b3f6149f94f1113aee9b5f3c4f43b"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\git-status-after.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\git-status-before.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\github-ci-artifacts-final.json",
+      "bytes": 34,
+      "sha256": "e338fb10e6740e1e43cdbe137da3a22ec09f95d8097c5f247e751de5f81f87b4"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\github-ci-jobs-final.json",
+      "bytes": 9903,
+      "sha256": "42c58a34690644f3f1091a59f949d3d189fa0987ed449f44940dbeba8e381804"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\github-ci-runs-final.json",
+      "bytes": 374,
+      "sha256": "3dfdeea1c26ba0b2c09dc0f81a02c161285273866ce2907c81b2c00e25aa61e1"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\github-ci-runs.json",
+      "bytes": 374,
+      "sha256": "4810a24e5189502fce8a97033b602441b879586fce561cf080f39b3f9aebbabf"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\github-pr-snapshot.json",
+      "bytes": 252,
+      "sha256": "e0545938b01048f76cd7e9ae88a44b92542119216c83a26bc03fc0af9da8888b"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\head-after.txt",
+      "bytes": 41,
+      "sha256": "7720a3ce8f612b0f5076ac44619ae3e190cd8109ab5ea7b6b1bedf8ee5168c02"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\head-before.txt",
+      "bytes": 41,
+      "sha256": "7720a3ce8f612b0f5076ac44619ae3e190cd8109ab5ea7b6b1bedf8ee5168c02"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\head-contact.test.js",
+      "bytes": 4794,
+      "sha256": "3f7da873c56f9e443b9d4305595a84337765938b36d0a24af8d367c3fb9d9a03"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\integration-boundaries.json",
+      "bytes": 10634,
+      "sha256": "99a88d8c8647fb0cb01f6a1c970a5b7a9dfb24bbd8a53bef2ce88119fe8c7b1d"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\jest-contact.config.cjs",
+      "bytes": 416,
+      "sha256": "0f596b83522a568631ff7cc7a418734bde22f52fc1f499e9c9e340d67fdc244f"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\jest-lazy.config.cjs",
+      "bytes": 402,
+      "sha256": "cea59f1d91e9f1bd3d82f572e1f6293aa3ee3ae2200f9fb016ddac7710df61f4"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\jest-runtime.config.cjs",
+      "bytes": 1035,
+      "sha256": "1f09f4040de8174e06a563cfb4346ec5d886d540cb5d723a7cc67bcb9d7ddb21"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\kickback-runtime.test.js",
+      "bytes": 9369,
+      "sha256": "0ba0d724083f698f2d0edd5cead4cc201a8cf21e987128cac2798cae7125532b"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\lazy52.initial.test.js.txt",
+      "bytes": 2894,
+      "sha256": "76087fae277e4e38699ba6a017c414edc174a67983ed5e18cff9902a94f09e9c"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\lazy52.test.js",
+      "bytes": 2896,
+      "sha256": "701b8f6f8249969ba9164da0f9976b8747d05c80faccfe892433d32ca4f4ec61"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\lazy84.test.js",
+      "bytes": 2914,
+      "sha256": "94349741dfc007f4fff4fb28bb2f314c2a03153b322a8b14e23c02f26049a9d5"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\prepare-v8.mjs",
+      "bytes": 5611,
+      "sha256": "34e31d2c28ec8e779358c3db83fd5c4f9835e6980e249bfcfa59001d15f83e1a"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\render-native-foot-styles.mjs",
+      "bytes": 1844,
+      "sha256": "05e6e83ab797da33e90234ead8297c1741a3ae6724dcddb810c356763440df8a"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\reverse-continuity-raw.log",
+      "bytes": 2275,
+      "sha256": "12440468a0456d715f38dd3d09c1261af80e3845073b1f7c69b5c043adf5abb1"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\reverse-continuity-results.json",
+      "bytes": 2203,
+      "sha256": "9156bbc4a9593dcdae107306bcfea8525d04f7050fd965c209d524b7cfbaeb10"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\reverse-crop.test.js",
+      "bytes": 5317,
+      "sha256": "f702754aa22daf6aa0115c66baa742bc27bd4b4ed72179673ccc53621dd3dc07"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\reverse-native-contact-results.json",
+      "bytes": 5913,
+      "sha256": "02fd3448494df7774551456e1e02c2365194aec0470a7d5ea4e1c999f50b03da"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\reverse-native-contact.test.js",
+      "bytes": 4733,
+      "sha256": "68c33f0ea549e10e8161d97882391c95d303b0c432c67725ae8eb156886ec393"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\reverse-runtime-measurements.json",
+      "bytes": 87348,
+      "sha256": "1771e1df4c7e7f0f563d178d3079e74df4c67023d731d8f9fc0c7a892ebcd8c5"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\reverse-runtime.test.js",
+      "bytes": 10709,
+      "sha256": "3e81ab63be920cd29fe84f74590f31bd33723da2d37c07e86b4d80a35fa34673"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\run-card-verifier.mjs",
+      "bytes": 484,
+      "sha256": "7547bcd82bb2046eb19fc16d0b4e0ee75a31d4b371ba856d08c4fdff881564f7"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\runtime-reproductions.test.js",
+      "bytes": 4215,
+      "sha256": "a82a6198ef4c60bc829d4cb0bed6e2b9bcfe3ffb422ff02a8a0a45f38acc08db"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\source-after.json",
+      "bytes": 186801,
+      "sha256": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\source-before.json",
+      "bytes": 186801,
+      "sha256": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\source-coverage-inventory.json",
+      "bytes": 578,
+      "sha256": "06faa3894b0a6334b35c0e7e9d52b5114e6a78292b92d55947585c873c0680d4"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\supported-crop.test.js",
+      "bytes": 5391,
+      "sha256": "c11b08e6a9e579e2265ad0d75b1cec64f7526c6d861509ad4fc1d231d67fad12"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\supported-math-raw.log",
+      "bytes": 693,
+      "sha256": "a3f39b115f80af1024c08f01817a345f944525f0f3a04c058e2ad2f23beec87d"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\supported-math-results.json",
+      "bytes": 20046,
+      "sha256": "4e1912877af37baf9747bf9bcf905fc167dc75340bbc3db91e4306c7d764783e"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\torso-girdle.test.js",
+      "bytes": 5072,
+      "sha256": "affc980d8f09f2d148787380cbee1a0492bf814769100961e53d73dc70e2be39"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\verification-summary.json",
+      "bytes": 53320,
+      "sha256": "62ec04c05521512386674755032b1db69bb79a10f3fc9f2402868f34349297b5"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\verify-cards-external.mjs",
+      "bytes": 36487,
+      "sha256": "7d9fc08c74f1ef869605d716f75af04be6ec0ac9b92db22fe4fe983b4409b88f"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\verify-reverse-continuity.mjs",
+      "bytes": 3783,
+      "sha256": "4ef6ed75594f19950b9ee0310bd9c41e0e84407674389521a9f38bd4ba856606"
+    },
+    {
+      "path": "C:\\Users\\fpike\\.codex\\visualizations\\2026\\10\\04\\01a10600-ce62-7120-b660-90110f93f889\\audit\\motion-completion\\runtime-release-integration-v8\\verify-supported.mjs",
+      "bytes": 18976,
+      "sha256": "1141440c4f26d8756a42781e914cce073ef917ab77782cac73a9ae5d6877a9e4"
+    }
+  ]
+}

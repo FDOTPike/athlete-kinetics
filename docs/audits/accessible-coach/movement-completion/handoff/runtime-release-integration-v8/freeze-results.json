@@ -1,0 +1,21 @@
+{
+  "head": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+  "gitStatus": "",
+  "captures": {
+    "source": {
+      "count": 811,
+      "unchanged": true,
+      "beforeInventorySha256": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+      "afterInventorySha256": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+      "changed": []
+    },
+    "assets": {
+      "count": 762,
+      "unchanged": true,
+      "beforeInventorySha256": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+      "afterInventorySha256": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+      "changed": []
+    }
+  },
+  "stableSource": true
+}
