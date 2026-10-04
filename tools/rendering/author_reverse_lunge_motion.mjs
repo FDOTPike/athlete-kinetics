@@ -26,4 +26,4 @@ const at = manifest.entries.findIndex(e=>e.movementId===52);
 if(at>=0&&manifest.entries[at].previewId!==entry.previewId)throw Error('52 is owned by another author');
 if(at<0)manifest.entries.push(entry);else manifest.entries[at]=entry;
 fs.writeFileSync(file,`${JSON.stringify(manifest)}\n`);
-fs.writeFileSync('docs/audits/accessible-coach/movement-completion/REVERSE_LUNGE_SOURCE_BINDING.json',`${JSON.stringify({source:row, schematic:{legSegments:[22.25,22.25],footLength:5.4,rearHeelRise:3.3,peakHipY:68.4,torsoLength:24},acceptance:'unreviewed; supplemental front alignment and native evidence pending'},null,2)}\n`);
+fs.writeFileSync('docs/audits/accessible-coach/movement-completion/REVERSE_LUNGE_SOURCE_BINDING.json',`${JSON.stringify({source:row, schematic:{legSegments:[22.25,22.25],footLength:5.4,rearHeelRise:2.2,peakHipY:68.4,torsoLength:24},acceptance:'unreviewed; supplemental front alignment and native evidence pending'},null,2)}\n`);

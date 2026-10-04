@@ -666,7 +666,7 @@ export function reverseLungeGeometry(phase: number, body: BodyParameters) {
   const nk: CanonicalPoint = [hp[0], hp[1] - 24];
   const nLeg = hp, fLeg: CanonicalPoint = [hp[0] - body.hw * 0.5, hp[1]];
   const an: CanonicalPoint = [48, soleY];
-  const af: CanonicalPoint = [48 - body.hw * 0.5 - 42.25 * step, soleY - 3.3 * step - 7 * Math.sin(Math.PI * step)];
+  const af: CanonicalPoint = [48 - body.hw * 0.5 - 42.25 * step, soleY - 2.2 * step - 7 * Math.sin(Math.PI * step)];
   const knee = (root: CanonicalPoint, ankle: CanonicalPoint): CanonicalPoint => {
     // The shared elbow solver deliberately rejects a fully straight chain.
     // A standing leg is exactly that tangent case: its knee is the midpoint.
@@ -685,10 +685,15 @@ export function reverseLungeGeometry(phase: number, body: BodyParameters) {
   const joints: FigureJoints = { hd: [nk[0], nk[1] - 9], nk, hp,
     waist: [hp[0], nk[1] + 24 * 0.56], nArm, fArm, el, wr, ef, wf,
     nLeg, fLeg, kn: knee(nLeg, an), an, kf: knee(fLeg, af), af };
-  const heelRise = 3.3 * step;
+  // Keep the existing5.4-unit foot and its ankle attachment. A native rounded
+  // View insets each cap centre along the diagonal; endpoint+radius is not
+  // its painted sole. This toe rise makes the actual rounded end tangent at
+  // landing, with the same7-unit flight arc above the floor.
+  const heelRise = 2.2 * step;
+  const toeRise = heelRise / (1 - footWidth / (2 * 5.4));
   const frontFoot: readonly [CanonicalPoint, CanonicalPoint] = [an, [an[0] + 5.4, an[1]]];
   const rearFoot: readonly [CanonicalPoint, CanonicalPoint] = [af,
-    [af[0] + Math.sqrt(5.4 ** 2 - heelRise ** 2), af[1] + heelRise]];
+    [af[0] + Math.sqrt(5.4 ** 2 - toeRise ** 2), af[1] + toeRise]];
   return { joints, frontFoot, rearFoot, footWidth };
 }
 

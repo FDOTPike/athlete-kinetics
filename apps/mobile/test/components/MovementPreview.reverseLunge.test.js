@@ -24,7 +24,9 @@ test.each(Object.keys(DUAL_BODY_PARAMETERS))('52 steps back and returns while th
       expect(dist(root,elbow)).toBeCloseTo(12.5,8);expect(dist(elbow,wrist)).toBeCloseTo(12,8);
       expect(root[0]).toBe(elbow[0]);expect(elbow[0]).toBe(wrist[0]);
     }
-    for(const p of g.rearFoot) expect(p[1]+g.footWidth/2).toBeLessThanOrEqual(NATIVE_GROUND_Y+1e-9);
+    const radius=g.footWidth/2,dy=g.rearFoot[1][1]-g.rearFoot[0][1];
+    const rearBottom=(g.rearFoot[0][1]+g.rearFoot[1][1])/2+(5.4/2-radius)*Math.abs(dy/5.4)+radius;
+    expect(rearBottom).toBeLessThanOrEqual(NATIVE_GROUND_Y+1e-9);
     expect(dist(...g.frontFoot)).toBeCloseTo(5.4,9);expect(dist(...g.rearFoot)).toBeCloseTo(5.4,9);
     const prims=layoutCanonicalFigure(pose,opts);
     const feet=prims.filter(p=>p.kind==='bone'&&p.w===g.footWidth&&p.x1===f.an[0]&&p.y1===f.an[1]);
@@ -41,7 +43,8 @@ test.each(Object.keys(DUAL_BODY_PARAMETERS))('52 steps back and returns while th
   const lift=reverseLungeGeometry(.5,body),land=reverseLungeGeometry(1,body),bottom=reverseLungeGeometry(2,body);
   expect(lift.rearFoot[1][1]).toBeLessThan(start.rearFoot[1][1]-6);
   expect(land.joints.af[0]).toBeLessThan(start.joints.af[0]-40);
-  expect(land.rearFoot[1][1]+land.footWidth/2).toBeCloseTo(NATIVE_GROUND_Y,8);
+  const radius=land.footWidth/2,dy=land.rearFoot[1][1]-land.rearFoot[0][1];
+  expect((land.rearFoot[0][1]+land.rearFoot[1][1])/2+(5.4/2-radius)*dy/5.4+radius).toBeCloseTo(NATIVE_GROUND_Y,8);
   expect(bottom.joints.af).toEqual(land.joints.af);
   expect(bottom.rearFoot[0][1]).toBeLessThan(bottom.rearFoot[1][1]);
   const paintedKneeGap=NATIVE_GROUND_Y-bottom.joints.kf[1]-body.lw*1.18/2;
