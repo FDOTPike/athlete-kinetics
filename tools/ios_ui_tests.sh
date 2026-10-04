@@ -61,13 +61,12 @@ for test in "${TESTS[@]}"; do
   xcrun simctl uninstall "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
   xcrun simctl install "$UDID" "$APP"
   echo "== $test"
-  set +e
+  # A failing test is reported once, by the annotator below (not the ERR trap).
+  code=0
   xcodebuild test-without-building -xctestrun "$XCTESTRUN" \
     -destination "id=$UDID" -resultBundlePath "$OUT/$test.xcresult" \
     -only-testing:"AthleteKineticsUITests/AthleteKineticsUITests/$test" \
-    > "$OUT/$test.log" 2>&1
-  code=$?
-  set -e
+    > "$OUT/$test.log" 2>&1 || code=$?
   echo "$test exit=$code"
   [ "$code" -eq 0 ] || FAILED=1
   node tools/ios_ui_annotate.mjs "$test" "$code" "$OUT/$test.log"

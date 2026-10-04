@@ -17,7 +17,8 @@ const code = Number(codeText);
 const escape = (text) => text.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
 const cap = (text, n) => (text.length > n ? `${text.slice(0, n)}…` : text);
 const lines = existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n') : [];
-const observations = lines.filter((l) => l.startsWith('AKUI ') && !l.startsWith('AKUI A11Y ') && !l.startsWith('AKUI FAIL-TREE '))
+const observations = lines.filter((l) => l.startsWith('AKUI ') && !l.startsWith('AKUI A11Y ') && !l.startsWith('AKUI FAIL-TREE ')
+  && !l.startsWith('AKUI files sheet without'))
   .map((l) => l.slice(5).trim());
 const a11y = lines.filter((l) => l.startsWith('AKUI A11Y ')).map((l) => l.slice(10).trim());
 const tree = lines.find((l) => l.startsWith('AKUI FAIL-TREE '));
@@ -33,5 +34,9 @@ if (passed) {
   if (a11y.length > 0) parts.push(`${a11y.length} accessibility audit issue(s): ${a11y.slice(0, 25).join(' || ')}`);
   parts.push(`observations: ${observations.slice(-12).join(' | ')}`);
   console.log(`::error title=ui ${test} failed::${escape(cap(parts.join(' ### '), 6000))}`);
-  if (tree) console.log(`::error title=ui ${test} element tree::${escape(cap(tree.slice(15), 6000))}`);
+  // GitHub keeps 10 errors per step: the on-screen inventory goes out as a
+  // warning so every test's result fits.
+  const sheet = lines.find((l) => l.startsWith('AKUI files sheet without'));
+  const screen = [sheet?.slice(5), tree?.slice(15)].filter(Boolean).join(' ### ');
+  if (screen) console.log(`::warning title=ui ${test} on screen at failure::${escape(cap(screen, 6000))}`);
 }

@@ -23,7 +23,7 @@ final class AthleteKineticsUITests: XCTestCase {
 
   override func tearDownWithError() throws {
     if let run = testRun, run.failureCount > 0 {
-      log("FAIL-TREE \(name): \(app.debugDescription.prefix(8000))")
+      log("FAIL-TREE \(name): app{\(visibleLabels(app))} springboard{\(visibleLabels(XCUIApplication(bundleIdentifier: "com.apple.springboard")))}")
       let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
       shot.name = "failure-\(name)"
       shot.lifetime = .keepAlways
@@ -32,6 +32,21 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   // MARK: - helpers
+
+  /// A compact, readable inventory of what is on screen (the raw element tree
+  /// is too long for an annotation): buttons, texts, cells, bars and fields.
+  private func visibleLabels(_ target: XCUIApplication) -> String {
+    let groups: [(String, XCUIElementQuery, Int)] = [
+      ("nav", target.navigationBars, 6), ("button", target.buttons, 40), ("cell", target.cells, 20),
+      ("field", target.textFields, 8), ("secure", target.secureTextFields, 4), ("text", target.staticTexts, 45),
+    ]
+    return groups.map { kind, query, limit in
+      let labels = query.allElementsBoundByIndex.prefix(limit)
+        .map { el -> String in let l = el.label.isEmpty ? el.identifier : el.label; return String(l.prefix(70)) }
+        .filter { !$0.isEmpty }
+      return "\(kind)[\(labels.joined(separator: "; "))]"
+    }.joined(separator: " ")
+  }
 
   private func log(_ message: String) {
     print("AKUI \(message.replacingOccurrences(of: "\n", with: " | "))")
@@ -145,8 +160,23 @@ final class AthleteKineticsUITests: XCTestCase {
     return label
   }
 
-  private func healthPermissionButton(_ title: String) -> XCUIElement {
-    app.buttons.matching(NSPredicate(format: "label IN %@", [title, title.replacingOccurrences(of: "’", with: "'")])).firstMatch
+  private func healthPermissionButton(_ title: String, in target: XCUIApplication? = nil) -> XCUIElement {
+    (target ?? app).buttons.matching(NSPredicate(format: "label IN %@", [title, title.replacingOccurrences(of: "’", with: "'")])).firstMatch
+  }
+
+  /// HealthKit's sheet, in the app's hierarchy or (if the system presents it
+  /// out of process) SpringBoard's.
+  private func findHealthSheetButton(_ title: String, timeout: TimeInterval) -> XCUIElement? {
+    let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      let inApp = healthPermissionButton(title)
+      if inApp.exists { log("health sheet: in the app"); return inApp }
+      let inSpringboard = healthPermissionButton(title, in: springboard)
+      if inSpringboard.exists { log("health sheet: in SpringBoard"); return inSpringboard }
+      sleep(1)
+    } while Date() < deadline
+    return nil
   }
 
   // MARK: - tests
@@ -183,6 +213,17 @@ final class AthleteKineticsUITests: XCTestCase {
     do {
       try app.performAccessibilityAudit(for: .all) { issue in
         let who = issue.element.map { "\($0.elementType.rawValue)|\($0.identifier)|\($0.label.prefix(80))" } ?? "-"
+        // React Native text fields scale their font with the person's text
+        // size through RN's own font multiplier, not UIKit's
+        // adjustsFontForContentSizeCategory, which is what this audit reads.
+        // test2 MEASURES that a text field grows at AX XXXL; only this exact
+        // pairing (Dynamic Type x text field) is classified, and it is still
+        // reported. Everything else fails the test.
+        let fieldTypes: [XCUIElement.ElementType] = [.textField, .secureTextField, .searchField]
+        if issue.auditType == .dynamicType, let el = issue.element, fieldTypes.contains(el.elementType) {
+          log("A11Y-MEASURED \(screen) [dynamicType] RN text field \(el.label.prefix(60)): scaling measured in test2")
+          return true
+        }
         issues.append("\(screen) [\(issue.auditType.rawValue)] \(issue.compactDescription) @ \(who)")
         return true // collect every issue; the caller fails the test if any exist
       }
@@ -200,13 +241,21 @@ final class AthleteKineticsUITests: XCTestCase {
     let regular = element("WHAT SHOULD I CALL YOU?")
     wait(regular, "the onboarding name prompt (default size)", timeout: 60)
     let regularHeight = regular.frame.height
+    let regularField = app.textFields["Your name"]
+    wait(regularField, "the name field (default size)")
+    let regularFieldHeight = regularField.frame.height
     app.terminate()
     launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
     let large = element("WHAT SHOULD I CALL YOU?")
     wait(large, "the onboarding name prompt (AX XXXL)", timeout: 60)
     let largeHeight = large.frame.height
+    let largeField = app.textFields["Your name"]
+    wait(largeField, "the name field (AX XXXL)")
+    let largeFieldHeight = largeField.frame.height
     log("dynamic type: name prompt height \(regularHeight) pt at L, \(largeHeight) pt at AX XXXL")
+    log("dynamic type: name text field height \(regularFieldHeight) pt at L, \(largeFieldHeight) pt at AX XXXL")
     XCTAssertGreaterThan(largeHeight, regularHeight * 1.5, "text did not scale with the accessibility text size")
+    XCTAssertGreaterThan(largeFieldHeight, regularFieldHeight * 1.3, "a text field did not scale with the accessibility text size")
     XCTAssertTrue(element("Next").isHittable, "Next is unreachable at the largest text size")
   }
 
@@ -220,8 +269,12 @@ final class AthleteKineticsUITests: XCTestCase {
     let idle = element(labelBeginsWith: "Apple Health is available.")
     wait(idle, "the Apple Health 'available' wording before any request")
     tap("Choose whether to share sleep and resting heart rate from Apple Health", "Apple Health CONNECT")
-    let dontAllow = healthPermissionButton("Don’t Allow")
-    wait(dontAllow, "HealthKit's permission sheet (Don't Allow)", timeout: 30)
+    guard let dontAllow = findHealthSheetButton("Don’t Allow", timeout: 30) else {
+      let hint = element(labelBeginsWith: "Apple Health")
+      log("health after CONNECT: no Don't Allow in the app or SpringBoard; hint=\(hint.exists ? String(hint.label.prefix(200)) : "-")")
+      XCTFail("HealthKit's permission sheet (Don't Allow) did not appear within 30 s")
+      return
+    }
     log("health sheet shown: allow=\(healthPermissionButton("Allow").exists) dontAllow=true")
     dontAllow.tap()
     log("health sheet: tapped Don't Allow")
@@ -241,7 +294,7 @@ final class AthleteKineticsUITests: XCTestCase {
     tap("Add a new athlete")
     completeOnboarding("athlete B")
     openProfile()
-    XCTAssertFalse(healthPermissionButton("Don’t Allow").waitForExistence(timeout: 5),
+    XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 5),
                    "a new athlete reopened the Health permission sheet")
     let hintB = element(labelBeginsWith: "Apple Health")
     wait(hintB, "athlete B's Apple Health wording")
@@ -259,7 +312,7 @@ final class AthleteKineticsUITests: XCTestCase {
     log("switched: \(otherLabel)")
     wait(element("shell-root"), "the shell after switching back")
     openProfile()
-    XCTAssertFalse(healthPermissionButton("Don’t Allow").waitForExistence(timeout: 5),
+    XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 5),
                    "switching athlete reopened the Health permission sheet")
     let hintBack = settledLabel(element(labelBeginsWith: "Apple Health access requested"),
                                 beginsWith: "Apple Health access requested", "health wording after switching back (A)", timeout: 30)
@@ -378,8 +431,13 @@ final class AthleteKineticsUITests: XCTestCase {
     if browse.waitForExistence(timeout: 10) && !browse.isSelected { browse.tap() }
     let local = app.descendants(matching: .any)
       .matching(NSPredicate(format: "label == 'On My iPhone' OR label == 'On My iPad'")).firstMatch
-    wait(local, "Files' 'On My iPhone' location", timeout: 30)
-    local.tap()
+    if local.waitForExistence(timeout: 20) {
+      local.tap()
+    } else {
+      // The sheet may already be at its only local location; what it shows is
+      // recorded, and the save/pick and final status assertions still decide.
+      log("files sheet without 'On My iPhone': app{\(visibleLabels(app))}")
+    }
   }
 
   private func saveInFiles() {

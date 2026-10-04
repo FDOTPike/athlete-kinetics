@@ -221,6 +221,12 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     suite.includes('performAccessibilityAudit(for: .all)') && suite.includes('UICTContentSizeCategoryAccessibilityXXXL')
       && suite.includes('Don’t Allow') && suite.includes('Athlete UITest B, active')
       && suite.includes('confirm-restore-button') && suite.includes('Restore complete.'));
+  const classified = [...suite.matchAll(/return true\s*\n\s*\}/g)].length;
+  check('the audit classifies only Dynamic Type on text fields, and only because test2 measures a text field scaling',
+    /if issue\.auditType == \.dynamicType, let el = issue\.element, fieldTypes\.contains\(el\.elementType\)/.test(suite)
+      && /let fieldTypes: \[XCUIElement\.ElementType\] = \[\.textField, \.secureTextField, \.searchField\]/.test(suite)
+      && suite.includes('a text field did not scale with the accessibility text size')
+      && (suite.match(/A11Y-MEASURED/g) ?? []).length === 1, `early returns: ${classified}`);
   const ci = read('.github/workflows/ci.yml');
   check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)
