@@ -30,6 +30,7 @@ import {
   type UserProfile,
 } from '@ak/inference';
 import { FocusGoalsPanel } from '../components/FocusGoalsPanel';
+import { SportPanel } from '../components/SportPanel';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
@@ -418,6 +419,9 @@ export default function ProfileScreen(): React.JSX.Element {
       {/* Work order 2: the focus question and SMART goals, reviewable and
           editable here without rewriting any existing plan. */}
       <FocusGoalsPanel />
+      {/* Work order 3: the sport answer and the weekly sport workload the next
+          block will be planned with. */}
+      <SportPanel />
       <ChipRow
         label="2 · TRAINING AGE"
         options={TRAINING_AGES}

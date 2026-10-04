@@ -20,6 +20,8 @@
  *     backup made between two app updates (v64, ...) keeps its newer data;
  *   - 066 focus, goals, goal revisions and measurements round-trip, and a
  *     forward migration seeds the muscle mapping without inventing a focus;
+ *   - 067 sport profile, goal exercise link and frozen block explanations
+ *     round-trip, and a forward migration invents none of them;
  *   - an athlete file not opened since the update still backs up.
  *
  * The file-system, crypto and SQLite stand-ins are the same ones
@@ -270,9 +272,35 @@ const preparationRows = (path) => {
     });
   } finally { db.close(); }
 };
+const hasTable = (db, name) => db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) !== undefined;
+const sportRows = (path) => {
+  const db = open(path);
+  try {
+    if (!hasTable(db, 'athlete_sport_profile')) return NO_SPORT_OR_EMPHASIS;
+    return JSON.stringify({
+      sport: db.prepare('SELECT * FROM athlete_sport_profile').all(),
+      links: db.prepare('SELECT * FROM athlete_goal_movement ORDER BY goal_id').all(),
+      emphasis: db.prepare('SELECT * FROM block_emphasis ORDER BY block_id').all(),
+    });
+  } finally { db.close(); }
+};
+const NO_SPORT_OR_EMPHASIS = JSON.stringify({ sport: [], links: [], emphasis: [] });
+/** A sport answer, a goal tied to an exercise, and one block with its frozen explanation (067). */
+const seedSportAndEmphasis = (db) => {
+  db.exec(`INSERT INTO athlete_sport_profile
+    (sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id, practice_sessions_per_week,
+     matches_per_week, typical_session_min, competition_date, revision, updated_at_ms)
+    VALUES (1, 'other', 'private-sport: Netball', 'general_support', '2_to_5_years', 2, NULL, 90, '2027-03-01', 3, 7000)`);
+  db.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-roundtrip-1', 1, 7100)");
+  const blockId = Number(db.prepare("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2026-10-05', 'strength', 7200)").run().lastInsertRowid);
+  db.prepare('INSERT INTO block_emphasis (block_id, emphasis_version, inputs_json, report_json, created_at_ms) VALUES (?, 1, ?, ?, 7300)')
+    .run(blockId, JSON.stringify({ version: 1, focus: { description: 'Lower body' } }),
+      JSON.stringify({ version: 1, applied: ['private-report: one thing changed.'], omitted: [] }));
+};
 const focusGoalRows = (path) => {
   const db = open(path);
   try {
+    if (!hasTable(db, 'athlete_focus')) return NO_FOCUS_OR_GOALS;
     return JSON.stringify({
       focus: db.prepare('SELECT * FROM athlete_focus').all(),
       focusMuscles: db.prepare('SELECT * FROM athlete_focus_muscle ORDER BY muscle_group_id').all(),
@@ -412,6 +440,7 @@ async function selectLegacyBackup(mutate, contract = V63) {
     sealed,
     data: { default: athleteData(defaultPath), alex: athleteData(alexPath) },
     preparation: { default: preparationRows(defaultPath), alex: preparationRows(alexPath) },
+    focusGoals: { default: focusGoalRows(defaultPath), alex: focusGoalRows(alexPath) },
     hashes: { default: mockCryptoProvider.sha256Hex(defaultBytes), alex: mockCryptoProvider.sha256Hex(alexBytes) },
   };
 }
@@ -426,7 +455,10 @@ function expectForwardRestored(legacy) {
     // The migration added tables; it did not invent preparation history,
     // a focus or a goal — and it did seed the muscle mapping the planner reads.
     expect(preparationRows(path)).toBe(legacy.preparation[key]);
-    expect(focusGoalRows(path)).toBe(NO_FOCUS_OR_GOALS);
+    // Focus and goals the backup held are kept; none are invented where it held none.
+    expect(focusGoalRows(path)).toBe(legacy.focusGoals[key]);
+    // No sport answer, goal exercise link or block explanation is invented.
+    expect(sportRows(path)).toBe(NO_SPORT_OR_EMPHASIS);
     expect(seedCounts(path)).toEqual({ muscleGroups: 17, mappedMovements: 299, roles: 794 });
     // The installed file is the migrated copy, not the v63 bytes.
     expect(mockHashFile(path)).not.toBe(legacy.hashes[key]);
@@ -622,7 +654,7 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect(SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => contract.migrationSlot - contract.userVersion))
       .toEqual(SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map(() => 1));
     expect(SUPPORTED_BACKUP_SCHEMA_CONTRACTS[SUPPORTED_BACKUP_SCHEMA_CONTRACTS.length - 1]).toBe(CURRENT);
-    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(2);
+    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(3);
   });
 
   test.each(PRE_UPGRADE.map((contract) => [contract.userVersion, contract]))(
@@ -631,10 +663,22 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
       // A backup made after 065 shipped carries preparation records; they must
       // survive the remaining forward migrations untouched.
       const hasPreparation = contract.userVersion >= 64;
+      // A backup made after 066 shipped carries a focus and goals as well.
+      const hasFocusGoals = contract.userVersion >= 65;
       const legacy = await selectLegacyBackup(hasPreparation
-        ? (path) => { const db = open(path); try { seedPreparation(db); } finally { db.close(); } }
+        ? (path) => {
+          const db = open(path);
+          try {
+            seedPreparation(db);
+            if (hasFocusGoals) seedFocusAndGoals(db);
+          } finally { db.close(); }
+        }
         : undefined, contract);
       if (hasPreparation) expect(JSON.parse(legacy.preparation.default).items).toHaveLength(2);
+      if (hasFocusGoals) {
+        expect(JSON.parse(legacy.focusGoals.default).revisions).toHaveLength(2);
+        expect(legacy.focusGoals.alex).toBe(NO_FOCUS_OR_GOALS);
+      }
       const built = open(join(incomingDir, 'athlete_kinetics.db'));
       try { expect(matchesBackupSchemaContract(schemaObjects(built), contract, mockCryptoProvider)).toBe(true); } finally { built.close(); }
 
@@ -670,12 +714,17 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
   );
 });
 
-test('round trip at the current schema: focus, goals, every goal revision and every measurement survive backup and restore', async () => {
+test('round trip at the current schema: focus, goals, every revision and measurement, the sport answer, goal exercise and block explanation survive backup and restore', async () => {
   const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
   const db = open(livePath);
   seedFocusAndGoals(db);
+  seedSportAndEmphasis(db);
   db.close();
-  const before = { athlete: athleteData(livePath), focusGoals: focusGoalRows(livePath), seeds: seedCounts(livePath) };
+  const before = {
+    athlete: athleteData(livePath), focusGoals: focusGoalRows(livePath), seeds: seedCounts(livePath), sport: sportRows(livePath),
+  };
+  expect(JSON.parse(before.sport)).toMatchObject({ sport: [{ sport_id: 'other', revision: 3 }], links: [{ movement_id: 1 }] });
+  expect(JSON.parse(before.sport).emphasis).toHaveLength(1);
   expect(JSON.parse(before.focusGoals)).toMatchObject({ focus: [{ bundle_id: 'lower_body', revision: 2 }] });
   expect(JSON.parse(before.focusGoals).revisions).toHaveLength(2);
   expect(JSON.parse(before.focusGoals).observations).toHaveLength(2);
@@ -684,13 +733,18 @@ test('round trip at the current schema: focus, goals, every goal revision and ev
   expect(useBackupStore.getState()).toMatchObject({ status: 'success' });
   // The athlete's own words are inside the encrypted archive, never in the clear.
   expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-reason');
+  expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-sport');
+  expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-report');
 
   // Lose the data, then restore. Deleting the goal is the one supported way
   // to remove its revisions and measurements (they cascade with it).
   const wipe = open(livePath);
-  wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;');
+  wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;'
+    + ' DELETE FROM athlete_sport_profile; DELETE FROM training_block;');
   wipe.close();
   expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
+  // The goal link and the block explanation went with their parents.
+  expect(sportRows(livePath)).toBe(NO_SPORT_OR_EMPHASIS);
   copyFileSync(mockSavedBackupPath, mockSelectedBackupPath);
   mockSelectedSize = statSync(mockSelectedBackupPath).size;
   useBackupStore.setState({ status: 'idle', message: null, preview: null });
@@ -700,6 +754,7 @@ test('round trip at the current schema: focus, goals, every goal revision and ev
   expect(useBackupStore.getState()).toMatchObject({ status: 'success' });
 
   expect(focusGoalRows(livePath)).toBe(before.focusGoals);
+  expect(sportRows(livePath)).toBe(before.sport);
   expect(athleteData(livePath)).toBe(before.athlete);
   expect(seedCounts(livePath)).toEqual(before.seeds);
   // The restored file is the real current schema again, guards included.
@@ -707,6 +762,7 @@ test('round trip at the current schema: focus, goals, every goal revision and ev
   const restored = open(livePath);
   try {
     expect(() => restored.exec('UPDATE athlete_goal_revision SET target_value = 500')).toThrow(/immutable/);
+    expect(() => restored.exec("UPDATE block_emphasis SET report_json = '{}'")).toThrow(/immutable/);
   } finally { restored.close(); }
   expect(artifacts()).toEqual([]);
 });

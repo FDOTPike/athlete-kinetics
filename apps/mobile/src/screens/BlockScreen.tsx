@@ -19,6 +19,7 @@ import { useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
+import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
@@ -191,6 +192,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const today = useStore((s) => s.today);
   const profile = useStore((s) => s.profile);
   const activityLedger = useStore((s) => s.activityLedger ?? EMPTY_ACTIVITY_LEDGER);
+  // Work order 3: the explanation frozen with the active block (null when the
+  // block was created with no focus, sport or goal exercise, or before 067).
+  const blockEmphasis = useStore((s) => s.blockEmphasis) ?? null;
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
   const triageReady = useStore((s) => s.triageReady);
@@ -501,6 +505,19 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.bodyText}>
             These are your reported facts. This version shows them alongside the plan but does not silently
             move, add, remove, or intensify coach sessions.
+          </Text>
+        </Disclosure>
+      )}
+
+      {block !== null && blockEmphasis !== null && (
+        <Disclosure
+          label="WHY THIS PLAN LOOKS THE WAY IT DOES"
+          hint="What your focus, goals and sport changed"
+          testID="plan-emphasis-disclosure"
+        >
+          <EmphasisReportCard report={blockEmphasis.report} testID="plan-emphasis" />
+          <Text style={styles.bodyText}>
+            This was recorded when the block was created and does not change if you edit your focus, goals or sport later. Those edits are used for your next block.
           </Text>
         </Disclosure>
       )}

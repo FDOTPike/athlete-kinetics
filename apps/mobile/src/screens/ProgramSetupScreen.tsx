@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   accessContextForBlockFocus,
   ANCHOR_MOVEMENT_NAMES,
+  NO_EMPHASIS_EXPLANATION,
   objectiveStyleLabel,
   powerObjectiveExplanation,
   SELECTABLE_SCHEMA_TYPES,
@@ -20,6 +21,7 @@ import {
 import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
+import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { recommendedProgramDefaults } from '../state/programDefaults';
 import {
   useStore,
@@ -638,6 +640,15 @@ export default function ProgramSetupScreen({
             <Text key={conflict} style={styles.error} testID="session-time-conflict">{conflict}</Text>
           ))}
         </View>
+      )}
+      {/* Work order 3: what focus, goals, sport and sport workload change in
+          THIS plan, and what they cannot — the generator's own words. */}
+      {previewResult.preview?.plan !== undefined && (
+        <EmphasisReportCard
+          report={previewResult.preview.plan.emphasis ?? null}
+          emptyText={NO_EMPHASIS_EXPLANATION}
+          testID="program-emphasis"
+        />
       )}
       {rankingNotes.length > 0 && (
         <View style={styles.card} testID="ranking-notes-card">

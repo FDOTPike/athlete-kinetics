@@ -117,6 +117,15 @@ export interface MovementRankingInput {
    * never handed Power Clean (Advanced) because the objective says power.
    */
   readonly powerPreferredMovementNames?: readonly string[];
+  /**
+   * Work order 3: a powerlifter competes in the three competition lifts
+   * whatever training objective they picked, so the sport answer can ask for
+   * the same anchor promotion the strength objective has. It binds in the
+   * loaded-first mode only (beginners and rehab keep the legacy order), and
+   * every gate still applies: a gated-out anchor is reported, never
+   * re-admitted. Absent = unchanged for every existing caller.
+   */
+  readonly promoteCompetitionLifts?: boolean;
 }
 
 export type RankingReason = 'preference' | 'anchor' | 'loaded' | 'bodyweight';
@@ -393,7 +402,9 @@ export function rankMovementsForPattern(
   }
 
   // Loaded-first mode (non-rehab intermediate+).
-  const anchorForThisObjective = new Set(anchorNamesForObjective(input.objective));
+  const anchorForThisObjective = new Set(input.promoteCompetitionLifts === true
+    ? bigLiftAnchorNames()
+    : anchorNamesForObjective(input.objective));
   const anchorAvailable = available.find((c) => anchorForThisObjective.has(c.name));
   const anchorExcluded = candidates.filter(
     (c) => anchorForThisObjective.has(c.name) && !available.includes(c),

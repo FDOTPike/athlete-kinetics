@@ -27,6 +27,7 @@ import { Disclosure, PrimaryButton, SecondaryButton } from './ui';
 import {
   BALANCED_FOCUS_DRAFT,
   EMPTY_GOAL_FIELDS,
+  GOAL_EXERCISE_METRICS,
   FocusPicker,
   GoalEditor,
   goalDraftFromFields,
@@ -50,12 +51,15 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
   const setGoalStatus = useStore((s) => s.setGoalStatus);
   const recordGoalObservation = useStore((s) => s.recordGoalObservation);
   const removeGoalObservation = useStore((s) => s.removeGoalObservation);
+  const movements = useStore((s) => s.movements) ?? [];
+  const goalMovements = useStore((s) => s.goalMovements) ?? {};
 
   const [focusDraft, setFocusDraft] = useState<FocusDraft | null>(null);
   const [showMuscles, setShowMuscles] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | 'new' | null>(null);
   const [goalFields, setGoalFields] = useState<GoalFields>(EMPTY_GOAL_FIELDS);
   const [showErrors, setShowErrors] = useState(false);
+  const [goalExerciseId, setGoalExerciseId] = useState<number | null>(null);
   const [measuringGoalId, setMeasuringGoalId] = useState<string | null>(null);
   const [measureValue, setMeasureValue] = useState('');
   const [measureDate, setMeasureDate] = useState('');
@@ -81,6 +85,7 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
   const beginGoalEdit = (goal: StoredGoal | null): void => {
     setEditingGoalId(goal === null ? 'new' : goal.goalId);
     setGoalFields(goal === null ? EMPTY_GOAL_FIELDS : goalFieldsFromGoal(goal.goal));
+    setGoalExerciseId(goal === null ? null : goalMovements[goal.goalId] ?? null);
     setShowErrors(false);
     setMessage(null);
   };
@@ -88,9 +93,11 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
     const draft = goalDraftFromFields(goalFields);
     if (!validateSmartGoal(draft, today).ok) { setShowErrors(true); return; }
     const existing = goals.find((goal) => goal.goalId === editingGoalId);
+    // A goal that is not measured on an exercise carries no exercise link.
+    const exerciseId = GOAL_EXERCISE_METRICS.has(goalFields.metricId) ? goalExerciseId : null;
     const saved = existing === undefined
-      ? saveGoal(draft)
-      : saveGoal(draft, { goalId: existing.goalId, expectedRevision: existing.revision });
+      ? saveGoal(draft, undefined, exerciseId)
+      : saveGoal(draft, { goalId: existing.goalId, expectedRevision: existing.revision }, exerciseId);
     if (saved) {
       setEditingGoalId(null);
       setMessage(existing === undefined
@@ -157,6 +164,11 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
               {`Target ${stored.goal.targetValue} ${stored.goal.unit}, ${deadline}${stored.status === 'active' ? '' : ` · ${stored.status}`}`}
             </Text>
             <Text style={styles.dim}>{`Measured: ${stored.goal.measurementMethod}`}</Text>
+            {goalMovements[stored.goalId] !== undefined && (
+              <Text style={styles.dim} testID={`profile-goal-exercise-${stored.goalId}`}>
+                {`Exercise: ${movements.find((movement) => movement.movement_id === goalMovements[stored.goalId])?.name ?? 'no longer in the library'}`}
+              </Text>
+            )}
             <Text style={styles.dim}>{`Why: ${stored.goal.reason}`}</Text>
             <Text style={styles.body} testID={`profile-goal-progress-${stored.goalId}`}>{progress.summary}</Text>
             <Disclosure label="WHAT THIS ASKS FOR" testID={`profile-goal-feasibility-${stored.goalId}`}>
@@ -240,9 +252,10 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
         <View style={styles.editor} testID="profile-goal-editor">
           <Text style={styles.heading} accessibilityRole="header">{editingGoalId === 'new' ? 'NEW GOAL' : 'EDIT GOAL'}</Text>
           <GoalEditor fields={goalFields} onChange={setGoalFields} today={today}
-            trainingAge={trainingAge} showAllErrors={showErrors} />
+            trainingAge={trainingAge} showAllErrors={showErrors}
+            exercise={{ movements, movementId: goalExerciseId, onChange: setGoalExerciseId }} />
           <Text style={styles.dim}>
-            A goal does not change your current plan or its four-week reviews. Editing keeps the earlier version and your measurements.
+            A goal does not change your current plan or its four-week reviews. An exercise it names is used when your next block is created. Editing keeps the earlier version and your measurements.
           </Text>
           <View style={styles.actions}>
             <PrimaryButton label="SAVE GOAL" onPress={commitGoal}
