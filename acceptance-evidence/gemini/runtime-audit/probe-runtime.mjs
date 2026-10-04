@@ -10,11 +10,11 @@ const __dirname = path.dirname(__filename);
 const ROOT = process.cwd();
 const OUT = __dirname;
 const P = 'apps/mobile/src/components/movementPreview';
-const HEAD = 'd3bfe0a2d00b9067583cb74f585701f894440948';
+const git = (...a) => execFileSync('git', a, { cwd: ROOT, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' }, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).trim();
+const HEAD = process.argv[2] || git('rev-parse', 'HEAD');
 const PREVIOUS = '1185f0d0d6eb91b482afe60af4a0bf8173ba8c06';
 
 const sha = b => createHash('sha256').update(b).digest('hex');
-const git = (...a) => execFileSync('git', a, { cwd: ROOT, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' }, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).trim();
 const blob = (rev, p) => execFileSync('git', ['show', `${rev}:${p}`], { cwd: ROOT, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' }, maxBuffer: 16 * 1024 * 1024 });
 
 function evaluate(source, name, figure) {
