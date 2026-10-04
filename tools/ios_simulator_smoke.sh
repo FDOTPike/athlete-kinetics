@@ -117,6 +117,11 @@ node -e '
   for (const c of r.checks.filter((x) => !x.ok)) console.log(`::error title=native smoke check::${c.name}: ${String(c.detail).slice(0, 400)}`);
   // Passed checks too, so the result is readable through the API, not only the artifact.
   for (const c of r.checks.filter((x) => x.ok)) console.log(`::notice title=native smoke check::PASS ${c.name}: ${String(c.detail).slice(0, 300)}`);
-  if (r.schema !== "ak.native-smoke/1" || r.ok !== true) { console.error("NATIVE SMOKE FAILED"); process.exit(1); }
+  // Every expected check must be present: a dropped check is a failure, not a pass.
+  const required = ["sqlite math functions", "fresh migration chain", "embedder inference + routing",
+    "native CSPRNG (backup provider)", "device backup exclusion at startup", "Files import types resolve natively", "store boot"];
+  const missing = required.filter((name) => !r.checks.some((c) => c.name === name));
+  for (const name of missing) console.log(`::error title=native smoke check::missing check: ${name}`);
+  if (r.schema !== "ak.native-smoke/1" || r.ok !== true || missing.length > 0) { console.error("NATIVE SMOKE FAILED"); process.exit(1); }
   console.log("NATIVE SMOKE PASSED");
 ' "$OUT/native-smoke.json"

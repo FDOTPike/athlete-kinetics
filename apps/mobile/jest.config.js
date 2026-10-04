@@ -29,8 +29,10 @@ module.exports = {
   // Noble publishes ESM. Keep the React Native preset's node_modules boundary,
   // opening it only for the two audited primitive packages imported by the
   // backup adapter so unrelated dependencies are never transformed implicitly.
+  // The document picker's JavaScript (ESM) is opened too, so the Files
+  // boundary test runs the installed library itself against a native stub.
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@noble/(?:ciphers|hashes))/)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@noble/(?:ciphers|hashes)|@react-native-documents/picker)/)',
   ],
   moduleNameMapper: {
     '^@ak/inference$': '<rootDir>/../../packages/inference/src/index.ts',

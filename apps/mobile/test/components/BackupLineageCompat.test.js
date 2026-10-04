@@ -159,6 +159,7 @@ jest.mock('../../src/state/useStore', () => ({
   restartStoreAfterRestore: (...args) => mockRestartStore(...args),
 }));
 jest.mock('@react-native-documents/picker', () => ({
+  types: { allFiles: 'public.item' }, // the installed library's iOS all-files identifier
   pick: async () => [{ uri: mockSelectedBackupPath, name: 'selected.pmbak', size: mockSelectedSize }],
   keepLocalCopy: (...args) => mockKeepLocalCopy(...args),
   saveDocuments: (...args) => mockSaveDocuments(...args),

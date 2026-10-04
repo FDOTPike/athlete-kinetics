@@ -16,7 +16,9 @@
  *     a direct RNGetRandomValues TurboModule call with no fallback) works;
  *   - the normal store boots to "ready" against a fresh install;
  *   - this launch's device-backup exclusion of Documents and Library reported
- *     'excluded' (the CI script then reads the real directory resource values).
+ *     'excluded' (the CI script then reads the real directory resource values);
+ *   - every Files import type the backup restore passes to the document picker
+ *     resolves through the picker's own native UTType(identifier) lookup.
  * The result is written to Documents/ak-native-smoke.json and logged with an
  * `[ak-native-smoke]` marker for the macOS CI job to collect. Content-free:
  * no athlete data is read or written.
@@ -28,6 +30,7 @@ import { tryCreateDeviceEmbedder } from '../inference/deviceEmbedder';
 import { useStore } from '../state/useStore';
 import { mobileBackupCrypto } from '../state/backupCrypto';
 import { startupDeviceBackupExclusion } from '../state/deviceBackupPolicy';
+import { backupImportTypes } from '../state/backupStore';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 
@@ -136,6 +139,19 @@ export async function runNativeSmoke(): Promise<void> {
     const result = await pending;
     if (result !== 'excluded') throw new Error(`result=${result}`);
     return 'Documents and Library excluded at startup';
+  });
+
+  // The exact types restore hands the Files sheet, resolved by the installed
+  // picker's native isKnownType (UTType(identifier), the same initializer its
+  // pick() uses). A type that does not resolve would leave nothing selectable.
+  await step(checks, 'Files import types resolve natively', () => {
+    const picker = require('@react-native-documents/picker') as typeof import('@react-native-documents/picker');
+    const sent = backupImportTypes(Platform.OS, picker.types.allFiles);
+    const resolved = sent.map((value) => ({ value, known: picker.isKnownType({ kind: 'UTType', value }) }));
+    const bad = resolved.filter((r) => !r.known.isKnown || r.known.UTType !== r.value);
+    if (sent.length === 0 || bad.length > 0) throw new Error(`unresolved: ${JSON.stringify(bad)}`);
+    const mimeAsIdentifier = picker.isKnownType({ kind: 'UTType', value: 'application/octet-stream' }).isKnown;
+    return `${sent.join(',')} resolved by UTType(identifier); a MIME string as identifier resolves=${mimeAsIdentifier}`;
   });
 
   await step(checks, 'store boot', async () => {

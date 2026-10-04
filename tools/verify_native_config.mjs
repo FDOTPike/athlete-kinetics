@@ -82,6 +82,15 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
   const smoke = read('apps/mobile/src/diagnostics/nativeSmoke.ts');
   check('the native smoke exercises the production backup CSPRNG, not a global polyfill',
     /mobileBackupCrypto\.randomBytes\(/.test(smoke) && !/globalThis[^;\n]*crypto/.test(smoke));
+  const backupSrc = read('apps/mobile/src/state/backupStore.ts');
+  check('restore hands the iOS Files sheet a type identifier (the picker maps UTType(identifier)), not a MIME string',
+    /return os === 'ios' \? \[allFilesType\] : \[MIME\];/.test(backupSrc)
+      && /type: backupImportTypes\(Platform\.OS, picker\.types\.allFiles\)/.test(backupSrc)
+      && !/pick\(\{[^}]*type: MIME/.test(backupSrc));
+  check('the native smoke resolves those exact import types natively and CI requires every smoke check',
+    smoke.includes("'Files import types resolve natively'") && smoke.includes('backupImportTypes(Platform.OS, picker.types.allFiles)')
+      && read('tools/ios_simulator_smoke.sh').includes('"Files import types resolve natively"')
+      && read('tools/ios_simulator_smoke.sh').includes('missing check:'));
   check('iOS opens the bundled model in place (no Documents copy)', /Platform\.OS === 'ios'[\s\S]{0,200}MainBundleDir/.test(embedder));
   const stage = read('scripts/stage-native-embedder.mjs');
   check('the staging script verifies against KNOWN_SHA256 and never downloads',

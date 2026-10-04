@@ -184,6 +184,7 @@ jest.mock('../../src/state/useStore', () => ({
   restartStoreAfterRestore: (...args) => mockRestartStore(...args),
 }));
 jest.mock('@react-native-documents/picker', () => ({
+  types: { allFiles: 'public.item' }, // the installed library's iOS all-files identifier
   pick: (...args) => mockPick(...args),
   keepLocalCopy: (...args) => mockKeepLocalCopy(...args),
   saveDocuments: (...args) => mockSaveDocuments(...args),

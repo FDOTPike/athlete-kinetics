@@ -604,10 +604,22 @@ async function pickerSave(sourcePath: string, fileName: string): Promise<boolean
   return saved.error === null && saved.uri.length > 0;
 }
 
+/** The Files import filter, per platform. The picker's iOS bridge resolves
+ *  each entry with `UTType(identifier)` (PickerOptions.swift), so a MIME string
+ *  resolves to nothing there and the sheet would offer no selectable file.
+ *  `.pmbak` has no system-declared type, so iOS offers every file through the
+ *  library's own all-files identifier (`public.item`); Android filters by MIME.
+ *  Either way the encrypted envelope is validated after selection. */
+export function backupImportTypes(os: string, allFilesType: string): string[] {
+  return os === 'ios' ? [allFilesType] : [MIME];
+}
+
 async function pickerOpen(): Promise<string | null> {
   const picker = require('@react-native-documents/picker') as typeof import('@react-native-documents/picker');
   try {
-    const [selected] = await picker.pick({ mode: 'import', type: MIME, allowMultiSelection: false, allowVirtualFiles: false });
+    const [selected] = await picker.pick({
+      mode: 'import', type: backupImportTypes(Platform.OS, picker.types.allFiles), allowMultiSelection: false, allowVirtualFiles: false,
+    });
     // The native import path copies before JavaScript regains control. Reject
     // unknown or oversized provider metadata before asking it to make that
     // private copy, then retain the post-copy stat as defence in depth.
