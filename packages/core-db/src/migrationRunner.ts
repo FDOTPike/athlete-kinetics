@@ -456,7 +456,108 @@ function applyFailClosedRepairs(db: MigrationDb, missing: readonly string[]): vo
   }
 }
 
+/**
+ * Cross-lineage ordinal reconciliation (integration of master 1da218d with the
+ * feature chain, 2026-10-04).
+ *
+ * Two lineages shipped DIFFERENT entries at the same array index:
+ *
+ *   master  (1da218d): [..., m033, m034, m058]           -> length 34
+ *   feature (12a1fb1): [..., m033, m034, m035, ..., m057, m058, ..., m068]
+ *
+ * Indices 0..32 (001..034) name the same migration in both. Index 33 does not:
+ * master put 058 there, the feature chain put 035 there. A master install
+ * therefore sits at user_version 34 having applied 058 but NOT 035, and on the
+ * unified (feature-ordered) chain user_version 34 would mean "035 applied". Run
+ * unreconciled, that install skips 035 and survives only through the sentinel
+ * full replay — a safety net, not a migration strategy.
+ *
+ * The two states are distinguishable from the schema itself, because each
+ * lineage's index-33 entry creates a table the other's does not have yet:
+ *
+ *   user_version 34 + suspension_episode + NO profile_load_preference
+ *     -> master lineage. Rewind to 33 so the unified chain applies 035..057,
+ *        then re-applies 058 (IF NOT EXISTS: a no-op on master's existing
+ *        table, data and triggers untouched), then 059 onward.
+ *   user_version 34 + profile_load_preference (with or without
+ *   suspension_episode)
+ *     -> 035 is applied, so continuing at 036 is correct whichever history
+ *        produced it: a feature install (no 058 yet), or a master install that
+ *        was rewound, applied 035, and was interrupted before 036 committed
+ *        (058 already present — the unified chain re-applies 058 at ordinal 57
+ *        idempotently). Nothing to do. Treating "both" as ambiguous would lock
+ *        an athlete out after an ordinary interrupted upgrade.
+ *   user_version 34 + neither table
+ *     -> the index-33 object of BOTH lineages is gone, so the lineage cannot
+ *        be identified safely. Fail closed BEFORE any write: no guessing, no
+ *        replay, no deletion. The athlete's file is left exactly as found and
+ *        the boot error names the recovery path.
+ *
+ * Only user_version 34 is ambiguous: every master state below 34 is a prefix
+ * shared byte-for-byte in meaning with the feature chain (034's CHECK text
+ * differs, and 061 converges both to the strict contract), and no master state
+ * exists above 34.
+ *
+ * The reconciliation is self-validating: it only engages when the supplied
+ * chain really is the unified chain (035's table at index 33 and 058's at index
+ * 56). Any other array (tests, partial chains) is left alone.
+ */
+export const MASTER_LINEAGE_USER_VERSION = 34;
+const UNIFIED_035_INDEX = 33;
+const UNIFIED_058_INDEX = 56;
+
+export class MigrationLineageError extends Error {
+  readonly code = 'migration_lineage_ambiguous';
+  constructor(detail: string) {
+    super(
+      `This athlete's database could not be matched to a known app version (${detail}). `
+      + 'Nothing was changed. Keep this app version installed and restore from an encrypted '
+      + 'backup, or contact support with this message before reinstalling.',
+    );
+    this.name = 'MigrationLineageError';
+  }
+}
+
+export type LineageReconciliation = 'not_applicable' | 'feature' | 'master_rewound';
+
+function hasObject(db: MigrationDb, type: string, name: string): boolean {
+  return db.executeSync(
+    `SELECT 1 AS ok FROM sqlite_master WHERE type = '${type}' AND name = '${name}'`,
+  ).rows.length > 0;
+}
+
+function isUnifiedChain(migrations: readonly string[]): boolean {
+  return migrations.length > UNIFIED_058_INDEX
+    && /CREATE TABLE IF NOT EXISTS profile_load_preference\b/.test(migrations[UNIFIED_035_INDEX] ?? '')
+    && /CREATE TABLE IF NOT EXISTS suspension_episode\b/.test(migrations[UNIFIED_058_INDEX] ?? '');
+}
+
+export function reconcileMigrationLineage(
+  db: MigrationDb,
+  migrations: readonly string[],
+): LineageReconciliation {
+  if (!isUnifiedChain(migrations) || userVersion(db) !== MASTER_LINEAGE_USER_VERSION) {
+    return 'not_applicable';
+  }
+  const has058 = hasObject(db, 'table', 'suspension_episode');
+  const has035 = hasObject(db, 'table', 'profile_load_preference');
+  if (has035) return 'feature';
+  if (has058) {
+    db.executeSync('BEGIN');
+    try {
+      db.executeSync(`PRAGMA user_version = ${UNIFIED_035_INDEX};`);
+      db.executeSync('COMMIT');
+    } catch (e) {
+      try { db.executeSync('ROLLBACK'); } catch { /* nothing left to roll back */ }
+      throw e;
+    }
+    return 'master_rewound';
+  }
+  throw new MigrationLineageError('user_version 34 with neither the 035 nor the 058 table');
+}
+
 export function runMigrations(db: MigrationDb, migrations: readonly string[]): void {
+  reconcileMigrationLineage(db, migrations);
   applyFrom(db, migrations, userVersion(db));
   const missing = sentinelsMissing(db);
   if (missing.length > 0) {

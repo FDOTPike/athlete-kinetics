@@ -93,7 +93,17 @@ import m068 from './schema/068_movement_content_correction_v2.sql';
  *  than as an edit to m034: 034 is shipped on two lineages with DIFFERENT
  *  CHECK constraints (see 061's header), and editing it would neither reach an
  *  installed device nor renumber safely. Order of application, not numeric
- *  order, is the contract; idempotency is what makes that safe. */
+ *  order, is the contract; idempotency is what makes that safe.
+ *
+ *  LINEAGE NOTE (2026-10-04 integration of master 1da218d). This array is the
+ *  feature-lineage order, which became the single chain. The master lineage
+ *  shipped a 34-entry array whose index 33 is m058 (not m035). Those installs
+ *  are identified from their schema and rewound by exactly one ordinal before
+ *  this chain runs — see reconcileMigrationLineage in migrationRunner.ts and
+ *  packages/core-db/MIGRATION_LINEAGE.md. The array itself was NOT reordered
+ *  and no shipped SQL file was edited; master's exact 034/058 bytes are kept
+ *  digest-pinned under packages/core-db/test/fixtures/lineage/master-1da218d/.
+ *  Every future migration is appended after m068. */
 const MIGRATIONS: readonly string[] = [m001, m002, m003, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033, m034, m035, m036, m037, m038, m039, m040, m041, m042, m043, m044, m045, m046, m047, m048, m049, m050, m051, m052, m053, m054, m055, m056, m057, m058, m059, m060, m061, m062, m063, m064, m065, m066, m067, m068];
 
 

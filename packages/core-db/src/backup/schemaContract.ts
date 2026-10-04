@@ -110,14 +110,88 @@ export function backupSchemaContractFor(userVersion: number, migrationSlot: numb
     contract.userVersion === userVersion && contract.migrationSlot === migrationSlot) ?? null;
 }
 
+/**
+ * Known-lineage schema text equivalences.
+ *
+ * SQLite stores a table's CREATE statement verbatim, comments included, and
+ * `CREATE TABLE IF NOT EXISTS` never rewrites it. Migration 058 shipped on two
+ * lineages with the SAME table definition but different inline comments:
+ *
+ *   master  1da218d  058_suspension_episode.sql  sha256 4452ae33971ccc8deb1acdc36a2d5cc68141b86eb8d2dcf5ca051398e00d2200 (no inline comments)
+ *   feature 12a1fb1  058_suspension_episode.sql  (the file in src/schema; inline comments)
+ *
+ * A master install upgraded by the unified chain therefore keeps master's text
+ * for `suspension_episode`, and its exact fingerprint differs from a fresh
+ * install's even though columns, CHECKs, indexes and triggers are identical.
+ *
+ * This table maps that ONE exact stored text to the canonical (feature) text
+ * before fingerprinting. It is an exact string match — not comment stripping,
+ * not whitespace folding, not a relaxed comparison — so any other text,
+ * including a one-byte change to either variant, still fails the contract.
+ * Columns are compared unchanged. Adding an entry here requires the same
+ * review as adding a migration: verify:backup pins both texts against the
+ * real chains (fixtures under packages/core-db/test/fixtures/lineage/).
+ */
+export const MASTER_058_SUSPENSION_EPISODE_SQL = 'CREATE TABLE suspension_episode (\n'
+  + '  episode_id         INTEGER PRIMARY KEY,\n'
+  + '  started_at_ms      INTEGER NOT NULL CHECK (started_at_ms > 0),\n'
+  + '  ended_at_ms        INTEGER CHECK (ended_at_ms IS NULL OR ended_at_ms >= started_at_ms),\n'
+  + "  reason             TEXT NOT NULL CHECK (reason IN ('injury', 'illness', 'life')),\n"
+  + '  frozen_macro_index INTEGER NOT NULL CHECK (frozen_macro_index BETWEEN 1 AND 8)\n'
+  + ') STRICT';
+
+export const FEATURE_058_SUSPENSION_EPISODE_SQL = 'CREATE TABLE suspension_episode (\n'
+  + '  episode_id         INTEGER PRIMARY KEY,\n'
+  + '  started_at_ms      INTEGER NOT NULL CHECK (started_at_ms > 0),\n'
+  + '  -- NULL = currently suspended. Set once, by the athlete, on resume.\n'
+  + '  ended_at_ms        INTEGER CHECK (ended_at_ms IS NULL OR ended_at_ms >= started_at_ms),\n'
+  + '  -- Closed domain: free text cannot be reasoned about and will not stay clean.\n'
+  + "  -- 'life' is deliberate --- travel, work, bereavement. Restricting suspension\n"
+  + '  -- to injury would leave the commonest cause of a training gap still burning\n'
+  + "  -- the athlete's progression track, which is the bug this table exists to fix.\n"
+  + "  reason             TEXT NOT NULL CHECK (reason IN ('injury', 'illness', 'life')),\n"
+  + '  -- The macro position frozen at entry, mirroring the 009 block_meta domain.\n'
+  + '  frozen_macro_index INTEGER NOT NULL CHECK (frozen_macro_index BETWEEN 1 AND 8)\n'
+  + ') STRICT';
+
+export const KNOWN_LINEAGE_SQL_EQUIVALENTS: readonly {
+  readonly type: 'table';
+  readonly name: string;
+  readonly lineage: string;
+  readonly variantSql: string;
+  readonly canonicalSql: string;
+}[] = [
+  {
+    type: 'table',
+    name: 'suspension_episode',
+    lineage: 'master 1da218d migration 058',
+    variantSql: MASTER_058_SUSPENSION_EPISODE_SQL,
+    canonicalSql: FEATURE_058_SUSPENSION_EPISODE_SQL,
+  },
+];
+
+/** Replace an exact known-lineage variant text with its canonical text. Every
+ *  other object, and every non-identical text, passes through unchanged. */
+export function canonicalizeKnownLineageSchema(objects: readonly BackupSchemaObject[]): BackupSchemaObject[] {
+  return objects.map((object) => {
+    const equivalent = KNOWN_LINEAGE_SQL_EQUIVALENTS.find((entry) =>
+      entry.type === object[0] && entry.name === object[1] && entry.name === object[2]
+      && entry.variantSql === object[3]);
+    return equivalent === undefined
+      ? object
+      : [object[0], object[1], object[2], equivalent.canonicalSql, object[4]] as const;
+  });
+}
+
 /** The fingerprint covers every user table/column/index/trigger definition,
  * rather than accepting any database that happens to contain the right
- * number of tables. */
+ * number of tables. Known-lineage text variants (above) are canonicalized
+ * first; nothing else is normalized. */
 export function calculateBackupSchemaFingerprint(
   objects: readonly BackupSchemaObject[],
   crypto: Pick<BackupCryptoProvider, 'sha256Hex' | 'utf8Encode'>,
 ): string {
-  return crypto.sha256Hex(crypto.utf8Encode(JSON.stringify(objects)));
+  return crypto.sha256Hex(crypto.utf8Encode(JSON.stringify(canonicalizeKnownLineageSchema(objects))));
 }
 
 /** Exact match against one registered contract. */

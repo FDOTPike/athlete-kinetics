@@ -501,8 +501,21 @@ async function prepareDatabaseSnapshot(
     if (!quickCheck(snapshotHandle)) throw new Error('A database snapshot did not pass its integrity check. No backup was saved.');
     const sourceVersion = oneNumber(snapshotHandle, 'PRAGMA user_version', 'user_version');
     sourceContract = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === sourceVersion);
-    if (sourceContract === undefined) throw new Error('A database uses an unsupported schema. Update the app before backing up.');
-    if (!matchesBackupSchemaContract(schemaContract(snapshotHandle), sourceContract, mobileBackupCrypto)) {
+    if (sourceContract === undefined) {
+      // This device's OWN athlete file, last opened by a build older than the
+      // first backup contract (any lineage: a master-lineage install at
+      // user_version 34, or an early feature build). Opening that athlete
+      // would run the production `migrate` on the live file with no contract
+      // check at all, so migrating an isolated COPY and then requiring the
+      // exact current fingerprint below is never weaker. The live file is not
+      // touched, an unidentifiable lineage still fails closed inside
+      // `migrate`, and imported archives keep their strict per-contract check
+      // (verifyStagedDatabase). A future or negative version is refused.
+      if (!Number.isInteger(sourceVersion) || sourceVersion < 0
+        || sourceVersion >= CURRENT_BACKUP_SCHEMA_CONTRACT.userVersion) {
+        throw new Error('A database uses an unsupported schema. Update the app before backing up.');
+      }
+    } else if (!matchesBackupSchemaContract(schemaContract(snapshotHandle), sourceContract, mobileBackupCrypto)) {
       throw new Error('A database snapshot does not match the verified app schema. No backup was saved.');
     }
   } finally { snapshotHandle.close(); }
