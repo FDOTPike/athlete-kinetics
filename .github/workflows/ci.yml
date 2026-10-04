@@ -14,7 +14,7 @@ env:
 
 jobs:
   verify:
-    name: Verification suite (23 gates + typecheck)
+    name: Verification suite (24 gates + typecheck)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -46,7 +46,7 @@ jobs:
       #       packet (AK_MEM_EVIDENCE_SESSION) that no runner possesses.
       # Both live in `npm run verify:release`, which is run by the owner before
       # a release, NOT here. `verify:all` is an alias for `verify:release`.
-      - name: verify:ci (23 gates + typecheck)
+      - name: verify:ci (24 gates + typecheck)
         run: npm run verify:ci
       - name: Seeder physiology — pinned alignment + today's alignment
         run: |
@@ -104,9 +104,8 @@ jobs:
       - name: Stage embedder model into Android assets
         run: |
           npm run fetch:embedder
-          mkdir -p apps/mobile/android/app/src/main/assets
-          cp packages/inference/assets/minilm/model_quantized.onnx \
-             apps/mobile/android/app/src/main/assets/minilm.onnx
+          node scripts/stage-native-embedder.mjs \
+            apps/mobile/android/app/src/main/assets/minilm.onnx --required
       # This artifact is deliberately DEBUG-signed for local device QA. Play
       # release artifacts require the external upload key documented in
       # docs/PRE_RELEASE_ANDROID.md and are never signed with this key.
@@ -144,4 +143,105 @@ jobs:
         with:
           name: athlete-kinetics-debug-qa-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  # Unsigned iOS simulator build + native smoke. This is the ONLY native iOS
+  # evidence this repository produces: a Linux host can verify sources
+  # (verify:native-config) but cannot run Xcode. It does NOT sign, archive for
+  # the App Store, or touch TestFlight — those need the owner's Apple team,
+  # registered bundle id and signing credentials (none are configured here).
+  ios-simulator:
+    name: iOS unsigned simulator build + native smoke
+    runs-on: macos-26
+    needs: verify
+    timeout-minutes: 90
+    env:
+      # Xcode/iOS SDK 26+ is the current App Store upload requirement. The job
+      # selects the newest installed Xcode of this major and records it.
+      XCODE_MAJOR: '26'
+      BUNDLE_ID: com.athletekinetics
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Select pinned Xcode major
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "error: no Xcode ${XCODE_MAJOR}.x on this runner:"; ls -d /Applications/Xcode*.app; exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphone
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: apps/mobile
+      - run: npm ci
+      # Same pin-bound cache and byte-verified fetch as the Android job.
+      - name: Cache embedding model
+        uses: actions/cache@v5
+        with:
+          path: node_modules/@xenova/transformers/.cache
+          key: minilm-${{ hashFiles('scripts/embedder-integrity.mjs') }}
+      - name: Fetch embedder assets
+        run: npm run fetch:embedder
+      # Lock-based when Podfile.lock is committed (--deployment refuses any
+      # drift). Until the first lock is committed, the job resolves one and
+      # uploads it for review rather than pretending to be reproducible.
+      - name: Install pods
+        working-directory: apps/mobile/ios
+        run: |
+          if git ls-files --error-unmatch Podfile.lock >/dev/null 2>&1; then
+            bundle exec pod install --deployment
+          else
+            echo "::warning::Podfile.lock is not committed; resolving a new lock (uploaded as an artifact for review)."
+            bundle exec pod install
+          fi
+      - name: Build unsigned Release for the simulator
+        working-directory: apps/mobile/ios
+        run: |
+          set -o pipefail
+          mkdir -p ../../../ios-evidence
+          xcodebuild -workspace AthleteKinetics.xcworkspace -scheme AthleteKinetics \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
+            build 2>&1 | tee ../../../ios-evidence/xcodebuild.log
+      - name: Inspect the built app (fails closed)
+        run: |
+          node tools/inspect_ios_app.mjs \
+            apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
+            ios-evidence/xcodebuild.log ios-evidence/app-inspection.json
+      - name: Simulator native smoke (fails closed)
+        run: |
+          tools/ios_simulator_smoke.sh \
+            apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
+            "$BUNDLE_ID" ios-evidence
+      - name: Record source and toolchain identity
+        if: always()
+        run: |
+          mkdir -p ios-evidence
+          node -e '
+            const { execSync } = require("child_process");
+            const sh = (c) => { try { return execSync(c, { encoding: "utf8" }).trim(); } catch { return null; } };
+            require("fs").writeFileSync("ios-evidence/identity.json", JSON.stringify({
+              schema: "ak.ios-ci-identity/1",
+              commit: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF, runId: process.env.GITHUB_RUN_ID,
+              trackedTreeClean: sh("git status --porcelain --untracked-files=no") === "",
+              xcode: sh("xcodebuild -version"), node: process.version,
+              podfileLockCommitted: sh("git ls-files apps/mobile/ios/Podfile.lock") !== "",
+            }, null, 2));'
+          cp apps/mobile/ios/Podfile.lock ios-evidence/ 2>/dev/null || true
+          if [ -d apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app ]; then
+            (cd apps/mobile/ios/build/Build/Products/Release-iphonesimulator && ditto -c -k --keepParent AthleteKinetics.app "$GITHUB_WORKSPACE/ios-evidence/AthleteKinetics-simulator-unsigned.zip")
+          fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: athlete-kinetics-ios-simulator-unsigned
+          path: ios-evidence/
           if-no-files-found: error

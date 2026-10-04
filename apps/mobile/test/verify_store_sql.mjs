@@ -1787,8 +1787,9 @@ if (resetTables.length >= 15) {
   const ciMatches = Array.from(ciYmlContent.matchAll(/\((\d+)\s+gates/g));
   const ciGateCounts = ciMatches.map((m) => Number(m[1]));
 
-  // 23 since verify:preparation joined the suite (session-time contract + preparation policy).
-  a('verify:ci script invokes exactly 23 verify:* targets', verifyInvocations === 23, `got ${verifyInvocations}`);
+  // 23 since verify:preparation joined the suite (session-time contract + preparation policy);
+  // 24 since verify:native-config (static iOS/native contract, 2026-10-04 integration).
+  a('verify:ci script invokes exactly 24 verify:* targets', verifyInvocations === 24, `got ${verifyInvocations}`);
   a('verify:components bypasses stale transformed migration caches',
     /(?:^|\s)--no-cache(?:\s|$)/.test(verifyComponentsScript), verifyComponentsScript);
   a('AGENT_WORKFLOW.md documents exact verify:ci gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);

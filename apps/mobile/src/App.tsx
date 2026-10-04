@@ -15,7 +15,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { tryCreateHealthConnectBridge } from '@ak/biometrics';
+import { tryCreateBiometricsBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
@@ -32,6 +32,8 @@ import { statusBarPaddingTop } from './layout/statusBarPadding';
 import { useBackupStore } from './state/backupStore';
 import { bootAfterSafeRecovery } from './state/backupStartup';
 import { authorizeAthleteDataBoot } from './state/dataMaintenanceLock';
+import { excludeAppDataFromDeviceBackup } from './state/deviceBackupPolicy';
+import { nativeSmokeRequested, runNativeSmoke } from './diagnostics/nativeSmoke';
 import { QuietAction } from './components/ui';
 
 /**
@@ -152,6 +154,11 @@ export function AppShell(): React.JSX.Element {
   const showOnboarding = status === 'ready' && !onboarded;
 
   useEffect(() => {
+    // iOS: keep health databases, registry and recovery files out of iCloud
+    // device backup (Android: allowBackup="false"). Idempotent, never blocks.
+    void excludeAppDataFromDeviceBackup();
+    // CI-only: the macOS job launches the simulator build with -AKNativeSmoke 1.
+    if (nativeSmokeRequested()) void runNativeSmoke();
     // Resolve an interrupted replace journal before any athlete database is
     // opened. A cold-start rollback therefore never races normal hydration.
     // Recovery failure keeps the normal store closed. Opening athlete data
@@ -164,9 +171,10 @@ export function AppShell(): React.JSX.Element {
     void tryCreateDeviceEmbedder().then((e) => {
       useStore.getState().setEmbedder(e);
     });
-    // Health Connect is optional by contract: a null bridge (APK missing,
-    // permission machinery broken, non-Android) costs nothing but telemetry.
-    void tryCreateHealthConnectBridge().then((bridge) => {
+    // Health data is optional by contract: Health Connect on Android, Apple
+    // Health on iOS. A null bridge (service missing, permission machinery
+    // broken, unsupported platform) costs nothing but telemetry.
+    void tryCreateBiometricsBridge().then((bridge) => {
       void useStore.getState().connectBiometrics(bridge);
     });
     // Foreground lifecycle: date rollover + biometric ingestion. No

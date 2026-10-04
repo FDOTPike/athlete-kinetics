@@ -49,6 +49,7 @@ jest.mock('../../src/inference/deviceEmbedder', () => ({
   tryCreateDeviceEmbedder: jest.fn(() => Promise.resolve(null)),
 }));
 jest.mock('@ak/biometrics', () => ({
+  tryCreateBiometricsBridge: jest.fn(() => Promise.resolve(null)),
   tryCreateHealthConnectBridge: jest.fn(() => Promise.resolve(null)),
 }));
 // Navigation tests begin after the central cold-start recovery authority has

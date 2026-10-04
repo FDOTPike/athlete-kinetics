@@ -12,7 +12,7 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -37,6 +37,7 @@ import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
 import InfoTip from '../components/InfoTip';
+import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
 import ActivitiesScreen from './ActivitiesScreen';
@@ -258,6 +259,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const saveOneRepMax = useStore((s) => (s.status === 'ready' ? s.saveOneRepMax : inertWhileClosed));
   const biometricsStatus = useStore((s) => s.biometricsStatus);
+  const healthCopy = biometricsCopy(providerForPlatform(Platform.OS), biometricsStatus);
   const syncBiometrics = useStore((s) => s.syncBiometrics);
   const requestBiometricsAccess = useStore((s) => s.requestBiometricsAccess);
   const profileSlots = useStore((s) => s.profileSlots);
@@ -508,26 +510,16 @@ export default function ProfileScreen(): React.JSX.Element {
       </View>
       <View style={styles.field}>
         <View style={styles.fieldLabelRow}>
-          <Text style={styles.fieldLabel}>BIOMETRICS — HEALTH CONNECT</Text>
-          <InfoTip term="HRV" />
+          <Text style={styles.fieldLabel}>{healthCopy.title}</Text>
+          {healthCopy.showHrvTip && <InfoTip term="HRV" />}
         </View>
-        <Text style={styles.fieldHint}>
-          {biometricsStatus === 'ready'
-            ? 'Connected. Overnight HRV, resting heart rate, and sleep feed your readiness score automatically — synced when the app comes to the foreground.'
-            : biometricsStatus === 'idle'
-              ? 'Health Connect is available. Tap CONNECT to grant read access to overnight HRV, resting heart rate, and sleep — the coach works fully without it.'
-              : biometricsStatus === 'denied'
-                ? 'Permission not granted. The coach still works fully from training data and your reports. Tap TRY AGAIN, or grant read access in Health Connect settings.'
-                : biometricsStatus === 'unavailable'
-                  ? 'Health Connect is not available on this device. The coach runs on training data and your reports — nothing else changes.'
-                  : 'Checking Health Connect…'}
-        </Text>
-        {(biometricsStatus === 'idle' || biometricsStatus === 'denied') && (
+        <Text style={styles.fieldHint}>{healthCopy.hint}</Text>
+        {healthCopy.connectLabel !== null && (
           <Chip
-            label={biometricsStatus === 'idle' ? 'CONNECT' : 'TRY AGAIN'}
+            label={healthCopy.connectLabel}
             selected={false}
             onPress={() => { void requestBiometricsAccess(); }}
-            accessibilityLabel="Connect Health Connect and grant read permissions"
+            accessibilityLabel={healthCopy.connectAccessibilityLabel}
           />
         )}
         {biometricsStatus === 'ready' && (
@@ -535,7 +527,7 @@ export default function ProfileScreen(): React.JSX.Element {
             label="SYNC NOW"
             selected={false}
             onPress={() => { void syncBiometrics(); }}
-            accessibilityLabel="Sync biometrics from Health Connect now"
+            accessibilityLabel={healthCopy.syncAccessibilityLabel}
           />
         )}
       </View>
