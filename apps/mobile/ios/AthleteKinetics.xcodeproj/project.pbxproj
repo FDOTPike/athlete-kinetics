@@ -298,7 +298,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.athletekinetics;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;
 				PRODUCT_NAME = AthleteKinetics;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -327,7 +327,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.athletekinetics;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;
 				PRODUCT_NAME = AthleteKinetics;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";

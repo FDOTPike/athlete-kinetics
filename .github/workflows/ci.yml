@@ -159,7 +159,7 @@ jobs:
       # Xcode/iOS SDK 26+ is the current App Store upload requirement. The job
       # selects the newest installed Xcode of this major and records it.
       XCODE_MAJOR: '26'
-      BUNDLE_ID: com.athletekinetics
+      BUNDLE_ID: com.pikemethods.training
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -221,6 +221,11 @@ jobs:
           tools/ios_simulator_smoke.sh \
             apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
             "$BUNDLE_ID" ios-evidence
+      # Job logs and artifacts live in blob storage some reviewers cannot reach;
+      # the decisive error lines are re-published as API-visible annotations.
+      - name: Annotate the failure
+        if: failure()
+        run: node tools/ci_annotate_failure.mjs ios-evidence/xcodebuild.log ios-evidence/console.log
       - name: Record source and toolchain identity
         if: always()
         run: |

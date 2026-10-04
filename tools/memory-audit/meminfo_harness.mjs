@@ -3,7 +3,7 @@
  * (WO remediation E2, correlation hardened at P1). Drives authorized-device
  * QA sessions:
  *
- *   node tools/memory-audit/meminfo_harness.mjs start   [--package com.athletekinetics.qa]
+ *   node tools/memory-audit/meminfo_harness.mjs start   [--package com.pikemethods.training.qa]
  *   node tools/memory-audit/meminfo_harness.mjs sample --label "cold-launch-baseline"
  *   node tools/memory-audit/meminfo_harness.mjs watch   --interval-ms 250 --duration-s 60 --label auto
  *   node tools/memory-audit/meminfo_harness.mjs finish
@@ -45,7 +45,9 @@ import {
 } from './lifecycle_correlator.mjs';
 import { computeEvidenceBinding } from './evidence_provenance.mjs';
 
-const PACKAGE_DEFAULT = 'com.athletekinetics.qa';
+// The QA variant's real application id (android/app/build.gradle:
+// applicationId com.pikemethods.training + applicationIdSuffix ".qa").
+const PACKAGE_DEFAULT = 'com.pikemethods.training.qa';
 const SESSION_FILE = () => join(evidenceRoot(), 'session.json');
 const PRODUCT_CEILING_BYTES = 450_000_000;
 

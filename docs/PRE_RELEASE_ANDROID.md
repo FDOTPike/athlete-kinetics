@@ -173,7 +173,7 @@ AAB SHA-256 alongside the version code/name used for the build.
 ## 5. Decisions required before the first store candidate
 
 - Confirm public app name (`AthleteKinetics` Android label versus `pikeMethods` in-app brand).
-- Confirm the permanent Play application ID (`com.athletekinetics`).
+- Confirm the permanent Play application ID (`com.pikemethods.training`; QA variant `com.pikemethods.training.qa`). The iOS bundle identifier is the same `com.pikemethods.training`.
 - Supply final icon, launch screen, support URL, privacy-policy URL, and store copy.
 - Complete Play Data Safety and Health Apps/Health Connect declarations.
 - Have the training/medical disclaimer and privacy wording professionally reviewed.
