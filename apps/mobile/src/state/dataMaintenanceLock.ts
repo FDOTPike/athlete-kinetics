@@ -29,8 +29,14 @@ export function dataMutationAllowed(): boolean {
  * is granted while maintenance holds the data or athlete-data boot has not been
  * authorized; backup, restore and startup recovery cannot start while any
  * lease is held. Returns null when the operation must not start. */
-export function tryAcquireDataMutationLease(): (() => void) | null {
-  if (activeOwner !== null || !bootAuthorized) return null;
+export function tryAcquireDataMutationLease(requireIdle: boolean = false): (() => void) | null {
+  // requireIdle: registry-changing actions (switch/create/rename/delete/
+  // settings/onboarding name) are EXCLUSIVE. Each reads the whole registry,
+  // awaits, and writes the whole registry back, so two overlapping ones lose an
+  // edit, and one overlapping an in-flight report or health read would rebind
+  // that work to another athlete. They refuse while any lease is held; ordinary
+  // leases (boot, report, health sync, backup prep) stay non-exclusive.
+  if (activeOwner !== null || !bootAuthorized || (requireIdle && activeMutationLeases > 0)) return null;
   activeMutationLeases += 1;
   let released = false;
   return () => {

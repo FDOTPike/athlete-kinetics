@@ -40,7 +40,7 @@ import {
   type AthleteEntry,
 } from './athleteRegistryCore';
 import { loadRegistry, saveRegistry } from './athleteRegistry';
-import { athleteDataBootAllowed, tryAcquireDataMutationLease } from './dataMaintenanceLock';
+import { activeDataMutationLeaseCount, athleteDataBootAllowed, tryAcquireDataMutationLease } from './dataMaintenanceLock';
 import {
   createHealthSupportStore, SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE,
   type SupportDetails, type SupportFacts, type SupportInstructionInput,
@@ -1157,15 +1157,18 @@ let bootInFlight = false;
  * was started for one athlete (the onboarding interview) captures the value
  * and refuses to write if it has moved on — including a switch away and back.
  *
- * PORT NOTE: the Health Connect ordering work, which is not published yet,
- * introduces a counter with this same name and the same increment points for
- * its own asynchronous guards. This is the minimal part of it that the
- * onboarding binding needs, kept name-compatible so the two reconcile to one
- * counter when that work lands.
+ * Health permission operations, health reads and subjective reports capture
+ * it too (the reviewed async-ownership repair, ported 2026-10-04), so a result
+ * that settles after A -> B -> A can never write into, or change the status
+ * of, an athlete context it did not start in.
  */
 let athleteContextRevision = 0;
 /** Shown when a normal athlete-data action cannot take its mutation lease. */
 const DATA_LOCKED_MESSAGE = 'Athlete data is temporarily locked for backup or restore.';
+/** Exclusive (registry-changing) actions are also refused while ordinary
+ *  athlete work is in flight; say which, so "try again" is truthful. */
+const mutationRefusalMessage = (): string => activeDataMutationLeaseCount() > 0
+  ? 'Athlete data is still being saved or opened. Try again in a moment.' : DATA_LOCKED_MESSAGE;
 
 /** Narrow lifecycle boundary used only by replace-only restore. The restore
  * journal and verified recovery copy already exist before this is called. */
@@ -1310,6 +1313,40 @@ let embedder: Embedder | null = null;
 /** Health Connect bridge; null = device cannot serve biometrics (by design,
  *  nothing else in the app changes — subjective-triage-only routing). */
 let biometrics: BiometricsBridge | null = null;
+/**
+ * Health permission operations are ORDERED (reviewed async-ownership repair,
+ * ported 2026-10-04). Every connect/request/disconnect starts a new revision
+ * bound to the athlete and store context it began in. A result that settles
+ * after a newer operation, an athlete switch (including A -> B -> A), a new
+ * athlete, a restore or a bridge replacement changes nothing: an old
+ * already-granted check can no longer overwrite a newer explicit denial, and
+ * no stale grant starts a read. `pending` marks a startup check that has not
+ * settled for its context, so the post-boot handoff can re-check it read-only.
+ */
+type BiometricsPermissionOperation = {
+  revision: number;
+  intent: 'connect' | 'request' | 'disconnect';
+  athleteContextRevision: number;
+  athleteId: string;
+  pending: boolean;
+};
+let biometricsPermissionOperation: BiometricsPermissionOperation = {
+  revision: 0, intent: 'disconnect', athleteContextRevision: 0, athleteId: 'default', pending: false,
+};
+/** The permission revision whose one automatic post-grant sync already ran. */
+let biometricsBootSyncRevision = -1;
+const beginBiometricsPermissionOperation = (
+  intent: BiometricsPermissionOperation['intent'], pending: boolean, athleteId: string,
+): BiometricsPermissionOperation => {
+  biometricsPermissionOperation = {
+    revision: biometricsPermissionOperation.revision + 1,
+    intent,
+    athleteContextRevision,
+    athleteId,
+    pending,
+  };
+  return biometricsPermissionOperation;
+};
 let codebaseCache: LoadedCodebase | null = null;
 const getCodebase = (): LoadedCodebase => {
   if (codebaseCache === null) {
@@ -2605,7 +2642,48 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
-export const useStore = create<KineticsStore>()((set, get) => ({
+export const useStore = create<KineticsStore>()((set, get) => {
+  /** The ONE automatic sync after a grant settles for the current context. It
+   *  only reads once the athlete's database is hydrated and boot is allowed. */
+  const syncBiometricsAtStartup = async (operation: BiometricsPermissionOperation): Promise<void> => {
+    if (biometricsPermissionOperation.revision !== operation.revision
+      || operation.athleteContextRevision !== athleteContextRevision
+      || operation.athleteId !== get().activeAthleteId
+      || !athleteDataBootAllowed()
+      || get().status !== 'ready'
+      || get().biometricsStatus !== 'ready'
+      || biometrics === null
+      || biometricsBootSyncRevision === operation.revision) return;
+    biometricsBootSyncRevision = operation.revision;
+    await get().syncBiometrics();
+  };
+  /** After a successful full hydration only. Never opens a permission sheet:
+   *  an unfinished startup check (or one for an athlete placeholder the
+   *  registry has since replaced) is re-checked read-only; a completed explicit
+   *  request, denial or disconnect is never superseded; a newer pending
+   *  explicit request is left to settle on its own. Optional native IO runs
+   *  AFTER the boot lease is released. */
+  const handoffBiometricsAfterBoot = (): void => {
+    const operation = biometricsPermissionOperation;
+    const bridge = biometrics;
+    if (bridge === null || operation.athleteContextRevision !== athleteContextRevision
+      || !athleteDataBootAllowed() || get().status !== 'ready') return;
+    if (operation.intent === 'disconnect') return;
+    if (operation.intent === 'request') {
+      if (!operation.pending && operation.athleteId === get().activeAthleteId
+        && get().biometricsStatus === 'ready') {
+        void syncBiometricsAtStartup(operation);
+      }
+      return;
+    }
+    if (operation.pending || operation.athleteId !== get().activeAthleteId
+      || get().biometricsStatus === 'off') {
+      void get().connectBiometrics(bridge);
+    } else if (get().biometricsStatus === 'ready') {
+      void syncBiometricsAtStartup(operation);
+    }
+  };
+  return {
   status: 'booting',
   error: null,
   today: localToday(),
@@ -2985,6 +3063,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       bootInFlight = false;
       releaseBootLease();
     }
+    handoffBiometricsAfterBoot();
     })();
   },
 
@@ -3559,9 +3638,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     }
     if (id === get().activeAthleteId && get().status === 'ready') return;
     // Lease from the registry read through the write, the close and the boot hand-off.
-    const releaseLease = tryAcquireDataMutationLease();
+    const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
-      set({ error: DATA_LOCKED_MESSAGE });
+      set({ error: mutationRefusalMessage() });
       return;
     }
     athleteContextRevision += 1;
@@ -3596,9 +3675,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       set({ error: 'End the active session before adding athletes.' });
       return;
     }
-    const releaseLease = tryAcquireDataMutationLease();
+    const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
-      set({ error: DATA_LOCKED_MESSAGE });
+      set({ error: mutationRefusalMessage() });
       return;
     }
     athleteContextRevision += 1;
@@ -3631,9 +3710,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   renameAthleteEntry: (id, name) => {
-    const releaseLease = tryAcquireDataMutationLease();
+    const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
-      set({ error: DATA_LOCKED_MESSAGE });
+      set({ error: mutationRefusalMessage() });
       return;
     }
     void (async () => {
@@ -3652,9 +3731,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
 
   deleteAthlete: (id) => {
     // The lease also covers the database file removal after the registry write.
-    const releaseLease = tryAcquireDataMutationLease();
+    const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
-      set({ error: DATA_LOCKED_MESSAGE });
+      set({ error: mutationRefusalMessage() });
       return;
     }
     void (async () => {
@@ -3686,9 +3765,9 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
 
   setAdvancedToolsUnlocked: (unlocked) => {
-    const releaseLease = tryAcquireDataMutationLease();
+    const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
-      set({ error: DATA_LOCKED_MESSAGE });
+      set({ error: mutationRefusalMessage() });
       return;
     }
     void (async () => {
@@ -4014,14 +4093,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     });
     get().refreshSport();
     if (get().prescription !== null) get().computePrescription([]);
-    const releaseNameLease = tryAcquireDataMutationLease();
+    // Exclusive: no switch, create, delete or other rename can interleave with
+    // this registry read-modify-write, so the name lands on the athlete who
+    // just finished onboarding and the stale snapshot cannot reset activeId.
+    const releaseNameLease = tryAcquireDataMutationLease(true);
     if (releaseNameLease === null) {
-      set({ error: 'Athlete name not saved — athlete data is locked for backup or restore. You can rename them in the ATHLETE tab.' });
+      set({ error: `Athlete name not saved — ${mutationRefusalMessage()} You can rename them in the ATHLETE tab.` });
       return;
     }
+    // Captured BEFORE the first await: the athlete who completed onboarding.
+    const onboardedAthleteId = get().activeAthleteId;
     void (async () => {
       try {
-        const reg = regRenameAthlete(await loadRegistry(), get().activeAthleteId, athleteName);
+        const reg = regRenameAthlete(await loadRegistry(), onboardedAthleteId, athleteName);
         if (!(await saveRegistry(reg))) {
           set({ error: 'Athlete name not saved — registry write failed. You can rename them in the ATHLETE tab.' });
           return;
@@ -5285,37 +5369,82 @@ export const useStore = create<KineticsStore>()((set, get) => ({
   },
   connectBiometrics: async (bridge) => {
     biometrics = bridge;
+    const athleteId = get().activeAthleteId;
+    const operation = beginBiometricsPermissionOperation(bridge === null ? 'disconnect' : 'connect', bridge !== null, athleteId);
     if (bridge === null) {
       // Health Connect APK missing / not Android / native module failed:
       // the Phase 8 subjective-triage-only path is the whole product here.
       set({ biometricsStatus: 'unavailable' });
       return;
     }
+    const ownsOperation = () => biometricsPermissionOperation.revision === operation.revision;
+    const stillCurrent = () => ownsOperation()
+      && operation.athleteContextRevision === athleteContextRevision
+      && athleteId === get().activeAthleteId && biometrics === bridge && athleteDataBootAllowed();
     try {
       // Boot is READ-ONLY: already-granted -> sync; otherwise wait for the
       // athlete to tap CONNECT. No automatic permission sheet, ever.
-      if (await bridge.hasGrantedPermissions()) {
+      const granted = await bridge.hasGrantedPermissions();
+      if (!ownsOperation()) return; // a newer connect/request/disconnect owns status
+      if (!stillCurrent()) {
+        // The athlete context moved on: this check settled for nobody. Leave it
+        // pending (re-checked after the next successful boot) unless the context
+        // itself was replaced.
+        if (operation.athleteContextRevision !== athleteContextRevision) {
+          biometricsPermissionOperation = { ...operation, pending: false };
+        }
+        return;
+      }
+      biometricsPermissionOperation = { ...operation, pending: false };
+      if (granted) {
         set({ biometricsStatus: 'ready' });
-        await get().syncBiometrics();
+        await syncBiometricsAtStartup(operation);
       } else {
         set({ biometricsStatus: 'idle' });
       }
     } catch {
+      if (!ownsOperation()) return;
+      if (!stillCurrent()) {
+        if (operation.athleteContextRevision !== athleteContextRevision) {
+          biometricsPermissionOperation = { ...operation, pending: false };
+        }
+        return;
+      }
+      biometricsPermissionOperation = { ...operation, pending: false };
       set({ biometricsStatus: 'unavailable' });
     }
   },
 
   requestBiometricsAccess: async () => {
-    if (biometrics === null) return;
+    const bridge = biometrics;
+    const athleteId = get().activeAthleteId;
+    const operation = beginBiometricsPermissionOperation('request', bridge !== null, athleteId);
+    if (bridge === null) return;
+    const ownsOperation = () => biometricsPermissionOperation.revision === operation.revision;
+    const stillCurrent = () => ownsOperation()
+      && operation.athleteContextRevision === athleteContextRevision
+      && athleteId === get().activeAthleteId && biometrics === bridge && athleteDataBootAllowed();
     try {
-      const granted = await biometrics.requestPermissions();
+      const granted = await bridge.requestPermissions();
+      if (!ownsOperation()) return;
+      if (!stillCurrent()) {
+        biometricsPermissionOperation = { ...operation, pending: false };
+        return;
+      }
+      biometricsPermissionOperation = { ...operation, pending: false };
       if (!granted) {
         set({ biometricsStatus: 'denied' });
         return;
       }
       set({ biometricsStatus: 'ready' });
-      await get().syncBiometrics();
+      await syncBiometricsAtStartup(operation);
     } catch {
+      if (!ownsOperation()) return;
+      if (!stillCurrent()) {
+        biometricsPermissionOperation = { ...operation, pending: false };
+        return;
+      }
+      biometricsPermissionOperation = { ...operation, pending: false };
       set({ biometricsStatus: 'denied' });
     }
   },
@@ -5326,8 +5455,23 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     if (get().status !== 'ready' || get().biometricsStatus !== 'ready' || biometrics === null) {
       return;
     }
+    // The lease keeps this athlete's database bound (switch/create/restore are
+    // refused) from the read through the write. Ownership is re-checked after
+    // the native await anyway: a disconnect, denial, reconnect or context
+    // change while reading means the data belongs to no current operation.
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) return;
+    const bridge = biometrics;
+    const permissionRevision = biometricsPermissionOperation.revision;
+    const contextRevision = athleteContextRevision;
+    const athleteId = get().activeAthleteId;
     try {
-      const days = await biometrics.readDaily(7);
+      const days = await bridge.readDaily(7);
+      if (biometricsPermissionOperation.revision !== permissionRevision
+        || athleteContextRevision !== contextRevision
+        || athleteId !== get().activeAthleteId || dbAthleteId !== athleteId
+        || biometrics !== bridge || get().status !== 'ready'
+        || get().biometricsStatus !== 'ready' || !athleteDataBootAllowed()) return;
       if (days.length === 0) return;
       const d = getDb();
       for (const r of days) {
@@ -5362,6 +5506,8 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     } catch {
       // Silent fallback: a biometric failure must never degrade the app
       // below its Phase 8 baseline (training data + subjective reports).
+    } finally {
+      releaseLease();
     }
   },
 
@@ -7357,8 +7503,19 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     const { vector, triaging } = get();
     const today = localToday();
     const raw = text.trim();
-    if (vector === null || triaging) return;
+    if (get().status !== 'ready' || vector === null || triaging) return;
     if (raw.length === 0 || raw.length > 500) return;
+    // The report belongs to the athlete whose database is open NOW. The lease
+    // keeps that database bound through the inference await (switch, create
+    // and restore are refused until it settles), so a delayed safety report
+    // can never be written into — or halt — another athlete.
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) {
+      set({ error: DATA_LOCKED_MESSAGE });
+      return;
+    }
+    const athleteId = get().activeAthleteId;
+    const contextRevision = athleteContextRevision;
     // The UI forces a 1-10 severity before processing; clamp at the boundary.
     const safeSeverity = Math.round(clamp(severity, 1, 10));
     set({ triaging: true });
@@ -7372,6 +7529,14 @@ export const useStore = create<KineticsStore>()((set, get) => ({
         } catch {
           semantic = null;
         }
+      }
+      // Defence in depth behind the lease: never resolve "the current
+      // database" for a report started in another athlete context. Nothing is
+      // written, and the athlete is told so rather than the report vanishing.
+      if (athleteContextRevision !== contextRevision || get().activeAthleteId !== athleteId
+        || dbAthleteId !== athleteId || db === null) {
+        set({ error: 'Your report was not saved because the athlete changed while it was being checked. Please report it again.' });
+        return;
       }
       const resolved = resolveReport(raw, semantic);
       const d = getDb();
@@ -7460,6 +7625,7 @@ export const useStore = create<KineticsStore>()((set, get) => ({
       }
     } finally {
       set({ triaging: false });
+      releaseLease();
     }
   },
 
@@ -7776,4 +7942,5 @@ export const useStore = create<KineticsStore>()((set, get) => ({
     if (current === null) return;
     set({ returnCheckin: { ...current, isDismissed: true } });
   },
-}));
+};
+});
