@@ -1,0 +1,322 @@
+[
+  {
+    "bytes": 60,
+    "path": "app.json",
+    "sha256": "AB79C61688BEC7AF44767292696311202D302483E9256FF361BF3EB3E9CBEDF3"
+  },
+  {
+    "bytes": 1311,
+    "path": "AppDelegate.swift",
+    "sha256": "52B9BA39E405F7BEADB7B0AE6F9FF49A7514E453AAF9621D70DBC81AF1262E8B"
+  },
+  {
+    "bytes": 315,
+    "path": "artifacts-before-completion.json",
+    "sha256": "B9D6822FE569F1687C08591589A491F418D19E62EF8D7E16D983328882891D57"
+  },
+  {
+    "bytes": 4298,
+    "path": "cf4c-decoded-bundled-plists.json",
+    "sha256": "9CA1ED9B724C0D3F66ACF6F8494133FC769A44AEC5DCEACBD6BC364BBF866F8C"
+  },
+  {
+    "bytes": 1458,
+    "path": "cf4c-independent-app-inventory.json",
+    "sha256": "82307D5F061940C1DCAAA33A3FDE0DC68A0059850478C9F5DA1733FE19B1738D"
+  },
+  {
+    "bytes": 3298,
+    "path": "check-report-diagnostics.cjs",
+    "sha256": "2894CE06647907581E66C8ACA77C51A079078AE1D75331CD85CBF22832D511F6"
+  },
+  {
+    "bytes": 9322,
+    "path": "check-source-failures.cjs",
+    "sha256": "0C770B1222C1E7E67C8CD52AA515FB1E019477CBADB12F0FCFC4331057B80A96"
+  },
+  {
+    "bytes": 2692,
+    "path": "ci-merge-commit.json",
+    "sha256": "6C18D4C38A6E99E31EB89EFF15059DE52E13C4922CA88A09978BB9650DB351F7"
+  },
+  {
+    "bytes": 268,
+    "path": "ci-source-tree-match.json",
+    "sha256": "29D3C3EA76717FA4C877768F5525A40774A455B895B15D032EC10AF5FDA02AAD"
+  },
+  {
+    "bytes": 4298,
+    "path": "decoded-plists.log",
+    "sha256": "9CA1ED9B724C0D3F66ACF6F8494133FC769A44AEC5DCEACBD6BC364BBF866F8C"
+  },
+  {
+    "bytes": 51,
+    "path": "diagnostic-cases/never-started/evidence/app-system-log.txt",
+    "sha256": "AC614520FD8DED7130D34DE92F4F58A136D2F74B6EF67B239F313637A47C05AF"
+  },
+  {
+    "bytes": 29,
+    "path": "diagnostic-cases/never-started/evidence/console.log",
+    "sha256": "0D3C0C4E7BA9043529CDD61D78E847E91ECF4F274548D188A0846EBDA39BBD58"
+  },
+  {
+    "bytes": 0,
+    "path": "diagnostic-cases/never-started/evidence/native-smoke.json",
+    "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+  },
+  {
+    "bytes": 2,
+    "path": "diagnostic-cases/never-started/evidence/simulator-selection.json",
+    "sha256": "44136FA355B3678A1146AD16F7E8649E94FB4FC21FE77E8310C060F61CAAFF8A"
+  },
+  {
+    "bytes": 5,
+    "path": "diagnostic-cases/started/container/Documents/ak-native-smoke.started",
+    "sha256": "5994471ABB01112AFCC18159F6CC74B4F511B99806DA59B3CAF5A9C173CACFC5"
+  },
+  {
+    "bytes": 51,
+    "path": "diagnostic-cases/started/evidence/app-system-log.txt",
+    "sha256": "AC614520FD8DED7130D34DE92F4F58A136D2F74B6EF67B239F313637A47C05AF"
+  },
+  {
+    "bytes": 29,
+    "path": "diagnostic-cases/started/evidence/console.log",
+    "sha256": "0D3C0C4E7BA9043529CDD61D78E847E91ECF4F274548D188A0846EBDA39BBD58"
+  },
+  {
+    "bytes": 0,
+    "path": "diagnostic-cases/started/evidence/native-smoke.json",
+    "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+  },
+  {
+    "bytes": 2,
+    "path": "diagnostic-cases/started/evidence/simulator-selection.json",
+    "sha256": "44136FA355B3678A1146AD16F7E8649E94FB4FC21FE77E8310C060F61CAAFF8A"
+  },
+  {
+    "bytes": 259,
+    "path": "diagnostic-mockbin/xcrun",
+    "sha256": "5D226840B729BE909CD1BBF86B7C031972B540A26CBA1531F18A571BD4BDA6EC"
+  },
+  {
+    "bytes": 2362,
+    "path": "exact-missing-report-diagnostics.sh",
+    "sha256": "F1827FB8D2CF6A79B3D0823E8CF8C794C8AD22B0B253A015997487CD5D9B0845"
+  },
+  {
+    "bytes": 2244,
+    "path": "final-artifacts.json",
+    "sha256": "E5D94AD22E1C1BAA7A86A7FC090A8D14CE877F1026EE965174E75DB5259DC991"
+  },
+  {
+    "bytes": 9901,
+    "path": "final-run.json",
+    "sha256": "F60A99484284AD72BBA61D63DD2696E696C1D3A1D3618E663B765C5AC441394E"
+  },
+  {
+    "bytes": 1177,
+    "path": "frozen-file-match.json",
+    "sha256": "33106024DE517871F9811F3CB8A35C0F1C2F0856FCF83A384B50CA1C4630D982"
+  },
+  {
+    "bytes": 187,
+    "path": "independent-native-proof.log",
+    "sha256": "67296511FA90736EE37C7B1514BAF5833C026F40B8326B7CB04BF30B0BE75C9A"
+  },
+  {
+    "bytes": 2714,
+    "path": "independent-real-native-proof.json",
+    "sha256": "A31F5D3AA05E452B81802C7C8B44B50AAD4DFC83C4B46EE8AC41D0DE38394AB9"
+  },
+  {
+    "bytes": 171,
+    "path": "index.js",
+    "sha256": "CFBF495F77AA43F922DA8E737A6F1FBB5B366E5195019E268AB20DCE5EC992CD"
+  },
+  {
+    "bytes": 8616,
+    "path": "IOS_REAUDIT_CF4C221E.md",
+    "sha256": "A1AACCE4C290C9EB278FA8FE342A0951879DC2FC04D9AD716B8F1285BF303C1F"
+  },
+  {
+    "bytes": 7689,
+    "path": "ios_simulator_smoke.sh",
+    "sha256": "53E559933C22FA586566F2760B72B8F921313DB9BB28A373FD99D2FF54582404"
+  },
+  {
+    "bytes": 21729682,
+    "path": "ios-job.log",
+    "sha256": "CF064A85B50476BEF8B06405B333E599A55AE3B457AADE304F57657B5F264AE4"
+  },
+  {
+    "bytes": 1880,
+    "path": "MainActivity.kt",
+    "sha256": "41F81C406BCC8408EE1773C3453C09408F79A7CA7D751CDDBD69B95B2455F782"
+  },
+  {
+    "bytes": 1341,
+    "path": "missing-report-diagnostic-results.json",
+    "sha256": "F959B77DC51B5D2F74D1461C24244912C09B36DF8D1450F5C81CC62E9821CFF5"
+  },
+  {
+    "bytes": 90,
+    "path": "missing-report-diagnostic.log",
+    "sha256": "FBE8335B6D047452037FA00820F8603367FBB3D319DADFD2AD71E293B4FF4D39"
+  },
+  {
+    "bytes": 1639,
+    "path": "native-artifact/app-inspection.json",
+    "sha256": "179284F8DFA500EB1064DAA7DCCB602DDC6BB6336B3CB818D68B2EB7EE7BF7DA"
+  },
+  {
+    "bytes": 54490111,
+    "path": "native-artifact/AthleteKinetics-simulator-unsigned.zip",
+    "sha256": "47EB5936783C8433BCF7D41DCCD31CB5273EFE5F1E28C921E6925DF787BC0145"
+  },
+  {
+    "bytes": 161,
+    "path": "native-artifact/backup-exclusion.json",
+    "sha256": "5A7CDD31A9E60EC71C6E3431ED99EC83192FEF10B481E8AEAF914D9254D90DEE"
+  },
+  {
+    "bytes": 557,
+    "path": "native-artifact/backup-exclusion.swift",
+    "sha256": "9C8CB3CDC62ADF1C3DCDB91C56F59035090B074A16F71C822C1ED5A2DA372D74"
+  },
+  {
+    "bytes": 486,
+    "path": "native-artifact/backup-exclusion.xattr.txt",
+    "sha256": "61DC5B81D379BC695242FFE9E988EADE94A01659A07D64D5C9BDE3307358BC30"
+  },
+  {
+    "bytes": 133,
+    "path": "native-artifact/console.log",
+    "sha256": "69794DA6CB3054E045CBDCD3789F4E11D99C34045BEFCE3F51BAA6C91803B9E6"
+  },
+  {
+    "bytes": 282,
+    "path": "native-artifact/identity.json",
+    "sha256": "786C573ED308E867E74EBA4ED94B67DB4EABF559052C76F26A85C760016AA416"
+  },
+  {
+    "bytes": 667,
+    "path": "native-artifact/native-smoke.json",
+    "sha256": "D3656893420F3EF7744F3C5800CBE1976DBF451B78F64123CCDDFE958F7F32A1"
+  },
+  {
+    "bytes": 74448,
+    "path": "native-artifact/Podfile.lock",
+    "sha256": "7F8467D97EC7D58923B9448D677E753E89624D20AD0E3F3914CCB15D0FA9FD22"
+  },
+  {
+    "bytes": 0,
+    "path": "native-artifact/simctl-create.err",
+    "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+  },
+  {
+    "bytes": 158592,
+    "path": "native-artifact/simctl-inventory.json",
+    "sha256": "3638F0239C9C1DBDB16354EF73F28E37E1CCF154CFBE89BE65D8398BB76D1CA8"
+  },
+  {
+    "bytes": 121,
+    "path": "native-artifact/simulator-selection.json",
+    "sha256": "0C6006AAFD857476F6C57251239E7D53D9D508A0C3C679D8A1F6781FBCAD6647"
+  },
+  {
+    "bytes": 167,
+    "path": "native-artifact/simulator.json",
+    "sha256": "CF0F83A19EEEF83580F9879BB8C2DCFBBD3BB6F06D8B56FA406191C2CBD2E320"
+  },
+  {
+    "bytes": 16142030,
+    "path": "native-artifact/xcodebuild.log",
+    "sha256": "13B76BD12B92AE9A68149F453A259A9B20664E0925C830A83605592A9BDA456B"
+  },
+  {
+    "bytes": 3816,
+    "path": "native-config.log",
+    "sha256": "0A95C6368874405E9BA455330A64CAA09A726611553C350FB97CD076B38EB4C6"
+  },
+  {
+    "bytes": 981,
+    "path": "native-proof-hashes.json",
+    "sha256": "C8BCF70DF3CB0325B207AEBBDD27F6B5899A9774D1A35AB937520FFB13068883"
+  },
+  {
+    "bytes": 206,
+    "path": "native-stage-artifacts.json",
+    "sha256": "403F68509E8CB51BEECE0A4793F73312360C84E4777FC8BAA9263F8689EC82B2"
+  },
+  {
+    "bytes": 8695,
+    "path": "nativeSmoke.ts",
+    "sha256": "38353ECC9662262A1EF49498EE2AFA29D2A0ECB82A0E02322534A8857E9A0071"
+  },
+  {
+    "bytes": 2200,
+    "path": "read-native-artifact.ps1",
+    "sha256": "E061F01125CFA863E78A292BC71E89D82EA2974510E4EF2C6D73D39D97611460"
+  },
+  {
+    "bytes": 732,
+    "path": "read-native-plists.py",
+    "sha256": "239F0C5EBF42BBF7E80D3D4DE5382ACC6839A1DA196F34114EDCC694E91D5AD9"
+  },
+  {
+    "bytes": 9766,
+    "path": "run-before-completion.json",
+    "sha256": "C3C49F6B25417F8FDA2AEEE206B83AEC60FC496026FCECFE5B06E8FC188C4E90"
+  },
+  {
+    "bytes": 9680,
+    "path": "run-first-after-source-proof.json",
+    "sha256": "9D9469DEF432C944D25C2512A4B38E98FD99A0177DDF98EA21DC1C7522D030FB"
+  },
+  {
+    "bytes": 9545,
+    "path": "run-native-stage-followup.json",
+    "sha256": "8A3B993E2D8AD97A5B774378DC21EDE16D23AB7473206F0369538C870A0CA607"
+  },
+  {
+    "bytes": 163,
+    "path": "source-clean-after-checks.json",
+    "sha256": "BAEB92FADFB026D2DC53AD2AD256A8D91DCD58BE4CA6CD763B37907D346010A1"
+  },
+  {
+    "bytes": 40198,
+    "path": "source-delta.json",
+    "sha256": "B363E07AFEF4E220839A094B614BB2BEA3C3CD441A17F1FAAB0F33B42D20405D"
+  },
+  {
+    "bytes": 31084,
+    "path": "source-failure-check-results.json",
+    "sha256": "2B3A7BA53459E3A67C68A48DD177DD5A0D54CC70384CA9688B9E2B41B40978CA"
+  },
+  {
+    "bytes": 813,
+    "path": "source-failure-check.log",
+    "sha256": "42DA0C91CAEF23D8A74573529187E8B4EC7C1A9813BD9201A9907BE24EBFB80B"
+  },
+  {
+    "bytes": 1021,
+    "path": "source-file-hashes.json",
+    "sha256": "9DC6774869C20555ED1440C75085DA72C205B9E69D6265189E552CCB2024D45A"
+  },
+  {
+    "bytes": 269,
+    "path": "unchanged-product-proof.json",
+    "sha256": "7E30AC9455901C6F484E33F50103C258F38FA85F34D17B6264CEFE04D7964EA1"
+  },
+  {
+    "bytes": 12509,
+    "path": "verify_native_config.mjs",
+    "sha256": "FB5CB71E0A1E16E1B1EB98A555E483D5DB7BAFEE5DAE62A6641BA4823EB52CFB"
+  },
+  {
+    "bytes": 5024,
+    "path": "verify-native-evidence.py",
+    "sha256": "4C33C0B59D8AB729B937B2392432238E893786A2D0A48901BCB9FEE6E2FE8FF3"
+  }
+]

@@ -1,0 +1,2533 @@
+{
+  "commit_before": "510127dd54798ad7963139908a2207e73531d119",
+  "git_status_before": "",
+  "source_hashes_before": {
+    "apps/mobile/src/components/movementPreview/canonicalFigure.ts": "83831045a8eb6d984c140b7416d999932ba8db2ce3543de4142681197daf0637",
+    "apps/mobile/src/components/movementPreview/derivation.ts": "10689809b038fbdac8d327f98eb9462409467c869c7daffcaa1e207a7d5b2f02",
+    "apps/mobile/src/components/movementPreview/familyLoaders.ts": "45de338232b712332c4555cad3748dd7f03ff6426a29e518828bb97eeb58ecfa",
+    "apps/mobile/src/components/movementPreview/index.ts": "906bf76bf9afdace6798ce5360097d2ba73bbc6dab80d24dc5dc84955ac266b6",
+    "apps/mobile/src/components/movementPreview/manifest.ts": "a0bd079aa0d89948f252699f4ff5e9c8ffcd36a02f4087d98997d77bbd6a79c6",
+    "apps/mobile/src/components/movementPreview/MovementPreview.tsx": "828033dcdb8cd4f62770584b7b0019bfeaca0822bb37ea099b92e40d5f923173",
+    "apps/mobile/src/components/movementPreview/movementPreviewManifest.json": "a1d647f9bfd03eb04e5d45754583215c921ceb47046aad1fdc411475369320f5",
+    "apps/mobile/src/components/movementPreview/playbackCoordinator.ts": "04530317f8ed5ac59f236c688628a96d4d84cc9d1c5e5a13f5a6489d90601f17",
+    "apps/mobile/src/components/movementPreview/previewIndex.json": "60caf5c7255bd1251a622534ff64edba49c4550666481ffcdad4a47dd8ad1067",
+    "apps/mobile/src/components/movementPreview/families/calf-raise__seated.json": "a5505d974257a0cb3206dbb16e86f5b4eb5158b73316bc59c154863652c282fc",
+    "apps/mobile/src/components/movementPreview/families/calf-raise__standing.json": "48d8d9d37e5216d899e9d88c5e410341aad6a84880eae12a09ec805d5de5900f",
+    "apps/mobile/src/components/movementPreview/families/carry__standing.json": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1",
+    "apps/mobile/src/components/movementPreview/families/dead-bug__supine.json": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json": "53202d5bbade091d9651581c3d10e76a4ee6a75ef7105156bab2e160a4dadac9",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json": "90f47cc370395e1f4f5865771042646b906d2900888920093ff62a1ef0d903c7",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json": "0355638f947b68167280b6cbc4f88b38acd20bf9ce656d3af5abaacd1afa7e23",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json": "2210f422efd0319444802d2cd8efd468d83c8aa47ab4862762c760b64fb60d1c",
+    "apps/mobile/src/components/movementPreview/families/face-pull__standing.json": "5233dd4ac70c38daa6593f753c9db4468c3558cc00e70e8abe7d084060b2576a",
+    "apps/mobile/src/components/movementPreview/families/flye__decline.json": "60d0283ba05520d9d06d402b256c27a22a1abdf883af13161b86d46cbec12113",
+    "apps/mobile/src/components/movementPreview/families/flye__incline.json": "784fef14e0ef35a4bfa3d466de46eff4e22c1e580951abb7afd2294673d9ca93",
+    "apps/mobile/src/components/movementPreview/families/flye__supine.json": "4f288c187ed4fb70fd716de50598dee3fdfe2783628669fffef9ec8cf8576432",
+    "apps/mobile/src/components/movementPreview/families/front-raise__incline.json": "1505c308d5616418497e2892b29cf65cb0d78388969ee26104af3bc9c8502710",
+    "apps/mobile/src/components/movementPreview/families/glute-kickback__standing.json": "505e9b914ec3d576787f88564b17602315032990cdcf9d9d82e8a3bec7f10afc",
+    "apps/mobile/src/components/movementPreview/families/hip-extension__standing.json": "44c367c41f82abf647a5c1e345811d81de06ca12d0d7ce6b7fac16c4e4360e4e",
+    "apps/mobile/src/components/movementPreview/families/hip-extension__supine.json": "02801c78342ba895dcbad701795caacfdc024bc087e6161797f2e53bd9ec3aa4",
+    "apps/mobile/src/components/movementPreview/families/hip-hinge__standing.json": "6f6751402288cee90c3a9276d7dcfbf559beb2f520035aa62e74193b2b9ff6ab",
+    "apps/mobile/src/components/movementPreview/families/horizontal-press__incline.json": "05c62c969d1c4523091218bf6e8bbf25aa3f466c14a1b13d188a50821b39b8ee",
+    "apps/mobile/src/components/movementPreview/families/horizontal-press__supine.json": "f02b4ebdd05b9c1f357cd3cad8c69e43d21a6aa839fbaf5ca343905339f4e3b6",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__bent-over.json": "78eee86c604524a3d53e405052883e28b14de1258b2749a356b20d0a9f412ffd",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__kneeling.json": "65a767fcb91de0319482851a63c4015817ca6f20552fe0c4ebff8120b30b39e9",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__prone-supported.json": "c1bcbcf65a9a102441077080a872b72fbf5d02713288a08ec6b91be89eea85f3",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json": "a690cf1dc453f422f8592c44c5128145f167f1fe84d2d227fb81d66c7deb1146",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json": "9d5ae1ca045621f87d150913f9325718f00f5d1d870552278c443470c37eaa14",
+    "apps/mobile/src/components/movementPreview/families/locomotion__standing.json": "8627d8fc74cda7e64ff7dccdf8b4d32e952dcc96e9a642473327490e2f9f112a",
+    "apps/mobile/src/components/movementPreview/families/lunge__split-stance.json": "d0a6553ca3c4269ecc754cbe9e9e2964eeb6ae6d013ae2122bbbc964ddf39975",
+    "apps/mobile/src/components/movementPreview/families/lunge__standing.json": "faae291edf7a3252d92a98d27193ae6273f66ccf2cdc683d46d01c3ac51e0d65",
+    "apps/mobile/src/components/movementPreview/families/lunge__traveling.json": "642f640bf0ff77c2cc5ccfb61ed8ccd242e1495a5cc4f9702dd53cdaed6872c0",
+    "apps/mobile/src/components/movementPreview/families/pallof__standing.json": "ee1f09ddebd84c55a45a37312d588057a80eefcac2b5a3066e6266a0debb9928",
+    "apps/mobile/src/components/movementPreview/families/plank__prone.json": "69f9360eadca89e88e85cef4f13794c8769e691933ab44abf69e7b42d4525eaa",
+    "apps/mobile/src/components/movementPreview/families/push-up__floor.json": "fabcae79a82c0b5f6b0e4f263410b89f325755ee647cac34240d50e0313b44b0",
+    "apps/mobile/src/components/movementPreview/families/push-up__incline.json": "b239070a3cafbd399da04529c12e9005516e8f0d3633047779a597783638cd72",
+    "apps/mobile/src/components/movementPreview/families/rear-delt__bent-over.json": "45079dda4fff3511b9b1a7c4326f8a2495fe73c0e6408a37c12061caadc34559",
+    "apps/mobile/src/components/movementPreview/families/rear-delt__standing.json": "8c8d59f8f17c91e6e0c3c565daf45ae6bef85dc2ed9649ca0f829a5b3fff3faa",
+    "apps/mobile/src/components/movementPreview/families/shoulder-rotation__standing.json": "e2d89e7ee72d58d876d79764ea6199b72949baae7f65f753a19e4bf2a8f8748d",
+    "apps/mobile/src/components/movementPreview/families/shrug__standing.json": "fe85f671fbe7184a93b3907d9ed667b001b4d6d8c79ac69086619b8de09585e6",
+    "apps/mobile/src/components/movementPreview/families/squat__standing.json": "66349c1d5f3b299174b0182ceca8de0084fa092ad7cef11bec730b2f9af942aa",
+    "apps/mobile/src/components/movementPreview/families/squat__sumo-stance.json": "21dea099db7ccd83678a1e282ada75cf142bdc35ba5df8717151f3752fc46d03",
+    "apps/mobile/src/components/movementPreview/families/straight-arm-pulldown__standing.json": "565c1f2ac2912469e0705dfe4092a2bfa793c34306b44aea4ffeb7778c16567d",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__seated.json": "ebaf8e879b4ab9f444f6eccf99aafab5dc24f702e7f2e42484f8d1ec873fef9d",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__standing.json": "645d759ac6cc21c737c75e3279302ec686839f8a2c0958f9c0ddff4c73f87794",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__supine.json": "8d7390c4c69a33768dcd8cede309e948755a2a161852b1c8df17d8a7f3a150b9",
+    "apps/mobile/src/components/movementPreview/families/trunk-twist__supine.json": "0c2c206b11ab6c6680784d9d9815296fa805632718673a5237979239c6368f68",
+    "apps/mobile/src/components/movementPreview/families/vertical-press__seated.json": "63bce93cd850a244a48192a2294d3f2584fd34c6054a19d258916805a9d08bcd",
+    "apps/mobile/src/components/movementPreview/families/vertical-press__standing.json": "6f8a0773a6c73f5f9914bb9c62c34ba88a97cb82645b7ecf8ed293a348dcfe44",
+    "apps/mobile/src/components/movementPreview/families/vertical-pull__standing.json": "df9712df793faebf96ccde69b9bab7b084c49b30aa5f8839c79aad47a973d7f8",
+    "tools/rendering/render_motion_cycle.mjs": "5e5f091261326f87ccbc408f62a23792fd2c03a0b208e78b8e5220589948fdda",
+    "tools/rendering/lib/canonicalSvg.mjs": "0c6a0d6a0c51a1f4fa49633082ae77f8b4b6bb2330bceb280e6a73471eb974ff",
+    "docs/audits/accessible-coach/movement-completion/KICKBACK_SOURCE_BINDING.json": "8180ce3b835e0078fe1a2973d0e8f6a629c89e44e731d8c07943e4b9a774e865",
+    "packages/core-db/src/schema/017_movement_batch.sql": "7c09a62ffa2e96895d8f4fb04a67d5ce2c55a1b677637a034bbe442599fa13fc",
+    "docs/audits/accessible-coach/movement-completion/FLYE_SOURCE_BINDINGS.json": "f1156cba45162d32b682bc9ba3975c694214a69ded70f48c79c89f16e9cf647b",
+    "packages/core-db/staging/movement_upstream_instructions.json": "6c28b044d749272135157e83fe00c006c9e8de1f58766acdc77f294307330e3e",
+    "packages/core-db/staging/movement_content_correction_v2.json": "6f3103ed7910584eac0b38a36651857e80a1e09625ca28c440fbaec854651b23",
+    "packages/core-db/staging/movement_import.json": "64bb31e29390a5a3c64aea17e855b1338b5762780d5259667b2cc4e39633313c",
+    "packages/core-db/src/schema/025_movement_coaching_content.sql": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d",
+    "packages/core-db/src/schema/068_movement_content_correction_v2.sql": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+  },
+  "scope_ids": [
+    143,
+    53,
+    82,
+    138,
+    163,
+    92,
+    158,
+    253,
+    80,
+    262,
+    292,
+    264,
+    49,
+    178,
+    220,
+    84
+  ],
+  "review_state": "complete",
+  "technique_approval": false,
+  "native_approval": false,
+  "measurements": [
+    {
+      "id": 143,
+      "body": "neutral",
+      "ticks": 159,
+      "totalMs": 5200,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        900,
+        900,
+        1000,
+        2400
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        -2.6645352591003757e-15,
+        -2.6645352591003757e-15
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 10.000000000000002
+    },
+    {
+      "id": 143,
+      "body": "male",
+      "ticks": 159,
+      "totalMs": 5200,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        900,
+        900,
+        1000,
+        2400
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        0,
+        0
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 10
+    },
+    {
+      "id": 143,
+      "body": "female",
+      "ticks": 159,
+      "totalMs": 5200,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        900,
+        900,
+        1000,
+        2400
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        1.0658141036401503e-14,
+        1.0658141036401503e-14
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 10
+    },
+    {
+      "id": 53,
+      "body": "neutral",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 53,
+      "body": "male",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 53,
+      "body": "female",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 82,
+      "body": "neutral",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 82,
+      "body": "male",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 82,
+      "body": "female",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 138,
+      "body": "neutral",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 138,
+      "body": "male",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 138,
+      "body": "female",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 163,
+      "body": "neutral",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 163,
+      "body": "male",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 163,
+      "body": "female",
+      "ticks": 95,
+      "totalMs": 3100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        420,
+        380,
+        1000,
+        650,
+        650
+      ]
+    },
+    {
+      "id": 92,
+      "body": "neutral",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 92,
+      "body": "male",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 92,
+      "body": "female",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 158,
+      "body": "neutral",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 158,
+      "body": "male",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 158,
+      "body": "female",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 253,
+      "body": "neutral",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 253,
+      "body": "male",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 253,
+      "body": "female",
+      "ticks": 162,
+      "totalMs": 5300,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        3000
+      ]
+    },
+    {
+      "id": 80,
+      "body": "neutral",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 80,
+      "body": "male",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 80,
+      "body": "female",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 262,
+      "body": "neutral",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 262,
+      "body": "male",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 262,
+      "body": "female",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 292,
+      "body": "neutral",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 292,
+      "body": "male",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 292,
+      "body": "female",
+      "ticks": 138,
+      "totalMs": 4500,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        650,
+        650,
+        1000,
+        2200
+      ]
+    },
+    {
+      "id": 264,
+      "body": "neutral",
+      "ticks": 147,
+      "totalMs": 4800,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        800,
+        800,
+        600,
+        2600
+      ]
+    },
+    {
+      "id": 264,
+      "body": "male",
+      "ticks": 147,
+      "totalMs": 4800,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        800,
+        800,
+        600,
+        2600
+      ]
+    },
+    {
+      "id": 264,
+      "body": "female",
+      "ticks": 147,
+      "totalMs": 4800,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        800,
+        800,
+        600,
+        2600
+      ]
+    },
+    {
+      "id": 49,
+      "body": "neutral",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        7.993605777301127e-15,
+        7.993605777301127e-15
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 4.198069654272864
+    },
+    {
+      "id": 49,
+      "body": "male",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        -5.329070518200751e-15,
+        -5.329070518200751e-15
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 4.054320859250495
+    },
+    {
+      "id": 49,
+      "body": "female",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        -1.509903313490213e-14,
+        -1.509903313490213e-14
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 4.3471083135297235
+    },
+    {
+      "id": 178,
+      "body": "neutral",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        -2.6645352591003757e-15,
+        -2.6645352591003757e-15
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 4.4608505502657465
+    },
+    {
+      "id": 178,
+      "body": "male",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        1.7763568394002505e-14,
+        1.7763568394002505e-14
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 4.316209588176449
+    },
+    {
+      "id": 178,
+      "body": "female",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        1.5987211554602254e-14,
+        1.5987211554602254e-14
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 4.610694387567449
+    },
+    {
+      "id": 220,
+      "body": "neutral",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        -8.881784197001252e-16,
+        -8.881784197001252e-16
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 5.15881588577308
+    },
+    {
+      "id": 220,
+      "body": "male",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        7.105427357601002e-15,
+        7.105427357601002e-15
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 5.0119428615399855
+    },
+    {
+      "id": 220,
+      "body": "female",
+      "ticks": 126,
+      "totalMs": 4100,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "kn",
+        "an",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        1000,
+        1000,
+        300,
+        1800
+      ],
+      "nativeBoundsFiniteHeadPadGapRange": [
+        -1.7763568394002505e-15,
+        -1.7763568394002505e-15
+      ],
+      "headProjectionInsideRoundedPad": true,
+      "minimumFiniteSupportMargin": 5.310674185528889
+    },
+    {
+      "id": 84,
+      "body": "neutral",
+      "ticks": 135,
+      "totalMs": 4400,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "waist",
+        "el",
+        "wr",
+        "ef",
+        "wf",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        700,
+        700,
+        800,
+        2200
+      ],
+      "hipSweepRangeDeg": [
+        0,
+        25
+      ],
+      "hingeAngleDeg": 14.036243467926477,
+      "upperLegLengthMaxError": 1.0658141036401503e-14,
+      "lowerLegLengthMaxError": 1.0658141036401503e-14,
+      "kneeFlexionDegRange": [
+        4.999999999999773,
+        5.0000000000002105
+      ],
+      "ankleXRange": [
+        32.71138698539725,
+        51.5
+      ],
+      "ankleYRange": [
+        91.79231063659157,
+        95.95764586039269
+      ],
+      "supportFootY": 96,
+      "cuffAttachmentMaxGap": 0,
+      "cableAttachmentMaxGap": 0,
+      "cuffAxisShinPerpendicularityMaxError": 2.6298407895808396e-15,
+      "balanceGripBarY": 31,
+      "balanceGripX": [
+        79.5,
+        74.7
+      ]
+    },
+    {
+      "id": 84,
+      "body": "male",
+      "ticks": 135,
+      "totalMs": 4400,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "waist",
+        "el",
+        "wr",
+        "ef",
+        "wf",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        700,
+        700,
+        800,
+        2200
+      ],
+      "hipSweepRangeDeg": [
+        0,
+        25
+      ],
+      "hingeAngleDeg": 14.036243467926477,
+      "upperLegLengthMaxError": 1.0658141036401503e-14,
+      "lowerLegLengthMaxError": 1.0658141036401503e-14,
+      "kneeFlexionDegRange": [
+        4.999999999999773,
+        5.0000000000002105
+      ],
+      "ankleXRange": [
+        32.71138698539725,
+        51.5
+      ],
+      "ankleYRange": [
+        91.79231063659157,
+        95.95764586039269
+      ],
+      "supportFootY": 96,
+      "cuffAttachmentMaxGap": 0,
+      "cableAttachmentMaxGap": 0,
+      "cuffAxisShinPerpendicularityMaxError": 2.581268532253489e-15,
+      "balanceGripBarY": 31,
+      "balanceGripX": [
+        79.5,
+        74.7
+      ]
+    },
+    {
+      "id": 84,
+      "body": "female",
+      "ticks": 135,
+      "totalMs": 4400,
+      "status": "pending",
+      "stationaryJointKeys": [
+        "hd",
+        "nk",
+        "hp",
+        "waist",
+        "el",
+        "wr",
+        "ef",
+        "wf",
+        "kf",
+        "af"
+      ],
+      "stationaryMaxDrift": 0,
+      "closureMaxGap": 0,
+      "segmentDurationsMs": [
+        700,
+        700,
+        800,
+        2200
+      ],
+      "hipSweepRangeDeg": [
+        0,
+        25
+      ],
+      "hingeAngleDeg": 14.036243467926477,
+      "upperLegLengthMaxError": 1.0658141036401503e-14,
+      "lowerLegLengthMaxError": 1.0658141036401503e-14,
+      "kneeFlexionDegRange": [
+        4.999999999999773,
+        5.0000000000002105
+      ],
+      "ankleXRange": [
+        32.71138698539725,
+        51.5
+      ],
+      "ankleYRange": [
+        91.79231063659157,
+        95.95764586039269
+      ],
+      "supportFootY": 96,
+      "cuffAttachmentMaxGap": 0,
+      "cableAttachmentMaxGap": 0,
+      "cuffAxisShinPerpendicularityMaxError": 2.858824288409778e-15,
+      "balanceGripBarY": 31,
+      "balanceGripX": [
+        79.5,
+        74.7
+      ]
+    }
+  ],
+  "fullCyclePoseSampleCount": 6297,
+  "production_preservation_checks": [
+    {
+      "id": 143,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 2
+    },
+    {
+      "id": 143,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 2
+    },
+    {
+      "id": 143,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 2
+    },
+    {
+      "id": 53,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 53,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 53,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 82,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 82,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 82,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 138,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 138,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 138,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 163,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 163,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 163,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 92,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 92,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 92,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 158,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 158,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 158,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 253,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 253,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 253,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 80,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 80,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 80,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 262,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 262,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 262,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 292,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 292,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 292,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 264,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 264,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 264,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [],
+      "completeProductionPrimitiveArraysIdentical": true,
+      "changedPrimitiveCountMax": 0
+    },
+    {
+      "id": 49,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    },
+    {
+      "id": 49,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    },
+    {
+      "id": 49,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    },
+    {
+      "id": 178,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    },
+    {
+      "id": 178,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    },
+    {
+      "id": 178,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    },
+    {
+      "id": 220,
+      "body": "neutral",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    },
+    {
+      "id": 220,
+      "body": "male",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    },
+    {
+      "id": 220,
+      "body": "female",
+      "timingIdentical": true,
+      "nonHeadJointGapMax": 0,
+      "changedJointKeys": [
+        "hd"
+      ],
+      "completeProductionPrimitiveArraysIdentical": false,
+      "changedPrimitiveCountMax": 5
+    }
+  ],
+  "kickback_source_check": {
+    "source_path": "packages/core-db/src/schema/017_movement_batch.sql",
+    "line": 32,
+    "file_hash_matches": true,
+    "instructions_exact_in_bound_line": true,
+    "cues_exact_in_bound_line": true,
+    "later_025_same_instruction_and_cues": true
+  },
+  "cycle_index_hash": "a80ab50f3f4fad15f22bc8c10ed43c592764aa6322ccbbb4f7980494b81a82f6",
+  "preview_digest": "f89df47e6753659fbd89063c8e50efff31c2debb057eed60abba32fac1a6ae8c",
+  "cycle_source_commit_matches": true,
+  "cycle_sources_committed_at_render": true,
+  "cycle_checks": [
+    {
+      "id": 143,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 143,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 143,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 53,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 53,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 53,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 82,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 82,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 82,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 138,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 138,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 138,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 163,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 163,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 163,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 92,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 92,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 92,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 158,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 158,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 158,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 253,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 253,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 253,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 80,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 80,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 80,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 262,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 262,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 262,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 292,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 292,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 292,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 264,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 264,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 264,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 49,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 49,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 49,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 178,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 178,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 178,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 220,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 220,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 220,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 84,
+      "body": "neutral",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 84,
+      "body": "male",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    },
+    {
+      "id": 84,
+      "body": "female",
+      "png_hash_matches": true,
+      "html_hash_matches": true,
+      "encoded_frame_hash_matches": true,
+      "times_match": true
+    }
+  ],
+  "card_checks": [
+    {
+      "id": 143,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 53,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 42,
+      "all_hashes_match": true
+    },
+    {
+      "id": 82,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 42,
+      "all_hashes_match": true
+    },
+    {
+      "id": 138,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 42,
+      "all_hashes_match": true
+    },
+    {
+      "id": 163,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 42,
+      "all_hashes_match": true
+    },
+    {
+      "id": 92,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 158,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 253,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 80,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 262,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 292,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 264,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 49,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 178,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 220,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    },
+    {
+      "id": 84,
+      "source_commit_matches": true,
+      "sources_committed_at_render": true,
+      "preview_digest_matches": true,
+      "files_checked": 36,
+      "all_hashes_match": true
+    }
+  ],
+  "render_input_hash_mismatches": [],
+  "source_hashes_after": {
+    "apps/mobile/src/components/movementPreview/canonicalFigure.ts": "83831045a8eb6d984c140b7416d999932ba8db2ce3543de4142681197daf0637",
+    "apps/mobile/src/components/movementPreview/derivation.ts": "10689809b038fbdac8d327f98eb9462409467c869c7daffcaa1e207a7d5b2f02",
+    "apps/mobile/src/components/movementPreview/familyLoaders.ts": "45de338232b712332c4555cad3748dd7f03ff6426a29e518828bb97eeb58ecfa",
+    "apps/mobile/src/components/movementPreview/index.ts": "906bf76bf9afdace6798ce5360097d2ba73bbc6dab80d24dc5dc84955ac266b6",
+    "apps/mobile/src/components/movementPreview/manifest.ts": "a0bd079aa0d89948f252699f4ff5e9c8ffcd36a02f4087d98997d77bbd6a79c6",
+    "apps/mobile/src/components/movementPreview/MovementPreview.tsx": "828033dcdb8cd4f62770584b7b0019bfeaca0822bb37ea099b92e40d5f923173",
+    "apps/mobile/src/components/movementPreview/movementPreviewManifest.json": "a1d647f9bfd03eb04e5d45754583215c921ceb47046aad1fdc411475369320f5",
+    "apps/mobile/src/components/movementPreview/playbackCoordinator.ts": "04530317f8ed5ac59f236c688628a96d4d84cc9d1c5e5a13f5a6489d90601f17",
+    "apps/mobile/src/components/movementPreview/previewIndex.json": "60caf5c7255bd1251a622534ff64edba49c4550666481ffcdad4a47dd8ad1067",
+    "apps/mobile/src/components/movementPreview/families/calf-raise__seated.json": "a5505d974257a0cb3206dbb16e86f5b4eb5158b73316bc59c154863652c282fc",
+    "apps/mobile/src/components/movementPreview/families/calf-raise__standing.json": "48d8d9d37e5216d899e9d88c5e410341aad6a84880eae12a09ec805d5de5900f",
+    "apps/mobile/src/components/movementPreview/families/carry__standing.json": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1",
+    "apps/mobile/src/components/movementPreview/families/dead-bug__supine.json": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json": "53202d5bbade091d9651581c3d10e76a4ee6a75ef7105156bab2e160a4dadac9",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json": "90f47cc370395e1f4f5865771042646b906d2900888920093ff62a1ef0d903c7",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json": "0355638f947b68167280b6cbc4f88b38acd20bf9ce656d3af5abaacd1afa7e23",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json": "2210f422efd0319444802d2cd8efd468d83c8aa47ab4862762c760b64fb60d1c",
+    "apps/mobile/src/components/movementPreview/families/face-pull__standing.json": "5233dd4ac70c38daa6593f753c9db4468c3558cc00e70e8abe7d084060b2576a",
+    "apps/mobile/src/components/movementPreview/families/flye__decline.json": "60d0283ba05520d9d06d402b256c27a22a1abdf883af13161b86d46cbec12113",
+    "apps/mobile/src/components/movementPreview/families/flye__incline.json": "784fef14e0ef35a4bfa3d466de46eff4e22c1e580951abb7afd2294673d9ca93",
+    "apps/mobile/src/components/movementPreview/families/flye__supine.json": "4f288c187ed4fb70fd716de50598dee3fdfe2783628669fffef9ec8cf8576432",
+    "apps/mobile/src/components/movementPreview/families/front-raise__incline.json": "1505c308d5616418497e2892b29cf65cb0d78388969ee26104af3bc9c8502710",
+    "apps/mobile/src/components/movementPreview/families/glute-kickback__standing.json": "505e9b914ec3d576787f88564b17602315032990cdcf9d9d82e8a3bec7f10afc",
+    "apps/mobile/src/components/movementPreview/families/hip-extension__standing.json": "44c367c41f82abf647a5c1e345811d81de06ca12d0d7ce6b7fac16c4e4360e4e",
+    "apps/mobile/src/components/movementPreview/families/hip-extension__supine.json": "02801c78342ba895dcbad701795caacfdc024bc087e6161797f2e53bd9ec3aa4",
+    "apps/mobile/src/components/movementPreview/families/hip-hinge__standing.json": "6f6751402288cee90c3a9276d7dcfbf559beb2f520035aa62e74193b2b9ff6ab",
+    "apps/mobile/src/components/movementPreview/families/horizontal-press__incline.json": "05c62c969d1c4523091218bf6e8bbf25aa3f466c14a1b13d188a50821b39b8ee",
+    "apps/mobile/src/components/movementPreview/families/horizontal-press__supine.json": "f02b4ebdd05b9c1f357cd3cad8c69e43d21a6aa839fbaf5ca343905339f4e3b6",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__bent-over.json": "78eee86c604524a3d53e405052883e28b14de1258b2749a356b20d0a9f412ffd",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__kneeling.json": "65a767fcb91de0319482851a63c4015817ca6f20552fe0c4ebff8120b30b39e9",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__prone-supported.json": "c1bcbcf65a9a102441077080a872b72fbf5d02713288a08ec6b91be89eea85f3",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json": "a690cf1dc453f422f8592c44c5128145f167f1fe84d2d227fb81d66c7deb1146",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json": "9d5ae1ca045621f87d150913f9325718f00f5d1d870552278c443470c37eaa14",
+    "apps/mobile/src/components/movementPreview/families/locomotion__standing.json": "8627d8fc74cda7e64ff7dccdf8b4d32e952dcc96e9a642473327490e2f9f112a",
+    "apps/mobile/src/components/movementPreview/families/lunge__split-stance.json": "d0a6553ca3c4269ecc754cbe9e9e2964eeb6ae6d013ae2122bbbc964ddf39975",
+    "apps/mobile/src/components/movementPreview/families/lunge__standing.json": "faae291edf7a3252d92a98d27193ae6273f66ccf2cdc683d46d01c3ac51e0d65",
+    "apps/mobile/src/components/movementPreview/families/lunge__traveling.json": "642f640bf0ff77c2cc5ccfb61ed8ccd242e1495a5cc4f9702dd53cdaed6872c0",
+    "apps/mobile/src/components/movementPreview/families/pallof__standing.json": "ee1f09ddebd84c55a45a37312d588057a80eefcac2b5a3066e6266a0debb9928",
+    "apps/mobile/src/components/movementPreview/families/plank__prone.json": "69f9360eadca89e88e85cef4f13794c8769e691933ab44abf69e7b42d4525eaa",
+    "apps/mobile/src/components/movementPreview/families/push-up__floor.json": "fabcae79a82c0b5f6b0e4f263410b89f325755ee647cac34240d50e0313b44b0",
+    "apps/mobile/src/components/movementPreview/families/push-up__incline.json": "b239070a3cafbd399da04529c12e9005516e8f0d3633047779a597783638cd72",
+    "apps/mobile/src/components/movementPreview/families/rear-delt__bent-over.json": "45079dda4fff3511b9b1a7c4326f8a2495fe73c0e6408a37c12061caadc34559",
+    "apps/mobile/src/components/movementPreview/families/rear-delt__standing.json": "8c8d59f8f17c91e6e0c3c565daf45ae6bef85dc2ed9649ca0f829a5b3fff3faa",
+    "apps/mobile/src/components/movementPreview/families/shoulder-rotation__standing.json": "e2d89e7ee72d58d876d79764ea6199b72949baae7f65f753a19e4bf2a8f8748d",
+    "apps/mobile/src/components/movementPreview/families/shrug__standing.json": "fe85f671fbe7184a93b3907d9ed667b001b4d6d8c79ac69086619b8de09585e6",
+    "apps/mobile/src/components/movementPreview/families/squat__standing.json": "66349c1d5f3b299174b0182ceca8de0084fa092ad7cef11bec730b2f9af942aa",
+    "apps/mobile/src/components/movementPreview/families/squat__sumo-stance.json": "21dea099db7ccd83678a1e282ada75cf142bdc35ba5df8717151f3752fc46d03",
+    "apps/mobile/src/components/movementPreview/families/straight-arm-pulldown__standing.json": "565c1f2ac2912469e0705dfe4092a2bfa793c34306b44aea4ffeb7778c16567d",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__seated.json": "ebaf8e879b4ab9f444f6eccf99aafab5dc24f702e7f2e42484f8d1ec873fef9d",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__standing.json": "645d759ac6cc21c737c75e3279302ec686839f8a2c0958f9c0ddff4c73f87794",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__supine.json": "8d7390c4c69a33768dcd8cede309e948755a2a161852b1c8df17d8a7f3a150b9",
+    "apps/mobile/src/components/movementPreview/families/trunk-twist__supine.json": "0c2c206b11ab6c6680784d9d9815296fa805632718673a5237979239c6368f68",
+    "apps/mobile/src/components/movementPreview/families/vertical-press__seated.json": "63bce93cd850a244a48192a2294d3f2584fd34c6054a19d258916805a9d08bcd",
+    "apps/mobile/src/components/movementPreview/families/vertical-press__standing.json": "6f8a0773a6c73f5f9914bb9c62c34ba88a97cb82645b7ecf8ed293a348dcfe44",
+    "apps/mobile/src/components/movementPreview/families/vertical-pull__standing.json": "df9712df793faebf96ccde69b9bab7b084c49b30aa5f8839c79aad47a973d7f8",
+    "tools/rendering/render_motion_cycle.mjs": "5e5f091261326f87ccbc408f62a23792fd2c03a0b208e78b8e5220589948fdda",
+    "tools/rendering/lib/canonicalSvg.mjs": "0c6a0d6a0c51a1f4fa49633082ae77f8b4b6bb2330bceb280e6a73471eb974ff",
+    "docs/audits/accessible-coach/movement-completion/KICKBACK_SOURCE_BINDING.json": "8180ce3b835e0078fe1a2973d0e8f6a629c89e44e731d8c07943e4b9a774e865",
+    "packages/core-db/src/schema/017_movement_batch.sql": "7c09a62ffa2e96895d8f4fb04a67d5ce2c55a1b677637a034bbe442599fa13fc",
+    "docs/audits/accessible-coach/movement-completion/FLYE_SOURCE_BINDINGS.json": "f1156cba45162d32b682bc9ba3975c694214a69ded70f48c79c89f16e9cf647b",
+    "packages/core-db/staging/movement_upstream_instructions.json": "6c28b044d749272135157e83fe00c006c9e8de1f58766acdc77f294307330e3e",
+    "packages/core-db/staging/movement_content_correction_v2.json": "6f3103ed7910584eac0b38a36651857e80a1e09625ca28c440fbaec854651b23",
+    "packages/core-db/staging/movement_import.json": "64bb31e29390a5a3c64aea17e855b1338b5762780d5259667b2cc4e39633313c",
+    "packages/core-db/src/schema/025_movement_coaching_content.sql": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d",
+    "packages/core-db/src/schema/068_movement_content_correction_v2.sql": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+  },
+  "source_inputs_unchanged": true,
+  "commit_after": "510127dd54798ad7963139908a2207e73531d119",
+  "git_status_after": "",
+  "capture_completed_utc": "2026-10-04T14:02:23.588806+00:00",
+  "outcome": "bounded_mechanics_pass_with_retained_source_hold_and_native_animation_evidence_outstanding",
+  "report": "TECHNIQUE_NATIVE_SUPPORT_V7_REVIEW.md",
+  "report_sha256": "85cd37c7d3d34881e06d0c263492410c61ff75976a9f25252b2025e400e45691",
+  "new_material_technique_findings": [],
+  "retained_findings": [
+    {
+      "finding_id": "V6-2",
+      "priority": "P2",
+      "movement_id": 220,
+      "title": "Curated neutral grip versus imported rotating variant remains unratified",
+      "implementation_contract": "Current committed curated SQL",
+      "acceptance": "Record intended grip variant through owner/source ratification; no guessing or silent restoration."
+    }
+  ],
+  "resolved_prior_findings": [
+    {
+      "finding_id": "V6-1",
+      "scope": "Source-level outer bounds and finite geometric head contact",
+      "result": "Inside SVG outlines mirror native View outer bounds; corrected head targets and extended finite flye pads yield all-body contact within 2e-14 units. No native animation observation or approval."
+    }
+  ],
+  "visually_inspected_cycle_sheet_count": 15,
+  "visually_inspected_card_sheet_count": 15,
+  "cycle_sheet_sample_positions": 12,
+  "animated_browser_playback_observed": false,
+  "native_animation_observed": false,
+  "smoothness_approval": false,
+  "memory_4gb_approval": false,
+  "reviewed_draft_statuses_changed": false,
+  "held_movement_ids_preserved": [
+    135,
+    187
+  ],
+  "source_grip_hold_preserved": [
+    220
+  ],
+  "source_freeze_released_after_completion": true,
+  "review_completed_utc": "2026-10-04T14:02:23.604202+00:00",
+  "review_limits": [
+    "Finite contact is independently measured against native primitive outer bounds; native device animation/pixels were not observed.",
+    "ID220 remains a source/owner grip-choice hold.",
+    "Side-view kickback does not expose frontal pelvic control, finger articulation or complete cuff/body volume.",
+    "Schematic numerical ranges are not universal anatomical targets.",
+    "Storage host measurements do not grant physical technique or phone memory approval; no 4GB acceptance condition was imposed.",
+    "Automatic browser approval rejected local HTML playback due to disallowed protocol; no workaround was used."
+  ],
+  "visually_inspected_files": [
+    "evidence-native-support-v7/movement-84/neutral-cycle.png",
+    "evidence-native-support-v7/movement-84/male-cycle.png",
+    "evidence-native-support-v7/movement-84/female-cycle.png",
+    "evidence-native-support-v7/movement-143/neutral-cycle.png",
+    "evidence-native-support-v7/movement-143/male-cycle.png",
+    "evidence-native-support-v7/movement-143/female-cycle.png",
+    "evidence-native-support-v7/movement-49/neutral-cycle.png",
+    "evidence-native-support-v7/movement-49/male-cycle.png",
+    "evidence-native-support-v7/movement-49/female-cycle.png",
+    "evidence-native-support-v7/movement-178/neutral-cycle.png",
+    "evidence-native-support-v7/movement-178/male-cycle.png",
+    "evidence-native-support-v7/movement-178/female-cycle.png",
+    "evidence-native-support-v7/movement-220/neutral-cycle.png",
+    "evidence-native-support-v7/movement-220/male-cycle.png",
+    "evidence-native-support-v7/movement-220/female-cycle.png",
+    "cards-native-support-v7/movement-84/cable-glute-kickback_neutral_app240_sheet.png",
+    "cards-native-support-v7/movement-84/cable-glute-kickback_neutral_320px_sheet.png",
+    "cards-native-support-v7/movement-84/cable-glute-kickback_neutral_390px_sheet.png",
+    "cards-native-support-v7/movement-143/bent-over-dumbbell-rear-delt-raise-with-head-on-bench_neutral_app240_sheet.png",
+    "cards-native-support-v7/movement-143/bent-over-dumbbell-rear-delt-raise-with-head-on-bench_neutral_320px_sheet.png",
+    "cards-native-support-v7/movement-143/bent-over-dumbbell-rear-delt-raise-with-head-on-bench_neutral_390px_sheet.png",
+    "cards-native-support-v7/movement-49/dumbbell-flye_neutral_app240_sheet.png",
+    "cards-native-support-v7/movement-49/dumbbell-flye_neutral_320px_sheet.png",
+    "cards-native-support-v7/movement-49/dumbbell-flye_neutral_390px_sheet.png",
+    "cards-native-support-v7/movement-178/decline-dumbbell-flyes_neutral_app240_sheet.png",
+    "cards-native-support-v7/movement-178/decline-dumbbell-flyes_neutral_320px_sheet.png",
+    "cards-native-support-v7/movement-178/decline-dumbbell-flyes_neutral_390px_sheet.png",
+    "cards-native-support-v7/movement-220/incline-dumbbell-flyes_neutral_app240_sheet.png",
+    "cards-native-support-v7/movement-220/incline-dumbbell-flyes_neutral_320px_sheet.png",
+    "cards-native-support-v7/movement-220/incline-dumbbell-flyes_neutral_390px_sheet.png"
+  ]
+}

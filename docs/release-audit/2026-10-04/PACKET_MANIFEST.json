@@ -15,14 +15,19 @@
       "sha256": "395c95ae5a78e3fca1c79f8258ab25d9b72a971e48ef45cd1319455a03d6ddce"
     },
     {
-      "path": "CLOUD_CHECK_2026-10-04_2154.json",
-      "bytes": 354,
-      "sha256": "43dd46c3f10cc6578d614ac041e1262a1dad0126ecc02815848afb254a609ff4"
+      "path": "CLAUDE_SESSION_STATUS_2026-10-05.md",
+      "bytes": 3351,
+      "sha256": "32921b4f709767a28f1cf470b937655411cffe0b7cf97c91427fd856b030606d"
     },
     {
       "path": "cloud-steering-2026-10-04-2200.json",
       "bytes": 138,
       "sha256": "5c0645b2f4c5df3d94a5d7203caabc394ea641eab22cbf1b84b618d317b5b7c9"
+    },
+    {
+      "path": "CLOUD_CHECK_2026-10-04_2154.json",
+      "bytes": 354,
+      "sha256": "43dd46c3f10cc6578d614ac041e1262a1dad0126ecc02815848afb254a609ff4"
     },
     {
       "path": "COMPONENT_GATE_OBSERVATION.md",
@@ -35,6 +40,21 @@
       "sha256": "140754c7b66deb86492bfed70154d89d37e3ffda4c90e6ed8de2ee4126fd3013"
     },
     {
+      "path": "ios-recheck-89f6f589/IOS_REAUDIT_89F6F589.md",
+      "bytes": 9863,
+      "sha256": "472b01c85fc70cff2bf607a43e986cd7d0ae21ce24da0dc37bc033f45505289d"
+    },
+    {
+      "path": "ios-recheck-cf4c221e/EVIDENCE_SHA256.json",
+      "bytes": 10274,
+      "sha256": "e3a82b5613ee831f92a001e3b5e6fe1228a0f98f835c068da6759ad026ff111e"
+    },
+    {
+      "path": "ios-recheck-cf4c221e/IOS_REAUDIT_CF4C221E.md",
+      "bytes": 8616,
+      "sha256": "a1aacce4c290c9eb278fa8fe342a0951879dc2fc04d9ad716b8f1285bf303c1f"
+    },
+    {
       "path": "IOS_AUDIT.md",
       "bytes": 15006,
       "sha256": "06856515eca3f06984cf41ea30bed58b8e5a2a2795b4e5e4e0783f995233620a"
@@ -43,6 +63,21 @@
       "path": "migration-upgrade-diagnostic-expanded.json",
       "bytes": 9649,
       "sha256": "9a32165871883b5f0e1f1bb8f171b139e52ce94404c195cd8e1336d7bf7b2918"
+    },
+    {
+      "path": "motion-completion/RUNTIME_NATIVE_SUPPORT_V7_REVIEW.md",
+      "bytes": 14252,
+      "sha256": "914ec16a5283f6979c1eb97bc7f5da29cbfab6851f1307b977e842b0d2259b46"
+    },
+    {
+      "path": "motion-completion/TECHNIQUE_NATIVE_SUPPORT_V7_EVIDENCE.json",
+      "bytes": 75555,
+      "sha256": "4e313f3f057820552219820d1994aab1f846b7114589408ae7ed55f3c4d3f47a"
+    },
+    {
+      "path": "motion-completion/TECHNIQUE_NATIVE_SUPPORT_V7_REVIEW.md",
+      "bytes": 9721,
+      "sha256": "85cd37c7d3d34881e06d0c263492410c61ff75976a9f25252b2025e400e45691"
     },
     {
       "path": "MOVEMENT_COMPLETION_WORK_ORDER.md",
@@ -60,9 +95,19 @@
       "sha256": "a2063f4629a62510c656f2626acd9ee16ee02cb7d07c222984c49fdf05a4134a"
     },
     {
+      "path": "opus-independent-review/recheck-55955f8e/RECHECK_REPORT.md",
+      "bytes": 8784,
+      "sha256": "959413cd350275a2387b9a1956bd4fe50647b60adbd4a36a1f7fa85851aeb487"
+    },
+    {
       "path": "OPUS_AUTONOMOUS_RELEASE_WORK_ORDER.md",
       "bytes": 15643,
       "sha256": "6a4805573ae6cc8a0580e8031436675e44c436a7259903cc25f84cc9c5b518f8"
+    },
+    {
+      "path": "OPUS_CLOUD_HANDOFF_UPDATE.md",
+      "bytes": 2380,
+      "sha256": "ab93c9d4080cded489b38e10f76c92655d5d7bbdd384dcf05ac9653dd735e46e"
     },
     {
       "path": "OPUS_STEERING_2026-10-04_2200.md",
@@ -71,8 +116,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 2110,
-      "sha256": "feff87fed3393b296434feb3346383f28456d06e2cfc9d05414d15da95dd8743"
+      "bytes": 2635,
+      "sha256": "8bc9d4cfe2ec90c85af5c7577701ce425b7e34e5cf9a9034564315d676cf6023"
     },
     {
       "path": "references/apps__mobile__src__App.tsx.txt",
@@ -139,5 +184,8 @@
       "bytes": 17487,
       "sha256": "38bd87a900e3d2f7c40fabb7f4e418746a00acbe7e817d7948ad9ac29500559e"
     }
-  ]
+  ],
+  "updatedAt": "2026-10-04T14:13:44.432300+00:00",
+  "currentOpusCoreSmokeAcceptedSource": "cf4c221ef3993341f903a1d228e94d4893002081",
+  "currentMotionBoundedAuditSource": "510127dd54798ad7963139908a2207e73531d119"
 }
