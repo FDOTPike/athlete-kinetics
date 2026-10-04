@@ -15,7 +15,12 @@
  *
  * Usage:
  *   Animated.timing(v, { duration: motionDuration(theme.motion.state.duration) })
+ *
+ * Components that do more than shorten a duration — a preview that must show
+ * stills instead of motion — read the same flag through `useReduceMotion()`.
+ * ONE module owns this preference so two features can never disagree about it.
  */
+import { useEffect, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
 // Accessibility-first default: reduced until the OS says otherwise.
@@ -29,6 +34,36 @@ void AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
 AccessibilityInfo.addEventListener('reduceMotionChanged', (reduced) => {
   _reduceMotion = reduced;
 });
+
+/** The current preference. Accessibility-first until the OS has answered. */
+export function reduceMotionEnabled(): boolean {
+  return _reduceMotion;
+}
+
+/**
+ * Re-renders its component whenever the OS reduced-motion preference changes.
+ * Mounting re-asks the OS as well: the module-level answer can predate a change
+ * made while the app was backgrounded, and a mount is the cheapest place to
+ * correct it. Each mount keeps its own OS subscription so the component stops
+ * hearing about changes the moment it unmounts.
+ */
+export function useReduceMotion(): boolean {
+  const [reduced, setReduced] = useState(reduceMotionEnabled);
+  useEffect(() => {
+    let alive = true;
+    const apply = (value: boolean): void => {
+      _reduceMotion = value;
+      if (alive) setReduced(value);
+    };
+    void AccessibilityInfo.isReduceMotionEnabled().then(apply);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', apply);
+    return () => {
+      alive = false;
+      subscription.remove();
+    };
+  }, []);
+  return reduced;
+}
 
 /**
  * Returns `requestedMs` if reduced-motion is OFF, or `0` if it is ON.

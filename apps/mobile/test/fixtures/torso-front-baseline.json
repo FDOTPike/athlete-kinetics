@@ -1,0 +1,31 @@
+{
+  "sourceCommit": "b6b32b7140bcf066aa24205eeb1ab7ef1a620c17",
+  "layoutSha256": "d664eddffc8177b93ae2f73b88e86e46b978e2e2eb0d6a869e427c3f75a748cf",
+  "manifestSha256": "b84ab3c8fa0d601ba632dad578cb099085afd4e094e2f43e1e78f265f3bc647a",
+  "cases": [
+    {
+      "movementId": 19,
+      "body": "male",
+      "samples": 17,
+      "sha256": "0afb579fe94dbbdb87722bfaaffb0ea07493bcedb69d48963a24068399e5f217"
+    },
+    {
+      "movementId": 19,
+      "body": "female",
+      "samples": 17,
+      "sha256": "50c30a0bb039ac58a80849c9444f846f0130a854b646434ce64f0fe0002d984f"
+    },
+    {
+      "movementId": 62,
+      "body": "male",
+      "samples": 9,
+      "sha256": "b66e07a6224ed6ede5f487f1e7b6fec2733898a1dba32f5e731a860f5e8c81b2"
+    },
+    {
+      "movementId": 62,
+      "body": "female",
+      "samples": 9,
+      "sha256": "3e35364c1eea04c02c345d4247b13fd21b4f2f7aac0578fada3213ee52654e2f"
+    }
+  ]
+}

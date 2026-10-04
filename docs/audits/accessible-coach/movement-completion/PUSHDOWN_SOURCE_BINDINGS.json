@@ -1,0 +1,53 @@
+{
+  "scope": "Source binding for pending high-pulley pushdown drafts; not approval",
+  "catalogueSourceCommit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+  "primaryArchive": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/dist/exercises.json",
+  "archiveSha256": "5bb747e3fc658f095a60dcbf6d53c96627acdcc6ffb6fffde86f7e26995d40bf",
+  "movements": [
+    {
+      "id": 80,
+      "name": "Triceps Pushdown",
+      "assetKey": "movement/triceps-pushdown/demo/v1",
+      "repoProvenance": {
+        "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+        "relative_path": "packages/core-db/src/schema/025_movement_coaching_content.sql",
+        "line": 127,
+        "file_sha256": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d"
+      },
+      "instructions": "Set the elbows beside the ribs at a high cable and take a small step back so the line of pull stays live. Press to a strong lockout and hold it for a beat. Return until the forearms pass parallel; if the elbows drift forward, reduce the load and restore the triceps-led path.",
+      "cues": "Elbows glued to the ribs. Squeeze the lockout for a beat. Ride the cable back up under full control.",
+      "gripAuthority": "Attach a straight or angled bar to a high pulley and grab with an overhand grip (palms facing down) at shoulder width.",
+      "primaryRecordSha256": "57bb0767032ef66d31e6e2c5efa4c043e3679842819f1f964c4f1fc1ea6c4636"
+    },
+    {
+      "id": 262,
+      "name": "Reverse Grip Triceps Pushdown",
+      "assetKey": "movement/reverse-grip-triceps-pushdown/demo/v1",
+      "repoProvenance": {
+        "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+        "relative_path": "packages/core-db/src/schema/068_movement_content_correction_v2.sql",
+        "line": 835,
+        "file_sha256": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+      },
+      "instructions": "Stand facing a high pulley and take the bar with a shoulder-width underhand grip, then bring it down until the elbows are at your sides and bent. Keeping the upper arms still against the body, straighten the elbows until the arms are fully extended beside the thighs. Let the bar rise slowly until the forearms are level with the chest.",
+      "cues": "Elbows pinned to the sides. Only the forearms move. Return slowly.",
+      "gripAuthority": "Start by setting a bar attachment (straight or e-z) on a high pulley machine.",
+      "primaryRecordSha256": "543abf1d85c980b3796973fdbcd2a8eeef85591e787f577b9255a8a7e5c74ba5"
+    },
+    {
+      "id": 292,
+      "name": "Triceps Pushdown - Rope Attachment",
+      "assetKey": "movement/triceps-pushdown-rope-attachment/demo/v1",
+      "repoProvenance": {
+        "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+        "relative_path": "packages/core-db/src/schema/068_movement_content_correction_v2.sql",
+        "line": 979,
+        "file_sha256": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+      },
+      "instructions": "Attach a rope to a high pulley and hold the ends with the palms facing each other, standing tall with the upper arms against the body and the forearms pointing up toward the pulley. Keeping the upper arms still, straighten the elbows and bring the rope ends down to the sides of the thighs. Pause, then let the rope rise slowly to the start.",
+      "cues": "Upper arms stay against the body. Spread the rope at the bottom. Return slowly.",
+      "gripAuthority": "Attach a rope attachment to a high pulley and grab with a neutral grip (palms facing each other).",
+      "primaryRecordSha256": "450c521885a09d851cf6d12aa581891fbffc509b223f6627435446e05249d809"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "source": {
+    "id": 52,
+    "name": "Dumbbell Reverse Lunge",
+    "source": {
+      "instructions": "Stand tall with a dumbbell in each hand and step one foot back, lowering until the back knee hovers above the floor. Drive through the whole front foot to return to standing. The backward step lets the working foot stay planted; if the front heel lifts, shorten the step and reset the balance.",
+      "cues": "The front leg does the work — the back leg just catches you. Torso tall and stacked. Place the step back soft and controlled.",
+      "coaching_intent": "Train one leg at a time with a backward step that keeps the working foot planted throughout the rep.",
+      "pattern": "lunge",
+      "primary_muscle": "quadriceps",
+      "is_compound": 1,
+      "base_name": "Lunge",
+      "difficulty_rating": "Beginner",
+      "supported_prefixes": [
+        "DB"
+      ],
+      "target_muscles": [
+        "quadriceps",
+        "calves",
+        "glutes",
+        "hamstrings"
+      ],
+      "category": "unilateral",
+      "implement": "dumbbell",
+      "taxonomy_family": "lunge",
+      "asset_key": "movement/dumbbell-reverse-lunge/demo/v1",
+      "media_status": "external_fallback",
+      "revision": 1,
+      "equipment": [
+        "dumbbells"
+      ],
+      "instructions_provenance": {
+        "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+        "relative_path": "packages/core-db/src/schema/025_movement_coaching_content.sql",
+        "line": 65,
+        "file_sha256": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d"
+      },
+      "owner_ratification": "not_established_by_this_audit"
+    },
+    "preview_baseline": {
+      "record_exists": false,
+      "committed_on_feature12a": false,
+      "legacy_family": null,
+      "legacy_status": null,
+      "derive_from": null,
+      "raw_frame_count": 0,
+      "global_technique_review": "pending",
+      "approved_by_this_audit": false
+    },
+    "in_legacy_174_beginner_scope": true,
+    "motion": {
+      "physical_family": "reverse-lunge",
+      "representation": "planar_joint_and_equipment_candidate",
+      "decision": "author_draft_then_independent_technique_and_runtime_review",
+      "review_views": "side plus front",
+      "family_constraints": "Step backward then return. 194 begins on low platform and rear foot steps off; cannot reuse level-floor contacts unchanged.",
+      "source_setup_sentence": "Stand tall with a dumbbell in each hand and step one foot back, lowering until the back knee hovers above the floor.",
+      "source_action_and_return_sentences": [
+        "Drive through the whole front foot to return to standing.",
+        "The backward step lets the working foot stay planted; if the front heel lifts, shorten the step and reset the balance."
+      ],
+      "rom_and_tempo_authority": "Stand tall with a dumbbell in each hand and step one foot back, lowering until the back knee hovers above the floor. Drive through the whole front foot to return to standing. The backward step lets the working foot stay planted; if the front heel lifts, shorten the step and reset the balance. Cues: The front leg does the work — the back leg just catches you. Torso tall and stacked. Place the step back soft and controlled.",
+      "per_id_cautions": "Backward step followed by return to original front-foot stance; not walking/forward lunge alias.",
+      "source_hold_reason": null,
+      "technique_approval": "unreviewed"
+    },
+    "priority": 1
+  },
+  "schematic": {
+    "legSegments": [
+      22.25,
+      22.25
+    ],
+    "footLength": 5.4,
+    "rearHeelRise": 3.3,
+    "peakHipY": 68.4,
+    "torsoLength": 24
+  },
+  "acceptance": "unreviewed; supplemental front alignment and native evidence pending"
+}

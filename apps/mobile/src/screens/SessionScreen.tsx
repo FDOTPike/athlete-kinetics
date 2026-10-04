@@ -19,6 +19,7 @@ import {
   RestTimerCard,
 } from '../components/ui';
 import { PreparationPanel } from '../components/PreparationPanel';
+import { MovementPreview } from '../components/movementPreview/MovementPreview';
 
 
 type SessionMode = 'guided' | 'self_directed';
@@ -1272,6 +1273,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           accessibilityLabel={detailsOpen ? "How and why, expanded" : "How and why, collapsed"}
                         >
                           <View style={{ gap: theme.space[3] }}>
+                            {movement != null && <MovementPreview movement={movement} compact />}
                             {movement?.coachingIntent != null && <Text style={styles.intent}>{movement.coachingIntent}</Text>}
                             {setup.length > 0 && (
                               <View style={styles.copyGroup}>
