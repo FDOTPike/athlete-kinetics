@@ -12,7 +12,8 @@
  *     production migration chain applies to a fresh native database;
  *   - the bundled, pinned MiniLM model loads in onnxruntime and a known phrase
  *     routes to its own codebase entry (tokenizer + inference + routing);
- *   - the native CSPRNG (react-native-get-random-values) is installed;
+ *   - the native CSPRNG the encrypted backup uses (mobileBackupCrypto.randomBytes,
+ *     a direct RNGetRandomValues TurboModule call with no fallback) works;
  *   - the normal store boots to "ready" against a fresh install.
  * The result is written to Documents/ak-native-smoke.json and logged with an
  * `[ak-native-smoke]` marker for the macOS CI job to collect. Content-free:
@@ -23,6 +24,7 @@ import { loadCodebase, triage, type PhraseCodebase } from '@ak/inference';
 import { BACKUP_SCHEMA_USER_VERSION, closeKineticsDb, migrate, openKineticsDb } from '@ak/core-db';
 import { tryCreateDeviceEmbedder } from '../inference/deviceEmbedder';
 import { useStore } from '../state/useStore';
+import { mobileBackupCrypto } from '../state/backupCrypto';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 
@@ -97,13 +99,15 @@ export async function runNativeSmoke(): Promise<void> {
     return `dims=384 norm=${norm.toFixed(6)} routed=${entry.id} similarity=${routed.similarity.toFixed(6)}`;
   });
 
-  await step(checks, 'native CSPRNG', () => {
-    const bytes = new Uint8Array(32);
-    const cryptoApi = (globalThis as { crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array } }).crypto;
-    if (typeof cryptoApi?.getRandomValues !== 'function') throw new Error('crypto.getRandomValues missing');
-    cryptoApi.getRandomValues(bytes);
-    if (bytes.every((b) => b === 0)) throw new Error('all-zero random bytes');
-    return 'getRandomValues ok';
+  // The exact production entropy path of encrypted backups (no global polyfill
+  // is installed, by design): two independent draws of the documented sizes.
+  await step(checks, 'native CSPRNG (backup provider)', () => {
+    const a = mobileBackupCrypto.randomBytes(32);
+    const b = mobileBackupCrypto.randomBytes(32);
+    if (!(a instanceof Uint8Array) || a.length !== 32 || b.length !== 32) throw new Error(`lengths ${a.length}/${b.length}`);
+    if (a.every((x) => x === 0) || b.every((x) => x === 0)) throw new Error('all-zero random bytes');
+    if (a.every((x, i) => x === b[i])) throw new Error('two draws were identical');
+    return 'RNGetRandomValues via mobileBackupCrypto.randomBytes: 2 x 32 bytes, distinct';
   });
 
   await step(checks, 'store boot', async () => {

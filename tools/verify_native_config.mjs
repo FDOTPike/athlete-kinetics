@@ -78,6 +78,9 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
   const prefix = embedder.match(/MODEL_PIN_PREFIX = '([0-9a-f]+)'/)?.[1];
   check('deviceEmbedder pin prefix matches the ratified model SHA-256',
     prefix !== undefined && prefix.length >= 16 && KNOWN_SHA256['onnx/model_quantized.onnx'].startsWith(prefix), prefix);
+  const smoke = read('apps/mobile/src/diagnostics/nativeSmoke.ts');
+  check('the native smoke exercises the production backup CSPRNG, not a global polyfill',
+    /mobileBackupCrypto\.randomBytes\(/.test(smoke) && !/globalThis[^;\n]*crypto/.test(smoke));
   check('iOS opens the bundled model in place (no Documents copy)', /Platform\.OS === 'ios'[\s\S]{0,200}MainBundleDir/.test(embedder));
   const stage = read('scripts/stage-native-embedder.mjs');
   check('the staging script verifies against KNOWN_SHA256 and never downloads',
