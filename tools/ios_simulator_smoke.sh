@@ -18,7 +18,9 @@ trap 'code=$?; echo "::error title=native smoke::line $LINENO exit $code: $BASH_
 
 # The newest available iOS runtime, and an iPhone that runtime itself lists as
 # supported (an arbitrary device type may not run on the newest runtime).
-read -r RUNTIME DEVICE_TYPE < <(xcrun simctl list runtimes -j | node -e '
+# The full inventory is kept as evidence of what the runner offered.
+xcrun simctl list -j runtimes devicetypes > "$OUT/simctl-inventory.json"
+read -r RUNTIME DEVICE_TYPE < <(node -e '
   let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
     const rs=JSON.parse(s).runtimes.filter(r=>r.isAvailable&&r.platform==="iOS")
       .sort((a,b)=>a.version.localeCompare(b.version,undefined,{numeric:true}));
@@ -29,9 +31,13 @@ read -r RUNTIME DEVICE_TYPE < <(xcrun simctl list runtimes -j | node -e '
     const pick=(plain.length?plain:phones).at(-1);
     if(!pick){console.error("runtime "+rt.identifier+" lists no supported iPhone");process.exit(1);}
     process.stdout.write(rt.identifier+" "+pick.identifier+"\n");
-  });')
+  });' < "$OUT/simctl-inventory.json")
 echo "runtime=$RUNTIME deviceType=$DEVICE_TYPE"
-UDID=$(xcrun simctl create ak-native-smoke "$DEVICE_TYPE" "$RUNTIME")
+printf '{"runtime":"%s","deviceType":"%s"}\n' "$RUNTIME" "$DEVICE_TYPE" > "$OUT/simulator-selection.json"
+if ! UDID=$(xcrun simctl create ak-native-smoke "$DEVICE_TYPE" "$RUNTIME" 2> "$OUT/simctl-create.err"); then
+  echo "::error title=native smoke::simctl create failed for $DEVICE_TYPE on $RUNTIME: $(tr '\n' ' ' < "$OUT/simctl-create.err" | cut -c1-600)"
+  exit 1
+fi
 cleanup() { xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 printf '{"runtime":"%s","deviceType":"%s","udid":"%s"}\n' "$RUNTIME" "$DEVICE_TYPE" "$UDID" > "$OUT/simulator.json"
