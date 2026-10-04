@@ -21,6 +21,7 @@ claims a device pass, a signed build or a store submission.
 | R2 iOS source | op-sqlite math flags at the root; read-only Apple Health adapter; pinned MiniLM staged into the app bundle; HealthKit entitlement; display name, font, launch screen; iOS backup exclusion of app data; CI-only native smoke. | `verify:native-config` (24th gate), `AppleHealthBridge`, `DeviceBackupPolicy` |
 | Apple resting heart rate | `069_resting_heart_rate` (append-only): `resting_hr_daily` keeps resting HR per local date with its unit (bpm), source (`apple_health`/`health_connect`) and sync time, independent of RMSSD. A later read of a date replaces it; an empty or failed read deletes nothing. Backup contract v68. | `verify:migrations` [069], `verify:backup`, `verify:store`, `AppleHealthBridge`, `BackupForwardRestore` |
 | Identity | One app identity on both platforms: `com.pikemethods.training` (QA: `.qa`). The memory harness now defaults to the real QA package. | `verify:native-config` [N5] |
+| iOS Files restore type (P2, independent recheck of `cf4c221`) | Restore handed the Files sheet `application/octet-stream`; the installed picker (12.0.2) maps iOS types with `UTType(identifier)`, so it resolved to nothing. iOS now gets the library's own all-files identifier `public.item` (`.pmbak` has no system type); Android keeps its MIME filter; encrypted validation, size refusal before copy and restore isolation are unchanged. | `BackupPickerBoundary` (real library JS, native stub only; fails on the old code), native smoke "Files import types resolve natively", [N8] |
 
 ### iOS signal parity — what iOS does and does not have
 - **Sleep:** read and used for readiness, same meaning as Android.
@@ -53,6 +54,28 @@ NitroModules' Swift/C++ interop, a runtime-supported simulator pair, the smoke
 checking the production CSPRNG instead of an absent global, and the iOS app
 launching the component the JS bundle registers (`pikeMethods`; it launched the
 template name `AthleteKinetics` and never mounted).
+
+**User-interaction tests (XCUITest, same job, after the smoke).** A UI-test
+target drives the shipped Release bundle on a fresh simulator, one freshly
+installed app per test: (1) onboarding and every primary/header destination
+with Apple's accessibility audit; (2) Dynamic Type — text and a text field
+measured at the largest accessibility size; (3) Apple Health — Don't Allow on
+HealthKit's real sheet, honest wording, a second athlete and switching never
+reopening the sheet; (4) an encrypted backup saved to Files, a cancelled Files
+sheet, then a restore of the saved `.pmbak` with preview and replace; (5) a
+workout set logged, background and return, then a cold relaunch that resumes
+the same session. Throughout, the app process's internet sockets are sampled
+once a second (offline evidence: the simulator shares the host network, so
+this observes rather than enforces isolation). The tests are built ad-hoc for
+the simulator (identity "-", no team); the job checks the HealthKit entitlement
+in the binary's `__TEXT,__entitlements` section.
+
+**Native reproducibility.** `Podfile.lock` (byte-identical to the lock the
+audited `cf4c221` build resolved, SHA-256 `7f8467d9…`) and the exact results
+of React Native's post-install (aggregated privacy manifest, `RCTNewArchEnabled`,
+project settings — blob hashes equal to CI's post-install output) are
+committed; CI runs `pod install --deployment` and fails if any tracked file
+changes.
 
 Status on this branch: see §6 (filled from CI, never assumed).
 
@@ -106,8 +129,17 @@ Host (Linux, Node 24) on `55955f8`: full component suite 60/60 suites, 995
 tests; every gate green. Independent external recheck at `55955f8`: no open
 product defect.
 
+User-interaction tests: first native run (`4add9de`) — Dynamic Type passed
+(text 14 → 100 pt at AX XXXL) and 311 socket samples saw no internet socket;
+the audit reported Dynamic Type on the Library search field (an RN text field;
+now measured in test 2 and classified only for that pairing), the HealthKit
+sheet and the Files location were not found, and the workout result was lost
+to the annotation limit. Diagnostics, annotations and those findings were
+addressed; **the UI tests are not yet green and are not claimed.**
+
 **Not claimed:** this is simulator evidence only — no signed build, no
-physical device, no TestFlight, and not the 4 GB memory test (§5).
+physical device, no real Health data, no VoiceOver session, no TestFlight, no
+motion acceptance, and not the 4 GB memory test (§5).
 
 ## 7. Dependency audit (npm audit)
 66 findings → 57 after semver-compatible build-tool updates; never

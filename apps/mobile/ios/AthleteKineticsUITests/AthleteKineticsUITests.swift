@@ -221,7 +221,7 @@ final class AthleteKineticsUITests: XCTestCase {
         // reported. Everything else fails the test.
         let fieldTypes: [XCUIElement.ElementType] = [.textField, .secureTextField, .searchField]
         if issue.auditType == .dynamicType, let el = issue.element, fieldTypes.contains(el.elementType) {
-          log("A11Y-MEASURED \(screen) [dynamicType] RN text field \(el.label.prefix(60)): scaling measured in test2")
+          self.log("A11Y-MEASURED \(screen) [dynamicType] RN text field \(el.label.prefix(60)): scaling measured in test2")
           return true
         }
         issues.append("\(screen) [\(issue.auditType.rawValue)] \(issue.compactDescription) @ \(who)")

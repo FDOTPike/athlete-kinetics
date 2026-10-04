@@ -214,10 +214,12 @@ jobs:
             echo "::warning::Podfile.lock is not committed; resolving a new lock (uploaded as an artifact for review)."
             bundle exec pod install
           fi
-      # The source identity check needs to know exactly what pod install
-      # rewrote in tracked files (e.g. the project file or the aggregated
-      # privacy manifest), not just that the tree is dirty.
-      - name: Record tracked files changed by pod install
+      # Reproducibility: with the committed Podfile.lock and the committed
+      # results of React Native's post-install (aggregated privacy manifest,
+      # RCTNewArchEnabled, project settings), pod install must leave every
+      # tracked file unchanged. Any change fails closed and is published
+      # verbatim for review.
+      - name: Pod install leaves tracked files unchanged (fails closed)
         run: |
           mkdir -p ios-evidence
           git status --porcelain --untracked-files=no > ios-evidence/pod-install-tracked-status.txt
@@ -231,9 +233,10 @@ jobs:
               const esc = (t) => t.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
               const parts = []; for (let i = 0; i < d.length; i += 3500) parts.push(d.slice(i, i + 3500));
               parts.slice(0, 8).forEach((p, i) => console.log(`::notice title=pod install diff ${i + 1}/${parts.length}::${esc(p)}`));'
-          else
-            echo "::notice title=pod install tracked changes::none — the tracked tree is unchanged by pod install"
+            echo "::error title=pod install tracked changes::pod install changed tracked files; commit the published diff or fix its cause"
+            exit 1
           fi
+          echo "::notice title=pod install tracked changes::none — the tracked tree is unchanged by pod install --deployment"
       - name: Build unsigned Release for the simulator
         working-directory: apps/mobile/ios
         run: |

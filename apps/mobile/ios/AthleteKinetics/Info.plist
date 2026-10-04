@@ -31,6 +31,14 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSHealthShareUsageDescription</key>
+	<string>pikeMethods reads your sleep and resting heart rate from Apple Health, only if you choose to share them. Sleep adjusts how hard each session should be; resting heart rate is kept with your measured days. It never writes to Apple Health. Your data stays on this device unless you export an encrypted backup yourself.</string>
+	<key>RCTNewArchEnabled</key>
+	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Archivo-VariableFont_wdth,wght.ttf</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -45,11 +53,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-	<key>NSHealthShareUsageDescription</key>
-	<string>pikeMethods reads your sleep and resting heart rate from Apple Health, only if you choose to share them. Sleep adjusts how hard each session should be; resting heart rate is kept with your measured days. It never writes to Apple Health. Your data stays on this device unless you export an encrypted backup yourself.</string>
-	<key>UIAppFonts</key>
-	<array>
-		<string>Archivo-VariableFont_wdth,wght.ttf</string>
-	</array>
 </dict>
 </plist>
