@@ -15,7 +15,8 @@
  *        no empty usage strings, display name, fonts.
  *   [N4] HealthKit entitlement wired on both configurations; read-only.
  *   [N5] identity: no React Native template bundle identifier; the iOS bundle
- *        identifier equals the permanent Android application id.
+ *        identifier equals the permanent Android application id; iOS and
+ *        Android launch the component the JS bundle registers (app.json name).
  *   [N6] Apple Health / Nitro autolink on iOS only; Health Connect Android only.
  *   [N7] the Archivo font shipped on iOS is the same hash-pinned file Android ships.
  *   [N8] privacy manifest present; Android device backup stays disabled.
@@ -128,6 +129,13 @@ console.log('[N5] identity');
   const androidId = read('apps/mobile/android/app/build.gradle').match(/applicationId "([^"]+)"/)?.[1];
   check('the iOS bundle identifier is the permanent Android application id', ids.length === 1 && ids[0] === androidId,
     `${ids[0]} vs ${androidId}`);
+  const registered = JSON.parse(read('apps/mobile/app.json')).name;
+  const iosModule = read('apps/mobile/ios/AthleteKinetics/AppDelegate.swift').match(/withModuleName:\s*"([^"]+)"/)?.[1];
+  const androidModule = read('apps/mobile/android/app/src/main/java/com/athletekinetics/MainActivity.kt')
+    .match(/getMainComponentName\(\)[^=]*=\s*"([^"]+)"/)?.[1];
+  check('iOS and Android launch the component the JS bundle registers (app.json name)',
+    typeof registered === 'string' && iosModule === registered && androidModule === registered,
+    `registered=${registered} ios=${iosModule} android=${androidModule}`);
   check('no development team is committed (owner-supplied at signing time)', !/DEVELOPMENT_TEAM = [A-Z0-9]{10};/.test(pbx));
 }
 

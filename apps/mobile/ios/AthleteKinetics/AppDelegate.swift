@@ -24,7 +24,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     window = UIWindow(frame: UIScreen.main.bounds)
 
     factory.startReactNative(
-      withModuleName: "AthleteKinetics",
+      withModuleName: "pikeMethods", // must equal app.json "name" (AppRegistry) and Android getMainComponentName
       in: window,
       launchOptions: launchOptions
     )
