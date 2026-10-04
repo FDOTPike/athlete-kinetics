@@ -10,7 +10,7 @@
 # simulator identity) is written to <out-dir> for upload.
 set -euo pipefail
 APP="$1"; BUNDLE_ID="$2"; OUT="$3"
-TIMEOUT_S="${AK_SMOKE_TIMEOUT_S:-240}"
+TIMEOUT_S="${AK_SMOKE_TIMEOUT_S:-600}"  # above the in-app bound (each step <= 90 s)
 mkdir -p "$OUT"
 # Any failing command is published as an API-visible annotation (job logs and
 # artifacts are not reachable from every reviewer environment).
@@ -64,6 +64,23 @@ done
 kill "$LAUNCH_PID" >/dev/null 2>&1 || true
 
 if [ -z "$REPORT" ]; then
+  # Diagnostics for a missing report, each published as an annotation: did the
+  # smoke start, is the app still running, did it crash, what did it log.
+  DATA=${DATA:-$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data 2>/dev/null || true)}
+  if [ -n "$DATA" ] && [ -f "$DATA/Documents/ak-native-smoke.started" ]; then STARTED=yes; else STARTED=no; fi
+  RUNNING=$(xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -c "$BUNDLE_ID" || true)
+  echo "::error title=native smoke::no report within ${TIMEOUT_S}s (smoke started=$STARTED, app processes running=$RUNNING)"
+  xcrun simctl spawn "$UDID" log show --last 20m --style compact \
+    --predicate "process == \"AthleteKinetics\" OR eventMessage CONTAINS \"ak-native-smoke\"" > "$OUT/app-system-log.txt" 2>&1 || true
+  grep -iE "ak-native-smoke|fault|error|exception|terminat" "$OUT/app-system-log.txt" | tail -6 | cut -c1-400 \
+    | while IFS= read -r line; do echo "::error title=native smoke app log::$line"; done || true
+  mkdir -p "$OUT/crash-reports"
+  find "$HOME/Library/Logs/DiagnosticReports" -name 'AthleteKinetics*' -newer "$OUT/simulator-selection.json" -exec cp {} "$OUT/crash-reports/" \; 2>/dev/null || true
+  for crash in "$OUT"/crash-reports/*; do
+    [ -f "$crash" ] || continue
+    grep -E '"exception"|"termination"|"type"|"signal"|"codes"|Exception Type|Termination Reason|Crashed Thread' "$crash" | head -6 | cut -c1-400 \
+      | while IFS= read -r line; do echo "::error title=native smoke crash::$(basename "$crash"): $line"; done || true
+  done
   # Fallback channel: the console marker.
   if grep -o '\[ak-native-smoke\] .*' "$OUT/console.log" | head -1 | sed 's/^\[ak-native-smoke\] //' > "$OUT/native-smoke.json" && [ -s "$OUT/native-smoke.json" ]; then
     echo "report recovered from the console marker"

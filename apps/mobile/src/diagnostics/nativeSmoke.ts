@@ -34,6 +34,13 @@ import phraseVectorsJson from '../../../../packages/inference/assets/phrase-code
 export const NATIVE_SMOKE_SETTING = 'AKNativeSmoke';
 const SMOKE_DB = 'ak_native_smoke.db';
 const RESULT_FILE = 'ak-native-smoke.json';
+const STARTED_FILE = 'ak-native-smoke.started';
+/** A step that has not settled by then is recorded as failed (the smoke always
+ *  produces a report instead of waiting forever on one native call). */
+const STEP_TIMEOUT_MS = 90_000;
+
+type BlobFs = { dirs: { DocumentDir: string }; writeFile(path: string, data: string, encoding: 'utf8'): Promise<unknown> };
+const blobFs = (): BlobFs => (require('react-native-blob-util') as { default: { fs: BlobFs } }).default.fs;
 
 export function nativeSmokeRequested(): boolean {
   if (Platform.OS !== 'ios') return false;
@@ -49,16 +56,24 @@ export function nativeSmokeRequested(): boolean {
 type Check = { name: string; ok: boolean; detail: string };
 
 async function step(checks: Check[], name: string, run: () => Promise<string> | string): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    checks.push({ name, ok: true, detail: await run() });
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`did not settle within ${STEP_TIMEOUT_MS} ms`)), STEP_TIMEOUT_MS);
+    });
+    checks.push({ name, ok: true, detail: await Promise.race([Promise.resolve().then(run), timeout]) });
   } catch (error) {
     checks.push({ name, ok: false, detail: error instanceof Error ? error.message : String(error) });
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
 export async function runNativeSmoke(): Promise<void> {
   const checks: Check[] = [];
   const startedAt = Date.now();
+  // Proof the smoke started at all (CI distinguishes "never ran" from "hung").
+  try { await blobFs().writeFile(`${blobFs().dirs.DocumentDir}/${STARTED_FILE}`, String(startedAt), 'utf8'); } catch { /* reported below */ }
 
   await step(checks, 'sqlite math functions', () => {
     const db = openKineticsDb(SMOKE_DB);
@@ -143,7 +158,9 @@ export async function runNativeSmoke(): Promise<void> {
   const text = JSON.stringify(result);
   console.log(`[ak-native-smoke] ${text}`);
   try {
-    const blob = (require('react-native-blob-util') as typeof import('react-native-blob-util')).default;
-    await blob.fs.writeFile(`${blob.fs.dirs.DocumentDir}/${RESULT_FILE}`, text, 'utf8');
-  } catch { /* the console marker is the fallback channel */ }
+    await blobFs().writeFile(`${blobFs().dirs.DocumentDir}/${RESULT_FILE}`, text, 'utf8');
+  } catch (error) {
+    // Release builds drop console.log; an error-level log reaches the system log.
+    console.error(`[ak-native-smoke] report write failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
