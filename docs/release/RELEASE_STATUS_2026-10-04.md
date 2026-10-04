@@ -75,5 +75,9 @@ download test and has **not** been measured or passed. Use
 ## 6. Results on the branch tip
 _To be filled from the CI run and the local suites on the final tip._
 
-## 7. Dependency audit (npm audit, 66 findings)
-_To be filled after triage._
+## 7. Dependency audit (npm audit)
+66 findings → 57 after semver-compatible build-tool updates; never
+`npm audit fix --force`. Release Metro bundles (both platforms, source-mapped)
+contain no package with an advisory of its own: every finding is build, test
+or developer tooling. Deferred items and their reasons:
+[DEPENDENCY_AUDIT_2026-10-04.md](DEPENDENCY_AUDIT_2026-10-04.md).
