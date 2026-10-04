@@ -101,8 +101,12 @@ console.log('[L1] frozen SQL bytes, ordinals and registry parity');
 }
 
 // --- harness ------------------------------------------------------------------
+// Every connection is tracked so cleanup can close them all before removing
+// the work directory (Windows refuses to delete a file that is still open).
+const openConnections = new Set();
 function openDb(path = ':memory:') {
   const raw = new DatabaseSync(path);
+  openConnections.add(raw);
   raw.exec('PRAGMA foreign_keys = ON;');
   try { raw.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
     raw.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
@@ -403,6 +407,9 @@ console.log('[L7] backup schema contract recognises exactly the known lineage va
   check('equivalence registry holds exactly one reviewed entry', contract.KNOWN_LINEAGE_SQL_EQUIVALENTS.length === 1);
 }
 
-rmSync(work, { recursive: true, force: true });
+for (const raw of openConnections) {
+  try { if (raw.isOpen !== false) raw.close(); } catch { /* already closed by its test */ }
+}
+rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 console.log(`\n${fail === 0 ? 'ALL LINEAGE CHECKS PASSED' : `${fail} LINEAGE CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);
