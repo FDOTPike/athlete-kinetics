@@ -34,7 +34,7 @@ read -r RUNTIME DEVICE_TYPE < <(node -e '
   });' < "$OUT/simctl-inventory.json")
 echo "runtime=$RUNTIME deviceType=$DEVICE_TYPE"
 printf '{"runtime":"%s","deviceType":"%s"}\n' "$RUNTIME" "$DEVICE_TYPE" > "$OUT/simulator-selection.json"
-if ! UDID=$(xcrun simctl create ak-native-smoke "$DEVICE_TYPE" "$RUNTIME" 2> "$OUT/simctl-create.err"); then
+if ! UDID=$(xcrun simctl create ak-smoke-device "$DEVICE_TYPE" "$RUNTIME" 2> "$OUT/simctl-create.err"); then
   echo "::error title=native smoke::simctl create failed for $DEVICE_TYPE on $RUNTIME: $(tr '\n' ' ' < "$OUT/simctl-create.err" | cut -c1-600)"
   exit 1
 fi
@@ -116,6 +116,7 @@ SWIFT
 xattr -l "$DATA/Documents" "$DATA/Library" > "$OUT/backup-exclusion.xattr.txt" 2>&1 || true
 if xcrun swift "$OUT/backup-exclusion.swift" "$DATA/Documents" "$DATA/Library" > "$OUT/backup-exclusion.json"; then
   echo "BACKUP EXCLUSION VERIFIED: $(cat "$OUT/backup-exclusion.json")"
+  echo "::notice title=native smoke backup exclusion::$(cat "$OUT/backup-exclusion.json")"
 else
   echo "error: Documents/Library are not excluded from backup: $(cat "$OUT/backup-exclusion.json")" >&2
   exit 1
@@ -125,6 +126,8 @@ node -e '
   const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
   for (const c of r.checks) console.log(`  ${c.ok ? "PASS" : "FAIL"}  ${c.name}  [${c.detail}]`);
   for (const c of r.checks.filter((x) => !x.ok)) console.log(`::error title=native smoke check::${c.name}: ${String(c.detail).slice(0, 400)}`);
+  // Passed checks too, so the result is readable through the API, not only the artifact.
+  for (const c of r.checks.filter((x) => x.ok)) console.log(`::notice title=native smoke check::PASS ${c.name}: ${String(c.detail).slice(0, 300)}`);
   if (r.schema !== "ak.native-smoke/1" || r.ok !== true) { console.error("NATIVE SMOKE FAILED"); process.exit(1); }
   console.log("NATIVE SMOKE PASSED");
 ' "$OUT/native-smoke.json"

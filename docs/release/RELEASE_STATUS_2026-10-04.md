@@ -37,11 +37,22 @@ claims a device pass, a signed build or a store submission.
 ## 2. Unsigned native proof (CI, no signing)
 
 The `ios-simulator` job (macOS 26, Xcode 26) builds an unsigned Release app for
-the simulator, inspects the built artifact (bundle, pinned model hash, font,
-privacy manifest, Info.plist, op-sqlite math flags) and launches it with
-`-AKNativeSmoke 1`, which checks SQLite math, the full migration chain, embedder
-inference and routing, the CSPRNG and a clean boot. The Android job builds the
-debug-key QA and debug APKs.
+the simulator, inspects the built artifact (executable present, bundle, pinned
+model hash, font, privacy manifest, Info.plist, op-sqlite math flags) and
+launches it on an iPhone the newest runtime itself supports, with
+`-AKNativeSmoke 1`. The in-app smoke checks SQLite math, the full migration
+chain, embedder inference and routing, the production backup CSPRNG
+(`mobileBackupCrypto.randomBytes`), this launch's device-backup exclusion and
+a clean boot; the script then reads the REAL `isExcludedFromBackup` resource
+values of the app's Documents and Library directories from the host. Every
+step fails closed. The Android job builds the debug-key QA and debug APKs.
+
+Getting there on Xcode 26 took five real fixes, each found from CI evidence:
+fmt 11.0.2 consteval (fmtlib/fmt#4740), glog's namespace-included headers for
+NitroModules' Swift/C++ interop, a runtime-supported simulator pair, the smoke
+checking the production CSPRNG instead of an absent global, and the iOS app
+launching the component the JS bundle registers (`pikeMethods`; it launched the
+template name `AthleteKinetics` and never mounted).
 
 Status on this branch: see §6 (filled from CI, never assumed).
 
@@ -73,7 +84,30 @@ download test and has **not** been measured or passed. Use
 `com.pikemethods.training.qa`).
 
 ## 6. Results on the branch tip
-_To be filled from the CI run and the local suites on the final tip._
+
+First fully green head: `cf4c221` (CI run on PR #26):
+
+| Job | Result |
+| --- | --- |
+| Verification suite (24 gates + typecheck) | success |
+| Android QA + debug APKs | success |
+| iOS unsigned Release simulator build | success (≈18 min) |
+| iOS built-app inspection | success |
+| iOS simulator native smoke + backup-exclusion readback | success (≈5 min) |
+
+The smoke step passes only when the report is `ak.native-smoke/1` with
+`ok: true` and every check passing, and both directories read back excluded,
+so a green step implies all of those held. The detailed report, the
+resource-value JSON and the simulator inventory are in the run's artifact
+(binding them to the exact head is the independent auditor's step); later
+runs also publish each passed check as an API-visible notice.
+
+Host (Linux, Node 24) on `55955f8`: full component suite 60/60 suites, 995
+tests; every gate green. Independent external recheck at `55955f8`: no open
+product defect.
+
+**Not claimed:** this is simulator evidence only — no signed build, no
+physical device, no TestFlight, and not the 4 GB memory test (§5).
 
 ## 7. Dependency audit (npm audit)
 66 findings → 57 after semver-compatible build-tool updates; never
