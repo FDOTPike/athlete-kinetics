@@ -1,0 +1,47 @@
+{
+  "runtime": "v24.11.1",
+  "scope": "Host storage and retained JSON-clone regression only; no native peak memory/frame-timing/4GBphone acceptance",
+  "records": 138,
+  "families": 47,
+  "rawBytes": 406094,
+  "gzipBytes": 61699,
+  "largestFamily": {
+    "file": "horizontal-press__supine.json",
+    "rawBytes": 40322
+  },
+  "singleFamily": {
+    "samples": [
+      90576,
+      93912,
+      94072,
+      94072,
+      94304
+    ],
+    "medianBytes": 94072
+  },
+  "allFamilies": {
+    "samples": [
+      1098000,
+      1097232,
+      1097104,
+      1097232,
+      1097104
+    ],
+    "medianBytes": 1097232
+  },
+  "budgets": {
+    "rawBytes": 1048576,
+    "gzipBytes": 196608,
+    "familyBytes": 65536,
+    "singleFamilyMaxBytes": 262144,
+    "allFamiliesMaxBytes": 2097152
+  },
+  "checks": {
+    "aggregateRaw": true,
+    "aggregateGzip": true,
+    "everyFamily": true,
+    "singleFamilyClone": true,
+    "allFamiliesClone": true
+  },
+  "pass": true
+}

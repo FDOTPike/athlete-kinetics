@@ -1,0 +1,6 @@
+{
+  "commit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+  "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+  "sourceSha256": "8b2627a4421e39d2e5c4f66abbf87c682f089d66ea5799d304605d1b73c35d45",
+  "transpileMethod": "TypeScript transpileModule for runtime negative control; current source typechecked separately"
+}

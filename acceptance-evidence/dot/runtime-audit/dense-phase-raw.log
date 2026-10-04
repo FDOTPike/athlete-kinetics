@@ -1,0 +1,53 @@
+{
+  "sourceCommit": "cad9de98fe9173a7533c294f7a62fd6ba9ea35b7",
+  "checked": 12003,
+  "motions": [
+    {
+      "body": "neutral",
+      "phaseSamples": 4001,
+      "lengthError": 2.1316282072803006e-14,
+      "connectionError": 0,
+      "frontGapError": 0,
+      "rearPenetration": 0,
+      "rearContactGapBoxUnits": 1.4210854715202004e-14,
+      "rearContactGapDp": 3.552713678800501e-14,
+      "kneeHoverBoxUnits": 3.4181453695771404,
+      "kneeHoverDp": 8.54536342394285,
+      "maxBoundaryJump": 1.257813376124955e-10,
+      "minimumRearLiftBoxUnits": 1.1167562167894118,
+      "closed": true
+    },
+    {
+      "body": "male",
+      "phaseSamples": 4001,
+      "lengthError": 1.7763568394002505e-14,
+      "connectionError": 0,
+      "frontGapError": 0,
+      "rearPenetration": 1.4210854715202004e-14,
+      "rearContactGapBoxUnits": 1.4210854715202004e-14,
+      "rearContactGapDp": 3.552713678800501e-14,
+      "kneeHoverBoxUnits": 3.1820973396601153,
+      "kneeHoverDp": 7.9552433491502885,
+      "maxBoundaryJump": 1.2473850632608892e-10,
+      "minimumRearLiftBoxUnits": 1.1167562167893976,
+      "closed": true
+    },
+    {
+      "body": "female",
+      "phaseSamples": 4001,
+      "lengthError": 2.1316282072803006e-14,
+      "connectionError": 0,
+      "frontGapError": 0,
+      "rearPenetration": 0,
+      "rearContactGapBoxUnits": 1.4210854715202004e-14,
+      "rearContactGapDp": 3.552713678800501e-14,
+      "kneeHoverBoxUnits": 3.6542093461847323,
+      "kneeHoverDp": 9.13552336546183,
+      "maxBoundaryJump": 1.2690363996479602e-10,
+      "minimumRearLiftBoxUnits": 1.1167562167893976,
+      "closed": true
+    }
+  ],
+  "errors": [],
+  "pass": true
+}

@@ -1,0 +1,1045 @@
+{
+  "head": "cad9de98fe9173a7533c294f7a62fd6ba9ea35b7",
+  "tree": "d430fad5a52c2970845844162637e2b213611278",
+  "branch": "codex/dot-movement-completion-2026-10-05",
+  "source": [
+    {
+      "path": "apps/mobile/src/components/movementPreview/MovementPreview.tsx",
+      "sha256": "828033dcdb8cd4f62770584b7b0019bfeaca0822bb37ea099b92e40d5f923173"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "sha256": "4764737a266ab57c15f411501059cb5295ce77a2f7857b4f152b677084b128af"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/derivation.ts",
+      "sha256": "10689809b038fbdac8d327f98eb9462409467c869c7daffcaa1e207a7d5b2f02"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/calf-raise__seated.json",
+      "sha256": "a5505d974257a0cb3206dbb16e86f5b4eb5158b73316bc59c154863652c282fc"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/calf-raise__standing.json",
+      "sha256": "48d8d9d37e5216d899e9d88c5e410341aad6a84880eae12a09ec805d5de5900f"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/carry__standing.json",
+      "sha256": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/dead-bug__supine.json",
+      "sha256": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json",
+      "sha256": "53202d5bbade091d9651581c3d10e76a4ee6a75ef7105156bab2e160a4dadac9"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json",
+      "sha256": "90f47cc370395e1f4f5865771042646b906d2900888920093ff62a1ef0d903c7"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json",
+      "sha256": "0355638f947b68167280b6cbc4f88b38acd20bf9ce656d3af5abaacd1afa7e23"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json",
+      "sha256": "2210f422efd0319444802d2cd8efd468d83c8aa47ab4862762c760b64fb60d1c"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/face-pull__standing.json",
+      "sha256": "5233dd4ac70c38daa6593f753c9db4468c3558cc00e70e8abe7d084060b2576a"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/flye__decline.json",
+      "sha256": "60d0283ba05520d9d06d402b256c27a22a1abdf883af13161b86d46cbec12113"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/flye__incline.json",
+      "sha256": "784fef14e0ef35a4bfa3d466de46eff4e22c1e580951abb7afd2294673d9ca93"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/flye__supine.json",
+      "sha256": "4f288c187ed4fb70fd716de50598dee3fdfe2783628669fffef9ec8cf8576432"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/front-raise__incline.json",
+      "sha256": "1505c308d5616418497e2892b29cf65cb0d78388969ee26104af3bc9c8502710"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/glute-kickback__standing.json",
+      "sha256": "505e9b914ec3d576787f88564b17602315032990cdcf9d9d82e8a3bec7f10afc"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/hip-extension__standing.json",
+      "sha256": "44c367c41f82abf647a5c1e345811d81de06ca12d0d7ce6b7fac16c4e4360e4e"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/hip-extension__supine.json",
+      "sha256": "02801c78342ba895dcbad701795caacfdc024bc087e6161797f2e53bd9ec3aa4"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/hip-hinge__standing.json",
+      "sha256": "6f6751402288cee90c3a9276d7dcfbf559beb2f520035aa62e74193b2b9ff6ab"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/horizontal-press__incline.json",
+      "sha256": "05c62c969d1c4523091218bf6e8bbf25aa3f466c14a1b13d188a50821b39b8ee"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/horizontal-press__supine.json",
+      "sha256": "f02b4ebdd05b9c1f357cd3cad8c69e43d21a6aa839fbaf5ca343905339f4e3b6"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/horizontal-pull__bent-over.json",
+      "sha256": "78eee86c604524a3d53e405052883e28b14de1258b2749a356b20d0a9f412ffd"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/horizontal-pull__kneeling.json",
+      "sha256": "65a767fcb91de0319482851a63c4015817ca6f20552fe0c4ebff8120b30b39e9"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/horizontal-pull__prone-supported.json",
+      "sha256": "c1bcbcf65a9a102441077080a872b72fbf5d02713288a08ec6b91be89eea85f3"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json",
+      "sha256": "a690cf1dc453f422f8592c44c5128145f167f1fe84d2d227fb81d66c7deb1146"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json",
+      "sha256": "9d5ae1ca045621f87d150913f9325718f00f5d1d870552278c443470c37eaa14"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/locomotion__standing.json",
+      "sha256": "8627d8fc74cda7e64ff7dccdf8b4d32e952dcc96e9a642473327490e2f9f112a"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/lunge__reverse.json",
+      "sha256": "94d1b96239d8b96c0713fbd793c6ff8714b8e79787cd83c9db378d162234fa4e"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/lunge__split-stance.json",
+      "sha256": "d0a6553ca3c4269ecc754cbe9e9e2964eeb6ae6d013ae2122bbbc964ddf39975"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/lunge__standing.json",
+      "sha256": "faae291edf7a3252d92a98d27193ae6273f66ccf2cdc683d46d01c3ac51e0d65"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/lunge__traveling.json",
+      "sha256": "642f640bf0ff77c2cc5ccfb61ed8ccd242e1495a5cc4f9702dd53cdaed6872c0"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/pallof__standing.json",
+      "sha256": "ee1f09ddebd84c55a45a37312d588057a80eefcac2b5a3066e6266a0debb9928"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/plank__prone.json",
+      "sha256": "69f9360eadca89e88e85cef4f13794c8769e691933ab44abf69e7b42d4525eaa"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/push-up__floor.json",
+      "sha256": "fabcae79a82c0b5f6b0e4f263410b89f325755ee647cac34240d50e0313b44b0"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/push-up__incline.json",
+      "sha256": "b239070a3cafbd399da04529c12e9005516e8f0d3633047779a597783638cd72"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/rear-delt__bent-over.json",
+      "sha256": "45079dda4fff3511b9b1a7c4326f8a2495fe73c0e6408a37c12061caadc34559"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/rear-delt__standing.json",
+      "sha256": "8c8d59f8f17c91e6e0c3c565daf45ae6bef85dc2ed9649ca0f829a5b3fff3faa"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/shoulder-rotation__standing.json",
+      "sha256": "e2d89e7ee72d58d876d79764ea6199b72949baae7f65f753a19e4bf2a8f8748d"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/shrug__standing.json",
+      "sha256": "fe85f671fbe7184a93b3907d9ed667b001b4d6d8c79ac69086619b8de09585e6"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/squat__standing.json",
+      "sha256": "66349c1d5f3b299174b0182ceca8de0084fa092ad7cef11bec730b2f9af942aa"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/squat__sumo-stance.json",
+      "sha256": "21dea099db7ccd83678a1e282ada75cf142bdc35ba5df8717151f3752fc46d03"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/straight-arm-pulldown__standing.json",
+      "sha256": "565c1f2ac2912469e0705dfe4092a2bfa793c34306b44aea4ffeb7778c16567d"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/trunk-flex__seated.json",
+      "sha256": "ebaf8e879b4ab9f444f6eccf99aafab5dc24f702e7f2e42484f8d1ec873fef9d"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/trunk-flex__standing.json",
+      "sha256": "645d759ac6cc21c737c75e3279302ec686839f8a2c0958f9c0ddff4c73f87794"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/trunk-flex__supine.json",
+      "sha256": "8d7390c4c69a33768dcd8cede309e948755a2a161852b1c8df17d8a7f3a150b9"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/trunk-twist__supine.json",
+      "sha256": "0c2c206b11ab6c6680784d9d9815296fa805632718673a5237979239c6368f68"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/vertical-press__seated.json",
+      "sha256": "63bce93cd850a244a48192a2294d3f2584fd34c6054a19d258916805a9d08bcd"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/vertical-press__standing.json",
+      "sha256": "6f8a0773a6c73f5f9914bb9c62c34ba88a97cb82645b7ecf8ed293a348dcfe44"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/families/vertical-pull__standing.json",
+      "sha256": "df9712df793faebf96ccde69b9bab7b084c49b30aa5f8839c79aad47a973d7f8"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/familyLoaders.ts",
+      "sha256": "7fabec6b351ec48946676ec7d70d346c6e3a39f32e000df21f83a6b3d75437a3"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/index.ts",
+      "sha256": "906bf76bf9afdace6798ce5360097d2ba73bbc6dab80d24dc5dc84955ac266b6"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/manifest.ts",
+      "sha256": "eb0c03bfa345262357fea319923379d328bd9b0db9f69b4427d70f4c57bbc468"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/movementPreviewManifest.json",
+      "sha256": "41ea5f1cea3a6e918b50a3c9e1a22009402e57e3315134176d7ea4b3bf934771"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/playbackCoordinator.ts",
+      "sha256": "04530317f8ed5ac59f236c688628a96d4d84cc9d1c5e5a13f5a6489d90601f17"
+    },
+    {
+      "path": "apps/mobile/src/components/movementPreview/previewIndex.json",
+      "sha256": "d7b94a57668344bcc505251effef48c92a3d1c55d1a4b0251d99edf214e42c2e"
+    },
+    {
+      "path": "apps/mobile/src/components/ui/motionDuration.ts",
+      "sha256": "8fd56170512e7a024be72bdb9021856e668ee51a78c4644bdb15ccad2733afac"
+    },
+    {
+      "path": "apps/mobile/src/screens/LibraryScreenV2.tsx",
+      "sha256": "867c9261059b870bc64d7031844293f1e0d4667ecf936e67fd5a5bb6b90a85b1"
+    },
+    {
+      "path": "apps/mobile/src/screens/SessionScreen.tsx",
+      "sha256": "d171880daaa8958ed42df944673bd7a11689b325b6be65b7706f64320bc843fe"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.adversarial.test.js",
+      "sha256": "82c28413b2d39e55776c06fe3ba429270f6fc34f20e8b6cb33b1e2dba4e1d870"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.approval.test.js",
+      "sha256": "1e9d017dce27c5fcbbe62ebb981b8b485e9f7204511a7c78e8ce7ab89977a422"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.batch3Perspective.test.js",
+      "sha256": "a144d86affc897d1e9e6657b7cabf03620ff1eef7fd5fc84042a4f11260d14ae"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.cableLow.test.js",
+      "sha256": "17692c67486eead8ce7a8f2d97e50b12d4f6b73bc4b356fd98e83df104bc5f81"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.canonical.test.js",
+      "sha256": "1bf229775c41c2c918cfc27bc0eef3f3697f62ffe83e084332cf898376c711f1"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.canonicalNavigation.test.js",
+      "sha256": "e2ea8aac90337e7e2b6d6496fa4eb77c0cb70c7cf2dbe961911554a87a429764"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.captionIntegrity.test.js",
+      "sha256": "38280dfe9ab7a3826dae59562165adacf5935b4fab9799146691042cd13da114"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.challenger_m6_4.test.js",
+      "sha256": "649929783f588cffe2349f35b149047d2abd7bfbd8e1f22188d34823cf456a70"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.challenger_m7_1.test.js",
+      "sha256": "0265eb945adb35e86bffb9028126bff07427a0ef228bbcfd1ab1aa77c02b8178"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.derivation.test.js",
+      "sha256": "ca56a8666c27497a6a9b40c4218dae8892aa2c5c1d46a92f4e41db3fb08dd0d0"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.flye.test.js",
+      "sha256": "089c5896801b1046d039c21676626da606aa36a5dce18e1439233854e8b3363a"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.gripDelta.test.js",
+      "sha256": "b53b74c3b02e9776566a80f79884c9ae3644333e3bb85386a78cde1ab2e22e29"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.headSupport.test.js",
+      "sha256": "05a094f7cf09e1b4d79990fc4848121412e83ea3cb5f716531664a10ee1e3f8d"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.jointOffsets.test.js",
+      "sha256": "70e804c13d097eb3b49677ba951792b20a37f45c199e2d3309947d76b7a374f3"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.kickback.test.js",
+      "sha256": "4081502919c064dcf5b94134c8c942940b57ef3f160351485f4ecc2fe1b662b4"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.layout.test.js",
+      "sha256": "80d521ecc2634ddf73a899f48cf9a85d69e19cc4df089cd7a5ca343401b5b443"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.lazyFamilyLoad.test.js",
+      "sha256": "aaa659c758051593d6db0d377e2b3c40190e256bb5506aa7ce7dbdefb3a4b6f1"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.lifecycle_stress.test.js",
+      "sha256": "62df33209717efec982855ef26bd852719f7dda3f95ee48423d30e2057848c7f"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.lungeContact.test.js",
+      "sha256": "fe2df46731741296ed22544ea9c6b562e64498017a359a03ff9b6c21dabb369c"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.lungeContactMutation.test.js",
+      "sha256": "32c38b9bce4998e35913032db4b489f8f2a8811d8e211e1a97920560aa9d3471"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.lungeReducedMotion.test.js",
+      "sha256": "3a249d2b16b4ffc2c6e19b5ef43f1c2ed5d07f3f998c32893a88c321f52f0c7c"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.manifestSplit.test.js",
+      "sha256": "6e6010c34100594d9b135f46bb7f3f77a9febefa786656107c4a5f7adf751c7f"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.pushdown.test.js",
+      "sha256": "364958bd0d7e13fe6320034768e9ecf2674509f470a1ef5147b439325c90d98a"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.reverseLunge.test.js",
+      "sha256": "2329b84a56a984f099036367d24c70f0b17f1289cf3eafb8c7dcd799ef99042f"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.reverseLungeNativeContact.test.js",
+      "sha256": "f072d41f1e8283d19f3d6340e1c4fc9387668d9e4ae9ac1e1672d9993fc269f9"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.ropeTension.test.js",
+      "sha256": "7ec966e64a60b661fe1f3a84247c309fd9033f6d3baf5632b42960b83b6089ce"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.runtimeRegression.test.js",
+      "sha256": "49a868b98e6300d74d773b309378155571ff71790a2cb80614283357d2006e3c"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.straightArmPulldown.test.js",
+      "sha256": "ab127536a5e776af013c3fa82aed59fb08f702dda04f18d064f74e6fcddaa769"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.supportedGeometry.test.js",
+      "sha256": "68246cf3d6f04219752bee626c9f46c3372a2312437ce1593d29569d492a76b3"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.test.js",
+      "sha256": "035a2620ad77aa418b336da0e16911c6f93b08ff1dd65b387a48ecf0185c8c66"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.torso.test.js",
+      "sha256": "eab598f53fd164fbc9b4a85eec60b03f213fe769f9fed88360f4c68a88243891"
+    },
+    {
+      "path": "apps/mobile/test/components/MovementPreview.walkingLunge.test.js",
+      "sha256": "d3d0fadf40218501e12d9e2e23da1b1a69270152beebc4e3e14c517ced3a65d8"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "9e02ca7f8c0f95ccbf0860d8ebeadaac64d016bcda3f978d7f39ff56d507f5cf"
+    },
+    {
+      "path": "tools/rendering/author_flye_motion.mjs",
+      "sha256": "8ff85f3d458d0030c35770e48c9797db406292be2f37fed5d217fdad40511d9a"
+    },
+    {
+      "path": "tools/rendering/author_kickback_motion.mjs",
+      "sha256": "fa5f89efc24cdaf697617d3400bc28c750a7489ca7b458035fcddae2a71f0776"
+    },
+    {
+      "path": "tools/rendering/author_pushdown_motion.mjs",
+      "sha256": "404eea029b4edec52915b61d14ff9ddf5e16f317b0dbcfff1d803286924738ae"
+    },
+    {
+      "path": "tools/rendering/author_reverse_lunge_motion.mjs",
+      "sha256": "4ad689058dcf1b94e9cf629851c7109d9ea88c5b00ffdeb2bf74e231f2282276"
+    },
+    {
+      "path": "tools/rendering/author_straight_arm_pulldown.mjs",
+      "sha256": "6cc9904ca805d4a0355d6813c77ba16fa78e07f71ad769bbbfd914369cbbf5cb"
+    },
+    {
+      "path": "tools/rendering/lib/canonicalSvg.mjs",
+      "sha256": "0c6a0d6a0c51a1f4fa49633082ae77f8b4b6bb2330bceb280e6a73471eb974ff"
+    },
+    {
+      "path": "tools/rendering/lib/derivation.mjs",
+      "sha256": "6d7b64e144bff12dad37f70aabc0c5417e08266a6f0a48d9521babd488f48557"
+    },
+    {
+      "path": "tools/rendering/lib/draftInput.mjs",
+      "sha256": "ea50b169cc6763dbc13d9bae5a4fb45c1fde642dfcdf48b2a457b30eaedd4215"
+    },
+    {
+      "path": "tools/rendering/lib/evidenceCard.mjs",
+      "sha256": "2c113ac18f3b868ebbc1b308b3f545390bd64b9d9e089ff06f5040186904ac63"
+    },
+    {
+      "path": "tools/rendering/lib/previewData.mjs",
+      "sha256": "8c53908d1e04726761133c954760481bc007aca2db542b5cbfc3a05ea5491590"
+    },
+    {
+      "path": "tools/rendering/lib/textFit.mjs",
+      "sha256": "ea2b59124de57df68008c8684d341edef1052f56141182eec62d5ebce4e4edf8"
+    },
+    {
+      "path": "tools/rendering/render_manifest_evidence.mjs",
+      "sha256": "552c47c50042e6a68a46445bbe922d1976c0d7635c1980fb0751c694dee496b8"
+    },
+    {
+      "path": "tools/rendering/render_motion_cycle.mjs",
+      "sha256": "5e5f091261326f87ccbc408f62a23792fd2c03a0b208e78b8e5220589948fdda"
+    },
+    {
+      "path": "tools/rendering/render_movement_evidence.mjs",
+      "sha256": "a1860171c717c1a6d57a02b51ee344966d67fa5f15457daaf17440a246144f22"
+    },
+    {
+      "path": "tools/rendering/repair_motion_crops.mjs",
+      "sha256": "c191fe9cf054daeace413fbfab1586bb5ef193548c44cac9ab9dba1cd8a4e3ff"
+    },
+    {
+      "path": "tools/rendering/repair_supported_motion.mjs",
+      "sha256": "46a4088003479feb1bddabc2a3319e8c257a11658e48d16d55f69c4789e4181a"
+    },
+    {
+      "path": "tools/rendering/test_native_border_bounds.mjs",
+      "sha256": "6298fea94c3dfeaf5e07a6aa139b953d26371f3dd1f0f2471b9916c0dc596c65"
+    },
+    {
+      "path": "tools/rendering/test_verify_movement_evidence.mjs",
+      "sha256": "bea4a205603ab5a0c4696ba5266d423ddafb24093175e73a22e6d1430cdc16f9"
+    },
+    {
+      "path": "tools/rendering/verify_movement_evidence.mjs",
+      "sha256": "d4118bf706ddae5a6bac729219ee0ec558fea0d2c7285fccf14c3975d7ec8647"
+    },
+    {
+      "path": "tools/rendering/verify_preview_storage.mjs",
+      "sha256": "9193c6cc1e13cca65a6dc49367e7ea5d4ece88cbb71b068c8adf29e71700fb86"
+    },
+    {
+      "path": "tools/rendering/wo09_split_preview_manifest.mjs",
+      "sha256": "9caf080d678c92ed0973b582d406e7394e1e57f0b7dc560f609aa2701e146f1c"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/cycle_evidence.json",
+      "sha256": "5ee5847efc683b15284bbafab07b40012dafeb7f668d855de767891bc3090654"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-138/female-cycle.html",
+      "sha256": "16ac66e35437d2d7c29fd3ca163a05c660ff167cfdd97ab107d568e0a97bb918"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-138/female-cycle.png",
+      "sha256": "4ffee3f83a9402212b92592ed339187c34d9c3c26af02eb1072a053ee08a7ed8"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-138/male-cycle.html",
+      "sha256": "558335adc9a6bfa442b6c1c32efe5f691fc9663712dcdc215ab9f70c72688df3"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-138/male-cycle.png",
+      "sha256": "a32272390b3a5384c2f27a38eb06ec07b383d403a9b9425769ae97982ebf9bce"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-138/neutral-cycle.html",
+      "sha256": "c83b521f33e82ad526008c2e41fa58ea05cea900e9f89eb02dad5607630f7b78"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-138/neutral-cycle.png",
+      "sha256": "4ad44a61db8af31a505be425c704644adcb9f1b989eb72ec64e607ddf325fee5"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-143/female-cycle.html",
+      "sha256": "17ba0639af40ea7a3a353019a4163f2d61660cb6d8b44553b345b4de5640b043"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-143/female-cycle.png",
+      "sha256": "9c580cb98a695874ac1ae2eb747289803c6e87bc258b3cd1f94589839bfcda29"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-143/male-cycle.html",
+      "sha256": "4339bc161d38cc34c5d128459794d5131d835381354192d534e44a4b2ea84717"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-143/male-cycle.png",
+      "sha256": "c157f3616f7bb1b74dfd7baaca4f0a79b93123e851f5184bc3cf4afa2cc3a42f"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-143/neutral-cycle.html",
+      "sha256": "baa1e71cbbb1f39aa4fe8c5f3022f9990519ad78813224b41fcd5ffa087904d5"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-143/neutral-cycle.png",
+      "sha256": "e3161af0a7dbaa03d03535bb09d14c4c50636669073d3a2e5983d53a56ea8aef"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-158/female-cycle.html",
+      "sha256": "7ce8910d67e88e527aa607c70b896c9084de22d4e53faf07d6507a9763fa1bfb"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-158/female-cycle.png",
+      "sha256": "ca150dee3a0a5ca81811160a2ed17094610f56240f958d3c47ed914dde9fc520"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-158/male-cycle.html",
+      "sha256": "009430e7948cf10c0424fc006845d855a875df69886eed9cb51adb419387cff8"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-158/male-cycle.png",
+      "sha256": "319ba1363b3df29649e40d4c77050c1f6bc587594914190423c894b4316db04e"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-158/neutral-cycle.html",
+      "sha256": "d143e2467abc1cdd1abfcf6f74b979486b10ae2609119c9a2cf8260d9a0c9efe"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-158/neutral-cycle.png",
+      "sha256": "fb0363966183009d38b9ddabc86d1dc88cc103f77cc74ef7b507530b4343eeec"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-163/female-cycle.html",
+      "sha256": "c1c52b39b617fd4a4ae65f11808f81b990b3b04758d347fc7d65772be237b14e"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-163/female-cycle.png",
+      "sha256": "09cb80346addc2fcba672a4c26a6846824e89d992f87e9a8852a7735dfc018ee"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-163/male-cycle.html",
+      "sha256": "433a4f676b65473b49cd46a6c9ca47256f67fc645fe9566ce7945d8184439568"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-163/male-cycle.png",
+      "sha256": "ae763973e8aece828942687b9141e38e61e389811c114eaffac71fc2eb790a66"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-163/neutral-cycle.html",
+      "sha256": "da42d0b44ef4477412d80862e140860af4bd5900d2958973c71dd446381d987d"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-163/neutral-cycle.png",
+      "sha256": "6a1516d7fb72e72fe203ead80360fd8a4d4c7afde6454d9b96e238890b570ce4"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-178/female-cycle.html",
+      "sha256": "49b6c9de684fe060de54171fea15b97960676297a8666df29adf894f7e318eee"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-178/female-cycle.png",
+      "sha256": "c4045d59c74d220b0a991138bd2e4d96e55985f22466480e3a4d431b22cf0613"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-178/male-cycle.html",
+      "sha256": "9acd8ffc78f7cad39112e78b874f64e11652d2c7c9b1d20b34c5359974d0e5f7"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-178/male-cycle.png",
+      "sha256": "8105212816059981ac138335a07084206ec1524e19dd22df35aaddd206ed1189"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-178/neutral-cycle.html",
+      "sha256": "a95a84d1fd6a28824b39bc805606a88f4ce323aee19335bbf7d67bcdfad90f07"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-178/neutral-cycle.png",
+      "sha256": "95a84bf2cf186f3c9f2aeaf5e3adeb06b91d82a47b8847d5531974d086ca5529"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-220/female-cycle.html",
+      "sha256": "308a82af496d4c8c8e379d962374679253e1fdafdc6b44080b8bb2cb45d91bf2"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-220/female-cycle.png",
+      "sha256": "896674caa2330e2c7bf79d0235dcc15ed375e7e6cb6ee58c13b141c35448772d"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-220/male-cycle.html",
+      "sha256": "3438066f0b0da7b775ec0ba70a8bbbd962e49f0866537d58229b047651f9a230"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-220/male-cycle.png",
+      "sha256": "2722bd316c3d9dfc9a231d879b598e115c850f4ab44f1bfea682605e18775229"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-220/neutral-cycle.html",
+      "sha256": "f1675a76ccb37b717edbfb33fcb7e77f1f2f2f12f3619ad1fe3756deb3535f46"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-220/neutral-cycle.png",
+      "sha256": "18c43c0abae67c8634a441bf6f8801882be23c1be1e96682f3db12ffe09da050"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-253/female-cycle.html",
+      "sha256": "1909a3dc1e31f0f921211fc88ae419f392b568cba087353241b958e4034d1e93"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-253/female-cycle.png",
+      "sha256": "1588e84c6f7c983549fa140890840ac7abdcefaaf61b5fe4ec4e45586bbf5546"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-253/male-cycle.html",
+      "sha256": "da979bc092e13747372c0e5516b815480d1f38dc5e9367adcf821f931dd70b91"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-253/male-cycle.png",
+      "sha256": "5dc2d0285cb5b4f4e37342f15c792d3cf0c8eb6be74a7a933e43c255c9661cfc"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-253/neutral-cycle.html",
+      "sha256": "8ea06bc64820f94cdb6672a3f7a00fc377ac8d8d47ed2de58337749eeb92589b"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-253/neutral-cycle.png",
+      "sha256": "f79c2c9484265adaa69ece5dfc65ef2d17053c230f52121f38c8b4ca3156184e"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-262/female-cycle.html",
+      "sha256": "15919d32d56037ab92bb7cbe45ca5ac56be14e8cb692d46c352070fe3e3afb03"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-262/female-cycle.png",
+      "sha256": "0edaec8cb259b62db107e65f3300e16417624445c3edf483357c156c1496e959"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-262/male-cycle.html",
+      "sha256": "cf3d0ca72a9ef6bd3ed2b68c116a0a5ac500415d39f10763c146ce84ef5543cf"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-262/male-cycle.png",
+      "sha256": "b97381abb0436c90618a165e7b7cf7191c2ac517515c5ad12b75072cec5fbc9d"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-262/neutral-cycle.html",
+      "sha256": "c9705335f05168826b0d0e5dbf751652e61941f37b3f36b1474de5255ee1a346"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-262/neutral-cycle.png",
+      "sha256": "6e6f7ae0452f73b902f66c74e26a49f7df26f4f541c080375f90f8432ca7056a"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-264/female-cycle.html",
+      "sha256": "822386cd4e524b25538cd59ead1393818db77dcd32b0315b3a43a145f026ba20"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-264/female-cycle.png",
+      "sha256": "0ee46adde9b1900211e862c343538488784810304917ed5150f66c21818957f4"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-264/male-cycle.html",
+      "sha256": "8fb1f87de74d07827c0c6d8143338f9f4bc15784d549fae9c94ae6294b441b4b"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-264/male-cycle.png",
+      "sha256": "adbf591abff6204c653e2e96eb7eb70d3a4175057b035d2f4e6a8e3f801c3f8f"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-264/neutral-cycle.html",
+      "sha256": "62c0f5e9c3787e1ab31c0d575bf5a521f17164fd21387609eb6f2a81852ed517"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-264/neutral-cycle.png",
+      "sha256": "f5360a99f7e663c59b215043e2d69c0bea4b2abcd38a44c64167d003edf40810"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-292/female-cycle.html",
+      "sha256": "eb25382a53b80b8b2e2d199386f26f842b1861524363abc27f90b6d5879a5ee0"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-292/female-cycle.png",
+      "sha256": "6e455d8061c881e3cb2255285cdfff82ad028640affd63a6aea68e6fcb273178"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-292/male-cycle.html",
+      "sha256": "88357f8807bb2971abfa4ed2d58aab9b84e05ae5db42dfa1ff278d85b5a70dfa"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-292/male-cycle.png",
+      "sha256": "ab99fd7571e90d6b04400a7e80849304a03da1cd057dd6d6dc1b0985a5427189"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-292/neutral-cycle.html",
+      "sha256": "144d3181a19af785aa5fd2c4a6b110c47c6fd44cc7c56a3173f8c938fa723850"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-292/neutral-cycle.png",
+      "sha256": "9bef929b5852c29fbaa52fe238327be32b0d2a23bf3945ae174d948f8757c8cd"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-49/female-cycle.html",
+      "sha256": "9bda6b1a24e55a53ce46ff142fdd51404a7779ee2ee8f4269ef59316bda6a246"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-49/female-cycle.png",
+      "sha256": "b326016561ab5bec6a16c6fa7d0b2eb2a25891e8c35391bfb4f0742814a7c288"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-49/male-cycle.html",
+      "sha256": "7a6c6c3e5b002ee6927df92fb9b5651e9dd8e76cfeddcbbbc395b83482418b6d"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-49/male-cycle.png",
+      "sha256": "563e48fa64c6aa376274deb79675badcf0eb46d649ffd46423db422d0ca41bb3"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-49/neutral-cycle.html",
+      "sha256": "6e9b75d9fe8e7c1a66904b9262db6cd63cd71513f854a11dbcacd871ce9860d2"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-49/neutral-cycle.png",
+      "sha256": "5276f33e456243fdd370e77b41d17b198e5f42b9d93eaf9fc7bd596bba8928b1"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-52/female-cycle.html",
+      "sha256": "f9cef3fb63fcbb236cb6dbe9c80a68f81acd69d805e40f7f4cc83e04155c9eff"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-52/female-cycle.png",
+      "sha256": "91b5184be9f5f64c09749ea3c3d77774b58b24223d5cc6b498309d4e76ce3005"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-52/male-cycle.html",
+      "sha256": "246374118fd97307e9c684e8c02110b7200bcb655bb662680105361099a1f245"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-52/male-cycle.png",
+      "sha256": "25158d328bfcaada0856d4c6af67eb9d3d4440443e661e58bf80b0bfb374f726"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-52/neutral-cycle.html",
+      "sha256": "38de7fdb52a8f3b165fc791e9b86a12f558b4917f3bf00a8c16f801fc5bbc52f"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-52/neutral-cycle.png",
+      "sha256": "94e853164892f58c7a0ab68f661271a9648f609a372c530c810e0de5f260229c"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-53/female-cycle.html",
+      "sha256": "1cb04395844141485d1cf18e66eefff50fa8e27c8ffce997570ce03d0cc529c5"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-53/female-cycle.png",
+      "sha256": "c6383ecd40cd01bd91b2afc2ee1b9975e18af82ef7e812e96153125314da8ea8"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-53/male-cycle.html",
+      "sha256": "c8f0573e91d5ce1c9ab880e89af75e36d3ac5226b95a353ee7b2aeeb52dcac19"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-53/male-cycle.png",
+      "sha256": "1eadef45f33b9cc85bd075d482ff0bc1e7535a810cb1fa873f2c2e6347d96f69"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-53/neutral-cycle.html",
+      "sha256": "66335f114284da06909f25e4813cefc522c1cdabe33d31966c474cd6483d9c80"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-53/neutral-cycle.png",
+      "sha256": "6973434904115d7059a2c221aceecadd559094c1ffe2b78c0e2b57d2f5513659"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-80/female-cycle.html",
+      "sha256": "56fe8cf3f636ce0e9f5afe844b15deff34113ea41e15b8586f08938e460d36c2"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-80/female-cycle.png",
+      "sha256": "84c6169296b85414273824453b04676bbc6d3134f87a0d569ac4b6cd1b282243"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-80/male-cycle.html",
+      "sha256": "5f9a92d401cc6298b2bee60356da43aa32182595cf85368200f01c29a4c4eac7"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-80/male-cycle.png",
+      "sha256": "ca30fedbf365a3526de78dcbd9e14bdb066a5d86b91f5795f19f715c1421ceaf"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-80/neutral-cycle.html",
+      "sha256": "dad691ffa24d83666a416474d3c010ef11d59aeb545574e8bb51319a3156322c"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-80/neutral-cycle.png",
+      "sha256": "b4a47a13a87db95f041f30fac03abebebe01fcdc2dc8d17f635fd009a94a31b2"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-82/female-cycle.html",
+      "sha256": "689f7beea4614ab11201892db9529229d3093ce9841c241795da5b7b7a6b927b"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-82/female-cycle.png",
+      "sha256": "b6a656616eab3040a72984fb8dbeb274ca41f48b068b750de66d6d55ce7af547"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-82/male-cycle.html",
+      "sha256": "463f83dd0d59c5c22e57a421e1e6a309703e05a1c4c127024580e11623ba6d94"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-82/male-cycle.png",
+      "sha256": "7a7736bdfbf191ead92c02fb83e2a4a51ddb0257884eef5b8c784f02e7e57526"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-82/neutral-cycle.html",
+      "sha256": "f644cb0e32f7ba20c6fa238990feacfe233b9618385f79117160e5fa69727f04"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-82/neutral-cycle.png",
+      "sha256": "f322ecca5171c19295dff18c0c538f6e283dc61ee2101eacc9c5808cf408bedd"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-84/female-cycle.html",
+      "sha256": "fcb72130597f6322971e4aedc5fca6e0b20014e1d78bb75ba139e61c849b526f"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-84/female-cycle.png",
+      "sha256": "a362b30ef609597086f436ebc53f780d4d8fc923d6fcdf987c18626cea62801b"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-84/male-cycle.html",
+      "sha256": "867be7252b61db7370d437f02ea1b22001562bd8078ee33cf9c66638db753860"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-84/male-cycle.png",
+      "sha256": "0e3cab7ad5b77b885eea4273d30251b96206cce0c7391501f7f86ba116e00035"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-84/neutral-cycle.html",
+      "sha256": "1e91ab55734bc7a122a4434a9d6c9ff28aad72d8fccc07f6d6f26c10db07e16f"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-84/neutral-cycle.png",
+      "sha256": "0fc33228f1b54e43d320fec211b55f2b880fbfe87502aca9893837decaa044a3"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-92/female-cycle.html",
+      "sha256": "5ee9bd9862b721b3fa0f8b4811c6a2fba94df351d128068344f9b65e3ac1e758"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-92/female-cycle.png",
+      "sha256": "c5458088e38f05b101c0f4e2a33724b00e82e422b87c319c3172206c0c449db3"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-92/male-cycle.html",
+      "sha256": "df562bf04105bd65557c74c446cc6a851c84be83ea42c276a1bfbccb6fb20079"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-92/male-cycle.png",
+      "sha256": "c424dc9fe95213ba0295bcc200688bfd3d5a1d0c17ad848a110bea728657e20d"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-92/neutral-cycle.html",
+      "sha256": "37157436530b6193c9a6a0864cf855751b3d484761388ad41e3e0ccd44f10273"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cycles/movement-92/neutral-cycle.png",
+      "sha256": "af3825933253a5f81fc7e2943029dc88675de28349f7b8a560bb855b58de94cc"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos1.png",
+      "sha256": "e35c98d348546a90ca7de7dd3837afa2a2a27c2c6bc93e5782f6e2d9def7890d"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos1.svg",
+      "sha256": "55a88c8600953ec9a58c8ded878696826bdba3ebe43022c37ef5a833da740578"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos2.png",
+      "sha256": "fe3adb3d1b3f5cb69a0799254902eb79194d3fcf918a5283a1f06c41c3eb4398"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos2.svg",
+      "sha256": "635bb9eed118fb4b1e3b2c1310442f03dd953d6cc215101dc71e127a688d4ff9"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos3.png",
+      "sha256": "6312067cf2024103c0817c763e4cadb31519cca5f7bd0bf306754480f7d88e0a"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos3.svg",
+      "sha256": "988a69413b175ba8e0b66f4eee079061eee139fb2d137cae563f159cad8b4d70"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos4.png",
+      "sha256": "34b6d5971969d6c7734e8a638a5b872a690a02ad7261744034a963dceb702f88"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos4.svg",
+      "sha256": "10ffb77b891c9f2f0092eb4d185499d43919a1217fc95b260041f7338d87635c"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos5.png",
+      "sha256": "7a6d2f482683aa9a8d97814bac6e2871b55e9ba76c3847ee8db4d115051381d2"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos5.svg",
+      "sha256": "7e614f007bd8006984622bf9c593567e5aec860ae5eab2bf7d2b16bb4474f4eb"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos6.png",
+      "sha256": "3eca36a54cd43bc1e9f480a08e9c974f15bc63b833a3bb1be7a056b50d029b55"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos6.svg",
+      "sha256": "59436b0cffd12d8e85a8fb89b27f2b71223d88cb3bc6b014295a67b31773949c"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_sheet.png",
+      "sha256": "082826c7c55b25e2669ff20554a4674068e72d3ca8dfa956724495e802fb3b6a"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_sheet.svg",
+      "sha256": "cb0a4251420d3c8d58b42d1e7d01750ea32e81219f246dfe87a2d4176b308395"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos1.png",
+      "sha256": "dbd863645ee8ed18077bb2f1fd2b941826c92d660f79d11e41bcab099d33f924"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos1.svg",
+      "sha256": "ad0e57521217fa4418163dbafae205d7800e43fc1c7f4ba0b80efe31153bfbda"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos2.png",
+      "sha256": "d5cbae35bc3b37c671d6c3086bc0144fec23a872a7c416ab2a0beefa36449303"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos2.svg",
+      "sha256": "51b582d6a3990665dd0a2b5327b78a685f6270c397028cc4cf8b1713ec2c2dcc"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos3.png",
+      "sha256": "0e559ad1d508cf3a0e8036f6bab6e19e3f4e7905b51cbeda9c102208bd23e1f8"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos3.svg",
+      "sha256": "d976683c55bd1f7971a9c9e62c13a6f972187e1472d3bc4a280c7d66b493ef04"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos4.png",
+      "sha256": "180aefa78f14a44d44202c67f12fdc48c223f28125e7ffbcb50f791db637e103"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos4.svg",
+      "sha256": "5af8d614c56c4e842ac13465a490673543e3b7f77140dc72f1dd9cdf9cb4c5e8"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos5.png",
+      "sha256": "d4fb4638a69b2f2af5b4b6f8fb2d4508113dbe0eb7ccf11c0ab3d25d66a16e61"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos5.svg",
+      "sha256": "f486e8201e28537863e4d2cd125f4610d4bf0471c6ac7724f2fb3e07116f383f"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos6.png",
+      "sha256": "a6d2c6b6eb50790d06e9e75767715058d2839bfbbeb6364a162faf96526cffd1"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos6.svg",
+      "sha256": "bbfe7a47f8f4c5d747c5ec4da62ca02b09b0f5040959de060d4074e73db12389"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_sheet.png",
+      "sha256": "26f81cfa857859cc9600e518b92b407b8ac6ca032385e7eadbf475f7ad2d28bb"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_sheet.svg",
+      "sha256": "eab2753ce30ef2ea7eb99918a678e6886251357a0a3361a418b245577d875a69"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos1.png",
+      "sha256": "4515e07f71e10ad9fd9d38ab9492aa5ced63818fb063f7dc6983b3aa8a84c8a7"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos1.svg",
+      "sha256": "9bd8a85fead8699aff0177c8b594f885756aa6825a623d855c771160b942526a"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos2.png",
+      "sha256": "1ef77194dc284a3b8c58ebb5034b2b5055db124d27590dcfa8e1245885a1d75e"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos2.svg",
+      "sha256": "60cbf1f0b01f46a2d32ebb46695ea6c256374a3ce4b93e64c23b176670a1d7b5"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos3.png",
+      "sha256": "438011443ea203ea6d5c88d7f16e6ad60f1b5d996f6d8611ab35c3b122dbda64"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos3.svg",
+      "sha256": "ecb36223101b5f20223613365157e050a379a757262881877cf689e0f0fbdd0e"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos4.png",
+      "sha256": "f3118dd88e387e544d320d76f2ef6f046fcd93a3c8c0441265f1bbd0d28c21e1"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos4.svg",
+      "sha256": "7434c2f610c4addb82f894d70a744a4c1202a1809ab582ee5f084c71992fd9fc"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos5.png",
+      "sha256": "0493c330bb463e7ff584359eae8f7317fab82bcf5eb2254c3995155084105399"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos5.svg",
+      "sha256": "5b3efe69fe5e3b7aaac45336d3089f7234715cde276a4798f2f21965ddd37bca"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos6.png",
+      "sha256": "40305f2c31b51d24eb21e961462b0a757429b0e5a87cd2e8f3a51aca34399980"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos6.svg",
+      "sha256": "b80f6ce1503756c05ac3708ce5a7e2e95afbb0657105db06f1b77f5f16a89ca5"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_sheet.png",
+      "sha256": "f5fcb817cb2a7031657ccd2e03c5cac91f771f44ff3d6b58b24f54fe7b4499a1"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_sheet.svg",
+      "sha256": "e57cd1c7bdc5728370f85d7c6f1c4b4627d31dd3c3638e60a654c31f64d4b61c"
+    },
+    {
+      "path": "acceptance-evidence/dot/recheck52-cards/evidence_index.json",
+      "sha256": "d37ae95696bd2d3f15d92a7efcffb951a5b9b01ad36670265fd4c21e1ac9a781"
+    }
+  ]
+}
