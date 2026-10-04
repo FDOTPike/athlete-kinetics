@@ -11938,3 +11938,111 @@ Results (Entry 0135 closed after every pre-APK result below existed):
 - **Unchanged:** backup code, schemas and migrations (Migration 064 blob `69090f2`), `package.json` and the lockfile, native projects and `.agents/**`.
 - **Reported in the pull request and handback, not here:** the QA APK, `verify:qa-candidate`, the emulator smoke check, push, PR and CI state. No repository write follows the provenance-bound APK build.
 - **Tokens:** INDEPENDENT AUDIT: PENDING. MERGE: NOT PERFORMED. C6: NOT EVALUATED. RELEASE: NO-GO — PHYSICAL DEVICE / SCREEN-READER QUALIFICATION AND C6 REMAIN DEFERRED.
+
+> **Ledger numbering note.** This published ledger ends at Entry 0135. Entries 0136-0191 exist in local lineages that have not been published (the animation and architecture lanes); they are not reproduced here. Entry 0192 keeps the number it was given on the lineage it was developed on, so the two ledgers reconcile without renumbering when those lineages land.
+
+## Entry 0192 — Coaching, goals, sport and preparation takeover (Claude Code Desktop)
+
+2026-10-02. Executor: Claude Opus 5.5 (model id `claude-opus-5-5`) in Claude Code Desktop. Worktree `.worktrees/coaching-goals`, branch `codex/coaching-goals-sport-preparation`, stacked on the prerequisite branch `codex/coaching-goals-sport-preparation-baseline` (`56ddfb7d`: frozen HEAD `01023cf0` plus the inherited 100-file overlay, digest `2b979f5c…67900`, committed unchanged and labelled as not coaching work). Entry 0192 keeps the number it was given on that development lineage, where 0191 was the highest entry in use; on the published ledger it follows Entry 0135 (see the numbering note above).
+
+### Input
+
+Received verbatim. The text matches the root's `CLAUDE_DESKTOP_HANDOVER_PROMPT.md` except that the received first paragraph omits that file's model-selection sentences (". Use Opus 5.5 with high effort as the default; reserve maximum effort for unresolved architecture, migration/recovery or session-lifecycle problems where deeper reasoning is warranted. Confirm the actual selected model and do not silently substitute an older model."), so "Claude Code Desktop" runs straight into "This is an execution assignment" without a full stop.
+
+```text
+You are taking over the recent Athlete App coaching work in Claude Code Desktop This is an execution assignment: audit the current implementation, implement the remaining requirements, fix defects, test, commit each bounded work order, push feature branches, create pull requests, obtain CodeRabbit review and address actionable findings. Continue through completion, rather than stopping at a plan.
+
+## Scope and authority
+
+Own only the recent coaching descriptions/cues, SMART goals, onboarding focus/sport questions, goal-responsive programming and movement-preparation routines. Warm-ups are the highest priority. Movement animation work remains entirely with Codex: do not edit frames, renderer geometry, preview assets/manifests, animation prompts, visual acceptance records or animation approval states. Do not implement the pending incline-raise correction for IDs 135/187; retain their holds and exclude them from prescribed preparation drills. Other ambiguous movement identities must stay unresolved rather than being invented.
+
+This prompt supersedes older no-commit/no-push instructions ONLY for your new coaching changes. Commits, feature-branch pushes, PR creation and comments requesting CodeRabbit review on those PRs are authorized. Merging, deployment, force-pushing, rewriting another worker's history, billing changes and importing unlicensed assets are not authorized. Existing architecture/memory work belongs to its separate Astra lead; preserve accepted constraints and do not open another Astra assignment. Do not invoke the disabled Athlete App skills. RTK is optional; actual source, raw logs, diffs and exit codes govern evidence. Prefer existing modules and dependencies. Do not launch additional model agents unless separately authorized.
+
+## Read-only evidence and the correct baseline
+
+Repository remote: https://github.com/FDOTPike/athlete-kinetics.git
+
+Primary discovery folder: C:/Users/fpike/Documents/Claude Coding/Athlete App. Its observed master HEAD is 3358be64bd328827eb9239b525ae96ddd264a06e. It is older and has inherited local changes. Do not implement on it or overwrite it.
+
+The selected newer baseline is the FROZEN checkout:
+C:/Users/fpike/.codex/worktrees/wo09-health-connect-ordering/Athlete App
+Branch: codex/wo09-health-connect-ordering
+HEAD: 01023cf04eeb85b73004b92de11f64efa7350a1c
+Base tree: 4b0bfbfe758a258bf29db79983d6d515be147c49
+100-file dirty overlay digest: 2b979f5cac3ef283a51939c4367cf79594813fe172adec22fe32a413eec67900
+Staged state: empty. Codex reverified this snapshot on 2 October 2026. It includes the 300-movement library, seven-screen intake, backup/recovery and accepted Health Connect ordering repairs. None of this new coaching feature work has been implemented yet.
+
+Management directory:
+C:/Users/fpike/.codex/visualizations/2026/09/30/01a0effe-3d01-7892-b15f-b3eece0b4917
+
+Read these evidence files relative to that directory:
+- coaching-goals-workorder-2026-10-01/OPUS55_C0_REVIEW.md: completed read-only Opus 5.5 audit of the selected baseline, with source locations and proposed changes. Its proposals are not implemented; apply the rulings below.
+- coaching-goals-workorder-2026-10-01/OPUS55_MODEL_VERIFICATION.json: verified served model for the completed assessment.
+- wo09-remediation/health-source-snapshot.json: exact inherited file list and hashes.
+- wo09-remediation/verify-health-handoff.mjs: read its usage, then run its existing verify command against the frozen source before copying.
+- wo09-remediation/OWNER_HANDOFF.md and health-connect-review/HEALTH_CONNECT_FOCUSED_REVIEW.md: baseline acceptance and remaining release limitations.
+
+The older WORK_ORDER.md mixes animation ownership and obsolete publication restrictions. Use this standalone prompt as the governing scope; that document is historical background, not authority to expand your assignment.
+
+Create a fresh isolated checkout/branch under codex/coaching-goals-sport-preparation (choose an unused suffix if necessary) from the selected HEAD, copy the exact overlay and prove byte equivalence before editing. Record source hashes, branch, HEAD, staged state and inherited changes. Keep the frozen source untouched. Check remote integration state and prerequisite PRs first: the 100 inherited changes are NOT automatically your feature changes and must not be swept into your commits. Establish an explicit prerequisite/stacked-PR strategy with the existing accepted ancestry; do not pretend an uncommitted baseline is already on remote main. Commit only your owned deltas, with prerequisites visibly identified. If a safe prerequisite cannot be established from available evidence, report that concrete blocker while completing independent implementation and validation in isolation.
+
+## Work order 1 — preparation on every live session path
+
+Treat preparation as a movement protocol: comfortable breathing and movement, relevant mobility/activation, coordination or balance where useful, pattern rehearsal and progressive preparation sets. Tailor to the session, athlete experience, equipment, capability restrictions, readiness and sport demands. Research technique and dose from authoritative coaching/sport sources and record provenance; do not prescribe from a title alone. The user's Muay Thai example of 25–50 hip-flexor raises per side is an example to evaluate, not an approved universal default. Meaningful fatigue, practice volume and extra work must be visible rather than hidden inside warm-ups.
+
+All live paths converge on useStore.startSession: planned, routine, free-form, sport-day, guided and self-directed. Create the frozen, versioned protocol atomically in that start transaction. Apply support/capability/safety/individual movement holds to preparation IDs too, and recheck relevant restrictions at execution. Empty free-form sessions currently start in runner phase complete: make sure this cannot bypass preparation. Completed historical/demo sessions must not acquire fabricated warm-up records.
+
+Offer truthful completed, modified, already-warm, skipped and stopped outcomes, with item-level performed dose/substitution as needed. Keep stop/halt available. Resume the same protocol after restart. Protect duplicate taps, stale writes, discarded sessions, reset and session-ID reuse; a revision check alone must not allow a new session with a reused ID to inherit old preparation. Preparation never writes main set_record entries, awards lifting PRs or changes APRE progression. Keep the existing four runner phases; use the smallest durable preparation sidecar needed rather than adding a fifth main phase.
+
+Count preparation, rest and transitions within TOTAL session availability. Audit and repair all THREE budgeting paths: blockGenerator (including its duplicated cap/22 formulas), routineMicrocycle/composeRoutineMicrocycle and routineComposer/composeRoutine defaults. Use one consistent contract. For an infeasible short session, explain the conflict and offer a feasible future plan/substitution or rescheduling; do not silently omit essential preparation or shrink below reviewed limits. Existing active/completed frozen plans remain unchanged; show any resulting time conflict honestly.
+
+## Work order 2 — goal and focus Q&A
+
+Add the exact slide question: "Is there an area that you want to work on?" Support individually selected muscle groups plus editable bundles: posture (upper back/core and movement control), beach muscles (arms/upper chest), lower-body emphasis and balanced whole body. Use plain gym language with canonical IDs and verified aliases. Do not infer preferences from gender. A lower-body emphasis can allocate one or two upper/full-body sessions when the athlete's actual weekly days permit it.
+
+Create explicit, provenance-backed primary/supporting muscle mappings for movement IDs; the current mixed target_muscles strings are not a complete allocation contract. Preserve canonical IDs and historical records. Allow athletes to skip detailed goals and choose focus only.
+
+For SMART goals capture specific outcome, measurement method and units, known baseline or explicit unknown, target, personal reason and requested deadline. Keep the deadline separate from the existing four-week plan review horizon. Validate feasibility and explain uncertainty; never guarantee outcomes. Record real observations and progress; do not invent measurements or infer muscle growth from training volume. Permit goals to be reviewed/edited without rewriting past plans or observations.
+
+Extend the existing compact seven-screen onboarding deliberately: the user explicitly authorizes the additional relevant slide(s), so update tests that pin the old screen count. Ask additional sport/metric questions only when relevant. Save the draft atomically, bound to the initiating athlete and context revision; athlete switches or stale completion must not write another athlete's profile. Reuse the existing athlete-revision guard pattern.
+
+## Work order 3 — sport selection and programming
+
+When sport is selected, ask which sport and desired outcome: basketball/jump, football with association/AFL/rugby/American distinctions, field/ice hockey, powerlifting, Muay Thai, and an honest supported fallback. Capture experience and practice/match workload. Migration 064 already provides activity_series/activity_occurrence schedule evidence: reuse it instead of duplicating scheduling. Keep the structured sport objective separate from activity kind, whose existing contract does not itself prescribe sport training. Explicitly explain when scheduled sport load affects a NEW program.
+
+Extend the deterministic offline engine so focus, goal, sport and workload materially change weekly allocation, movement eligibility/selection and progression. Safety, capability, equipment, skill and actual time availability take precedence over preference. Explain choices and omitted options. Preserve current broad Objective CHECK compatibility using an additive sidecar if appropriate. A competition date provides context/reminders/goal review only: retain the accepted rule that it grants no automatic peaking or maximal-testing authority. Do not implement competition peaking in this order.
+
+## Work order 4 — coaching descriptions and cues
+
+Review the existing content audit at:
+C:/Users/fpike/.codex/worktrees/movement-content-review/Athlete App/docs/audits/movement-content-review/REVIEW.md
+and its review.json/coverage.json.
+
+Replace confusing generic descriptions and incorrect names only where intended movement identity and reliable sources support the correction. Write concrete setup, action, controlled return and brief useful cues. Preserve movement IDs, verified aliases, asset keys and historical references. Respect source licenses. Resolve supported text defects in this lane; list genuinely ambiguous records with specific outstanding questions. If text conflicts with frames or demands animation changes, record a Codex animation dependency and leave that record held rather than changing visuals or declaring it accepted. IDs 135/187 and their pending prone correction belong exclusively to Codex.
+
+## Persistence, compatibility and migrations
+
+The baseline has 63 ordered migration entries ending at filename 064; user_version counts entries, not filename suffixes. Append migrations, never fill historical gaps or rewrite shipped migration bytes. Reserve the next unused filename with awareness of the separate animation lane; 065 is a proposal, not a reservation. Register durable-table/seed sentinels and relevant replay-blocking triggers. Test replay and self-heal without altering historical observations.
+
+The current backup contract pins version/table counts/fingerprint and accepts only the exact current schema. Update contracts and tests together. Required policy: preserve restoration of supported pre-upgrade v63 backups and retained recovery copies by validating their original schema, restoring safely into an isolated copy and applying the forward migrations under existing maintenance/recovery protections. Do not merely relax validation or overwrite the live database before success. Unknown/future/corrupt contracts must fail closed. Include new goal, sport and preparation data in round-trip backup/recovery. Handle reset, athlete deletion, session discard and reused IDs explicitly.
+
+Preserve accepted preview/memory budgets and release holds. The prior full CI ran on a predecessor; the selected health successor has focused acceptance, not a fresh whole-app release certificate. Native-device memory acceptance remains a separate lane and must not be claimed from desktop tests.
+
+## Audit, commits, pull requests and review
+
+Record a bounded checklist and run baseline checks first. Execute preparation before goal/program integration where shared store/migration files overlap; use one migration writer. Keep an audit/fix/validation record and meaningful commit for each owned work order or review fix. Validate actual flows, not just labels: all three short-session budgets, all live start paths, duplicate/resume/reset/reused-ID cases, hold exclusions, no preparation influence on APRE/PRs, athlete-switch races, goal allocation differences, sport workload behavior, old/new backup round trips, migration replay/self-heal, historical-plan preservation and accessibility. Use regression tests that fail without the fix. Run appropriate package tests, typechecks and the repository's verify:ci on the final integrated coaching candidate; retain exit codes and disclose environmental failures.
+
+Inspect GitHub authentication, remote base/prerequisites and CodeRabbit integration/configuration. Push owned feature branches and create reviewable PR(s) with concrete behavior changes, validation, dependencies and remaining holds. One PR per coherent dependency unit or a clearly explained stack is sufficient. Explicitly request CodeRabbit with a PR comment "@coderabbitai full review"; see https://kb.coderabbit.ai/articles/1442026547-troubleshoot-why-coderabbit-reviews-might-not-trigger . Wait for an actual response, assess its findings, implement warranted fixes, commit/push them and request review again as needed. Run an independent final review that is not merely the implementer's self-check. Do not equate bot silence, a rate limit or an unavailable integration with approval; report review pending/unavailable accurately and do not purchase/install services beyond existing authorization.
+
+Finish with work orders completed, commits and PR URLs, tests/CI results, CodeRabbit disposition, unresolved product/content questions and precise remaining release blockers. Do not merge or deploy. Keep the movement animation lane separate throughout.
+```
+
+Follow-up after an interruption during read-only discovery:
+
+```text
+sorry for the interruption please start
+```
+
+### Output
+
+Pending — completed when the work orders land (see the end of this entry).

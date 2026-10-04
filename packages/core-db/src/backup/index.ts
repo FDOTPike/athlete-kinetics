@@ -67,8 +67,13 @@ export {
   BACKUP_SCHEMA_OBJECT_COUNT,
   BACKUP_SCHEMA_TABLE_COUNT,
   BACKUP_SCHEMA_USER_VERSION,
+  CURRENT_BACKUP_SCHEMA_CONTRACT,
+  SUPPORTED_BACKUP_SCHEMA_CONTRACTS,
+  backupSchemaContractFor,
   calculateBackupSchemaFingerprint,
   isCurrentBackupSchema,
+  matchesBackupSchemaContract,
   type BackupSchemaColumn,
+  type BackupSchemaContract,
   type BackupSchemaObject,
 } from './schemaContract';

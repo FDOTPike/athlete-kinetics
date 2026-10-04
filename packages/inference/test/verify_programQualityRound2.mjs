@@ -272,12 +272,18 @@ console.log('[P3] pure strength anchor capacity over shaped plan slots');
     strengthAnchorCapacity(mkProfile(3, 90), programFocuses, defaultProgramDayIndices) === 3,
     String(strengthAnchorCapacity(mkProfile(3, 90), programFocuses, defaultProgramDayIndices)));
 
-  // Duration shaping: 15 minutes clamps the budget to 2. lower's menu is
-  // squat+hinge, upper's push_h, full's trimmed menu is squat+hinge — the
-  // three roles are still all reachable across a 3-day week.
-  check('[P3] 15-minute sessions: budget clamps to 2; a 3-day plan still reaches all 3 roles',
-    strengthAnchorCapacity(mkProfile(3, 15), programFocuses, defaultProgramDayIndices) === 3,
+  // Duration shaping, re-pinned for the session-time contract (2026-10-02).
+  // Preparation is now reserved inside the session limit, so a 15-minute
+  // session carries ONE movement, not the two the old clamp promised (two
+  // 22-minute movements were never going to fit 15 minutes). lower's menu is
+  // squat, upper's push_h, full's squat — hinge is no longer reachable, and
+  // the setup screen must say so rather than imply all three roles are carried.
+  check('[P3] 15-minute sessions: one movement each once preparation is reserved; a 3-day plan reaches 2 of 3 roles',
+    strengthAnchorCapacity(mkProfile(3, 15), programFocuses, defaultProgramDayIndices) === 2,
     String(strengthAnchorCapacity(mkProfile(3, 15), programFocuses, defaultProgramDayIndices)));
+  check('[P3] 45-minute sessions keep two movements each and still reach all 3 roles',
+    strengthAnchorCapacity(mkProfile(3, 45), programFocuses, defaultProgramDayIndices) === 3,
+    String(strengthAnchorCapacity(mkProfile(3, 45), programFocuses, defaultProgramDayIndices)));
   check('[P3] 240-minute sessions: budget clamps to 5, menus are already shorter, so all 3 roles remain reachable',
     strengthAnchorCapacity(mkProfile(3, 240), programFocuses, defaultProgramDayIndices) === 3,
     String(strengthAnchorCapacity(mkProfile(3, 240), programFocuses, defaultProgramDayIndices)));

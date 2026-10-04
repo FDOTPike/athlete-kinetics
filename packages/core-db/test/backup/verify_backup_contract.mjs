@@ -38,7 +38,56 @@ const cryptoProvider = {
 const runnerSource = readFileSync(join(import.meta.dirname, '..', '..', 'src', 'migrationRunner.ts'), 'utf8');
 const sentinelTables = [...runnerSource.matchAll(/type: 'table', name: '([^']+)'/g)].map((match) => match[1]);
 const tableNames = [...new Set([...sentinelTables, 'routine_template_contract_cutoff'])].sort();
-assert.equal(tableNames.length, 104, 'live durable inventory must still contain exactly 104 tables');
+assert.equal(tableNames.length, 106, 'live durable inventory must still contain exactly 106 tables');
+
+// The supported-schema registry. The current contract is pinned here as
+// literals on purpose (adding a migration must be a conscious act), and the
+// pre-upgrade contract is the EXACT one that shipped: its fingerprint
+// authenticates backups already in the field and must never be edited.
+assert.deepEqual(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => [contract.userVersion, contract.migrationSlot, contract.tableCount, contract.objectCount]),
+  [[63, 64, 104, 174], [64, 65, 106, 181]], 'supported schema registry must list the shipped v63 contract and the current v64 contract, oldest first');
+assert.equal(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[0].fingerprint, 'f829bcba999b7f125d70c6f2a4053f11bdfe3bbda42781f6ef8ee8e3449590f6',
+  'the shipped v63 fingerprint must never change');
+assert.equal(backup.CURRENT_BACKUP_SCHEMA_CONTRACT, backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS.at(-1));
+assert.equal(backup.BACKUP_SCHEMA_USER_VERSION, 64);
+assert.equal(backup.BACKUP_SCHEMA_MIGRATION_SLOT, 65);
+assert.equal(backup.BACKUP_SCHEMA_TABLE_COUNT, 106);
+assert.equal(backup.backupSchemaContractFor(63, 64), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[0]);
+assert.equal(backup.backupSchemaContractFor(64, 65), backup.CURRENT_BACKUP_SCHEMA_CONTRACT);
+assert.equal(backup.backupSchemaContractFor(63, 65), null, 'a version and slot that do not belong together are not a known schema');
+assert.equal(backup.backupSchemaContractFor(65, 66), null, 'a future schema has no contract');
+assert.equal(backup.backupSchemaContractFor(62, 63), null, 'a schema older than the first backup-capable build has no contract');
+
+const schemaFiles = readdirSync(schemaDirectory).filter((name) => /^0\d\d_.*\.sql$/.test(name) && !name.startsWith('004_')).sort();
+function schemaObjectsOf(db) {
+  return db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
+    .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
+      ? db.prepare(`PRAGMA table_info("${object.name.replaceAll('"', '""')}")`).all()
+        .map((column) => [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk]) : []]);
+}
+{
+  // The pre-upgrade contract is measured, not assumed: a database built from
+  // exactly the migrations that shipped with v63 must match it, must NOT pass
+  // as the current schema, and — brought forward by the remaining migrations —
+  // must match the current contract exactly.
+  const legacy = new DatabaseSync(':memory:');
+  for (const name of schemaFiles.slice(0, 63)) legacy.exec(readFileSync(join(schemaDirectory, name), 'utf8'));
+  const legacyObjects = schemaObjectsOf(legacy);
+  assert.equal(backup.matchesBackupSchemaContract(legacyObjects, backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[0], cryptoProvider), true,
+    'a database built by the v63 migration chain must match the shipped v63 contract');
+  assert.equal(backup.isCurrentBackupSchema(legacyObjects, cryptoProvider), false,
+    'a v63 database must not be accepted as the current schema');
+  assert.equal(backup.matchesBackupSchemaContract(legacyObjects, backup.CURRENT_BACKUP_SCHEMA_CONTRACT, cryptoProvider), false);
+  for (const name of schemaFiles.slice(63)) legacy.exec(readFileSync(join(schemaDirectory, name), 'utf8'));
+  const migratedObjects = schemaObjectsOf(legacy);
+  assert.equal(backup.isCurrentBackupSchema(migratedObjects, cryptoProvider), true,
+    'a v63 database brought forward by the remaining migrations must match the current contract exactly');
+  assert.equal(backup.matchesBackupSchemaContract(migratedObjects, backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[0], cryptoProvider), false);
+  const drifted = migratedObjects.filter((object) => object[1] !== 'trg_session_preparation_live_session_bi');
+  assert.equal(backup.isCurrentBackupSchema(drifted, cryptoProvider), false,
+    'a migrated database missing one guard must fail the current contract');
+  legacy.close();
+}
 
 function makeDatabase(file, label) {
   const db = new DatabaseSync(file);
@@ -58,7 +107,7 @@ function makeDatabase(file, label) {
   db.prepare(`INSERT INTO health_support_note
     (note_id,revision,note_kind,body_text,provenance,recorded_at_ms,updated_at_ms)
     VALUES (?,?,?,?,?,?,?)`).run(`note-${label}`, 1, 'general', `private-support-fixture:${label}`, 'user_reported', 1, 1);
-  db.exec('PRAGMA user_version=63');
+  db.exec('PRAGMA user_version=64');
   assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
   const schemaObjects = db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
     .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
@@ -76,7 +125,7 @@ function makeDatabase(file, label) {
 function snapshot(athleteId, dbName, bytes) {
   return {
     athleteId, dbName, byteLength: bytes.length, sha256Hex: cryptoProvider.sha256Hex(bytes),
-    userVersion: 63, tableCount: 104, databaseBase64: backup.bytesToBase64(bytes),
+    userVersion: 64, tableCount: 106, databaseBase64: backup.bytesToBase64(bytes),
   };
 }
 
@@ -178,8 +227,8 @@ const archive = {
   backupId: '00112233445566778899aabbccddeeff',
   createdAt: '2026-09-13T05:00:00.000Z',
   sourceAppVersion: '0.1.0',
-  sourceSchemaVersion: 63,
-  sourceMigrationSlot: 64,
+  sourceSchemaVersion: 64,
+  sourceMigrationSlot: 65,
   scope: 'all-athletes',
   restorePolicy: 'replace',
   registry: {
@@ -292,12 +341,38 @@ try {
   );
   await assert.rejects(() => backup.sealBackup(archive, 'too-short', cryptoProvider), /at least 12/);
 
-  const compatible = { readerSchemaVersion: 63, supportedSourceSchemaVersions: [63], readerMigrationSlot: 64, supportedSourceMigrationSlots: [64] };
+  const compatible = { readerSchemaVersion: 64, supportedSourceSchemaVersions: [63, 64], readerMigrationSlot: 65, supportedSourceMigrationSlots: [64, 65] };
   assert.equal(backup.decideRestore('merge', opened.archive, compatible).code, 'merge_not_supported');
   assert.equal(backup.decideRestore('replace', opened.archive, compatible).recoveryCopyRequired, true);
-  assert.equal(backup.decideRestore('replace', opened.archive, { ...compatible, readerSchemaVersion: 62 }).code, 'newer_schema');
-  assert.equal(backup.decideRestore('replace', opened.archive, { ...compatible, supportedSourceSchemaVersions: [64] }).code, 'schema_adapter_unavailable');
-  assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceMigrationSlot: 65 }, compatible).code, 'newer_schema');
+  assert.equal(backup.decideRestore('replace', opened.archive, { ...compatible, readerSchemaVersion: 63 }).code, 'newer_schema');
+  assert.equal(backup.decideRestore('replace', opened.archive, { ...compatible, supportedSourceSchemaVersions: [63] }).code, 'schema_adapter_unavailable');
+  assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceMigrationSlot: 66 }, compatible).code, 'newer_schema');
+  // A supported pre-upgrade archive is restorable; it is not treated as current.
+  assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceSchemaVersion: 63, sourceMigrationSlot: 64 }, compatible).ok, true);
+
+  // Archive validation is contract-driven and fails closed. A database table
+  // count is compared against the count of the schema the archive DECLARES,
+  // and an unknown or future schema is refused before any bytes are decoded.
+  const withSchema = (version, slot, tableCount) => ({
+    ...archive, sourceSchemaVersion: version, sourceMigrationSlot: slot,
+    databases: archive.databases.map((database) => ({ ...database, userVersion: version, tableCount })),
+  });
+  await assert.rejects(() => backup.sealBackup(withSchema(65, 66, 108), password, cryptoProvider),
+    (error) => error.code === 'newer_version', 'a future schema must be refused as newer, not as corruption');
+  await assert.rejects(() => backup.sealBackup(withSchema(64, 66, 106), password, cryptoProvider),
+    (error) => error.code === 'newer_version');
+  await assert.rejects(() => backup.sealBackup(withSchema(63, 65, 104), password, cryptoProvider),
+    (error) => error.code === 'unsupported_version', 'a mismatched version/slot pair is not a known schema');
+  await assert.rejects(() => backup.sealBackup(withSchema(62, 63, 104), password, cryptoProvider),
+    (error) => error.code === 'unsupported_version', 'a schema older than the first backup-capable build is refused');
+  await assert.rejects(() => backup.sealBackup(withSchema(63, 64, 106), password, cryptoProvider),
+    (error) => error.code === 'invalid_archive', 'a v63 archive must carry the v63 table count, not the current one');
+  await assert.rejects(() => backup.sealBackup(withSchema(64, 65, 104), password, cryptoProvider),
+    (error) => error.code === 'invalid_archive', 'a current archive must carry the current table count');
+  const legacySealed = await backup.sealBackup(withSchema(63, 64, 104), password, cryptoProvider);
+  const legacyOpened = await backup.openBackup(legacySealed, password, cryptoProvider);
+  assert.equal(legacyOpened.ok, true, 'a well-formed v63 archive still authenticates and opens');
+  assert.equal(legacyOpened.archive.sourceSchemaVersion, 63);
 
   let state = backup.initialRestoreState();
   state = backup.transitionRestore(state, { type: 'VALIDATE', backupId: archive.backupId });
@@ -470,8 +545,8 @@ try {
 
   const inventory = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'docs', 'audits', 'accessible-coach', 'WO03_DURABLE_DATA_INVENTORY.md'), 'utf8');
   for (const tableName of tableNames) assert.ok(inventory.includes(`\`${tableName}\``), `inventory must list ${tableName}`);
-  assert.match(inventory, /Final live durable tables: 104/);
-  console.log('verify:backup PASS — AES-GCM+scrypt all-athlete physical round trip, 104 tables including activity/support, wrong-password/tamper/truncation/KDF cap/nonce/duplicate/compatibility/journal rollback');
+  assert.match(inventory, /Final live durable tables: 106/);
+  console.log('verify:backup PASS — AES-GCM+scrypt all-athlete physical round trip, 106 tables including activity/support/preparation, v63 forward-restore contract, wrong-password/tamper/truncation/KDF cap/nonce/duplicate/compatibility/journal rollback');
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

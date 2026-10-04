@@ -7,6 +7,8 @@ import {
   BACKUP_SCHEMA_TABLE_COUNT,
   BACKUP_SCHEMA_USER_VERSION,
   BackupContractError,
+  CURRENT_BACKUP_SCHEMA_CONTRACT,
+  SUPPORTED_BACKUP_SCHEMA_CONTRACTS,
   MAX_DATABASE_BYTES,
   base64ToBytes,
   bytesToBase64,
@@ -18,6 +20,8 @@ import {
   hasRequiredStorage,
   isCurrentBackupSchema,
   isWellFormedBackupContainer,
+  matchesBackupSchemaContract,
+  migrate,
   openBackup,
   replacementStorageRequirement,
   rollbackRestoreFiles,
@@ -27,6 +31,7 @@ import {
   validateRestoreJournal,
   type BackupArchiveV1,
   type BackupDatabaseSnapshot,
+  type BackupSchemaContract,
   type BackupSchemaObject,
   type RestoreJournalEntry,
   type RestoreJournalV1,
@@ -341,6 +346,57 @@ function requireCurrentSchema(handle: DB, message: string): void {
   if (!isCurrentBackupSchema(schemaContract(handle), mobileBackupCrypto)) throw new Error(message);
 }
 
+/** The schemas this build restores, as the restore decision reads them. */
+const RESTORE_COMPATIBILITY = {
+  readerSchemaVersion: SCHEMA_VERSION,
+  supportedSourceSchemaVersions: SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => contract.userVersion),
+  readerMigrationSlot: MIGRATION_SLOT,
+  supportedSourceMigrationSlots: SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => contract.migrationSlot),
+} as const;
+
+/** The registered contract an archive declares, or null when it declares a
+ * (version, slot) pair this build has no exact contract for. */
+function archiveSchemaContract(archive: BackupArchiveV1): BackupSchemaContract | null {
+  return SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) =>
+    contract.userVersion === archive.sourceSchemaVersion
+    && contract.migrationSlot === archive.sourceMigrationSlot) ?? null;
+}
+
+/**
+ * Bring an ISOLATED database copy from a supported earlier schema to the
+ * current one. The file at `path` is never a live athlete database: it is a
+ * staged restore copy or a backup snapshot, so a failure here leaves every
+ * live database exactly as it was.
+ *
+ * The caller has already proved the copy matches its ORIGINAL schema contract
+ * byte-for-byte. This runs the production migration chain on it (the same
+ * `migrate` boot uses), then requires the result to match the CURRENT contract
+ * exactly — a partly-migrated or drifted result is refused, not accepted.
+ *
+ * Rollback-journal mode keeps the migration inside the one file being hashed
+ * and moved; a write-ahead log left beside it would be data the replacement
+ * step does not carry.
+ */
+async function forwardMigrateIsolatedDatabase(path: string, failureMessage: string): Promise<void> {
+  const io = fs();
+  const handle = openDatabase(basename(path), dirname(path));
+  try {
+    handle.executeSync('PRAGMA journal_mode = DELETE');
+    handle.executeSync('PRAGMA foreign_keys = ON');
+    migrate(handle);
+    if (!quickCheck(handle)
+      || oneNumber(handle, 'PRAGMA user_version', 'user_version') !== SCHEMA_VERSION) {
+      throw new Error(failureMessage);
+    }
+    requireCurrentSchema(handle, failureMessage);
+  } catch {
+    throw new Error(failureMessage);
+  } finally { handle.close(); }
+  for (const suffix of ['-wal', '-shm', '-journal']) {
+    if (await io.exists(`${path}${suffix}`)) throw new Error(failureMessage);
+  }
+}
+
 async function availableBytes(): Promise<number | null> {
   try {
     const value = await fs().df();
@@ -435,7 +491,25 @@ async function prepareDatabaseSnapshot(
     if (!quickCheck(handle)) throw new Error('A local athlete database did not pass its integrity check. No backup was saved.');
     handle.executeSync(`VACUUM INTO '${escapeSql(snapshotPath)}'`);
   } finally { handle.close(); }
-  const snapshotHandle = openDatabase(basename(snapshotPath), dirname(snapshotPath));
+  // An athlete who has not been opened since an app update still has a file
+  // at an earlier supported schema. The live file is left untouched: the
+  // snapshot copy is checked against its own exact contract and brought
+  // forward, so the archive always holds current-schema databases.
+  let snapshotHandle = openDatabase(basename(snapshotPath), dirname(snapshotPath));
+  let sourceContract: BackupSchemaContract | undefined;
+  try {
+    if (!quickCheck(snapshotHandle)) throw new Error('A database snapshot did not pass its integrity check. No backup was saved.');
+    const sourceVersion = oneNumber(snapshotHandle, 'PRAGMA user_version', 'user_version');
+    sourceContract = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === sourceVersion);
+    if (sourceContract === undefined) throw new Error('A database uses an unsupported schema. Update the app before backing up.');
+    if (!matchesBackupSchemaContract(schemaContract(snapshotHandle), sourceContract, mobileBackupCrypto)) {
+      throw new Error('A database snapshot does not match the verified app schema. No backup was saved.');
+    }
+  } finally { snapshotHandle.close(); }
+  if (sourceContract !== CURRENT_BACKUP_SCHEMA_CONTRACT) {
+    await forwardMigrateIsolatedDatabase(snapshotPath, 'A database snapshot could not be brought up to the current app schema. No backup was saved.');
+  }
+  snapshotHandle = openDatabase(basename(snapshotPath), dirname(snapshotPath));
   let userVersion: number;
   let tableCount: number;
   try {
@@ -536,15 +610,23 @@ async function pickerOpen(): Promise<string | null> {
   }
 }
 
-async function verifyStagedDatabase(path: string, expected: BackupDatabaseSnapshot): Promise<void> {
+/** Validate a staged copy against the EXACT schema contract its archive
+ * declares — the original schema for a pre-upgrade backup, never a relaxed
+ * check and never the current schema by assumption. */
+async function verifyStagedDatabase(
+  path: string, expected: BackupDatabaseSnapshot, sourceContract: BackupSchemaContract,
+): Promise<void> {
   const handle = openDatabase(basename(path), dirname(path));
   try {
     if (!quickCheck(handle)
-      || oneNumber(handle, 'PRAGMA user_version', 'user_version') !== expected.userVersion
-      || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count') !== TABLE_COUNT) {
+      || expected.userVersion !== sourceContract.userVersion
+      || oneNumber(handle, 'PRAGMA user_version', 'user_version') !== sourceContract.userVersion
+      || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count') !== sourceContract.tableCount) {
       throw new Error('A restored database failed validation. Existing data is unchanged.');
     }
-    requireCurrentSchema(handle, 'A restored database does not match the verified app schema. Existing data is unchanged.');
+    if (!matchesBackupSchemaContract(schemaContract(handle), sourceContract, mobileBackupCrypto)) {
+      throw new Error('A restored database does not match the verified app schema. Existing data is unchanged.');
+    }
   } finally { handle.close(); }
 }
 
@@ -651,6 +733,10 @@ async function replaceAllData(incoming: BackupArchiveV1): Promise<void> {
   const registryRollbackPath = `${io.dirs.DocumentDir}/.ak-registry-${operationId}.old`;
   const allNames = [...new Set([...current.athletes.map((entry) => entry.dbName), ...incoming.registry.athletes.map((entry) => entry.dbName)])].sort();
   const incomingByName = new Map(incoming.databases.map((database) => [database.dbName, database]));
+  // The hash each replaced database must have: the authenticated backup's own
+  // hash, or — for a pre-upgrade backup — the hash of its verified,
+  // forward-migrated staged copy.
+  const replacementHashByName = new Map<string, string>();
   const entries: RestoreJournalEntry[] = [];
   const totalBytes = incoming.databases.reduce((sum, database) => sum + database.byteLength, 0);
   let registryExistedBefore = false;
@@ -658,6 +744,10 @@ async function replaceAllData(incoming: BackupArchiveV1): Promise<void> {
   let storeClosed = false;
   let committed = false;
   try {
+    const sourceContract = archiveSchemaContract(incoming);
+    if (sourceContract === null) {
+      throw new Error('This backup uses a database version this app cannot restore. Existing data is unchanged.');
+    }
     await requireWorkingSpace(replacementStorageRequirement(totalBytes));
     for (let index = 0; index < allNames.length; index += 1) {
       const name = allNames[index]!;
@@ -692,7 +782,20 @@ async function replaceAllData(incoming: BackupArchiveV1): Promise<void> {
       if (entry.stagedPath !== null && incomingSnapshot !== undefined) {
         await io.writeFile(entry.stagedPath, incomingSnapshot.databaseBase64, 'base64');
         if ((await io.hash(entry.stagedPath, 'sha256')) !== incomingSnapshot.sha256Hex) throw new Error('A staged database did not match the authenticated backup. Existing data is unchanged.');
-        await verifyStagedDatabase(entry.stagedPath, incomingSnapshot);
+        await verifyStagedDatabase(entry.stagedPath, incomingSnapshot, sourceContract);
+        if (sourceContract === CURRENT_BACKUP_SCHEMA_CONTRACT) {
+          replacementHashByName.set(allNames[index]!, incomingSnapshot.sha256Hex);
+        } else {
+          // Supported pre-upgrade backup. Its original schema was just proved
+          // exact; the forward migration runs on this isolated staged copy,
+          // inside the journalled preparation and before the applying marker,
+          // so no live database has been touched if it fails.
+          await forwardMigrateIsolatedDatabase(
+            entry.stagedPath,
+            'A restored database could not be brought up to the current app schema. Existing data is unchanged.',
+          );
+          replacementHashByName.set(allNames[index]!, await io.hash(entry.stagedPath, 'sha256'));
+        }
       }
     }
     if (registryExistedBefore) {
@@ -720,8 +823,8 @@ async function replaceAllData(incoming: BackupArchiveV1): Promise<void> {
       await removeIfPresent(entry.targetPath);
       if (entry.stagedPath !== null) {
         await movePathConfirmed(entry.stagedPath, entry.targetPath, 'Database replacement did not complete.');
-        const expected = incomingByName.get(allNames[index]!);
-        if (expected === undefined || await io.hash(entry.targetPath, 'sha256') !== expected.sha256Hex) {
+        const expectedHash = replacementHashByName.get(allNames[index]!);
+        if (expectedHash === undefined || await io.hash(entry.targetPath, 'sha256') !== expectedHash) {
           throw new Error('Database replacement did not match the authenticated backup.');
         }
       }
@@ -942,12 +1045,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       validatePortableBackupFileSize((await fs().stat(localPath)).size);
       const opened = await openBackup(asText(await fs().readFile(localPath, 'utf8')), password, mobileBackupCrypto);
       if (!opened.ok) throw new Error(opened.message);
-      const decision = decideRestore('replace', opened.archive, {
-        readerSchemaVersion: SCHEMA_VERSION,
-        supportedSourceSchemaVersions: [SCHEMA_VERSION],
-        readerMigrationSlot: MIGRATION_SLOT,
-        supportedSourceMigrationSlots: [MIGRATION_SLOT],
-      });
+      const decision = decideRestore('replace', opened.archive, RESTORE_COMPATIBILITY);
       if (!decision.ok) throw new Error(decision.message);
       const pending: PendingRestore = { archive: opened.archive, source: 'portable_backup' };
       pendingRestore = pending;
@@ -989,12 +1087,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         }
       }
       if (opened === null || !opened.ok) throw new Error('Previous data recovery could not be opened. Check the password from the previous restore.');
-      const decision = decideRestore('replace', opened.archive, {
-        readerSchemaVersion: SCHEMA_VERSION,
-        supportedSourceSchemaVersions: [SCHEMA_VERSION],
-        readerMigrationSlot: MIGRATION_SLOT,
-        supportedSourceMigrationSlots: [MIGRATION_SLOT],
-      });
+      const decision = decideRestore('replace', opened.archive, RESTORE_COMPATIBILITY);
       if (!decision.ok) throw new Error('Previous data recovery is not compatible with this app version.');
       const pending: PendingRestore = { archive: opened.archive, source: 'retained_recovery' };
       pendingRestore = pending;

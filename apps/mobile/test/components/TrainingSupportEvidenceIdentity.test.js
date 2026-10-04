@@ -42,6 +42,9 @@ test('real block, session and substitution entry points persist factual target i
 
   const plannedSessionId = state().todayPlan.plannedSessionId;
   state().startSession();
+  // Preparation gates the first set (work order 1, migration 065); it records
+  // no support decision, so the evidence identities below are unaffected.
+  state().finishPreparation('already_warm', state().preparation.revision);
   const sessionEvidence = evidenceFor('session-start-commit');
   expect(sessionEvidence.identity).toBe(`session-start-commit:planned-session:${plannedSessionId}`);
   expect(sessionEvidence.identity).not.toContain(sessionEvidence.decision_id);

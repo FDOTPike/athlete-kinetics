@@ -1,5 +1,12 @@
 import type { Objective, SchemaType, TrainingAge } from './types';
 import {
+  PREPARATION_FLOOR_MIN,
+  describeSessionAlternative,
+  estimateSlotMinutes,
+  feasibleSessionAlternatives,
+  preparationPlanningMinutes,
+} from './sessionTimeBudget';
+import {
   groupRoutineTemplateDays,
   type RoutineRole,
   type RoutineRoleEligibility,
@@ -133,6 +140,21 @@ export interface RoutineFamilyStressDecision {
   readonly adaptations: readonly string[];
 }
 
+/** How one routine day spends the athlete's session limit. */
+export interface RoutineDayTime {
+  readonly dayIndex: number;
+  readonly capMin: number;
+  /** Minutes reserved for preparation (never below the reviewed floor). */
+  readonly preparationMin: number;
+  /** True when preparation was condensed to the floor to make the day fit. */
+  readonly preparationCondensed: boolean;
+  /** Changeovers, work and rest for the included movements. */
+  readonly mainWorkMin: number;
+  /** preparationMin + mainWorkMin. */
+  readonly estimatedMin: number;
+  readonly feasible: boolean;
+}
+
 export interface ComposedRoutineMicrocycle {
   readonly prescriptions: readonly RoutineMicrocyclePrescription[];
   readonly familyDecisions: readonly RoutineFamilyStressDecision[];
@@ -140,6 +162,8 @@ export interface ComposedRoutineMicrocycle {
   readonly recommendations: readonly string[];
   readonly adaptations: readonly string[];
   readonly blockers: readonly string[];
+  /** Preparation, rest and changeovers counted inside the session limit. */
+  readonly dayTimes: readonly RoutineDayTime[];
 }
 
 export interface RoutineAccessoryRecommendation {
@@ -354,8 +378,11 @@ const purposeReductionPriority = (purpose: RoutineStressPurpose | null): number 
   }
 };
 
-const estimatedMinutes = (row: MutablePrescription): number => {
-  if (!row.included) return 0;
+/** The pre-contract role allowances (set-up plus minutes per set, including
+ * rest). They are kept as each row's reviewed MINIMUM, so the shared estimate
+ * can only lengthen a day relative to the law it replaces: every day that was
+ * refused before is still refused, and preparation is counted on top. */
+const roleAllowanceMinutes = (row: MutablePrescription): number => {
   switch (row.role) {
     case 'major': return 3 + row.sets * 2.5;
     case 'supplementary': return 2 + row.sets * 1.5;
@@ -363,6 +390,18 @@ const estimatedMinutes = (row: MutablePrescription): number => {
     case 'accessory': return 1 + row.sets;
   }
 };
+
+/** Changeover + work + rest for one row, from the shared session-time
+ * contract (sessionTimeBudget) — the same estimator the block generator and
+ * the single-day composer use, so "fits the session" means one thing. */
+const estimatedMinutes = (row: MutablePrescription): number => row.included
+  ? estimateSlotMinutes({
+      sets: row.sets,
+      target: { kind: 'reps', reps: row.reps },
+      targetRpe: row.targetRpe,
+      minimumSeconds: roleAllowanceMinutes(row) * 60,
+    })
+  : 0;
 
 const legacyRoleKey = (
   dayIndex: number,
@@ -527,7 +566,7 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
 
   const uniqueBlockers = [...new Set(blockers)];
   if (uniqueBlockers.length > 0) {
-    return { prescriptions: [], familyDecisions: [], warnings: [], recommendations: [], adaptations: [], blockers: uniqueBlockers };
+    return { prescriptions: [], familyDecisions: [], warnings: [], recommendations: [], adaptations: [], blockers: uniqueBlockers, dayTimes: [] };
   }
 
   const rows: MutablePrescription[] = input.selections.map((selection) => {
@@ -646,10 +685,22 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
     boundFamily(family, budgets.week);
   }
 
-  const durationCap = Math.max(15, input.durationCapMin);
+  // Session-time contract: preparation is reserved out of the athlete's
+  // session limit BEFORE any work is counted. A day that is over first has its
+  // preparation condensed to the reviewed floor (never below it), then sheds
+  // support work, then reduces major sets — and what still does not fit is a
+  // blocker with feasible options, never a silently shortened warm-up.
+  const sessionCap = Math.max(15, input.durationCapMin);
+  const planningPreparation = preparationPlanningMinutes(sessionCap);
+  const dayTimes: RoutineDayTime[] = [];
+  const populatedDays = [...selectionsByDay.keys()].length;
   for (const dayIndex of [...selectionsByDay.keys()].sort((a, b) => a - b)) {
     const dayRows = rows.filter((row) => row.dayIndex === dayIndex);
     const duration = (): number => dayRows.reduce((sum, row) => sum + estimatedMinutes(row), 0);
+    const preparationMin = duration() + planningPreparation <= sessionCap
+      ? planningPreparation
+      : PREPARATION_FLOOR_MIN;
+    const durationCap = sessionCap - preparationMin;
     const supports = dayRows.filter((row) => row.role !== 'major').sort(
       (a, b) => supportPriority(a.role) - supportPriority(b.role)
         || b.sourceSlotIndex - a.sourceSlotIndex,
@@ -658,7 +709,7 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
       if (duration() <= durationCap) break;
       if (!row.included) continue;
       row.included = false;
-      row.adaptations.push(`Omitted to keep day ${dayIndex} inside the ${durationCap}-minute duration cap before changing a major.`);
+      row.adaptations.push(`Omitted to keep day ${dayIndex} inside the ${sessionCap}-minute duration cap (including ${preparationMin} minutes of preparation) before changing a major.`);
     }
     const majors = dayRows.filter((row) => row.role === 'major').sort(
       (a, b) => purposeReductionPriority(a.purpose) - purposeReductionPriority(b.purpose)
@@ -671,8 +722,22 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
       if (reducible === undefined) break;
       reducible.sets -= 1;
     }
-    if (duration() > durationCap + 0.05) {
-      const message = `Day ${dayIndex} cannot fit every selected major at a safe minimum dose inside ${durationCap} minutes.`;
+    const mainWorkMin = round1(duration());
+    const feasible = duration() <= durationCap + 0.05;
+    dayTimes.push({
+      dayIndex,
+      capMin: sessionCap,
+      preparationMin,
+      preparationCondensed: preparationMin < planningPreparation,
+      mainWorkMin,
+      estimatedMin: round1(preparationMin + mainWorkMin),
+      feasible,
+    });
+    if (!feasible) {
+      const options = feasibleSessionAlternatives({
+        capMin: sessionCap, requiredMin: preparationMin + duration(), weeklyFrequency: populatedDays,
+      }).map(describeSessionAlternative);
+      const message = `Day ${dayIndex} cannot fit every selected major at a safe minimum dose inside ${sessionCap} minutes once ${preparationMin} minutes of preparation are counted (about ${Math.ceil(preparationMin + duration())} minutes needed). Options: remove a major from this day.${options.length === 0 ? '' : ` ${options.join(' ')}`}`;
       if (input.executionGateDayIndices === undefined
           || input.executionGateDayIndices.has(dayIndex)) {
         blockers.push(message);
@@ -800,6 +865,7 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
     recommendations: [...new Set(recommendations)],
     adaptations: [...new Set(globalAdaptations)],
     blockers: [...new Set(blockers)],
+    dayTimes,
   };
 }
 

@@ -296,6 +296,20 @@ export default function ProgramSetupScreen({
 
   // Ranking decisions from the generated preview: anchor substitutions and
   // reasoned bodyweight fallbacks surface verbatim in the preview card.
+  // Session-time contract, straight from the generated preview: preparation,
+  // rest and changeovers are counted inside the session limit, and a session
+  // that cannot fit is shown as a conflict with its options before creation.
+  const sessionTime = useMemo(() => {
+    const budget = previewResult.preview?.plan?.timeBudget;
+    if (budget === undefined || budget.sessions.length === 0) return null;
+    return {
+      capMin: budget.capMin,
+      preparationMin: Math.min(...budget.sessions.map((session) => session.preparationMin)),
+      longestMin: Math.max(...budget.sessions.map((session) => session.estimatedMin)),
+      trimmed: budget.sessions.some((session) => session.trimmedSlotIndexes.length > 0),
+      conflicts: budget.conflicts,
+    };
+  }, [previewResult.preview]);
   const rankingNotes = previewResult.preview?.plan?.warnings?.filter((w) =>
     w.includes('unavailable for') || w.includes('no loaded')) ?? [];
 
@@ -608,6 +622,23 @@ export default function ProgramSetupScreen({
           ))}
         </View>
       )}
+      {sessionTime !== null && (
+        <View style={styles.card} testID="session-time-card"
+          accessibilityRole={sessionTime.conflicts.length > 0 ? 'alert' : undefined}>
+          <Text style={styles.sectionTitle}>Time in each session</Text>
+          <Text style={styles.caption} testID="session-time-summary">
+            {`Each session counts preparation (${sessionTime.preparationMin} min), your sets, rest and changeovers inside your ${sessionTime.capMin}-minute limit. The longest session is about ${Math.ceil(sessionTime.longestMin)} minutes.`}
+          </Text>
+          {sessionTime.trimmed && (
+            <Text style={styles.caption} testID="session-time-trimmed">
+              Some sets were reduced so sessions fit your limit. Preparation was not shortened below its minimum.
+            </Text>
+          )}
+          {sessionTime.conflicts.map((conflict) => (
+            <Text key={conflict} style={styles.error} testID="session-time-conflict">{conflict}</Text>
+          ))}
+        </View>
+      )}
       {rankingNotes.length > 0 && (
         <View style={styles.card} testID="ranking-notes-card">
           <Text style={styles.sectionTitle}>Coach decisions in this plan</Text>
@@ -622,7 +653,8 @@ export default function ProgramSetupScreen({
         </Text>
       )}
       <PrimaryButton label={editing ? 'Save future preferences' : 'Create program'} onPress={confirm}
-        disabled={input === null || previewResult.preview === null} />
+        disabled={input === null || previewResult.preview === null
+          || (sessionTime !== null && sessionTime.conflicts.length > 0)} />
       {onCancel !== undefined && <SecondaryButton label="Cancel" onPress={onCancel} />}
       <Text style={styles.caption}>Program starts {today}. Future blocks require confirmation.</Text>
     </KeyboardAwareScrollView>

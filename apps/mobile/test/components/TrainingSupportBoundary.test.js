@@ -147,6 +147,9 @@ const startPlanned = (method = 'LINEAR') => {
   state().generateNewBlock(method);
   expect(state().todayPlan).not.toBeNull();
   state().startSession();
+  // Preparation gates the first set (work order 1, migration 065). These tests
+  // are about the SUPPORT boundary, so preparation is given an outcome first.
+  state().finishPreparation('already_warm', state().preparation.revision);
   expect(state().sessionPlan.length).toBeGreaterThan(0);
   return state().sessionPlan[0];
 };
