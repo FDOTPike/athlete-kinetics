@@ -2,7 +2,7 @@
  * export_movement_library.mjs — dumps the full movement library to JSON for
  * design-time analysis (see PROMPT_1a_DeepMind_movement_analysis.md).
  *
- * Deterministic: replays migrations 001–026 into an in-memory DB (the same
+ * Deterministic: replays the full production migration chain into an in-memory DB (the same
  * schema-replay the verify: gates use), then exports movement + movement_detail
  * + movement_progression + equipment + beginner flag. No device or seed-file
  * dependency; reproducible from source.
@@ -18,22 +18,20 @@ const ROOT = join(import.meta.dirname, '..');
 const SCHEMA_DIR = join(ROOT, 'packages', 'core-db', 'src', 'schema');
 const OUT = join(ROOT, 'movement_library_export.json');
 
-const FILES = [
-  '001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
-  '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
-  '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
-  '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
-  '014_movement_prefixes.sql', '015_set_prefix.sql',
-  '016_movement_library_seed.sql', '017_movement_batch.sql',
-  '018_logging_modes.sql', '019_movement_batch.sql', '020_movement_batch.sql',
-  '021_taxonomy_corrections.sql', '022_set_target.sql',
-  '023_phase17_session_foundation.sql', '024_phase17_equipment_fixes.sql',
-  '025_movement_coaching_content.sql', '026_phase18_session_outcome.sql',
-  '027_operational_safeguards.sql', '028_capability_graph.sql',
-  '029_routine_history_analytics.sql', '030_readiness_import_integration.sql',
-  '031_planned_session_method.sql', '032_capability_content.sql',
-  '033_goal_program.sql', '034_autopilot_attribution.sql',
-];
+// The production registry IS the replay order (user_version ordinals; see
+// packages/core-db/MIGRATION_LINEAGE.md). A hand-copied list here went stale
+// at 033 and exported the 124-row pre-v2 library instead of all 300 rows.
+const REGISTRY = readFileSync(join(ROOT, 'packages', 'core-db', 'src', 'migrations.ts'), 'utf-8');
+const IMPORTS = Object.fromEntries([...REGISTRY.matchAll(/import (m\d+) from '\.\/schema\/([^']+)'/g)].map((m) => [m[1], m[2]]));
+const registryMatch = REGISTRY.match(/(?:^|\n)\s*(?:export\s+)?const\s+MIGRATIONS\b[^=]*=\s*\[([^\]]+)\]/s);
+if (!registryMatch) throw new Error('migrations.ts: the MIGRATIONS registry declaration was not found');
+const IDS = registryMatch[1].split(',').map((id) => id.trim()).filter(Boolean);
+const unresolved = IDS.filter((id) => IMPORTS[id] === undefined);
+// An incomplete parse must fail, never export a truncated library.
+if (IDS.length === 0 || unresolved.length > 0 || IDS.length !== Object.keys(IMPORTS).length) {
+  throw new Error(`migrations.ts registry parse is incomplete: ${IDS.length} ids, ${Object.keys(IMPORTS).length} imports, unresolved: ${unresolved.join(', ') || 'none'}`);
+}
+const FILES = IDS.map((id) => IMPORTS[id]);
 
 const db = new DatabaseSync(':memory:');
 // Some migrations reference ln/sqrt (present in op-sqlite at runtime); shim for node:sqlite.

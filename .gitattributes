@@ -16,3 +16,13 @@
 *.db binary
 *.keystore binary
 *.jar binary
+
+# Frozen evidence archives: byte-for-byte preservation, no EOL conversion.
+# These artifacts are identified by SHA-256 in docs/research/ and in commit
+# messages. Normalising their line endings would silently break every recorded
+# hash, so all conversion is disabled here. Do not remove this rule.
+docs/research/audits/** -text
+
+# Frozen migration-lineage fixtures: exact master 1da218d bytes, SHA-256
+# pinned in packages/core-db/MIGRATION_LINEAGE.json. No EOL conversion.
+packages/core-db/test/fixtures/lineage/** -text

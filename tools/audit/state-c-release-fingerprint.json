@@ -1,0 +1,63 @@
+{
+  "lineage": "state-c-release-readiness",
+  "base_commit": "34f91ffe548a0b9e51db863ffc6fad993619f940",
+  "canonical_ledger_base": {
+    "path": "PROMPT_LEDGER.md",
+    "sha256": "00f3d78475d4192a0bcbe03db2432301ab23fdabb5bb6a994b5835cb4f8f9c68",
+    "lines": 3139
+  },
+  "audit_lineage_archive": {
+    "path": "docs/audits/state-c-release-readiness/lineage/PROMPT_LEDGER_AUDIT_LINEAGE_1A878602.md",
+    "source_path": "progression-evidence-remediation worktree PROMPT_LEDGER.md (dirty, preserved)",
+    "sha256": "1a8786020be1eef107a1b3c8b6e1d02ff7826b688e67789adaf1414bc8e5c3b0",
+    "lines": 3942,
+    "status": "immutable external lineage; never the canonical ledger"
+  },
+  "carried_audit_documents": {
+    "MASTER_AUDIT_SYNTHESIS.md": {
+      "sha256": "ab6f53d27a32d15dc4b1ce9691d32442db74f903fa4d50f9bf01f175c81526fb",
+      "lines": 1272
+    },
+    "docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md": {
+      "sha256": "284f86ffe702a12faead4c776503cda40cb3e10b879dc8c023b618ebbfa09114",
+      "lines": 345
+    },
+    "docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md": {
+      "sha256": "9377394e9cb473cae76506a3e3ad12b6efbf015feed43dce5dcf0b35632fc155",
+      "lines": 484
+    },
+    "docs/WORKORDER_MASTER_AUDIT_SYNTHESIS_REMEDIATION.md": {
+      "sha256": "687617d9e6dfa7222d6cfd85fc25978caa92303109031ac0ed771bec2d20f2ec"
+    },
+    "docs/WORKORDER_GLM53_AUDIT_SYNTHESIS_CONTINUATION.md": {
+      "sha256": "72e1166b1c44564c2fc799621d5cd9512b8c8c65e7b7318331c0d80f38104338"
+    }
+  },
+  "release_work_order": {
+    "path": "docs/WORKORDER_STATE_C_RELEASE_READINESS.md",
+    "entry": "PROMPT_LEDGER.md Entry 0058"
+  },
+  "curated_evidence_root": "docs/audits/state-c-release-readiness/",
+  "note": "Fingerprint covers the pre-certification freeze; commit hashes are appended by the verifier from git.",
+  "round_13_review_handoffs": {
+    "docs/audits/state-c-release-readiness/reviews/round-13-reviewer-a.txt": {
+      "sha256": "36c6420f29ed48e403056fbe3f116365cac9863b51f904b477e98f9637e2b153",
+      "lines": 67
+    },
+    "docs/audits/state-c-release-readiness/reviews/round-13-reviewer-b.txt": {
+      "sha256": "12cfdae76d18c4aec348f0437210cb0c8b21f395d1ce146ecd2f4678ec639d1d",
+      "lines": 21
+    }
+  },
+  "certification": {
+    "candidate_freeze": "952afd3ce0c45497e0d46c66d2d71788a56dead2",
+    "round_13_attempt_1": {
+      "reviewer_a": "REQUEST_CHANGES",
+      "reviewer_b": "APPROVE"
+    },
+    "round_13_attempt_2": {
+      "reviewer_a": "APPROVE",
+      "reviewer_b": "APPROVE"
+    }
+  }
+}
