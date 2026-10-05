@@ -1,6 +1,6 @@
 **Batch:** MOV-B002  **Type:** REPAIR (frame guard and stage clipping)
 
-**Baseline:** the accepted MOV-B001 commit (SHA supplied when this is sent). Not to be started before MOV-B001 is accepted.
+**Baseline:** `ee5bca7143e922b491024972f9f8e81875e83824` (MOV-B001 accepted: source `7754e1507f3688d17b57552810554c07a4269b15` plus its evidence commit). Stop and report if your HEAD differs or the tree is dirty. Line numbers below were taken at `a1a073f6`; MOV-B001 moved a few of them slightly.
 
 **Source of findings:** `PRE_DISPATCH_FRAME_FIT_REVIEW_a1a073f6.md` and its raw measurements in `evidence/a1a073f6-frame-fit/` on branch `claude/movement-orchestration-2026-10-05`.
 
@@ -17,7 +17,13 @@
 4. Only Dumbbell Reverse Lunge has a frame guard. The all-entries test at `:186-292` never renders the component, re-implements renderer geometry, samples five times per cycle, and skips the three derived movements.
 5. `MovementPreview.fixedBarBodyMotion.test.js:20` turns the whole suite into `describe.skip` while Inverted Row and the fixed-bar triceps press are absent.
 
-**Owned files:** `MovementPreview.canonicalFrameFit.test.js`; `MovementPreview.fixedBarBodyMotion.test.js`; the source data for the fifteen movements (`movementPreviewManifest.json` and the family files, regenerated with the existing authoring tools, never hand-edited generated output alone); `MovementPreview.tsx` only if a diagnosed renderer cause requires it.
+**MOV-B001 acceptance, and three follow-ups to do first in this batch:**
+MOV-B001 is accepted. I re-ran it on your commit in an isolated worktree: typecheck exit 0; MovementPreview suites exit 0 (33 passed, 1 skipped; 700 passed, 4 skipped); evidence gate exit 0; and my own rendered-output probe shows 0 of 132 movements changed against `a1a073f6`, drawing and captions.
+- Follow-up 1. `MovementPreview.batch3Perspective.test.js` now skips the byte-identity lock on the 12 base movements. That test was a regression lock, not a body comparison, so skipping it removed a guard. Restore it on the neutral figure: generate a NEW neutral baseline file beside the historical one from the `a1a073f6` source (same 20 ms sampling), commit it, and assert against it. Leave `acceptance-evidence/wo09/batch3-perspective/base-primitives.json` byte-for-byte unchanged. Prove the new baseline is identical when generated at `a1a073f6` and at your commit.
+- Follow-up 2. `derivation.ts` still imports `DUAL_BODY_PARAMETERS` without using it, and the doc comment above `CANONICAL_BODY_PARAMETERS` in `canonicalFigure.ts` still describes the old three-set contract. Tidy both.
+- Follow-up 3. Your reply gave the evidence commit as `ee5bca7140fb...`; the real one is `ee5bca7143e922b491024972f9f8e81875e83824`. Paste SHAs from `git rev-parse` output, never retype them.
+
+**Owned files:** `MovementPreview.batch3Perspective.test.js` and one new neutral baseline file beside the historical one; `derivation.ts` and `canonicalFigure.ts` for follow-up 2 only; `MovementPreview.canonicalFrameFit.test.js`; `MovementPreview.fixedBarBodyMotion.test.js`; the source data for the fifteen movements (`movementPreviewManifest.json` and the family files, regenerated with the existing authoring tools, never hand-edited generated output alone); `MovementPreview.tsx` only if a diagnosed renderer cause requires it.
 
 **Excluded:** every other movement's data; joint positions of the fifteen unless the diagnosis shows the pose, not the framing, is wrong; existing files under `acceptance-evidence/`; the joint-limits checker and scanner.
 
