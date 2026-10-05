@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
 
-test.each(['male', 'female'])('Walking Lunge canonical navigation and motion transitions (%s)', async (bodyType) => {
+test.each(['neutral'])('Walking Lunge canonical navigation and motion transitions (%s)', async (bodyType) => {
   const element = (reducedMotion) => <MovementPreview movement={subject} bodyType={bodyType} reducedMotion={reducedMotion} />;
   const view = render(element(true));
   await act(async () => {});

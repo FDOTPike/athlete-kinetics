@@ -108,12 +108,8 @@ describe('canonical rendering behind the gate (fixture override)', () => {
 
   test('neutral is the exact midpoint and the implicit component default', async () => {
     expect(DUAL_BODY_PARAMETERS.neutral).toEqual({ sw: 10.2, hw: 8.5, lw: 4.8, hr: 6.2 });
-    for (const key of ['sw', 'hw', 'lw', 'hr']) {
-      expect(DUAL_BODY_PARAMETERS.neutral[key]).toBeCloseTo(
-        (DUAL_BODY_PARAMETERS.male[key] + DUAL_BODY_PARAMETERS.female[key]) / 2,
-        12,
-      );
-    }
+    expect(DUAL_BODY_PARAMETERS.male).toEqual(DUAL_BODY_PARAMETERS.neutral);
+    expect(DUAL_BODY_PARAMETERS.female).toEqual(DUAL_BODY_PARAMETERS.neutral);
     const implicit = await renderPreview(<MovementPreview movement={FIXTURE_SUBJECT} />);
     const explicit = await renderPreview(<MovementPreview movement={FIXTURE_SUBJECT} bodyType="neutral" />);
     const drawing = (view) => JSON.stringify(React.Children.toArray(
@@ -122,15 +118,15 @@ describe('canonical rendering behind the gate (fixture override)', () => {
     expect(drawing(implicit)).toBe(drawing(explicit));
   });
 
-  test('bodyType changes the drawn silhouette (dual-body parameters are actually consumed)', async () => {
+  test('legacy male/female bodyType inputs resolve to the identical neutral geometry', async () => {
+    const neutral = await renderPreview(<MovementPreview movement={FIXTURE_SUBJECT} bodyType="neutral" />);
     const male = await renderPreview(<MovementPreview movement={FIXTURE_SUBJECT} bodyType="male" />);
     const female = await renderPreview(<MovementPreview movement={FIXTURE_SUBJECT} bodyType="female" />);
-    const heights = (tree) => JSON.stringify(
-      tree.root.findAll(() => true).map((node) => node.props?.style)
-        .filter(Boolean).map((s) => (Array.isArray(s) ? s : [s]))
-        .flat().map((s) => s.height).filter((h) => h !== undefined).sort((a, b) => a - b),
-    );
-    expect(heights(female)).not.toBe(heights(male));
+    const drawing = (view) => JSON.stringify(React.Children.toArray(
+      view.getByTestId('movement-preview-stage-canonical').props.children,
+    ).map((child) => child.props.style));
+    expect(drawing(male)).toBe(drawing(neutral));
+    expect(drawing(female)).toBe(drawing(neutral));
   });
 
   test('canonical playback advances through segments and halts at the final frame (single cycle)', async () => {

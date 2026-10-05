@@ -1,5 +1,9 @@
 # Movement completion status
 
+> [!NOTE]
+> **SUPERSEDED BY OWNER DECISION (MOV-B001 — Neutral-Only Silhouette Standard):**
+> Exactly ONE gender-neutral figure is rendered for every movement. Animation morphology must not vary by gender. Historical male/female multi-body profiles, tests, and matrices mentioned in this document are superseded; all animation pipelines, derivation rules, test suites, and evidence tooling now target the single canonical neutral morphology (`CANONICAL_BODY_PARAMETERS`). Historical text below is retained intact for audit lineage.
+
 Root implements the established offline primitive renderer in isolated motion branches. The original implementation branch is preserved at5a1c84c1 on feature12a1fb15. Current isolated release integration starts from independently checked Opuscf4c221ef3993341f903a1d228e94d4893002081; its actual unsigned iOS core smoke passed all six checks and both backup flags, with source/artifact identity independently verified. Whole-app user flows and native motion acceptance remain separate. No store or shipped migration files are copied into this work.
 
 ## Current authored scope

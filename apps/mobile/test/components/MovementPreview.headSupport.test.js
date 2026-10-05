@@ -7,7 +7,7 @@ import { MovementPreview } from '../../src/components/movementPreview';
 import { DUAL_BODY_PARAMETERS, layoutCanonicalFigure } from '../../src/components/movementPreview/canonicalFigure';
 import * as manifest from '../../src/components/movementPreview/manifest';
 import { previewManifest } from './previewManifest';
-const cases=[143,49,178,220].flatMap(id=>Object.keys(DUAL_BODY_PARAMETERS).map(body=>[id,body]));
+const cases=[143,49,178,220].map(id=>[id,'neutral']);
 afterEach(()=>jest.restoreAllMocks());
 
 test.each(cases)('%i/%s actual RN head touches its finite support capsule',async(id,bodyType)=>{

@@ -9,7 +9,7 @@ test.each(entries)('$movementId pushdown preserves upper arms, actual flexion an
   expect(entry.segmentDurationsMs[2]).toBe(1000);
   expect(entry.frames.at(-1).joints).toEqual(entry.frames[0].joints);
   const total = entry.segmentDurationsMs.reduce((a, b) => a + b, 0);
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) {
     const opts = { ...entry, body };
     const first = resolveFigureJoints(entry.frames[0].joints, opts);
     const ticks = [...Array.from({ length: Math.ceil(total / 33) }, (_, i) => i * 33), total];
@@ -46,7 +46,7 @@ test.each(entries)('$movementId pushdown preserves upper arms, actual flexion an
 });
 
 test('bar grips have opposite palm orientation and rope endpoints really spread without bending the extended elbows', () => {
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) {
     const prims = entries.slice(0, 2).map(e => layoutCanonicalFigure(e.frames[0].joints, { ...e, body }));
     const palms = prims.map(ps => ps.filter(p => p.kind === 'bone' && p.w === 2.2 && p.color === 'textHi'));
     expect(palms[0]).toHaveLength(2); expect(palms[1]).toHaveLength(2);

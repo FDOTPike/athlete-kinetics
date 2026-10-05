@@ -24,7 +24,7 @@ for (const id of ids) {
     for (const offset of [-0.001, 0, 0.001]) times.add(Math.max(0, Math.min(total, elapsed + offset)));
   }
   let bounds = { minX: entry.viewBox[0], minY: entry.viewBox[1], maxX: entry.viewBox[0] + entry.viewBox[2], maxY: entry.viewBox[1] + entry.viewBox[3] };
-  for (const body of Object.values(layout.DUAL_BODY_PARAMETERS)) {
+  for (const body of [layout.CANONICAL_BODY_PARAMETERS]) {
     for (const time of times) {
       const pose = layout.poseAtTime(entry.frames.map(f => f.joints), time, entry.segmentDurationsMs);
       const options = { ...entry, view: entry.view, body,

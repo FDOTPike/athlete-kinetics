@@ -5,7 +5,7 @@ import { DUAL_BODY_PARAMETERS } from '../../src/components/movementPreview/canon
 import { measureLungeContacts, assertLungeContacts } from './lungeContactProbe';
 const entry = raw.entries.find((e) => e.movementId === 17);
 
-test.each(['male', 'female'])('drawn support and lead feet stay planted in both lunge descents (%s)', (body) => {
+test.each(['neutral'])('drawn support and lead feet stay planted in both lunge descents (%s)', (body) => {
   const rows = measureLungeContacts(entry, DUAL_BODY_PARAMETERS[body],
     require('../../src/components/movementPreview/canonicalFigure'));
   assertLungeContacts(rows);

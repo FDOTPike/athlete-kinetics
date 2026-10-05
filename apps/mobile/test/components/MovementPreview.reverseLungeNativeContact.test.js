@@ -20,7 +20,7 @@ beforeEach(()=>{
 });
 afterEach(()=>{cleanup();jest.useRealTimers();jest.restoreAllMocks();resetPreviewPlayback();});
 
-test.each(Object.keys(DUAL_BODY_PARAMETERS))('52 actual rounded RN feet contact the native ground after landing (%s)',async bodyName=>{
+test.each(['neutral'])('52 actual rounded RN feet contact the native ground after landing (%s)',async bodyName=>{
   const body=DUAL_BODY_PARAMETERS[bodyName],scale=Math.min(240/raw.viewBox[2],240/raw.viewBox[3]);
   render(<MovementPreview movement={subject} bodyType={bodyName} reducedMotion={true}/>);
   await act(async()=>{});

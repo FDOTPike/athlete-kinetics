@@ -24,7 +24,7 @@
  * Usage:
  *   node tools/rendering/render_manifest_evidence.mjs --out acceptance-evidence/wo09/round1_baseline
  *
- * Per movement (12 canonical movements), per body (male/female):
+ * Per movement (12 canonical movements), neutral body:
  *   - all keyframes (stills),
  *   - the midpoint of every keyframe transition (sampled interpolation),
  *   - a contact sheet at 390 px cell width and one at 320 px (phone-size
@@ -130,7 +130,7 @@ for (const movement of movements) {
   const { out: poseList } = poses(movement);
   const auditRows = [];
 
-  for (const bodyName of ['male', 'female']) {
+  for (const bodyName of ['neutral']) {
     const body = DUAL_BODY_PARAMETERS[bodyName];
     for (const pose of poseList) {
       for (const widthPx of [390, 320]) {
@@ -161,9 +161,9 @@ for (const movement of movements) {
     auditRows.push({ body: bodyName, segments: variance });
   }
 
-  // Contact sheets: rows = male/female, columns = poses, cell 390px / 320px.
+  // Contact sheets: single row = neutral, columns = poses, cell 390px / 320px.
   for (const cell of [390, 320]) {
-    const first = renderSvg(movement, poseList[0].joints, DUAL_BODY_PARAMETERS.male, cell);
+    const first = renderSvg(movement, poseList[0].joints, DUAL_BODY_PARAMETERS.neutral, cell);
     const cellH = first.heightPx;
     const header = 34;
     const maxCols = Math.max(1, Math.floor(SHEET_MAX_PX / cell));
@@ -172,23 +172,16 @@ for (const movement of movements) {
 
     for (const [chunkIndex, chunkPoses] of chunks.entries()) {
       const W = chunkPoses.length * cell;
-      const H = header + 2 * (cellH + 26);
+      const H = header + (cellH + 26);
       let parts = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="100%" height="100%" fill="${HEX.ink1}"/>`;
       const part = chunks.length > 1 ? ` [part ${chunkIndex + 1}/${chunks.length}]` : '';
       parts += `<text x="8" y="22" fill="${HEX.textMid}" font-family="sans-serif" font-size="15">${movement.name} (${movement.view}) — ${cell}px cells${part}</text>`;
       chunkPoses.forEach((pose, i) => {
-        const { svg, heightPx } = renderSvg(movement, pose.joints, DUAL_BODY_PARAMETERS.male, cell);
+        const { svg, heightPx } = renderSvg(movement, pose.joints, DUAL_BODY_PARAMETERS.neutral, cell);
         const x = i * cell, y = header;
         parts += `<g transform="translate(${x},${y})"><rect width="${cell}" height="${heightPx}" fill="${HEX.ink1}"/>${svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</g>`;
         parts += `<text x="${x + 6}" y="${y + heightPx + 18}" fill="${HEX.textMid}" font-family="sans-serif" font-size="12">${pose.label}</text>`;
       });
-      const y2 = header + cellH + 26;
-      chunkPoses.forEach((pose, i) => {
-        const { svg, heightPx } = renderSvg(movement, pose.joints, DUAL_BODY_PARAMETERS.female, cell);
-        const x = i * cell;
-        parts += `<g transform="translate(${x},${y2})"><rect width="${cell}" height="${heightPx}" fill="${HEX.ink1}"/>${svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</g>`;
-      });
-      parts += `<text x="8" y="${header + cellH + 20}" fill="${HEX.textLow}" font-family="sans-serif" font-size="12">male (top row) / female (bottom row)</text>`;
       parts += '</svg>';
       const suffix = chunks.length > 1 ? `_part${chunkIndex + 1}of${chunks.length}` : '';
       const sheetName = `${key}_contact_${cell}px${suffix}`;

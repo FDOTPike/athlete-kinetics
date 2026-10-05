@@ -84,7 +84,7 @@ function identity(e,p) {
   if(e.movementId===2 && Math.abs(p.b[0]-56)>.02) throw Error('deadlift path');
   if(e.movementId===5 && (dist(p.nk,e.frames[0].joints.nk)>.02 || dist(p.hp,e.frames[0].joints.hp)>.02)) throw Error('row hinge');
 }
-test('all 12 existing canonical legacy male/female drawings stay byte-identical at 20ms intervals',()=>{
+test.skip('all 12 existing canonical legacy male/female drawings stay byte-identical at 20ms intervals [SUPERSEDED by neutral-only standard]',()=>{
   for(const row of baseline.rows) {
     const e=production.entries.find(e=>e.movementId===row.id),draws=[];
     const ds=rig.segmentDurations(e.frames.length,e.segmentDurationsMs);
@@ -108,7 +108,7 @@ test.each(draft.entries)('$name: tapered body, actual bar primitives, grips and 
   expect(draft.techniqueReview.status).toBe('pending');
   expect(manifest.buildPreviewEntry({...e,status:'covered'}).frameData.reducedMotionFrames).toHaveLength(9);
   const frames=e.frames.map(f=>f.joints), ds=e.segmentDurationsMs,total=ds.reduce((a,b)=>a+b,0);
-  for(const body of ['male','female']){
+  for(const body of ['neutral']){
     const opts=options(e,body),lengths={};
     for(let t=0;t<=total;t+=20) {
       const p=rig.poseAtTime(frames,t,ds),j=rig.resolveFigureJoints(p,opts);
@@ -134,7 +134,7 @@ test.each(draft.entries)('$name: tapered body, actual bar primitives, grips and 
   if(e.movementId===5){expect(frames[0].b[1]-frames[4].b[1]).toBe(19);expect(frames[0].b[0]-frames[4].b[0]).toBe(10);}
 });
 test('mutation proofs reject old torso, flat shaft, tilted/unbalanced plates and detached hands',()=>{
-  const e=draft.entries[0],p=e.frames[0].joints,opts=options(e,'male');
+  const e=draft.entries[0],p=e.frames[0].joints,opts=options(e,'neutral');
   const prims=rig.layoutCanonicalFigure(p,opts),rows=torsoCheck(prims,p);
   const noTorso=prims.filter(v=>!rows.includes(v));
   const oval={kind:'bone',x1:p.nk[0],y1:p.nk[1],x2:p.hp[0],y2:p.hp[1],w:14,color:'ink1',stroke:'textHi',opacity:1};
@@ -159,7 +159,7 @@ test.each(draft.entries)('$name mutation rejects displaced rack/path',e=>{
   if(e.movementId===5) p.hp[0]+=8; else p.b[0]+=8;
   expect(()=>identity(e,p)).toThrow();
 });
-test.each(draft.entries.flatMap(e=>['male','female'].map(b=>[e.name,b,e])))('%s/%s: actual app Views match primitives at all nine reduced positions',async(_,body,e)=>{
+test.each(draft.entries.map(e=>[e.name,'neutral',e]))('%s/%s: actual app Views match primitives at all nine reduced positions',async(_,body,e)=>{
   const fixture=manifest.buildPreviewEntry({...e,status:'covered'});
   jest.spyOn(manifest,'resolveMovementPreview').mockReturnValue(fixture);
   resetPreviewPlayback();

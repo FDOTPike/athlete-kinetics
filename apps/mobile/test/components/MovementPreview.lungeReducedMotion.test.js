@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
 
-test.each(['male', 'female'])('curated reduced-motion sequence teaches the lunge (%s)', async (bodyType) => {
+test.each(['neutral'])('curated reduced-motion sequence teaches the lunge (%s)', async (bodyType) => {
   const element = (reducedMotion) => (
     <MovementPreview movement={subject} bodyType={bodyType} reducedMotion={reducedMotion} />
   );

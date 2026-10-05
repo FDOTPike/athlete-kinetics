@@ -43,7 +43,7 @@ for (const id of ids) {
   const scale = Math.min(240 / w, 240 / h);
   const width = Math.ceil(w * scale), height = Math.ceil(h * scale);
   const records = [];
-  for (const [bodyName, body] of Object.entries(layout.DUAL_BODY_PARAMETERS)) {
+  for (const [bodyName, body] of [['neutral', layout.CANONICAL_BODY_PARAMETERS]]) {
     const frames = [];
     for (const time of ticks) {
       const pose = layout.poseAtTime(entry.frames.map(f => f.joints), time, entry.segmentDurationsMs);

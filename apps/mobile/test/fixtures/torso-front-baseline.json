@@ -5,27 +5,15 @@
   "cases": [
     {
       "movementId": 19,
-      "body": "male",
+      "body": "neutral",
       "samples": 17,
-      "sha256": "0afb579fe94dbbdb87722bfaaffb0ea07493bcedb69d48963a24068399e5f217"
-    },
-    {
-      "movementId": 19,
-      "body": "female",
-      "samples": 17,
-      "sha256": "50c30a0bb039ac58a80849c9444f846f0130a854b646434ce64f0fe0002d984f"
+      "sha256": "d5ca260f1e00e13a778880c92cc15b052d6b1577d81a6655f049c3ce24daa8ed"
     },
     {
       "movementId": 62,
-      "body": "male",
+      "body": "neutral",
       "samples": 9,
-      "sha256": "b66e07a6224ed6ede5f487f1e7b6fec2733898a1dba32f5e731a860f5e8c81b2"
-    },
-    {
-      "movementId": 62,
-      "body": "female",
-      "samples": 9,
-      "sha256": "3e35364c1eea04c02c345d4247b13fd21b4f2f7aac0578fada3213ee52654e2f"
+      "sha256": "b96f63dc49b2f341441c5c8dbb33b10a239e977bb10b78b576383091430c6f2d"
     }
   ]
 }

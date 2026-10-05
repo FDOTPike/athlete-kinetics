@@ -1,5 +1,9 @@
 # Independent motion completion map
 
+> [!NOTE]
+> **SUPERSEDED BY OWNER DECISION (MOV-B001 — Neutral-Only Silhouette Standard):**
+> Exactly ONE gender-neutral figure is rendered for every movement. Animation morphology must not vary by gender. Historical male/female multi-body profiles, tests, and matrices mentioned in this document are superseded; all animation pipelines, derivation rules, test suites, and evidence tooling now target the single canonical neutral morphology (`CANONICAL_BODY_PARAMETERS`). Historical text below is retained intact for audit lineage.
+
 Source snapshot: `12a1fb15aff5611b771348a53e2e04f4079e0e34` on `origin/claude/coaching-wo4-coaching-content`. Local overlay: 129 records. This is an authoring backlog, not technique approval.
 
 All 300 stable IDs are bound to exact replayed instructions, cues, equipment, implements, media keys and source path:line. Missing 171 consist of 169 not excluded by the old catalogue plus 27/291 previously excluded for locomotion. The 169 map to 106 physically bounded families; 52 belong to the old 174-ID Beginner scope. No motion is approved by this audit.
