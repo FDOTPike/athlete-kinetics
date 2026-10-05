@@ -372,6 +372,22 @@ final class AthleteKineticsUITests: XCTestCase {
       log("HEALTH-UNANSWERED HealthKit returned no answer to the app on this simulator; the app kept its request pending and claimed nothing")
     }
     XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 2), "the permission sheet stayed open")
+    // CI evidence (c4ef71b, 37c6022): when the sheet was answered but healthd
+    // never closed the transaction, nothing in the app was hittable afterwards
+    // (the build label "never became hittable"); in the run where no sheet
+    // appeared, the same steps passed. The stuck system authorization view is
+    // recorded and cleared by relaunching the app (data persists on disk). The
+    // same sequence on a physical device is an owner check.
+    if !answered {
+      let header = element("header-athlete")
+      if header.exists && !header.isHittable {
+        log("HEALTH-VIEW-STUCK the app was not hittable after the unanswered Health request; relaunching")
+        app.terminate()
+        launch(["-AKUITestTrace", "1"])
+      } else {
+        log("app hittable after the Health request: \(header.exists ? "yes" : "header absent")")
+      }
+    }
 
     let before = expandCoachMode()
     XCTAssertTrue(before.hasPrefix("Coach mode, 1 athletes"), "expected one athlete before adding: \(before)")
@@ -478,9 +494,13 @@ final class AthleteKineticsUITests: XCTestCase {
         log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: \(now.prefix(120))")
         lastRestoreStatus = now
       }
-      if now.hasPrefix("Restore complete.") || !(now.hasPrefix("Creating") || now.hasPrefix("Recovery") || now.hasPrefix("Replacing") || now == "<absent>") { break }
+      // Only the app's own restore outcomes end the wait; any other text (an
+      // overlay read mid-transition) means keep waiting.
+      // "Restore cancelled." is the earlier Files-sheet result still on screen.
+      if (now.hasPrefix("Restore ") && !now.hasPrefix("Restore cancelled")) || now.hasPrefix("A restored database") { break }
       sleep(2)
     }
+    dismissSetUpOfferIfShown("after the restore")
     settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)
     wait(element("shell-root"), "the app after restore")
     openProfile()
