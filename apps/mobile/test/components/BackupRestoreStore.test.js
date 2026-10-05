@@ -25,7 +25,7 @@ const mockKeepLocalCopy = jest.fn(async () => {
   return [{ status: 'success', localUri: localPath }];
 });
 const mockSaveDocuments = jest.fn(async ({ sourceUris }) => {
-  expect(sourceUris[0]).toMatch(/\/ak-portable-[a-f0-9]{32}\.pmbak$/);
+  expect(sourceUris[0]).toMatch(/\/ak-portable-[a-f0-9]{32}\/pikeMethods-\d{4}-\d{2}-\d{2}\.pmbak$/);
   expect(readdirSync(mockCacheDir).filter((name) => /^ak-backup-/.test(name))).toEqual([]);
   return [{ error: null, uri: 'content://saved/backup' }];
 });

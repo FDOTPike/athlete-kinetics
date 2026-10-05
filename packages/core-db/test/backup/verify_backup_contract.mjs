@@ -544,10 +544,13 @@ try {
   assert.equal(removedSourceRead, true, 'the first source may be read, while removed later sources fail before creation/read');
 
   const operationHex = '00112233445566778899aabbccddeeff';
-  const abandoned = [`ak-backup-${operationHex}`, `ak-portable-${operationHex}.pmbak`];
+  // The portable export now stages <ak-portable-hex>/<person-facing name>.pmbak
+  // (iOS saves under the source name), so that exact directory is abandoned too.
+  const abandoned = [`ak-backup-${operationHex}`, `ak-portable-${operationHex}.pmbak`, `ak-portable-${operationHex}`];
   const retainedCacheNames = [
     'ak-backup-not-an-operation', 'user-cache', 'user-backup.pmbak', 'selected-local.pmbak',
-    `ak-backup-${operationHex}.pmbak`, `ak-portable-${operationHex}`, `ak-portable-${operationHex.toUpperCase()}.pmbak`,
+    `ak-backup-${operationHex}.pmbak`, `ak-portable-${operationHex.toUpperCase()}`, `ak-portable-${operationHex.slice(1)}`,
+    `ak-portable-${operationHex}0`, `ak-portable-${operationHex}/`, `ak-portable-${operationHex.toUpperCase()}.pmbak`,
     `ak-portable-${operationHex.slice(1)}.pmbak`, `ak-portable-${operationHex}0.pmbak`, `ak-portable-${operationHex}.PMBAK`,
     `ak-portable-${operationHex}.pmbak.new`, `ak-portable-${operationHex}.pmbak\n`, `xak-portable-${operationHex}.pmbak`,
     `ak-portable-${operationHex}pmbak`, `ak-portable-${operationHex}.pmbakx`, `ak-portable-g${operationHex.slice(1)}.pmbak`,

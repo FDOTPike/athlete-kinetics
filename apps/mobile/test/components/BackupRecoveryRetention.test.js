@@ -889,6 +889,8 @@ describe('W4 startup cache cleanup', () => {
     const hex = '0123456789abcdef0123456789abcdef';
     const other = 'fedcba9876543210fedcba9876543210';
     writeFileSync(`${mockCacheDir}/ak-portable-${hex}.pmbak`, 'abandoned ciphertext');
+    mkdirSync(`${mockCacheDir}/ak-portable-${other}`);
+    writeFileSync(`${mockCacheDir}/ak-portable-${other}/pikeMethods-2026-10-05.pmbak`, 'abandoned export ciphertext');
     mkdirSync(`${mockCacheDir}/ak-backup-${other}`);
     writeFileSync(`${mockCacheDir}/ak-backup-${other}/snapshot-0.db`, 'abandoned plaintext');
     const retained = [

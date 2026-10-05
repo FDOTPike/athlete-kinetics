@@ -64,11 +64,15 @@ export async function executeInterruptedRestoreRecovery(
 
 const ABANDONED_PLAINTEXT_SNAPSHOT_DIRECTORY = /^ak-backup-[a-f0-9]{32}$/;
 const ABANDONED_PORTABLE_CIPHERTEXT_FILE = /^ak-portable-[a-f0-9]{32}\.pmbak$/;
+const ABANDONED_PORTABLE_EXPORT_DIRECTORY = /^ak-portable-[a-f0-9]{32}$/;
 
-/** Exact generated cache names only: a plaintext snapshot work directory, or
- * the encrypted portable file staged for the operating-system save flow. */
+/** Exact generated cache names only: a plaintext snapshot work directory, the
+ * private directory holding the encrypted portable file staged for the
+ * operating-system save flow (named for the person, since iOS saves under the
+ * source file's name), or that file as earlier builds staged it. */
 export function isAbandonedBackupCacheEntry(name: string): boolean {
-  return ABANDONED_PLAINTEXT_SNAPSHOT_DIRECTORY.test(name) || ABANDONED_PORTABLE_CIPHERTEXT_FILE.test(name);
+  return ABANDONED_PLAINTEXT_SNAPSHOT_DIRECTORY.test(name) || ABANDONED_PORTABLE_CIPHERTEXT_FILE.test(name)
+    || ABANDONED_PORTABLE_EXPORT_DIRECTORY.test(name);
 }
 
 export async function cleanupAbandonedBackupCacheEntries(

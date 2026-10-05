@@ -284,26 +284,34 @@ final class AthleteKineticsUITests: XCTestCase {
     openProfile()
     let idle = element(labelBeginsWith: "Apple Health is available.")
     wait(idle, "the Apple Health 'available' wording before any request")
-    tap("Choose whether to share sleep and resting heart rate from Apple Health", "Apple Health CONNECT")
-    guard let dontAllow = findHealthSheetButton("Don’t Allow", timeout: 30) else {
-      let hint = element(labelBeginsWith: "Apple Health")
-      log("health after CONNECT: no Don't Allow in the app or SpringBoard; hint=\(hint.exists ? String(hint.label.prefix(200)) : "-")")
-      XCTFail("HealthKit's permission sheet (Don't Allow) did not appear within 30 s")
-      return
-    }
-    log("health sheet shown: allow=\(healthPermissionButton("Allow").exists) dontAllow=true")
-    dontAllow.tap()
-    log("health sheet: tapped Don't Allow")
-    // What the app shows over the next 45 s, each change recorded: tells an
-    // answer that never arrives from one that arrives and is then replaced.
+    // CI evidence (5bdc452): the simulator's HealthKit sheet service can start
+    // slower than HealthKit's own 10 s authorization session; HealthKit then
+    // fails the request ("Authorization session timed out") and the app shows
+    // its honest "did not complete — TRY AGAIN" wording. That path is recorded
+    // as evidence; the person then taps TRY AGAIN once, as anyone would.
     let healthHint = element(labelBeginsWith: "Apple Health")
-    var seen = ""
-    for second in 0..<45 {
-      let now = healthHint.exists ? String(healthHint.label.prefix(60)) : "<absent>"
-      if now != seen { log("health hint t=\(second)s: \(now)"); seen = now }
-      if now.hasPrefix("Apple Health access requested") { break }
-      sleep(1)
+    var answered = false
+    for attempt in 1...2 where !answered {
+      let control = "Choose whether to share sleep and resting heart rate from Apple Health"
+      tap(control, "Apple Health CONNECT / TRY AGAIN (attempt \(attempt))")
+      if let dontAllow = findHealthSheetButton("Don’t Allow", timeout: 60) {
+        log("health sheet shown (attempt \(attempt)): allow=\(healthPermissionButton("Allow").exists) dontAllow=true")
+        dontAllow.tap()
+        log("health sheet: tapped Don't Allow")
+      } else {
+        log("health sheet not shown within 60 s (attempt \(attempt))")
+      }
+      // Every change of the wording for up to 120 s.
+      var seen = ""
+      for second in 0..<120 {
+        let now = healthHint.exists ? String(healthHint.label.prefix(60)) : "<absent>"
+        if now != seen { log("health hint attempt \(attempt) t=\(second)s: \(now)"); seen = now }
+        if now.hasPrefix("Apple Health access requested") { answered = true; break }
+        if now.hasPrefix("The Apple Health request did not complete") { break }
+        sleep(1)
+      }
     }
+    XCTAssertTrue(answered, "the person's answer on HealthKit's sheet was never reflected in the app")
     // HealthKit never tells an app that reading was denied, so the honest
     // wording is 'requested' plus where to check — never 'connected'.
     let hintA = settledLabel(element(labelBeginsWith: "Apple Health access requested"),
@@ -476,7 +484,7 @@ final class AthleteKineticsUITests: XCTestCase {
   // MARK: - Files
 
   private func onMyIPhone() {
-    let browse = app.buttons["Browse"]
+    let browse = app.buttons.matching(identifier: "Browse").firstMatch
     if browse.waitForExistence(timeout: 10) && !browse.isSelected { browse.tap() }
     let local = app.descendants(matching: .any)
       .matching(NSPredicate(format: "label == 'On My iPhone' OR label == 'On My iPad'")).firstMatch

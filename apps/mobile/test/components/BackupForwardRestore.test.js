@@ -62,7 +62,7 @@ let mockSavedBackupPath;
 // The OS "save" flow: keep the encrypted file the app handed over so a test
 // can restore from the exact backup that was just created.
 const mockSaveDocuments = jest.fn(async ({ sourceUris }) => {
-  expect(sourceUris[0]).toMatch(/\/ak-portable-[a-f0-9]{32}\.pmbak$/);
+  expect(sourceUris[0]).toMatch(/\/ak-portable-[a-f0-9]{32}\/pikeMethods-\d{4}-\d{2}-\d{2}\.pmbak$/);
   expect(readdirSync(mockCacheDir).filter((name) => /^ak-backup-/.test(name))).toEqual([]);
   mockSavedBackupPath = `${mockRoot}/saved.pmbak`;
   require('node:fs').copyFileSync(sourceUris[0].slice('file://'.length), mockSavedBackupPath);

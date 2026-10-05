@@ -1025,6 +1025,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
     pendingRestore = null;
     let workDirectory: string | null = null;
     let encryptedPath: string | null = null;
+    let exportDirectory: string | null = null;
     let releaseMaintenance: (() => void) | null = null;
     try {
       if (!(await actionCanProceed(get(), set))) return;
@@ -1035,7 +1036,12 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       await ensurePlaintextSnapshotsRemoved(workDirectory);
       workDirectory = null;
       const fileName = `pikeMethods-${new Date().toISOString().slice(0, 10)}.pmbak`;
-      encryptedPath = `${fs().dirs.CacheDir}/ak-portable-${randomId()}.pmbak`;
+      // iOS saves under the SOURCE file's name (the picker's fileName is
+      // Android-only), so the staged file carries the person-facing name inside
+      // a private, uniquely named directory that is removed afterwards.
+      exportDirectory = `${fs().dirs.CacheDir}/ak-portable-${randomId()}`;
+      await fs().mkdir(exportDirectory);
+      encryptedPath = `${exportDirectory}/${fileName}`;
       await fs().writeFile(encryptedPath, created.text, 'utf8');
       const saved = await pickerSave(encryptedPath, fileName);
       if (!saved) throw new Error('The system storage provider did not confirm the file was saved.');
@@ -1049,6 +1055,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
     } finally {
       try {
         if (encryptedPath !== null) await removeIfPresent(encryptedPath);
+        if (exportDirectory !== null) await removeIfPresent(exportDirectory);
         if (workDirectory !== null) await removeIfPresent(workDirectory);
         if (releaseMaintenance !== null) {
           releaseMaintenance();
