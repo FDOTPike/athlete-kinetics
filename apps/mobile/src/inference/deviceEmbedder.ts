@@ -146,11 +146,20 @@ export async function tryCreateDeviceEmbedder(): Promise<Embedder | null> {
         return bundled;
       }
       if (!(await ReactNativeBlobUtil.fs.exists(dest))) {
-        // Remove a working copy left by an earlier unkeyed build (same bytes
-        // or not, it is never read again) before writing the keyed one.
-        const legacy = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${MODEL_ASSET}`;
-        if (await ReactNativeBlobUtil.fs.exists(legacy)) await ReactNativeBlobUtil.fs.unlink(legacy);
-        await ReactNativeBlobUtil.fs.cp(ReactNativeBlobUtil.fs.asset(MODEL_ASSET), dest);
+        // Remove working copies that are never read again: the unkeyed copy of
+        // an earlier build, copies keyed to an older pin, and an interrupted
+        // partial copy (~23 MB each).
+        const dir = ReactNativeBlobUtil.fs.dirs.DocumentDir;
+        for (const name of await ReactNativeBlobUtil.fs.ls(dir)) {
+          if (name === MODEL_ASSET || /^minilm-[a-f0-9]{16}\.onnx(?:\.partial)?$/.test(name)) {
+            await ReactNativeBlobUtil.fs.unlink(`${dir}/${name}`);
+          }
+        }
+        // Copy beside the final name, then move: a copy cut short by process
+        // death or a full disk is never mistaken for the model on next launch.
+        const partial = `${dest}.partial`;
+        await ReactNativeBlobUtil.fs.cp(ReactNativeBlobUtil.fs.asset(MODEL_ASSET), partial);
+        if ((await ReactNativeBlobUtil.fs.mv(partial, dest)) === false) throw new Error('embedder model copy could not be finalized');
       }
       return dest;
     };

@@ -66,8 +66,10 @@ export const inventoryToSnapshot = <T extends string>(inventory: readonly T[]): 
 
 /** LOAD: the inventory half of a parsed profile_slot snapshot. The value
  *  arrives already JSON-parsed, so it is re-serialized through the one shared
- *  parser — a hand-edited slot holding `{}`, `7` or a missing key must fail
- *  closed exactly as a damaged athlete_profile cell does. Used by
+ *  parser: a hand-edited slot holding `{}` or `7` falls back exactly as a
+ *  damaged athlete_profile cell does. An absent or null key grants NOTHING
+ *  (the empty set), never the recovery defaults — a slot that never recorded
+ *  equipment must not gain any (verify:store pins both). Used by
  *  useStore.profileFromJsonString. */
 export const inventoryFromSnapshot = <T extends string>(
   value: unknown,

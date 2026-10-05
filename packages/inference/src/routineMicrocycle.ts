@@ -859,7 +859,9 @@ export function composeRoutineMicrocycle(input: ComposeRoutineMicrocycleInput): 
   }));
 
   return {
-    prescriptions,
+    // Fail-closed: a blocker found late (stress budget, session time, dose
+    // monotonicity) still never coexists with therapeutic output.
+    prescriptions: blockers.length > 0 ? [] : prescriptions,
     familyDecisions,
     warnings: [...new Set(warnings)],
     recommendations: [...new Set(recommendations)],

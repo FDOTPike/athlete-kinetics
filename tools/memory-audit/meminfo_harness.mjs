@@ -43,13 +43,13 @@ import {
   parseLifecycleMarkers,
   summarizeMemory,
 } from './lifecycle_correlator.mjs';
-import { computeEvidenceBinding } from './evidence_provenance.mjs';
+import { computeEvidenceBinding, LOGCAT_FILENAME } from './evidence_provenance.mjs';
+import { PREFERRED_TARGET_BYTES, RATIFIED_CEILING_BYTES } from './memory_gate.mjs';
 
 // The QA variant's real application id (android/app/build.gradle:
 // applicationId com.pikemethods.training + applicationIdSuffix ".qa").
 const PACKAGE_DEFAULT = 'com.pikemethods.training.qa';
 const SESSION_FILE = () => join(evidenceRoot(), 'session.json');
-const PRODUCT_CEILING_BYTES = 450_000_000;
 
 function evidenceRoot() {
   return process.env.AK_MEM_EVIDENCE_DIR || join(tmpdir(), 'ak-mem-evidence');
@@ -212,6 +212,10 @@ function cmdFinish() {
   const logcat = logFile
     ? readFileSync(logFile, 'utf-8')
     : (adb(['logcat', '-d', '-v', 'epoch', '-t', '5000'], { optional: true }) ?? '');
+  // Freeze the exact text correlated here into the packet: provenance
+  // re-derives the lifecycle claims from <evidence>/logcat-epoch.txt, whatever
+  // the source (adb -d, or a still-growing AK_LOGCAT_FILE).
+  writeFileSync(join(evidenceRoot(), LOGCAT_FILENAME), logcat);
   const tzOffsetMinutes = Number.isFinite(session.deviceUtcOffsetMinutes)
     ? session.deviceUtcOffsetMinutes : null;
   const { markers, undated, malformed } = parseLifecycleMarkers(logcat, {
@@ -319,9 +323,14 @@ function cmdFinish() {
       maxSampledPrivateDirtyBytes: memory.maxSampledPrivateDirtyBytes,
       perRequest: memory.perRequest,
       perRun: memory.perRun,
-      ratifiedCeilingBytes: PRODUCT_CEILING_BYTES,
+      // Ratified 2026-08-24: 512 MiB is the hard ceiling; 450 MB is the
+      // preferred operating target (memory_gate.mjs owns both values).
+      ratifiedCeilingBytes: RATIFIED_CEILING_BYTES,
+      preferredTargetBytes: PREFERRED_TARGET_BYTES,
       withinRatifiedCeiling: memory.maxSampledPrivateDirtyBytes !== null
-        && memory.maxSampledPrivateDirtyBytes <= PRODUCT_CEILING_BYTES,
+        && memory.maxSampledPrivateDirtyBytes <= RATIFIED_CEILING_BYTES,
+      withinPreferredTarget: memory.maxSampledPrivateDirtyBytes !== null
+        && memory.maxSampledPrivateDirtyBytes <= PREFERRED_TARGET_BYTES,
     },
 
     endToEndLatencyMs: latency.length ? {

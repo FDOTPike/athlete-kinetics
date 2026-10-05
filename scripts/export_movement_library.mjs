@@ -23,8 +23,15 @@ const OUT = join(ROOT, 'movement_library_export.json');
 // at 033 and exported the 124-row pre-v2 library instead of all 300 rows.
 const REGISTRY = readFileSync(join(ROOT, 'packages', 'core-db', 'src', 'migrations.ts'), 'utf-8');
 const IMPORTS = Object.fromEntries([...REGISTRY.matchAll(/import (m\d+) from '\.\/schema\/([^']+)'/g)].map((m) => [m[1], m[2]]));
-const FILES = REGISTRY.match(/MIGRATIONS[^=]*=\s*\[([^\]]+)\]/s)[1].split(',').map((id) => id.trim()).filter(Boolean)
-  .map((id) => IMPORTS[id]);
+const registryMatch = REGISTRY.match(/(?:^|\n)\s*(?:export\s+)?const\s+MIGRATIONS\b[^=]*=\s*\[([^\]]+)\]/s);
+if (!registryMatch) throw new Error('migrations.ts: the MIGRATIONS registry declaration was not found');
+const IDS = registryMatch[1].split(',').map((id) => id.trim()).filter(Boolean);
+const unresolved = IDS.filter((id) => IMPORTS[id] === undefined);
+// An incomplete parse must fail, never export a truncated library.
+if (IDS.length === 0 || unresolved.length > 0 || IDS.length !== Object.keys(IMPORTS).length) {
+  throw new Error(`migrations.ts registry parse is incomplete: ${IDS.length} ids, ${Object.keys(IMPORTS).length} imports, unresolved: ${unresolved.join(', ') || 'none'}`);
+}
+const FILES = IDS.map((id) => IMPORTS[id]);
 
 const db = new DatabaseSync(':memory:');
 // Some migrations reference ln/sqrt (present in op-sqlite at runtime); shim for node:sqlite.

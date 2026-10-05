@@ -106,7 +106,7 @@ const SUSPENSION_REASONS = ['injury', 'illness', 'life'] as const;
 const SUSPENSION_REASON_LABEL: Record<(typeof SUSPENSION_REASONS)[number], string> = {
   injury: 'an injury',
   illness: 'illness',
-  life: 'life',
+  life: 'life events',
 };
 
 function targetLabel(slot: TodaySlot): string {
@@ -376,7 +376,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   if (editingProgram) {
     return (
       <ProgramSetupScreen
-        editing
+        // Create mode when there is no program yet ("Build your first block"):
+        // edit mode would submit to updateProgramPreferences, which refuses.
+        editing={program !== null}
         onComplete={() => setEditingProgram(false)}
         onCancel={() => setEditingProgram(false)}
       />

@@ -142,6 +142,9 @@ export async function publishRecoveryBackup(
     throw new RecoveryPublicationUnresolvedError(UNRESOLVED_MESSAGE);
   }
   const retainedBefore = await io.exists(paths.final);
+  // Once a preserved candidate has been deleted, the newly authenticated
+  // recovery is the only successor to that content: abandonment must keep it.
+  let candidatesSuperseded = false;
   try {
     await io.write(paths.fresh, sealedText);
     const sealedIdentity = await authenticate(await io.read(paths.fresh));
@@ -152,10 +155,13 @@ export async function publishRecoveryBackup(
       throw new Error('The retained recovery backup could not be verified. Existing data is unchanged.');
     }
     if (retainedBefore) await io.remove(paths.previous);
-    for (const alternate of await io.alternates()) await io.remove(alternate);
+    for (const alternate of await io.alternates()) {
+      candidatesSuperseded = true;
+      await io.remove(alternate);
+    }
   } catch (error) {
     try {
-      await abandonRecoveryPublication(io, paths, retainedBefore);
+      await abandonRecoveryPublication(io, paths, retainedBefore || candidatesSuperseded);
     } catch {
       throw new RecoveryPublicationUnresolvedError(UNRESOLVED_MESSAGE);
     }

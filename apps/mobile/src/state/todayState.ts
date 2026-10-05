@@ -250,7 +250,9 @@ export const durationEstimate = (
 ): DurationEstimate => {
   const median = medianMinutes(recordedSamples);
   if (median === null) return { kind: 'cap', minutes: sessionDurationCapMin };
-  return { kind: 'recorded', minutes: median, sampleSize: recordedSamples.length };
+  // The count the median actually used (medianMinutes drops unusable samples).
+  const sampleSize = recordedSamples.filter((n) => Number.isFinite(n) && n > 0).length;
+  return { kind: 'recorded', minutes: median, sampleSize };
 };
 
 /** Athlete-facing sentence for a duration estimate. Never invents precision. */

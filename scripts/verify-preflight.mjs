@@ -150,16 +150,17 @@ const LAZY_VERIFIER = join(ROOT, 'packages', 'inference', 'test', 'verify_lazy_l
 check('lifecycle verifier present (verify_lazy_lifecycle.mjs)', existsSync(LAZY_VERIFIER));
 
 // --- [6] verification cannot silently download ---------------------------------
-const EMBEDDER_SRC = readFileSync(
-  join(ROOT, 'packages', 'inference', 'src', 'semantic', 'onnxEmbedder.ts'), 'utf-8',
-);
+// A missing source is a FAIL line in the summary, never an uncaught stack trace.
+const readOr = (path) => { try { return readFileSync(path, 'utf-8'); } catch { return null; } };
+const EMBEDDER_SRC = readOr(join(ROOT, 'packages', 'inference', 'src', 'semantic', 'onnxEmbedder.ts'));
 check('verification pipeline is constructed from local assets only',
-  !EMBEDDER_SRC.includes('@xenova/transformers'),
+  EMBEDDER_SRC !== null && !EMBEDDER_SRC.includes('@xenova/transformers'),
   'onnxEmbedder consumes injected sessions from packages/inference/assets/minilm');
-const integritySrc = readFileSync(join(ROOT, 'scripts', 'embedder-integrity.mjs'), 'utf-8');
-check('offline options enforce local_files_only', integritySrc.includes('local_files_only: true'));
-check('fetch-embedder remains the sole downloader',
-  readFileSync(join(ROOT, 'scripts', 'fetch-embedder.mjs'), 'utf-8').includes('huggingface.co'));
+const integritySrc = readOr(join(ROOT, 'scripts', 'embedder-integrity.mjs'));
+check('offline options enforce local_files_only', integritySrc !== null && integritySrc.includes('local_files_only: true'));
+const fetchSrc = readOr(join(ROOT, 'scripts', 'fetch-embedder.mjs'));
+check('fetch-embedder downloads from the pinned host',
+  fetchSrc !== null && fetchSrc.includes('huggingface.co'));
 
 console.log(`\n${fail === 0 ? 'PREFLIGHT OK' : `${fail} PREFLIGHT CHECK(S) FAILED`}`);
 if (fail > 0) {

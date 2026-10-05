@@ -32,6 +32,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      # allowScripts / strict-allow-scripts need npm >= 11.16.0; the npm
+      # bundled with the selected Node may be older (engine-strict would then
+      # refuse, correctly). Pin the reviewed npm explicitly.
+      - name: Pin npm 11.16.0 (install-script policy)
+        run: npm install -g npm@11.16.0 && npm --version
       - run: npm ci
       # MiniLM (~25 MB) used by verify:semantic + verify:embedder; cached.
       # Keyed on the pin-bearing integrity module: any revision/hash change
@@ -101,6 +106,11 @@ jobs:
             "ndk;28.2.13676358"
           test -x "$ANDROID_HOME/cmake/3.30.5/bin/cmake"
           test -d "$ANDROID_HOME/ndk/28.2.13676358"
+      # allowScripts / strict-allow-scripts need npm >= 11.16.0; the npm
+      # bundled with the selected Node may be older (engine-strict would then
+      # refuse, correctly). Pin the reviewed npm explicitly.
+      - name: Pin npm 11.16.0 (install-script policy)
+        run: npm install -g npm@11.16.0 && npm --version
       - run: npm ci
       # The triage embedding model ships inside the APK (Android assets);
       # cache-first fetch, then stage it where AGP packages assets from.
@@ -193,6 +203,11 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
           working-directory: apps/mobile
+      # allowScripts / strict-allow-scripts need npm >= 11.16.0; the npm
+      # bundled with the selected Node may be older (engine-strict would then
+      # refuse, correctly). Pin the reviewed npm explicitly.
+      - name: Pin npm 11.16.0 (install-script policy)
+        run: npm install -g npm@11.16.0 && npm --version
       - run: npm ci
       # Same pin-bound cache and byte-verified fetch as the Android job.
       - name: Cache embedding model

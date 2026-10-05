@@ -6,7 +6,7 @@
  *
  * The policy itself: a package with an install script runs arbitrary code on
  * `npm install`, on every developer machine and every CI runner, before any
- * test has executed. npm >= 11.6 can refuse to run any install script that is
+ * test has executed. npm >= 11.16 can refuse to run any install script that is
  * not explicitly reviewed, via an `allowScripts` map in package.json. That
  * refusal is only real if three things hold together — the map exists and is
  * pinned to exact versions, the map and the lockfile agree IN BOTH DIRECTIONS,
@@ -28,8 +28,19 @@
  * the raw `.npmrc` text; fixtures supply synthetic ones.
  */
 
-/** The first npm that understands `allowScripts`. Below this the policy is inert. */
-export const REQUIRED_NPM_FLOOR = '11.6';
+/** The first npm that understands `allowScripts` and `strict-allow-scripts`
+ *  (npm 11.16.0). Below this the policy is inert. */
+export const REQUIRED_NPM_FLOOR = [11, 16, 0];
+
+/** The lower bound of a `>=X.Y.Z` range, or null for any other shape (a `<`,
+ *  `^`, `~`, `*` or missing range is not a floor). */
+export function engineFloor(range) {
+  const m = String(range ?? '').trim().match(/^>=\s*(\d+)\.(\d+)\.(\d+)$/);
+  return m === null ? null : [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+const atLeast = (v, floor) => v !== null
+  && (v[0] !== floor[0] ? v[0] > floor[0] : v[1] !== floor[1] ? v[1] > floor[1] : v[2] >= floor[2]);
 /** The supported node major. */
 export const REQUIRED_NODE_MAJOR = '24';
 
@@ -108,9 +119,9 @@ export function checkInstallScriptPolicy({ pkgJson = null, lockJson = null, npmr
   const npmEngine = pkgJson?.engines?.npm ?? '';
   const nodeEngine = pkgJson?.engines?.node ?? '';
   add('package.json floors npm at the first version that understands allowScripts',
-    npmEngine.includes(REQUIRED_NPM_FLOOR), npmEngine || '(absent)');
+    atLeast(engineFloor(npmEngine), REQUIRED_NPM_FLOOR), npmEngine || '(absent)');
   add('package.json floors node at the supported major',
-    new RegExp(REQUIRED_NODE_MAJOR).test(nodeEngine), nodeEngine || '(absent)');
+    atLeast(engineFloor(nodeEngine), [Number(REQUIRED_NODE_MAJOR), 0, 0]), nodeEngine || '(absent)');
 
   const problems = checks.filter((c) => !c.ok).map((c) => `${c.label}${c.detail ? ` [${c.detail}]` : ''}`);
   return {

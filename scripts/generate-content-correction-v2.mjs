@@ -32,7 +32,8 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -266,6 +267,13 @@ function main() {
   const sql = renderMigration(overlay);
   const manifest = renderManifest(overlay, context.evidenceDoc);
   if (mode === '--write') {
+    // A shipped migration is never edited (migrations.ts): devices that
+    // applied 068 keep its bytes, so any later revision, including owner
+    // approval, ships in a new migration slot.
+    const rel = relative(ROOT, MIGRATION).replaceAll('\\', '/');
+    let shipped = true;
+    try { execFileSync('git', ['cat-file', '-e', `HEAD:${rel}`], { cwd: ROOT, stdio: 'ignore' }); } catch { shipped = false; }
+    if (shipped) throw new Error(`Refusing to overwrite shipped migration: ${rel}`);
     writeFileSync(MIGRATION, sql);
     writeFileSync(MANIFEST, manifest);
     console.log(`content correction v2: wrote ${overlay.records.length} corrections (${overlay.ratification.state})`);

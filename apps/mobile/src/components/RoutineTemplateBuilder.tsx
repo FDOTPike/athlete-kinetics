@@ -923,7 +923,7 @@ function AvailableRoutineTemplateBuilder({
                           value={String(slot.sets ?? defaults?.sets ?? '')}
                           onChangeText={(value) => updateDose(index, 'sets', value)}
                           keyboardType="number-pad"
-                          accessibilityLabel={`Sets for slot ${index + 1}`}
+                          accessibilityLabel={`Sets for day ${activeDay} slot ${activeSlotIndex + 1}`}
                         />
                       </View>
                       <View style={styles.doseField}>
@@ -934,7 +934,7 @@ function AvailableRoutineTemplateBuilder({
                           value={String(slot.reps ?? defaults?.reps ?? '')}
                           onChangeText={(value) => updateDose(index, 'reps', value)}
                           keyboardType="number-pad"
-                          accessibilityLabel={`Reps for slot ${index + 1}`}
+                          accessibilityLabel={`Reps for day ${activeDay} slot ${activeSlotIndex + 1}`}
                         />
                       </View>
                       {majorProjection !== undefined && (
@@ -965,8 +965,8 @@ function AvailableRoutineTemplateBuilder({
                           onChangeText={(value) => updateDose(index, 'targetRpe', value)}
                           keyboardType="decimal-pad"
                           accessibilityLabel={majorProjection === undefined
-                            ? `Target RPE for slot ${index + 1}`
-                            : `Maximum RPE for slot ${index + 1}`}
+                            ? `Target RPE for day ${activeDay} slot ${activeSlotIndex + 1}`
+                            : `Maximum RPE for day ${activeDay} slot ${activeSlotIndex + 1}`}
                         />
                       </View>
                     </View>

@@ -16,7 +16,9 @@ module.exports = {
   rootDir: __dirname,
   testMatch: [`${testComponentsDir}/**/*.test.js`],
   transform: {
-    '^.+\\\\.(js|ts|tsx)$': ['babel-jest', { babelrc: false, configFile: false, presets: ['module:@react-native/babel-preset'] }],
+    // Same key as the react-native preset's entry, so this one REPLACES it
+    // (it previously required a literal backslash and never matched).
+    '^.+\\.(js|ts|tsx)$': ['babel-jest', { babelrc: false, configFile: false, presets: ['module:@react-native/babel-preset'] }],
     // Raw loader for schema files. The app gets this from
     // babel-plugin-inline-import, which the transform above deliberately
     // excludes (babelrc/configFile off), so without this entry any module that

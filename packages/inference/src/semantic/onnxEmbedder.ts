@@ -235,7 +235,7 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
       emit(failedInference ? 'inference' : 'session', 'settled', requestId, false);
       throw error;
     } finally {
-      let disposalFailed = false;
+      let disposalError: { error: unknown } | null = null;
       if (session !== null) {
         const s = session;
         session = null;
@@ -246,14 +246,16 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
           emit('disposal', 'settled', requestId, true);
         } catch (error) {
           disposedTotal += 1;
-          disposalFailed = true;
+          disposalError = { error };
           emit('disposal', 'settled', requestId, false);
-          throw error;
         }
       }
       // A failed disposal is reported on its own stage event; the request-level
-      // settled event stays truthful about the request outcome itself.
-      emit('request', 'settled', requestId, requestOk && !disposalFailed);
+      // settled event is always emitted and stays truthful about the outcome.
+      emit('request', 'settled', requestId, requestOk && disposalError === null);
+      // The request's own error (already propagating) is never replaced; a
+      // disposal failure surfaces only when the request itself succeeded.
+      if (disposalError !== null && requestOk) throw disposalError.error;
     }
   };
 

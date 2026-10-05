@@ -232,7 +232,11 @@ check('loadCoachMovementAccessContext is a read-only projection of the access si
     join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
   const start = storeSource.indexOf('  loadCoachMovementAccessContext: () => {');
   assert.ok(start >= 0, 'loadCoachMovementAccessContext not found in useStore.ts');
-  const end = storeSource.indexOf('\n  },', start);
+  // Bound the method at the next sibling store key, not the first two-space
+  // `},`: a nested literal closing at that indentation would end it early and
+  // hide a later write from the forbidden-token scan.
+  const next = storeSource.slice(start + 1).search(/\n  [A-Za-z_]\w*: /);
+  const end = next < 0 ? -1 : start + 1 + next;
   assert.ok(end > start, 'could not bound loadCoachMovementAccessContext');
   const body = storeSource.slice(start, end);
   for (const forbidden of ['INSERT', 'UPDATE', 'DELETE', 'BEGIN', 'COMMIT', 'ROLLBACK', 'DROP', 'set(']) {

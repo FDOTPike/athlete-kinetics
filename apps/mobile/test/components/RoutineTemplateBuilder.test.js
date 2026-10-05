@@ -340,9 +340,9 @@ describe('RoutineTemplateBuilder', () => {
 
     fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
     fireEvent.press(screen.getByText('Competition Squat'));
-    fireEvent.changeText(screen.getByLabelText('Sets for slot 1'), '6');
-    fireEvent.changeText(screen.getByLabelText('Reps for slot 1'), '4');
-    fireEvent.changeText(screen.getByLabelText('Maximum RPE for slot 1'), '8.5');
+    fireEvent.changeText(screen.getByLabelText('Sets for day 1 slot 1'), '6');
+    fireEvent.changeText(screen.getByLabelText('Reps for day 1 slot 1'), '4');
+    fireEvent.changeText(screen.getByLabelText('Maximum RPE for day 1 slot 1'), '8.5');
     expect(screen.getByText(/6 sets x 4 reps @ RPE 6.0 start \/ 8.5 max/)).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 2'));
     fireEvent.press(screen.getByText('Dumbbell Row'));
@@ -363,8 +363,8 @@ describe('RoutineTemplateBuilder', () => {
     fireEvent.press(screen.getByText('Competition Squat'));
 
     expect(screen.getByLabelText('Projected starting RPE for day 1 slot 1: 5.5')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Maximum RPE for slot 1')).toHaveProp('value', '8');
-    fireEvent.changeText(screen.getByLabelText('Maximum RPE for slot 1'), '8.5');
+    expect(screen.getByLabelText('Maximum RPE for day 1 slot 1')).toHaveProp('value', '8');
+    fireEvent.changeText(screen.getByLabelText('Maximum RPE for day 1 slot 1'), '8.5');
     expect(screen.getByLabelText('Projected starting RPE for day 1 slot 1: 6.0')).toBeOnTheScreen();
     expect(screen.getByTestId('major-rpe-projection-note-1').props.children.join('')).toContain(
       'Projected loading range: RPE 6.0 start to 8.5 max.',
@@ -432,7 +432,7 @@ describe('RoutineTemplateBuilder', () => {
     expect(screen.getByTestId('routine-rpe-normalization-notice')).toHaveTextContent(
       /1 stored routine RPE value exceeded the athlete's current cap/,
     );
-    expect(screen.getByLabelText('Maximum RPE for slot 1')).toHaveProp('value', '7.5');
+    expect(screen.getByLabelText('Maximum RPE for day 1 slot 1')).toHaveProp('value', '7.5');
     fireEvent.press(screen.getByLabelText('Save routine template'));
     expect(saveRoutineTemplate).toHaveBeenCalledWith(expect.objectContaining({
       routineTemplateId: 20,
@@ -445,7 +445,7 @@ describe('RoutineTemplateBuilder', () => {
     fireEvent.changeText(screen.getByLabelText('Routine template name'), 'Above cap');
     fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
     fireEvent.press(screen.getByText('Competition Squat'));
-    fireEvent.changeText(screen.getByLabelText('Maximum RPE for slot 1'), '9.5');
+    fireEvent.changeText(screen.getByLabelText('Maximum RPE for day 1 slot 1'), '9.5');
     fireEvent.press(screen.getByLabelText('Save routine template'));
 
     expect(saveRoutineTemplate).not.toHaveBeenCalled();

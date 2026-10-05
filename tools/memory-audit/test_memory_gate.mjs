@@ -660,7 +660,7 @@ function computeCadenceLocal(sampleStarts) {
   // Provenance must be MANDATORY, not merely available: a real-looking packet
   // with no provenance result supplied cannot pass.
   const g = evaluateMemoryGate({
-    budget: REVIEWED_BUDGET, vectors: VECTORS, session: soundSession(), evidenceProvenance: BOUND_STUB, evidenceProvenance: null,
+    budget: REVIEWED_BUDGET, vectors: VECTORS, session: soundSession(), evidenceProvenance: null,
   });
   check('B-1: [G] fails closed when no provenance was computed at all',
     g.checks.find((c) => c.id === 'G')?.ok === false, 'absence of a digest is not a pass');

@@ -370,6 +370,21 @@ describe('portable-restore recovery publication', () => {
     }
   });
 
+  test('a failure while removing preserved candidates keeps the new authenticated recovery (no retained recovery)', async () => {
+    const FIRST = envelope('preserved-first');
+    const SECOND = envelope('preserved-second');
+    const initial = { [paths.alternateFor(sha(FIRST))]: FIRST, [paths.alternateFor(sha(SECOND))]: SECOND };
+    const clean = await cleanPublication(initial);
+    const removals = clean.operations.map((op, i) => [op, i]).filter(([op]) => op.startsWith('remove pikeMethods-recovery-current.pmbak.alternate-'));
+    expect(removals).toHaveLength(2);
+    const run = harness(initial, { failAt: [removals[1][1]] });
+    await expect(publishRecoveryBackup(run.io, paths, SEALED, run.authenticate)).rejects.toThrow();
+    // One candidate is already gone: the verified recovery is its successor and must remain.
+    expect(recoveryFiles(run.files)).toEqual({ final: SEALED, fresh: null, previous: null });
+    expect(Object.keys(alternatesOf(run.files))).toHaveLength(1);
+    expectUnrelatedIntact(run.files);
+  });
+
   test('the table marks exactly the combinations publication, abandonment and reconciliation can produce', async () => {
     const kind = (value) => (value === null ? 'absent' : isWellFormed(value) ? 'wellFormed' : 'malformed');
     const produced = new Set();

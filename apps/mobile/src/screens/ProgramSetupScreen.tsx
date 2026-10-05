@@ -142,8 +142,10 @@ export default function ProgramSetupScreen({
   }), [getVerdicts, movementAvailabilityRevision, profile, movements, niggles]);
 
   const toggleDay = (day: number): void => {
+    // The last training day stays selected; its choices must stay too.
+    if (dayIndices.length === 1 && dayIndices.includes(day)) return;
     const nextDays = dayIndices.includes(day)
-      ? (dayIndices.length === 1 ? dayIndices : dayIndices.filter((value) => value !== day))
+      ? dayIndices.filter((value) => value !== day)
       : [...dayIndices, day].sort((a, b) => a - b);
     setDayIndices(nextDays);
     setPreferences((current) => current.filter((preference) => preference.dayIndex !== day));

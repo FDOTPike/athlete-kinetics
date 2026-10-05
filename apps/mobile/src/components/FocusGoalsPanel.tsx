@@ -232,9 +232,11 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
                   testID={`profile-goal-edit-${stored.goalId}`} />
                 {stored.status === 'active' ? (
                   <>
-                    <SecondaryButton label="MARK ACHIEVED" fullWidth onPress={() => setGoalStatus(stored.goalId, 'achieved')}
+                    <SecondaryButton label="MARK ACHIEVED" fullWidth
+                      onPress={() => { if (!setGoalStatus(stored.goalId, 'achieved')) setMessage(storeError()); }}
                       accessibilityLabel={`Mark the goal ${stored.goal.specificOutcome} as achieved`} />
-                    <SecondaryButton label="RETIRE GOAL" fullWidth onPress={() => setGoalStatus(stored.goalId, 'retired')}
+                    <SecondaryButton label="RETIRE GOAL" fullWidth
+                      onPress={() => { if (!setGoalStatus(stored.goalId, 'retired')) setMessage(storeError()); }}
                       accessibilityLabel={`Retire the goal ${stored.goal.specificOutcome}. It is kept, not deleted.`} />
                   </>
                 ) : (

@@ -71,7 +71,7 @@ deterministic offline integrity gate.
 ## 3. Verification and build sequence (one unambiguous clean checkout path)
 
 ```powershell
-npm.cmd ci                      # npm >= 11.6; enforces the install-script policy
+npm.cmd ci                      # npm >= 11.16; enforces the install-script policy
 npm.cmd run fetch:embedder
 npm.cmd run verify:ci           # MERGE gate: must exit 0
 npm.cmd run verify:release      # RELEASE gate: adds [A], [D] and the real QA APK
@@ -83,7 +83,7 @@ to run a lifecycle script at install time, and `.npmrc` sets
 `strict-allow-scripts=true`, so a dependency that GAINS an install script — or
 whose approved version drifts — fails `npm ci` with `ESTRICTALLOWSCRIPTS`
 instead of executing unreviewed code. `engine-strict=true` plus the `engines`
-floor stops an npm older than 11.6 (which ignores the policy entirely) from
+floor stops an npm older than 11.16 (which ignores the policy entirely) from
 producing a silent false green. Approve a genuinely required new script with
 `npm install-scripts approve`; never with `--dangerously-allow-all-scripts`.
 

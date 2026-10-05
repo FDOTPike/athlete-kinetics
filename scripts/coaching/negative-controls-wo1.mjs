@@ -199,8 +199,14 @@ const failureEvidence = (output) => {
 
 const only = process.argv[2];
 const results = [];
+// Keep Node alive on Ctrl-C / SIGTERM: the signal still reaches the gate
+// (same process group), spawnSync returns, and the finally below restores the
+// mutated production file before the run stops.
+let interrupted = false;
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { interrupted = true; });
 for (const mutation of mutations) {
-  if (only !== undefined && !mutation.name.startsWith(only)) continue;
+  if (interrupted) break;
+  if (only !== undefined && !mutation.name.startsWith(`${only} `)) continue;
   if (!gatePassesUnmutated(mutation.gate)) {
     results.push({ name: mutation.name, outcome: 'GATE FAILS WITHOUT THE MUTATION' });
     console.log(JSON.stringify(results.at(-1)));
@@ -217,6 +223,7 @@ for (const mutation of mutations) {
   fs.writeFileSync(mutation.file, mutated);
   let result;
   try { result = run(mutation.gate); } finally { fs.writeFileSync(mutation.file, original); }
+  if (interrupted) { results.push({ name: mutation.name, outcome: 'INTERRUPTED' }); break; }
   const output = `${result.stdout}\n${result.stderr}`;
   const evidence = failureEvidence(output);
   const outcome = result.status === 0 ? 'NOT DETECTED' : evidence.length === 0 ? 'FAILED WITH NO REPORTED CHECK' : 'detected';

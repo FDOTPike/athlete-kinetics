@@ -34,7 +34,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /** A policy that is genuinely closed: pinned, in lockstep, strict, floored. */
 const SOUND_PKG = {
-  engines: { node: '>=24.0.0', npm: '>=11.6.0' },
+  engines: { node: '>=24.0.0', npm: '>=11.16.0' },
   allowScripts: { 'sharp@0.32.6': true, 'fsevents@2.3.3': true },
 };
 const SOUND_LOCK = {
@@ -164,11 +164,24 @@ console.log('\n[5] the engine floors that make the policy enforceable');
 
 {
   const r = sound({ pkgJson: { ...SOUND_PKG, engines: { node: '>=24.0.0', npm: '>=10.0.0' } } });
-  check('an npm floor below 11.6 is REJECTED (that npm ignores allowScripts)',
+  check('an npm floor below 11.16 is REJECTED (that npm ignores allowScripts)',
     redBecause(r, 'floors npm'));
 }
 {
-  const r = sound({ pkgJson: { ...SOUND_PKG, engines: { node: '>=20.0.0', npm: '>=11.6.0' } } });
+  // npm 11.6-11.15 accept the config keys but do not enforce them.
+  const r = sound({ pkgJson: { ...SOUND_PKG, engines: { node: '>=24.0.0', npm: '>=11.6.0' } } });
+  check('the old >=11.6.0 floor is REJECTED (allowScripts arrived in npm 11.16.0)', redBecause(r, 'floors npm'));
+}
+{
+  const r = sound({ pkgJson: { ...SOUND_PKG, engines: { node: '>=24.0.0', npm: '<11.16.0' } } });
+  check('an upper bound is not a floor and is REJECTED', redBecause(r, 'floors npm'));
+}
+{
+  const r = sound({ pkgJson: { ...SOUND_PKG, engines: { node: '>=24.0.0', npm: '>=12.0.0' } } });
+  check('a higher floor is accepted (compared numerically, not by substring)', r.ok);
+}
+{
+  const r = sound({ pkgJson: { ...SOUND_PKG, engines: { node: '>=20.0.0', npm: '>=11.16.0' } } });
   check('a node floor below the supported major is REJECTED', redBecause(r, 'floors node'));
 }
 {
