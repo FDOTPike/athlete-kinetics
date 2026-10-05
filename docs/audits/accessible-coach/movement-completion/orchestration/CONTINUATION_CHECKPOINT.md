@@ -9,7 +9,8 @@ Claude Desktop cannot be woken by mail. Whoever resumes: read this, then
 - Latest implementation source: `a1a073f6a08ce0c1f9921ba385579856348b3923` on
   `gemini/movement-animation-completion-2026-10-05`, local only, clean when
   last checked. Gemini is the only implementation writer.
-- Handshake `MOV-B000` is sent and unanswered. Nothing else is dispatched.
+- Handshake `MOV-B000` is closed: round trip verified. `MOV-B001`
+  (neutral-only) is sent and awaiting acknowledgement and completion.
 - Frame-fit repair reviewed: `PRE_DISPATCH_FRAME_FIT_REVIEW_a1a073f6.md`.
   The frame fix holds for all 132 movements; fifteen movements still clip at
   the stage; the guard and its controls need rework; neutral-only is not done.
@@ -24,9 +25,10 @@ Claude Desktop cannot be woken by mail. Whoever resumes: read this, then
 
 ## Next actions, in order
 
-1. Read the `MOV-B000` reply and check it against Gemini's checkout.
-2. Send `MOV-B001` (neutral-only), then `MOV-B002` (frame guard and the
-   fifteen clipped movements) once B001 is frozen and checked.
+1. Read the `MOV-B001` replies; check the frozen commit yourself (typecheck,
+   MovementPreview suites, neutral identity proof, body-selection search).
+2. Send `MOV-B002` (frame guard and the fifteen clipped movements) once B001
+   is accepted.
 3. Reconcile the holds and the exclusion reassessments in `ALL_300_LEDGER.json`
    against the actual sources.
 4. Then the ordered backlog: Inverted Row, fixed-bar body triceps press, the
