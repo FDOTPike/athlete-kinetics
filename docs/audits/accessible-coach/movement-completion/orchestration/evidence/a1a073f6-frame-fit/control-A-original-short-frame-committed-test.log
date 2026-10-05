@@ -1,0 +1,72 @@
+FAIL apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (12.307 s)
+  Finding A: Canonical Frame-Fit Enclosure and Stage Integrity
+    × Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (neutral) (551 ms)
+    × Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (male) (7 ms)
+    × Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (female) (7 ms)
+    √ Negative Control: original 171.43 dp frame height demonstrably fails enclosure guard for 52 (1 ms)
+    √ Negative Control: 24 dp shorter frame mutation demonstrably fails enclosure guard for 52
+    √ Coverage of all 129 renderable canonical entries across bodies and cycle checkpoints (9871 ms)
+    √ Parent layout presentation: compact mode (SessionScreen) and card mode (LibraryScreenV2) (8 ms)
+
+  ● Finding A: Canonical Frame-Fit Enclosure and Stage Integrity › Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (neutral)
+
+    expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 239.999999
+    Received:    171.42857142857142
+
+      100 |         // 1. Frame encloses stage
+      101 |         expect(frameW).toBeGreaterThanOrEqual(stageW - EPS);
+    > 102 |         expect(frameH).toBeGreaterThanOrEqual(stageH - EPS);
+          |                        ^
+      103 |         expect(frameH).toBeCloseTo(240, 5);
+      104 |
+      105 |         // Visible window in stage coordinates
+
+      at toBeGreaterThanOrEqual (test/components/MovementPreview.canonicalFrameFit.test.js:102:24)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Finding A: Canonical Frame-Fit Enclosure and Stage Integrity › Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (male)
+
+    expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 239.999999
+    Received:    171.42857142857142
+
+      100 |         // 1. Frame encloses stage
+      101 |         expect(frameW).toBeGreaterThanOrEqual(stageW - EPS);
+    > 102 |         expect(frameH).toBeGreaterThanOrEqual(stageH - EPS);
+          |                        ^
+      103 |         expect(frameH).toBeCloseTo(240, 5);
+      104 |
+      105 |         // Visible window in stage coordinates
+
+      at toBeGreaterThanOrEqual (test/components/MovementPreview.canonicalFrameFit.test.js:102:24)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Finding A: Canonical Frame-Fit Enclosure and Stage Integrity › Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (female)
+
+    expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 239.999999
+    Received:    171.42857142857142
+
+      100 |         // 1. Frame encloses stage
+      101 |         expect(frameW).toBeGreaterThanOrEqual(stageW - EPS);
+    > 102 |         expect(frameH).toBeGreaterThanOrEqual(stageH - EPS);
+          |                        ^
+      103 |         expect(frameH).toBeCloseTo(240, 5);
+      104 |
+      105 |         // Visible window in stage coordinates
+
+      at toBeGreaterThanOrEqual (test/components/MovementPreview.canonicalFrameFit.test.js:102:24)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 4 passed, 7 total
+Snapshots:   0 total
+Time:        12.85 s
+Ran all test suites matching /MovementPreview.canonicalFrameFit/i.

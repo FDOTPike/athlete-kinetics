@@ -1,0 +1,149 @@
+/**
+ * Opus audit probe (untracked, audit worktree only). Measures, through the REAL
+ * MovementPreview render path and the single neutral figure, how far any
+ * painted primitive or the floor line leaves (a) the canonical stage and
+ * (b) the visible figure frame, at every 33 ms tick of the full cycle.
+ * It asserts nothing about clipping: it writes measurements to AUDIT_OUT.
+ */
+import React from 'react';
+import fs from 'fs';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react-native';
+import { MovementPreview } from '../../src/components/movementPreview';
+import * as manifest from '../../src/components/movementPreview/manifest';
+import { resetPreviewPlayback } from '../../src/components/movementPreview/playbackCoordinator';
+import { theme } from '../../src/theme/theme';
+import { rawEntries } from './previewManifest';
+
+const TICK_MS = 33;
+const ONLY = process.env.AUDIT_IDS ? new Set(process.env.AUDIT_IDS.split(',').map(Number)) : null;
+const byId = new Map(rawEntries.map((e) => [e.movementId, e]));
+
+function rotOf(s) {
+  const r = s.transform?.find((t) => t.rotate !== undefined);
+  return r ? (parseFloat(r.rotate) * Math.PI) / 180 : 0;
+}
+
+function paintedBounds(s) {
+  const w = s.width;
+  const h = s.height;
+  const th = rotOf(s);
+  const r = Math.min(s.borderRadius ?? 0, w / 2, h / 2);
+  const cx = s.left + w / 2;
+  const cy = s.top + h / 2;
+  const ex = (w / 2 - r) * Math.abs(Math.cos(th)) + (h / 2 - r) * Math.abs(Math.sin(th)) + r;
+  const ey = (w / 2 - r) * Math.abs(Math.sin(th)) + (h / 2 - r) * Math.abs(Math.cos(th)) + r;
+  return { left: cx - ex, right: cx + ex, top: cy - ey, bottom: cy + ey };
+}
+
+const blank = () => ({ left: 0, right: 0, top: 0, bottom: 0, atMs: { left: null, right: null, top: null, bottom: null } });
+function note(acc, side, value, ms) {
+  if (value > acc[side]) {
+    acc[side] = value;
+    acc.atMs[side] = ms;
+  }
+}
+
+const results = [];
+const skipped = [];
+const subjects = [];
+for (const raw of rawEntries) {
+  if (ONLY && !ONLY.has(raw.movementId)) continue;
+  if (raw.status === 'intentionally_unsuitable') {
+    skipped.push({ movementId: raw.movementId, why: 'intentionally_unsuitable' });
+    continue;
+  }
+  const derived = raw.derivesFrom !== undefined;
+  let fixture;
+  try {
+    fixture = manifest.buildPreviewEntry({ ...raw, status: 'covered' }, derived ? byId.get(raw.derivesFrom) : undefined);
+  } catch (err) {
+    skipped.push({ movementId: raw.movementId, why: 'build failed: ' + String(err.message).slice(0, 160) });
+    continue;
+  }
+  if (fixture.frameData.rig !== 'canonical') {
+    skipped.push({ movementId: raw.movementId, why: 'rig ' + fixture.frameData.rig });
+    continue;
+  }
+  subjects.push([raw.movementId, raw, fixture, derived]);
+}
+
+beforeEach(() => {
+  jest.useFakeTimers();
+  resetPreviewPlayback();
+  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+});
+
+afterEach(() => {
+  cleanup();
+  jest.useRealTimers();
+  jest.restoreAllMocks();
+  resetPreviewPlayback();
+});
+
+afterAll(() => {
+  fs.writeFileSync(process.env.AUDIT_OUT, JSON.stringify({ tickMs: TICK_MS, body: 'neutral (component default)', results, skipped }, null, 1));
+});
+
+test.each(subjects)('measure movement %i', async (movementId, raw, fixture, derived) => {
+  jest.spyOn(manifest, 'resolveMovementPreview').mockImplementation(() => fixture);
+  render(<MovementPreview movement={{ movement_id: raw.movementId, media: { assetKey: raw.assetKey, status: 'ready' } }} />);
+  await act(async () => {});
+  fireEvent.press(screen.getByTestId('movement-preview-control'));
+  const segs = fixture.frameData.segmentDurationsMs;
+  const total = segs ? segs.reduce((a, b) => a + b, 0) : 0;
+  const ticks = Math.ceil(total / TICK_MS) + 1;
+  const stage = blank();
+  const frame = blank();
+  let dims = null;
+  let floorSeen = false;
+  let prims = 0;
+  for (let tick = 0; tick <= ticks; tick++) {
+    const ms = tick * TICK_MS;
+    const frameStyle = StyleSheet.flatten(screen.getByTestId('movement-preview-figure').props.style);
+    const stageEl = screen.getByTestId('movement-preview-stage-canonical');
+    const stageStyle = StyleSheet.flatten(stageEl.props.style);
+    const frameW = frameStyle.width;
+    const frameH = frameStyle.height;
+    const stageW = stageStyle.width;
+    const stageH = stageStyle.height;
+    dims = { frameW, frameH, stageW, stageH };
+    // The frame centres the stage; its visible window in stage coordinates.
+    const minX = (stageW - frameW) / 2;
+    const maxX = stageW - minX;
+    const minY = (stageH - frameH) / 2;
+    const maxY = stageH - minY;
+    const children = React.Children.toArray(stageEl.props.children).map((c) => StyleSheet.flatten(c.props.style));
+    for (const child of children) {
+      const isFloor = child.height === 1 && child.backgroundColor === theme.color.line && child.left === 0 && child.right === 0;
+      let b;
+      if (isFloor) {
+        floorSeen = true;
+        b = { left: 0, right: stageW, top: child.top, bottom: child.top + child.height };
+      } else {
+        prims = Math.max(prims, children.length);
+        b = paintedBounds(child);
+      }
+      note(stage, 'top', 0 - b.top, ms);
+      note(stage, 'bottom', b.bottom - stageH, ms);
+      if (!isFloor) {
+        note(stage, 'left', 0 - b.left, ms);
+        note(stage, 'right', b.right - stageW, ms);
+      }
+      note(frame, 'top', Math.max(minY, 0) - b.top, ms);
+      note(frame, 'bottom', b.bottom - Math.min(maxY, stageH), ms);
+      if (!isFloor) {
+        note(frame, 'left', Math.max(minX, 0) - b.left, ms);
+        note(frame, 'right', b.right - Math.min(maxX, stageW), ms);
+      }
+    }
+    act(() => {
+      jest.advanceTimersByTime(TICK_MS);
+    });
+  }
+  results.push({
+    movementId: raw.movementId, name: raw.name, derived, derivesFrom: raw.derivesFrom ?? null,
+    view: fixture.frameData.view, viewBox: fixture.frameData.viewBox, totalMs: total, ticks: ticks + 1,
+    dims, floorSeen, maxChildren: prims, stageOverflowDp: stage, frameOverflowDp: frame,
+  });
+}, 120000);

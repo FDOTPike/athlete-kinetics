@@ -1,0 +1,54 @@
+{
+ "tickMs": 33,
+ "body": "neutral (component default)",
+ "results": [
+  {
+   "movementId": 52,
+   "name": "Dumbbell Reverse Lunge",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    -6,
+    6,
+    80,
+    96
+   ],
+   "totalMs": 4400,
+   "ticks": 136,
+   "dims": {
+    "frameW": 240,
+    "frameH": 171.42857142857142,
+    "stageW": 200,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 21.68571428571427,
+    "bottom": 22.535714285714278,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": 0,
+     "bottom": 0
+    }
+   }
+  }
+ ],
+ "skipped": []
+}
