@@ -1,0 +1,177 @@
+﻿node.exe : Could not resolve "C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\packages\inference\src" in file 
+C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\apps\mobile\test\components\SessionScreen.test.js.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\fpike\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Could not resol...Screen.test.js.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Could not resolve "C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\packages\inference\src" in file 
+C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\apps\mobile\test\components\SessionScreen.test.js.
+Could not resolve "C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\packages\inference\src" in file 
+C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\apps\mobile\src\screens\SessionScreen.tsx.
+Could not resolve "C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\packages\inference\src" in file 
+C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\apps\mobile\src\state\healthSupportStore.ts.
+Could not resolve "C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\packages\inference\src" in file 
+C:\Users\fpike\.gemini\antigravity\worktrees\Athlete 
+App\athlete_movement_animation_completion\apps\mobile\src\components\PreparationPanel.tsx.
+PASS apps/mobile/test/components/SessionScreen.test.js (18.677 s)
+  ΓùÅ Console
+
+    console.error
+      An update to Animated(Text) inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+      at ../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV 
+(../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchReducerAction (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4097:14)
+      at Object.scheduleUpdate [as current] 
+(../../node_modules/react-native/src/private/animated/createAnimatedPropsHook.js:128:20)
+      at AnimatedProps.current (../../node_modules/react-native/src/private/animated/createAnimatedPropsHook.js:64:56)
+      at AnimatedProps.update (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedProps.js:231:9)
+      at update (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:65:31)
+          at Set.forEach (<anonymous>)
+      at forEach (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:65:10)
+      at AnimatedValue.flushValue [as _updateValue] 
+(../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:366:7)
+      at TimingAnimation._updateValue [as _onUpdate] 
+(../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:327:14)
+      at TimingAnimation._onUpdate [as onUpdate] 
+(../../node_modules/react-native/Libraries/Animated/animations/TimingAnimation.js:155:10)
+      at onUpdate (../../node_modules/react-native/Libraries/Animated/animations/TimingAnimation.js:130:67)
+      at Timeout.callback [as _onTimeout] (../../node_modules/react-native/jest/setup.js:61:31)
+
+    console.error
+      An update to Animated(Text) inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+      at ../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV 
+(../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchReducerAction (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4097:14)
+      at Object.scheduleUpdate [as current] 
+(../../node_modules/react-native/src/private/animated/createAnimatedPropsHook.js:128:20)
+      at AnimatedProps.current (../../node_modules/react-native/src/private/animated/createAnimatedPropsHook.js:64:56)
+      at AnimatedProps.update (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedProps.js:231:9)
+      at update (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:65:31)
+          at Set.forEach (<anonymous>)
+      at forEach (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:65:10)
+      at AnimatedValue.flushValue [as _updateValue] 
+(../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:366:7)
+      at TimingAnimation._updateValue [as _onUpdate] 
+(../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:327:14)
+      at TimingAnimation._onUpdate [as onUpdate] 
+(../../node_modules/react-native/Libraries/Animated/animations/TimingAnimation.js:155:10)
+      at onUpdate (../../node_modules/react-native/Libraries/Animated/animations/TimingAnimation.js:130:67)
+      at Timeout.callback [as _onTimeout] (../../node_modules/react-native/jest/setup.js:61:31)
+
+    console.error
+      An update to Animated(Text) inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+      at ../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV 
+(../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchReducerAction (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4097:14)
+      at Object.scheduleUpdate [as current] 
+(../../node_modules/react-native/src/private/animated/createAnimatedPropsHook.js:128:20)
+      at AnimatedProps.current (../../node_modules/react-native/src/private/animated/createAnimatedPropsHook.js:64:56)
+      at AnimatedProps.update (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedProps.js:231:9)
+      at update (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:65:31)
+          at Set.forEach (<anonymous>)
+      at forEach (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:65:10)
+      at AnimatedValue.flushValue [as _updateValue] 
+(../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:366:7)
+      at TimingAnimation._updateValue [as _onUpdate] 
+(../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:327:14)
+      at TimingAnimation._onUpdate [as onUpdate] 
+(../../node_modules/react-native/Libraries/Animated/animations/TimingAnimation.js:155:10)
+      at onUpdate (../../node_modules/react-native/Libraries/Animated/animations/TimingAnimation.js:130:67)
+      at Timeout.callback [as _onTimeout] (../../node_modules/react-native/jest/setup.js:61:31)
+
+    console.error
+      An update to Animated(View) inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+      at ../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV 
+(../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchReducerAction (../../node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4097:14)
+      at Object.scheduleUpdate [as current] 
+(../../node_modules/react-native/src/private/animated/createAnimatedPropsHook.js:128:20)
+      at AnimatedProps.current (../../node_modules/react-native/src/private/animated/createAnimatedPropsHook.js:64:56)
+      at AnimatedProps.update (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedProps.js:231:9)
+      at update (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:65:31)
+          at Set.forEach (<anonymous>)
+      at forEach (../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:65:10)
+      at AnimatedValue.flushValue [as _updateValue] 
+(../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:366:7)
+      at TimingAnimation._updateValue [as _onUpdate] 
+(../../node_modules/react-native/Libraries/Animated/nodes/AnimatedValue.js:327:14)
+      at TimingAnimation._onUpdate [as onUpdate] 
+(../../node_modules/react-native/Libraries/Animated/animations/TimingAnimation.js:155:10)
+      at onUpdate (../../node_modules/react-native/Libraries/Animated/animations/TimingAnimation.js:130:67)
+      at Timeout.callback [as _onTimeout] (../../node_modules/react-native/jest/setup.js:61:31)
+
+PASS apps/mobile/test/components/LibraryScreen.test.js
+
+Test Suites: 2 passed, 2 total
+Tests:       113 passed, 113 total
+Snapshots:   0 total
+Time:        21.003 s
+Ran all test suites matching 
+/apps\\mobile\\test\\components\\LibraryScreen.test.js|apps\\mobile\\test\\components\\SessionScreen.test.js/i.

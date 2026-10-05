@@ -1,0 +1,21 @@
+﻿node.exe : PASS apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (30.783 s)
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\fpike\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS apps/mobil...t.js (30.783 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Finding A: Canonical Frame-Fit Enclosure and Stage Integrity
+    ΓêÜ Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (neutral) (1655 ms)
+    ΓêÜ Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (male) (2414 ms)
+    ΓêÜ Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (female) (2737 ms)
+    ΓêÜ Negative Control: original 171.43 dp frame height demonstrably fails enclosure guard for 52 (1 ms)
+    ΓêÜ Negative Control: 24 dp shorter frame mutation demonstrably fails enclosure guard for 52 (1 ms)
+    ΓêÜ Coverage of all 129 renderable canonical entries across bodies and cycle checkpoints (22551 ms)
+    ΓêÜ Parent layout presentation: compact mode (SessionScreen) and card mode (LibraryScreenV2) (24 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        30.968 s
+Ran all test suites matching /apps\\mobile\\test\\components\\MovementPreview.canonicalFrameFit.test.js/i.
