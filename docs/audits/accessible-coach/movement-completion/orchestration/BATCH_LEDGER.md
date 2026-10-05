@@ -54,3 +54,7 @@ Noted from the B000 reply, outside this order: the worker says it earlier left u
 Francis found that the nudges had gone to an Antigravity chat opened for RPE familiarisation; that chat did MOV-B001 to MOV-B003 by path in the movement checkout. All three landed only in that checkout (checked each time; the RPE worktrees are unchanged). Francis is moving the worker role to the Gemini movement chat in goal mode and telling the first chat to stop. No mail is sent until a `HANDOVER ACK` from the new chat is checked against the checkout. Committed work is kept.
 
 `HANDOVER ACK` received 17:05 +11:00 (message `2026-10-05_170514_antigravity_to_claude_handover-ack-sole-implementer-`) and checked: new conversation `233f7d27-e16a-4b40-a703-914fc9456807` (the earlier worker was `3faf5eed-a7cd-4eac-86fc-925378062def`), model Gemini 3.8 Flash (High), same checkout and branch, HEAD `6f4b4283f4c56ae9fb03bc8f8a21861a10d751a8`, clean, sole writer, neutral-only readback correct. Worker of record from MOV-B004 on.
+
+## Mailbox retired, 2026-10-05
+
+Francis instructed that deaddrop is not to be used. No mail is sent or read from this point. MOV-B004 was already with the implementer; its result will be read from git. Next steps are in `RELEASE_PLAN.md`.

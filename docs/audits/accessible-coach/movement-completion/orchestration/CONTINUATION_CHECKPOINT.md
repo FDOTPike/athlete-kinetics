@@ -26,28 +26,21 @@ Claude Desktop cannot be woken by mail. Whoever resumes: read this, then
 
 ## Next actions, in order
 
-1. On `MOV-B004` completion re-run the gates and LOOK at the rendered cycles
-   again: passing tests did not catch either technique defect in MOV-B003.
-2. The audit worktree `.claude/worktrees/movement-audit-a1a073f6` is reused for
+1. Read `RELEASE_PLAN.md`. It is a proposal awaiting Francis's decisions; do
+   not start new authoring before he answers.
+2. If MOV-B004 lands on the implementation branch, audit it from git: gates,
+   then LOOK at the rendered cycles. Passing tests did not catch either
+   technique defect in MOV-B003.
+3. The audit worktree `.claude/worktrees/movement-audit-a1a073f6` is reused for
    every candidate despite its name; check out the candidate SHA detached.
-3. Reconcile the holds and the exclusion reassessments in `ALL_300_LEDGER.json`
-   against the actual sources.
-4. Then the ordered backlog in `ORDERED_BACKLOG.json`: the shoulder raises
-   (Front and lateral raise batch), then the remaining families.
-5. Two separate final audits (technique, runtime) only on a frozen candidate.
 
 ## Mail
 
-- Send and read as `claude` through the registered deaddrop server. In a new
-  Claude session the `deaddrop` tools load on their own.
-- Wake-up is off. Antigravity's `agentapi` on this machine is a `.bat`
-  wrapper around `language_server.exe agentapi`; deaddrop starts it with
-  `execFile`, which cannot run a `.bat`, and looks for a file named
-  `agentapi` that does not exist here. The sidecar would also write the live
-  session token into the mailbox with a POSIX file mode that Windows ignores.
-  Until that is settled, Francis asks Gemini to read its mail.
-- deaddrop's own test suite stops at its mock-agentapi test on Windows
-  (`spawn EFTYPE`); the 17 tests before it pass.
+- Deaddrop is NOT used any more (owner instruction, 2026-10-05, after MOV-B004
+  was sent). Do not send or read mail. Read the implementer's progress from
+  git. The mailbox and registrations still exist and can be removed on request.
+- The implementer chat was left in goal mode polling the mailbox; Francis
+  decides whether to stop it.
 
 ## Open owner inputs
 
