@@ -6,13 +6,13 @@ Claude Desktop cannot be woken by mail. Whoever resumes: read this, then
 
 ## State
 
-- Latest implementation source: `ee5bca7143e922b491024972f9f8e81875e83824` on
+- Latest implementation source: `982b081b627ce2f170b4294a8768881a362c7110` on
   `gemini/movement-animation-completion-2026-10-05`, local only. Gemini is the
   only implementation writer.
-- `MOV-B001` (neutral-only) is accepted at that commit. `MOV-B002` is sent.
-- Frame-fit repair reviewed: `PRE_DISPATCH_FRAME_FIT_REVIEW_a1a073f6.md`.
-  The frame fix holds for all 132 movements; fifteen movements still clip at
-  the stage; the guard and its controls need rework; neutral-only is not done.
+- `MOV-B001` (neutral-only) and `MOV-B002` (frame guard, fifteen clipped
+  movements) are accepted. `MOV-B003` (Inverted Row, Body Tricep Press) is sent.
+- All 132 drafted movements now measure zero clipping on the neutral figure.
+  First review: `PRE_DISPATCH_FRAME_FIT_REVIEW_a1a073f6.md`.
 - Coverage at this source: 138 records. 129 canonical drafts and 3 derived
   have frames, 3 are legacy-rig prototypes, 3 are marked unsuitable. All 132
   drafts are `pending`; technique review status is `pending`, so nothing is
@@ -24,15 +24,16 @@ Claude Desktop cannot be woken by mail. Whoever resumes: read this, then
 
 ## Next actions, in order
 
-1. Read the `MOV-B002` replies; check the frozen commit yourself: typecheck,
-   MovementPreview suites, the v2 probe (zero overflow everywhere; drawn hashes
-   may change only for the fifteen repaired movements), both real mutations.
+1. Read the `MOV-B003` replies; check the frozen commit yourself: typecheck,
+   MovementPreview suites, storage guard, the v2 probe (132 existing movements
+   byte-identical, zero overflow for all 134), and LOOK at the rendered
+   neutral cycles for the two new movements against their source contracts.
 2. The audit worktree `.claude/worktrees/movement-audit-a1a073f6` is reused for
    every candidate despite its name; check out the candidate SHA detached.
 3. Reconcile the holds and the exclusion reassessments in `ALL_300_LEDGER.json`
    against the actual sources.
-4. Then the ordered backlog: Inverted Row, fixed-bar body triceps press, the
-   source-specific raises, and the remaining families.
+4. Then the ordered backlog in `ORDERED_BACKLOG.json`: the shoulder raises
+   (Front and lateral raise batch), then the remaining families.
 5. Two separate final audits (technique, runtime) only on a frozen candidate.
 
 ## Mail
