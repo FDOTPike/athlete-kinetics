@@ -62,6 +62,14 @@ final class AthleteKineticsUITests: XCTestCase {
     app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
   }
 
+  /// The element's label now, or nil when it is absent. A snapshot throws
+  /// instead of failing the test when the element vanishes between an
+  /// existence check and the read (CI evidence 5032e65: the restore status
+  /// disappeared mid-read during the hand-over to the restored athlete).
+  private func currentLabel(_ el: XCUIElement) -> String? {
+    (try? el.snapshot())?.label
+  }
+
   private func element(labelContains text: String) -> XCUIElement {
     app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
   }
@@ -234,7 +242,11 @@ final class AthleteKineticsUITests: XCTestCase {
     for (key, screen, marker) in destinations {
       tap(key, screen)
       wait(element(marker), "the \(screen) screen marker (\(marker))")
-      XCTAssertTrue(element(key).isSelected, "\(screen) control is not marked selected after tapping it")
+      // Today and Plan share a screen marker, so the marker alone does not
+      // prove the switch has rendered; the selected state must follow.
+      let selected = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+        predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 10)
+      XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 10 s of tapping it")
       log("visited \(screen)")
       guard #available(iOS 17.0, *) else {
         XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
@@ -331,7 +343,7 @@ final class AthleteKineticsUITests: XCTestCase {
       var seen = ""
       var inventories = 0
       for second in 0..<180 {
-        let now = healthHint.exists ? String(healthHint.label.prefix(60)) : "<absent>"
+        let now = currentLabel(healthHint).map { String($0.prefix(60)) } ?? "<absent>"
         if now != seen { log("health hint attempt \(attempt) t=\(second)s: \(now)"); seen = now }
         if now == "<absent>" && (second == 20 || second == 90) && inventories < 2 {
           inventories += 1
@@ -384,6 +396,9 @@ final class AthleteKineticsUITests: XCTestCase {
         log("HEALTH-VIEW-STUCK the app was not hittable after the unanswered Health request; relaunching")
         app.terminate()
         launch(["-AKUITestTrace", "1"])
+        // The relaunch opens on Today; the steps below start from Profile.
+        openProfile()
+        log("after relaunch: Profile hittable=\(element("athlete-screen-shown").exists && element("header-athlete").isHittable)")
       } else {
         log("app hittable after the Health request: \(header.exists ? "yes" : "header absent")")
       }
@@ -489,7 +504,7 @@ final class AthleteKineticsUITests: XCTestCase {
         openProfile()
         continue
       }
-      let now = restoreStatus.exists ? restoreStatus.label : "<absent>"
+      let now = currentLabel(restoreStatus) ?? "<absent>"
       if now != lastRestoreStatus {
         log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: \(now.prefix(120))")
         lastRestoreStatus = now
