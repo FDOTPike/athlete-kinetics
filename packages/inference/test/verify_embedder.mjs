@@ -16,6 +16,10 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// The reference pipeline must load the SAME immutable revision/cache as the
+// device ONNX and must never reach the network during verification.
+import { offlineTransformersLoad } from '../../../scripts/embedder-integrity.mjs';
+
 const require = createRequire(import.meta.url);
 const cosineMod = require('./.build/semantic/cosine.js');
 const cbMod = require('./.build/semantic/codebase.js');
@@ -32,6 +36,10 @@ if (!existsSync(MODEL) || !existsSync(TOK)) {
 const codebase = JSON.parse(readFileSync(join(ASSETS, 'phrase-codebase.json'), 'utf-8'));
 const vecFile = JSON.parse(readFileSync(join(ASSETS, 'phrase-codebase.vectors.json'), 'utf-8'));
 const tokenizerSpec = JSON.parse(readFileSync(TOK, 'utf-8'));
+const transformerLoad = offlineTransformersLoad(
+  codebase.embeddingModel,
+  process.env.AK_EMBEDDER_CACHE,
+);
 
 let fail = 0;
 const check = (label, ok, detail = '') => {
@@ -51,8 +59,14 @@ const device = createMiniLmEmbedder({ session, Tensor: ort.Tensor, tokenizer: to
 
 // --- reference pipeline (built the codebase vectors) --------------------------
 const { AutoTokenizer, pipeline } = await import('@xenova/transformers');
-const refTokenizer = await AutoTokenizer.from_pretrained(codebase.embeddingModel);
-const refPipe = await pipeline('feature-extraction', codebase.embeddingModel, { quantized: true });
+const refTokenizer = await AutoTokenizer.from_pretrained(
+  transformerLoad.modelId,
+  transformerLoad.options,
+);
+const refPipe = await pipeline('feature-extraction', transformerLoad.modelId, {
+  quantized: true,
+  ...transformerLoad.options,
+});
 const refEmbed = async (t) => {
   const o = await refPipe(t, { pooling: 'mean', normalize: true });
   return Float32Array.from(o.data);

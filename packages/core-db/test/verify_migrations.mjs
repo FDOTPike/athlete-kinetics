@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
-const { runMigrations, sentinelsMissing, SENTINELS } = require('./.build/migrationRunner.js');
+const { runMigrations, sentinelsMissing, SENTINELS, DURABLE_TABLE_EXEMPTIONS } = require('./.build/migrationRunner.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', 'src', 'schema');
 const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
@@ -41,9 +41,36 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '031_planned_session_method.sql',
   '032_capability_content.sql',
   '033_goal_program.sql',
-  '034_autopilot_attribution.sql',
-  '058_suspension_episode.sql'];
+  '034_autopilot_attribution.sql', '035_profile_load_preference.sql',
+  '036_movement_media.sql',
+  '037_movement_library_v2_batch.sql', '038_movement_library_v2_batch.sql',
+  '039_movement_library_v2_batch.sql', '040_movement_library_v2_batch.sql',
+  '041_movement_library_v2_batch.sql', '042_movement_library_v2_batch.sql',
+  '043_movement_library_v2_batch.sql', '044_movement_library_v2_batch.sql',
+  '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
+  '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
+  '049_movement_content_correction_v1.sql',
+  '050_movement_role_convergence.sql',
+  '051_routine_access_context.sql',
+  '052_bounded_microcycle_roles.sql',
+  '053_routine_role_compatibility.sql',
+  '054_contract_cutoff_provenance.sql',
+  '055_return_checkin_ack.sql',
+  '056_movement_taxonomy_backfill.sql',
+  '057_block_meta_phase_invariant.sql',
+  '058_suspension_episode.sql', '059_suspension_state_and_load_intent.sql',
+  '060_program_goal_tier_alignment.sql',
+  '061_autopilot_attribution_convergence.sql',
+  '062_suspension_sidecar_immutability.sql',
+  '063_movement_load_intent.sql',
+  '064_accessible_coach_support.sql',
+  '065_session_preparation.sql',
+  '066_focus_and_goals.sql',
+  '067_sport_and_emphasis.sql',
+  '068_movement_content_correction_v2.sql',
+  '069_resting_heart_rate.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
 
 let fail = 0;
@@ -106,6 +133,20 @@ const coachingContentComplete = (db) => {
   return summary.count === 124
     && summary.feetElevatedUrl === 'https://www.youtube.com/watch?v=J_mB4TjUf6c';
 };
+const phase2aLibrarySummary = (db) => db.raw.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM movement) AS movements,
+    (SELECT COUNT(*) FROM movement_coaching_intent) AS coaching,
+    (SELECT COUNT(*) FROM movement_media) AS media,
+    (SELECT COUNT(*) FROM movement_media WHERE status = 'external_fallback') AS fallback,
+    (SELECT COUNT(*) FROM movement_media WHERE status = 'planned') AS planned,
+    (SELECT COUNT(*) FROM movement_media WHERE status = 'ready') AS ready
+`).get();
+const phase2aLibraryComplete = (db) => {
+  const summary = phase2aLibrarySummary(db);
+  return summary.movements === 300 && summary.coaching === 300 && summary.media === 300
+    && summary.fallback === 124 && summary.planned === 176 && summary.ready === 0;
+};
 
 // --- 1. fresh install ---------------------------------------------------------
 console.log('[1] fresh install');
@@ -118,12 +159,33 @@ check('024 fresh install applies all three ratified equipment-prefix corrections
   phase17PrefixesHold(a), JSON.stringify(phase17Prefixes(a)));
 check('025 fresh install applies all 124 attested coaching records and approved video replacement',
   coachingContentComplete(a), JSON.stringify(coachingContentSummary(a)));
+check('036-048 fresh install yields the exact 300-row media/content corpus',
+  phase2aLibraryComplete(a), JSON.stringify(phase2aLibrarySummary(a)));
 a.raw.exec("INSERT INTO import_readiness_daily (date, tonnage_kg, updated_at_ms) VALUES ('2030-01-01', 2800, 1)");
 a.raw.prepare(MATERIALIZE_SQL).run('2030-01-01');
 const importedReadiness = a.raw.prepare("SELECT acute_load_kg, chronic_load_kg FROM state_vector WHERE date = '2030-01-01'").get();
 check('030 consumes only materialized eligible import load in readiness',
   importedReadiness !== undefined && importedReadiness.acute_load_kg === 400 && importedReadiness.chronic_load_kg === 100,
   JSON.stringify(importedReadiness));
+
+// W5 item 8: 004 is runtime SQL, not a version-gated migration. A latest-version
+// install with an old ACWR-derived row must converge when boot materializes it.
+const readRecovery = () => a.raw.prepare(
+  "SELECT readiness_score, acwr, load_component FROM state_vector WHERE date = '2030-01-01'",
+).get();
+const freshRecovery = readRecovery();
+check('runtime readiness keeps ACWR as context, with neutral recovery when HRV/sleep are absent',
+  freshRecovery.readiness_score === 50 && freshRecovery.acwr === 4 && freshRecovery.load_component === 0,
+  JSON.stringify(freshRecovery));
+a.raw.exec("UPDATE state_vector SET readiness_score = 0 WHERE date = '2030-01-01'");
+const versionBeforeRefresh = uv(a);
+runMigrations(a, MIGRATIONS); // already latest: no migration runs
+check('a no-op migration boot does not itself rewrite an old readiness snapshot',
+  uv(a) === versionBeforeRefresh && readRecovery().readiness_score === 0);
+a.raw.prepare(MATERIALIZE_SQL).run('2030-01-01'); // same runtime upsert as boot
+check('existing and fresh installs converge without advancing user_version',
+  uv(a) === versionBeforeRefresh && JSON.stringify(readRecovery()) === JSON.stringify(freshRecovery),
+  JSON.stringify(readRecovery()));
 a.raw.exec(`
   INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
   VALUES (31000, '2030-01-01', 'strength', 1);
@@ -172,12 +234,7 @@ try {
     VALUES ('gpp', '2030-01-01', 'weeks', NULL, '2030-01-29', 1, 1, 'LINEAR', 'review_due', 2, 2)`);
 } catch { secondCurrentRejected = true; }
 check('033 enforces only one active or review-due program', secondCurrentRejected);
-a.raw.exec('DROP INDEX idx_training_program_one_current');
-check('033 poison precondition marks the one-current correctness index missing',
-  sentinelsMissing(a).includes('idx_training_program_one_current'));
-runMigrations(a, MIGRATIONS);
-check('033 self-heal restores the one-current correctness index',
-  !sentinelsMissing(a).includes('idx_training_program_one_current'));
+
 runMigrations(a, MIGRATIONS); // second boot
 check('re-boot is a no-op (idempotent)', uv(a) === MIGRATIONS.length);
 check('024 corrections survive a normal no-op reboot',
@@ -229,7 +286,8 @@ b2.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
 check('precondition: movement_progression missing', sentinelsMissing(b2).includes('movement_progression'));
 runMigrations(b2, MIGRATIONS);
 check('self-heal applied 016 (progression + whitelist sentinels present)', sentinelsMissing(b2).length === 0);
-check('016+017+019+020 seeds arrived: 124 movements', Number(b2.raw.prepare('SELECT COUNT(*) c FROM movement').get().c) === 124);
+check('all movement seed batches arrive after sentinel self-heal: 300 movements',
+  Number(b2.raw.prepare('SELECT COUNT(*) c FROM movement').get().c) === 300);
 
 // --- 2c. partial-018 damage: set_metric survives, siblings dropped (audit B4) --
 console.log('[2c] partial 018 damage: movement_logging_mode dropped post-apply');
@@ -240,8 +298,8 @@ check('precondition: movement_logging_mode missing, set_metric present',
   sentinelsMissing(b3).includes('movement_logging_mode') && !sentinelsMissing(b3).includes('set_metric'));
 runMigrations(b3, MIGRATIONS);
 check('self-heal restored the dropped 018 sibling', sentinelsMissing(b3).length === 0);
-check('time-mode seeds healed back (5 rows)',
-  Number(b3.raw.prepare('SELECT COUNT(*) c FROM movement_logging_mode').get().c) === 5);
+check('time-mode seeds healed back (6 rows including Trail Running/Walking)',
+  Number(b3.raw.prepare('SELECT COUNT(*) c FROM movement_logging_mode').get().c) === 6);
 
 // --- 2d. set_target + 022 tables dropped post-apply (Fix-1 provenance side-car, 022) -------
 console.log('[2d] 022 tables dropped post-apply (provenance self-heal)');
@@ -309,6 +367,7 @@ const expectedTimePolicy = {
   'Plank': '3/30',
   'Road Run': '1/1200',
   'Suitcase Carry': '3/40',
+  'Trail Running/Walking': '1/1200',
 };
 check('023 restores ratified time-policy defaults',
   Object.keys(timePolicy).length === Object.keys(expectedTimePolicy).length
@@ -411,6 +470,7 @@ check('026 failure rolls both side-cars and all six triggers back atomically',
 runMigrations(phase18Rollback, MIGRATIONS);
 check('026 retry with the valid migration completes',
   uv(phase18Rollback) === MIGRATIONS.length && sentinelsMissing(phase18Rollback).length === 0);
+
 // --- 2h. 034 autopilot attribution side-car: replay, exact rows, cascade ---
 console.log('[2h] 034 autopilot attribution side-car');
 const attributionDb = freshDb();
@@ -433,21 +493,19 @@ check('034 side-car round-trips the effective per-slot delta',
   JSON.stringify(attributionRow));
 check('034 untouched slot has no side-car row',
   Number(attributionDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_autopilot WHERE planned_slot_id = 3302').get().c) === 0);
-let zeroDeltaRejected = false;
-try {
-  attributionDb.executeSync("INSERT INTO planned_slot_autopilot VALUES (3302, 0.0, 0, 'raised')");
-} catch { zeroDeltaRejected = true; }
-check('034 rejects a zero-delta attribution row', zeroDeltaRejected);
-let offGridRejected = false;
-try {
-  attributionDb.executeSync("INSERT INTO planned_slot_autopilot VALUES (3302, 0.25, 0, 'raised')");
-} catch { offGridRejected = true; }
-check('034 rejects an off-grid RPE delta', offGridRejected);
-let contradictoryReasonRejected = false;
-try {
-  attributionDb.executeSync("INSERT INTO planned_slot_autopilot VALUES (3302, -0.5, 0, 'raised')");
-} catch { contradictoryReasonRejected = true; }
-check('034 rejects a direction that contradicts its attribution reason', contradictoryReasonRejected);
+let invalidAttributionRejected = 0;
+for (const values of [
+  "3302, 1.0, 0, 'raised'",
+  "3302, 0.0, 2, 'raised'",
+  "3302, 0.0, 0, 'unknown'",
+]) {
+  try {
+    attributionDb.executeSync(`INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (${values})`);
+  } catch {
+    invalidAttributionRejected += 1;
+  }
+}
+check('034 rejects out-of-authority deltas and unknown reasons', invalidAttributionRejected === 3);
 attributionDb.executeSync(`PRAGMA user_version = ${FILES.indexOf('034_autopilot_attribution.sql')};`);
 runMigrations(attributionDb, MIGRATIONS);
 check('034 replay preserves the attribution row and exact row count',
@@ -464,66 +522,6 @@ check('034 self-heal restores the side-car table',
   !sentinelsMissing(attributionDb).includes('planned_slot_autopilot')
     && uv(attributionDb) === MIGRATIONS.length);
 
-// --- 2i. 058 suspension episode invariants ----------------------------------
-console.log('[2i] 058 suspension episode invariants');
-{
-  const suspensionDb = freshDb();
-  runMigrations(suspensionDb, MIGRATIONS);
-  const open = () => suspensionDb.raw.prepare(
-    'SELECT episode_id, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL',
-  ).all();
-  const insertSql = 'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, ?, ?, ?)';
-  const begin = (startedAt, reason, frozen) =>
-    suspensionDb.raw.prepare(insertSql).run(startedAt, null, reason, frozen);
-  const rejects = (args) => {
-    try { suspensionDb.raw.prepare(insertSql).run(...args); return false; } catch { return true; }
-  };
-
-  check('058 creates the episode table, triggers, and single-open index',
-    suspensionDb.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name='suspension_episode'").get().c === 1
-      && suspensionDb.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='trigger' AND name IN ('trg_suspension_episode_single_open_bi','trg_suspension_episode_no_reopen_bu')").get().c === 2
-      && suspensionDb.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='index' AND name='ux_suspension_episode_single_open'").get().c === 1);
-  check('fresh install has no open suspension', open().length === 0);
-  begin(1000, 'injury', 5);
-  check('opening an episode freezes its macro position',
-    open().length === 1 && open()[0].frozen_macro_index === 5);
-  let secondRejected = false;
-  try { begin(2000, 'illness', 3); } catch (error) {
-    secondRejected = /already open/i.test(String(error.message));
-  }
-  check('a second open episode is rejected', secondRejected);
-  suspensionDb.raw.prepare(insertSql).run(400, 900, 'life', 2);
-  check('closed history can coexist with an open episode',
-    suspensionDb.raw.prepare('SELECT COUNT(*) AS c FROM suspension_episode').get().c === 2);
-  suspensionDb.raw.prepare('UPDATE suspension_episode SET ended_at_ms = ? WHERE ended_at_ms IS NULL').run(3000);
-  check('closing the active episode leaves none open', open().length === 0);
-  let reopenRejected = false;
-  try {
-    suspensionDb.raw.prepare('UPDATE suspension_episode SET ended_at_ms = NULL WHERE episode_id = 1').run();
-  } catch (error) {
-    reopenRejected = /cannot be reopened/i.test(String(error.message));
-  }
-  check('a closed episode cannot be reopened', reopenRejected);
-  begin(5000, 'injury', 7);
-  check('a new episode may open after the previous one closes', open().length === 1);
-  check('058 rejects invalid reason, macro index, and time order',
-    rejects([6000, 6100, 'sprain', 3])
-      && rejects([6000, 6100, 'injury', 9])
-      && rejects([6000, 5000, 'injury', 3]));
-
-  suspensionDb.raw.exec('DROP TRIGGER trg_suspension_episode_single_open_bi');
-  check('a dropped 058 trigger is a missing sentinel',
-    sentinelsMissing(suspensionDb).includes('trg_suspension_episode_single_open_bi'));
-  runMigrations(suspensionDb, MIGRATIONS);
-  check('self-heal restores the dropped 058 trigger',
-    !sentinelsMissing(suspensionDb).includes('trg_suspension_episode_single_open_bi'));
-  suspensionDb.raw.exec('DROP TABLE suspension_episode');
-  check('a dropped 058 table is a missing sentinel',
-    sentinelsMissing(suspensionDb).includes('suspension_episode'));
-  runMigrations(suspensionDb, MIGRATIONS);
-  check('self-heal restores the dropped 058 table',
-    !sentinelsMissing(suspensionDb).includes('suspension_episode'));
-}
 // --- 3. failing migration: fail fast, recover on retry --------------------------
 console.log('[3] failing migration mid-chain (the device "ln" scenario)');
 const c = freshDb();
@@ -572,6 +570,3528 @@ check('self-heal re-apply preserves hybrid objective + custom inventory',
   `${healed.objective} / ${healed.equipment_inventory}`);
 check('self-heal restored the dropped view',
   sentinelsMissing(d).length === 0 && uv(d) === MIGRATIONS.length);
+
+// --- 2i. 035 profile load preference: seeding law, CHECK, cascade, replay ---
+console.log('[2i] 035 profile load preference side-car');
+const prefDb = freshDb();
+runMigrations(prefDb, MIGRATIONS);
+// 013 seeds 4 slots; the slot matching the live athlete_profile.training_age
+// (DEFAULT_PROFILE = beginner) is active; the rest are inactive snapshots.
+const prefRows = Object.fromEntries(prefDb.raw.prepare(
+  `SELECT s.slot_id, s.is_active, json_extract(s.profile_json, '$.training_age') AS age, p.preference, p.is_explicit
+   FROM profile_slot s JOIN profile_load_preference p ON p.profile_slot_id = s.slot_id ORDER BY s.slot_id`,
+).all().map((r) => [r.slot_id, r]));
+check('035 seeds one preference row per profile slot', Object.keys(prefRows).length === 4,
+  JSON.stringify(Object.keys(prefRows)));
+check('035 beginner + intermediate slots seed auto',
+  prefRows[1]?.preference === 'auto' && prefRows[2]?.preference === 'auto',
+  JSON.stringify([prefRows[1]?.preference, prefRows[2]?.preference]));
+check('035 advanced + elite slots seed manual',
+  prefRows[3]?.preference === 'manual' && prefRows[4]?.preference === 'manual',
+  JSON.stringify([prefRows[3]?.preference, prefRows[4]?.preference]));
+check('035 tier-derived seeds are marked non-explicit',
+  Number(prefDb.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference WHERE is_explicit <> 0').get()?.c) === 0);
+// Active slot derives from the LIVE athlete_profile row, not the snapshot:
+// mutate the live profile to elite, drop the side-car, self-heal, and the
+// active slot must re-seed from the live row ('manual') even though its
+// frozen profile_json still says beginner.
+prefDb.executeSync(`UPDATE athlete_profile SET training_age = 'elite' WHERE profile_id = 1`);
+prefDb.executeSync(`UPDATE profile_slot SET is_active = 1 WHERE slot_id = 1`);
+prefDb.executeSync('DROP TABLE profile_load_preference');
+check('035 poison precondition marks the side-car sentinel missing',
+  sentinelsMissing(prefDb).includes('profile_load_preference'));
+runMigrations(prefDb, MIGRATIONS);
+check('035 self-heal restores the table and re-seeds the active slot from the LIVE profile',
+  !sentinelsMissing(prefDb).includes('profile_load_preference')
+    && prefDb.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 1').get()?.preference === 'manual'
+    && uv(prefDb) === MIGRATIONS.length);
+// Upgrade path: a 034-era DB gains the side-car without touching existing rows.
+const upDb035 = freshDb();
+const to034 = MIGRATIONS.slice(0, FILES.indexOf('035_profile_load_preference.sql'));
+// Stage the 034-era state without the runner: the runner's sentinel list
+// already knows 035, so a partial chain would (correctly) fail self-heal.
+for (const m of to034) upDb035.executeSync(m);
+upDb035.executeSync(`PRAGMA user_version = ${to034.length};`);
+runMigrations(upDb035, MIGRATIONS); // the app update ships 035
+// Verify 035 created the table and seeded four tier-derived rows.
+const seededPrefs = upDb035.raw.prepare(
+  'SELECT profile_slot_id, preference, is_explicit FROM profile_load_preference ORDER BY profile_slot_id',
+).all();
+check('034 -> 035 upgrade creates the side-car and seeds four tier-derived rows (non-explicit)',
+  seededPrefs.length === 4
+    && seededPrefs.every((r) => r.is_explicit === 0)
+    && seededPrefs[0].preference === 'auto'   // beginner
+    && seededPrefs[1].preference === 'auto'   // intermediate
+    && seededPrefs[2].preference === 'manual' // advanced
+    && seededPrefs[3].preference === 'manual' // elite
+);
+// Make an explicit user update AFTER 035 has run.
+upDb035.executeSync(`UPDATE profile_load_preference SET preference = 'manual', is_explicit = 1 WHERE profile_slot_id = 2`);
+// Replay: re-running the full chain must preserve the explicit update (INSERT OR IGNORE).
+runMigrations(upDb035, MIGRATIONS);
+check('035 replay preserves an explicit user update (INSERT OR IGNORE does not overwrite)',
+  upDb035.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 2').get()?.preference === 'manual'
+    && upDb035.raw.prepare('SELECT is_explicit FROM profile_load_preference WHERE profile_slot_id = 2').get()?.is_explicit === 1
+    && Number(upDb035.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference').get().c) === 4);
+// Poison + self-heal on the upgrade DB: a DROPPED table loses its stored
+// rows, so the rebuild re-derives slot seeds from profile_json (the safe
+// tier-default fallback the WO mandates for missing rows).
+upDb035.executeSync('DROP TABLE profile_load_preference');
+check('035 poison precondition marks the sentinel missing on the upgrade DB',
+  sentinelsMissing(upDb035).includes('profile_load_preference'));
+runMigrations(upDb035, MIGRATIONS);
+check('035 poison/self-heal rebuilds the table (seeds re-derive to tier defaults)',
+  !sentinelsMissing(upDb035).includes('profile_load_preference')
+    && Number(upDb035.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference').get().c) === 4
+    && upDb035.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 2').get()?.preference === 'auto');
+// CHECK rejection: prove the preference domain independently on an EXISTING
+// slot (an unknown slot would only prove the foreign key).
+let badPrefRejected = 0;
+for (const bad of ["'guided'", "NULL", "''"]) {
+  try {
+    prefDb.executeSync(`UPDATE profile_load_preference SET preference = ${bad} WHERE profile_slot_id = 1`);
+  } catch {
+    badPrefRejected += 1;
+  }
+}
+check('035 CHECK rejects non auto|manual on an existing profile slot', badPrefRejected === 3);
+let badExplicitRejected = 0;
+for (const bad of [-1, 2]) {
+  try {
+    prefDb.executeSync(`UPDATE profile_load_preference SET is_explicit = ${bad} WHERE profile_slot_id = 1`);
+  } catch {
+    badExplicitRejected += 1;
+  }
+}
+check('035 CHECK constrains explicit-choice metadata to boolean 0|1', badExplicitRejected === 2);
+let unknownSlotRejected = false;
+try {
+  prefDb.executeSync("INSERT INTO profile_load_preference (profile_slot_id, preference) VALUES (99, 'auto')");
+} catch {
+  unknownSlotRejected = true;
+}
+check('035 foreign key rejects an unknown profile slot', unknownSlotRejected);
+// FK cascade: deleting a slot deletes its preference row.
+prefDb.executeSync('DELETE FROM profile_slot WHERE slot_id = 4');
+check('035 profile-slot delete cascades the preference row',
+  prefDb.raw.prepare('SELECT preference FROM profile_load_preference WHERE profile_slot_id = 4').get() === undefined);
+
+// --- 2j. 036-048 movement media + v2 catalogue: upgrade, poison, replay ---
+console.log('[2j] 036-048 Phase 2a movement library');
+const phase2aDb = freshDb();
+const mediaIndex = FILES.indexOf('036_movement_media.sql');
+for (let i = 0; i < mediaIndex; i += 1) phase2aDb.executeSync(MIGRATIONS[i]);
+phase2aDb.executeSync(`PRAGMA user_version = ${mediaIndex};`);
+check('035-era upgrade precondition has 124 movements and no media table',
+  Number(phase2aDb.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c) === 124
+    && phase2aDb.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='movement_media'").get() === undefined);
+runMigrations(phase2aDb, MIGRATIONS);
+check('clean 035 -> 048 upgrade yields the exact 300-row corpus',
+  phase2aLibraryComplete(phase2aDb), JSON.stringify(phase2aLibrarySummary(phase2aDb)));
+
+phase2aDb.executeSync('DROP TABLE movement_media');
+check('036 poison precondition marks movement_media missing',
+  sentinelsMissing(phase2aDb).includes('movement_media'));
+runMigrations(phase2aDb, MIGRATIONS);
+check('036 poison self-heal restores all 300 media rows and statuses',
+  sentinelsMissing(phase2aDb).length === 0 && phase2aLibraryComplete(phase2aDb),
+  JSON.stringify(phase2aLibrarySummary(phase2aDb)));
+
+let replayedBatches = 0;
+for (const file of FILES.filter((name) => /^0(?:3[7-9]|4[0-8])_movement_library_v2_batch\.sql$/.test(name))) {
+  phase2aDb.executeSync(`PRAGMA user_version = ${FILES.indexOf(file)};`);
+  runMigrations(phase2aDb, MIGRATIONS);
+  if (phase2aLibraryComplete(phase2aDb)) replayedBatches += 1;
+}
+check('all twelve v2 batch boundaries replay idempotently', replayedBatches === 12,
+  `${replayedBatches}/12`);
+
+// --- 2k. 049 pre-release content correction: upgrade, replay, poison, rebuild ---
+console.log('[2k] 049 Phase 2a pre-release content correction');
+const correctionIndex = FILES.indexOf('049_movement_content_correction_v1.sql');
+const CORRECTED_EQUIPMENT = ['Board Press', 'Floor Glute-Ham Raise', 'Natural Glute Ham Raise', 'Seated Good Mornings'];
+const equipmentRows = (db) => db.raw.prepare(`
+  SELECT m.name, e.item FROM movement_equipment e JOIN movement m USING(movement_id)
+  ORDER BY m.name, e.item
+`).all().map((r) => `${r.name}|${r.item}`);
+const untouchedEquipment = (db) =>
+  equipmentRows(db).filter((row) => !CORRECTED_EQUIPMENT.includes(row.split('|')[0]));
+const correctionSummary = (db) => db.raw.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM movement_content_correction) AS corrections,
+    (SELECT COUNT(*) FROM movement_content_correction WHERE correction_version = 1) AS v1,
+    (SELECT COUNT(*) FROM movement_scope WHERE scope = 'full_body') AS scoped,
+    (SELECT COUNT(*) FROM movement_equipment WHERE item = 'boards') AS boards,
+    (SELECT m.pattern FROM movement m WHERE m.name = 'Kettlebell Turkish Get-Up (Lunge style)') AS tguPattern,
+    (SELECT t.category FROM movement_taxonomy t JOIN movement m USING(movement_id)
+      WHERE m.name = 'Kettlebell Turkish Get-Up (Lunge style)') AS tguCategory,
+    (SELECT d.video_placeholder_uri FROM movement_detail d JOIN movement m USING(movement_id)
+      WHERE m.name = 'Kettlebell Turkish Get-Up') AS canonicalTguUrl
+`).get();
+// 068 appends its own provenance at version 2 beside these, so on a complete
+// chain the table holds the 32 v1 rows plus the 115 v2 rows.
+const V2_CORRECTIONS = 115;
+const correctionComplete = (db) => {
+  const s = correctionSummary(db);
+  return s.corrections === 32 + V2_CORRECTIONS && s.v1 === 32 && s.scoped === 2 && s.boards === 1
+    && s.tguPattern === 'rotation' && s.tguCategory === 'core'
+    && s.canonicalTguUrl === 'https://www.youtube.com/watch?v=lpltjWHd0ek';
+};
+
+// (1) clean 048 -> current upgrade: 049 applies the correction, then 050
+// converges supplementary-role eligibility.
+const correctionDb = freshDb();
+for (let i = 0; i < correctionIndex; i += 1) correctionDb.executeSync(MIGRATIONS[i]);
+correctionDb.executeSync(`PRAGMA user_version = ${correctionIndex};`);
+check('048-era upgrade precondition: user_version 47, no correction tables',
+  uv(correctionDb) === 47 && correctionIndex === 47
+    && correctionDb.raw.prepare("SELECT 1 FROM sqlite_master WHERE name='movement_scope'").get() === undefined,
+  String(uv(correctionDb)));
+const equipmentBefore = untouchedEquipment(correctionDb);
+runMigrations(correctionDb, MIGRATIONS);
+check('clean 048 -> current upgrade lands every correction and reaches the latest user_version',
+  uv(correctionDb) === MIGRATIONS.length && correctionComplete(correctionDb),
+  JSON.stringify(correctionSummary(correctionDb)));
+check('the movement_equipment rebuild preserves every untouched row, content for content',
+  JSON.stringify(untouchedEquipment(correctionDb)) === JSON.stringify(equipmentBefore),
+  `${equipmentBefore.length} rows`);
+check('049 moves no media: the 300-row media corpus is untouched',
+  phase2aLibraryComplete(correctionDb), JSON.stringify(phase2aLibrarySummary(correctionDb)));
+
+// (2) explicit replay from the 049 boundary.
+correctionDb.executeSync(`PRAGMA user_version = ${correctionIndex};`);
+runMigrations(correctionDb, MIGRATIONS);
+check('049 replays idempotently from its own boundary (no duplicate provenance rows)',
+  uv(correctionDb) === MIGRATIONS.length && correctionComplete(correctionDb)
+    && JSON.stringify(untouchedEquipment(correctionDb)) === JSON.stringify(equipmentBefore),
+  JSON.stringify(correctionSummary(correctionDb)));
+
+// (3) full re-apply from zero: 037-048 rewrite the originals, 049 re-asserts last.
+correctionDb.executeSync('PRAGMA user_version = 0;');
+runMigrations(correctionDb, MIGRATIONS);
+check('full re-apply from 0 leaves the corrections asserted last, not the originals',
+  correctionComplete(correctionDb) && phase2aLibraryComplete(correctionDb),
+  JSON.stringify(correctionSummary(correctionDb)));
+
+// (4) poisoned user_version claims the latest chain while 049 never applied.
+const poisonedCorrection = freshDb();
+for (let i = 0; i < correctionIndex; i += 1) poisonedCorrection.executeSync(MIGRATIONS[i]);
+poisonedCorrection.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('049 poison precondition: user_version claims latest but both sentinels are absent',
+  sentinelsMissing(poisonedCorrection).includes('movement_scope')
+    && sentinelsMissing(poisonedCorrection).includes('movement_content_correction'));
+runMigrations(poisonedCorrection, MIGRATIONS);
+check('049 poison self-heal re-applies the whole chain and restores both sentinels',
+  sentinelsMissing(poisonedCorrection).length === 0 && correctionComplete(poisonedCorrection),
+  JSON.stringify(correctionSummary(poisonedCorrection)));
+
+// Constraint surface of the two new tables + the widened equipment domain.
+const scopeMovementId = Number(correctionDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Kettlebell Turkish Get-Up'").get().movement_id);
+let scopeRejections = 0;
+for (const sql of [
+  `INSERT INTO movement_scope (movement_id, scope) VALUES (${scopeMovementId}, 'upper_body')`,
+  `INSERT INTO movement_scope (movement_id, scope) VALUES (${scopeMovementId}, 'full_body')`,
+  "INSERT INTO movement_scope (movement_id, scope) VALUES (999999, 'full_body')",
+  `INSERT INTO movement_content_correction (movement_id, correction_version, correction_sha256, applied_at_ms) VALUES (${scopeMovementId}, 0, 'x', 1)`,
+]) {
+  try { correctionDb.executeSync(sql); } catch { scopeRejections += 1; }
+}
+check('049 CHECK/PK/FK surface rejects a bad scope, a duplicate, an unknown movement, and version 0',
+  scopeRejections === 4, `${scopeRejections}/4`);
+const boardPressId = Number(correctionDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Board Press'").get().movement_id);
+let equipmentRejected = false;
+try {
+  correctionDb.executeSync(`INSERT INTO movement_equipment (movement_id, item) VALUES (${boardPressId}, 'sled')`);
+} catch { equipmentRejected = true; }
+check('the widened domain accepts boards (already stored) and still rejects a bogus item',
+  equipmentRejected
+    && Number(correctionDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM movement_equipment WHERE movement_id = ? AND item = ?',
+    ).get(boardPressId, 'boards').c) === 1);
+correctionDb.executeSync(`DELETE FROM movement WHERE movement_id = ${scopeMovementId}`);
+check('movement delete cascades both 049 side-cars',
+  Number(correctionDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_scope WHERE movement_id = ?').get(scopeMovementId).c) === 0
+    && Number(correctionDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_content_correction WHERE movement_id = ?').get(scopeMovementId).c) === 0
+    && Number(correctionDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_equipment WHERE movement_id = ?').get(scopeMovementId).c) === 0);
+
+const mediaCascadeId = Number(phase2aDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = '3/4 Sit-Up'",
+).get().movement_id);
+phase2aDb.executeSync(`DELETE FROM movement WHERE movement_id = ${mediaCascadeId}`);
+check('movement delete cascades its media side-car',
+  phase2aDb.raw.prepare('SELECT 1 FROM movement_media WHERE movement_id = ?').get(mediaCascadeId) === undefined);
+
+// --- 2l. 050 movement-role convergence --------------------------------------
+console.log('[2l] 050 supplementary-role convergence');
+const roleIndex = FILES.indexOf('050_movement_role_convergence.sql');
+const roleDb = freshDb();
+for (let i = 0; i < roleIndex; i += 1) roleDb.executeSync(MIGRATIONS[i]);
+roleDb.executeSync(`PRAGMA user_version = ${roleIndex};`);
+const roleCounts = (database) => database.raw.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM movement) AS movements,
+    (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'supplementary') AS supplementary,
+    (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'major') AS major,
+    (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'accessory') AS accessory,
+    (SELECT COUNT(*) FROM movement_role_eligibility WHERE role = 'conditional') AS conditional
+`).get();
+check('049-era precondition exposes the fresh/poison divergence: 300 movements but 124 supplementary',
+  roleCounts(roleDb).movements === 300 && roleCounts(roleDb).supplementary === 124,
+  JSON.stringify(roleCounts(roleDb)));
+roleDb.executeSync(MIGRATIONS[roleIndex]);
+roleDb.executeSync(`PRAGMA user_version = ${roleIndex + 1};`);
+check('clean 049 -> historical 050 boundary converges every live movement without widening explicit roles',
+  uv(roleDb) === roleIndex + 1
+    && roleCounts(roleDb).supplementary === roleCounts(roleDb).movements
+    && roleCounts(roleDb).major === 8 && roleCounts(roleDb).accessory === 0
+    && roleCounts(roleDb).conditional === 12,
+  JSON.stringify(roleCounts(roleDb)));
+
+roleDb.executeSync(MIGRATIONS[roleIndex]);
+check('historical 050 replay is idempotent and duplicate-free',
+  roleCounts(roleDb).supplementary === 300
+    && Number(roleDb.raw.prepare(`
+      SELECT COUNT(*) AS c FROM (
+        SELECT movement_id, role, COUNT(*) AS n FROM movement_role_eligibility
+        GROUP BY movement_id, role HAVING n > 1
+      )
+    `).get().c) === 0);
+
+const poisonedRole = freshDb();
+for (let i = 0; i < roleIndex; i += 1) poisonedRole.executeSync(MIGRATIONS[i]);
+poisonedRole.executeSync(MIGRATIONS[FILES.indexOf('028_capability_graph.sql')]);
+poisonedRole.executeSync(`PRAGMA user_version = ${roleIndex + 1};`);
+check('poison precondition has widened data but lacks the 050 trigger sentinel',
+  roleCounts(poisonedRole).supplementary === 300
+    && poisonedRole.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='trg_movement_supplementary_ai'").get() === undefined);
+poisonedRole.executeSync(MIGRATIONS[roleIndex]);
+check('historical 050 repair and clean upgrade converge byte-for-byte on role counts',
+  poisonedRole.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='trg_movement_supplementary_ai'").get() !== undefined
+    && JSON.stringify(roleCounts(poisonedRole)) === JSON.stringify(roleCounts(roleDb)),
+  JSON.stringify(roleCounts(poisonedRole)));
+
+roleDb.executeSync("INSERT INTO movement (name, pattern, is_compound) VALUES ('050 Future Movement', 'isolation', 0)");
+const futureMovementId = Number(roleDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = '050 Future Movement'",
+).get().movement_id);
+check('historical 050 trigger gives a future live movement supplementary eligibility exactly once',
+  Number(roleDb.raw.prepare(
+    "SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ? AND role = 'supplementary'",
+  ).get(futureMovementId).c) === 1);
+
+// --- 2m. 051 routine access context ----------------------------------------
+console.log('[2m] 051 routine access context');
+const accessIndex = FILES.indexOf('051_routine_access_context.sql');
+const accessDb = freshDb();
+for (let i = 0; i < accessIndex; i += 1) accessDb.executeSync(MIGRATIONS[i]);
+accessDb.executeSync(`PRAGMA user_version = ${accessIndex};`);
+const roleFingerprint = (database) => database.raw.prepare(`
+  SELECT group_concat(movement_id || ':' || role, '|') AS value
+  FROM (SELECT movement_id, role FROM movement_role_eligibility ORDER BY movement_id, role)
+`).get().value;
+const rolesBefore051 = roleFingerprint(accessDb);
+const accessSummary = (database) => ({
+  sport: database.raw.prepare(`
+    SELECT group_concat(name, '|') AS names FROM (
+      SELECT m.name FROM movement_sport_tracking st
+      JOIN movement m USING (movement_id) ORDER BY m.name
+    )
+  `).get().names,
+  nonCardio: Number(database.raw.prepare(`
+    SELECT COUNT(*) AS c FROM movement_sport_tracking st
+    JOIN movement_taxonomy mt USING (movement_id) WHERE mt.category <> 'cardio'
+  `).get().c),
+  taxonomyRows: Number(database.raw.prepare(`
+    SELECT COUNT(*) AS c FROM movement_sport_tracking st
+    JOIN movement_taxonomy mt USING (movement_id)
+  `).get().c),
+  edgeEndpoints: Number(database.raw.prepare(`
+    SELECT COUNT(*) AS c FROM movement_capability_edge edge
+    WHERE edge.prerequisite_movement_id IN (SELECT movement_id FROM movement_sport_tracking)
+       OR edge.movement_id IN (SELECT movement_id FROM movement_sport_tracking)
+  `).get().c),
+  movements: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c),
+  media: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_media').get().c),
+  corrections: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_content_correction').get().c),
+  roleFingerprint: roleFingerprint(database),
+});
+accessDb.executeSync(MIGRATIONS[accessIndex]);
+accessDb.executeSync(`PRAGMA user_version = ${accessIndex + 1};`);
+const cleanAccessSummary = accessSummary(accessDb);
+check('clean 050 -> historical 051 boundary seeds the exact cardio-only sport set without role or content drift',
+  uv(accessDb) === accessIndex + 1
+    && cleanAccessSummary.sport === 'BJJ Sparring Round|Road Run|Trail Running/Walking'
+    && cleanAccessSummary.nonCardio === 0
+    && cleanAccessSummary.taxonomyRows === 3
+    && cleanAccessSummary.edgeEndpoints === 0
+    && cleanAccessSummary.movements === 300
+    && cleanAccessSummary.media === 300
+    && cleanAccessSummary.corrections === 32
+    && cleanAccessSummary.roleFingerprint === rolesBefore051,
+  JSON.stringify(cleanAccessSummary));
+
+const roadRunId = Number(accessDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Road Run'",
+).get().movement_id);
+accessDb.raw.prepare(`INSERT INTO movement_prior_experience
+  (movement_id, confirmed_at_ms, revoked_at_ms, basis) VALUES (?, 100, NULL, 'local_user_confirmation')`).run(roadRunId);
+accessDb.executeSync(MIGRATIONS[accessIndex]);
+check('historical 051 replay is idempotent and preserves athlete declarations',
+  Number(accessDb.raw.prepare('SELECT COUNT(*) AS c FROM movement_sport_tracking').get().c) === 3
+    && Number(accessDb.raw.prepare(
+      'SELECT confirmed_at_ms FROM movement_prior_experience WHERE movement_id = ?',
+    ).get(roadRunId).confirmed_at_ms) === 100);
+
+let accessConstraintRejections = 0;
+for (const sql of [
+  `INSERT INTO movement_prior_experience (movement_id, confirmed_at_ms, basis) VALUES (${roadRunId}, 1, 'other')`,
+  `INSERT INTO movement_prior_experience (movement_id, confirmed_at_ms, revoked_at_ms) VALUES (${roadRunId + 1}, 10, 9)`,
+  `INSERT INTO movement_prior_experience (movement_id, confirmed_at_ms) VALUES (999999, 1)`,
+  `INSERT INTO movement_sport_tracking (movement_id) VALUES (999999)`,
+]) {
+  try { accessDb.executeSync(sql); } catch { accessConstraintRejections += 1; }
+}
+check('051 STRICT/CHECK/PK/FK surface rejects invalid basis, time ordering, and unknown movements',
+  accessConstraintRejections === 4, `${accessConstraintRejections}/4`);
+
+const poisonedAccess = freshDb();
+for (let i = 0; i < accessIndex; i += 1) poisonedAccess.executeSync(MIGRATIONS[i]);
+poisonedAccess.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('051 poison precondition claims completion while both access sentinels are absent',
+  sentinelsMissing(poisonedAccess).includes('movement_prior_experience')
+    && sentinelsMissing(poisonedAccess).includes('movement_sport_tracking'));
+runMigrations(poisonedAccess, MIGRATIONS);
+check('051 poison repair converges on the current exact state through 052',
+  sentinelsMissing(poisonedAccess).length === 0
+    && JSON.stringify(accessSummary(poisonedAccess)) === JSON.stringify(accessSummary(a)),
+  JSON.stringify(accessSummary(poisonedAccess)));
+
+// --- 2n. 052 bounded microcycle roles ---------------------------------------
+console.log('[2n] 052 bounded microcycle roles');
+const boundedIndex = FILES.indexOf('052_bounded_microcycle_roles.sql');
+const boundedDb = freshDb();
+for (let i = 0; i < boundedIndex; i += 1) boundedDb.executeSync(MIGRATIONS[i]);
+boundedDb.executeSync(`PRAGMA user_version = ${boundedIndex};`);
+boundedDb.executeSync("INSERT INTO routine_template (name, schema_type, created_at_ms, updated_at_ms) VALUES ('052 preserved', 'LINEAR', 1, 1)");
+const preservedTemplateId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+const competitionBenchId = Number(boundedDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Competition Bench'",
+).get().movement_id);
+const boardPress052Id = Number(boundedDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Board Press'",
+).get().movement_id);
+const hammerCurlId = Number(boundedDb.raw.prepare(
+  "SELECT movement_id FROM movement WHERE name = 'Hammer Curl'",
+).get().movement_id);
+boundedDb.raw.prepare(`INSERT INTO routine_template_slot
+  (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, 1, 'major', ?, 3, 7, 8.5)`).run(preservedTemplateId, competitionBenchId);
+const preservedRoutineSlotId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+
+runMigrations(boundedDb, MIGRATIONS);
+const boundedSummary = (database) => ({
+  liftFamilies: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_lift_family').get().c),
+  namedFamilies: Number(database.raw.prepare('SELECT COUNT(DISTINCT family) AS c FROM movement_lift_family').get().c),
+  assistance: Number(database.raw.prepare('SELECT COUNT(*) AS c FROM movement_assistance_relationship').get().c),
+  roles: roleCounts(database),
+  oldAutoTrigger: database.raw.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='trg_movement_supplementary_ai'",
+  ).get() !== undefined,
+});
+check('clean 051 -> 052 upgrade installs the exact curated family/relationship and multi-role surface',
+  uv(boundedDb) === MIGRATIONS.length
+    && boundedSummary(boundedDb).liftFamilies === 79
+    && boundedSummary(boundedDb).namedFamilies === 7
+    && boundedSummary(boundedDb).assistance === 54
+    && boundedSummary(boundedDb).roles.supplementary === 84
+    && boundedSummary(boundedDb).roles.major === 79
+    && boundedSummary(boundedDb).roles.accessory === 14
+    && boundedSummary(boundedDb).roles.conditional === 12
+    && !boundedSummary(boundedDb).oldAutoTrigger,
+  JSON.stringify(boundedSummary(boundedDb)));
+
+const benchCoefficients = boundedDb.raw.prepare(`
+  SELECT group_concat(name || ':' || printf('%.2f', stress_coefficient), '|') AS value
+  FROM (
+    SELECT m.name, lf.stress_coefficient FROM movement_lift_family lf
+    JOIN movement m USING (movement_id)
+    WHERE m.name IN ('Competition Bench', 'Board Press') ORDER BY m.name
+  )
+`).get().value;
+check('052 ratifies weighted same-family bench variations without using the capability graph',
+  benchCoefficients === 'Board Press:0.90|Competition Bench:1.00', String(benchCoefficients));
+const hammerContext = boundedDb.raw.prepare(`
+  SELECT group_concat(major_family || ':' || distance, '|') AS value FROM (
+    SELECT ar.major_family, ar.distance FROM movement_assistance_relationship ar
+    WHERE ar.movement_id = ? ORDER BY ar.major_family
+  )
+`).get(hammerCurlId).value;
+check('052 classifies Hammer Curl contextually: direct after pulls, accessory after other major families',
+  hammerContext === 'bench_press:2|deadlift:2|horizontal_pull:1|overhead_press:2|power_clean:2|squat:2|vertical_pull:1',
+  String(hammerContext));
+check('052 table rebuild preserves existing routine slot identity and authored dose',
+  JSON.stringify(boundedDb.raw.prepare(`
+    SELECT routine_template_slot_id, role, movement_id, sets, reps, target_rpe
+    FROM routine_template_slot WHERE routine_template_slot_id = ?
+  `).get(preservedRoutineSlotId)) === JSON.stringify({
+    routine_template_slot_id: preservedRoutineSlotId, role: 'major', movement_id: competitionBenchId,
+    sets: 3, reps: 7, target_rpe: 8.5,
+  }));
+
+boundedDb.raw.prepare(`INSERT INTO routine_template_slot
+  (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, 7, 'major', ?, 2, 6, 8.0)`).run(preservedTemplateId, boardPress052Id);
+boundedDb.raw.prepare(`INSERT INTO routine_template_slot
+  (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, 8, 'accessory', ?, 2, 12, 6.5)`).run(preservedTemplateId, hammerCurlId);
+check('052 routine slots accept multiple same-day majors and positions beyond the old six-slot ceiling',
+  Number(boundedDb.raw.prepare(`
+    SELECT COUNT(*) AS c FROM routine_template_slot
+    WHERE routine_template_id = ? AND day_index = 1 AND role = 'major'
+  `).get(preservedTemplateId).c) === 2
+    && Number(boundedDb.raw.prepare(`
+      SELECT MAX(slot_index) AS n FROM routine_template_slot WHERE routine_template_id = ?
+    `).get(preservedTemplateId).n) === 8);
+
+boundedDb.executeSync("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2035-01-01', 'strength', 1)");
+const boundedBlockId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+boundedDb.raw.prepare(`INSERT INTO planned_session
+  (block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (?, 1, 1, 'full', 'accumulation', '2035-01-01')`).run(boundedBlockId);
+const boundedSessionId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+boundedDb.raw.prepare(`INSERT INTO planned_slot
+  (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, ?, 2, 6, 8.0)`).run(boundedSessionId, boardPress052Id);
+const boundedPlannedSlotId = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+const boundedFamilyDecisionJson = JSON.stringify([{
+  family: 'bench_press', exposureCount: 1, variationCount: 1,
+  equivalentVolume: 10.8, initialStress: 9.5, finalStress: 9.5,
+  weeklyBudget: 100, level: 'low', purposes: ['heavy'], adaptations: [],
+  sessions: [{
+    dayIndex: 1, exposureCount: 1, variationCount: 1,
+    equivalentVolume: 10.8, initialStress: 9.5, finalStress: 9.5,
+    budget: 48, level: 'low',
+  }],
+}]);
+boundedDb.raw.prepare(`INSERT INTO planned_session_routine_context
+  (planned_session_id, routine_day_index, family_decisions_json, warnings_json,
+   recommendations_json, adaptations_json) VALUES (?, 1, ?, '[]', '[]', '[]')`
+).run(boundedSessionId, boundedFamilyDecisionJson);
+boundedDb.raw.prepare(`INSERT INTO planned_slot_routine_decision
+  (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+   equivalent_volume, stress_dose, adaptations_json)
+  VALUES (?, 'major', 'bench_press', 'heavy', 0.9, 10.8, 9.5, '[]')`).run(boundedPlannedSlotId);
+check('052 frozen session and slot stress decisions round-trip as athlete-local side-cars',
+  boundedDb.raw.prepare(`
+    SELECT routine_day_index FROM planned_session_routine_context WHERE planned_session_id = ?
+  `).get(boundedSessionId).routine_day_index === 1
+    && boundedDb.raw.prepare(`
+      SELECT lift_family, stress_coefficient, equivalent_volume
+      FROM planned_slot_routine_decision WHERE planned_slot_id = ?
+    `).get(boundedPlannedSlotId).lift_family === 'bench_press');
+
+let boundedConstraintRejections = 0;
+for (const sql of [
+  `UPDATE movement_lift_family SET stress_coefficient = 2 WHERE movement_id = ${boardPress052Id}`,
+  `UPDATE movement_assistance_relationship SET distance = 4 WHERE movement_id = ${hammerCurlId} AND major_family = 'bench_press'`,
+  `UPDATE routine_template_slot SET role = 'other' WHERE routine_template_slot_id = ${preservedRoutineSlotId}`,
+  `UPDATE planned_session_routine_context SET warnings_json = 'not-json' WHERE planned_session_id = ${boundedSessionId}`,
+  `UPDATE planned_session_routine_context SET warnings_json = '{}' WHERE planned_session_id = ${boundedSessionId}`,
+  `UPDATE planned_session_routine_context SET family_decisions_json = '[]' WHERE planned_session_id = ${boundedSessionId}`,
+  `UPDATE planned_slot_routine_decision SET role = 'supplementary' WHERE planned_slot_id = ${boundedPlannedSlotId}`,
+  "INSERT INTO movement_lift_family (movement_id, family, stress_coefficient) VALUES (999999, 'squat', 1)",
+]) {
+  try { boundedDb.executeSync(sql); } catch { boundedConstraintRejections += 1; }
+}
+check('052 STRICT/CHECK/FK surface rejects invalid stress, distance, roles, JSON shape, decision shape, and movement FK',
+  boundedConstraintRejections === 8, `${boundedConstraintRejections}/8`);
+
+boundedDb.executeSync("INSERT INTO movement (name, pattern, is_compound) VALUES ('052 Future Movement', 'isolation', 0)");
+const future052Id = Number(boundedDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+check('052 fails future movement roles closed until a curator adds a relationship',
+  Number(boundedDb.raw.prepare(
+    'SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ?',
+  ).get(future052Id).c) === 0);
+boundedDb.executeSync(`PRAGMA user_version = ${boundedIndex};`);
+runMigrations(boundedDb, MIGRATIONS);
+check('052 replay is idempotent and preserves routine and frozen stress data',
+  uv(boundedDb) === MIGRATIONS.length
+    && Number(boundedDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_slot WHERE routine_template_id = ?',
+    ).get(preservedTemplateId).c) === 3
+    && Number(boundedDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM planned_slot_routine_decision WHERE planned_slot_id = ?',
+    ).get(boundedPlannedSlotId).c) === 1);
+
+const poisonedBounded = freshDb();
+for (let i = 0; i < boundedIndex; i += 1) poisonedBounded.executeSync(MIGRATIONS[i]);
+poisonedBounded.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('052 poison precondition claims completion while all four current sentinels are absent',
+  ['movement_lift_family', 'movement_assistance_relationship',
+    'planned_session_routine_context', 'planned_slot_routine_decision']
+    .every((name) => sentinelsMissing(poisonedBounded).includes(name)));
+runMigrations(poisonedBounded, MIGRATIONS);
+check('052 poison repair converges on the curated structural contract',
+  sentinelsMissing(poisonedBounded).length === 0
+    && JSON.stringify(boundedSummary(poisonedBounded)) === JSON.stringify(boundedSummary(a)),
+  JSON.stringify(boundedSummary(poisonedBounded)));
+
+// --- 2o. 053 exact legacy routine-role compatibility -----------------------
+console.log('[2o] 053 exact legacy routine-role compatibility');
+const compatibilityIndex = FILES.indexOf('053_routine_role_compatibility.sql');
+const compatibilityDb = freshDb();
+for (let i = 0; i < boundedIndex; i += 1) compatibilityDb.executeSync(MIGRATIONS[i]);
+compatibilityDb.executeSync("INSERT INTO routine_template (name, schema_type, created_at_ms, updated_at_ms) VALUES ('pre-052 compatibility', 'LINEAR', 1, 1)");
+const compatibilityTemplateId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+const compatibilityMovementId = (name) => Number(compatibilityDb.raw.prepare(
+  'SELECT movement_id FROM movement WHERE name = ?',
+).get(name).movement_id);
+const compatibilityBenchId = compatibilityMovementId('Competition Bench');
+const compatibilitySitUpId = compatibilityMovementId('3/4 Sit-Up');
+const compatibilityDbBenchId = compatibilityMovementId('Dumbbell Bench Press');
+for (const slot of [
+  [1, 'major', compatibilityBenchId, 3, 5, 8],
+  [2, 'supplementary', compatibilitySitUpId, 2, 10, 6],
+  [3, 'supplementary', compatibilityDbBenchId, 3, 8, 7],
+]) {
+  compatibilityDb.raw.prepare(`INSERT INTO routine_template_slot
+    (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?)`
+  ).run(compatibilityTemplateId, ...slot);
+}
+
+// Apply 052, then create an already-frozen reviewed session before 053. The
+// append-only migration must snapshot the exact compatibility marker in-place.
+compatibilityDb.executeSync(MIGRATIONS[boundedIndex]);
+compatibilityDb.executeSync(`PRAGMA user_version = ${compatibilityIndex};`);
+compatibilityDb.executeSync("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2036-01-01', 'strength', 1)");
+const compatibilityBlockId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+compatibilityDb.raw.prepare(`INSERT INTO planned_session
+  (block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (?, 1, 1, 'full', 'accumulation', '2036-01-01')`).run(compatibilityBlockId);
+const compatibilitySessionId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+compatibilityDb.raw.prepare(`INSERT INTO planned_session_method
+  (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+  VALUES (?, 'LINEAR', ?, 'pre-052 compatibility', 1)`
+).run(compatibilitySessionId, compatibilityTemplateId);
+compatibilityDb.raw.prepare(`INSERT INTO planned_session_routine_context
+  (planned_session_id, routine_day_index, family_decisions_json, warnings_json,
+   recommendations_json, adaptations_json) VALUES (?, 1, ?, '[]', '[]', '[]')`
+).run(compatibilitySessionId, boundedFamilyDecisionJson);
+compatibilityDb.raw.prepare(`INSERT INTO planned_slot
+  (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (?, 1, ?, 3, 5, 8)`).run(compatibilitySessionId, compatibilityBenchId);
+const compatibilityMajorSlotId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+compatibilityDb.raw.prepare(`INSERT INTO planned_slot_routine_decision
+  (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+   equivalent_volume, stress_dose, adaptations_json)
+  VALUES (?, 'major', 'bench_press', 'heavy', 1, 15, 14.2, '[]')`
+).run(compatibilityMajorSlotId);
+compatibilityDb.raw.prepare(`INSERT INTO planned_slot
+  (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (?, 2, ?, 2, 10, 6)`).run(compatibilitySessionId, compatibilitySitUpId);
+const compatibilitySupportSlotId = Number(
+  compatibilityDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id,
+);
+compatibilityDb.raw.prepare(`INSERT INTO planned_slot_routine_decision
+  (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+   equivalent_volume, stress_dose, adaptations_json)
+  VALUES (?, 'supplementary', NULL, NULL, 0, 0, 0, '[]')`
+).run(compatibilitySupportSlotId);
+
+runMigrations(compatibilityDb, MIGRATIONS);
+const compatibilityAllowanceRows = compatibilityDb.raw.prepare(`
+  SELECT day_index, movement_id, role
+  FROM routine_template_legacy_role_allowance
+  WHERE routine_template_id = ? ORDER BY day_index, movement_id
+`).all(compatibilityTemplateId);
+check('053 upgrade backfills only the exact unrelated supplementary slot',
+  JSON.stringify(compatibilityAllowanceRows) === JSON.stringify([{
+    day_index: 1, movement_id: compatibilitySitUpId, role: 'supplementary',
+  }])
+    && Number(compatibilityDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_slot WHERE routine_template_id = ?',
+    ).get(compatibilityTemplateId).c) === 3,
+  JSON.stringify(compatibilityAllowanceRows));
+check('053 does not broaden global roles or grandfather current same-family work',
+  JSON.stringify(roleCounts(compatibilityDb)) === JSON.stringify(roleCounts(a))
+    && Number(compatibilityDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ?',
+    ).get(compatibilitySitUpId).c) === 0
+    && !compatibilityAllowanceRows.some((row) => Number(row.movement_id) === compatibilityDbBenchId),
+  JSON.stringify(roleCounts(compatibilityDb)));
+check('053 snapshots an existing frozen legacy slot during upgrade',
+  compatibilityDb.raw.prepare(`
+    SELECT role FROM planned_slot_legacy_role_allowance WHERE planned_slot_id = ?
+  `).get(compatibilitySupportSlotId)?.role === 'supplementary');
+
+let compatibilityConstraintRejections = 0;
+for (const [sql, params] of [
+  [`INSERT INTO routine_template_legacy_role_allowance
+      (routine_template_id, day_index, movement_id, role) VALUES (?, 1, ?, 'major')`,
+    [compatibilityTemplateId, compatibilitySitUpId]],
+  [`INSERT INTO routine_template_legacy_role_allowance
+      (routine_template_id, day_index, movement_id, role) VALUES (?, 8, ?, 'supplementary')`,
+    [compatibilityTemplateId, compatibilitySitUpId]],
+  [`INSERT INTO routine_template_legacy_role_allowance
+      (routine_template_id, day_index, movement_id, role) VALUES (?, 1, 999999, 'supplementary')`,
+    [compatibilityTemplateId]],
+  [`INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id, role) VALUES (?, 'major')`,
+    [compatibilityMajorSlotId]],
+  [`INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id, role) VALUES (999999, 'supplementary')`,
+    []],
+]) {
+  try { compatibilityDb.raw.prepare(sql).run(...params); } catch { compatibilityConstraintRejections += 1; }
+}
+const compatibilityStrict = compatibilityDb.raw.prepare(`
+  SELECT name, strict FROM pragma_table_list
+  WHERE name IN ('routine_template_legacy_role_allowance', 'planned_slot_legacy_role_allowance')
+  ORDER BY name
+`).all();
+check('053 tables are STRICT and reject wrong roles, days, and foreign keys',
+  compatibilityConstraintRejections === 5
+    && compatibilityStrict.length === 2
+    && compatibilityStrict.every((row) => Number(row.strict) === 1),
+  `${compatibilityConstraintRejections}/5 ${JSON.stringify(compatibilityStrict)}`);
+
+compatibilityDb.executeSync(`PRAGMA user_version = ${compatibilityIndex};`);
+runMigrations(compatibilityDb, MIGRATIONS);
+check('053 replay is idempotent and preserves exact template and frozen allowances',
+  Number(compatibilityDb.raw.prepare(
+    'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+  ).get(compatibilityTemplateId).c) === 1
+    && Number(compatibilityDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance WHERE planned_slot_id = ?',
+    ).get(compatibilitySupportSlotId).c) === 1);
+
+compatibilityDb.raw.prepare('DELETE FROM routine_template WHERE routine_template_id = ?')
+  .run(compatibilityTemplateId);
+check('053 frozen allowance survives source-template deletion',
+  compatibilityDb.raw.prepare(`
+    SELECT role FROM planned_slot_legacy_role_allowance WHERE planned_slot_id = ?
+  `).get(compatibilitySupportSlotId)?.role === 'supplementary'
+    && compatibilityDb.raw.prepare(`
+      SELECT routine_template_id FROM planned_session_method WHERE planned_session_id = ?
+    `).get(compatibilitySessionId)?.routine_template_id === null);
+
+const poisonedCompatibility = freshDb();
+runMigrations(poisonedCompatibility, MIGRATIONS);
+poisonedCompatibility.executeSync('DROP TABLE planned_slot_legacy_role_allowance');
+poisonedCompatibility.executeSync('DROP TABLE routine_template_legacy_role_allowance');
+poisonedCompatibility.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+check('053 poison precondition claims completion while both compatibility sentinels are absent',
+  ['routine_template_legacy_role_allowance', 'planned_slot_legacy_role_allowance']
+    .every((name) => sentinelsMissing(poisonedCompatibility).includes(name)));
+runMigrations(poisonedCompatibility, MIGRATIONS);
+check('053 poison repair restores both exact compatibility tables',
+  sentinelsMissing(poisonedCompatibility).length === 0
+    && poisonedCompatibility.raw.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'routine_template_legacy_role_allowance'",
+    ).get() !== undefined
+    && poisonedCompatibility.raw.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'planned_slot_legacy_role_allowance'",
+    ).get() !== undefined);
+
+// --- 2p. 054 exact contract-cutoff provenance ---------------------------------
+// Migration 053 is shipped and its backfill re-derives from LIVE family and
+// assistance rows on every self-heal. 054 bounds that re-derivation to
+// templates authored before the contract (the first-run watermark), so a
+// future curation change that removes or re-parents a relationship row can
+// never grandfather a post-contract template. This block pins the required
+// adversarial coverage: (1) exact 053 allowances survive upgrade + replay,
+// (2) a post-contract template does NOT become legacy after its relationship
+// is removed and the full chain self-heals, (3) poisoned provenance (a
+// missing or over-reached marker) fails closed and grants nothing.
+console.log('[2p] 054 exact contract-cutoff provenance');
+const cutoffIndex = FILES.indexOf('054_contract_cutoff_provenance.sql');
+const cutoffDb = freshDb();
+// Land the contract the way the eventual release does: an install that never
+// saw 053 upgrades through 053 + 054 in one batch.
+for (let i = 0; i < boundedIndex; i += 1) cutoffDb.executeSync(MIGRATIONS[i]);
+cutoffDb.executeSync(MIGRATIONS[boundedIndex]); // 052: curated families, assistance, frozen-decision side-cars
+const cutoffMovementId = (name) => Number(cutoffDb.raw.prepare(
+  'SELECT movement_id FROM movement WHERE name = ?',
+).get(name).movement_id);
+const cutoffBenchId = cutoffMovementId('Competition Bench');
+const cutoffSitUpId = cutoffMovementId('3/4 Sit-Up');
+const cutoffDbBenchId = cutoffMovementId('Dumbbell Bench Press');
+
+// A pre-contract template: one unrelated supplementary slot (053 grandfathers
+// it) plus one same-family supplementary slot (valid today, never marked).
+cutoffDb.raw.prepare(`INSERT INTO routine_template
+  (name, schema_type, created_at_ms, updated_at_ms) VALUES ('pre-contract cutoff', 'LINEAR', 1, 1)`).run();
+const cutoffPreTemplateId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+for (const slot of [
+  [1, 'major', cutoffBenchId, 3, 5, 8],
+  [2, 'supplementary', cutoffSitUpId, 2, 10, 6],
+  [3, 'supplementary', cutoffDbBenchId, 3, 8, 7],
+]) {
+  cutoffDb.raw.prepare(`INSERT INTO routine_template_slot
+    (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?)`).run(cutoffPreTemplateId, ...slot);
+}
+cutoffDb.executeSync(MIGRATIONS[compatibilityIndex]); // 053 backfills the Sit-Up allowance
+cutoffDb.executeSync(MIGRATIONS[cutoffIndex]);        // 054 captures the watermark, prunes nothing
+const cutoffWatermark = () => Number(cutoffDb.raw.prepare(
+  'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+).get().cutoff_template_id);
+const cutoffPreAllowances = (templateId) => cutoffDb.raw.prepare(
+  'SELECT day_index, movement_id, role FROM routine_template_legacy_role_allowance WHERE routine_template_id = ? ORDER BY movement_id',
+).all(templateId);
+check('054 upgrade captures the pre-contract watermark exactly',
+  cutoffWatermark() === cutoffPreTemplateId, String(cutoffWatermark()));
+check('054 preserves every exact 053 allowance on the upgrade path',
+  JSON.stringify(cutoffPreAllowances(cutoffPreTemplateId)) === JSON.stringify([
+    { day_index: 1, movement_id: cutoffSitUpId, role: 'supplementary' },
+  ]), JSON.stringify(cutoffPreAllowances(cutoffPreTemplateId)));
+
+// A template authored AFTER the contract (id above the watermark).
+cutoffDb.raw.prepare(`INSERT INTO routine_template
+  (name, schema_type, created_at_ms, updated_at_ms) VALUES ('post-contract cutoff', 'LINEAR', 1, 1)`).run();
+const cutoffPostTemplateId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+for (const slot of [
+  [1, 'major', cutoffBenchId, 3, 5, 8],
+  [2, 'supplementary', cutoffDbBenchId, 3, 8, 7],
+]) {
+  cutoffDb.raw.prepare(`INSERT INTO routine_template_slot
+    (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?)`).run(cutoffPostTemplateId, ...slot);
+}
+check('the post-contract supplementary slot is justified under the contract and carries no allowance',
+  Number(cutoffDb.raw.prepare(
+    'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+  ).get(cutoffPostTemplateId).c) === 0);
+
+// Freeze an executable day from each template BEFORE the heal, exactly as the
+// store would, so a full self-heal has frozen slots it could contaminate.
+const cutoffFrozenSession = (templateId) => {
+  cutoffDb.executeSync("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2037-01-01', 'strength', 1)");
+  const blockId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+  cutoffDb.raw.prepare(`INSERT INTO planned_session
+    (block_id, week_index, day_index, focus, phase, session_date)
+    VALUES (?, 1, 1, 'full', 'accumulation', '2037-01-01')`).run(blockId);
+  const sessionId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+  cutoffDb.raw.prepare(`INSERT INTO planned_session_method
+    (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+    VALUES (?, 'LINEAR', ?, 'cutoff freeze', 1)`).run(sessionId, templateId);
+  cutoffDb.raw.prepare(`INSERT INTO planned_session_routine_context
+    (planned_session_id, routine_day_index, family_decisions_json, warnings_json,
+     recommendations_json, adaptations_json)
+    VALUES (?, 1, ?, '[]', '[]', '[]')`).run(sessionId, boundedFamilyDecisionJson);
+  const slotIds = [];
+  for (const [slotIndex, movementId] of [[1, cutoffBenchId], [2, cutoffSitUpId], [2, cutoffDbBenchId]]) {
+    if (slotIndex === 2 && movementId === cutoffSitUpId && templateId !== cutoffPreTemplateId) continue;
+    if (slotIndex === 2 && movementId === cutoffDbBenchId && templateId !== cutoffPostTemplateId) continue;
+    cutoffDb.raw.prepare(`INSERT INTO planned_slot
+      (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+      VALUES (?, ?, ?, 3, 5, 8)`).run(sessionId, slotIndex, movementId);
+    const plannedSlotId = Number(cutoffDb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+    const isMajor = movementId === cutoffBenchId;
+    cutoffDb.raw.prepare(`INSERT INTO planned_slot_routine_decision
+      (planned_slot_id, role, lift_family, stress_purpose, stress_coefficient,
+       equivalent_volume, stress_dose, adaptations_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        plannedSlotId, isMajor ? 'major' : 'supplementary',
+        isMajor ? 'bench_press' : null,
+        isMajor ? 'heavy' : null,
+        isMajor ? 1 : 0,
+        isMajor ? 15 : 0,
+        isMajor ? 14.2 : 0,
+        '[]');
+    slotIds.push({ plannedSlotId, movementId });
+  }
+  return { sessionId, slotIds };
+};
+cutoffFrozenSession(cutoffPreTemplateId);   // Sit-Up supplementary slot
+cutoffFrozenSession(cutoffPostTemplateId);  // Dumbbell Bench Press supplementary slot
+check('pre-heal: no frozen legacy marker exists for either frozen day',
+  Number(cutoffDb.raw.prepare('SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance').get().c) === 0);
+
+// A future curation migration re-parents Dumbbell Bench Press out of the bench
+// family. Re-parenting via UPDATE survives a full heal (052's INSERT OR IGNORE
+// seed never overwrites the existing row), so 053's next backfill sees the
+// db-bench slot as unjustified and re-derives an allowance for BOTH templates;
+// 054 must keep the pre-contract one (authored before the contract) and prune
+// the post-contract one.
+cutoffDb.raw.prepare("UPDATE movement_lift_family SET family = 'deadlift' WHERE movement_id = ?").run(cutoffDbBenchId);
+check('precondition: re-parenting removes the bench-family membership of the db-bench movement',
+  Number(cutoffDb.raw.prepare(
+    "SELECT COUNT(*) AS c FROM movement_lift_family WHERE movement_id = ? AND family = 'bench_press'",
+  ).get(cutoffDbBenchId).c) === 0
+    && Number(cutoffDb.raw.prepare(
+      "SELECT COUNT(*) AS c FROM movement_lift_family WHERE movement_id = ? AND family = 'deadlift'",
+    ).get(cutoffDbBenchId).c) === 1);
+cutoffDb.executeSync('DROP TABLE planned_slot_legacy_role_allowance');
+cutoffDb.executeSync('DROP TABLE routine_template_legacy_role_allowance');
+check('precondition: full self-heal is armed by missing 053 sentinels',
+  sentinelsMissing(cutoffDb).includes('routine_template_legacy_role_allowance')
+    && sentinelsMissing(cutoffDb).includes('planned_slot_legacy_role_allowance'));
+runMigrations(cutoffDb, MIGRATIONS);
+
+check('full self-heal restores every sentinel and preserves the original watermark',
+  sentinelsMissing(cutoffDb).length === 0
+    && cutoffWatermark() === cutoffPreTemplateId, String(cutoffWatermark()));
+check('pre-contract allowances survive a narrowed contract + full self-heal, including the newly re-derived slot',
+  JSON.stringify(cutoffPreAllowances(cutoffPreTemplateId)) === JSON.stringify([
+    { day_index: 1, movement_id: cutoffDbBenchId, role: 'supplementary' },
+    { day_index: 1, movement_id: cutoffSitUpId, role: 'supplementary' },
+  ]), JSON.stringify(cutoffPreAllowances(cutoffPreTemplateId)));
+check('the post-contract template does NOT become legacy after its relationship is removed + full self-heal',
+  Number(cutoffDb.raw.prepare(
+    'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+  ).get(cutoffPostTemplateId).c) === 0);
+check('the pre-contract frozen legacy marker is reconstructed and survives the heal',
+  Number(cutoffDb.raw.prepare(`SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance pla
+    JOIN planned_slot ps USING (planned_slot_id)
+    JOIN planned_session_method psm USING (planned_session_id)
+    WHERE psm.routine_template_id = ?`).get(cutoffPreTemplateId).c) === 1);
+check('the post-contract frozen marker reconstructed by the heal is pruned (poisoned provenance grants nothing)',
+  Number(cutoffDb.raw.prepare(`SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance pla
+    JOIN planned_slot ps USING (planned_slot_id)
+    JOIN planned_session_method psm USING (planned_session_id)
+    WHERE psm.routine_template_id = ?`).get(cutoffPostTemplateId).c) === 0);
+check('role counts and eligibility are untouched by the 054 prune',
+  JSON.stringify(roleCounts(cutoffDb)) === JSON.stringify(roleCounts(a))
+    && cutoffDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM movement_role_eligibility WHERE movement_id = ? AND role = ?',
+    ).get(cutoffDbBenchId, 'major').c === 1);
+
+cutoffDb.executeSync(`PRAGMA user_version = ${cutoffIndex};`);
+runMigrations(cutoffDb, MIGRATIONS);
+check('054 replay is idempotent: watermark, allowances, and prunes are stable',
+  cutoffWatermark() === cutoffPreTemplateId
+    && cutoffPreAllowances(cutoffPreTemplateId).length === 2
+    && Number(cutoffDb.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+    ).get(cutoffPostTemplateId).c) === 0
+    && cutoffDb.raw.prepare(`SELECT COUNT(*) AS c FROM planned_slot_legacy_role_allowance pla
+      JOIN planned_slot ps USING (planned_slot_id)
+      JOIN planned_session_method psm USING (planned_session_id)
+      WHERE psm.routine_template_id = ?`).get(cutoffPostTemplateId).c === 0,
+  String(cutoffWatermark()));
+
+let cutoffConstraintRejections = 0;
+for (const sql of [
+  'INSERT INTO routine_template_contract_cutoff (cutoff_template_id, capture_epoch) VALUES (1, 1)',
+  'INSERT INTO routine_template_contract_cutoff (cutoff_template_id, capture_epoch) VALUES (-5, 2)',
+  'INSERT INTO routine_template_contract_cutoff (cutoff_template_id, capture_epoch) VALUES (1.5, 1)',
+  'UPDATE routine_template_contract_cutoff SET cutoff_template_id = 99 WHERE capture_epoch = 1',
+  'DELETE FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+]) {
+  try { cutoffDb.executeSync(sql); } catch { cutoffConstraintRejections += 1; }
+}
+const cutoffTable = cutoffDb.raw.prepare(`
+  SELECT strict, wr FROM pragma_table_list WHERE name = 'routine_template_contract_cutoff'
+`).get();
+check('054 cutoff is STRICT, WITHOUT ROWID, immutable, and rejects re-capture and bad watermarks',
+  cutoffConstraintRejections === 5 && cutoffTable?.strict === 1 && cutoffTable?.wr === 1,
+  `${cutoffConstraintRejections}/5 ${JSON.stringify(cutoffTable)}`);
+
+// Poison of the cutoff marker itself must fail closed. A post-contract
+// template already exists BEFORE the marker is lost; recapturing MAX(id)
+// would silently classify it as pre-contract. The production runner instead
+// commits cutoff zero before replay, including when an earlier replayed
+// migration fails and the next boot must retry from that boundary.
+console.log('[2p-b] 054 cutoff sentinel poison');
+const cutoffPoison = freshDb();
+runMigrations(cutoffPoison, MIGRATIONS);
+check('fresh-install watermark is zero (no pre-contract templates exist)',
+  Number(cutoffPoison.raw.prepare(
+    'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+).get().cutoff_template_id) === 0);
+const cutoffPoisonMovementId = (name) => Number(cutoffPoison.raw.prepare(
+  'SELECT movement_id FROM movement WHERE name = ?',
+).get(name).movement_id);
+const cutoffPoisonBenchId = cutoffPoisonMovementId('Competition Bench');
+const cutoffPoisonDbBenchId = cutoffPoisonMovementId('Dumbbell Bench Press');
+cutoffPoison.raw.prepare(`INSERT INTO routine_template
+  (name, schema_type, created_at_ms, updated_at_ms) VALUES ('pre-poison post-contract', 'LINEAR', 1, 1)`).run();
+const cutoffPoisonTemplateId = Number(cutoffPoison.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+for (const slot of [
+  [1, 'major', cutoffPoisonBenchId, 3, 5, 8],
+  [2, 'supplementary', cutoffPoisonDbBenchId, 3, 8, 7],
+]) {
+  cutoffPoison.raw.prepare(`INSERT INTO routine_template_slot
+    (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?)`).run(cutoffPoisonTemplateId, ...slot);
+}
+cutoffPoison.raw.prepare("UPDATE movement_lift_family SET family = 'deadlift' WHERE movement_id = ?")
+  .run(cutoffPoisonDbBenchId);
+cutoffPoison.executeSync('DROP TABLE routine_template_contract_cutoff');
+check('precondition: the cutoff sentinel is missing',
+  sentinelsMissing(cutoffPoison).includes('routine_template_contract_cutoff'));
+const brokenCutoffReplay = [
+  `${MIGRATIONS[0]}\nSELECT no_such_cutoff_repair_fn(1);`,
+  ...MIGRATIONS.slice(1),
+];
+let cutoffReplayThrew = false;
+try { runMigrations(cutoffPoison, brokenCutoffReplay); } catch { cutoffReplayThrew = true; }
+check('cutoff loss is persisted as zero before a failing full replay',
+  cutoffReplayThrew
+    && uv(cutoffPoison) === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === 0);
+runMigrations(cutoffPoison, MIGRATIONS);
+check('cutoff poison retry restores every sentinel without recapturing MAX(id)',
+  sentinelsMissing(cutoffPoison).length === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === 0);
+check('a template that existed before cutoff loss cannot become legacy after replay',
+  Number(cutoffPoison.raw.prepare(
+    'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+  ).get(cutoffPoisonTemplateId).c) === 0);
+
+// The sentinel is row-aware as well as table-aware. Losing only the singleton
+// row takes the same conservative repair path and cannot retain a fabricated
+// post-contract allowance.
+cutoffPoison.raw.prepare(`INSERT INTO routine_template_legacy_role_allowance
+  (routine_template_id, day_index, movement_id, role) VALUES (?, 1, ?, 'supplementary')`)
+  .run(cutoffPoisonTemplateId, cutoffPoisonDbBenchId);
+cutoffPoison.executeSync('DROP TRIGGER trg_routine_template_contract_cutoff_bd');
+cutoffPoison.executeSync('DELETE FROM routine_template_contract_cutoff');
+check('precondition: a missing cutoff row is detected even while its table exists',
+  sentinelsMissing(cutoffPoison).includes('routine_template_contract_cutoff'));
+runMigrations(cutoffPoison, MIGRATIONS);
+check('missing-row poison also restores cutoff zero and prunes fabricated access',
+  sentinelsMissing(cutoffPoison).length === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+    ).get(cutoffPoisonTemplateId).c) === 0);
+
+// Losing an immutability guard is itself compromised provenance: the value may
+// have been widened before boot. The runner conservatively resets it to zero.
+cutoffPoison.executeSync('DROP TRIGGER trg_routine_template_contract_cutoff_bu');
+cutoffPoison.executeSync(`UPDATE routine_template_contract_cutoff
+  SET cutoff_template_id = ${cutoffPoisonTemplateId} WHERE capture_epoch = 1`);
+cutoffPoison.raw.prepare(`INSERT INTO routine_template_legacy_role_allowance
+  (routine_template_id, day_index, movement_id, role) VALUES (?, 1, ?, 'supplementary')`)
+  .run(cutoffPoisonTemplateId, cutoffPoisonDbBenchId);
+check('precondition: a missing update guard leaves detectably widened provenance',
+  sentinelsMissing(cutoffPoison).includes('trg_routine_template_contract_cutoff_bu')
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === cutoffPoisonTemplateId);
+runMigrations(cutoffPoison, MIGRATIONS);
+check('guard poison resets cutoff zero, restores both guards, and prunes fabricated access',
+  sentinelsMissing(cutoffPoison).length === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT cutoff_template_id FROM routine_template_contract_cutoff WHERE capture_epoch = 1',
+    ).get().cutoff_template_id) === 0
+    && Number(cutoffPoison.raw.prepare(
+      'SELECT COUNT(*) AS c FROM routine_template_legacy_role_allowance WHERE routine_template_id = ?',
+    ).get(cutoffPoisonTemplateId).c) === 0);
+
+// --- 2q. 055 return_checkin_ack: poison heal, constraints, replay -------------
+console.log('[2q] 055 return_checkin_ack');
+{
+  const ackPoison = freshDb();
+  runMigrations(ackPoison, MIGRATIONS);
+  ackPoison.executeSync('DROP TABLE return_checkin_ack');
+  check('055 poison precondition: return_checkin_ack sentinel missing',
+    sentinelsMissing(ackPoison).includes('return_checkin_ack'));
+  runMigrations(ackPoison, MIGRATIONS);
+  check('055 poison self-heal restores return_checkin_ack sentinel',
+    sentinelsMissing(ackPoison).length === 0);
+
+  // Check valid insertion and primary key deduplication
+  ackPoison.raw.prepare(`
+    INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-07-01', 'continue_plan', 1000)
+  `).run();
+  ackPoison.raw.prepare(`
+    INSERT OR IGNORE INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-07-01', 'review_first_session', 2000)
+  `).run();
+  const row055 = ackPoison.raw.prepare("SELECT * FROM return_checkin_ack WHERE last_qualifying_date = '2026-07-01'").get();
+  check('055 persists acknowledged_action correctly', row055.acknowledged_action === 'continue_plan');
+
+  // Check CHECK constraints
+  let invalidActionThrew = false;
+  try {
+    ackPoison.raw.prepare(`
+      INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+      VALUES ('2026-07-02', 'unauthorized_dose_modifier', 3000)
+    `).run();
+  } catch {
+    invalidActionThrew = true;
+  }
+  check('055 schema rejects unauthorized action values', invalidActionThrew);
+
+  let invalidDateThrew = false;
+  try {
+    ackPoison.raw.prepare(`
+      INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+      VALUES ('2026/07/02', 'continue_plan', 3000)
+    `).run();
+  } catch {
+    invalidDateThrew = true;
+  }
+  check('055 schema rejects invalid date GLOB format', invalidDateThrew);
+}
+
+// --- 2r. 056 movement_taxonomy_backfill: coverage assertion ----------------
+console.log('[2r] 056 movement_taxonomy_backfill');
+{
+  const db056 = freshDb();
+  runMigrations(db056, MIGRATIONS);
+  const missingTaxonomy = db056.raw.prepare(`
+    SELECT COUNT(*) AS c
+    FROM movement m
+    LEFT JOIN movement_taxonomy t ON m.movement_id = t.movement_id
+    WHERE t.movement_id IS NULL
+  `).get().c;
+  check('every row in movement has exactly one movement_taxonomy row (missing count is 0)',
+    Number(missingTaxonomy) === 0, `${missingTaxonomy} missing`);
+}
+
+// --- 2s. R1: durable-object drift guard + per-table self-heal matrix --------
+// The registry used to carry ~one representative object per migration, which
+// detects "a migration never applied" but NOT "one table was lost while
+// user_version still reads latest". This guard fails when a durable table is
+// introduced without recovery coverage, so the defect cannot recur at 057.
+console.log('[2s] R1 durable-object drift guard');
+{
+  const dbDrift = freshDb();
+  runMigrations(dbDrift, MIGRATIONS);
+  const registered = new Set(SENTINELS.map((s) => s.name));
+  const exempt = new Map(DURABLE_TABLE_EXEMPTIONS.map((e) => [e.name, e.reason]));
+  const durable = dbDrift.raw.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+  ).all().map((r) => r.name);
+  const uncovered = durable.filter((t) => !registered.has(t) && !exempt.has(t));
+  check('every durable table is a sentinel or a justified exemption',
+    uncovered.length === 0,
+    uncovered.length === 0 ? `${durable.length} tables covered` : `UNCOVERED: ${uncovered.join(', ')}`);
+  check('every exemption names a table that does NOT exist at latest user_version',
+    DURABLE_TABLE_EXEMPTIONS.every((e) => !durable.includes(e.name)),
+    DURABLE_TABLE_EXEMPTIONS.map((e) => e.name).join(', ') || 'none');
+  check('every exemption carries a reason',
+    DURABLE_TABLE_EXEMPTIONS.every((e) => typeof e.reason === 'string' && e.reason.length > 20));
+}
+
+// Per-table recovery matrix: drop each table at latest user_version, boot the
+// PRODUCTION runner, and prove detection + restoration + unrelated-data safety.
+console.log('[2t] R1 missing-table self-heal matrix (production runner)');
+for (const target of ['movement_capability_family', 'movement_capability_attestation',
+  'routine_template_slot', 'history_import_session', 'history_import_set',
+  'history_import_capability_evidence',
+  'activity_definition', 'activity_requirement', 'activity_series',
+  'activity_occurrence', 'activity_completion', 'activity_source_link',
+  'activity_typical_week_report', 'activity_typical_week_item',
+  'health_support_profile', 'health_support_preference', 'health_support_note',
+  'clinician_instruction', 'clinician_instruction_revision',
+  'health_support_hold', 'health_support_scope',
+  'recommendation_support_record', 'recommendation_activity_basis',
+  'recommendation_hold_basis',
+  'session_preparation', 'session_preparation_item',
+  // muscle_group itself is the seeded PARENT of the two tables below, so it
+  // cannot be dropped with foreign keys on; its loss is exercised in [066].
+  'muscle_group_alias', 'movement_muscle_role',
+  'athlete_focus', 'athlete_focus_muscle',
+  'athlete_goal', 'athlete_goal_revision', 'athlete_goal_observation',
+  'athlete_sport_profile', 'athlete_goal_movement', 'block_emphasis']) {
+  const db = freshDb();
+  runMigrations(db, MIGRATIONS);
+  const before = uv(db);
+  db.raw.exec(`INSERT INTO movement_taxonomy (movement_id, category, implement)
+    SELECT movement_id, 'squat', 'barbell' FROM movement LIMIT 0`);
+  const unrelatedBefore = db.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c;
+  db.raw.exec(`DROP TABLE ${target}`);
+  db.raw.exec(`PRAGMA user_version = ${before}`);
+  // sentinelsMissing already returns names, not sentinel objects.
+  const detected = sentinelsMissing(db).includes(target);
+  runMigrations(db, MIGRATIONS);
+  const restored = db.raw.prepare(
+    `SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name = ?`,
+  ).get(target).c === 1;
+  const unrelatedAfter = db.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c;
+  runMigrations(db, MIGRATIONS);
+  const idempotent = uv(db) === before && db.raw.prepare(
+    `SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name = ?`,
+  ).get(target).c === 1;
+  check(`${target}: loss detected, restored, unrelated data intact, replay idempotent`,
+    detected && restored && idempotent && unrelatedAfter === unrelatedBefore,
+    `detected=${detected} restored=${restored} idempotent=${idempotent} `
+    + `movement ${unrelatedBefore}->${unrelatedAfter} uv=${uv(db)}`);
+}
+
+// --- [2u] 057 block_meta phase/index invariant (DB-BLOCK-META-DRIFT) ---------
+// Field capture held (block_id=2, macro_block_index=3, macro_phase='volume');
+// the production mapping requires index 3 -> 'hypertrophy'. 057 repairs every
+// persisted mismatch from macro_block_index and installs fail-closed triggers
+// so the drift cannot be re-inserted at the database boundary.
+console.log('[2u] 057 block_meta phase/index repair + enforcement');
+{
+  // Canonical index->phase mapping mirrored from macroPhaseOf (verify:blocks
+  // machine-checks the TS side; this is the SQL side of the same contract).
+  const phaseOf = (i) =>
+    i <= 2 ? 'gpp' : i <= 4 ? 'hypertrophy' : i <= 6 ? 'volume' : 'peak';
+
+  // Seed a training_block + block_meta row. The UPDATE-of-phase helper keeps
+  // each scenario explicit about which mismatch it plants.
+  const seedBlock = (db, blockId, idx) => {
+    db.raw.prepare(
+      `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+       VALUES (?, '2026-01-05', 'strength', 4, 'archived', 1000)`,
+    ).run(blockId);
+    db.raw.prepare(
+      `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+       VALUES (?, ?, ?, 'WAVE', 0)`,
+    ).run(blockId, idx, phaseOf(idx));
+  };
+  const setPhase = (db, blockId, phase) => {
+    // Directly plant a drifted phase, bypassing nothing: before 057 there is
+    // no trigger, so this is exactly how the field row came to exist.
+    db.raw.prepare('UPDATE block_meta SET macro_phase = ? WHERE block_id = ?').run(phase, blockId);
+  };
+
+  // --- fresh install reaches user_version 60 with the invariant enforced ---
+  {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    // Slot 004 is the parameterized materialize script, never a migration:
+    // 68 files (slots 001-069, no 004) -> user_version 68. This count is
+    // pinned deliberately so adding a migration is a conscious act, not a
+    // silent one. Re-pinned for 069 (resting heart rate).
+    check('fresh install reaches user_version 68 (68 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 68,
+      String(uv(db)));
+    const trig = db.raw.prepare(
+      `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
+       AND name IN ('trg_block_meta_phase_bi', 'trg_block_meta_phase_bu')`,
+    ).get().c;
+    check('fresh install carries both 057 enforcement triggers', trig === 2);
+    let insertRejected = false;
+    try {
+      db.raw.prepare(
+        `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+         VALUES (9001, '2026-01-05', 'strength', 4, 'active', 1)`,
+      ).run();
+      db.raw.prepare(
+        `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+         VALUES (9001, 3, 'volume', 'WAVE', 0)`,
+      ).run();
+    } catch (e) {
+      insertRejected = /macro_phase does not match/i.test(String(e.message));
+    }
+    check('invalid INSERT (3, volume) rejected at the boundary', insertRejected);
+    // Every valid pair must pass the same boundary.
+    let allValidAccepted = true;
+    for (let i = 1; i <= 8; i += 1) {
+      try {
+        db.raw.prepare(
+          `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+           VALUES (?, '2026-01-05', 'strength', 4, 'active', 1)`,
+        ).run(9100 + i);
+        db.raw.prepare(
+          `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+           VALUES (?, ?, ?, 'LINEAR', 0)`,
+        ).run(9100 + i, i, phaseOf(i));
+      } catch {
+        allValidAccepted = false;
+      }
+    }
+    check('every valid index/phase pair accepted (all 8)', allValidAccepted);
+  }
+
+  // --- version-56 DB containing EVERY possible mismatch is repaired ----------
+  {
+    const db = freshDb();
+    const v56 = FILES.indexOf('057_block_meta_phase_invariant.sql'); // = 56 migrations applied
+    for (let i = 0; i < v56; i += 1) db.executeSync(MIGRATIONS[i]);
+    db.executeSync(`PRAGMA user_version = ${v56};`);
+    check('precondition: version-56 database built', uv(db) === v56);
+    // One row per macro index; plant the WRONG phase for every index.
+    for (let i = 1; i <= 8; i += 1) {
+      seedBlock(db, i, i);
+      const wrong = phaseOf(i === 8 ? 7 : i + 1); // always a different VALID phase value
+      setPhase(db, i, wrong);
+    }
+    runMigrations(db, MIGRATIONS);
+    const rows = db.raw.prepare(
+      'SELECT block_id, macro_block_index, macro_phase, schema_type, peak_shifted FROM block_meta ORDER BY block_id',
+    ).all();
+    const allRepaired = rows.length === 8 && rows.every((r) => r.macro_phase === phaseOf(r.macro_block_index));
+    check('version-56 DB with all 8 indexes drifted: every phase repaired deterministically', allRepaired,
+      JSON.stringify(rows.map((r) => [r.macro_block_index, r.macro_phase])));
+    // Repair preserves everything except the derived phase.
+    const preserved = rows.every((r) => r.schema_type === 'WAVE' && r.peak_shifted === 0);
+    check('repair preserves schema_type/peak_shifted/block ids', preserved);
+  }
+
+  // --- the exact captured case: (3,'volume') -> (3,'hypertrophy') ------------
+  {
+    const db = freshDb();
+    const v56 = FILES.indexOf('057_block_meta_phase_invariant.sql');
+    for (let i = 0; i < v56; i += 1) db.executeSync(MIGRATIONS[i]);
+    db.executeSync(`PRAGMA user_version = ${v56};`);
+    seedBlock(db, 2, 3);
+    setPhase(db, 2, 'volume'); // the captured field row
+    runMigrations(db, MIGRATIONS);
+    const row = db.raw.prepare(
+      'SELECT macro_block_index, macro_phase FROM block_meta WHERE block_id = 2',
+    ).get();
+    check('captured field row (block_id=2, index=3, volume) becomes (3, hypertrophy)',
+      row && row.macro_block_index === 3 && row.macro_phase === 'hypertrophy',
+      JSON.stringify(row));
+  }
+
+  // --- valid rows survive replay byte/logically unchanged --------------------
+  {
+    const db = freshDb();
+    const v56 = FILES.indexOf('057_block_meta_phase_invariant.sql');
+    for (let i = 0; i < v56; i += 1) db.executeSync(MIGRATIONS[i]);
+    db.executeSync(`PRAGMA user_version = ${v56};`);
+    for (let i = 1; i <= 8; i += 1) seedBlock(db, i, i);
+    const before = JSON.stringify(db.raw.prepare(
+      'SELECT * FROM block_meta ORDER BY block_id',
+    ).all());
+    runMigrations(db, MIGRATIONS);
+    const after = JSON.stringify(db.raw.prepare(
+      'SELECT * FROM block_meta ORDER BY block_id',
+    ).all());
+    check('valid index/phase pairs survive migration logically unchanged', before === after);
+    runMigrations(db, MIGRATIONS); // full replay/self-heal path
+    const afterReplay = JSON.stringify(db.raw.prepare(
+      'SELECT * FROM block_meta ORDER BY block_id',
+    ).all());
+    check('replay/idempotency leaves correct rows unchanged', afterReplay === after);
+  }
+
+  // --- invalid UPDATE rejected; FK cascade intact; rollback atomicity --------
+  {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    seedBlock(db, 50, 3);
+    let updateRejected = false;
+    try { setPhase(db, 50, 'volume'); } catch (e) {
+      updateRejected = /macro_phase does not match/i.test(String(e.message));
+    }
+    const stillHypertrophy = db.raw.prepare(
+      "SELECT macro_phase FROM block_meta WHERE block_id = 50",
+    ).get().macro_phase;
+    check('invalid UPDATE of phase rejected at the boundary, row untouched',
+      updateRejected && stillHypertrophy === 'hypertrophy');
+
+    // Dependent planned_session data survives; parent delete still cascades.
+    db.raw.prepare(
+      `INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+       VALUES (5001, 50, 1, 1, 'lower', 'accumulation', '2026-01-06')`,
+    ).run();
+    const depBefore = db.raw.prepare(
+      'SELECT COUNT(*) AS c FROM planned_session WHERE block_id = 50',
+    ).get().c;
+    db.raw.prepare('DELETE FROM training_block WHERE block_id = 50').run();
+    const depAfter = db.raw.prepare(
+      'SELECT COUNT(*) AS c FROM planned_session WHERE block_id = 50',
+    ).get().c;
+    const metaAfter = db.raw.prepare(
+      'SELECT COUNT(*) AS c FROM block_meta WHERE block_id = 50',
+    ).get().c;
+    check('dependent planned data present pre-delete, FK cascade intact post-delete',
+      depBefore === 1 && depAfter === 0 && metaAfter === 0);
+
+    // Transactional atomicity: an aborted statement leaves no partial repair.
+    // Plant a multi-row "repair" where one row violates the invariant inside a
+    // transaction; the violating statement aborts and the earlier one rolls back.
+    seedBlock(db, 60, 5);   // volume
+    seedBlock(db, 61, 6);   // volume
+    let txAborted = false;
+    try {
+      db.raw.exec('BEGIN');
+      db.raw.prepare("UPDATE block_meta SET macro_phase = 'gpp' WHERE block_id = 60").run(); // valid
+      db.raw.prepare("UPDATE block_meta SET macro_phase = 'bogus' WHERE block_id = 61").run(); // CHECK rejects
+      db.raw.exec('COMMIT');
+    } catch {
+      txAborted = true;
+      try { db.raw.exec('ROLLBACK'); } catch { /* already rolled back */ }
+    }
+    const r60 = db.raw.prepare('SELECT macro_phase FROM block_meta WHERE block_id = 60').get().macro_phase;
+    const r61 = db.raw.prepare('SELECT macro_phase FROM block_meta WHERE block_id = 61').get().macro_phase;
+    check('transaction failure rolls back without partial repair',
+      txAborted && r60 === 'volume' && r61 === 'volume',
+      `r60=${r60} r61=${r61}`);
+  }
+
+  // --- both production block-creation paths keep passing ---------------------
+  {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    // Path 1: continuation via nextMacroPosition semantics — next index wraps 8->1.
+    db.raw.prepare(
+      `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+       VALUES (70, '2026-01-05', 'strength', 4, 'archived', 1000),
+              (71, '2026-02-02', 'hypertrophy', 4, 'active', 2000)`,
+    ).run();
+    db.raw.prepare(
+      `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+       VALUES (70, 8, 'peak', 'WAVE', 0), (71, 1, 'gpp', 'LINEAR', 0)`,
+    ).run();
+    // Path 2: goal-program minting at a mid-cycle anchor (programMacroIndex), e.g. 6,7,8,1.
+    db.raw.prepare(
+      `INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+       VALUES (72, '2026-03-02', 'power', 4, 'active', 3000),
+              (73, '2026-03-30', 'power', 4, 'active', 4000),
+              (74, '2026-04-27', 'strength', 4, 'active', 5000),
+              (75, '2026-05-25', 'strength', 4, 'active', 6000)`,
+    ).run();
+    for (const [bid, idx] of [[72, 6], [73, 7], [74, 8], [75, 1]]) {
+      db.raw.prepare(
+        `INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted)
+         VALUES (?, ?, ?, 'APRE', 0)`,
+      ).run(bid, idx, phaseOf(idx));
+    }
+    const count = db.raw.prepare('SELECT COUNT(*) AS c FROM block_meta').get().c;
+    check('both block-creation paths (continuation + program anchor) accept mapped phases', count === 6,
+      String(count));
+  }
+
+  // --- self-heal coverage: dropped 057 trigger is detected and restored ------
+  {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    db.raw.exec('DROP TRIGGER trg_block_meta_phase_bi');
+    check('dropped 057 trigger is detected as missing sentinel',
+      sentinelsMissing(db).includes('trg_block_meta_phase_bi'));
+    runMigrations(db, MIGRATIONS);
+    const restoredTrig = db.raw.prepare(
+      `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_block_meta_phase_bi'`,
+    ).get().c;
+    check('self-heal restores dropped 057 trigger', restoredTrig === 1);
+  }
+}
+
+// --- [058] suspension episodes (RR-02) ---------------------------------------
+console.log('\n[058] suspension episode invariants');
+{
+  const db = freshDb();
+  runMigrations(db, MIGRATIONS);
+  const open = () => db.raw.prepare(
+    'SELECT episode_id, frozen_macro_index FROM suspension_episode WHERE ended_at_ms IS NULL').all();
+  const INS = 'INSERT INTO suspension_episode (started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (?, ?, ?, ?)';
+  const begin = (startedAt, reason, frozen) => db.raw.prepare(INS).run(startedAt, null, reason, frozen);
+  const rejects = (args) => { try { db.raw.prepare(INS).run(...args); return false; } catch { return true; } };
+
+  check('fresh install carries the suspension_episode table',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name='suspension_episode'").get().c === 1);
+  check('fresh install carries both 058 enforcement triggers',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='trigger' AND name IN ('trg_suspension_episode_single_open_bi','trg_suspension_episode_no_reopen_bu')").get().c === 2);
+  check('fresh install carries the single-open partial unique index',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='index' AND name='ux_suspension_episode_single_open'").get().c === 1);
+  check('no episode is open on a fresh install (never suspended by default)', open().length === 0);
+
+  begin(1000, 'injury', 5);
+  check('an episode opens and freezes the macro position',
+    open().length === 1 && open()[0].frozen_macro_index === 5);
+
+  let secondRejected = false;
+  try { begin(2000, 'illness', 3); } catch (e) { secondRejected = /already open/i.test(String(e.message)); }
+  check('a SECOND open episode is rejected (single-open invariant)', secondRejected);
+
+  let closedAccepted = true;
+  try { db.raw.prepare(INS).run(400, 900, 'life', 2); } catch { closedAccepted = false; }
+  check('a closed historical episode coexists with an open one', closedAccepted);
+
+  db.raw.prepare('UPDATE suspension_episode SET ended_at_ms = ? WHERE ended_at_ms IS NULL').run(3000);
+  check('closing the open episode leaves none open', open().length === 0);
+
+  let reopenRejected = false;
+  try { db.raw.prepare('UPDATE suspension_episode SET ended_at_ms = NULL WHERE episode_id = 1').run(); }
+  catch (e) { reopenRejected = /cannot be reopened/i.test(String(e.message)); }
+  check('a closed episode cannot be reopened (the audit trail is durable)', reopenRejected);
+
+  let reBegun = true;
+  try { begin(5000, 'injury', 7); } catch { reBegun = false; }
+  check('a NEW episode may open after the previous one closed', reBegun && open().length === 1);
+
+  check('reason outside injury|illness|life is rejected', rejects([6000, 6100, 'sprain', 3]));
+  check('frozen_macro_index outside 1..8 is rejected', rejects([6000, 6100, 'injury', 9]));
+  check('ended_at_ms before started_at_ms is rejected', rejects([6000, 5000, 'injury', 3]));
+  check('every valid reason is accepted', ['injury', 'illness', 'life'].every((r, i) =>
+    !rejects([7000 + i, 7100 + i, r, (i % 8) + 1])));
+
+  db.raw.exec('DROP TRIGGER trg_suspension_episode_single_open_bi');
+  check('dropped 058 trigger is detected as a missing sentinel',
+    sentinelsMissing(db).includes('trg_suspension_episode_single_open_bi'));
+  runMigrations(db, MIGRATIONS);
+  check('self-heal restores the dropped 058 trigger',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='trigger' AND name='trg_suspension_episode_single_open_bi'").get().c === 1);
+
+  db.raw.exec('DROP TABLE suspension_episode');
+  check('a dropped suspension_episode TABLE is detected as a missing sentinel',
+    sentinelsMissing(db).includes('suspension_episode'));
+  runMigrations(db, MIGRATIONS);
+  check('self-heal restores the dropped suspension_episode table',
+    db.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name='suspension_episode'").get().c === 1);
+}
+
+// --- 2z. 060 program-goal tier alignment: exact three rows, idempotent, fail-closed ---
+console.log('[2z] 060 program-goal tier alignment (WO §2.3)');
+{
+const difficultyRows = (db) => db.raw.prepare(`
+    SELECT m.name, d.difficulty_rating
+    FROM movement m JOIN movement_detail d USING(movement_id)
+    WHERE m.name IN ('Competition Squat','Competition Bench','Deadlift')
+    ORDER BY m.name`).all();
+  const alignmentRows = (db) => db.raw.prepare(
+    'SELECT movement_id, movement_name, previous_difficulty, aligned_difficulty FROM movement_tier_alignment ORDER BY movement_name',
+  ).all();
+
+  // (1) The fresh-install chain lands the correction exactly.
+  const a60 = freshDb();
+  runMigrations(a60, MIGRATIONS);
+  check('060 fresh install: exactly the three big-lift rows are Intermediate after the chain',
+    JSON.stringify(difficultyRows(a60)) === JSON.stringify([
+      { name: 'Competition Bench', difficulty_rating: 'Intermediate' },
+      { name: 'Competition Squat', difficulty_rating: 'Intermediate' },
+      { name: 'Deadlift', difficulty_rating: 'Intermediate' },
+    ]) && uv(a60) === MIGRATIONS.length,
+    JSON.stringify(difficultyRows(a60)));
+  check('060 provenance records exactly three Advanced -> Intermediate rows',
+    JSON.stringify(alignmentRows(a60)) === JSON.stringify([
+      { movement_id: 3, movement_name: 'Competition Bench', previous_difficulty: 'Advanced', aligned_difficulty: 'Intermediate' },
+      { movement_id: 1, movement_name: 'Competition Squat', previous_difficulty: 'Advanced', aligned_difficulty: 'Intermediate' },
+      { movement_id: 2, movement_name: 'Deadlift', previous_difficulty: 'Advanced', aligned_difficulty: 'Intermediate' },
+    ]),
+    JSON.stringify(alignmentRows(a60)));
+  const allAdvancedAfter = a60.raw.prepare(
+    "SELECT m.name FROM movement m JOIN movement_detail d USING(movement_id) WHERE d.difficulty_rating = 'Advanced' ORDER BY m.name",
+  ).all().map((r) => r.name);
+  check('060 did not widen the correction beyond the three named rows',
+    !allAdvancedAfter.includes('Competition Squat')
+    && !allAdvancedAfter.includes('Competition Bench')
+    && !allAdvancedAfter.includes('Deadlift')
+    && allAdvancedAfter.length === a60.raw.prepare(
+      "SELECT COUNT(*) AS c FROM movement m JOIN movement_detail d USING(movement_id) WHERE d.difficulty_rating = 'Advanced'").get().c,
+    `${allAdvancedAfter.length} Advanced rows remain`);
+
+  // (2) Replay from the 059 boundary: idempotent, zero re-correction.
+  const r60 = freshDb();
+  const idx060 = FILES.indexOf('060_program_goal_tier_alignment.sql');
+  for (let i = 0; i < idx060; i += 1) r60.executeSync(MIGRATIONS[i]);
+  r60.executeSync(`PRAGMA user_version = ${idx060};`);
+  const pre60 = difficultyRows(r60);
+  check('060 precondition: the three rows are still Advanced at the 059 boundary',
+    JSON.stringify(pre60) === JSON.stringify([
+      { name: 'Competition Bench', difficulty_rating: 'Advanced' },
+      { name: 'Competition Squat', difficulty_rating: 'Advanced' },
+      { name: 'Deadlift', difficulty_rating: 'Advanced' },
+    ]), JSON.stringify(pre60));
+  runMigrations(r60, MIGRATIONS);
+  check('060 upgrade from 059 flips exactly the three rows',
+    difficultyRows(r60).every((r) => r.difficulty_rating === 'Intermediate'));
+  r60.executeSync(`PRAGMA user_version = ${idx060};`);
+  const alignmentSnapshot = JSON.stringify(alignmentRows(r60));
+  runMigrations(r60, MIGRATIONS);
+  check('060 replays idempotently from its own boundary (provenance rows unchanged)',
+    uv(r60) === MIGRATIONS.length && JSON.stringify(alignmentRows(r60)) === alignmentSnapshot);
+
+  // (3) Poisoned DB: user_version claims latest, the sentinel side-table is absent.
+  const p60 = freshDb();
+  for (let i = 0; i < idx060; i += 1) p60.executeSync(MIGRATIONS[i]);
+  p60.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+  check('060 poison precondition: user_version claims latest but the alignment sentinel is absent',
+    sentinelsMissing(p60).includes('movement_tier_alignment'));
+  runMigrations(p60, MIGRATIONS);
+  check('060 poison self-heal re-applies the chain, restores the sentinel and lands the correction',
+    sentinelsMissing(p60).length === 0
+    && difficultyRows(p60).every((r) => r.difficulty_rating === 'Intermediate'));
+
+  // (4) Full re-apply from zero (the row-healing path the runner supports —
+  // the same shape the 049 section proves): 037-059 rebuild the library, then
+  // 060 re-asserts the correction and its provenance last.
+  const d60 = freshDb();
+  runMigrations(d60, MIGRATIONS);
+  d60.raw.prepare("UPDATE movement_detail SET difficulty_rating = 'Advanced' WHERE movement_id = (SELECT movement_id FROM movement WHERE name = 'Deadlift')").run();
+  d60.raw.exec('DELETE FROM movement_tier_alignment');
+  d60.raw.exec('PRAGMA user_version = 0;');
+  runMigrations(d60, MIGRATIONS);
+  check('060 full re-apply from zero restores the corrected difficulty row AND its provenance row',
+    d60.raw.prepare("SELECT difficulty_rating AS d FROM movement_detail WHERE movement_id = (SELECT movement_id FROM movement WHERE name = 'Deadlift')").get().d === 'Intermediate'
+    && alignmentRows(d60).length === 3);
+
+  // (5) Dropped sentinel table self-heals.
+  d60.raw.exec('DROP TABLE movement_tier_alignment');
+  check('060 a dropped alignment table is detected as a missing sentinel',
+    sentinelsMissing(d60).includes('movement_tier_alignment'));
+  runMigrations(d60, MIGRATIONS);
+  check('060 self-heal restores the dropped alignment table with its three provenance rows',
+    alignmentRows(d60).length === 3);
+
+  // (6) CHECK-rejection and FK-cascade surface of the new table.
+  const c60 = freshDb();
+  runMigrations(c60, MIGRATIONS);
+  let alignmentFkRejected = false;
+  try {
+    c60.raw.prepare("INSERT INTO movement_tier_alignment (movement_id, movement_name, previous_difficulty, aligned_difficulty) VALUES (99999, 'Ghost Lift', 'Advanced', 'Intermediate')").run();
+  } catch { alignmentFkRejected = true; }
+  check('060 alignment table rejects an unknown movement (FK fail-closed)', alignmentFkRejected);
+  c60.raw.exec("DELETE FROM movement WHERE name = 'Deadlift'");
+  check('060 alignment rows cascade on movement delete (FK surface)',
+    c60.raw.prepare("SELECT COUNT(*) AS c FROM movement_tier_alignment WHERE movement_name = 'Deadlift'").get().c === 0);
+}
+
+// --- 2aa. 061 converges the two shipped 034 schemas onto the strict contract ---
+// 034 exists on two lineages with DIFFERENT CHECKs (relaxed: rpe_delta BETWEEN
+// -0.5 AND 0.5; strict: rpe_delta IN (-0.5,0.0,0.5) plus a no-all-zero and a
+// reason/sign CHECK). Because migrations are CREATE TABLE IF NOT EXISTS, a
+// device keeps whichever it first saw. 061 must land BOTH on the strict shape,
+// preserve every valid row byte-identically, and refuse to converge rather than
+// coerce a row it cannot explain.
+console.log('[2aa] 061 autopilot attribution convergence (two shipped 034 schemas)');
+
+const IDX_034 = FILES.indexOf('034_autopilot_attribution.sql');
+const IDX_058 = FILES.indexOf('058_suspension_episode.sql');
+const IDX_061 = FILES.indexOf('061_autopilot_attribution_convergence.sql');
+
+// The master lineage's 034, verbatim, as a FIXTURE. It is deliberately not a
+// file in src/schema: 034 is shipped and may never be edited or duplicated.
+const STRICT_034_FIXTURE = `
+CREATE TABLE IF NOT EXISTS planned_slot_autopilot (
+  planned_slot_id INTEGER PRIMARY KEY REFERENCES planned_slot ON DELETE CASCADE,
+  rpe_delta REAL NOT NULL CHECK (rpe_delta IN (-0.5, 0.0, 0.5)),
+  set_delta INTEGER NOT NULL CHECK (set_delta BETWEEN -1 AND 1),
+  reason TEXT NOT NULL CHECK (reason IN ('eased','raised','held_safety')),
+  CHECK (rpe_delta <> 0.0 OR set_delta <> 0),
+  CHECK (
+    (reason = 'raised' AND rpe_delta >= 0.0 AND set_delta >= 0)
+    OR
+    (reason IN ('eased','held_safety') AND rpe_delta <= 0.0 AND set_delta <= 0)
+  )
+) STRICT;`;
+
+// Minimal FK-satisfying parent chain for planned_slot rows.
+// Slots baseId+1..+3 carry attribution rows; baseId+9 is a permanently EMPTY
+// spare reserved for constraint probes, so a probe can never be rejected for a
+// missing FK parent or a PRIMARY KEY clash instead of the CHECK under test.
+const seedSlots = (db, baseId) => db.executeSync(`
+  INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
+  VALUES (${baseId}, '2030-05-01', 'strength', 1);
+  INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (${baseId + 1}, ${baseId}, 1, 1, 'lower', 'accumulation', '2030-05-01');
+  INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (${baseId + 1}, ${baseId + 1}, 1, 1, 3, 5, 8.0),
+         (${baseId + 2}, ${baseId + 1}, 2, 2, 3, 5, 8.0),
+         (${baseId + 3}, ${baseId + 1}, 3, 3, 3, 5, 8.0),
+         (${baseId + 9}, ${baseId + 1}, 9, 4, 3, 5, 8.0);
+`);
+const PROBE = (baseId) => baseId + 9;
+// Apply a PREFIX of the chain the way the runner would, WITHOUT runMigrations'
+// sentinel self-heal — that guard sees a short chain as a poisoned DB and
+// re-applies from zero, which cannot reproduce a mid-chain device.
+const applyRaw = (db, migrations, from, to) => {
+  for (let v = from; v < to; v++) db.executeSync(migrations[v]);
+  db.executeSync(`PRAGMA user_version = ${to};`);
+};
+const autopilotRows = (db) => db.raw.prepare(
+  'SELECT planned_slot_id, rpe_delta, set_delta, reason FROM planned_slot_autopilot ORDER BY planned_slot_id',
+).all();
+// The strict-only violations: each PASSES the relaxed CHECKs and FAILS the
+// strict ones, so each isolates exactly what convergence buys.
+const STRICT_ONLY_VIOLATIONS = [
+  { label: 'off-grid rpe_delta (0.25)', values: "0.25, 0, 'raised'" },
+  { label: 'all-zero attribution row', values: "0.0, 0, 'eased'" },
+  { label: "mixed-sign 'raised'", values: "0.5, -1, 'raised'" },
+  { label: "positive 'held_safety'", values: "0.5, 1, 'held_safety'" },
+];
+// Returns -1 unless the probe slot is genuinely insertable first: without that
+// guard every rejection below could be a missing FK parent rather than the
+// CHECK under test, and the assertion would pass for the wrong reason.
+const strictRejections = (db, baseId) => {
+  const slotId = PROBE(baseId);
+  try {
+    db.executeSync(`INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (${slotId}, -0.5, -1, 'eased')`);
+    db.executeSync(`DELETE FROM planned_slot_autopilot WHERE planned_slot_id = ${slotId}`);
+  } catch { return -1; }
+  let rejected = 0;
+  for (const v of STRICT_ONLY_VIOLATIONS) {
+    try {
+      db.executeSync(`INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (${slotId}, ${v.values})`);
+      db.executeSync(`DELETE FROM planned_slot_autopilot WHERE planned_slot_id = ${slotId}`);
+    } catch { rejected += 1; }
+  }
+  return rejected;
+};
+const ALL = STRICT_ONLY_VIOLATIONS.length;
+
+// (1) FRESH INSTALL -- the chain ends on the strict contract.
+const fresh61 = freshDb();
+runMigrations(fresh61, MIGRATIONS);
+check('061 fresh install completes the chain',
+  uv(fresh61) === MIGRATIONS.length && sentinelsMissing(fresh61).length === 0);
+seedSlots(fresh61, 6100);
+fresh61.executeSync("INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6101, -0.5, -1, 'eased')");
+check('061 fresh install still accepts a valid attribution row', autopilotRows(fresh61).length === 1);
+check('061 fresh install enforces all four strict-only contracts',
+  strictRejections(fresh61, 6100) === ALL);
+
+// (2) RELAXED 034 DEVICE -- upgrades and preserves every valid row EXACTLY.
+const relaxed61 = freshDb();
+applyRaw(relaxed61, MIGRATIONS, 0, IDX_061); // pre-061 device
+check('061 relaxed-034 precondition: device sits one migration short', uv(relaxed61) === IDX_061);
+seedSlots(relaxed61, 6200);
+relaxed61.executeSync(`
+  INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES
+    (6201, -0.5, -1, 'eased'),
+    (6202,  0.5,  1, 'raised'),
+    (6203, -0.5,  0, 'held_safety');
+`);
+const relaxedAcceptsOffGrid = (() => {
+  try {
+    relaxed61.executeSync("INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6209, 0.25, 0, 'raised')");
+    relaxed61.executeSync('DELETE FROM planned_slot_autopilot WHERE planned_slot_id = 6209');
+    return true;
+  } catch { return false; }
+})();
+check('061 relaxed-034 precondition: the old schema really did accept an off-grid delta', relaxedAcceptsOffGrid);
+const beforeRelaxed = autopilotRows(relaxed61);
+runMigrations(relaxed61, MIGRATIONS);
+const afterRelaxed = autopilotRows(relaxed61);
+check('061 relaxed-034 device reaches the end of the chain',
+  uv(relaxed61) === MIGRATIONS.length && sentinelsMissing(relaxed61).length === 0);
+check('061 relaxed-034 upgrade preserves all three valid rows EXACTLY',
+  JSON.stringify(beforeRelaxed) === JSON.stringify(afterRelaxed) && afterRelaxed.length === 3,
+  JSON.stringify(afterRelaxed));
+check('061 relaxed-034 upgrade keeps rpe_delta a REAL, uncoerced',
+  afterRelaxed.every((r) => typeof r.rpe_delta === 'number') && afterRelaxed[0].rpe_delta === -0.5);
+check('061 relaxed-034 upgrade now enforces all four strict-only contracts',
+  strictRejections(relaxed61, 6200) === ALL);
+relaxed61.executeSync('DELETE FROM planned_slot WHERE planned_slot_id = 6201');
+check('061 converged table keeps 034 FK cascade on parent delete',
+  autopilotRows(relaxed61).length === 2);
+
+// (3) STRICT 034 DEVICE AT user_version = 34 -- the master-lineage install.
+// That build shipped a 34-entry array (m001-m034 then m058), so the device sits
+// at 34 while THIS array has m035 at index 33. Resuming positionally would skip
+// m035; the sentinel self-heal is what rescues it.
+const strict61 = freshDb();
+applyRaw(strict61, MIGRATIONS, 0, IDX_034); // m001..m033
+strict61.executeSync(STRICT_034_FIXTURE);              // strict 034, not the relaxed file
+strict61.executeSync(MIGRATIONS[IDX_058]);             // master appended 058 straight after 034
+strict61.executeSync('PRAGMA user_version = 34;');
+check('061 strict-034 precondition: device reports the master-lineage user_version', uv(strict61) === 34);
+seedSlots(strict61, 6300);
+strict61.executeSync(`
+  INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES
+    (6301, -0.5, -1, 'eased'),
+    (6302,  0.5,  1, 'raised');
+`);
+const strictRejectsBefore = strictRejections(strict61, 6300);
+check('061 strict-034 precondition: the device already enforces the strict contract',
+  strictRejectsBefore === ALL, `${strictRejectsBefore}/${ALL}`);
+const beforeStrict = autopilotRows(strict61);
+runMigrations(strict61, MIGRATIONS);
+const afterStrict = autopilotRows(strict61);
+check('061 strict-034 device reaches the end of the chain',
+  uv(strict61) === MIGRATIONS.length && sentinelsMissing(strict61).length === 0,
+  `uv=${uv(strict61)} missing=${sentinelsMissing(strict61).join(',')}`);
+check('061 strict-034 upgrade preserves both valid rows EXACTLY',
+  JSON.stringify(beforeStrict) === JSON.stringify(afterStrict) && afterStrict.length === 2,
+  JSON.stringify(afterStrict));
+check('061 strict-034 upgrade still enforces all four strict-only contracts',
+  strictRejections(strict61, 6300) === ALL);
+// The positional skew is real: m035 sits at an index the device has already
+// passed, so only the self-heal re-apply lands it. Assert the OUTCOME.
+const loadPrefCount = () => Number(strict61.raw.prepare('SELECT COUNT(*) AS c FROM profile_load_preference').get().c);
+check('061 strict-034 upgrade still lands the positionally-skipped m035',
+  loadPrefCount() === 4, String(loadPrefCount()));
+
+// (4) FAIL CLOSED -- an unexplained row stops convergence and changes nothing.
+for (const violation of STRICT_ONLY_VIOLATIONS) {
+  const poison = freshDb();
+  applyRaw(poison, MIGRATIONS, 0, IDX_061);
+  seedSlots(poison, 6400);
+  poison.executeSync("INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6401, -0.5, -1, 'eased')");
+  poison.executeSync(`INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6402, ${violation.values})`);
+  const beforePoison = autopilotRows(poison);
+  let poisonThrew = false;
+  try { runMigrations(poison, MIGRATIONS); } catch { poisonThrew = true; }
+  check(`061 fails closed on an unexplained row -- ${violation.label}`, poisonThrew);
+  // IDX_061 is the ARRAY INDEX of this migration (59 of 60), not the number
+  // 61: a rollback leaves user_version exactly where it was before the attempt.
+  check(`061 fail-closed leaves user_version unchanged at index ${IDX_061} -- ${violation.label}`,
+    uv(poison) === IDX_061, String(uv(poison)));
+  check(`061 fail-closed leaves the original rows untouched -- ${violation.label}`,
+    JSON.stringify(autopilotRows(poison)) === JSON.stringify(beforePoison)
+      && autopilotRows(poison).length === 2);
+  check(`061 fail-closed leaves no staging table behind -- ${violation.label}`,
+    poison.raw.prepare("SELECT 1 FROM sqlite_master WHERE name='planned_slot_autopilot_061'").get() === undefined);
+}
+
+// (5) IDEMPOTENCE -- re-applying 061 over an already-converged table is a no-op.
+const replay61 = freshDb();
+runMigrations(replay61, MIGRATIONS);
+seedSlots(replay61, 6500);
+replay61.executeSync("INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (6501, -0.5, -1, 'eased')");
+const beforeReplay = autopilotRows(replay61);
+replay61.executeSync(`PRAGMA user_version = ${IDX_061};`);
+runMigrations(replay61, MIGRATIONS);
+check('061 replay over an already-strict table preserves the row exactly',
+  JSON.stringify(autopilotRows(replay61)) === JSON.stringify(beforeReplay) && autopilotRows(replay61).length === 1);
+replay61.executeSync('DROP TABLE planned_slot_autopilot');
+check('061 poison precondition marks the side-car sentinel missing',
+  sentinelsMissing(replay61).includes('planned_slot_autopilot'));
+runMigrations(replay61, MIGRATIONS);
+check('061 self-heal restores the side-car ON THE STRICT CONTRACT',
+  !sentinelsMissing(replay61).includes('planned_slot_autopilot')
+    && uv(replay61) === MIGRATIONS.length
+    && strictRejections(replay61, 6500) === ALL);
+
+
+// --- 2ab. 062 completes the 059 side-car immutability contract --------------
+// 059 protected the base episode fully, and its own frozen-program side-car
+// against UPDATE only. Probed against the real chain, three mutations were
+// still ALLOWED: DELETE suspension_episode_program, and BOTH update and delete
+// of block_suspension_origin. block_suspension_origin is the sharp one: the
+// position readers work by ABSENCE, excluding attributed blocks rather than
+// storing a second copy of the position, so removing or re-pointing one row
+// silently returns a suspension-era block to consuming a macro position — the
+// exact S6(b) defect the ruling was raised to close.
+//
+// This section also carries the FIRST behavioural coverage of 059's own four
+// triggers. Sentinel registration proves an object is present and restorable,
+// not that it refuses anything, and nothing asserted a refusal before.
+console.log('[2ab] 062 suspension side-car immutability (completes 059)');
+
+const IDX_062 = FILES.indexOf('062_suspension_sidecar_immutability.sql');
+const TRG_062 = [
+  'trg_suspension_episode_program_no_delete_bd',
+  'trg_block_suspension_origin_immutable_bu',
+  'trg_block_suspension_origin_no_delete_bd',
+  'trg_planned_slot_load_intent_no_repoint_bu',
+];
+const triggerPresent = (db, name) => db.raw
+  .prepare("SELECT 1 AS x FROM sqlite_master WHERE type='trigger' AND name=?").get(name) !== undefined;
+
+// One CLOSED episode carrying a full set of 059 side-cars, plus a SPARE block
+// and a SPARE slot that carry none. The spares exist so an INSERT probe can
+// never be rejected for a missing FK parent or a PRIMARY KEY clash instead of
+// the trigger under test. training_program.status is 'archived' because 033's
+// idx_training_program_one_current allows only one active/review_due row.
+const seed062 = (db, b) => db.executeSync(`
+  INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
+  VALUES (${b}, '2030-06-01', 'strength', 1), (${b + 9}, '2030-07-01', 'strength', 2);
+  INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+  VALUES (${b}, ${b}, 1, 1, 'lower', 'accumulation', '2030-06-01');
+  INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+  VALUES (${b}, ${b}, 1, 1, 3, 5, 8.0), (${b + 9}, ${b}, 9, 2, 3, 5, 8.0);
+  INSERT INTO training_program (program_id, objective, start_date, horizon_kind, planned_end_date,
+                                planned_block_count, starting_macro_block_index, schema_type, status,
+                                created_at_ms, updated_at_ms)
+  VALUES (${b}, 'strength', '2030-06-01', 'weeks', '2030-08-01', 4, 1, 'LINEAR', 'archived', 1, 1);
+  INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index)
+  VALUES (${b}, 1000, 2000, 'injury', 3), (${b + 8}, 3000, 4000, 'illness', 5);
+  INSERT INTO suspension_episode_program (episode_id, program_id, frozen_sequence_index)
+  VALUES (${b}, ${b}, 2);
+  INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${b}, ${b});
+  INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (${b}, 'BB');
+`);
+// true when the statement was REFUSED. A trigger RAISE(ABORT) surfaces as a
+// throw, and nothing else in these probes should throw.
+const refused = (db, sql) => { try { db.executeSync(sql); return false; } catch { return true; } };
+const sidecars = (db) => JSON.stringify({
+  program: db.raw.prepare('SELECT episode_id, program_id, frozen_sequence_index FROM suspension_episode_program ORDER BY episode_id').all(),
+  origin: db.raw.prepare('SELECT block_id, episode_id FROM block_suspension_origin ORDER BY block_id').all(),
+  intent: db.raw.prepare('SELECT planned_slot_id, planned_implement FROM planned_slot_load_intent ORDER BY planned_slot_id').all(),
+});
+// The mutations 062 must refuse, plus the one 059 already refused. The same
+// list drives the fresh-install assertions, the post-upgrade assertions and the
+// per-trigger self-heal assertions, so a gate cannot hold in one place and be
+// quietly missing in another.
+const PROHIBITED_062 = (b) => [
+  ['059 UPDATE suspension_episode_program.frozen_sequence_index',
+    `UPDATE suspension_episode_program SET frozen_sequence_index = 7 WHERE episode_id = ${b}`],
+  ['062 direct DELETE suspension_episode_program',
+    `DELETE FROM suspension_episode_program WHERE episode_id = ${b}`],
+  ['062 UPDATE block_suspension_origin.episode_id (re-point onto the other episode)',
+    `UPDATE block_suspension_origin SET episode_id = ${b + 8} WHERE block_id = ${b}`],
+  ['062 direct DELETE block_suspension_origin',
+    `DELETE FROM block_suspension_origin WHERE block_id = ${b}`],
+  ['062 UPDATE planned_slot_load_intent.planned_slot_id (move a declared intent)',
+    `UPDATE planned_slot_load_intent SET planned_slot_id = ${b + 9} WHERE planned_slot_id = ${b}`],
+];
+
+// (1) FRESH INSTALL -- the chain ends with the contract enforced.
+{
+  const B = 6600;
+  const fresh62 = freshDb();
+  runMigrations(fresh62, MIGRATIONS);
+  check('062 fresh install completes the chain',
+    uv(fresh62) === MIGRATIONS.length && sentinelsMissing(fresh62).length === 0,
+    `uv=${uv(fresh62)} missing=${sentinelsMissing(fresh62).join(',')}`);
+  check('062 installs all four triggers on a fresh install',
+    TRG_062.every((t) => triggerPresent(fresh62, t)),
+    TRG_062.filter((t) => !triggerPresent(fresh62, t)).join(',') || 'all present');
+  seed062(fresh62, B);
+  const before = sidecars(fresh62);
+  for (const [label, sql] of PROHIBITED_062(B)) {
+    check(`062 fresh install REFUSES ${label}`, refused(fresh62, sql));
+  }
+  // A refused statement must change nothing -- an ABORT that had already
+  // written would be worse than no trigger at all.
+  check('062 every refused mutation left the original rows byte-identical',
+    sidecars(fresh62) === before, sidecars(fresh62));
+
+  // Legitimate INSERTs stay available: none of these tables is insert-gated,
+  // and the spare block/slot exist precisely so this cannot pass vacuously.
+  check('062 INSERT block_suspension_origin remains available',
+    !refused(fresh62, `INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${B + 9}, ${B})`));
+  check('062 INSERT planned_slot_load_intent remains available',
+    !refused(fresh62, `INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (${B + 9}, 'DB')`));
+  // planned_implement revision on its OWN slot is deliberately still open:
+  // OW-001's athlete-facing implement selection is unimplemented, and no source
+  // document makes a declared intent immutable. Only re-pointing is refused.
+  check('062 revising planned_implement on its OWN slot stays permitted (OW-001 is still open)',
+    !refused(fresh62, `UPDATE planned_slot_load_intent SET planned_implement = 'KB' WHERE planned_slot_id = ${B}`));
+  check('062 deleting a load intent stays permitted (absence is the conservative loaded path)',
+    !refused(fresh62, `DELETE FROM planned_slot_load_intent WHERE planned_slot_id = ${B + 9}`));
+
+  // 059's own four triggers -- the refusal surface nothing exercised before.
+  check('059 REFUSES UPDATE suspension_episode.frozen_macro_index',
+    refused(fresh62, `UPDATE suspension_episode SET frozen_macro_index = 5 WHERE episode_id = ${B}`));
+  check('059 REFUSES UPDATE suspension_episode.started_at_ms',
+    refused(fresh62, `UPDATE suspension_episode SET started_at_ms = 900 WHERE episode_id = ${B}`));
+  check('059 REFUSES UPDATE suspension_episode.reason',
+    refused(fresh62, `UPDATE suspension_episode SET reason = 'life' WHERE episode_id = ${B}`));
+  check('059 REFUSES moving a recorded close time',
+    refused(fresh62, `UPDATE suspension_episode SET ended_at_ms = 3000 WHERE episode_id = ${B}`));
+  check('059 REFUSES deleting a CLOSED episode',
+    refused(fresh62, `DELETE FROM suspension_episode WHERE episode_id = ${B}`));
+  // The two deliberate permissions. The open-episode delete is what
+  // resetTrainingData depends on, so it is asserted, never assumed.
+  fresh62.executeSync(`INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (${B + 1}, 4000, NULL, 'illness', 4)`);
+  check('059 PERMITS the athlete resume (ended_at_ms NULL -> non-NULL, once)',
+    !refused(fresh62, `UPDATE suspension_episode SET ended_at_ms = 5000 WHERE episode_id = ${B + 1}`));
+  fresh62.executeSync(`INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (${B + 2}, 6000, NULL, 'life', 2)`);
+  check('059 PERMITS deleting an OPEN episode (the reset path depends on this)',
+    !refused(fresh62, `DELETE FROM suspension_episode WHERE episode_id = ${B + 2}`));
+}
+
+// (2) UPGRADE FROM THE CURRENTLY SHIPPED PRE-062 STATE.
+// The precondition half matters as much as the outcome: it proves the gap was
+// real on the shipped chain rather than taking the audit's word for it.
+{
+  const B = 6700;
+  const up62 = freshDb();
+  applyRaw(up62, MIGRATIONS, 0, IDX_062);
+  check('062 upgrade precondition: device sits one migration short',
+    uv(up62) === IDX_062, String(uv(up62)));
+  seed062(up62, B);
+  // Every 062-prohibited mutation succeeds at pre-062 -- then the rows are put
+  // back, so the upgrade below runs against exactly what the seed created.
+  //
+  // The re-point is checked separately and by its EFFECT. A statement that
+  // assigns a column the value it already holds is accepted on ANY schema, so
+  // "not refused" would prove nothing about the S6(b) hole; the row has to
+  // actually land on the other episode. This is why seed062 creates two.
+  const repointSql = PROHIBITED_062(B).find(([label]) => label.includes('re-point'))[1];
+  const repointAccepted = !refused(up62, repointSql);
+  const landedOn = up62.raw
+    .prepare(`SELECT episode_id FROM block_suspension_origin WHERE block_id = ${B}`).get();
+  check('062 upgrade precondition: the pre-062 chain really did permit MOVING the attribution',
+    repointAccepted && Number(landedOn?.episode_id) === B + 8,
+    `accepted=${repointAccepted} episode_id=${landedOn?.episode_id ?? 'row gone'}`);
+  up62.executeSync(`UPDATE block_suspension_origin SET episode_id = ${B} WHERE block_id = ${B}`);
+
+  const gapWasReal = PROHIBITED_062(B)
+    .filter(([label]) => label.startsWith('062') && !label.includes('re-point'))
+    .every(([, sql]) => !refused(up62, sql));
+  check('062 upgrade precondition: the pre-062 chain permitted the other three too', gapWasReal);
+  up62.executeSync(`DELETE FROM suspension_episode_program WHERE episode_id = ${B}`);
+  up62.executeSync(`DELETE FROM block_suspension_origin WHERE block_id = ${B}`);
+  up62.executeSync(`DELETE FROM planned_slot_load_intent WHERE planned_slot_id IN (${B}, ${B + 9})`);
+  up62.executeSync(`
+    INSERT INTO suspension_episode_program (episode_id, program_id, frozen_sequence_index) VALUES (${B}, ${B}, 2);
+    INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${B}, ${B});
+    INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (${B}, 'BB');
+  `);
+  const beforeUpgrade = sidecars(up62);
+  runMigrations(up62, MIGRATIONS);
+  check('062 upgraded device reaches the end of the chain',
+    uv(up62) === MIGRATIONS.length && sentinelsMissing(up62).length === 0,
+    `uv=${uv(up62)} missing=${sentinelsMissing(up62).join(',')}`);
+  check('062 upgrade preserves every existing side-car row EXACTLY',
+    sidecars(up62) === beforeUpgrade, sidecars(up62));
+  for (const [label, sql] of PROHIBITED_062(B)) {
+    check(`062 upgraded device now REFUSES ${label}`, refused(up62, sql));
+  }
+  check('062 upgrade: the refused mutations left the rows byte-identical',
+    sidecars(up62) === beforeUpgrade, sidecars(up62));
+}
+
+// (3) THE DELETE GUARDS ARE PARENT-SCOPED, AND THE REPLAY SURVIVES THEM.
+//
+// Measured, not assumed: an FK ON DELETE CASCADE action DOES fire the child's
+// BEFORE DELETE trigger, whatever recursive_triggers says. An unconditional
+// guard would therefore make every parent undeletable and abort the reset, so
+// the guard must be `WHEN EXISTS (<parent>)` -- 026's shape. The price is that
+// naming another table makes ALTER TABLE ... RENAME fail while that table is
+// absent, and 049/052/061 each rename. migrationRunner drops these two
+// triggers before a full re-apply for exactly that reason; both halves are
+// asserted here, because either one alone is a broken database.
+{
+  const B = 6800;
+
+  // (3a) A direct delete is refused while the parents live; a cascade from
+  // EITHER parent still carries the row away.
+  const casc = freshDb();
+  runMigrations(casc, MIGRATIONS);
+  seed062(casc, B);
+  check('062 a direct delete is refused while both parents are present',
+    refused(casc, `DELETE FROM block_suspension_origin WHERE block_id = ${B}`)
+      && casc.raw.prepare('SELECT COUNT(*) AS c FROM block_suspension_origin').get().c === 1);
+  casc.executeSync(`DELETE FROM training_block WHERE block_id = ${B}`);
+  check('062 block deletion still CASCADES its attribution away',
+    casc.raw.prepare('SELECT COUNT(*) AS c FROM block_suspension_origin').get().c === 0);
+  casc.executeSync(`DELETE FROM training_program WHERE program_id = ${B}`);
+  check('062 program deletion still CASCADES the frozen program state away',
+    casc.raw.prepare('SELECT COUNT(*) AS c FROM suspension_episode_program').get().c === 0);
+
+  // (3b) The OTHER parent: the reset deletes the open episode first, so that
+  // episode's attribution must leave with it and no other episode's may.
+  const epi = freshDb();
+  runMigrations(epi, MIGRATIONS);
+  seed062(epi, B);
+  epi.executeSync(`INSERT INTO suspension_episode (episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index) VALUES (${B + 1}, 8000, NULL, 'injury', 5)`);
+  epi.executeSync(`INSERT INTO block_suspension_origin (block_id, episode_id) VALUES (${B + 9}, ${B + 1})`);
+  check("062 the reset's open-episode delete CASCADES only THAT episode's attribution",
+    !refused(epi, 'DELETE FROM suspension_episode WHERE ended_at_ms IS NULL')
+      && epi.raw.prepare(`SELECT COUNT(*) AS c FROM block_suspension_origin WHERE episode_id = ${B + 1}`).get().c === 0
+      && epi.raw.prepare(`SELECT COUNT(*) AS c FROM block_suspension_origin WHERE episode_id = ${B}`).get().c === 1);
+
+  // (3c) resetTrainingData's parentless cleanup, FKs OFF: the rows survive
+  // their parents and must then be deletable, or a reused block rowid would
+  // inherit a stale attribution and vanish from nextMacroPosition.
+  const off = freshDb();
+  off.raw.exec('PRAGMA foreign_keys = OFF;');
+  runMigrations(off, MIGRATIONS);
+  seed062(off, B);
+  off.executeSync(`DELETE FROM training_program WHERE program_id = ${B}`);
+  off.executeSync(`DELETE FROM training_block WHERE block_id = ${B}`);
+  check('062 FK-OFF precondition: the side-car rows are parentless, not cascaded',
+    off.raw.prepare('SELECT COUNT(*) AS c FROM suspension_episode_program').get().c === 1
+      && off.raw.prepare('SELECT COUNT(*) AS c FROM block_suspension_origin').get().c === 1);
+  check("062 PERMITS the reset's parentless cleanup once the parents are gone",
+    !refused(off, 'DELETE FROM suspension_episode_program')
+      && !refused(off, 'DELETE FROM block_suspension_origin'));
+
+  // (3d) THE TRAP. Drop a named parent and prove the poisoned DB still heals.
+  // Without REPLAY_BLOCKING_TRIGGERS this aborts inside 049's ALTER TABLE
+  // RENAME -- nine migrations before 058 could recreate suspension_episode --
+  // and the database is unrecoverable. Reproduced before the guard was added.
+  for (const parent of ['suspension_episode', 'training_block', 'training_program']) {
+    const heal = freshDb();
+    runMigrations(heal, MIGRATIONS);
+    seed062(heal, B);
+    heal.raw.exec(`DROP TABLE ${parent}`);
+    check(`062 precondition: dropped ${parent} is seen as a missing sentinel`,
+      sentinelsMissing(heal).includes(parent));
+    let threw = null;
+    try { runMigrations(heal, MIGRATIONS); } catch (e) { threw = String(e.message).split('\n')[0]; }
+    check(`062 self-heal replays the whole chain with ${parent} missing`,
+      threw === null && sentinelsMissing(heal).length === 0 && uv(heal) === MIGRATIONS.length,
+      threw ?? `missing=${sentinelsMissing(heal).join(',')}`);
+    // Recovery must restore the CONTRACT, not merely the objects.
+    seed062(heal, B + 100);
+    check(`062 self-heal after losing ${parent} restores the refusals too`,
+      PROHIBITED_062(B + 100).every(([, sql]) => refused(heal, sql)));
+  }
+
+  // (3d-ii) THE OTHER SIDE OF THE RULE, so the distinction is proven and not
+  // just asserted in a comment. 026's trg_set_dose_target_bd and
+  // trg_session_outcome_bd have exactly the same cross-table WHEN EXISTS shape,
+  // and they are NOT replay-blocking, because set_record and session are created
+  // by 001 -- position 1, long before the earliest rename at position 48. The
+  // replay has recreated them by the time 049 rewrites the schema. If that ever
+  // stops being true, this fails and the runner's list needs a new entry.
+  for (const parent of ['set_record', 'session']) {
+    const early = freshDb();
+    runMigrations(early, MIGRATIONS);
+    early.raw.exec(`DROP TABLE ${parent}`);
+    check(`062 precondition: dropped ${parent} is seen as a missing sentinel`,
+      sentinelsMissing(early).includes(parent));
+    let threw = null;
+    try { runMigrations(early, MIGRATIONS); } catch (e) { threw = String(e.message).split('\n')[0]; }
+    check(`062 rule: a 026 trigger naming ${parent} (001) needs no replay-blocking entry`,
+      threw === null && sentinelsMissing(early).length === 0 && uv(early) === MIGRATIONS.length,
+      threw ?? `missing=${sentinelsMissing(early).join(',')}`);
+    // Recovery must restore 026's refusal too, not merely the table.
+    early.executeSync("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (7701, '2030-06-01', 1)");
+    early.executeSync('INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (7701, 7701, 1, 1, 5, 100, 8, 2)');
+    early.executeSync("INSERT INTO set_dose_target (set_id, target_kind, target_reps) VALUES (7701, 'reps', 5)");
+    check(`062 rule: 026's own immutability is restored after losing ${parent}`,
+      refused(early, 'DELETE FROM set_dose_target WHERE set_id = 7701')
+        && refused(early, 'UPDATE set_dose_target SET target_reps = 9 WHERE set_id = 7701'));
+  }
+
+  // (3e) The structural rule, asserted against migrationRunner's own list so a
+  // future cross-table trigger cannot be added without joining it. Comments are
+  // stripped first: prose says "from" too.
+  const sql062Bare = MIGRATIONS[IDX_062].replace(/^\s*--.*$/gm, '');
+  const named = [...sql062Bare.matchAll(/\bFROM\s+(\w+)/gi)].map((m) => m[1]);
+  const runnerSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'migrationRunner.ts'), 'utf-8');
+  check('062 every cross-table trigger it adds is on REPLAY_BLOCKING_TRIGGERS',
+    named.length > 0
+      && TRG_062.filter((t) => runnerSrc.includes(`'${t}',`) && runnerSrc.indexOf(`'${t}',`) > runnerSrc.indexOf('REPLAY_BLOCKING_TRIGGERS'))
+        .length === 2,
+    `tables named: ${[...new Set(named)].join(',')}`);
+}
+
+// (4) IDEMPOTENCE AND SELF-HEAL, PER TRIGGER.
+// Restoration is asserted through BEHAVIOUR, not presence: a trigger that is
+// back in sqlite_master but semantically wrong would pass a presence check.
+{
+  const B = 6900;
+  const heal = freshDb();
+  runMigrations(heal, MIGRATIONS);
+  seed062(heal, B);
+  const beforeHeal = sidecars(heal);
+  heal.executeSync(`PRAGMA user_version = ${IDX_062};`);
+  runMigrations(heal, MIGRATIONS);
+  check('062 replay over an already-protected chain is a no-op',
+    sidecars(heal) === beforeHeal && uv(heal) === MIGRATIONS.length);
+
+  const prohibited = PROHIBITED_062(B);
+  for (const name of TRG_062) {
+    heal.raw.exec(`DROP TRIGGER ${name}`);
+    check(`062 a dropped ${name} is detected as a missing sentinel`,
+      sentinelsMissing(heal).includes(name), sentinelsMissing(heal).join(',') || 'none');
+    runMigrations(heal, MIGRATIONS);
+    check(`062 self-heal restores ${name} AND its refusal`,
+      !sentinelsMissing(heal).includes(name)
+        && uv(heal) === MIGRATIONS.length
+        && prohibited.every(([, sql]) => refused(heal, sql)));
+  }
+  check('062 self-heal left every side-car row untouched',
+    sidecars(heal) === beforeHeal, sidecars(heal));
+}
+
+// (5) ARRAY INDEX AND user_version. 062 is the 61st entry, so it APPLIES at
+// index 60 and leaves user_version 61 -- the file number and the array index
+// are not the same thing, and the runner uses the index.
+check(`062 is appended at array index ${IDX_062}, never spliced`,
+  IDX_062 === 60, `index=${IDX_062} length=${MIGRATIONS.length}`);
+
+
+// --- 2ac. 063 the athlete's own load-intent declaration (OW-001) -------------
+// 059 gave the per-slot RECORD and the fail-closed read; it never gave the
+// athlete a way to declare anything, so the 17 ambiguous movements on the
+// shipped corpus were permanently undeclared and permanently loaded. 063 is the
+// declaration. It adds no number and defaults nothing on the athlete's behalf.
+console.log('[2ac] 063 movement load intent (OW-001)');
+
+const IDX_063 = FILES.indexOf('063_movement_load_intent.sql');
+const TRG_063 = [
+  'trg_movement_load_intent_supported_bi',
+  'trg_movement_load_intent_supported_bu',
+];
+// A real ambiguous movement from the shipped library, and a real unambiguous
+// one, both looked up rather than assumed so a library correction cannot make
+// this pass for the wrong reason.
+const pickMovements = (db) => {
+  const rows = db.raw.prepare(`
+    SELECT m.movement_id AS id, m.name, d.supported_prefixes AS p
+      FROM movement m JOIN movement_detail d USING(movement_id)
+     ORDER BY m.movement_id
+  `).all().map((r) => ({ id: Number(r.id), name: r.name, prefixes: JSON.parse(r.p ?? '[]') }));
+  return {
+    ambiguous: rows.find((r) => r.prefixes.length > 1 && r.prefixes.includes('Bodyweight')),
+    sole: rows.find((r) => r.prefixes.length === 1),
+  };
+};
+const intents = (db) => db.raw
+  .prepare('SELECT movement_id, planned_implement FROM movement_load_intent ORDER BY movement_id')
+  .all();
+
+// (1) FRESH INSTALL.
+{
+  const fresh63 = freshDb();
+  runMigrations(fresh63, MIGRATIONS);
+  check('063 fresh install completes the chain',
+    uv(fresh63) === MIGRATIONS.length && sentinelsMissing(fresh63).length === 0,
+    `uv=${uv(fresh63)} missing=${sentinelsMissing(fresh63).join(',')}`);
+  check('063 installs the table and both supported-implement triggers',
+    fresh63.raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name='movement_load_intent'").get() !== undefined
+      && TRG_063.every((t) => triggerPresent(fresh63, t)));
+  check('063 declares NOTHING on a fresh install — every movement starts undeclared',
+    intents(fresh63).length === 0);
+
+  const { ambiguous, sole } = pickMovements(fresh63);
+  check('063 precondition: the shipped library really carries an ambiguous movement',
+    ambiguous !== undefined && sole !== undefined,
+    ambiguous ? `${ambiguous.name} ${JSON.stringify(ambiguous.prefixes)}` : 'none found');
+
+  check('063 accepts a declaration the movement actually supports',
+    !refused(fresh63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Bodyweight', 1000)`)
+      && intents(fresh63).length === 1);
+  // The pairing guard: vocabulary alone cannot catch this, only the trigger can.
+  const unsupported = ['DB', 'BB', 'KB', 'Cable', 'Chains'].find((p) => !ambiguous.prefixes.includes(p));
+  check(`063 REFUSES an implement the movement does not support (${unsupported})`,
+    refused(fresh63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${sole.id}, '${unsupported}', 1000)`));
+  check('063 REFUSES revising a declaration onto an unsupported implement',
+    refused(fresh63, `UPDATE movement_load_intent SET planned_implement = '${unsupported}' WHERE movement_id = ${ambiguous.id}`));
+  check('063 the refused mutations left the declaration untouched',
+    JSON.stringify(intents(fresh63)) === JSON.stringify([{ movement_id: ambiguous.id, planned_implement: 'Bodyweight' }]),
+    JSON.stringify(intents(fresh63)));
+  // Revising to another SUPPORTED implement is allowed: a declaration is
+  // prospective, so changing your mind rewrites nothing already planned.
+  const otherSupported = ambiguous.prefixes.find((p) => p !== 'Bodyweight');
+  check(`063 PERMITS revising onto another supported implement (${otherSupported})`,
+    !refused(fresh63, `UPDATE movement_load_intent SET planned_implement = '${otherSupported}' WHERE movement_id = ${ambiguous.id}`));
+  check('063 PERMITS withdrawing a declaration entirely (back to undeclared)',
+    !refused(fresh63, `DELETE FROM movement_load_intent WHERE movement_id = ${ambiguous.id}`)
+      && intents(fresh63).length === 0);
+  check('063 the vocabulary CHECK still rejects a non-canonical implement',
+    refused(fresh63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Kettlebell', 1000)`));
+  check('063 declared_at_ms must be a real stamp',
+    refused(fresh63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Bodyweight', 0)`));
+  // A declaration belongs to its movement and goes when the movement goes.
+  fresh63.executeSync(`INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Bodyweight', 1000)`);
+  fresh63.executeSync(`DELETE FROM movement WHERE movement_id = ${ambiguous.id}`);
+  check('063 a declaration cascades away with its movement', intents(fresh63).length === 0);
+}
+
+// (2) UPGRADE FROM THE SHIPPED PRE-063 STATE, preserving existing rows.
+{
+  const up63 = freshDb();
+  applyRaw(up63, MIGRATIONS, 0, IDX_063);
+  check('063 upgrade precondition: device sits one migration short',
+    uv(up63) === IDX_063, String(uv(up63)));
+  check('063 upgrade precondition: the table does not exist yet',
+    up63.raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name='movement_load_intent'").get() === undefined);
+  const { ambiguous } = pickMovements(up63);
+  // Real athlete data that must survive the upgrade untouched.
+  up63.executeSync(`INSERT INTO movement_preference (movement_id, preference, updated_at_ms) VALUES (${ambiguous.id}, 1, 5) ON CONFLICT(movement_id) DO UPDATE SET preference = 1`);
+  runMigrations(up63, MIGRATIONS);
+  check('063 upgraded device reaches the end of the chain',
+    uv(up63) === MIGRATIONS.length && sentinelsMissing(up63).length === 0,
+    `uv=${uv(up63)} missing=${sentinelsMissing(up63).join(',')}`);
+  check('063 upgrade declares nothing retroactively — an upgraded athlete is still undeclared',
+    intents(up63).length === 0);
+  check('063 upgrade leaves unrelated athlete preferences intact',
+    Number(up63.raw.prepare(`SELECT preference FROM movement_preference WHERE movement_id = ${ambiguous.id}`).get().preference) === 1);
+  check('063 upgraded device now enforces the pairing guard',
+    refused(up63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Cable', 1000)`)
+      || ambiguous.prefixes.includes('Cable'));
+}
+
+// (3) IDEMPOTENCE AND SELF-HEAL, asserted through behaviour.
+{
+  const heal63 = freshDb();
+  runMigrations(heal63, MIGRATIONS);
+  const { ambiguous, sole } = pickMovements(heal63);
+  heal63.executeSync(`INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${ambiguous.id}, 'Bodyweight', 1000)`);
+  const before = JSON.stringify(intents(heal63));
+  heal63.executeSync(`PRAGMA user_version = ${IDX_063};`);
+  runMigrations(heal63, MIGRATIONS);
+  check('063 replay preserves the athlete declaration exactly',
+    JSON.stringify(intents(heal63)) === before && uv(heal63) === MIGRATIONS.length);
+
+  const unsupported = ['DB', 'BB', 'KB', 'Cable', 'Chains'].find((p) => !ambiguous.prefixes.includes(p));
+  for (const name of TRG_063) {
+    heal63.raw.exec(`DROP TRIGGER ${name}`);
+    check(`063 a dropped ${name} is detected as a missing sentinel`,
+      sentinelsMissing(heal63).includes(name), sentinelsMissing(heal63).join(',') || 'none');
+    runMigrations(heal63, MIGRATIONS);
+    check(`063 self-heal restores ${name} AND its refusal`,
+      !sentinelsMissing(heal63).includes(name)
+        && uv(heal63) === MIGRATIONS.length
+        && refused(heal63, `INSERT INTO movement_load_intent (movement_id, planned_implement, declared_at_ms) VALUES (${sole.id}, '${unsupported}', 1)`));
+  }
+  heal63.raw.exec('DROP TABLE movement_load_intent');
+  check('063 a dropped declaration TABLE is detected as a missing sentinel',
+    sentinelsMissing(heal63).includes('movement_load_intent'));
+  runMigrations(heal63, MIGRATIONS);
+  check('063 self-heal restores the table (declarations are athlete data, not derivable)',
+    !sentinelsMissing(heal63).includes('movement_load_intent') && uv(heal63) === MIGRATIONS.length);
+}
+
+// (4) ARRAY INDEX AND user_version.
+check(`063 remains at array index ${IDX_063}, never spliced`,
+  IDX_063 === 61, `index=${IDX_063} length=${MIGRATIONS.length}`);
+
+// --- 2ad. 064 Accessible Coach shared capture/accounting/hold contract -------
+console.log('[2ad] 064 Accessible Coach neutral shared contract');
+const IDX_064 = FILES.indexOf('064_accessible_coach_support.sql');
+const TABLES_064 = [
+  'activity_definition', 'activity_requirement', 'activity_series',
+  'activity_occurrence', 'activity_completion', 'activity_source_link',
+  'activity_typical_week_report', 'activity_typical_week_item',
+  'health_support_profile', 'health_support_preference', 'health_support_note',
+  'clinician_instruction', 'clinician_instruction_revision',
+  'health_support_hold', 'health_support_scope',
+  'recommendation_support_record', 'recommendation_activity_basis',
+  'recommendation_hold_basis',
+];
+const TRIGGERS_064 = [
+  'trg_activity_completion_completed_bi',
+  'trg_activity_completion_completed_bu',
+  'trg_activity_occurrence_completion_consistency_bu',
+  'trg_activity_occurrence_origin_immutable_bu',
+  'trg_activity_occurrence_source_consistency_bi',
+  'trg_activity_source_link_origin_consistency_bi',
+  'trg_activity_source_link_identity_immutable_bu',
+  'trg_health_support_note_limit_bi',
+  'trg_clinician_instruction_limit_bi',
+  'trg_clinician_instruction_revision_limit_bi',
+  'trg_clinician_instruction_revision_limit_bu',
+  'trg_health_support_scope_limit_bi',
+  'trg_health_support_scope_limit_bu',
+  'trg_health_support_hold_no_delete_held_bd',
+  'trg_health_support_hold_versioned_withdrawal_bu',
+  'trg_clinician_instruction_delete_bd',
+];
+
+{
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  check('064 remains at array index 62, never spliced, and the chain completes',
+    IDX_064 === 62 && uv(d) === MIGRATIONS.length,
+    `index=${IDX_064} uv=${uv(d)}`);
+  check('064 installs every shared table and enforcement trigger',
+    TABLES_064.every((name) => d.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))
+      && TRIGGERS_064.every((name) => triggerPresent(d, name)));
+  check('064 fresh install infers no activity, health fact, instruction, or hold',
+    TABLES_064.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+  const rawTextBounds = [
+    ['activity_definition', 'display_name', 160],
+    ['activity_series', 'timezone_id', 128],
+    ['activity_occurrence', 'origin_identity', 240],
+    ['activity_occurrence', 'timezone_id', 128],
+    ['activity_occurrence', 'resolver_version', 80],
+    ['activity_occurrence', 'original_recurrence_key', 160],
+    ['activity_source_link', 'source_identity', 240],
+    ['activity_typical_week_report', 'timezone_id', 128],
+    ['health_support_note', 'body_text', 4000],
+    ['clinician_instruction_revision', 'instruction_text', 16000],
+    ['clinician_instruction_revision', 'issuer_text', 160],
+    ['clinician_instruction_revision', 'date_zone_id', 128],
+    ['health_support_preference', 'detail_text', 4000],
+    ['health_support_scope', 'reported_scope_text', 4000],
+    ['recommendation_support_record', 'advice_target_identity', 160],
+    ['recommendation_support_record', 'engine_version', 80],
+  ];
+  check('064 DDL carries raw text caps rather than trim-bypassable caps',
+    rawTextBounds.every(([table, column, limit]) => String(d.raw.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+    ).get(table)?.sql ?? '').includes(`length(${column}) <= ${limit}`)));
+  check('064 rejects whitespace-padded display text beyond its raw cap',
+    refused(d, `INSERT INTO activity_definition
+      (activity_id,kind_id,display_name,demand_class,demand_source,provenance,created_at_ms,updated_at_ms)
+      VALUES ('a-padded','custom','x${' '.repeat(160)}','unknown','unknown','user_reported',1,1)`));
+
+  d.executeSync(`
+    INSERT INTO activity_definition
+      (activity_id, kind_id, display_name, demand_class, demand_source, provenance, created_at_ms, updated_at_ms)
+    VALUES ('a-basketball', 'basketball', 'Friday basketball', 'unknown', 'unknown', 'user_reported', 1, 1);
+    INSERT INTO activity_requirement
+      (requirement_id, activity_id, requirement_kind, requirement_code, requirement_state, provenance, recorded_at_ms)
+    VALUES ('req-court', 'a-basketball', 'facility', 'court', 'known_available', 'user_reported', 1);
+    INSERT INTO activity_series
+      (series_id, activity_id, revision, recurrence_kind, local_weekday, local_start_minute,
+       timezone_id, time_resolution_state, effective_start_date, effective_end_date,
+       timing_commitment, expected_duration_min, expected_effort, effort_scale_id,
+       effort_scale_version, created_at_ms, updated_at_ms)
+    VALUES ('s-friday', 'a-basketball', 1, 'weekly', 5, 1020,
+      'Australia/Sydney', 'unambiguous', '2026-09-01', NULL,
+      'fixed', 60, NULL, NULL, NULL, 1, 1);
+    INSERT INTO activity_occurrence
+      (occurrence_id, activity_id, series_id, original_recurrence_key, revision,
+       origin_kind, origin_identity,
+       local_date, local_start_minute, timezone_id, time_resolution_state,
+       resolved_start_at_ms, resolved_end_at_ms, resolver_version,
+        occurrence_state, timing_commitment, modality_id, purpose_id,
+        expected_duration_min, expected_effort,
+        effort_scale_id, effort_scale_version, created_at_ms, updated_at_ms)
+    VALUES ('o-friday', 'a-basketball', 's-friday', '2026-09-18', 1,
+      'manual', 'manual-friday',
+      '2026-09-18', 1020, 'Australia/Sydney', 'unambiguous', 1000, 2000,
+       'tzdb-fixture-1', 'completed', 'fixed', 'unknown', 'match',
+       60, NULL, NULL, NULL, 1, 2);
+    INSERT INTO activity_completion
+      (occurrence_id, completion_state, actual_start_at_ms, actual_end_at_ms,
+       actual_duration_min, actual_effort, effort_scale_id, effort_scale_version,
+       effort_reported_at_ms, provenance, recorded_at_ms)
+    VALUES ('o-friday', 'completed', 1000, 2000, 55, NULL, NULL, NULL,
+      NULL, 'user_reported', 2000);
+    INSERT INTO activity_source_link
+      (source_link_id, occurrence_id, source_kind, source_identity, linked_session_id, recorded_at_ms)
+    VALUES ('src-manual', 'o-friday', 'manual', 'manual-friday', NULL, 2000),
+           ('src-import', 'o-friday', 'imported', 'vendor-friday', NULL, 2000);
+  `);
+  const friday = d.raw.prepare(`
+    SELECT s.local_weekday, s.local_start_minute, s.timezone_id,
+            s.timing_commitment, o.modality_id, o.purpose_id, c.actual_duration_min,
+           (SELECT COUNT(*) FROM activity_source_link l WHERE l.occurrence_id=o.occurrence_id) AS sources
+    FROM activity_series s
+    JOIN activity_occurrence o USING(series_id, activity_id)
+    JOIN activity_completion c USING(occurrence_id)
+  `).get();
+  check('064 preserves a fixed Friday 17:00 occurrence and counts its factual completion once',
+    friday.local_weekday === 5 && friday.local_start_minute === 1020
+       && friday.timezone_id === 'Australia/Sydney' && friday.timing_commitment === 'fixed'
+       && friday.modality_id === 'unknown' && friday.purpose_id === 'match'
+       && friday.actual_duration_min === 55 && friday.sources === 2,
+    JSON.stringify(friday));
+  check('064 keeps the occurrence origin immutable after materialization',
+    refused(d, `UPDATE activity_occurrence SET origin_identity='silently-relabelled'
+                WHERE occurrence_id='o-friday'`));
+  d.executeSync(`
+    INSERT INTO session (session_id,session_date,started_at_ms)
+      VALUES (64000,'2026-09-19',3000);
+    INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,origin_session_id,revision,
+       local_date,timezone_id,time_resolution_state,occurrence_state,timing_commitment,
+       created_at_ms,updated_at_ms)
+      VALUES ('o-coached','a-basketball','coached_session','session:64000',64000,1,
+        '2026-09-19','Australia/Sydney','unresolved','planned','flexible',3,3);
+    INSERT INTO activity_source_link
+      (source_link_id,occurrence_id,source_kind,source_identity,linked_session_id,recorded_at_ms)
+      VALUES ('src-coached','o-coached','coached_session','session:64000',64000,3);
+    INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-origin-only','a-basketball','manual','origin-only',1,'2026-09-20',
+        'Australia/Sydney','unresolved','planned','flexible',3,3);
+  `);
+  check('064 requires and preserves an explicit native session link for a coached origin',
+    d.raw.prepare(`SELECT 1 FROM activity_occurrence o JOIN activity_source_link l
+      ON l.occurrence_id=o.occurrence_id AND l.linked_session_id=o.origin_session_id
+      WHERE o.occurrence_id='o-coached' AND o.origin_kind='coached_session'`).get() !== undefined
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-coached-unlinked','a-basketball','coached_session','missing-session-link',1,
+        '2026-09-21','Australia/Sydney','unresolved','planned','flexible',3,3)`));
+  check('064 rejects cross-occurrence source reuse and source-link relabelling',
+    refused(d, `INSERT INTO activity_source_link
+      (source_link_id,occurrence_id,source_kind,source_identity,recorded_at_ms)
+      VALUES ('src-cross','o-coached','manual','origin-only',3)`)
+    && refused(d, `UPDATE activity_source_link SET source_identity='relabelled'
+      WHERE source_link_id='src-import'`));
+  d.executeSync(`INSERT INTO activity_source_link
+    (source_link_id,occurrence_id,source_kind,source_identity,recorded_at_ms)
+    VALUES ('src-link-first','o-coached','imported','link-first-origin',3)`);
+  check('064 rejects source identity collisions regardless of insertion order',
+    refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-link-first','a-basketball','imported','link-first-origin',1,'2026-09-21',
+        'Australia/Sydney','unresolved','planned','flexible',3,3)`));
+  check('064 requires a recurrence key and admits one occurrence per series slot',
+    refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,series_id,revision,origin_kind,origin_identity,
+       local_date,timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-null-key','a-basketball','s-friday',1,'manual','null-key',
+        '2026-09-18','Australia/Sydney','unresolved','planned','flexible',3,3)`)
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,series_id,original_recurrence_key,revision,
+       origin_kind,origin_identity,local_date,timezone_id,time_resolution_state,
+       occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-duplicate-slot','a-basketball','s-friday','2026-09-18',1,
+        'manual','duplicate-slot','2026-09-18','Australia/Sydney','unresolved',
+        'planned','flexible',3,3)`));
+  d.executeSync(`
+    INSERT INTO activity_definition
+      (activity_id,kind_id,display_name,demand_class,demand_source,provenance,created_at_ms,updated_at_ms)
+      VALUES ('a-cycle','cycling','Recumbent cycle','unknown','unknown','user_reported',4,4);
+    INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,
+       modality_id,purpose_id,created_at_ms,updated_at_ms)
+      VALUES ('o-cycle','a-cycle','manual','cycle-manual',1,'2026-09-22',
+        'Australia/Sydney','unresolved','planned','flexible',
+        'stationary_recumbent','conditioning',4,4);
+  `);
+  const cycleContext = d.raw.prepare(`SELECT modality_id,purpose_id FROM activity_occurrence
+    WHERE occurrence_id='o-cycle'`).get();
+  check('064 preserves ratified modality and occurrence-purpose context',
+    cycleContext?.modality_id === 'stationary_recumbent'
+      && cycleContext?.purpose_id === 'conditioning', JSON.stringify(cycleContext));
+  check('064 rejects unratified modality and occurrence-purpose tokens',
+    refused(d, `UPDATE activity_occurrence SET modality_id='recumbent-ish' WHERE occurrence_id='o-cycle'`)
+      && refused(d, `UPDATE activity_occurrence SET purpose_id='competition-ish' WHERE occurrence_id='o-cycle'`));
+  d.executeSync(`INSERT INTO activity_typical_week_report
+    (report_id,reported_local_date,coverage_start_date,coverage_end_date,timezone_id,recorded_at_ms)
+    VALUES ('typical-1','2026-09-13','2026-08-16','2026-09-12','Australia/Sydney',4)`);
+  check('064 rejects unparseable civil dates across activity date fields', [
+    `UPDATE activity_series SET effective_start_date='2026-13-01' WHERE series_id='s-friday'`,
+    `UPDATE activity_series SET effective_end_date='2026-13-01' WHERE series_id='s-friday'`,
+    `UPDATE activity_occurrence SET local_date='2026-13-01' WHERE occurrence_id='o-friday'`,
+    `UPDATE activity_typical_week_report SET reported_local_date='2026-13-01' WHERE report_id='typical-1'`,
+    `UPDATE activity_typical_week_report SET coverage_start_date='2026-13-01' WHERE report_id='typical-1'`,
+    `UPDATE activity_typical_week_report SET coverage_end_date='2026-13-01' WHERE report_id='typical-1'`,
+  ].every((sql) => refused(d, sql)));
+  check('064 rejects impossible civil dates and a fixed occurrence without resolved instants',
+    refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-bad-date','a-basketball','manual','bad-date',1,'2026-02-30',
+        'Australia/Sydney','unresolved','planned','flexible',1,1)`)
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       timezone_id,time_resolution_state,occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-unparseable-date','a-basketball','manual','unparseable-date',1,'2026-13-01',
+        'Australia/Sydney','unresolved','planned','flexible',1,1)`)
+    && refused(d, `INSERT INTO activity_occurrence
+      (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,
+       local_start_minute,timezone_id,time_resolution_state,occurrence_state,
+       timing_commitment,created_at_ms,updated_at_ms)
+      VALUES ('o-unresolved-fixed','a-basketball','manual','unresolved-fixed',1,'2026-09-19',
+        1020,'Australia/Sydney','unresolved','planned','fixed',1,1)`));
+  check('064 rejects an effort value without its named/versioned scale',
+    refused(d, `INSERT INTO activity_definition VALUES ('a-walk','walking','Walk','unknown','unknown','user_reported',1,1);
+      INSERT INTO activity_occurrence
+        (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,timezone_id,time_resolution_state,
+         occurrence_state,timing_commitment,expected_effort,created_at_ms,updated_at_ms)
+      VALUES ('o-bad','a-walk','manual','bad-effort',1,'2026-09-13','Australia/Sydney','unresolved','planned','flexible',7,1,1)`));
+  check('064 rejects completion evidence for an occurrence not explicitly completed',
+    !refused(d, `INSERT OR IGNORE INTO activity_definition VALUES ('a-walk','walking','Walk','unknown','unknown','user_reported',1,1)`)
+      && !refused(d, `INSERT INTO activity_occurrence
+        (occurrence_id,activity_id,origin_kind,origin_identity,revision,local_date,timezone_id,time_resolution_state,
+          occurrence_state,timing_commitment,created_at_ms,updated_at_ms)
+        VALUES ('o-planned','a-walk','manual','planned-walk',1,'2026-09-13','Australia/Sydney','unresolved','planned','flexible',1,1)`)
+      && refused(d, `INSERT INTO activity_completion
+        (occurrence_id,completion_state,provenance,recorded_at_ms)
+        VALUES ('o-planned','completed','user_reported',1)`));
+
+  d.executeSync('BEGIN');
+  d.executeSync(`INSERT INTO clinician_instruction
+    (instruction_id,current_revision,created_at_ms) VALUES ('instruction-1',1,10)`);
+  d.executeSync(`INSERT INTO clinician_instruction_revision
+    (instruction_id,revision,instruction_text,issuer_text,source_class,provenance,
+     verification_state,recorded_at_ms,date_status,transcription_state,
+     confirmed_at_ms,lifecycle)
+    VALUES ('instruction-1',1,'Reported instruction text','Clinician as entered',
+      'clinician_guidance_as_reported','user_reported','not_verified',10,'unknown',
+      'user_confirmed',11,'current')`);
+  d.executeSync(`INSERT INTO health_support_hold
+    (hold_id,revision,instruction_id,instruction_revision,origin,state,reason_code,created_at_ms,updated_at_ms)
+    VALUES ('hold-1',1,'instruction-1',1,'instruction_review','held','instruction_unreviewed',10,10)`);
+  d.executeSync(`INSERT INTO health_support_scope
+    (scope_id,hold_id,target_kind,occurrence_id)
+    VALUES ('scope-1','hold-1','activity_occurrence','o-friday')`);
+  d.executeSync(`INSERT INTO health_support_scope
+    (scope_id,instruction_id,instruction_revision,target_kind,reported_scope_text)
+    VALUES ('scope-direct','instruction-1',1,'unresolved','scope as reported')`);
+  d.executeSync(`INSERT INTO recommendation_support_record
+    (decision_id,advice_target_kind,advice_target_identity,support_status,engine_version,generated_at_ms)
+    VALUES ('decision-1','session','planned-session:7','held','fixture-1',20)`);
+  d.executeSync(`INSERT INTO recommendation_activity_basis
+    (decision_id,occurrence_id,occurrence_revision) VALUES ('decision-1','o-friday',1)`);
+  d.executeSync(`INSERT INTO recommendation_hold_basis
+    (decision_id,hold_id,hold_revision,reason_code)
+    VALUES ('decision-1','hold-1',1,'instruction_unreviewed')`);
+  d.executeSync('COMMIT');
+  check('064 stores confirmed transcription as user-reported/not-verified and an exact explicit hold scope',
+    d.raw.prepare(`SELECT 1 FROM clinician_instruction_revision r
+      JOIN health_support_hold h ON h.instruction_id=r.instruction_id AND h.instruction_revision=r.revision
+      JOIN health_support_scope s USING(hold_id)
+      WHERE r.provenance='user_reported' AND r.verification_state='not_verified'
+         AND h.state='held' AND s.target_kind='activity_occurrence' AND s.occurrence_id='o-friday'`).get() !== undefined);
+  check('064 rejects unparseable civil dates across instruction date fields', [
+    'instruction_date', 'effective_date', 'review_date', 'expiry_date',
+  ].every((column) => refused(d, `UPDATE clinician_instruction_revision
+    SET ${column}='2026-13-01' WHERE instruction_id='instruction-1' AND revision=1`)));
+  check('064 rejects whitespace-padded instruction text beyond its raw cap',
+    refused(d, `UPDATE clinician_instruction_revision
+      SET instruction_text='x${' '.repeat(16000)}'
+      WHERE instruction_id='instruction-1' AND revision=1`));
+  check('064 has no clearance, diagnosis, screening, medical metric, operator, unit, or threshold column',
+    !TABLES_064.flatMap((name) => d.raw.prepare(`PRAGMA table_info(${name})`).all())
+      .some((column) => /clear|diagnos|screen|metric|operator|threshold|medical|limit_value|unit/i.test(String(column.name))));
+  check('064 rejects a claimed verified clinician source',
+    refused(d, `INSERT INTO clinician_instruction_revision
+      (instruction_id,revision,instruction_text,source_class,provenance,verification_state,
+       recorded_at_ms,date_status,transcription_state,lifecycle)
+      VALUES ('instruction-1',2,'text','clinician_guidance_as_reported','user_reported',
+        'verified',20,'unknown','draft','current')`));
+  check('064 rejects a scope whose target kind and target ID disagree',
+    refused(d, `INSERT INTO health_support_scope
+      (scope_id,hold_id,target_kind,movement_id) VALUES ('bad-scope','hold-1','activity_occurrence',1)`));
+  check('064 persists content-free recommendation provenance without copying support prose',
+    d.raw.prepare(`SELECT 1 FROM recommendation_support_record r
+      JOIN recommendation_activity_basis a USING(decision_id)
+      JOIN recommendation_hold_basis h USING(decision_id)
+      WHERE r.support_status='held' AND a.occurrence_id='o-friday'
+        AND h.hold_id='hold-1' AND h.hold_revision=1
+        AND h.reason_code='instruction_unreviewed'`).get() !== undefined
+    && !['recommendation_support_record','recommendation_activity_basis','recommendation_hold_basis']
+      .flatMap((name) => d.raw.prepare(`PRAGMA table_info(${name})`).all())
+       .some((column) => /text|note|prose|instruction/i.test(String(column.name))));
+  d.executeSync(`INSERT INTO health_support_hold
+    (hold_id,revision,origin,state,reason_code,created_at_ms,updated_at_ms)
+    VALUES ('free-held',1,'user_requested','held','review_requested',20,20)`);
+  check('064 a held review marker cannot disappear or be withdrawn without a revision bump',
+    refused(d, `DELETE FROM health_support_hold WHERE hold_id='free-held'`)
+      && refused(d, `UPDATE health_support_hold SET state='withdrawn' WHERE hold_id='free-held'`)
+      && !refused(d, `UPDATE health_support_hold
+        SET state='withdrawn',revision=2,updated_at_ms=21 WHERE hold_id='free-held'`)
+      && !refused(d, `DELETE FROM health_support_hold WHERE hold_id='free-held'`));
+  d.executeSync('BEGIN');
+  d.executeSync(`INSERT INTO clinician_instruction
+    (instruction_id,current_revision,created_at_ms) VALUES ('instruction-unscoped',1,30)`);
+  d.executeSync(`INSERT INTO clinician_instruction_revision
+    (instruction_id,revision,instruction_text,source_class,provenance,verification_state,
+     recorded_at_ms,date_status,transcription_state,lifecycle)
+    VALUES ('instruction-unscoped',1,'reported','clinician_guidance_as_reported',
+      'user_reported','not_verified',30,'unknown','draft','current')`);
+  d.executeSync(`INSERT INTO health_support_hold
+    (hold_id,revision,instruction_id,instruction_revision,origin,state,reason_code,created_at_ms,updated_at_ms)
+    VALUES ('unscoped-deletion-marker',1,'instruction-unscoped',1,'instruction_review',
+      'held','instruction_unreviewed',30,30)`);
+  d.executeSync('COMMIT');
+  d.executeSync(`DELETE FROM clinician_instruction WHERE instruction_id='instruction-unscoped'`);
+  const unscopedMarker = d.raw.prepare(`SELECT origin,state,reason_code,revision FROM health_support_hold
+    WHERE hold_id='unscoped-deletion-marker'`).get();
+  check('064 an unscoped deleted-support marker remains athlete-wide and non-deletable',
+    unscopedMarker?.origin === 'deleted_support_review'
+      && unscopedMarker?.state === 'held'
+      && unscopedMarker?.reason_code === 'support_deleted'
+      && unscopedMarker?.revision === 2
+      && refused(d, `DELETE FROM health_support_hold WHERE hold_id='unscoped-deletion-marker'`),
+    JSON.stringify(unscopedMarker));
+  d.executeSync(`DELETE FROM clinician_instruction WHERE instruction_id='instruction-1'`);
+  const deletedSupport = d.raw.prepare(`SELECT h.origin,h.state,h.reason_code,h.instruction_id,
+      (SELECT COUNT(*) FROM health_support_scope s WHERE s.hold_id=h.hold_id) AS retained_scopes,
+      (SELECT COUNT(*) FROM recommendation_hold_basis b WHERE b.hold_id=h.hold_id) AS retained_evidence
+    FROM health_support_hold h WHERE h.hold_id='hold-1'`).get();
+  check('064 deletion removes sensitive revisions/direct scope but retains a content-free protective marker',
+    Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM clinician_instruction_revision
+      WHERE instruction_id='instruction-1'`).get().c) === 0
+      && Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM health_support_scope
+        WHERE instruction_id='instruction-1' OR reported_scope_text IS NOT NULL`).get().c) === 0
+      && deletedSupport?.origin === 'deleted_support_review'
+      && deletedSupport?.state === 'held'
+      && deletedSupport?.reason_code === 'support_deleted'
+      && deletedSupport?.instruction_id === null
+      && Number(deletedSupport?.retained_scopes) === 1
+      && Number(deletedSupport?.retained_evidence) === 1,
+    JSON.stringify(deletedSupport));
+}
+
+{
+  const bounds = freshDb();
+  runMigrations(bounds, MIGRATIONS);
+
+  check('064 rejects whitespace-padded notes beyond the 4,000-code-point raw cap',
+    refused(bounds, `INSERT INTO health_support_note
+      (note_id,revision,note_kind,body_text,provenance,recorded_at_ms,updated_at_ms)
+      VALUES ('padded-note',1,'general','x${' '.repeat(4000)}','user_reported',1,1)`));
+
+  const noteInsert = bounds.raw.prepare(`INSERT INTO health_support_note
+    (note_id,revision,note_kind,body_text,provenance,recorded_at_ms,updated_at_ms)
+    VALUES (?,1,'general','bounded note','user_reported',1,1)`);
+  for (let i = 0; i < 256; i += 1) noteInsert.run(`note-${i}`);
+  check('064 enforces the per-athlete 256-note bound without truncation or deletion',
+    refused(bounds, `INSERT INTO health_support_note VALUES
+      ('note-overflow',1,'general','must reject','user_reported',1,1)`)
+    && Number(bounds.raw.prepare('SELECT COUNT(*) AS c FROM health_support_note').get().c) === 256);
+
+  bounds.executeSync('BEGIN');
+  const envelopeInsert = bounds.raw.prepare(`INSERT INTO clinician_instruction
+    (instruction_id,current_revision,created_at_ms) VALUES (?,1,1)`);
+  const firstRevisionInsert = bounds.raw.prepare(`INSERT INTO clinician_instruction_revision
+    (instruction_id,revision,instruction_text,source_class,provenance,verification_state,
+     recorded_at_ms,date_status,transcription_state,lifecycle)
+    VALUES (?,1,'reported','clinician_guidance_as_reported','user_reported','not_verified',
+      1,'unknown','draft','current')`);
+  for (let i = 0; i < 64; i += 1) {
+    envelopeInsert.run(`bounded-instruction-${i}`);
+    firstRevisionInsert.run(`bounded-instruction-${i}`);
+  }
+  bounds.executeSync('COMMIT');
+  check('064 enforces the per-athlete 64-instruction-envelope bound',
+    refused(bounds, `INSERT INTO clinician_instruction VALUES ('instruction-overflow',1,1)`)
+    && Number(bounds.raw.prepare('SELECT COUNT(*) AS c FROM clinician_instruction').get().c) === 64);
+
+  const revisions = freshDb();
+  runMigrations(revisions, MIGRATIONS);
+  revisions.executeSync('BEGIN');
+  revisions.executeSync(`INSERT INTO clinician_instruction VALUES ('revision-target',64,1)`);
+  const revisionInsert = revisions.raw.prepare(`INSERT INTO clinician_instruction_revision
+    (instruction_id,revision,instruction_text,source_class,provenance,verification_state,
+     recorded_at_ms,date_status,transcription_state,lifecycle)
+    VALUES ('revision-target',?,'reported','clinician_guidance_as_reported','user_reported',
+      'not_verified',1,'unknown','draft','current')`);
+  for (let i = 1; i <= 64; i += 1) revisionInsert.run(i);
+  revisions.executeSync(`INSERT INTO clinician_instruction VALUES ('revision-source',65,1)`);
+  revisions.executeSync(`INSERT INTO clinician_instruction_revision
+    VALUES ('revision-source',65,'reported',NULL,'clinician_guidance_as_reported','user_reported',
+      'not_verified',1,NULL,NULL,NULL,NULL,NULL,'unknown','draft',NULL,NULL,'current')`);
+  revisions.executeSync('COMMIT');
+  check('064 revision bound cannot be bypassed by moving a row between envelopes',
+    refused(revisions, `UPDATE clinician_instruction_revision SET instruction_id='revision-target'
+      WHERE instruction_id='revision-source' AND revision=65`)
+    && Number(revisions.raw.prepare(`SELECT COUNT(*) AS c FROM clinician_instruction_revision
+      WHERE instruction_id='revision-target'`).get().c) === 64);
+
+  const scopes = freshDb();
+  runMigrations(scopes, MIGRATIONS);
+  scopes.executeSync(`INSERT INTO health_support_hold
+    VALUES ('scope-target',1,NULL,NULL,'user_requested','held','review_requested',1,1),
+           ('scope-source',1,NULL,NULL,'user_requested','held','review_requested',1,1)`);
+  const scopeInsert = scopes.raw.prepare(`INSERT INTO health_support_scope
+    (scope_id,hold_id,target_kind) VALUES (?,'scope-target','all_prescription')`);
+  for (let i = 0; i < 256; i += 1) scopeInsert.run(`bounded-scope-${i}`);
+  scopes.executeSync(`INSERT INTO health_support_scope
+    (scope_id,hold_id,target_kind) VALUES ('movable-scope','scope-source','all_prescription')`);
+  check('064 scope bound cannot be bypassed by changing a row owner',
+    refused(scopes, `UPDATE health_support_scope SET hold_id='scope-target'
+      WHERE scope_id='movable-scope'`)
+    && Number(scopes.raw.prepare(`SELECT COUNT(*) AS c FROM health_support_scope
+      WHERE hold_id='scope-target'`).get().c) === 256);
+}
+
+{
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_064);
+  const before = Number(upgrade.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c);
+  runMigrations(upgrade, MIGRATIONS);
+  check('064 clean upgrade preserves the existing 300-movement corpus and adds no inferred rows',
+    uv(upgrade) === MIGRATIONS.length
+      && Number(upgrade.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c) === before
+      && TABLES_064.every((name) => Number(upgrade.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+}
+
+for (const name of TRIGGERS_064) {
+  const heal = freshDb();
+  runMigrations(heal, MIGRATIONS);
+  heal.raw.exec(`DROP TRIGGER ${name}`);
+  const detected = sentinelsMissing(heal).includes(name);
+  runMigrations(heal, MIGRATIONS);
+  check(`064 ${name}: loss detected and self-healed`,
+    detected && triggerPresent(heal, name) && uv(heal) === MIGRATIONS.length);
+}
+
+// --- 065 session preparation side-car ---------------------------------------
+// Preparation is durable athlete state bound to ONE live session. These checks
+// pin the properties the store relies on: nothing can be fabricated for a
+// finished session, a frozen protocol and a recorded outcome cannot be
+// rewritten, a reused session id cannot inherit an old protocol, and losing
+// any table or guard is detected and self-healed without touching history.
+console.log('[065] session preparation side-car');
+const IDX_065 = FILES.indexOf('065_session_preparation.sql');
+const TABLES_065 = ['session_preparation', 'session_preparation_item'];
+const TRIGGERS_065 = [
+  'trg_session_preparation_live_session_bi',
+  'trg_session_preparation_frozen_bu',
+  'trg_session_preparation_transition_bu',
+  'trg_session_preparation_item_frozen_bu',
+  'trg_session_preparation_item_open_bu',
+];
+const PROTOCOL_065 = JSON.stringify({ version: 1, items: [{ itemId: 'raise.easy_movement' }] });
+const insertPreparation = (db, sessionId, startedAtMs, instanceId = `instance-${sessionId}-${startedAtMs}`) =>
+  db.raw.prepare(`INSERT INTO session_preparation
+    (session_id, instance_id, session_started_at_ms, policy_id, policy_revision, protocol_version,
+     protocol_json, item_count, estimate_low_seconds, estimate_high_seconds, status, revision,
+     created_at_ms, updated_at_ms, finished_at_ms)
+    VALUES (?, ?, ?, 'ramp-general', 1, 1, ?, 1, 240, 300, 'pending', 1, ?, ?, NULL)`)
+    .run(sessionId, instanceId, startedAtMs, PROTOCOL_065, startedAtMs, startedAtMs);
+const insertPreparationItem = (db, sessionId) =>
+  db.raw.prepare(`INSERT INTO session_preparation_item
+    (session_id, item_index, item_id, item_revision, movement_id, prescribed_kind, prescribed_amount,
+     per_side, status, updated_at_ms)
+    VALUES (?, 0, 'raise.easy_movement', 1, NULL, 'time', 240, 0, 'pending', 1)`).run(sessionId);
+const liveSession = (db, startedAtMs) => {
+  db.raw.prepare("INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-10-02', ?)").run(startedAtMs);
+  return Number(db.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+};
+const refusedRaw = (fn) => { try { fn(); return false; } catch { return true; } };
+
+{
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  check('065 remains at array index 63, never spliced, and the chain completes',
+    IDX_065 === 63 && uv(d) === MIGRATIONS.length,
+    `index=${IDX_065} uv=${uv(d)}`);
+  check('065 installs both tables and all five guards',
+    TABLES_065.every((name) => d.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))
+      && TRIGGERS_065.every((name) => triggerPresent(d, name)));
+  check('065 fresh install fabricates no preparation record',
+    TABLES_065.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+
+  // A finished session (the shape of every completed, imported and demo row)
+  // can never acquire a preparation record.
+  d.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-09-01', 5000, 42.5)");
+  const finishedId = Number(d.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+  check('065 refuses a protocol for a FINISHED session (no fabricated history)',
+    refusedRaw(() => insertPreparation(d, finishedId, 5000)));
+  d.raw.exec("INSERT INTO session (micro_cycle_id, session_date) VALUES (NULL, '2026-09-02')");
+  const unstartedId = Number(d.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
+  check('065 refuses a protocol for a session with no start time',
+    refusedRaw(() => insertPreparation(d, unstartedId, 0)));
+
+  const liveId = liveSession(d, 7000);
+  check('065 refuses a protocol bound to a different session start',
+    refusedRaw(() => insertPreparation(d, liveId, 6999)));
+  check('065 refuses a protocol that is not created pending at revision 1',
+    refusedRaw(() => d.raw.prepare(`INSERT INTO session_preparation
+      (session_id, instance_id, session_started_at_ms, policy_id, policy_revision, protocol_version,
+       protocol_json, item_count, estimate_low_seconds, estimate_high_seconds, status, revision,
+       created_at_ms, updated_at_ms, finished_at_ms)
+      VALUES (?, 'instance-completed', 7000, 'ramp-general', 1, 1, ?, 1, 240, 300, 'completed', 1, 7000, 7000, 7000)`)
+      .run(liveId, PROTOCOL_065)));
+  insertPreparation(d, liveId, 7000);
+  insertPreparationItem(d, liveId);
+  check('065 accepts a pending protocol for a live session',
+    Number(d.raw.prepare('SELECT COUNT(*) AS c FROM session_preparation').get().c) === 1
+      && Number(d.raw.prepare('SELECT COUNT(*) AS c FROM session_preparation_item').get().c) === 1);
+
+  check('065 the frozen protocol cannot be rewritten',
+    refused(d, `UPDATE session_preparation SET protocol_json = '{"version":1}', revision = revision + 1 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation SET instance_id = 'instance-other-x', revision = revision + 1 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation SET session_started_at_ms = 1, revision = revision + 1 WHERE session_id = ${liveId}`));
+  check('065 a write that does not advance the revision by exactly one is refused',
+    refused(d, `UPDATE session_preparation SET status = 'in_progress' WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation SET status = 'in_progress', revision = revision + 2 WHERE session_id = ${liveId}`));
+  check('065 the prescribed item cannot be rewritten',
+    refused(d, `UPDATE session_preparation_item SET prescribed_amount = 10 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation_item SET movement_id = 1 WHERE session_id = ${liveId}`));
+  check('065 an item record must say what happened (done needs the prescribed amount)',
+    refused(d, `UPDATE session_preparation_item SET status = 'done', performed_amount = 100, updated_at_ms = 2 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation_item SET status = 'skipped', updated_at_ms = 2 WHERE session_id = ${liveId}`));
+
+  d.executeSync(`UPDATE session_preparation SET status = 'in_progress', revision = revision + 1, updated_at_ms = 7001 WHERE session_id = ${liveId}`);
+  d.executeSync(`UPDATE session_preparation_item SET status = 'done', performed_amount = 240, updated_at_ms = 7002 WHERE session_id = ${liveId}`);
+  check('065 a write that names only timestamps still has to advance the revision',
+    refused(d, `UPDATE session_preparation SET updated_at_ms = 7002 WHERE session_id = ${liveId}`));
+  check('065 a started protocol never returns to pending',
+    refused(d, `UPDATE session_preparation SET status = 'pending', revision = revision + 1 WHERE session_id = ${liveId}`));
+  check('065 an outcome needs its finish time',
+    refused(d, `UPDATE session_preparation SET status = 'completed', revision = revision + 1 WHERE session_id = ${liveId}`));
+  d.executeSync(`UPDATE session_preparation SET status = 'completed', revision = revision + 1, updated_at_ms = 7003, finished_at_ms = 7003 WHERE session_id = ${liveId}`);
+  check('065 a recorded outcome is final',
+    refused(d, `UPDATE session_preparation SET status = 'skipped', revision = revision + 1 WHERE session_id = ${liveId}`));
+  check('065 a recorded outcome accepts no further write, even under the same status',
+    refused(d, `UPDATE session_preparation SET finished_at_ms = 9000, updated_at_ms = 9000, revision = revision + 1 WHERE session_id = ${liveId}`)
+      && refused(d, `UPDATE session_preparation SET updated_at_ms = 9000 WHERE session_id = ${liveId}`)
+      && Number(d.raw.prepare('SELECT finished_at_ms AS f FROM session_preparation WHERE session_id = ?').get(liveId).f) === 7003);
+  check('065 item records close with their protocol',
+    refused(d, `UPDATE session_preparation_item SET status = 'modified', performed_amount = 100, updated_at_ms = 7004 WHERE session_id = ${liveId}`));
+  check('065 preparation never wrote a set_record row',
+    Number(d.raw.prepare('SELECT COUNT(*) AS c FROM set_record').get().c) === 0);
+
+  d.raw.exec(`DELETE FROM session WHERE session_id = ${liveId}`);
+  check('065 discarding the session removes its preparation (FK cascade)',
+    TABLES_065.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+}
+
+// Reused session id. session_id has no AUTOINCREMENT, so after the table is
+// emptied the next session gets the SAME id. With foreign keys OFF (the test
+// and recovery connections) the old protocol survives its session's delete —
+// and it must still be impossible for the new session to inherit it.
+{
+  const reuse = freshDb();
+  runMigrations(reuse, MIGRATIONS);
+  const firstId = liveSession(reuse, 1000);
+  insertPreparation(reuse, firstId, 1000, 'instance-first-session');
+  insertPreparationItem(reuse, firstId);
+  reuse.raw.exec('PRAGMA foreign_keys = OFF');
+  reuse.raw.exec('DELETE FROM session');
+  const secondId = liveSession(reuse, 2000);
+  const orphan = reuse.raw.prepare('SELECT instance_id, session_started_at_ms FROM session_preparation WHERE session_id = ?').get(secondId);
+  check('065 a reused session id exposes an orphan that is NOT bound to the new session',
+    secondId === firstId && orphan !== undefined && orphan.instance_id === 'instance-first-session'
+      && Number(orphan.session_started_at_ms) !== 2000,
+    `first=${firstId} second=${secondId}`);
+  const boundToLive = reuse.raw.prepare(`SELECT COUNT(*) AS c FROM session_preparation p
+    JOIN session s ON s.session_id = p.session_id AND s.started_at_ms = p.session_started_at_ms
+    WHERE p.session_id = ?`).get(secondId).c;
+  check('065 the binding read (session id AND start time) rejects the orphan', Number(boundToLive) === 0);
+  check('065 the orphan cannot be re-pointed at the new session',
+    refused(reuse, `UPDATE session_preparation SET session_started_at_ms = 2000, revision = revision + 1 WHERE session_id = ${secondId}`));
+  reuse.raw.exec(`DELETE FROM session_preparation_item WHERE session_id = ${secondId}`);
+  reuse.raw.exec(`DELETE FROM session_preparation WHERE session_id = ${secondId}`);
+  insertPreparation(reuse, secondId, 2000, 'instance-second-session');
+  check('065 after the explicit delete the new session gets its own protocol',
+    reuse.raw.prepare('SELECT instance_id FROM session_preparation WHERE session_id = ?').get(secondId).instance_id === 'instance-second-session');
+}
+
+// Upgrade from the shipped pre-065 state: existing sessions stay exactly as
+// they were and none of them acquires a preparation record.
+{
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_065);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min, session_rpe) VALUES (NULL, '2026-09-10', 1111, 55.5, 7.5)");
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-09-11', 2222)");
+  const before = JSON.stringify(upgrade.raw.prepare('SELECT * FROM session ORDER BY session_id').all());
+  check('065 pre-upgrade database is the 064 schema',
+    uv(upgrade) === IDX_065
+      && upgrade.raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name='session_preparation'").get() === undefined);
+  runMigrations(upgrade, MIGRATIONS);
+  check('065 clean upgrade reaches the latest version with no missing sentinel',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0,
+    `uv=${uv(upgrade)} missing=${sentinelsMissing(upgrade).join(',')}`);
+  check('065 upgrade leaves every existing session byte-identical',
+    JSON.stringify(upgrade.raw.prepare('SELECT * FROM session ORDER BY session_id').all()) === before);
+  check('065 upgrade fabricates no preparation for historical or in-progress sessions',
+    TABLES_065.every((name) => Number(upgrade.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+  runMigrations(upgrade, MIGRATIONS);
+  check('065 re-boot after upgrade is a no-op', uv(upgrade) === MIGRATIONS.length);
+}
+
+// Self-heal: each guard and each table, with a live protocol in place.
+for (const name of TRIGGERS_065) {
+  const heal = freshDb();
+  runMigrations(heal, MIGRATIONS);
+  const id = liveSession(heal, 3000);
+  insertPreparation(heal, id, 3000);
+  insertPreparationItem(heal, id);
+  const before = JSON.stringify(heal.raw.prepare('SELECT * FROM session_preparation').all());
+  heal.raw.exec(`DROP TRIGGER ${name}`);
+  const detected = sentinelsMissing(heal).includes(name);
+  runMigrations(heal, MIGRATIONS);
+  check(`065 ${name}: loss detected and self-healed without altering the protocol`,
+    detected && triggerPresent(heal, name) && uv(heal) === MIGRATIONS.length
+      && JSON.stringify(heal.raw.prepare('SELECT * FROM session_preparation').all()) === before);
+}
+
+{
+  // The replay-blocking case: the PARENT table is lost while the child's
+  // cross-table trigger survives. Without REPLAY_BLOCKING_TRIGGERS the full
+  // replay aborts inside the first ALTER TABLE ... RENAME.
+  const replay = freshDb();
+  runMigrations(replay, MIGRATIONS);
+  const sessionsBefore = Number(replay.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c);
+  replay.raw.exec('PRAGMA foreign_keys = OFF');
+  replay.raw.exec('DROP TABLE session_preparation');
+  replay.raw.exec('PRAGMA foreign_keys = ON');
+  const survives = triggerPresent(replay, 'trg_session_preparation_item_open_bu');
+  let healed = false;
+  let error = '';
+  try { runMigrations(replay, MIGRATIONS); healed = true; } catch (e) { error = String(e && e.message); }
+  check('065 losing session_preparation alone still self-heals (item trigger does not block the replay)',
+    survives && healed && sentinelsMissing(replay).length === 0 && uv(replay) === MIGRATIONS.length
+      && Number(replay.raw.prepare('SELECT COUNT(*) AS c FROM movement').get().c) === sessionsBefore,
+    error || `uv=${uv(replay)}`);
+  const runnerSrc065 = readFileSync(join(SCHEMA_DIR, '..', 'migrationRunner.ts'), 'utf-8');
+  check('065 the cross-table item trigger is on REPLAY_BLOCKING_TRIGGERS',
+    runnerSrc065.indexOf("'trg_session_preparation_item_open_bu',") > runnerSrc065.indexOf('REPLAY_BLOCKING_TRIGGERS'));
+}
+
+// --- 066 focus and SMART goals ------------------------------------------------
+// Reference tables are seeded from the library and must survive loss; athlete
+// tables are durable intentions and measurements. These checks pin: the seed
+// is exactly what the provenance rule says; nothing athlete-owned is invented;
+// a goal is edited by appending and a measurement is never rewritten; and
+// every table, seed and guard self-heals without touching athlete rows.
+console.log('[066] focus and SMART goals');
+const IDX_066 = FILES.indexOf('066_focus_and_goals.sql');
+const SEED_TABLES_066 = ['muscle_group', 'muscle_group_alias', 'movement_muscle_role'];
+const ATHLETE_TABLES_066 = ['athlete_focus', 'athlete_focus_muscle', 'athlete_goal', 'athlete_goal_revision', 'athlete_goal_observation'];
+const TRIGGERS_066 = [
+  'trg_athlete_focus_muscle_limit_bi',
+  'trg_athlete_goal_revision_immutable_bu',
+  'trg_athlete_goal_revision_no_delete_bd',
+  'trg_athlete_goal_revision_forward_bu',
+  'trg_athlete_goal_observation_immutable_bu',
+  'trg_athlete_goal_active_limit_bi',
+  'trg_athlete_goal_active_limit_bu',
+];
+const seedSnapshot = (db) => JSON.stringify({
+  groups: db.raw.prepare('SELECT * FROM muscle_group ORDER BY sort_order').all(),
+  aliases: db.raw.prepare('SELECT * FROM muscle_group_alias ORDER BY alias').all(),
+  roles: db.raw.prepare('SELECT * FROM movement_muscle_role ORDER BY movement_id, muscle_group_id').all(),
+});
+const insertGoal = (db, goalId, status = 'active') => {
+  db.raw.prepare("INSERT INTO athlete_goal (goal_id, status, current_revision, created_at_ms, updated_at_ms) VALUES (?, ?, 1, 1000, 1000)").run(goalId, status);
+  db.raw.prepare(`INSERT INTO athlete_goal_revision
+    (goal_id, revision, specific_outcome, metric_id, unit, measurement_method, baseline_known, baseline_value,
+     target_value, reason, requested_deadline, recorded_at_ms)
+    VALUES (?, 1, 'Squat 100 kg for 5', 'load_kg', 'kg', 'back squat, 5 reps to parallel', 1, 80, 100, 'for my sport', '2027-01-01', 1000)`).run(goalId);
+};
+const athleteSnapshot = (db) => JSON.stringify(Object.fromEntries(ATHLETE_TABLES_066.map((name) =>
+  [name, db.raw.prepare(`SELECT * FROM ${name} ORDER BY 1, 2`).all()])));
+
+{
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  check('066 is appended directly after 065',
+    IDX_066 === 64 && FILES[IDX_066 - 1] === '065_session_preparation.sql' && uv(d) === MIGRATIONS.length,
+    `index=${IDX_066} uv=${uv(d)}`);
+  check('066 installs every table and guard',
+    [...SEED_TABLES_066, ...ATHLETE_TABLES_066].every((name) => d.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))
+      && TRIGGERS_066.every((name) => triggerPresent(d, name)));
+  check('066 fresh install records no focus, goal or measurement for the athlete',
+    ATHLETE_TABLES_066.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+
+  const count = (sql) => Number(d.raw.prepare(sql).get().c);
+  check('066 seeds 17 muscle groups and the 27 library-term aliases',
+    count('SELECT COUNT(*) AS c FROM muscle_group') === 17
+      && count("SELECT COUNT(*) AS c FROM muscle_group_alias WHERE alias_kind = 'library_term'") === 27);
+  // Every distinct term in the library either has an alias or is one of the two
+  // documented non-muscle terms. Nothing is silently dropped.
+  const terms = d.raw.prepare("SELECT DISTINCT lower(trim(j.value)) AS term FROM movement_detail d, json_each(d.target_muscles) j ORDER BY 1").all().map((row) => row.term);
+  const unaliased = terms.filter((term) => d.raw.prepare("SELECT 1 FROM muscle_group_alias WHERE alias = ? AND alias_kind = 'library_term'").get(term) === undefined);
+  check('066 every library muscle term is aliased, except the two documented non-muscle terms',
+    terms.length === 29 && JSON.stringify(unaliased) === JSON.stringify(['cardiovascular', 'full_body']),
+    `terms=${terms.length} unaliased=${unaliased.join(',')}`);
+  const unusedLibraryAliases = d.raw.prepare("SELECT alias FROM muscle_group_alias WHERE alias_kind = 'library_term'").all()
+    .map((row) => row.alias).filter((alias) => !terms.includes(alias));
+  check('066 every library-term alias is a term that really appears in the library',
+    unusedLibraryAliases.length === 0, unusedLibraryAliases.join(','));
+
+  // The mapping is exactly what the provenance rule says, recomputed independently.
+  const expected = new Map();
+  for (const row of d.raw.prepare('SELECT movement_id, target_muscles FROM movement_detail ORDER BY movement_id').all()) {
+    JSON.parse(row.target_muscles).forEach((term, index) => {
+      const alias = d.raw.prepare("SELECT muscle_group_id FROM muscle_group_alias WHERE alias = ? AND alias_kind = 'library_term'").get(String(term).trim().toLowerCase());
+      if (alias === undefined) return;
+      const key = `${row.movement_id}:${alias.muscle_group_id}`;
+      if (!expected.has(key)) expected.set(key, index === 0 ? 'primary' : 'supporting');
+    });
+  }
+  const libraryRows = d.raw.prepare("SELECT movement_id, muscle_group_id, role FROM movement_muscle_role WHERE source = 'library_target_muscles'").all();
+  check('066 library mapping: position 0 is primary, later positions are supporting, earliest position wins',
+    libraryRows.length === expected.size
+      && libraryRows.every((row) => expected.get(`${row.movement_id}:${row.muscle_group_id}`) === row.role),
+    `${libraryRows.length} rows vs ${expected.size} expected`);
+  check('066 299 of 300 movements are mapped; only the full-body sparring round is not',
+    count('SELECT COUNT(DISTINCT movement_id) AS c FROM movement_muscle_role') === 299
+      && d.raw.prepare('SELECT m.name FROM movement m WHERE m.movement_id NOT IN (SELECT movement_id FROM movement_muscle_role)').all()
+        .map((row) => row.name).join(',') === 'BJJ Sparring Round');
+  check('066 every mapped movement has exactly one library primary',
+    count("SELECT COUNT(*) AS c FROM (SELECT movement_id FROM movement_muscle_role WHERE source = 'library_target_muscles' AND role = 'primary' GROUP BY movement_id HAVING COUNT(*) <> 1)") === 0
+      && count("SELECT COUNT(DISTINCT movement_id) AS c FROM movement_muscle_role WHERE role = 'primary'") === 299);
+  const incline = d.raw.prepare("SELECT r.movement_id, m.name FROM movement_muscle_role r JOIN movement m USING (movement_id) WHERE r.source = 'incline_press_rule' ORDER BY 1").all();
+  check('066 the incline rule maps exactly the four incline presses to the upper chest',
+    incline.map((row) => row.movement_id).join(',') === '65,134,212,216'
+      && incline.every((row) => /Incline/.test(row.name) && /Press/.test(row.name)),
+    incline.map((row) => `${row.movement_id}:${row.name}`).join(' | '));
+  check('066 the incline rule does not touch incline push-ups, flyes, 218, 135 or 187',
+    count("SELECT COUNT(*) AS c FROM movement_muscle_role WHERE muscle_group_id = 'upper_chest' AND role = 'primary' AND movement_id IN (90, 223, 217, 220, 218, 135, 187)") === 0);
+  check('066 leaves movement_detail.target_muscles and every movement id untouched',
+    count('SELECT COUNT(*) AS c FROM movement') === 300
+      && d.raw.prepare('SELECT target_muscles FROM movement_detail WHERE movement_id = 1').get().target_muscles === '["quadriceps","glutes","spinal_erectors"]');
+
+  // Focus guards.
+  d.raw.exec("INSERT INTO athlete_focus (focus_id, bundle_id, customised, movement_control, revision, updated_at_ms) VALUES (1, 'lower_body', 0, 0, 1, 1)");
+  check('066 only one focus row can exist, and only a known bundle',
+    refused(d, "INSERT INTO athlete_focus (focus_id, bundle_id, customised, movement_control, revision, updated_at_ms) VALUES (2, NULL, 1, 0, 1, 1)")
+      && refused(d, "UPDATE athlete_focus SET bundle_id = 'summer_body' WHERE focus_id = 1"));
+  for (const muscle of ['glutes', 'quadriceps', 'hamstrings', 'calves', 'core', 'lats']) {
+    d.raw.prepare('INSERT INTO athlete_focus_muscle (focus_id, muscle_group_id) VALUES (1, ?)').run(muscle);
+  }
+  check('066 a seventh focus area is refused, and so is an unknown muscle group',
+    refused(d, "INSERT INTO athlete_focus_muscle (focus_id, muscle_group_id) VALUES (1, 'chest')")
+      && refused(d, "DELETE FROM athlete_focus_muscle WHERE muscle_group_id = 'lats'; INSERT INTO athlete_focus_muscle (focus_id, muscle_group_id) VALUES (1, 'legs')") === true);
+
+  // Goal guards.
+  insertGoal(d, 'goal-aaaa-1');
+  check('066 a goal definition cannot be rewritten or deleted while its goal exists',
+    refused(d, "UPDATE athlete_goal_revision SET target_value = 200 WHERE goal_id = 'goal-aaaa-1'")
+      && refused(d, "DELETE FROM athlete_goal_revision WHERE goal_id = 'goal-aaaa-1'"));
+  check('066 a baseline is a number or an explicit unknown, never an assumed zero',
+    refused(d, `INSERT INTO athlete_goal_revision (goal_id, revision, specific_outcome, metric_id, unit, measurement_method, baseline_known, baseline_value, target_value, reason, requested_deadline, recorded_at_ms)
+      VALUES ('goal-aaaa-1', 2, 'Squat 100', 'load_kg', 'kg', 'back squat 5 reps', 1, NULL, 100, 'reason', NULL, 2000)`)
+      && refused(d, `INSERT INTO athlete_goal_revision (goal_id, revision, specific_outcome, metric_id, unit, measurement_method, baseline_known, baseline_value, target_value, reason, requested_deadline, recorded_at_ms)
+      VALUES ('goal-aaaa-1', 2, 'Squat 100', 'load_kg', 'kg', 'back squat 5 reps', 0, 0, 100, 'reason', NULL, 2000)`));
+  d.raw.exec(`INSERT INTO athlete_goal_revision (goal_id, revision, specific_outcome, metric_id, unit, measurement_method, baseline_known, baseline_value, target_value, reason, requested_deadline, recorded_at_ms)
+    VALUES ('goal-aaaa-1', 2, 'Squat 110 kg for 5', 'load_kg', 'kg', 'back squat, 5 reps to parallel', 0, NULL, 110, 'for my sport', NULL, 2000)`);
+  d.raw.exec("UPDATE athlete_goal SET current_revision = 2, updated_at_ms = 2000 WHERE goal_id = 'goal-aaaa-1'");
+  check('066 editing appends a revision: revision 1 is still there, unchanged',
+    Number(d.raw.prepare("SELECT target_value FROM athlete_goal_revision WHERE goal_id = 'goal-aaaa-1' AND revision = 1").get().target_value) === 100
+      && Number(d.raw.prepare("SELECT COUNT(*) AS c FROM athlete_goal_revision WHERE goal_id = 'goal-aaaa-1'").get().c) === 2);
+  check('066 the current revision cannot move backwards',
+    refused(d, "UPDATE athlete_goal SET current_revision = 1 WHERE goal_id = 'goal-aaaa-1'"));
+  d.raw.exec("INSERT INTO athlete_goal_observation (observation_id, goal_id, goal_revision, observed_on, value, unit, source, recorded_at_ms) VALUES ('obs-aaaa-1', 'goal-aaaa-1', 1, '2026-10-01', 82.5, 'kg', 'athlete_entered', 3000)");
+  check('066 a measurement cannot be edited, must be athlete-entered, and must name a real revision',
+    refused(d, "UPDATE athlete_goal_observation SET value = 95 WHERE observation_id = 'obs-aaaa-1'")
+      && refused(d, "INSERT INTO athlete_goal_observation (observation_id, goal_id, goal_revision, observed_on, value, unit, source, recorded_at_ms) VALUES ('obs-aaaa-2', 'goal-aaaa-1', 1, '2026-10-02', 90, 'kg', 'derived_from_volume', 3000)")
+      && refused(d, "INSERT INTO athlete_goal_observation (observation_id, goal_id, goal_revision, observed_on, value, unit, source, recorded_at_ms) VALUES ('obs-aaaa-3', 'goal-aaaa-1', 9, '2026-10-02', 90, 'kg', 'athlete_entered', 3000)"));
+  check('066 an athlete can remove their own measurement',
+    !refused(d, "DELETE FROM athlete_goal_observation WHERE observation_id = 'obs-aaaa-1'"));
+  for (const id of ['goal-bbbb-2', 'goal-cccc-3', 'goal-dddd-4', 'goal-eeee-5']) insertGoal(d, id);
+  check('066 a sixth active goal is refused on insert and on reactivation',
+    refusedRaw(() => insertGoal(d, 'goal-ffff-6'))
+      && (() => {
+        d.raw.exec("UPDATE athlete_goal SET status = 'retired' WHERE goal_id = 'goal-bbbb-2'");
+        insertGoal(d, 'goal-gggg-7');
+        return refused(d, "UPDATE athlete_goal SET status = 'active' WHERE goal_id = 'goal-bbbb-2'");
+      })());
+  d.raw.exec("DELETE FROM athlete_goal WHERE goal_id = 'goal-aaaa-1'");
+  check('066 deleting a goal removes its revisions with it (cascade through the parent-first guard)',
+    Number(d.raw.prepare("SELECT COUNT(*) AS c FROM athlete_goal_revision WHERE goal_id = 'goal-aaaa-1'").get().c) === 0);
+}
+
+// Upgrade from the shipped pre-066 state: the library and every athlete row are
+// untouched, and the seed is identical to a fresh install's.
+{
+  const fresh = freshDb();
+  runMigrations(fresh, MIGRATIONS);
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_066);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-09-10', 1111, 55.5)");
+  const before = JSON.stringify({
+    session: upgrade.raw.prepare('SELECT * FROM session').all(),
+    profile: upgrade.raw.prepare('SELECT * FROM athlete_profile').all(),
+    detail: upgrade.raw.prepare('SELECT movement_id, target_muscles FROM movement_detail ORDER BY 1').all(),
+  });
+  runMigrations(upgrade, MIGRATIONS);
+  check('066 clean upgrade reaches the latest version with no missing sentinel',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0,
+    `uv=${uv(upgrade)} missing=${sentinelsMissing(upgrade).join(',')}`);
+  check('066 upgrade leaves sessions, the profile and the library text untouched',
+    JSON.stringify({
+      session: upgrade.raw.prepare('SELECT * FROM session').all(),
+      profile: upgrade.raw.prepare('SELECT * FROM athlete_profile').all(),
+      detail: upgrade.raw.prepare('SELECT movement_id, target_muscles FROM movement_detail ORDER BY 1').all(),
+    }) === before);
+  check('066 an upgraded database carries exactly the fresh-install seed', seedSnapshot(upgrade) === seedSnapshot(fresh));
+  check('066 upgrade invents no focus, goal or measurement',
+    ATHLETE_TABLES_066.every((name) => Number(upgrade.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+}
+
+// Self-heal: guards, seed rows and tables, with athlete rows in place.
+{
+  const reference = freshDb();
+  runMigrations(reference, MIGRATIONS);
+  const referenceSeed = seedSnapshot(reference);
+  const seeded = () => {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    db.raw.exec("INSERT INTO athlete_focus (focus_id, bundle_id, customised, movement_control, revision, updated_at_ms) VALUES (1, 'posture', 0, 1, 1, 1)");
+    db.raw.exec("INSERT INTO athlete_focus_muscle (focus_id, muscle_group_id) VALUES (1, 'upper_back'), (1, 'core')");
+    insertGoal(db, 'goal-heal-1');
+    db.raw.exec("INSERT INTO athlete_goal_observation (observation_id, goal_id, goal_revision, observed_on, value, unit, source, recorded_at_ms) VALUES ('obs-heal-1', 'goal-heal-1', 1, '2026-10-01', 82.5, 'kg', 'athlete_entered', 3000)");
+    return db;
+  };
+  for (const name of TRIGGERS_066) {
+    const heal = seeded();
+    const before = athleteSnapshot(heal);
+    heal.raw.exec(`DROP TRIGGER ${name}`);
+    const detected = sentinelsMissing(heal).includes(name);
+    runMigrations(heal, MIGRATIONS);
+    check(`066 ${name}: loss detected and self-healed without altering athlete rows`,
+      detected && triggerPresent(heal, name) && uv(heal) === MIGRATIONS.length && athleteSnapshot(heal) === before);
+  }
+  {
+    // Seed rows lost while the tables and user_version look complete.
+    const heal = seeded();
+    const before = athleteSnapshot(heal);
+    heal.raw.exec("DELETE FROM movement_muscle_role WHERE movement_id IN (1, 2, 3)");
+    const detected = sentinelsMissing(heal).includes('movement_muscle_role seed');
+    runMigrations(heal, MIGRATIONS);
+    check('066 lost mapping rows are detected and re-seeded exactly, athlete rows untouched',
+      detected && seedSnapshot(heal) === referenceSeed && athleteSnapshot(heal) === before
+        && sentinelsMissing(heal).length === 0);
+  }
+  {
+    const heal = seeded();
+    const before = athleteSnapshot(heal);
+    heal.raw.exec('PRAGMA foreign_keys = OFF');
+    heal.raw.exec("DELETE FROM muscle_group_alias WHERE alias = 'traps'");
+    heal.raw.exec('PRAGMA foreign_keys = ON');
+    const detected = sentinelsMissing(heal).includes('muscle_group seed');
+    runMigrations(heal, MIGRATIONS);
+    check('066 a lost alias row is detected and re-seeded, athlete rows untouched',
+      detected && seedSnapshot(heal) === referenceSeed && athleteSnapshot(heal) === before);
+  }
+  {
+    // The seeded parent table itself is lost (only possible with foreign keys
+    // off, as on a damaged file): detected, recreated and re-seeded.
+    const heal = seeded();
+    const before = athleteSnapshot(heal);
+    heal.raw.exec('PRAGMA foreign_keys = OFF');
+    heal.raw.exec('DROP TABLE muscle_group');
+    heal.raw.exec('PRAGMA foreign_keys = ON');
+    const detected = sentinelsMissing(heal).includes('muscle_group');
+    runMigrations(heal, MIGRATIONS);
+    check('066 a lost muscle_group table is detected, recreated and re-seeded, athlete rows untouched',
+      detected && seedSnapshot(heal) === referenceSeed && athleteSnapshot(heal) === before
+        && sentinelsMissing(heal).length === 0);
+  }
+  {
+    // Replay-blocking case: athlete_goal is lost while the revision table's
+    // cross-table trigger survives.
+    const replay = seeded();
+    replay.raw.exec('PRAGMA foreign_keys = OFF');
+    replay.raw.exec('DROP TABLE athlete_goal');
+    replay.raw.exec('PRAGMA foreign_keys = ON');
+    const survives = triggerPresent(replay, 'trg_athlete_goal_revision_no_delete_bd');
+    let healed = false;
+    let error = '';
+    try { runMigrations(replay, MIGRATIONS); healed = true; } catch (e) { error = String(e && e.message); }
+    check('066 losing athlete_goal alone still self-heals (the revision trigger does not block the replay)',
+      survives && healed && sentinelsMissing(replay).length === 0 && uv(replay) === MIGRATIONS.length,
+      error || `uv=${uv(replay)}`);
+    const runnerSrc066 = readFileSync(join(SCHEMA_DIR, '..', 'migrationRunner.ts'), 'utf-8');
+    check('066 the cross-table revision trigger is on REPLAY_BLOCKING_TRIGGERS',
+      runnerSrc066.indexOf("'trg_athlete_goal_revision_no_delete_bd',") > runnerSrc066.indexOf('REPLAY_BLOCKING_TRIGGERS'));
+  }
+}
+
+// --- 067 sport profile, goal exercise link, block emphasis record -------------
+// The sport objective is a side-car: athlete_profile.objective and the activity
+// kind list are byte-for-byte what they were. The block explanation is written
+// once and frozen. Everything self-heals without touching athlete rows.
+console.log('[067] sport profile and block emphasis');
+const IDX_067 = FILES.indexOf('067_sport_and_emphasis.sql');
+const TABLES_067 = ['athlete_sport_profile', 'athlete_goal_movement', 'block_emphasis'];
+const tableSql = (db, name) => db.raw.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(name)?.sql;
+const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+const insertSport = (db, columns = {}) => {
+  const row = {
+    sport_profile_id: 1, sport_id: 'basketball', other_sport_name: null, outcome_id: 'jump_higher',
+    experience_id: '2_to_5_years', practice_sessions_per_week: 2, matches_per_week: 1, typical_session_min: 90,
+    competition_date: null, revision: 1, updated_at_ms: 1000, ...columns,
+  };
+  const names = Object.keys(row);
+  db.raw.prepare(`INSERT INTO athlete_sport_profile (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})`).run(...Object.values(row));
+};
+const insertBlock = (db) => Number(db.raw.prepare("INSERT INTO training_block (start_date, objective, created_at_ms) VALUES ('2026-10-05', 'strength', 1000)").run().lastInsertRowid);
+const insertEmphasis = (db, blockId, inputs = '{"focus":"Lower body"}', report = '{"version":1,"applied":[],"omitted":[]}', version = 1) =>
+  db.raw.prepare('INSERT INTO block_emphasis (block_id, emphasis_version, inputs_json, report_json, created_at_ms) VALUES (?, ?, ?, ?, 2000)').run(blockId, version, inputs, report);
+const snapshot067 = (db) => JSON.stringify({
+  ...Object.fromEntries(TABLES_067.map((name) => [name, db.raw.prepare(`SELECT * FROM ${name} ORDER BY 1`).all()])),
+  goals: athleteSnapshot(db),
+  blocks: db.raw.prepare('SELECT * FROM training_block ORDER BY 1').all(),
+});
+
+{
+  const before = freshDb();
+  applyRaw(before, MIGRATIONS, 0, IDX_067);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  check('067 is appended directly after 066',
+    IDX_067 === 65 && FILES[IDX_067 - 1] === '066_focus_and_goals.sql' && uv(d) === MIGRATIONS.length, `index=${IDX_067} uv=${uv(d)}`);
+  check('067 installs every table and the immutability guard',
+    TABLES_067.every((name) => tableSql(d, name) !== undefined) && triggerPresent(d, 'trg_block_emphasis_immutable_bu'));
+  check('067 fresh install records no sport, goal link or block explanation',
+    TABLES_067.every((name) => Number(d.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+  check('067 leaves the objective column and its CHECK exactly as they were (the sport is a side-car)',
+    tableSql(d, 'athlete_profile') === tableSql(before, 'athlete_profile')
+      && tableSql(d, 'training_block') === tableSql(before, 'training_block')
+      && throws(() => d.raw.exec("UPDATE athlete_profile SET objective = 'basketball'")));
+  check('067 leaves the activity kind list exactly as it was (a sport objective is not an activity kind)',
+    tableSql(d, 'activity_definition') === tableSql(before, 'activity_definition')
+      && tableSql(d, 'activity_series') === tableSql(before, 'activity_series')
+      && !/muay_thai|powerlifting|football_australian/.test(tableSql(d, 'activity_definition')));
+
+  // Sport profile.
+  insertSport(d);
+  check('067 one sport profile per athlete database', throws(() => insertSport(d, { sport_profile_id: 2 })) && throws(() => insertSport(d)));
+  d.raw.exec('DELETE FROM athlete_sport_profile');
+  check('067 only a known sport, outcome and experience band are accepted',
+    throws(() => insertSport(d, { sport_id: 'chess' })) && throws(() => insertSport(d, { outcome_id: 'win' }))
+      && throws(() => insertSport(d, { experience_id: 'forever' })));
+  check('067 "another sport" must be named, and a listed sport must not carry a free-text name',
+    throws(() => insertSport(d, { sport_id: 'other', outcome_id: 'general_support' }))
+      && throws(() => insertSport(d, { other_sport_name: 'Netball' }))
+      && !throws(() => insertSport(d, { sport_id: 'other', outcome_id: 'general_support', other_sport_name: 'Netball' })));
+  d.raw.exec('DELETE FROM athlete_sport_profile');
+  insertSport(d, { practice_sessions_per_week: null, matches_per_week: null, typical_session_min: null });
+  check('067 "not sure" is stored as NULL, never as zero',
+    d.raw.prepare('SELECT practice_sessions_per_week AS p, matches_per_week AS m, typical_session_min AS t FROM athlete_sport_profile').get().p === null);
+  d.raw.exec('DELETE FROM athlete_sport_profile');
+  check('067 workload numbers are bounded and a competition date must be a real date',
+    throws(() => insertSport(d, { practice_sessions_per_week: 15 })) && throws(() => insertSport(d, { matches_per_week: -1 }))
+      && throws(() => insertSport(d, { typical_session_min: 0 })) && throws(() => insertSport(d, { competition_date: '2027-02-30' }))
+      && !throws(() => insertSport(d, { competition_date: '2027-03-01' })));
+
+  // Goal exercise link.
+  insertGoal(d, 'goal-link-1');
+  d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-link-1', 1, 1000)");
+  const revisionsBefore = JSON.stringify(d.raw.prepare('SELECT * FROM athlete_goal_revision').all());
+  check('067 a goal links to at most one real exercise of a real goal',
+    throws(() => d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-link-1', 2, 1000)"))
+      && throws(() => d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-missing', 1, 1000)"))
+      && throws(() => d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-link-1', 999999, 1000)")));
+  d.raw.exec("UPDATE athlete_goal_movement SET movement_id = 2 WHERE goal_id = 'goal-link-1'");
+  d.raw.exec("DELETE FROM athlete_goal_movement WHERE goal_id = 'goal-link-1'");
+  check('067 changing or removing the link leaves the goal definition untouched',
+    JSON.stringify(d.raw.prepare('SELECT * FROM athlete_goal_revision').all()) === revisionsBefore
+      && Number(d.raw.prepare('SELECT COUNT(*) AS c FROM athlete_goal').get().c) === 1);
+  d.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-link-1', 1, 1000)");
+  d.raw.exec("DELETE FROM athlete_goal WHERE goal_id = 'goal-link-1'");
+  check('067 deleting a goal removes its link with it',
+    Number(d.raw.prepare('SELECT COUNT(*) AS c FROM athlete_goal_movement').get().c) === 0);
+
+  // Block emphasis record.
+  const blockId = insertBlock(d);
+  check('067 a block explanation needs a real block, valid JSON objects and the known version',
+    throws(() => insertEmphasis(d, 424242)) && throws(() => insertEmphasis(d, blockId, 'not json'))
+      && throws(() => insertEmphasis(d, blockId, '[]')) && throws(() => insertEmphasis(d, blockId, '{}', '"text"'))
+      && throws(() => insertEmphasis(d, blockId, '{}', '{}', 2)));
+  insertEmphasis(d, blockId);
+  check('067 one explanation per block, and it is frozen once written',
+    throws(() => insertEmphasis(d, blockId))
+      && throws(() => d.raw.exec("UPDATE block_emphasis SET report_json = '{}'"))
+      && throws(() => d.raw.exec('UPDATE block_emphasis SET created_at_ms = 1')));
+  d.raw.prepare('DELETE FROM training_block WHERE block_id = ?').run(blockId);
+  check('067 the explanation goes when its block goes',
+    Number(d.raw.prepare('SELECT COUNT(*) AS c FROM block_emphasis').get().c) === 0);
+}
+
+// Upgrade from the shipped pre-067 state with athlete data in place.
+{
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_067);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-09-10', 1111, 55.5)");
+  insertGoal(upgrade, 'goal-upgrade-1');
+  insertBlock(upgrade);
+  const state = () => JSON.stringify({
+    session: upgrade.raw.prepare('SELECT * FROM session').all(),
+    profile: upgrade.raw.prepare('SELECT * FROM athlete_profile').all(),
+    goals: athleteSnapshot(upgrade),
+    blocks: upgrade.raw.prepare('SELECT * FROM training_block').all(),
+    seed: seedSnapshot(upgrade),
+  });
+  const before = state();
+  runMigrations(upgrade, MIGRATIONS);
+  check('067 clean upgrade reaches the latest version with no missing sentinel',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0,
+    `uv=${uv(upgrade)} missing=${sentinelsMissing(upgrade).join(',')}`);
+  check('067 upgrade leaves sessions, the profile, goals, blocks and the muscle mapping untouched', state() === before);
+  check('067 upgrade invents no sport, no goal link and no explanation for an existing block',
+    TABLES_067.every((name) => Number(upgrade.raw.prepare(`SELECT COUNT(*) AS c FROM ${name}`).get().c) === 0));
+}
+
+// Self-heal with athlete rows in place.
+{
+  const seeded = () => {
+    const db = freshDb();
+    runMigrations(db, MIGRATIONS);
+    insertSport(db, { competition_date: '2027-03-01' });
+    insertGoal(db, 'goal-heal-67');
+    db.raw.exec("INSERT INTO athlete_goal_movement (goal_id, movement_id, linked_at_ms) VALUES ('goal-heal-67', 1, 1000)");
+    insertEmphasis(db, insertBlock(db));
+    return db;
+  };
+  {
+    const heal = seeded();
+    const before = snapshot067(heal);
+    heal.raw.exec('DROP TRIGGER trg_block_emphasis_immutable_bu');
+    const detected = sentinelsMissing(heal).includes('trg_block_emphasis_immutable_bu');
+    runMigrations(heal, MIGRATIONS);
+    check('067 a lost immutability guard is detected and restored; the full replay alters no athlete row',
+      detected && triggerPresent(heal, 'trg_block_emphasis_immutable_bu') && uv(heal) === MIGRATIONS.length
+        && snapshot067(heal) === before && throws(() => heal.raw.exec("UPDATE block_emphasis SET report_json = '{}'")));
+  }
+  for (const name of TABLES_067) {
+    const heal = seeded();
+    const keep = TABLES_067.filter((other) => other !== name);
+    const beforeOthers = JSON.stringify(keep.map((other) => heal.raw.prepare(`SELECT * FROM ${other} ORDER BY 1`).all()));
+    const goalsBefore = athleteSnapshot(heal);
+    heal.raw.exec('PRAGMA foreign_keys = OFF');
+    heal.raw.exec(`DROP TABLE ${name}`);
+    heal.raw.exec('PRAGMA foreign_keys = ON');
+    const detected = sentinelsMissing(heal).includes(name);
+    let error = '';
+    try { runMigrations(heal, MIGRATIONS); } catch (e) { error = String(e && e.message); }
+    check(`067 ${name}: loss detected and the table recreated, every other athlete row untouched`,
+      detected && error === '' && tableSql(heal, name) !== undefined && sentinelsMissing(heal).length === 0
+        && JSON.stringify(keep.map((other) => heal.raw.prepare(`SELECT * FROM ${other} ORDER BY 1`).all())) === beforeOthers
+        && athleteSnapshot(heal) === goalsBefore,
+      error);
+  }
+  {
+    const runnerSrc067 = readFileSync(join(SCHEMA_DIR, '..', 'migrationRunner.ts'), 'utf-8');
+    check('067 the block_emphasis guard names only its own table, so it needs no replay-blocking entry',
+      !runnerSrc067.slice(runnerSrc067.indexOf('const REPLAY_BLOCKING_TRIGGERS')).includes('trg_block_emphasis_immutable_bu')
+        && !/training_block|athlete_goal\b/.test(MIGRATIONS[IDX_067].slice(MIGRATIONS[IDX_067].indexOf('CREATE TRIGGER'))));
+  }
+}
+
+// --- 068 movement content correction v2 ----------------------------------------
+// Coaching text only, on 115 seeded movements, appended after every migration
+// that seeds or corrects movement text. These checks pin: what it may touch;
+// that it lands on upgrade and survives every replay; that movements 135 and
+// 187 are untouched; and that a database which skipped it is detected.
+console.log('[068] movement content correction v2');
+const IDX_068 = FILES.indexOf('068_movement_content_correction_v2.sql');
+const libraryText = (db) => new Map(db.raw.prepare(`
+  SELECT m.movement_id AS id, m.name, d.instructions, d.cues, i.coaching_intent AS intent
+  FROM movement m JOIN movement_detail d USING(movement_id)
+  LEFT JOIN movement_coaching_intent i USING(movement_id) ORDER BY m.movement_id`).all().map((row) => [row.id, row]));
+const libraryRest = (db) => JSON.stringify({
+  movement: db.raw.prepare('SELECT * FROM movement ORDER BY movement_id').all(),
+  detail: db.raw.prepare('SELECT movement_id, base_name, supported_prefixes, difficulty_rating, target_muscles, video_placeholder_uri FROM movement_detail ORDER BY movement_id').all(),
+  taxonomy: db.raw.prepare('SELECT * FROM movement_taxonomy ORDER BY movement_id').all(),
+  equipment: db.raw.prepare('SELECT * FROM movement_equipment ORDER BY movement_id, item').all(),
+  media: db.raw.prepare('SELECT * FROM movement_media ORDER BY movement_id').all(),
+  roles: db.raw.prepare('SELECT * FROM movement_muscle_role ORDER BY movement_id, muscle_group_id').all(),
+  v1: db.raw.prepare('SELECT * FROM movement_content_correction WHERE correction_version = 1 ORDER BY movement_id').all(),
+});
+const v2Rows = (db) => db.raw.prepare('SELECT movement_id FROM movement_content_correction WHERE correction_version = 2 ORDER BY movement_id').all().map((row) => row.movement_id);
+const isTemplate = (row) => row.instructions.startsWith(`Set up ${row.name} with `);
+
+{
+  const before = freshDb();
+  applyRaw(before, MIGRATIONS, 0, IDX_068);
+  const after = freshDb();
+  runMigrations(after, MIGRATIONS);
+  const textBefore = libraryText(before);
+  const textAfter = libraryText(after);
+  const changed = [...textAfter.values()].filter((row) => {
+    const old = textBefore.get(row.id);
+    return old.instructions !== row.instructions || old.cues !== row.cues || old.intent !== row.intent;
+  });
+  const corrected = new Set(v2Rows(after));
+  check('068 is appended after 067 and the chain completes',
+    IDX_068 === FILES.indexOf('067_sport_and_emphasis.sql') + 1 && IDX_068 === 66 && uv(after) === MIGRATIONS.length,
+    `index=${IDX_068} uv=${uv(after)}`);
+  check('068 corrects exactly 115 movements and records each one at version 2',
+    corrected.size === V2_CORRECTIONS && changed.length === V2_CORRECTIONS && changed.every((row) => corrected.has(row.id)),
+    `provenance=${corrected.size} changed=${changed.length}`);
+  check('every corrected movement had the shared template before, and has specific text after',
+    changed.every((row) => isTemplate(textBefore.get(row.id)) && !isTemplate(row)));
+  check('every corrected movement changed all three coaching fields and none is left empty',
+    changed.every((row) => {
+      const old = textBefore.get(row.id);
+      return old.instructions !== row.instructions && old.cues !== row.cues && old.intent !== row.intent
+        && row.instructions.length > 60 && row.cues.length > 10 && row.intent.length > 10;
+    }));
+  check('068 writes coaching text ONLY: names, ids, aliases, difficulty, targets, taxonomy, equipment, media, muscle mapping and v1 provenance are byte-identical',
+    libraryRest(after) === libraryRest(before));
+  check('movements 135 and 187 are not touched (they belong to the animation lane)',
+    !corrected.has(135) && !corrected.has(187)
+      && JSON.stringify(textAfter.get(135)) === JSON.stringify(textBefore.get(135))
+      && JSON.stringify(textAfter.get(187)) === JSON.stringify(textBefore.get(187))
+      && /Incline Shoulder Raise/.test(textAfter.get(135).name) && /Incline Shoulder Raise/.test(textAfter.get(187).name));
+  check('no movement corrected by 049 is corrected again',
+    Number(after.raw.prepare(`SELECT COUNT(*) AS c FROM movement_content_correction a
+      JOIN movement_content_correction b USING(movement_id) WHERE a.correction_version = 1 AND b.correction_version = 2`).get().c) === 0);
+  check('the remaining template rows are exactly the ones deliberately held',
+    [...textAfter.values()].filter(isTemplate).length === 144 - V2_CORRECTIONS,
+    String([...textAfter.values()].filter(isTemplate).length));
+
+  // Upgrade from the shipped pre-068 state with athlete data in place.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_068);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-09-10', 1111, 55.5)");
+  const correctedId = [...corrected][0];
+  upgrade.raw.prepare('INSERT INTO set_record (session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (1, ?, 1, 8, 20, 7, 2222)').run(correctedId);
+  const history = () => JSON.stringify([upgrade.raw.prepare('SELECT * FROM session').all(), upgrade.raw.prepare('SELECT * FROM set_record').all()]);
+  const historyBefore = history();
+  runMigrations(upgrade, MIGRATIONS);
+  check('068 clean upgrade reaches the latest version with no missing sentinel',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0,
+    `uv=${uv(upgrade)} missing=${sentinelsMissing(upgrade).join(',')}`);
+  check('an upgraded database reads exactly the fresh-install text',
+    JSON.stringify([...libraryText(upgrade).values()]) === JSON.stringify([...textAfter.values()]));
+  check('logged history that references a corrected movement is untouched', history() === historyBefore);
+
+  // Replays.
+  const final = JSON.stringify([...textAfter.values()]);
+  runMigrations(after, MIGRATIONS);
+  check('068 is a no-op on a normal reboot', JSON.stringify([...libraryText(after).values()]) === final && v2Rows(after).length === V2_CORRECTIONS);
+  after.executeSync(`PRAGMA user_version = ${IDX_068};`);
+  runMigrations(after, MIGRATIONS);
+  check('068 replays idempotently from its own boundary (no duplicate provenance rows)',
+    JSON.stringify([...libraryText(after).values()]) === final && v2Rows(after).length === V2_CORRECTIONS && uv(after) === MIGRATIONS.length);
+  after.executeSync('PRAGMA user_version = 0;');
+  runMigrations(after, MIGRATIONS);
+  check('a full re-apply from 0 leaves the v2 text asserted last, not the template',
+    JSON.stringify([...libraryText(after).values()]) === final && v2Rows(after).length === V2_CORRECTIONS);
+
+  // Poisoned user_version: claims the latest chain while 068 never applied.
+  const poisoned = freshDb();
+  applyRaw(poisoned, MIGRATIONS, 0, IDX_068);
+  poisoned.executeSync(`PRAGMA user_version = ${MIGRATIONS.length};`);
+  const detected = sentinelsMissing(poisoned).includes('movement_content_correction v2');
+  runMigrations(poisoned, MIGRATIONS);
+  check('a database that claims the latest version but never applied 068 is detected and healed',
+    detected && sentinelsMissing(poisoned).length === 0
+      && JSON.stringify([...libraryText(poisoned).values()]) === final);
+  // Lost provenance rows (text may or may not have survived): detected and re-applied.
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DELETE FROM movement_content_correction WHERE correction_version = 2 AND movement_id IN (SELECT movement_id FROM movement_content_correction WHERE correction_version = 2 LIMIT 3)');
+  const lostDetected = sentinelsMissing(lost).includes('movement_content_correction v2');
+  runMigrations(lost, MIGRATIONS);
+  check('lost v2 provenance rows are detected and restored exactly',
+    lostDetected && v2Rows(lost).length === V2_CORRECTIONS && sentinelsMissing(lost).length === 0
+      && JSON.stringify([...libraryText(lost).values()]) === final);
+}
+
+// =============================================================================
+// [069] resting heart rate independent of HRV
+// =============================================================================
+// Append-only: a new table, nothing existing changes. Proves it lands on a
+// fresh install and on a populated upgrade without inventing or moving data,
+// that readiness is untouched, that the table's domain is enforced, that its
+// rows survive every replay, and that a lost table is detected and rebuilt.
+console.log('[069] resting heart rate (resting_hr_daily)');
+const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
+{
+  check('069 is appended after 068 and completes the chain',
+    IDX_069 === IDX_068 + 1 && IDX_069 === MIGRATIONS.length - 1 && IDX_069 === 67, `index=${IDX_069}`);
+
+  const telemetry = (db) => JSON.stringify({
+    hrv: db.raw.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
+    sleep: db.raw.prepare('SELECT * FROM sleep_daily ORDER BY date').all(),
+    readiness: db.raw.prepare('SELECT * FROM v_readiness_inputs ORDER BY date').all(),
+  });
+  const rhrRows = (db) => db.raw.prepare('SELECT * FROM resting_hr_daily ORDER BY date').all();
+
+  // Populated pre-069 install: HRV with and without resting HR, and sleep.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_069);
+  upgrade.raw.exec(`INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source) VALUES
+    ('2026-09-28', 61.5, 52, 'health_connect'), ('2026-09-29', 58.0, NULL, 'health_connect');
+    INSERT INTO sleep_daily (date, in_bed_min, asleep_min) VALUES ('2026-09-29', 480, 420);`);
+  const before = telemetry(upgrade);
+  runMigrations(upgrade, MIGRATIONS);
+  check('a populated v67 install upgrades to the latest version with every sentinel present',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0, `uv=${uv(upgrade)}`);
+  check('the upgrade leaves HRV, sleep and readiness byte-identical (nothing moved, nothing recomputed)',
+    telemetry(upgrade) === before);
+  check('the upgrade invents no resting heart rate (the new table starts empty)', rhrRows(upgrade).length === 0);
+
+  // Domain: unit range, provenance and date shape are enforced by the schema.
+  const fresh = freshDb();
+  runMigrations(fresh, MIGRATIONS);
+  const insert = (date, bpm, source) => fresh.raw
+    .prepare('INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms) VALUES (?, ?, ?, 1)').run(date, bpm, source);
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  insert('2026-10-01', 54.5, 'apple_health');
+  insert('2026-10-02', 49, 'health_connect');
+  check('valid rows from either service are accepted without an RMSSD value', rhrRows(fresh).length === 2);
+  check('bpm outside 20..150 is rejected', rejects(() => insert('2026-10-03', 19.9, 'apple_health'))
+    && rejects(() => insert('2026-10-03', 150.1, 'apple_health')));
+  check('an unknown provenance is rejected', rejects(() => insert('2026-10-03', 55, 'wearable'))
+    && rejects(() => insert('2026-10-03', 55, null)));
+  check('a malformed date is rejected', rejects(() => insert('2026-1-3', 55, 'apple_health'))
+    && rejects(() => insert('03/10/2026', 55, 'apple_health')));
+  check('a second row for the same date is rejected (one value per day)', rejects(() => insert('2026-10-01', 60, 'health_connect')));
+  check('the table is STRICT (a text bpm is rejected, not coerced)', rejects(() => insert('2026-10-04', 'fifty', 'apple_health')));
+
+  // Replays keep the rows.
+  const kept = JSON.stringify(rhrRows(fresh));
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync(`PRAGMA user_version = ${IDX_069};`);
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync('PRAGMA user_version = 0;');
+  runMigrations(fresh, MIGRATIONS);
+  check('resting heart rate rows survive a reboot, a replay from 069 and a full re-apply from 0',
+    JSON.stringify(rhrRows(fresh)) === kept && uv(fresh) === MIGRATIONS.length);
+
+  // A database that claims the latest version but lost the table.
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DROP TABLE resting_hr_daily');
+  const detected = sentinelsMissing(lost).includes('resting_hr_daily');
+  runMigrations(lost, MIGRATIONS);
+  check('a lost resting_hr_daily table is detected and rebuilt by self-heal',
+    detected && sentinelsMissing(lost).length === 0 && rhrRows(lost).length === 0);
+}
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

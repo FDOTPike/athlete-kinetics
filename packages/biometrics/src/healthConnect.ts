@@ -45,7 +45,13 @@ const READ_PERMISSIONS: { accessType: 'read'; recordType: string }[] = [
   { accessType: 'read', recordType: 'SleepSession' },
 ];
 
+/** The service a bridge reads. Stored as provenance (resting_hr_daily.source)
+ *  — always the bridge's own declaration, never inferred from the data. */
+export type BiometricsSource = 'health_connect' | 'apple_health';
+
 export interface BiometricsBridge {
+  /** Which service this bridge reads. */
+  readonly provider: BiometricsSource;
   /** READ-ONLY check of already-granted permissions — never opens a sheet,
    *  never touches the native permission launcher. Safe at boot. */
   hasGrantedPermissions(): Promise<boolean>;
@@ -80,6 +86,7 @@ export async function tryCreateHealthConnectBridge(): Promise<BiometricsBridge |
     if (!(await hc.initialize())) return null;
 
     return {
+      provider: 'health_connect',
       hasGrantedPermissions: async (): Promise<boolean> => {
         try {
           return (await hc.getGrantedPermissions()).length > 0;

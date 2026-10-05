@@ -20,22 +20,33 @@
  * Run:  npm run verify:blocks
  */
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { verifyR05Blocks, verifyR05Eligibility } from './verify_r05.mjs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
 const { generateBlock, addDaysIso, macroPhaseOf, targetLoadKg, targetPct,
   SCHEMA_FATIGUE_COST, MACRO_BLOCKS, MACRO_TOTAL_WEEKS, defaultProgramDayIndices,
-  normalizeProgramHorizon, programFocuses, programHorizonAnchor,
-  programMacroIndex } = require('./.build/blockGenerator.js');
+  programFocuses, programMacroIndex, datedProgramMacroAnchor, weeklyProgressionSummary,
+  normalizeProgramHorizon, programHorizonAnchor } = require('./.build/blockGenerator.js');
 const { computeSubstitutions, JOINTS } = require('./.build/substitution.js');
+const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
 const { calculateEffectiveLoad } = require('./.build/conditionEngine.js');
-const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, OBJECTIVES,
-  SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
+const { DEFAULT_PROFILE, EQUIPMENT_ITEMS, EQUIPMENT_PRESETS,
+  STANDARD_EQUIPMENT_ITEMS, SPECIALIST_EQUIPMENT_ITEMS, OBJECTIVES,
+  SCHEMA_TYPES, SELECTABLE_SCHEMA_TYPES, MACRO_PHASES, TAXONOMY_CATEGORIES, TAXONOMY_IMPLEMENTS,
   MOVEMENT_PATTERNS, MOVEMENT_PREFIXES, DIFFICULTY_RATINGS, MOVEMENT_PREFERENCE,
   PATTERN_TO_CATEGORY } = require('./.build/types.js');
 const { DEFAULT_ADVANCEMENT_POLICY } = require('./.build/progressionEngine.js');
+const {
+  mapImplementToTier,
+  sortPickerMovements,
+  groupAndSortPickerMovements,
+  PICKER_TIER_NAMES,
+  TIER_3_CAPTION,
+} = require('./.build/pickerTiering.js');
+
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', '..', 'core-db', 'src', 'schema');
 const START = '2026-06-15';
@@ -73,9 +84,45 @@ const movements = db.prepare(
   pattern: r.pattern,
   is_compound: Number(r.is_compound) === 1,
   required: JSON.parse(r.required_json ?? '[]'),
-  primaryImplement: JSON.parse(r.prefixes_json ?? '[]')[0] ?? undefined,
+  // L1(a): the implement PLANNED for the slot, exactly as the store threads it.
+  // The store's rule, applied here: an explicit athlete selection wins; failing
+  // that, a movement whose supported set has exactly ONE member has no choice to
+  // make, so that member IS the selection; anything else stays undeclared and
+  // fails closed to the loaded path. Element zero of a MULTI-member list is
+  // never used — that is dropdown ordering, not intent.
+  plannedImplement: (() => {
+    const p = JSON.parse(r.prefixes_json ?? '[]');
+    return p.length === 1 ? p[0] : undefined;
+  })(),
+  // L2(b): this 001-015 fixture predates movement_progression, so it cannot
+  // resolve real chain membership. It declares every movement a chain member so
+  // the sections below keep exercising FLOOR MECHANICS. Chain SCOPING — that an
+  // off-chain movement is not floored — is tested in [28] against the real
+  // 001-059 corpus, where membership is genuine.
+  progressionGroup: 'fixture-chain',
+  difficulty: 'Beginner',
+  beginner_ok: false,
+  sportTracking: false,
+  capability_available_weight_room: true,
+  capability_available_sport_conditioning: true,
 }));
+check('generator fixture explicitly carries both contexts and sport status', movements.every((movement) =>
+  typeof movement.sportTracking === 'boolean'
+  && typeof movement.capability_available_weight_room === 'boolean'
+  && typeof movement.capability_available_sport_conditioning === 'boolean'));
 const requiredById = new Map(movements.map((m) => [m.movement_id, m.required]));
+/** An athlete who explicitly planned BODYWEIGHT wherever the movement supports
+ *  it. Under L1(a) the bodyweight route requires a declaration, so the sections
+ *  that assert bodyweight behaviour must declare it rather than relying on the
+ *  fixture having inferred it from dropdown order. */
+const prefixesById = new Map(db.prepare(
+  `SELECT m.movement_id, d.supported_prefixes AS p FROM movement m
+   JOIN movement_detail d USING (movement_id)`,
+).all().map((r) => [Number(r.movement_id), JSON.parse(r.p ?? '[]')]));
+const declaredBodyweightPool = movements.map((m) => (
+  (prefixesById.get(m.movement_id) ?? []).includes('Bodyweight')
+    ? { ...m, plannedImplement: 'Bodyweight' }
+    : m));
 const prof = (over = {}) => ({ ...DEFAULT_PROFILE, ...over });
 const gen = (over = {}) => generateBlock({ profile: prof(over), movements, startDate: START });
 
@@ -166,8 +213,10 @@ check('beginner block carries strictly less volume than elite',
 console.log('[3] equipment strictness bound');
 let violations = 0, sweepPlans = 0;
 for (const objective of OBJECTIVES) {
-  for (let mask = 0; mask < 1 << EQUIPMENT_ITEMS.length; mask++) {
-    const inventory = EQUIPMENT_ITEMS.filter((_, i) => mask & (1 << i));
+  // Swept over the STANDARD vocabulary: specialist items are explicit opt-in
+  // and get their own targeted test in [7] rather than doubling this powerset.
+  for (let mask = 0; mask < 1 << STANDARD_EQUIPMENT_ITEMS.length; mask++) {
+    const inventory = STANDARD_EQUIPMENT_ITEMS.filter((_, i) => mask & (1 << i));
     const plan = generateBlock({
       profile: prof({ objective, equipment_inventory: inventory }),
       movements,
@@ -207,7 +256,7 @@ check('every hybrid frequency contains bjj focus sessions', bjjAlways);
 check('hybrid strength set volume strictly below pure strength (all freqs)', damped);
 const noMats = gen({
   objective: 'hybrid',
-  equipment_inventory: EQUIPMENT_ITEMS.filter((i) => i !== 'mats'),
+  equipment_inventory: STANDARD_EQUIPMENT_ITEMS.filter((i) => i !== 'mats'),
 });
 const bjjRoundId = movements.find((m) => m.name === 'BJJ Sparring Round').movement_id;
 check('mats removed: bjj days fall back without ever emitting BJJ Sparring Round',
@@ -218,19 +267,33 @@ check('mats removed: bjj days fall back without ever emitting BJJ Sparring Round
 console.log('[5] SQL contract (007 <-> types.ts single source of truth)');
 const sql007 = readFileSync(join(SCHEMA_DIR, '007_program_engine.sql'), 'utf-8');
 const grab = (re) => { const m = sql007.match(re); return m === null ? null : m[1]; };
-check('athlete_profile default inventory == EQUIPMENT_ITEMS',
-  grab(/equipment_inventory\s+TEXT NOT NULL DEFAULT\s+'(\[[^']+\])'/) === JSON.stringify(EQUIPMENT_ITEMS));
+check('athlete_profile default inventory == STANDARD_EQUIPMENT_ITEMS (never the specialist union)',
+  grab(/equipment_inventory\s+TEXT NOT NULL DEFAULT\s+'(\[[^']+\])'/) === JSON.stringify(STANDARD_EQUIPMENT_ITEMS));
 check("legacy 'home_basic' bundle == EQUIPMENT_PRESETS.home_basic",
   grab(/WHEN 'home_basic' THEN '(\[[^']+\])'/) === JSON.stringify(EQUIPMENT_PRESETS.home_basic));
 check("legacy 'minimal' bundle == EQUIPMENT_PRESETS.minimal",
   grab(/WHEN 'minimal'\s+THEN '(\[[^']+\])'/) === JSON.stringify(EQUIPMENT_PRESETS.minimal));
-check("legacy 'full_gym' bundle == EQUIPMENT_ITEMS",
-  grab(/ELSE '(\[[^']+\])'/) === JSON.stringify(EQUIPMENT_ITEMS));
+check("legacy 'full_gym' bundle == STANDARD_EQUIPMENT_ITEMS (a preset never grants specialist gear)",
+  grab(/ELSE '(\[[^']+\])'/) === JSON.stringify(STANDARD_EQUIPMENT_ITEMS));
+check('EQUIPMENT_PRESETS.full_gym == STANDARD_EQUIPMENT_ITEMS',
+  JSON.stringify(EQUIPMENT_PRESETS.full_gym) === JSON.stringify(STANDARD_EQUIPMENT_ITEMS));
 const itemList = grab(/item\s+TEXT NOT NULL CHECK \(item IN\s*\(([\s\S]*?)\)\)/);
 const sqlItems = itemList === null ? [] : [...itemList.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
-check('movement_equipment item CHECK == EQUIPMENT_ITEMS (set equality)',
-  sqlItems.length === EQUIPMENT_ITEMS.length &&
-  EQUIPMENT_ITEMS.every((i) => sqlItems.includes(i)));
+check('007 movement_equipment item CHECK == STANDARD_EQUIPMENT_ITEMS (the pre-049 domain)',
+  sqlItems.length === STANDARD_EQUIPMENT_ITEMS.length &&
+  STANDARD_EQUIPMENT_ITEMS.every((i) => sqlItems.includes(i)));
+// 049 rebuilds the table to widen the CHECK; the PERSISTED domain must equal
+// the complete union, or an explicit specialist opt-in could never be stored.
+const sql049 = readFileSync(join(SCHEMA_DIR, '049_movement_content_correction_v1.sql'), 'utf-8');
+const item049 = sql049.match(/item\s+TEXT NOT NULL CHECK \(item IN\s*\(([\s\S]*?)\)\)/);
+const sql049Items = item049 === null ? [] : [...item049[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+check('049 movement_equipment item CHECK == EQUIPMENT_ITEMS (the complete union, set equality)',
+  sql049Items.length === EQUIPMENT_ITEMS.length &&
+  EQUIPMENT_ITEMS.every((i) => sql049Items.includes(i)),
+  JSON.stringify(sql049Items));
+check('the rebuilt table keeps STRICT, WITHOUT ROWID and the composite primary key',
+  /PRIMARY KEY \(movement_id, item\)\s*\)\s*STRICT, WITHOUT ROWID/.test(sql049)
+  && sql049.includes('REFERENCES movement ON DELETE CASCADE'));
 const sql008 = readFileSync(join(SCHEMA_DIR, '008_taxonomy.sql'), 'utf-8');
 const grab008 = (re) => { const m = sql008.match(re); return m === null ? '' : m[1]; };
 const sqlCats = [...grab008(/category\s+TEXT NOT NULL CHECK \(category IN\s*\(([\s\S]*?)\)\)/)
@@ -301,6 +364,36 @@ const orphans = Number(db.prepare(
           (SELECT count(*) FROM block_meta) AS c`).get().c);
 check('block delete cascades sessions + slots + meta (no orphans)', orphans === 0, String(orphans));
 
+// --- [6b] selectable schema subset (retirement is selection-only) ---------------
+// SCHEMA_TYPES mirrors the frozen block_meta CHECK in 009 and is the domain every
+// persisted block was written against, so it must never shrink. Retiring a schema
+// removes it from SELECTABLE_SCHEMA_TYPES only; the engine keeps generating it so
+// blocks that already chose it still load, run and render.
+console.log('[6b] selectable schema subset (retirement is selection-only)');
+check('SCHEMA_TYPES is exactly the frozen 009 domain (never shrinks)',
+  SCHEMA_TYPES.length === 4
+  && ['LINEAR', 'WAVE', 'STEP', 'APRE'].every((t, i) => SCHEMA_TYPES[i] === t),
+  SCHEMA_TYPES.join(','));
+check('SELECTABLE_SCHEMA_TYPES is non-empty and contains no unknown schema',
+  SELECTABLE_SCHEMA_TYPES.length > 0
+  && SELECTABLE_SCHEMA_TYPES.every((t) => SCHEMA_TYPES.includes(t)),
+  SELECTABLE_SCHEMA_TYPES.join(','));
+check('SELECTABLE_SCHEMA_TYPES is a STRICT subset (at least one schema is retired)',
+  SELECTABLE_SCHEMA_TYPES.length < SCHEMA_TYPES.length,
+  `${SELECTABLE_SCHEMA_TYPES.length} selectable of ${SCHEMA_TYPES.length}`);
+check('SELECTABLE_SCHEMA_TYPES has no duplicates',
+  new Set(SELECTABLE_SCHEMA_TYPES).size === SELECTABLE_SCHEMA_TYPES.length);
+// Retired schemas must still generate — persisted blocks depend on it.
+let retiredGenerates = true;
+const retiredSchemas = SCHEMA_TYPES.filter((t) => !SELECTABLE_SCHEMA_TYPES.includes(t));
+for (const schemaType of retiredSchemas) {
+  const p = generateBlock({
+    profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType });
+  if (p.sessions.length === 0 || p.schemaType !== schemaType) retiredGenerates = false;
+}
+check('every RETIRED schema still generates a valid block (persisted blocks keep running)',
+  retiredSchemas.length > 0 && retiredGenerates, retiredSchemas.join(','));
+
 // --- [7] multi-schema strategy bound --------------------------------------------
 console.log('[7] multi-schema strategies (LINEAR / WAVE / STEP / APRE)');
 // Weekly loading signature: (sets, reps, rpe) of the first strength slot for
@@ -360,12 +453,133 @@ check('pct rises with RPE at fixed reps', targetPct(5, 9.0) > targetPct(5, 7.0))
 check('pct falls as reps rise at fixed RPE', targetPct(3, 8.0) > targetPct(10, 8.0));
 check('1 rep @ RPE 10 approaches the 1RM', targetPct(1, 10) > 0.95 && targetPct(1, 10) <= 1.0);
 
+// --- [8b] estimated 1RM from logged sets (the inverse of [8]) ---------------------
+// e1rm.ts must be the SAME translation read backwards, never a second formula.
+// The round-trip below is what proves that: anything with its own coefficient
+// would drift outside targetLoadKg's own 2.5 kg plate rounding.
+console.log('[8b] estimated 1RM derived from logged sets (inverse Epley)');
+const e1rmMod = require('./.build/e1rm.js');
+const { estimateOneRepMax, bestPerSession } = e1rmMod;
+
+let roundTrips = true, worstDrift = 0;
+for (const oneRm of [60, 100, 140, 227.5]) {
+  for (const reps of [1, 3, 5, 8, 12, 20]) {
+    for (const rpe of [6, 6.5, 7, 8, 8.5, 9, 10]) {
+      const load = targetLoadKg(oneRm, reps, rpe);
+      const back = estimateOneRepMax(load, reps, rpe);
+      // targetLoadKg rounds the LOAD to 2.5 kg, so the recovered 1RM can sit up
+      // to half an increment / pct away. Nothing wider than that is rounding.
+      const tolerance = 1.25 / targetPct(reps, rpe) + 1e-9;
+      const drift = Math.abs(back - oneRm);
+      if (drift > worstDrift) worstDrift = drift;
+      if (!(drift <= tolerance)) roundTrips = false;
+    }
+  }
+}
+check('estimateOneRepMax inverts targetLoadKg within plate-rounding tolerance',
+  roundTrips, `worst drift ${worstDrift.toFixed(3)} kg over 168 cases`);
+check('a set at RPE 10 for 1 rep recovers its own load as the estimate',
+  Math.abs(estimateOneRepMax(100, 1, 10) - 100 * (31 / 30)) < 1e-9,
+  String(estimateOneRepMax(100, 1, 10)));
+check('estimate rises with reps at fixed load and RPE',
+  estimateOneRepMax(100, 8, 8) > estimateOneRepMax(100, 3, 8));
+check('estimate rises as RPE falls at fixed load and reps',
+  estimateOneRepMax(100, 5, 6) > estimateOneRepMax(100, 5, 9));
+
+// Missingness stays missing — no fallback RPE, no default, no zero.
+check('a set logged without an RPE yields no estimate',
+  estimateOneRepMax(100, 5, null) === null);
+check('non-positive load, zero reps and non-finite inputs yield no estimate',
+  estimateOneRepMax(0, 5, 8) === null && estimateOneRepMax(-10, 5, 8) === null
+  && estimateOneRepMax(100, 0, 8) === null
+  && estimateOneRepMax(Number.NaN, 5, 8) === null
+  && estimateOneRepMax(100, Number.NaN, 8) === null
+  && estimateOneRepMax(100, 5, Number.NaN) === null);
+check('an RPE outside the set_record CHECK domain yields no estimate',
+  estimateOneRepMax(100, 5, -1) === null && estimateOneRepMax(100, 5, 11) === null);
+
+const mkSet = (set_id, session_id, session_date, reps, load_kg, rpe) => ({
+  set_id, session_id, session_date, reps, load_kg, rpe });
+const series = bestPerSession([
+  mkSet(3, 20, '2026-07-02', 5, 100, 8),
+  mkSet(1, 10, '2026-07-01', 5, 100, 8),
+  mkSet(2, 10, '2026-07-01', 3, 110, 8),   // higher estimate, same session
+  mkSet(4, 30, '2026-07-03', 5, 100, null), // unrated -> session drops out
+]);
+check('bestPerSession returns one point per session, date-ordered',
+  series.length === 2 && series[0].session_id === 10 && series[1].session_id === 20,
+  series.map((p) => `${p.session_date}:${p.session_id}`).join(','));
+check('bestPerSession keeps the highest estimate in a session',
+  series[0].set_id === 2, `set_id ${series[0]?.set_id}`);
+check('a session with no rated set produces NO point (never a zero or a gap-fill)',
+  !series.some((p) => p.session_id === 30));
+check('bestPerSession is order-independent and does not mutate its input',
+  JSON.stringify(bestPerSession([
+    mkSet(2, 10, '2026-07-01', 3, 110, 8),
+    mkSet(1, 10, '2026-07-01', 5, 100, 8),
+  ])) === JSON.stringify(bestPerSession([
+    mkSet(1, 10, '2026-07-01', 5, 100, 8),
+    mkSet(2, 10, '2026-07-01', 3, 110, 8),
+  ])));
+check('bestPerSession of no sets is an empty series', bestPerSession([]).length === 0);
+
+// Numerical calibration is DEFERRED (Calibration Policy v1 section 5). This module
+// must expose the two derivations and NOTHING else — no MDC, no noise floor, no
+// persistence window, no "stalled" verdict. A threshold added later turns this red.
+check('the e1RM module exports NO threshold, constant or detector',
+  Object.keys(e1rmMod).sort().join(',') === 'bestPerSession,estimateOneRepMax');
+const e1rmSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'e1rm.ts'), 'utf-8');
+check('source tripwire: no plateau/threshold vocabulary in e1rm.ts',
+  !/\bMDC\b|[Tt]hreshold\s*=|[Ss]talled\s*[=:]|[Pp]lateauDetect|[Nn]oiseFloor/.test(e1rmSrc));
+check('source tripwire: e1rm.ts imports the ratified targetPct rather than restating it',
+  /import\s*\{\s*targetPct\s*\}\s*from\s*'\.\/blockGenerator'/.test(e1rmSrc)
+  && !/1\s*\/\s*\(\s*1\s*\+/.test(e1rmSrc.replace(/^\s*\*.*$/gm, '')));
+
+// --- [8c] R8: athlete-visible loading copy must match the generator --------------
+// The WAVE tip promised "rises ... then rises past where it was". Derived from
+// SCHEMA_WEEKS the block actually goes 80 -> 85 -> 80 kg: a rise and a fall, with
+// nothing exceeding the earlier high. Copy was corrected to the generator; the
+// generator was NOT changed to fit the copy (that needs separate ratification).
+console.log('[8c] R8 WAVE copy matches generated loading');
+{
+  const oneRm = 100;
+  const waveLoads = [1, 2, 3].map((week) => {
+    const s = generateBlock({
+      profile: prof({ objective: 'strength' }), movements, startDate: START, schemaType: 'WAVE',
+    }).sessions.find((x) => x.week_index === week && x.focus !== 'bjj' && x.focus !== 'conditioning');
+    const sl = s.slots[0];
+    return targetLoadKg(oneRm, sl.reps, sl.target_rpe);
+  });
+  check('WAVE rises then falls: week 2 is the high and week 3 does NOT exceed it',
+    waveLoads[1] > waveLoads[0] && waveLoads[2] <= waveLoads[1],
+    waveLoads.join(' -> '));
+
+  const glossarySrc = readFileSync(
+    join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'data', 'glossary.ts'),
+    'utf-8',
+  );
+  const waveMatch = glossarySrc.match(/id:\s*['"]UNDULATING['"][\s\S]*?definition:\s*\n?\s*['"]([^'"]+)['"]/i);
+  const waveCopy = (waveMatch ?? [])[1] ?? '';
+  check('WAVE tip exists and makes no "rises past" claim the block never delivers',
+    waveCopy.length > 0 && !/past where it was|past its former|rises past/i.test(waveCopy),
+    waveCopy.slice(0, 70));
+  check('LINEAR and WAVE both remain selectable; STEP stays retired but generable',
+    SELECTABLE_SCHEMA_TYPES.includes('LINEAR') && SELECTABLE_SCHEMA_TYPES.includes('WAVE')
+    && !SELECTABLE_SCHEMA_TYPES.includes('STEP') && SCHEMA_TYPES.includes('STEP'));
+}
+
 // --- [9] the hybrid tax -----------------------------------------------------------
 console.log('[9] hybrid tax (schema fatigue cost matrix)');
 const accessorySets = (plan) => plan.sessions
   .filter((s) => ['lower', 'upper', 'full'].includes(s.focus))
   .reduce((a, s) => a + s.slots.filter((sl) => sl.slot_index >= 3).reduce((b, sl) => b + sl.sets, 0), 0);
-const loadedMovements = movements.map((m) => ({ ...m, primaryImplement: undefined }));
+// Option C: strictly bodyweight slots now carry their own volume progression,
+// so a LINEAR total is no longer comparable with an APRE total on a mixed pool.
+// The fatigue tax is a statement about LOADED accessory work, so this whole
+// section asserts against a pool routed entirely as external load — which is
+// exactly the pool these checks ran against before implements were threaded.
+// The bodyweight behaviour is asserted separately in [9b].
+const loadedMovements = movements.map((m) => ({ ...m, plannedImplement: undefined }));
 const hybridApre = generateBlock({
   profile: prof({ objective: 'hybrid' }), movements: loadedMovements, startDate: START, schemaType: 'APRE' });
 const hybridLinear = generateBlock({
@@ -385,26 +599,37 @@ check('cost matrix: APRE outweighs LINEAR in every macro phase',
 check('hybrid APRE accessories never fall below one working set',
   hybridApre.sessions.every((s) => s.slots.every((sl) => sl.sets >= 1)));
 
-// --- [9b] implement-routed bodyweight progression ----------------------------
-// `check` RECORDS a failure and continues — it does not stop the script. So an
-// unguarded index into a fixture array whose length was merely *checked* turns
-// a regression into an uncaught TypeError that aborts this file, taking every
-// later section's results with it. `slotAt` hands back a shaped placeholder
-// whose NaN metrics fail any comparison, so a regression reports FAIL and the
-// remaining sections still run.
-const SLOT_PLACEHOLDER = Object.freeze({
-  movement_id: -1, sets: NaN, reps: NaN, target_rpe: NaN, phase: 'absent',
-});
-const slotAt = (arr, i) => (Array.isArray(arr) ? arr[i] : undefined) ?? SLOT_PLACEHOLDER;
-console.log('[9b] bodyweight LINEAR progression routes on implement');
-const pushUp = movements.find((m) => m.name === 'Push-up');
-check('fixture: Push-up seeds primaryImplement Bodyweight',
-  pushUp !== undefined && pushUp.primaryImplement === 'Bodyweight',
-  String(pushUp?.primaryImplement));
+// --- [9b] Option C: implement-routed bodyweight progression -------------------
+// Owner ruling 2026-08-27. LINEAR's only progression channel is effort, and
+// effort reaches the athlete solely through targetPct -> targetLoadKg -> 2.5 kg
+// rounding. A strictly bodyweight movement has no load channel, so its three
+// working weeks were identical apart from the RPE label. Bodyweight slots now
+// progress by VOLUME instead; loaded slots are untouched.
+//
+// The two pools below differ in ONE field on ONE movement: Push-up's
+// plannedImplement. Same movement_id, same name, same required equipment. If
+// the two blocks differ, the routing is provably by IMPLEMENT and not by name.
+console.log('[9b] Option C — bodyweight progression routes on implement');
 
+const pushUp = movements.find((m) => m.name === 'Push-up');
+// L1(a): Push-up supports ["Bodyweight","Banded"], so the fixture leaves it
+// UNDECLARED — a multi-implement movement has a choice to make and the plan
+// must record which way it went. The pools below declare it explicitly, which
+// is the whole point: the two differ in that one declaration and nothing else.
+check('fixture: multi-implement Push-up is undeclared until a slot declares it',
+  pushUp !== undefined && pushUp.plannedImplement === undefined,
+  String(pushUp?.plannedImplement));
+
+// Two pools differing in ONE declaration on ONE movement: the implement the
+// athlete planned for Push-up. Same movement_id, same name, same equipment.
+const bodyweightPool = movements.map((m) =>
+  (m.movement_id === pushUp.movement_id ? { ...m, plannedImplement: 'Bodyweight' } : m));
 const plateLoadedPool = movements.map((m) =>
-  (m.movement_id === pushUp?.movement_id ? { ...m, primaryImplement: 'BB' } : m));
+  (m.movement_id === pushUp.movement_id ? { ...m, plannedImplement: 'BB' } : m));
+
 const patternById = new Map(movements.map((m) => [m.movement_id, m.pattern]));
+// Empty inventory: every emitted movement is equipment-free, so Push-up fills
+// push_h in BOTH pools and the only difference is how it is routed.
 const bwProfile = { objective: 'strength', equipment_inventory: [] };
 const pushSlots = (pool) => {
   const plan = generateBlock({
@@ -419,181 +644,267 @@ const pushSlots = (pool) => {
   return [1, 2, 3, 4].map((w) => out.get(w)).filter((x) => x !== undefined);
 };
 
-const bw = pushSlots(movements);
+const bw = pushSlots(bodyweightPool);
 const loaded = pushSlots(plateLoadedPool);
-check('both pools emit the same push_h movement in all four weeks',
-  bw.length === 4 && loaded.length === 4
-    && bw.every((sl, i) => sl.movement_id === slotAt(loaded, i).movement_id));
-check('bodyweight Push-up adds sets 0 -> 1 -> 1 across working weeks',
-  slotAt(bw, 1).sets === slotAt(bw, 0).sets + 1 && slotAt(bw, 2).sets === slotAt(bw, 1).sets,
-  `${slotAt(bw, 0).sets} -> ${slotAt(bw, 1).sets} -> ${slotAt(bw, 2).sets}`);
-check('bodyweight Push-up holds reps flat across working weeks',
-  slotAt(bw, 0).reps === slotAt(bw, 1).reps && slotAt(bw, 1).reps === slotAt(bw, 2).reps);
-check('bodyweight Push-up preserves the effort ramp',
-  slotAt(bw, 0).target_rpe < slotAt(bw, 1).target_rpe
-    && slotAt(bw, 1).target_rpe < slotAt(bw, 2).target_rpe);
-check('week 4 remains a strict volume deload',
-  slotAt(bw, 3).phase === 'deload' && slotAt(bw, 3).sets < slotAt(bw, 0).sets);
-check('plate-loaded Push-up keeps working sets flat',
-  slotAt(loaded, 0).sets === slotAt(loaded, 1).sets
-    && slotAt(loaded, 1).sets === slotAt(loaded, 2).sets);
-check('plate-loaded Push-up preserves the identical effort ramp',
-  slotAt(loaded, 0).target_rpe < slotAt(loaded, 1).target_rpe
-    && slotAt(loaded, 1).target_rpe < slotAt(loaded, 2).target_rpe
-    && bw.every((sl, i) => sl.target_rpe === slotAt(loaded, i).target_rpe));
-check('the loading classes diverge only through observable set volume',
-  slotAt(bw, 1).sets !== slotAt(loaded, 1).sets
-    && slotAt(bw, 2).sets !== slotAt(loaded, 2).sets);
 
-const noPrefixPool = movements.map((m) => ({ ...m, primaryImplement: undefined }));
+check('both pools emit a push_h slot in all four weeks',
+  bw.length === 4 && loaded.length === 4, `bw=${bw.length} loaded=${loaded.length}`);
+check('both pools select the SAME movement (routing is not selection)',
+  bw.every((sl, i) => sl.movement_id === loaded[i].movement_id));
+
+// --- pure bodyweight: volume progresses, reps do not -------------------------
+check('bodyweight Push-up ADDS sets across weeks 1-3 (0 -> 1 -> 1)',
+  bw[1].sets === bw[0].sets + 1 && bw[2].sets === bw[1].sets,
+  `${bw[0].sets} -> ${bw[1].sets} -> ${bw[2].sets}`);
+check('bodyweight Push-up holds reps flat across weeks 1-3',
+  bw[0].reps === bw[1].reps && bw[1].reps === bw[2].reps,
+  `${bw[0].reps} / ${bw[1].reps} / ${bw[2].reps}`);
+check('bodyweight Push-up still ramps effort across weeks 1-3',
+  bw[0].target_rpe < bw[1].target_rpe && bw[1].target_rpe < bw[2].target_rpe,
+  `${bw[0].target_rpe} < ${bw[1].target_rpe} < ${bw[2].target_rpe}`);
+check('week 4 stays a strict volume deload — the added set is NOT carried in',
+  bw[3].phase === 'deload' && bw[3].sets < bw[0].sets,
+  `deload=${bw[3].sets} vs week1=${bw[0].sets}`);
+
+// --- plate-loaded: effort ramps, volume does not ------------------------------
+check('plate-loaded Push-up holds sets FLAT across weeks 1-3',
+  loaded[0].sets === loaded[1].sets && loaded[1].sets === loaded[2].sets,
+  `${loaded[0].sets} / ${loaded[1].sets} / ${loaded[2].sets}`);
+check('plate-loaded Push-up holds reps flat across weeks 1-3',
+  loaded[0].reps === loaded[1].reps && loaded[1].reps === loaded[2].reps);
+check('plate-loaded Push-up progresses by RPE/load instead',
+  loaded[0].target_rpe < loaded[1].target_rpe && loaded[1].target_rpe < loaded[2].target_rpe,
+  `${loaded[0].target_rpe} < ${loaded[1].target_rpe} < ${loaded[2].target_rpe}`);
+check('the RPE ramp is IDENTICAL for both classes (only volume differs)',
+  bw.every((sl, i) => sl.target_rpe === loaded[i].target_rpe));
+check('the two classes actually diverge in set count (the fix is observable)',
+  bw[1].sets !== loaded[1].sets && bw[2].sets !== loaded[2].sets,
+  `bw ${bw[1].sets}/${bw[2].sets} vs loaded ${loaded[1].sets}/${loaded[2].sets}`);
+
+// --- fail-toward-external-load (P2-2) ----------------------------------------
+const noPrefixPool = movements.map((m) => ({ ...m, plannedImplement: undefined }));
 const emptyPrefixSlots = pushSlots(noPrefixPool);
-check('absent primaryImplement fails toward external load',
-  slotAt(emptyPrefixSlots, 0).sets === slotAt(emptyPrefixSlots, 1).sets
-    && slotAt(emptyPrefixSlots, 1).sets === slotAt(emptyPrefixSlots, 2).sets);
-check('a non-canonical implement fails toward external load', (() => {
-  const junk = movements.map((m) => ({ ...m, primaryImplement: 'Bodyweight ' }));
-  const slots = pushSlots(junk);
-  return slotAt(slots, 0).sets === slotAt(slots, 1).sets
-    && slotAt(slots, 1).sets === slotAt(slots, 2).sets;
-})());
+check('absent plannedImplement is NOT bodyweight evidence — sets stay flat',
+  emptyPrefixSlots[0].sets === emptyPrefixSlots[1].sets
+  && emptyPrefixSlots[1].sets === emptyPrefixSlots[2].sets,
+  `${emptyPrefixSlots.map((x) => x.sets).join('/')}`);
+check('a non-canonical implement is NOT bodyweight evidence either',
+  (() => {
+    const junk = bodyweightPool.map((m) => ({ ...m, plannedImplement: 'Bodyweight ' }));
+    const j = pushSlots(junk);
+    return j[0].sets === j[1].sets && j[1].sets === j[2].sets;
+  })());
 
-const legacyPool = movements.map(({ primaryImplement: _drop, ...rest }) => rest);
-check('legacy callers are byte-identical to explicit external-load routing',
+// --- legacy callers stay byte-identical --------------------------------------
+// The field is optional precisely so callers predating it do not change
+// behaviour. Omitting the key entirely must equal passing it as undefined,
+// and both must equal external-load routing.
+const legacyPool = movements.map(({ plannedImplement: _drop, ...rest }) => rest);
+check('a pool that OMITS plannedImplement is byte-identical to explicit external load',
   JSON.stringify(generateBlock({
     profile: prof(bwProfile), movements: legacyPool, startDate: START, schemaType: 'LINEAR' }))
   === JSON.stringify(generateBlock({
     profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: 'LINEAR' })));
+check('legacy omission never yields the bodyweight progression',
+  (() => { const l = pushSlots(legacyPool);
+    return l[0].sets === l[1].sets && l[1].sets === l[2].sets; })());
+
+// --- non-LINEAR schemas: the SETS table is untouched --------------------------
+// The Option C setsDelta table mirrors each non-LINEAR schema's own row, so set
+// counts must be identical under bodyweight routing. Reps are a SEPARATE
+// mechanism: the ladder floor is deliberately schema-independent, because an
+// athlete on WAVE must be able to level up too. Asserted separately below so a
+// regression in one cannot hide behind the other.
 for (const st of SCHEMA_TYPES.filter((x) => x !== 'LINEAR')) {
-  const withBw = generateBlock({ profile: prof(bwProfile), movements, startDate: START, schemaType: st });
+  const withBw = generateBlock({ profile: prof(bwProfile), movements: declaredBodyweightPool, startDate: START, schemaType: st });
   const asLoaded = generateBlock({ profile: prof(bwProfile), movements: noPrefixPool, startDate: START, schemaType: st });
-  const doseShape = (plan) => plan.sessions.map((sess) =>
+  const setsOf = (plan) => plan.sessions.map((sess) =>
     sess.slots.map((sl) => `${sl.slot_index}:${sl.movement_id}:${sl.sets}:${sl.target_rpe}`).join(','));
-  check(`${st}: bodyweight routing leaves sets and RPE unchanged`,
-    JSON.stringify(doseShape(withBw)) === JSON.stringify(doseShape(asLoaded)));
-  const workingReps = withBw.sessions
-    .filter((x) => x.phase !== 'deload')
-    .flatMap((x) => x.slots)
-    .map((sl) => sl.reps);
-  check(`${st}: capability rep floor is schema-independent`,
-    workingReps.length > 0
-      && Math.min(...workingReps) >= DEFAULT_ADVANCEMENT_POLICY.requiredReps);
+  check(`${st}: bodyweight routing leaves sets and RPE identical (setsDelta mirrors)`,
+    JSON.stringify(setsOf(withBw)) === JSON.stringify(setsOf(asLoaded)));
+  const bwReps = withBw.sessions.filter((x) => x.phase !== 'deload').flatMap((x) => x.slots).map((sl) => sl.reps);
+  check(`${st}: the ladder rep floor still applies (schema-independent by design)`,
+    bwReps.length > 0 && Math.min(...bwReps) >= DEFAULT_ADVANCEMENT_POLICY.requiredReps,
+    `min reps ${Math.min(...bwReps)}`);
 }
 
-// --- [9c] RR-04 primary-slot volume bias ------------------------------------
-console.log('[9c] macro-phase volume delta lands on primary slots only');
+// --- [9c] RR-04: macro-phase set delta biases to PRIMARY slots ---------------
+// Owner-ratified 2026-08-27. PHASE_MODS.volume carries the only non-zero sets
+// delta (+1). It is sport/primary-specific loading, not generic accumulation,
+// so it lands only on slots below ACCESSORY_SLOT_FROM. This is what stops
+// `volume` and `hypertrophy` being the same block.
+console.log('[9c] RR-04 — phase set delta lands on primary slots only');
 {
   const volumeBlock = generateBlock({
     profile: prof({ objective: 'strength' }), movements, startDate: START,
     schemaType: 'LINEAR', macroBlockIndex: 5 });
-  check('macroBlockIndex 5 resolves to volume', volumeBlock.macroPhase === 'volume');
+  check('macroBlockIndex 5 resolves to the volume phase', volumeBlock.macroPhase === 'volume',
+    volumeBlock.macroPhase);
   const work = volumeBlock.sessions.filter((x) => x.phase !== 'deload' && x.slots.length >= 3);
+  check('volume phase emits sessions with both primary and accessory slots', work.length > 0);
+  // Compared WITHIN the loaded class. A bodyweight accessory legitimately gains
+  // a set in weeks 2-3 from the Option C progression, which is an independent
+  // mechanism — mixing the classes would test both at once and prove neither.
   const isLoaded = (sl) => {
     const mv = movements.find((x) => x.movement_id === sl.movement_id);
-    return mv !== undefined && mv.pattern !== 'locomotion' && mv.primaryImplement !== 'Bodyweight';
+    return mv !== undefined && mv.pattern !== 'locomotion' && mv.plannedImplement !== 'Bodyweight';
   };
-  let compared = 0;
-  let biased = true;
+  let biased = true; let compared = 0;
   for (const sess of work) {
     const primary = sess.slots.filter((sl) => sl.slot_index < 3 && isLoaded(sl));
     const accessory = sess.slots.filter((sl) => sl.slot_index >= 3 && isLoaded(sl));
     if (primary.length === 0 || accessory.length === 0) continue;
     compared += 1;
-    if (Math.min(...primary.map((sl) => sl.sets))
-      <= Math.max(...accessory.map((sl) => sl.sets))) biased = false;
+    if (!(Math.min(...primary.map((sl) => sl.sets)) > Math.max(...accessory.map((sl) => sl.sets)))) {
+      biased = false;
+    }
   }
-  check('volume gives every loaded primary more sets than loaded accessories',
+  check('volume: every LOADED primary carries strictly more sets than every loaded accessory',
     compared > 0 && biased, `${compared} sessions compared`);
 
+  // The contrast that proves the delta, not just an ordering artefact: a phase
+  // with sets delta 0 must show NO primary/accessory set difference.
   const gppBlock = generateBlock({
     profile: prof({ objective: 'strength' }), movements, startDate: START,
     schemaType: 'LINEAR', macroBlockIndex: 1 });
+  check('macroBlockIndex 1 resolves to gpp (sets delta 0)', gppBlock.macroPhase === 'gpp');
   let flat = true;
   for (const sess of gppBlock.sessions.filter((x) => x.phase !== 'deload')) {
-    const loadedSlots = sess.slots.filter(isLoaded);
-    if (loadedSlots.length >= 2 && new Set(loadedSlots.map((sl) => sl.sets)).size !== 1) flat = false;
+    const loaded = sess.slots.filter((sl) => {
+      const mv = movements.find((x) => x.movement_id === sl.movement_id);
+      return mv !== undefined && mv.pattern !== 'locomotion' && mv.plannedImplement !== 'Bodyweight';
+    });
+    if (loaded.length < 2) continue;
+    if (new Set(loaded.map((sl) => sl.sets)).size !== 1) flat = false;
   }
-  check('gpp keeps loaded primary and accessory sets flat', flat);
+  check('gpp: loaded primary and accessory sets are equal (no delta to bias)', flat);
 }
 
-// --- [9d] capability-ladder reconciliation ----------------------------------
-console.log('[9d] bodyweight reps reach the capability advancement bar');
+// --- [9d] ladder reconciliation ----------------------------------------------
+// Owner-ratified 2026-08-27. The capability ladder advances a rung only at
+// DEFAULT_ADVANCEMENT_POLICY.requiredReps. PHASE_MODS' rep deltas encode a
+// load<->rep trade a bodyweight movement cannot make, so bodyweight slots were
+// prescribed BELOW the level at which their own capability is measured (7 in
+// gpp, 5 in volume, 3 in peak, against a bar of 8). An athlete following the
+// plan could only level up during hypertrophy.
+console.log('[9d] ladder reconciliation — bodyweight reps reach the advancement bar');
 {
   const floor = DEFAULT_ADVANCEMENT_POLICY.requiredReps;
-  check('the generator reads the ladder policy instead of restating a literal',
+  check('the gate reads the ladder policy rather than restating a literal',
     typeof floor === 'number' && floor > 0, `requiredReps=${floor}`);
-  let reachableBlocks = 0;
-  let totalBlocks = 0;
+
+  let reachableBlocks = 0; let totalBlocks = 0;
   const loadedRepsByBlock = [];
   for (let i = 1; i <= MACRO_BLOCKS; i += 1) {
     const bwPlan = generateBlock({
-      profile: prof({ objective: 'strength', equipment_inventory: [] }), movements,
+      profile: prof({ objective: 'strength', equipment_inventory: [] }),
+      movements: declaredBodyweightPool,
       startDate: START, schemaType: 'LINEAR', macroBlockIndex: i });
-    const bwSlots = bwPlan.sessions
-      .filter((x) => x.phase !== 'deload')
-      .flatMap((x) => x.slots);
+    const bwWork = bwPlan.sessions.filter((x) => x.phase !== 'deload');
+    const bwSlots = bwWork.flatMap((x) => x.slots);
     if (bwSlots.length === 0) continue;
     totalBlocks += 1;
     if (bwSlots.every((sl) => sl.reps >= floor)) reachableBlocks += 1;
 
+    // This compact 001-015 fixture deliberately marks every movement as a
+    // capability-chain member (see the fixture comment above). Loading class
+    // must not make those members lose the same chain floor; off-chain phase
+    // prescriptions are tested against real membership in [28].
     const loadedPlan = generateBlock({
-      profile: prof({ objective: 'strength' }), movements: noPrefixPool,
+      profile: prof({ objective: 'strength' }),
+      movements: movements.map((m) => ({ ...m, plannedImplement: undefined })),
       startDate: START, schemaType: 'LINEAR', macroBlockIndex: i });
     const loadedSlots = loadedPlan.sessions
       .filter((x) => x.phase !== 'deload')
       .flatMap((x) => x.slots)
-      .filter((sl) => patternById.get(sl.movement_id) !== 'locomotion');
+      .filter((sl) => {
+        const mv = movements.find((x) => x.movement_id === sl.movement_id);
+        return mv !== undefined && mv.pattern !== 'locomotion';
+      });
     loadedRepsByBlock.push(Math.min(...loadedSlots.map((sl) => sl.reps)));
   }
-  check('all eight macro blocks can satisfy the bodyweight ladder threshold',
-    totalBlocks === MACRO_BLOCKS && reachableBlocks === totalBlocks,
-    `${reachableBlocks}/${totalBlocks}`);
-  check('loaded rep prescriptions retain their phase shape below the floor',
-    new Set(loadedRepsByBlock).size > 1 && Math.min(...loadedRepsByBlock) < floor,
-    `min loaded reps=${Math.min(...loadedRepsByBlock)}`);
+  // "EVERY macro block" is scoped to this fixture, in which every movement is
+  // declared a chain member (see the progressionGroup note above). It tests
+  // FLOOR MECHANICS, not chain scoping; on the shipped corpus most bodyweight
+  // movements are off-chain and correctly keep their lower phase reps, which is
+  // L2(b) and is tested in [28]. Round-2 finding 1 read the old label as a
+  // product-wide claim, which is how it was worded.
+  check('[fixture 001-015] every macro block floors chain-member bodyweight work at the ladder bar',
+    totalBlocks > 0 && reachableBlocks === totalBlocks, `${reachableBlocks}/${totalBlocks}`);
+  check('loaded chain members retain the advancement floor in every macro block',
+    loadedRepsByBlock.length === MACRO_BLOCKS
+      && loadedRepsByBlock.every((minimum) => minimum >= floor),
+    `min loaded reps across blocks = ${Math.min(...loadedRepsByBlock)}`);
 
+  // The deload is exempt: it must stay a strict cut, never floored upward.
   const peakPlan = generateBlock({
-    profile: prof({ objective: 'strength', equipment_inventory: [] }), movements,
+    profile: prof({ objective: 'strength', equipment_inventory: [] }),
+    movements: declaredBodyweightPool,
     startDate: START, schemaType: 'LINEAR', macroBlockIndex: 7 });
-  const peakDeload = peakPlan.sessions
-    .filter((x) => x.phase === 'deload')
-    .flatMap((x) => x.slots);
-  const peakWork = peakPlan.sessions
-    .filter((x) => x.phase !== 'deload')
-    .flatMap((x) => x.slots);
-  check('peak deload reps remain below the floor',
-    peakDeload.length > 0 && Math.min(...peakDeload.map((sl) => sl.reps)) < floor);
-  check('peak working reps meet the floor',
-    peakWork.length > 0 && Math.min(...peakWork.map((sl) => sl.reps)) >= floor);
+  check('macroBlockIndex 7 resolves to peak', peakPlan.macroPhase === 'peak');
+  const peakDeload = peakPlan.sessions.filter((x) => x.phase === 'deload').flatMap((x) => x.slots);
+  const peakWork = peakPlan.sessions.filter((x) => x.phase !== 'deload').flatMap((x) => x.slots);
+  check('peak deload reps are NOT floored (the deload stays a real cut)',
+    peakDeload.length > 0 && Math.min(...peakDeload.map((sl) => sl.reps)) < floor,
+    `deload min reps = ${Math.min(...peakDeload.map((sl) => sl.reps))}`);
+  check('peak working weeks ARE floored (bodyweight peak is no longer 3 reps)',
+    Math.min(...peakWork.map((sl) => sl.reps)) >= floor);
 }
 
-// --- [10] deadlift auto-regulation (peak shift) -----------------------------------
-console.log('[10] deadlift auto-regulation (ACWR gate on the peak block)');
-const peakCalm = generateBlock({
+// --- [10] Calibration Policy v1: ACWR descriptive only in block generation -------
+console.log('[10] Calibration Policy v1: ACWR descriptive only (no peak shifting)');
+const bgSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'blockGenerator.ts'), 'utf-8');
+check('source tripwire: "acwr" does not appear in blockGenerator.ts', !/acwr/i.test(bgSrc));
+
+const peakPlan = generateBlock({
   profile: prof({ objective: 'strength' }), movements, startDate: START,
-  schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: 1.0 });
-const peakHot = generateBlock({
+  schemaType: 'LINEAR', macroBlockIndex: 7 });
+const gppPlan = generateBlock({
   profile: prof({ objective: 'strength' }), movements, startDate: START,
-  schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: 1.7 });
-const gppHot = generateBlock({
-  profile: prof({ objective: 'strength' }), movements, startDate: START,
-  schemaType: 'LINEAR', macroBlockIndex: 1, recentAcwr: 1.7 });
-check('calm ACWR: peak block keeps the normal shape (deload week 4)',
-  !peakCalm.peakShifted &&
-  peakCalm.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
-check('overreached ACWR: deload inserted week 1, peak shifted to week 4',
-  peakHot.peakShifted &&
-  peakHot.sessions.filter((s) => s.week_index === 1).every((s) => s.phase === 'deload') &&
-  peakHot.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'realization'));
-const wkSets = (plan, w) => plan.sessions.filter((s) => s.week_index === w)
-  .reduce((a, s) => a + s.slots.reduce((b, sl) => b + sl.sets, 0), 0);
-check('shifted block: week 1 (deload) volume strictly below week 2',
-  wkSets(peakHot, 1) < wkSets(peakHot, 2), `${wkSets(peakHot, 1)} < ${wkSets(peakHot, 2)}`);
-check('the gate only guards the peak phase (gpp ignores hot ACWR)',
-  !gppHot.peakShifted &&
-  gppHot.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
-check('null ACWR (no telemetry) never shifts the peak',
-  !generateBlock({ profile: prof({ objective: 'strength' }), movements, startDate: START,
-    schemaType: 'LINEAR', macroBlockIndex: 7, recentAcwr: null }).peakShifted);
+  schemaType: 'LINEAR', macroBlockIndex: 1 });
+
+check('peak block keeps the ordinary schedule (deload week 4, realization week 3)',
+  !peakPlan.peakShifted &&
+  peakPlan.sessions.filter((s) => s.week_index === 3).every((s) => s.phase === 'realization') &&
+  peakPlan.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
+check('gpp block keeps the ordinary schedule (deload week 4)',
+  !gppPlan.peakShifted &&
+  gppPlan.sessions.filter((s) => s.week_index === 4).every((s) => s.phase === 'deload'));
+check('peakShifted is false in returned plan shape for backwards compatibility',
+  peakPlan.peakShifted === false && gppPlan.peakShifted === false);
+
+// --- [10b] Calibration Policy v1: Hybrid planned-dose & retrospective invariants ---
+console.log('[10b] Calibration Policy v1: Hybrid planned-dose & retrospective signal invariants');
+const hybridSeedProfile = prof({ objective: 'hybrid', training_age: 'intermediate' });
+const hybridBlock1 = generateBlock({ profile: hybridSeedProfile, movements, startDate: START, schemaType: 'LINEAR', macroBlockIndex: 1 });
+const hybridBlock2 = generateBlock({ profile: hybridSeedProfile, movements, startDate: START, schemaType: 'LINEAR', macroBlockIndex: 1 });
+check('planned-dose model stays active and deterministic across multiple runs',
+  JSON.stringify(hybridBlock1) === JSON.stringify(hybridBlock2));
+check('hybrid block preserves 4-week structure and planned slot definitions',
+  hybridBlock1.weeks === 4 && hybridBlock1.sessions.length > 0 &&
+  hybridBlock1.sessions.every((s) => s.slots.every((sl) => sl.sets > 0 && sl.reps > 0 && sl.target_rpe >= 5)));
+
+const blockPlannerFiles = ['blockGenerator.ts', 'routineComposer.ts', 'routineMicrocycle.ts'];
+let blockRetroLeak = null;
+for (const bf of blockPlannerFiles) {
+  const code = readFileSync(join(import.meta.dirname, '..', 'src', bf), 'utf-8');
+  if (/\bhard_sets\b/.test(code) || /\bsession_rpe\b/.test(code)) {
+    blockRetroLeak = bf;
+  }
+}
+check('source tripwire: block planners contain no retrospective signal references',
+  blockRetroLeak === null, blockRetroLeak ? `leaked in ${blockRetroLeak}` : '3 block planner files clean');
+
+const cleanGen = generateBlock({ profile: hybridSeedProfile, movements, startDate: START, schemaType: 'LINEAR', macroBlockIndex: 1 });
+const poisonedGen = generateBlock({
+  profile: { ...hybridSeedProfile, hard_sets: 9999, session_rpe: 10.0 },
+  movements,
+  startDate: START,
+  schemaType: 'LINEAR',
+  macroBlockIndex: 1,
+});
+check('forward block generation is byte-identical when retrospective signals are poisoned',
+  JSON.stringify(cleanGen) === JSON.stringify(poisonedGen));
 
 // --- [11] 010 movement library contract (types.ts <-> 010 SQL/seed) --------------
 console.log('[11] 010 movement library contract (Phase 12)');
@@ -620,7 +931,11 @@ for (const r of detailRows) {
     if (!prefixSet.has(p)) prefixOk = false;
   }
 }
-check('every seeded supported_prefixes token is a MOVEMENT_PREFIXES member',
+// Scope is the 001-015 fixture, which is why detailRows.length === 30 is part
+// of the predicate. The SHIPPED corpus is covered separately by
+// [F2-corpus] — round-2 finding 1 was that this label read as if it covered
+// both, leaving the 270 later-migration movements silently unchecked.
+check('[fixture 001-015] every seeded supported_prefixes token is a MOVEMENT_PREFIXES member',
   prefixOk, `${seenPrefixes.size} distinct tokens over ${detailRows.length} rows`);
 check('movement_detail seeded for all 30 movements (base stored once per pattern)',
   Number(db.prepare('SELECT count(*) c FROM movement_detail').get().c) === 30 &&
@@ -643,6 +958,9 @@ const subLib = movements.map((m) => ({
   family: detailById.get(m.movement_id).base_name,
   required: m.required,
   preference: 0,
+  beginnerOk: m.beginner_ok,
+  capabilityAvailable: true,
+  sportTracking: m.sportTracking,
 }));
 const byName = (n) => subLib.find((m) => m.name === n);
 const idOf = (n) => byName(n).movement_id;
@@ -650,6 +968,7 @@ const RANK = { Beginner: 0, Intermediate: 1, Advanced: 2 };
 const baseInput = {
   target: byName('Competition Squat'), library: subLib,
   inventory: [...EQUIPMENT_ITEMS], niggles: [], futureSlots: [], currentDayIndex: 1,
+  trainingAge: 'intermediate', accessContext: 'weight_room',
 };
 
 // determinism
@@ -659,7 +978,8 @@ let subDet = true;
 const detFuture = [{ plannedSlotId: 77, dayIndex: 5, movement: byName('Cable Row'), sets: 4 }];
 for (const m of subLib) {
   const inp = { target: m, library: subLib, inventory: [...EQUIPMENT_ITEMS],
-    niggles: [{ region: 'knee', severity: 4 }], futureSlots: detFuture, currentDayIndex: 2 };
+    niggles: [{ region: 'knee', severity: 4 }], futureSlots: detFuture, currentDayIndex: 2,
+    trainingAge: 'intermediate', accessContext: 'weight_room' };
   if (JSON.stringify(computeSubstitutions(inp)) !== JSON.stringify(computeSubstitutions(inp))) subDet = false;
 }
 check('determinism across all 30 targets (niggle + future slots)', subDet, `${subLib.length} targets`);
@@ -707,7 +1027,8 @@ const futureSlots = [
   { plannedSlotId: 79, dayIndex: 1, movement: byName('Single-Arm Dumbbell Row'), sets: 5 }, // row but not later
 ];
 const ds = computeSubstitutions({ target: byName('Barbell Row'), library: subLib,
-  inventory: [...EQUIPMENT_ITEMS], niggles: [], futureSlots, currentDayIndex: 2 }).layer2DaySwap;
+  inventory: [...EQUIPMENT_ITEMS], niggles: [], futureSlots, currentDayIndex: 2,
+  trainingAge: 'intermediate', accessContext: 'weight_room' }).layer2DaySwap;
 check('Layer 2 colour is purple', ds.color === 'purple');
 check('Layer 2 pulls only same-category, strictly-later slots',
   ds.options.length === 1 && ds.options[0].name === 'Cable Row' && ds.options[0].fromDayIndex === 5,
@@ -760,11 +1081,11 @@ check('elite severity 6: halt advised, no triage cluster, guardrail still bars',
   sub(6, 'elite').haltAdvised === true &&
   sub(6, 'elite').layer3Triage.cluster === null &&
   sub(6, 'elite').blockedByGuardrail.length > 0);
-// Default (no trainingAge) == intermediate baseline: trips at 4, not at 3.
-check('default trainingAge == intermediate (severity 4 trips, 3 does not)',
-  computeSubstitutions({ ...baseInput, niggles: [{ region: 'knee', severity: 4 }] })
+// Intermediate baseline is explicit: context/experience omission is forbidden.
+check('explicit Intermediate thresholds trip at severity 4, not at 3',
+  computeSubstitutions({ ...baseInput, trainingAge: 'intermediate', niggles: [{ region: 'knee', severity: 4 }] })
     .layer3Triage.cluster !== null &&
-  computeSubstitutions({ ...baseInput, niggles: [{ region: 'knee', severity: 3 }] })
+  computeSubstitutions({ ...baseInput, trainingAge: 'intermediate', niggles: [{ region: 'knee', severity: 3 }] })
     .layer3Triage.cluster === null);
 
 console.log('[15] condition multipliers (014 movement_prefix + conditionEngine)');
@@ -849,19 +1170,14 @@ check('the adjusted pattern is recorded in autopilotAdjusted', defPlan.autopilot
 const upPlan = genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: -0.5 } }));
 const upSq = ndSlots(upPlan, 'squat');
 check('latent_headroom raises squat target_rpe vs baseline (≤ base_rpe_cap)',
-  upSq.some((sl, i) => sl.target_rpe > slotAt(baseSq, i).target_rpe)
-    && upSq.every((sl) => sl.target_rpe <= prof().base_rpe_cap));
+  upSq.some((sl, i) => sl.target_rpe > baseSq[i].target_rpe) && upSq.every((sl) => sl.target_rpe <= prof().base_rpe_cap));
 
 // Direct attribution provenance: the side-car carries only the effective post-clamp change.
 const easedSlot = defSq.find((sl) => sl.autopilotDelta !== undefined);
-// baseSq and defSq are produced by separate generateBlock runs; neither their
-// equal length nor easedSlot's presence in defSq is asserted anywhere, so index
-// through slotAt rather than letting a short array throw.
-const easedBaseline = slotAt(baseSq, defSq.indexOf(easedSlot));
 check('eased attribution records effective post-clamp deltas',
   easedSlot?.autopilotDelta?.reason === 'eased'
-    && easedSlot.autopilotDelta.rpe_delta === easedSlot.target_rpe - easedBaseline.target_rpe
-    && easedSlot.autopilotDelta.set_delta === easedSlot.sets - easedBaseline.sets,
+    && easedSlot.autopilotDelta.rpe_delta === easedSlot.target_rpe - baseSq[defSq.indexOf(easedSlot)].target_rpe
+    && easedSlot.autopilotDelta.set_delta === easedSlot.sets - baseSq[defSq.indexOf(easedSlot)].sets,
   JSON.stringify(easedSlot?.autopilotDelta));
 const raisedSlot = upSq.find((sl) => sl.autopilotDelta !== undefined);
 check('raised attribution records the raised reason and effective deltas',
@@ -877,12 +1193,12 @@ check('held-safety attribution records the safety reason',
     && safetySlot.autopilotDelta.rpe_delta < 0
     && safetySlot.autopilotDelta.set_delta < 0,
   JSON.stringify(safetySlot?.autopilotDelta));
-
-// Every emitted attribution must satisfy migration 034's CHECK constraints, or
-// the INSERT fails INSIDE the block-generation transaction and costs the
-// athlete the whole block. Assert the schema's own predicate against every
-// delta this file can generate, so a ladder change that broke the sign
-// invariant is caught here rather than on a device.
+// Every emitted attribution must satisfy the 034/061 STRICT CHECK predicate. If
+// it does not, the INSERT fails INSIDE the block-generation transaction and
+// costs the athlete the whole block — and on a device that has converged to 061
+// there is no looser schema left to absorb it. Assert the schema's own
+// predicate against every delta this file can generate, so a ladder change that
+// broke the grid or the sign invariant is caught here rather than in the field.
 const satisfies034 = (d) =>
   [-0.5, 0.0, 0.5].includes(d.rpe_delta)
   && Number.isInteger(d.set_delta) && d.set_delta >= -1 && d.set_delta <= 1
@@ -897,9 +1213,10 @@ const everyDelta = [defPlan, upPlan, safetyPlan]
   .map((sl) => sl.autopilotDelta)
   .filter((d) => d !== undefined);
 const bad034 = everyDelta.filter((d) => !satisfies034(d));
-check('every emitted autopilot attribution satisfies migration 034 CHECKs',
+check('every emitted autopilot attribution satisfies the 034/061 strict CHECKs',
   everyDelta.length > 0 && bad034.length === 0,
   `${everyDelta.length} deltas, ${bad034.length} invalid${bad034.length ? `: ${JSON.stringify(bad034[0])}` : ''}`);
+
 const clampPlan = genFR({ objective: 'hybrid', training_age: 'beginner', base_rpe_cap: 5, session_duration_cap_min: 90, weekly_frequency: 2 },
   makeFlawReport({ squat: { phi: 0.5 } }));
 const clampedSlot = clampPlan.sessions.filter((s) => s.week_index === 4)
@@ -915,6 +1232,7 @@ check('deload and locomotion slots remain unattributed',
     && locomotionPlan.sessions.filter((s) => s.phase !== 'deload')
       .flatMap((s) => s.slots.filter((sl) => patternOf(sl.movement_id) === 'locomotion'))
       .every((sl) => sl.autopilotDelta === undefined));
+
 // halt supremacy: recovery template — every week deload, volume dropped, no corrections.
 const haltPlan = genFR({ objective: 'strength' }, makeFlawReport({ squat: { phi: 0.5 }, hinge: { phi: -0.5 } }, { halt: true }));
 check('halt → recovery=true and EVERY session phase is deload',
@@ -1031,7 +1349,7 @@ const injSq = ndSlots(injuredThin, 'squat');
 check('thin-data severe-niggle headroom never raises squat in the block',
   injSq.every((sl, i) => sl.target_rpe <= baseSq[i].target_rpe && sl.sets <= baseSq[i].sets));
 
-// --- [7] Phase 16: tier gating (plan law: Beginner + whitelisted Intermediate staples)
+// --- [7] Phase 2a: one progressive tier ceiling across every selection route
 {
   const WL = new Set(['Romanian Deadlift', 'Dumbbell Shoulder Press']);
   const tagged = movements.map((m) => ({
@@ -1051,10 +1369,18 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   check('tier law: whitelisted Intermediate staples remain prescribable', [...wlIds].some((id) => begIds.has(id)));
   const intPlan = generateBlock({ profile: prof({ training_age: 'intermediate' }), movements: tagged, startDate: START });
   const intIds = new Set(intPlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
-  check('tier law: non-beginner keeps Advanced movements eligible', [...intIds].some((id) => advIds.has(id)));
+  check('tier law: Intermediate block contains no Advanced movement', [...intIds].every((id) => !advIds.has(id)));
+  const advancedPlan = generateBlock({ profile: prof({ training_age: 'advanced' }), movements: tagged, startDate: START });
+  const advancedIds = new Set(advancedPlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
+  check('tier law: Advanced profile keeps Advanced movements eligible', [...advancedIds].some((id) => advIds.has(id)));
+  const elitePlan = generateBlock({ profile: prof({ training_age: 'elite' }), movements: tagged, startDate: START });
+  const eliteIds = new Set(elitePlan.sessions.flatMap((s) => s.slots.map((sl) => sl.movement_id)));
+  check('tier law: Elite profile keeps Advanced movements eligible', [...eliteIds].some((id) => advIds.has(id)));
+  check('tier predicate: whitelist never bypasses the Intermediate ceiling',
+    !isDifficultyAllowed('intermediate', 'Advanced', true, 'weight_room', false));
   // The cap is HARD: an all-Advanced library prescribes a beginner NOTHING.
   const allAdv = movements.map((m) => ({ ...m, difficulty: 'Advanced' }));
-  const begAll = generateBlock({ profile: prof({ training_age: 'beginner' }), movements: allAdv, startDate: START });
+  const begAll = generateBlock({ profile: prof({ objective: 'strength', training_age: 'beginner' }), movements: allAdv, startDate: START });
   const slotsAll = begAll.sessions.reduce((a, s) => a + s.slots.length, 0);
   check('tier law is HARD: all-Advanced library prescribes a beginner nothing', slotsAll === 0, `slots=${slotsAll}`);
   check('tier law: dropped patterns carry tier warnings',
@@ -1064,6 +1390,7 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   const subMv = (id, name, difficulty, opts = {}) => ({
     movement_id: id, name, pattern: opts.pattern ?? 'squat', is_compound: opts.compound ?? true,
     difficulty, family: `f${id}`, required: [], preference: 0,
+    capabilityAvailable: true, sportTracking: false,
     ...(opts.beginnerOk !== undefined ? { beginnerOk: opts.beginnerOk } : {}),
   });
   const subLib = [
@@ -1077,19 +1404,38 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   const subTarget = subMv(999, 'Target', 'Advanced');
   const gated = computeSubstitutions({
     target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
+    accessContext: 'weight_room',
   });
   const offered = gated.layer1Regression.options.map((o) => o.name);
   check('substitution L1 (beginner): only Beginner + whitelisted staples offered',
     offered.length > 0 && offered.every((n) => n === 'Beginner Squat' || n === 'Whitelisted Int Squat'), offered.join(','));
+  const intermediateSubs = computeSubstitutions({
+    target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'intermediate',
+    accessContext: 'weight_room',
+  });
+  const intermediateOffered = intermediateSubs.layer1Regression.options.map((o) => o.name);
+  check('substitution L1 (Intermediate): Advanced movements are never offered',
+    intermediateOffered.length > 0 && intermediateOffered.every((name) => name !== 'Advanced Squat'),
+    intermediateOffered.join(','));
   const { EXPERIENCE_SEVERITY } = require('./.build/types.js');
   const triage = computeSubstitutions({
     target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
+    accessContext: 'weight_room',
     niggles: [{ region: 'general fatigue', severity: EXPERIENCE_SEVERITY.beginner.triageMin }],
   });
   const cluster = triage.layer3Triage.cluster;
   check('substitution L3 triage (beginner): Advanced accessories never selected',
     cluster !== null && cluster.movements.every((m) => m.name !== 'Advanced Iso'),
     cluster === null ? 'no cluster' : cluster.movements.map((m) => m.name).join(','));
+  const intermediateTriage = computeSubstitutions({
+    target: subTarget, library: subLib, inventory: [], currentDayIndex: 0, trainingAge: 'intermediate',
+    accessContext: 'weight_room',
+    niggles: [{ region: 'general fatigue', severity: EXPERIENCE_SEVERITY.intermediate.triageMin }],
+  });
+  const intermediateCluster = intermediateTriage.layer3Triage.cluster;
+  check('substitution L3 triage (Intermediate): Advanced accessories never selected',
+    intermediateCluster !== null && intermediateCluster.movements.every((m) => m.name !== 'Advanced Iso'),
+    intermediateCluster === null ? 'no cluster' : intermediateCluster.movements.map((m) => m.name).join(','));
   // Untagged libraries remain byte-identical (legacy back-compat).
   const u1 = gen({ training_age: 'beginner' });
   const u2 = generateBlock({ profile: prof({ training_age: 'beginner' }), movements, startDate: START });
@@ -1098,14 +1444,100 @@ check('thin-data severe-niggle headroom never raises squat in the block',
   // PRODUCTION wiring contract (audit R1): the live app passes the gate inputs.
   const storeSrc = readFileSync(join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
   check('production: store passes trainingAge into computeSubstitutions', storeSrc.includes('trainingAge: profile.training_age'));
+  check('production: store passes explicit accessContext into computeSubstitutions', storeSrc.includes('accessContext,'));
   check('production: store maps beginner_ok into generator + substitution inputs',
     storeSrc.includes('beginner_ok: m.beginnerOk') && storeSrc.includes('beginnerOk: m.beginnerOk'));
   check('production: store movement query joins movement_beginner_whitelist', storeSrc.includes('movement_beginner_whitelist'));
   const screenSrc = readFileSync(join(import.meta.dirname, '..', '..', '..', 'apps', 'mobile', 'src', 'screens', 'SessionScreen.tsx'), 'utf-8');
-  check('production: picker applies the beginner whitelist rule',
-    storeSrc.includes("movement.difficulty === 'Beginner' || movement.beginnerOk")
-    && storeSrc.includes('if (!permittedForProfile(movement, profile) || !capabilityAvailable.has(m.movement_id))')
-    && screenSrc.includes('beginnerPlanViolation'));
+  const blockSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'blockGenerator.ts'), 'utf-8');
+  const substitutionSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'substitution.ts'), 'utf-8');
+  const capabilitySrc = readFileSync(join(import.meta.dirname, '..', 'src', 'capabilityResolver.ts'), 'utf-8');
+  check('production: shared tier predicate is wired across generation, substitution, capability, store, and renderer',
+    blockSrc.includes('isDifficultyAllowed(')
+    && substitutionSrc.includes('isDifficultyAllowed(')
+    && capabilitySrc.includes('isDifficultyAllowed(')
+    && storeSrc.includes('isDifficultyAllowed(')
+    && storeSrc.includes('permittedForProfile(')
+    && screenSrc.includes('isDifficultyAllowed(')
+    && screenSrc.includes('tierPlanViolation'));
+  // P1-1: the SESSION-WIDE blocker is tier only. This check previously pinned
+  // the defect itself — `state !== 'available'` — which let an ordinary
+  // mid-session niggle blank the whole active session. Equipment, safety,
+  // capability and attestation now gate the current slot instead.
+  check('production: the renderer session blocker is the shared tier law, never the full verdict',
+    !screenSrc.includes("availabilityMap.get(slot.movementId)?.state !== 'available'")
+    && /const tierPlanViolation = sessionAccessContext === null \|\| sessionPlan\.some/.test(screenSrc)
+    && screenSrc.includes("const currentSlotExecutable = currentAvailability?.state === 'available';")
+    && screenSrc.includes('if (!currentSlotExecutable) return;')
+    && screenSrc.includes('disabled={!loadLoggable || !currentSlotExecutable}'));
+}
+
+// --- [16b] day-local sport/weight access context -----------------------------
+console.log('[16b] day-local sport/weight access context');
+{
+  const mixedDays = [
+    { day_index: 1, focus: 'conditioning' },
+    { day_index: 2, focus: 'full' },
+  ];
+  const sportOnly = movements.map((movement) => ({
+    ...movement,
+    difficulty: 'Advanced',
+    capability_available_weight_room: false,
+    capability_available_sport_conditioning: true,
+  }));
+  const beginnerMixed = generateBlock({
+    profile: prof({ objective: 'endurance', weekly_frequency: 2, training_age: 'beginner' }),
+    movements: sportOnly,
+    startDate: START,
+    programDays: mixedDays,
+  });
+  const conditioningSessions = beginnerMixed.sessions.filter((session) => session.focus === 'conditioning');
+  const weightSessions = beginnerMixed.sessions.filter((session) => session.focus === 'full');
+  check('conditioning ignores Advanced difficulty across every slot for Beginner',
+    conditioningSessions.length === 4
+      && conditioningSessions.every((session) => session.slots.length > 0)
+      && conditioningSessions.flatMap((session) => session.slots)
+        .every((slot) => sportOnly.find((movement) => movement.movement_id === slot.movement_id)?.difficulty === 'Advanced'));
+  check('the same mixed plan keeps its weight-room days behind the weight-room tier/capability law',
+    weightSessions.length === 0
+      && beginnerMixed.warnings.some((warning) => warning === 'full: session dropped, no available movements at all'));
+  check('warning classification uses the day-local tier pool',
+    beginnerMixed.warnings.some((warning) => warning.startsWith('full: no tier-eligible'))
+      && !beginnerMixed.warnings.some((warning) => warning.startsWith('conditioning: no tier-eligible')));
+
+  const weightOnly = movements.map((movement) => ({
+    ...movement,
+    difficulty: 'Advanced',
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: false,
+  }));
+  const advancedMixed = generateBlock({
+    profile: prof({ objective: 'endurance', weekly_frequency: 2, training_age: 'advanced' }),
+    movements: weightOnly,
+    startDate: START,
+    programDays: mixedDays,
+  });
+  check('Advanced bypass cannot leak into sport/conditioning capability availability',
+    advancedMixed.sessions.filter((session) => session.focus === 'conditioning')
+      .every((session) => session.slots.length === 0)
+      && advancedMixed.warnings.some((warning) => warning.startsWith('conditioning: no capability-available')));
+  check('weight-room capability remains independently usable in the same mixed plan',
+    advancedMixed.sessions.filter((session) => session.focus === 'full')
+      .every((session) => session.slots.length > 0));
+
+  const sportSubMovement = (movement_id, name) => ({
+    movement_id, name, pattern: 'squat', is_compound: true, difficulty: 'Advanced',
+    family: `sport-${movement_id}`, required: [], preference: 0,
+    beginnerOk: false, capabilityAvailable: true, sportTracking: false,
+  });
+  const sportSubstitutions = computeSubstitutions({
+    target: sportSubMovement(900, 'Sport target'),
+    library: [sportSubMovement(901, 'Advanced sport option')],
+    inventory: [], currentDayIndex: 0, trainingAge: 'beginner',
+    accessContext: 'sport_conditioning',
+  });
+  check('substitution applies the same sport tier relief',
+    sportSubstitutions.layer1Regression.options.some((option) => option.movement_id === 901));
 }
 
 // --- [17] guided goal-program schedule and preference laws -----------------
@@ -1129,11 +1561,9 @@ console.log('[17] guided goal-program schedule and preference laws');
   const baselineSquat = baseline.sessions[0].slots.find((slot) =>
     movements.find((movement) => movement.movement_id === slot.movement_id)?.pattern === 'squat');
   const alternate = movements.find((movement) => movement.pattern === 'squat' && movement.movement_id !== baselineSquat?.movement_id);
-  check('fixture: library offers a second squat movement to prefer', alternate !== undefined,
-    String(alternate?.movement_id));
   const preferenceDays = [{
     day_index: 2, focus: 'full',
-    movement_preferences: [{ slot_index: 1, pattern: 'squat', movement_id: alternate?.movement_id ?? -1 }],
+    movement_preferences: [{ slot_index: 1, pattern: 'squat', movement_id: alternate.movement_id }],
   }];
   const preferred = generateBlock({
     profile: prof({ objective, weekly_frequency: 1 }), movements, startDate: START, programDays: preferenceDays,
@@ -1147,7 +1577,11 @@ console.log('[17] guided goal-program schedule and preference laws');
   })));
 
   const unsafeLibrary = movements.map((movement) => movement.movement_id === alternate.movement_id
-    ? { ...movement, capability_available: false } : movement);
+    ? {
+        ...movement,
+        capability_available_weight_room: false,
+        capability_available_sport_conditioning: false,
+      } : movement);
   const fallback = generateBlock({
     profile: prof({ objective, weekly_frequency: 1 }), movements: unsafeLibrary, startDate: START, programDays: preferenceDays,
   });
@@ -1203,9 +1637,23 @@ console.log('[18] guided program macro-cycle ownership');
     macroPhaseOf(programMacroIndex(6, 4)) === 'gpp'
       && macroPhaseOf(programMacroIndex(6, 1)) === 'volume'
       && macroPhaseOf(programMacroIndex(6, 2)) === 'peak');
+
+  // R3 (REVIEW_BOUNDARY, ratified 2026-08-22): the review date sets the horizon
+  // and block count only. No macro anchor is derived from it, so the former
+  // dated-anchor table is withdrawn along with datedProgramMacroAnchor. Guard
+  // against a quiet reintroduction: competition preparation is deferred and
+  // needs its own ratification.
+  check('no date-derived macro anchor is exported from the engine (REVIEW_BOUNDARY)',
+    !Object.keys(require('./.build/blockGenerator.js')).includes('datedProgramMacroAnchor'));
+  check('programMacroIndex still owns program macro progression from a stored anchor',
+    programMacroIndex(6, 1) === 6 && programMacroIndex(6, 3) === 8 && programMacroIndex(8, 2) === 1);
 }
 
-// --- [19] guided program review-horizon ownership ---------------------------
+// --- [7] full-body scope routing + specialist equipment (O3/O4, migration 049) --
+// The scope axis exists because FOCUS_PATTERNS.full already holds five entries
+// and slotBudget caps at five: a full-body movement CANNOT be routed by adding
+// a pattern. These are the laws that axis has to satisfy.
+// --- [19] guided program review-horizon ownership (ported from master 7bebc15)
 console.log('[19] guided program review-horizon ownership');
 {
   const initial = normalizeProgramHorizon('2026-08-03', { kind: 'weeks', blockCount: 4 });
@@ -1230,49 +1678,873 @@ console.log('[19] guided program review-horizon ownership');
       && dateHorizon.plannedEndDate === addDaysIso('2026-08-03', 56)
       && dateHorizon.requestedReviewDate === '2026-09-01');
 
-  let invalidDateRejected = false;
-  try { normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2026-02-30' }); }
-  catch { invalidDateRejected = true; }
-  check('invalid calendar review date is rejected', invalidDateRejected);
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  check('date horizon rejects under 4 and over 32 weeks',
+    rejects(() => normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2026-08-30' }))
+      && rejects(() => normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2027-03-16' }))
+      && !rejects(() => normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2027-03-15' })));
+  check('invalid calendar review date is rejected',
+    rejects(() => normalizeProgramHorizon('2026-08-03', { kind: 'date', requestedReviewDate: '2026-02-30' })));
 }
 
-// --- [20] persisted set caps and effective autopilot attribution ------------
-console.log('[20] persisted set caps and effective autopilot attribution');
+console.log('[7] full-body scope routing and specialist equipment');
 {
-  const carry = movements.find((movement) => movement.pattern === 'carry');
-  const cappedCarry = { ...carry, required: [], set_cap: 3 };
-  const input = {
-    profile: prof({ objective: 'endurance', weekly_frequency: 1 }),
-    movements: [cappedCarry],
-    startDate: START,
-    macroBlockIndex: 6,
-    programDays: [{ day_index: 1, focus: 'conditioning' }],
+  const mv = (movement_id, name, pattern, over = {}) => ({
+    movement_id, name, pattern, is_compound: true, required: [], difficulty: 'Beginner',
+    beginner_ok: false, sportTracking: false,
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: true,
+    ...over,
+  });
+  // Mirrors the shipped rows: both TGUs are compound kettlebell rotation work,
+  // the canonical one Advanced (68) and the Lunge-style one Intermediate (231).
+  // Farmer Carry (19) is the lowest-id compound carry, so a naive union pool
+  // would always beat both — which is exactly why the union design was discarded.
+  const CANON_TGU = 68, LUNGE_TGU = 231, FARMER = 19, SUITCASE = 20, PLANK = 25;
+  const scopeLib = [
+    mv(1, 'Sq', 'squat'), mv(2, 'Ph', 'push_h'), mv(3, 'Hi', 'hinge'), mv(4, 'Pl', 'pull_h'),
+    mv(5, 'Lu', 'lunge'), mv(6, 'Is', 'isolation'), mv(7, 'Lo', 'locomotion'),
+    mv(FARMER, 'Farmer Carry', 'carry', { required: ['dumbbells'] }),
+    mv(SUITCASE, 'Suitcase Carry', 'carry', { required: ['kettlebell'] }),
+    // An UNSCOPED rotation movement: it must never inherit full-body routing.
+    mv(PLANK, 'Plank', 'rotation'),
+    mv(CANON_TGU, 'Kettlebell Turkish Get-Up', 'rotation',
+      { required: ['kettlebell'], difficulty: 'Advanced', scope: 'full_body' }),
+    mv(LUNGE_TGU, 'Kettlebell Turkish Get-Up (Lunge style)', 'rotation',
+      { required: ['kettlebell'], difficulty: 'Intermediate', scope: 'full_body' }),
+  ];
+  // session_duration_cap_min 110 -> slotBudget 5, the only budget with a slot 5.
+  const scopeProfile = (over = {}) => ({
+    ...DEFAULT_PROFILE,
+    objective: 'strength',
+    weekly_frequency: 1,          // STRENGTH_SPLITS[0] = ['full']
+    session_duration_cap_min: 110,
+    training_age: 'advanced',
+    equipment_inventory: ['dumbbells', 'kettlebell'],
+    ...over,
+  });
+  const scopePlan = (over = {}, extra = {}) => generateBlock({
+    profile: scopeProfile(over), movements: scopeLib, startDate: START, ...extra,
+  });
+  const slotFive = (plan) => {
+    const session = plan.sessions.find((s) => s.focus === 'full');
+    return session === undefined ? null : session.slots[4]?.movement_id ?? null;
   };
-  const baseline = generateBlock(input);
-  const baselineCarry = baseline.sessions[0].slots[0];
-  check('movement set policy is applied in the returned plan, not after generation',
-    baselineCarry.sets === 3
-      && baseline.sessions.filter((session) => session.week_index === 4)[0].slots[0].sets < 3);
 
-  const clampedRaise = generateBlock({
-    ...input, flawReport: makeFlawReport({ carry: { phi: -0.5 } }),
-  });
-  const raisedCarry = clampedRaise.sessions[0].slots[0];
-  check('fully set-capped late-cycle raise emits no false attribution',
-    raisedCarry.sets === baselineCarry.sets
-      && raisedCarry.target_rpe === baselineCarry.target_rpe
-      && raisedCarry.autopilotDelta === undefined
-      && !clampedRaise.autopilotAdjusted.includes('carry'));
+  check('slot budget 5 is a precondition: the full session really has five slots',
+    scopePlan().sessions.every((s) => s.slots.length === 5));
+  check('Advanced/Elite with a kettlebell draft the canonical TGU (compound tie -> lowest id)',
+    slotFive(scopePlan({ training_age: 'advanced' })) === CANON_TGU
+      && slotFive(scopePlan({ training_age: 'elite' })) === CANON_TGU,
+    String(slotFive(scopePlan({ training_age: 'advanced' }))));
+  check('Intermediate drafts the Lunge-style TGU (the canonical one is tier-barred at Advanced)',
+    slotFive(scopePlan({ training_age: 'intermediate' })) === LUNGE_TGU,
+    String(slotFive(scopePlan({ training_age: 'intermediate' }))));
+  check('Beginner falls back to the carry: neither TGU is on the ratified whitelist',
+    slotFive(scopePlan({ training_age: 'beginner' })) === FARMER,
+    String(slotFive(scopePlan({ training_age: 'beginner' }))));
+  check('no kettlebell: the strict subset filter removes both TGUs, carry fills the slot',
+    slotFive(scopePlan({ equipment_inventory: ['dumbbells'] })) === FARMER,
+    String(slotFive(scopePlan({ equipment_inventory: ['dumbbells'] }))));
+  check('an UNSCOPED rotation movement never inherits full-body routing',
+    scopePlan({ training_age: 'beginner' }).sessions
+      .every((s) => s.slots.every((sl) => sl.movement_id !== PLANK)));
+  check('scope never displaces the first four slots of a full session',
+    scopePlan().sessions.every((s) =>
+      JSON.stringify(s.slots.slice(0, 4).map((sl) => sl.movement_id)) === '[1,2,3,4]'));
 
-  const eased = generateBlock({
-    ...input, flawReport: makeFlawReport({ carry: { phi: 0.5 } }),
+  // O4: the Turkish Get-Up is never lower-body lunge work, under any objective
+  // or inventory. FOCUS_PATTERNS.lower carries no rotation and has no scope slot.
+  let tguInLower = 0, lowerPlans = 0;
+  for (const objective of OBJECTIVES) {
+    for (const inventory of [[], ['kettlebell'], ['dumbbells', 'kettlebell'],
+      [...STANDARD_EQUIPMENT_ITEMS], [...EQUIPMENT_ITEMS]]) {
+      for (let f = 1; f <= 7; f++) {
+        const plan = generateBlock({
+          profile: scopeProfile({ objective, weekly_frequency: f, equipment_inventory: inventory }),
+          movements: scopeLib,
+          startDate: START,
+        });
+        for (const session of plan.sessions) {
+          if (session.focus !== 'lower') continue;
+          lowerPlans += 1;
+          if (session.slots.some((sl) => sl.movement_id === CANON_TGU || sl.movement_id === LUNGE_TGU)) {
+            tguInLower += 1;
+          }
+        }
+      }
+    }
+  }
+  check('neither TGU is EVER drafted into a lower-body session (all objectives x inventories)',
+    tguInLower === 0 && lowerPlans > 0, `${lowerPlans} lower sessions, ${tguInLower} violations`);
+
+  // Guardrail 1: precedence is preference > scope > carry, never reordered.
+  const withPrefs = (movement_preferences) => scopePlan({}, {
+    programDays: [{ day_index: 1, focus: 'full', movement_preferences }],
   });
-  const easedCarry = eased.sessions[0].slots[0];
-  check('effective cut below the set cap carries the exact persisted delta',
-    easedCarry.sets === baselineCarry.sets - 1
-      && easedCarry.autopilotDelta?.set_delta === -1
-      && easedCarry.autopilotDelta?.reason === 'eased');
+  const carryPreference = withPrefs([{ slot_index: 5, pattern: 'carry', movement_id: FARMER }]);
+  check('a valid explicit carry preference WINS: the scope selector does not run',
+    slotFive(carryPreference) === FARMER
+      && carryPreference.warnings.length === 0,
+    `${slotFive(carryPreference)} / ${JSON.stringify(carryPreference.warnings)}`);
+  const suitcasePreference = withPrefs([{ slot_index: 5, pattern: 'carry', movement_id: SUITCASE }]);
+  check('an explicit preference for the OTHER carry is honoured too (not just the default pick)',
+    slotFive(suitcasePreference) === SUITCASE, String(slotFive(suitcasePreference)));
+  const squatPreference = withPrefs([{ slot_index: 1, pattern: 'squat', movement_id: 1 }]);
+  check('a preference on a different slot does not suppress the scope selector',
+    slotFive(squatPreference) === CANON_TGU, String(slotFive(squatPreference)));
+  const unavailablePreference = generateBlock({
+    profile: scopeProfile({ equipment_inventory: ['kettlebell'] }), // Farmer Carry needs dumbbells
+    movements: scopeLib,
+    startDate: START,
+    programDays: [{ day_index: 1, focus: 'full', movement_preferences: [
+      { slot_index: 5, pattern: 'carry', movement_id: FARMER },
+    ] }],
+  });
+  check('an unavailable preference still warns AND falls through to the scope candidate',
+    slotFive(unavailablePreference) === CANON_TGU
+      && unavailablePreference.warnings.includes('full: preferred carry movement unavailable; safe fallback used'),
+    `${slotFive(unavailablePreference)} / ${JSON.stringify(unavailablePreference.warnings)}`);
+
+  // Type boundary (3.5.2): the store maps null -> undefined; absent means unscoped.
+  const undefinedScope = generateBlock({
+    profile: scopeProfile(),
+    movements: scopeLib.map((m) => ({ ...m, scope: m.scope ?? undefined })),
+    startDate: START,
+  });
+  const noScopeField = generateBlock({
+    profile: scopeProfile(),
+    movements: scopeLib.map(({ scope, ...rest }) => rest),
+    startDate: START,
+  });
+  check('an explicit undefined scope is identical to an absent one',
+    JSON.stringify(undefinedScope) === JSON.stringify(scopePlan()));
+  check('a library with NO scope field at all is byte-identical to the pre-049 behaviour',
+    slotFive(noScopeField) === FARMER
+      && JSON.stringify(noScopeField.sessions.map((s) => s.slots.map((sl) => sl.movement_id)))
+        === JSON.stringify(scopePlan({ training_age: 'beginner' }).sessions.map((s) => s.slots.map((sl) => sl.movement_id))));
+  check('determinism holds with the scope selector active (double-run deep equality)',
+    JSON.stringify(scopePlan()) === JSON.stringify(scopePlan()));
+
+  // 3.7 row 13: substitution needs no scope threading — the CATEGORY gate
+  // already routes a rotation TGU into the `core` pool, beside its sibling.
+  check('PATTERN_TO_CATEGORY keeps rotation in core and lunge in unilateral',
+    PATTERN_TO_CATEGORY.rotation === 'core' && PATTERN_TO_CATEGORY.lunge === 'unilateral');
+  const subMovement = (m) => ({
+    movement_id: m.movement_id, name: m.name, pattern: m.pattern, is_compound: m.is_compound,
+    difficulty: m.difficulty, family: m.name.toLowerCase().replace(/[^a-z]+/g, '_'),
+    required: m.required, preference: 0, beginnerOk: m.beginner_ok,
+    capabilityAvailable: true, sportTracking: m.sportTracking,
+  });
+  const subLib = scopeLib.map(subMovement);
+  const tguTarget = subLib.find((m) => m.movement_id === LUNGE_TGU);
+  const subResult = computeSubstitutions({
+    target: tguTarget, library: subLib, inventory: [...EQUIPMENT_ITEMS],
+    niggles: [], futureSlots: [
+      { dayIndex: 3, plannedSlotId: 1, sets: 3, movement: subLib.find((m) => m.movement_id === CANON_TGU) },
+      { dayIndex: 3, plannedSlotId: 2, sets: 3, movement: subLib.find((m) => m.movement_id === 5) },
+    ], currentDayIndex: 1, trainingAge: 'elite', accessContext: 'weight_room',
+  });
+  check('the corrected TGU swaps within the core pool and never with lunge work',
+    subResult.layer2DaySwap.options.some((o) => o.movement_id === CANON_TGU)
+      && !subResult.layer2DaySwap.options.some((o) => o.movement_id === 5),
+    JSON.stringify(subResult.layer2DaySwap.options.map((o) => o.movement_id)));
+
+  // O3: specialist equipment is fail-closed at the ONLY enforcement point.
+  const boardPress = mv(151, 'Board Press', 'push_h',
+    { required: ['boards', 'bands', 'barbell', 'bench', 'squat_rack'] });
+  // Board Press is the ONLY push_h candidate here, so the single reason it can
+  // or cannot be drafted is the strict equipment-subset filter.
+  const boardLib = [...scopeLib.filter((m) => m.pattern !== 'push_h'), boardPress];
+  const withoutBoards = generateBlock({
+    profile: scopeProfile({ equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS] }),
+    movements: boardLib, startDate: START,
+  });
+  const withBoards = generateBlock({
+    profile: scopeProfile({ equipment_inventory: [...EQUIPMENT_ITEMS] }),
+    movements: boardLib, startDate: START,
+  });
+  check('a movement needing specialist equipment is unreachable on a full STANDARD inventory',
+    withoutBoards.sessions.every((s) => s.slots.every((sl) => sl.movement_id !== 151)));
+  check('every preset and the profile default leave that movement unreachable',
+    [...Object.values(EQUIPMENT_PRESETS), DEFAULT_PROFILE.equipment_inventory].every((inventory) =>
+      generateBlock({ profile: scopeProfile({ equipment_inventory: [...inventory] }), movements: boardLib, startDate: START })
+        .sessions.every((s) => s.slots.every((sl) => sl.movement_id !== 151))));
+  check('an explicit specialist opt-in is what makes it draftable — nothing else',
+    withBoards.sessions.some((s) => s.slots.some((sl) => sl.movement_id === 151)));
+  check('dropping any single required item alone makes it unreachable again',
+    boardPress.required.every((item) => generateBlock({
+      profile: scopeProfile({ equipment_inventory: EQUIPMENT_ITEMS.filter((i) => i !== item) }),
+      movements: boardLib, startDate: START,
+    }).sessions.every((s) => s.slots.every((sl) => sl.movement_id !== 151))));
+  check('SPECIALIST_EQUIPMENT_ITEMS is disjoint from every preset bundle',
+    Object.values(EQUIPMENT_PRESETS).every((bundle) =>
+      SPECIALIST_EQUIPMENT_ITEMS.every((i) => !bundle.includes(i))));
 }
 
+// --- [27] Custom Block Builder: implement tiering in picker (Phase 19) -------
+console.log('\n[27] custom block builder: picker implement tiering & sorting');
+{
+  // Total mapping: every implement lands in exactly one tier
+  check('barbell maps to Tier 1', mapImplementToTier('barbell') === 1);
+  check('dumbbell, kettlebell, bodyweight, band map to Tier 2',
+    ['dumbbell', 'kettlebell', 'bodyweight', 'band'].every((i) => mapImplementToTier(i) === 2));
+  check('cable, machine, other map to Tier 3',
+    ['cable', 'machine', 'other'].every((i) => mapImplementToTier(i) === 3));
+  check('unknown or null implement falls back to Tier 3',
+    mapImplementToTier(null) === 3 && mapImplementToTier('nonsense') === 3);
+  check('every taxonomy implement lands in exactly one tier [1, 2, 3]',
+    TAXONOMY_IMPLEMENTS.every((i) => [1, 2, 3].includes(mapImplementToTier(i))));
+
+
+  // Sort order Tier 1: usable first, difficulty DESCENDING (Adv > Int > Beg), name alphabetical
+  const t1Sample = [
+    { name: 'Back Squat', difficulty: 'Intermediate', implement: 'barbell', executable: true },
+    { name: 'Overhead Squat', difficulty: 'Advanced', implement: 'barbell', executable: true },
+    { name: 'Box Squat', difficulty: 'Intermediate', implement: 'barbell', executable: true },
+    { name: 'Locked Barbell Lift', difficulty: 'Advanced', implement: 'barbell', executable: false },
+    { name: 'Beginner Barbell Squat', difficulty: 'Beginner', implement: 'barbell', executable: true },
+  ];
+  const t1Sorted = sortPickerMovements(t1Sample, 1);
+  check('Tier 1 sorts usable first, then difficulty DESC, then name ASC',
+    JSON.stringify(t1Sorted.map((m) => m.name)) === JSON.stringify([
+      'Overhead Squat',        // Adv, usable
+      'Back Squat',            // Int, usable (B before B... wait 'Back' before 'Box')
+      'Box Squat',             // Int, usable
+      'Beginner Barbell Squat', // Beg, usable
+      'Locked Barbell Lift',   // Adv, locked (usable sorts above locked)
+    ]),
+    JSON.stringify(t1Sorted.map((m) => m.name)));
+
+  // Sort order Tiers 2 and 3: usable first, difficulty ASCENDING (Beg > Int > Adv), name alphabetical
+  const t2Sample = [
+    { name: 'Single-Leg RDL', difficulty: 'Advanced', implement: 'dumbbell', executable: true },
+    { name: 'Goblet Squat', difficulty: 'Beginner', implement: 'kettlebell', executable: true },
+    { name: 'DB Bench Press', difficulty: 'Intermediate', implement: 'dumbbell', executable: true },
+    { name: 'Locked DB Row', difficulty: 'Beginner', implement: 'dumbbell', executable: false },
+  ];
+  const t2Sorted = sortPickerMovements(t2Sample, 2);
+  check('Tier 2 sorts usable first, then difficulty ASC, then name ASC',
+    JSON.stringify(t2Sorted.map((m) => m.name)) === JSON.stringify([
+      'Goblet Squat',    // Beg, usable
+      'DB Bench Press',  // Int, usable
+      'Single-Leg RDL',  // Adv, usable
+      'Locked DB Row',   // Beg, locked (locked goes below usable)
+    ]),
+    JSON.stringify(t2Sorted.map((m) => m.name)));
+
+  // Tier 3 grouping and sorting
+  const fullSample = [...t1Sample, ...t2Sample,
+    { name: 'Cable Fly', difficulty: 'Intermediate', implement: 'cable', executable: true },
+    { name: 'Lat Pulldown', difficulty: 'Beginner', implement: 'cable', executable: true },
+  ];
+  const grouped = groupAndSortPickerMovements(fullSample);
+  check('grouped Tier 1 has 5 items sorted correctly', grouped[1].length === 5 && grouped[1][0].name === 'Overhead Squat');
+  check('grouped Tier 2 has 4 items sorted correctly', grouped[2].length === 4 && grouped[2][0].name === 'Goblet Squat');
+  check('grouped Tier 3 has 2 items sorted ASC (Lat Pulldown before Cable Fly)',
+    grouped[3].length === 2 && grouped[3][0].name === 'Lat Pulldown' && grouped[3][1].name === 'Cable Fly');
+
+  check('TIER_3_CAPTION is present and non-empty',
+    typeof TIER_3_CAPTION === 'string' && TIER_3_CAPTION.length > 0);
+}
+
+// ---------------------------------------------------------------------------
+// Work Order A: Split transparency and program focuses
+// ---------------------------------------------------------------------------
+console.log('\n[Work Order A: Split transparency and program focuses]');
+{
+  // Pin rehab profile behavior Francis hit: all full-body days across 1..7 frequency
+  for (let n = 1; n <= 7; n++) {
+    const focuses = programFocuses('rehab', n);
+    check(`programFocuses('rehab', ${n}) returns ${n} entries all equal to 'full'`,
+      focuses.length === n && focuses.every((f) => f === 'full'),
+      JSON.stringify(focuses));
+  }
+
+  // Pin strength 5-day split
+  const strength5 = programFocuses('strength', 5);
+  check("programFocuses('strength', 5) is ['lower','upper','lower','upper','full']",
+    JSON.stringify(strength5) === JSON.stringify(['lower', 'upper', 'lower', 'upper', 'full']),
+    JSON.stringify(strength5));
+
+  // Verify splitExplainer verbatim copy
+  const { splitExplainer, SPLIT_EXPLAINER_FOOTER } = require('./.build/blockGenerator.js');
+  check('splitExplainer for rehab matches approved copy',
+    splitExplainer('rehab', 5) === 'Every day is full-body and effort is capped at RPE 7. Rehab keeps volume low and frequency steady rather than loading any one pattern hard.');
+  check('splitExplainer for strength matches approved copy',
+    splitExplainer('strength', 5) === 'Alternating lower and upper days across 5 sessions, so each half recovers while the other works.');
+  check('splitExplainer for power matches approved copy',
+    splitExplainer('power', 4) === 'Alternating lower and upper days across 4 sessions, so each half recovers while the other works.');
+  check('splitExplainer for hypertrophy matches approved copy',
+    splitExplainer('hypertrophy', 3) === 'Alternating lower and upper days across 3 sessions, so each half recovers while the other works.');
+  check('splitExplainer for endurance matches approved copy',
+    splitExplainer('endurance', 3) === 'Full-body strength alternated with conditioning across 3 sessions.');
+  check('splitExplainer for weight_loss matches approved copy',
+    splitExplainer('weight_loss', 4) === 'Full-body strength alternated with conditioning across 4 sessions.');
+  check('splitExplainer for gpp matches approved copy',
+    splitExplainer('gpp', 4) === 'A mix of lower, upper, full-body and conditioning across 4 sessions — broad rather than specialised.');
+  check('splitExplainer for hybrid matches approved copy',
+    splitExplainer('hybrid', 4) === 'Strength days interleaved with mat time across 4 sessions, so grappling stays the priority.');
+  check('SPLIT_EXPLAINER_FOOTER matches approved copy',
+    SPLIT_EXPLAINER_FOOTER === 'You can change any day below.');
+}
+
+// --- [28] L1(a)/L2(b): prospective load intent + chain-scoped ladder floor ----
+//
+// Ratified 2026-08-29 (docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md §6):
+//   L1(a) constrained — the bodyweight route is taken only on an EXPLICIT
+//         prospective per-slot load intent. Intent may not be derived from
+//         dropdown order, taxonomy, equipment ownership, or retrospective set
+//         data; missing state fails closed toward the loaded path.
+//   L2(b) — the ladder rep floor applies to capability-chain movements only,
+//         honouring an applicable per-chain progression_policy. Unrelated
+//         bodyweight movements keep their phase prescription.
+//
+// The fixture above applies migrations 001-015 (30 movements) and derives
+// `plannedImplement` from `supported_prefixes[0]` — i.e. it reproduces the
+// defect under test. This section builds a SECOND fixture from the FULL live
+// 001-058 corpus (300 movements) so dropdown ordering is real.
+console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor (L2b)');
+{
+  const fullDb = new DatabaseSync(':memory:');
+  fullDb.exec('PRAGMA foreign_keys = ON;');
+  try { fullDb.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
+    fullDb.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+    fullDb.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+  }
+  for (const f of readdirSync(SCHEMA_DIR)
+    .filter((f) => /^\d{3}_.*\.sql$/.test(f) && !f.startsWith('004_'))
+    .sort()) {
+    fullDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+
+  const corpus = fullDb.prepare(
+    `SELECT m.movement_id, m.name, m.pattern, m.is_compound,
+            (SELECT json_group_array(me.item) FROM movement_equipment me
+             WHERE me.movement_id = m.movement_id) AS required_json,
+            (SELECT d.supported_prefixes FROM movement_detail d
+             WHERE d.movement_id = m.movement_id) AS prefixes_json,
+            (SELECT p.progression_group FROM movement_progression p
+             WHERE p.movement_id = m.movement_id) AS progression_group
+     FROM movement m ORDER BY m.movement_id`,
+  ).all();
+  check('[28] full corpus fixture is the live library, not the 001-015 subset',
+    corpus.length === 300, `${corpus.length} movements`);
+
+  const byName = new Map(corpus.map((r) => [r.name, r]));
+  const prefixesOf = (name) => JSON.parse(byName.get(name)?.prefixes_json ?? '[]');
+
+  // The three movements the audit named, plus the rest of the mixed set.
+  const MIXED = ['Bulgarian Split Squat', 'Walking Lunge', 'Weighted Pull-up',
+    'Chin-up', 'Glute Bridge', 'Nordic Curl', 'Push-up'];
+  check('[28] the mixed set lists Bodyweight FIRST and also supports external load',
+    MIXED.every((n) => {
+      const p = prefixesOf(n);
+      return p[0] === 'Bodyweight' && p.length > 1;
+    }), MIXED.map((n) => `${n}=${JSON.stringify(prefixesOf(n))}`).join(' '));
+
+  // A movement is only a member of a capability chain when movement_progression
+  // says so. 40 of the 55 dropdown-bodyweight movements are NOT members.
+  const chainMembers = new Set(corpus.filter((r) => r.progression_group !== null)
+    .map((r) => Number(r.movement_id)));
+  const dropdownBodyweight = corpus.filter((r) => JSON.parse(r.prefixes_json ?? '[]')[0] === 'Bodyweight');
+  check('[28] the corpus separates chain members from unrelated bodyweight work',
+    dropdownBodyweight.length === 55
+    && dropdownBodyweight.filter((r) => !chainMembers.has(Number(r.movement_id))).length === 40,
+    `${dropdownBodyweight.length} bodyweight-first, ${dropdownBodyweight.filter((r) => !chainMembers.has(Number(r.movement_id))).length} off-chain`);
+
+  /** Build a generator pool carrying an EXPLICIT prospective load intent.
+   *  `intent` maps movement name -> the implement selected for its planned
+   *  slot. For unmapped movements, the store's L1(a) rule applies:
+   *  a singleton supported_prefixes stands; multi-implement stays undeclared
+   *  and fails closed. Dropdown ordering is never consulted. */
+  const poolWithIntent = (intent = {}, c = corpus) => c.map((r) => {
+    const p = JSON.parse(r.prefixes_json ?? '[]');
+    return {
+      movement_id: Number(r.movement_id),
+      name: r.name,
+      pattern: r.pattern,
+      is_compound: Number(r.is_compound) === 1,
+      required: JSON.parse(r.required_json ?? '[]'),
+      difficulty: 'Beginner',
+      beginner_ok: false,
+      sportTracking: false,
+      capability_available_weight_room: true,
+      capability_available_sport_conditioning: true,
+      // L1(a): the implement ACTUALLY selected for the planned slot. If declared,
+      // the athlete's selection wins. If absent, a singleton supported set stands;
+      // multi-element lists stay undeclared and fail closed to the loaded path.
+      plannedImplement: Object.prototype.hasOwnProperty.call(intent, r.name)
+        ? intent[r.name]
+        : (p.length === 1 ? p[0] : undefined),
+      // Chain membership + applicable policy arrive as typed planning inputs
+      // (work order §7.3): the engine never queries the database.
+      progressionGroup: r.progression_group ?? undefined,
+    };
+  });
+
+  const planFor = (pool, over = {}) =>
+    generateBlock({ profile: prof(over), movements: pool, startDate: START });
+
+  /** The generator picks per pattern, so a named movement may simply not be
+   *  selected — which would make every assertion about it vacuously true.
+   *  Drop its pattern-mates so it is the ONLY candidate for its slot. */
+  const focusedOn = (name, intent = {}) => {
+    const target = byName.get(name);
+    const targetId = Number(target.movement_id);
+    return poolWithIntent(intent).filter((m) =>
+      m.movement_id === targetId || m.pattern !== target.pattern);
+  };
+
+  const slotsOf = (plan) => plan.sessions.flatMap((s) => s.slots);
+  const repsForMovement = (plan, movementId) =>
+    slotsOf(plan).filter((s) => s.movement_id === movementId).map((s) => s.reps);
+  const routedSlotsForMovement = (plan, movementId) => plan.sessions.flatMap((session) =>
+    session.slots.filter((slot) => slot.movement_id === movementId).map((slot) => ({
+      ...slot,
+      week_index: session.week_index,
+      phase: session.phase,
+    })));
+  const nonDeloadSlotsForMovement = (plan, movementId) =>
+    routedSlotsForMovement(plan, movementId).filter((slot) => slot.phase !== 'deload');
+  const deloadRepsForMovement = (plan, movementId) =>
+    routedSlotsForMovement(plan, movementId)
+      .filter((slot) => slot.phase === 'deload').map((slot) => slot.reps);
+  /** sets x reps — Option C routes VOLUME, and an off-chain bodyweight movement
+   *  correctly keeps its phase reps, so reps alone cannot tell the classes apart. */
+  const shapeForMovement = (plan, movementId) =>
+    slotsOf(plan).filter((s) => s.movement_id === movementId).map((s) => `${s.sets}x${s.reps}`);
+
+  // --- the falsifier: ordering alone must not move the dose ------------------
+  // Permuting supported_prefixes changes element zero and nothing else. Under
+  // L1(a) the plan must be byte-identical, because order is not intent.
+  const baseline = planFor(poolWithIntent());
+  const reorderedCorpus = corpus.map((r) => {
+    const p = JSON.parse(r.prefixes_json ?? '[]');
+    return { ...r, prefixes_json: JSON.stringify([...p].reverse()) };
+  });
+  const reorderedPool = poolWithIntent({}, reorderedCorpus);
+  const reversedPrefixesCount = reorderedCorpus.filter((r, i) => {
+    const pOrig = JSON.parse(corpus[i].prefixes_json ?? '[]');
+    const pRev = JSON.parse(r.prefixes_json ?? '[]');
+    return pOrig.length > 1 && pRev[0] !== pOrig[0];
+  }).length;
+  check('[28] reversing every supported_prefixes list cannot change the plan',
+    reversedPrefixesCount === 17
+    && JSON.stringify(planFor(reorderedPool)) === JSON.stringify(baseline),
+    `${reversedPrefixesCount} multi-prefix movements inverted`);
+
+  // --- explicit intent routes, both directions ------------------------------
+  const pushUp = byName.get('Push-up');
+  check('[28] Push-up probe movement exists in corpus', pushUp !== undefined);
+  if (pushUp !== undefined) {
+    const id = Number(pushUp.movement_id);
+    const atPeak = (pool) => generateBlock({
+      profile: prof(), movements: pool, startDate: START, macroBlockIndex: 7,
+    });
+    const unloaded = atPeak(focusedOn('Push-up', { 'Push-up': 'Bodyweight' }));
+    const loaded = atPeak(focusedOn('Push-up', { 'Push-up': 'Banded' }));
+    const unknown = atPeak(focusedOn('Push-up'));
+
+    const unloadedSlots = nonDeloadSlotsForMovement(unloaded, id);
+    const loadedSlots = nonDeloadSlotsForMovement(loaded, id);
+    const unknownSlots = nonDeloadSlotsForMovement(unknown, id);
+    const floor = DEFAULT_ADVANCEMENT_POLICY.requiredReps;
+
+    check('[28] explicit Bodyweight intent: chain floor applies on the Option C bodyweight set route',
+      unloadedSlots.length > 0 && unloadedSlots.every((slot) => slot.reps >= floor)
+      && JSON.stringify(unloadedSlots.map((slot) => slot.sets))
+        !== JSON.stringify(loadedSlots.map((slot) => slot.sets)),
+      `bodyweight=${JSON.stringify(unloadedSlots.map((slot) => `${slot.sets}x${slot.reps}`))}`);
+    check('[28] explicit external-load intent: chain floor remains while sets stay on the loaded route',
+      loadedSlots.length > 0 && loadedSlots.every((slot) => slot.reps >= floor)
+      && JSON.stringify(loadedSlots.map((slot) => slot.sets))
+        === JSON.stringify(unknownSlots.map((slot) => slot.sets)),
+      `loaded=${JSON.stringify(loadedSlots.map((slot) => `${slot.sets}x${slot.reps}`))}`);
+    check('[28] undeclared intent: chain floor remains while fail-closed routing matches loaded sets',
+      unknownSlots.length > 0 && unknownSlots.every((slot) => slot.reps >= floor)
+      && JSON.stringify(unknownSlots.map((slot) => `${slot.sets}x${slot.reps}`))
+        === JSON.stringify(loadedSlots.map((slot) => `${slot.sets}x${slot.reps}`)),
+      `unknown=${JSON.stringify(unknownSlots.map((slot) => `${slot.sets}x${slot.reps}`))}`);
+    check('[28] deload reps are intent-independent and bypass the chain floor',
+      JSON.stringify(deloadRepsForMovement(unloaded, id))
+        === JSON.stringify(deloadRepsForMovement(loaded, id))
+      && JSON.stringify(deloadRepsForMovement(unknown, id))
+        === JSON.stringify(deloadRepsForMovement(loaded, id))
+      && deloadRepsForMovement(loaded, id).length > 0
+      && deloadRepsForMovement(loaded, id).every((reps) => reps < floor),
+      `deload=${JSON.stringify(deloadRepsForMovement(loaded, id))}`);
+  }
+
+  // --- weighted calisthenics is loaded --------------------------------------
+  const weightedPullUp = byName.get('Weighted Pull-up');
+  check('[28] Weighted Pull-up probe movement exists in corpus', weightedPullUp !== undefined);
+  if (weightedPullUp !== undefined) {
+    const id = Number(weightedPullUp.movement_id);
+    const asLoaded = shapeForMovement(planFor(focusedOn('Weighted Pull-up', { 'Weighted Pull-up': 'Banded' })), id);
+    const asUnloaded = shapeForMovement(planFor(focusedOn('Weighted Pull-up', { 'Weighted Pull-up': 'Bodyweight' })), id);
+    check('[28] weighted calisthenics follows the loaded path despite supporting Bodyweight',
+      asLoaded.length > 0 && JSON.stringify(asLoaded) !== JSON.stringify(asUnloaded),
+      `loaded=${JSON.stringify(asLoaded)} unloaded=${JSON.stringify(asUnloaded)}`);
+  }
+
+  // --- the named dropdown-order victims -------------------------------------
+  for (const name of ['Bulgarian Split Squat', 'Walking Lunge']) {
+    const row = byName.get(name);
+    check(`[28] ${name} probe movement exists in corpus`, row !== undefined);
+    if (row === undefined) continue;
+    const id = Number(row.movement_id);
+    const loadedSelection = shapeForMovement(planFor(focusedOn(name, { [name]: 'DB' })), id);
+    const bodyweightSelection = shapeForMovement(planFor(focusedOn(name, { [name]: 'Bodyweight' })), id);
+    check(`[28] ${name} is not bodyweight merely because the dropdown starts with it`,
+      loadedSelection.length > 0
+      && JSON.stringify(loadedSelection) !== JSON.stringify(bodyweightSelection),
+      `DB=${JSON.stringify(loadedSelection)} BW=${JSON.stringify(bodyweightSelection)}`);
+  }
+
+  // --- L2(b): the floor is chain-scoped -------------------------------------
+  // An off-chain bodyweight movement keeps its PHASE prescription; it must not
+  // be lifted to the ladder bar it is not measured against.
+  const offChain = dropdownBodyweight.find((r) => !chainMembers.has(Number(r.movement_id))
+    && r.pattern !== 'locomotion'
+    && JSON.parse(r.prefixes_json ?? '[]').some((prefix) => prefix !== 'Bodyweight'));
+  const onChain = dropdownBodyweight.find((r) => chainMembers.has(Number(r.movement_id))
+    && r.pattern !== 'locomotion');
+  check('[28] on-chain and off-chain probe movements exist in corpus',
+    offChain !== undefined && onChain !== undefined,
+    `on=${onChain?.name} off=${offChain?.name}`);
+  if (offChain !== undefined && onChain !== undefined) {
+    const repsAtPeak = (row, intent) => routedSlotsForMovement(generateBlock({
+      profile: prof(),
+      movements: focusedOn(row.name, intent === undefined ? {} : { [row.name]: intent }),
+      startDate: START, macroBlockIndex: 7,
+    }), Number(row.movement_id));
+    const offBodyweight = repsAtPeak(offChain, 'Bodyweight');
+    const offLoaded = repsAtPeak(offChain,
+      JSON.parse(offChain.prefixes_json ?? '[]').find((prefix) => prefix !== 'Bodyweight'));
+    const offUnknown = repsAtPeak(offChain, undefined);
+    const onReps = repsAtPeak(onChain, 'Bodyweight').filter((slot) => slot.phase !== 'deload');
+    const offNonDeload = offBodyweight.filter((slot) => slot.phase !== 'deload');
+    // The pair is the point: L2(b) says the floor is chain-scoped, so exactly
+    // one of these two is lifted to the bar.
+    check(`[28] L2(b) the ladder floor is chain-scoped (on=${onChain.name}, off=${offChain.name})`,
+      onReps.length > 0 && offNonDeload.length > 0
+      && onReps.every((slot) => slot.reps >= DEFAULT_ADVANCEMENT_POLICY.requiredReps)
+      && offNonDeload.every((slot) => slot.reps < DEFAULT_ADVANCEMENT_POLICY.requiredReps),
+      `on-chain=${JSON.stringify(onReps.map((slot) => slot.reps))}`
+      + ` off-chain=${JSON.stringify(offBodyweight.map((slot) => slot.reps))}`);
+    check(`[28] off-chain phase reps are intent-independent (${offChain.name})`,
+      offBodyweight.length > 0
+      && JSON.stringify(offBodyweight.map((slot) => slot.reps))
+        === JSON.stringify(offLoaded.map((slot) => slot.reps))
+      && JSON.stringify(offUnknown.map((slot) => slot.reps))
+        === JSON.stringify(offLoaded.map((slot) => slot.reps)),
+      `bodyweight=${JSON.stringify(offBodyweight.map((slot) => slot.reps))}`
+      + ` loaded=${JSON.stringify(offLoaded.map((slot) => slot.reps))}`);
+  }
+
+  // --- L2(b): a per-chain policy overrides the default ----------------------
+  // progression_policy ships with zero rows; insert a supported custom value
+  // and prove the prescription follows the CHAIN's bar, not the global default.
+  fullDb.prepare(
+    'INSERT INTO progression_policy (progression_group, required_sets, required_value) VALUES (?, ?, ?)',
+  ).run('pull-up', 3, 12);
+  const customPolicyRow = fullDb.prepare(
+    'SELECT required_value FROM progression_policy WHERE progression_group = ?',
+  ).get('pull-up');
+  const customPolicyBar = Number(customPolicyRow.required_value);
+  const chainMember = corpus.find((r) => r.progression_group === 'pull-up'
+    && JSON.parse(r.prefixes_json ?? '[]').includes('Bodyweight')
+    && JSON.parse(r.prefixes_json ?? '[]').some((prefix) => prefix !== 'Bodyweight'));
+  check('[28] pull-up chain member with multi-prefix exists for custom policy probe',
+    chainMember !== undefined, chainMember?.name ?? 'none');
+  if (chainMember !== undefined) {
+    const id = Number(chainMember.movement_id);
+    const external = JSON.parse(chainMember.prefixes_json ?? '[]')
+      .find((prefix) => prefix !== 'Bodyweight');
+    const withPolicy = (intent) => focusedOn(chainMember.name,
+      intent === undefined ? {} : { [chainMember.name]: intent }).map((m) => (
+      m.movement_id === id ? { ...m, chainAdvancementReps: customPolicyBar } : m));
+    const bodyweightPlan = planFor(withPolicy('Bodyweight'));
+    const loadedPlan = planFor(withPolicy(external));
+    const unknownPlan = planFor(withPolicy(undefined));
+    const bodyweightSlots = nonDeloadSlotsForMovement(bodyweightPlan, id);
+    const loadedSlots = nonDeloadSlotsForMovement(loadedPlan, id);
+    const unknownSlots = nonDeloadSlotsForMovement(unknownPlan, id);
+    check(`[28] custom per-chain policy floors Bodyweight, loaded, and undeclared routes (${chainMember.name}, bar ${customPolicyBar})`,
+      bodyweightSlots.length > 0
+      && [bodyweightSlots, loadedSlots, unknownSlots]
+        .every((slots) => slots.every((slot) => slot.reps >= customPolicyBar)),
+      `BW=${JSON.stringify(bodyweightSlots.map((slot) => slot.reps))}`
+      + ` loaded=${JSON.stringify(loadedSlots.map((slot) => slot.reps))}`
+      + ` unknown=${JSON.stringify(unknownSlots.map((slot) => slot.reps))}`);
+    check('[28] custom policy preserves loaded fail-closed set routing',
+      loadedSlots.length > 0
+      && JSON.stringify(loadedSlots.map((slot) => slot.sets))
+        === JSON.stringify(unknownSlots.map((slot) => slot.sets))
+      && JSON.stringify(bodyweightSlots.map((slot) => slot.sets))
+        !== JSON.stringify(loadedSlots.map((slot) => slot.sets)));
+    check('[28] custom policy never floors deload reps',
+      JSON.stringify(deloadRepsForMovement(bodyweightPlan, id))
+        === JSON.stringify(deloadRepsForMovement(loadedPlan, id))
+      && JSON.stringify(deloadRepsForMovement(unknownPlan, id))
+        === JSON.stringify(deloadRepsForMovement(loadedPlan, id))
+      && deloadRepsForMovement(loadedPlan, id).length > 0
+      && deloadRepsForMovement(loadedPlan, id).every((reps) => reps < customPolicyBar),
+      JSON.stringify(deloadRepsForMovement(loadedPlan, id)));
+  }
+
+  // --- loaded prescriptions are untouched by all of the above ---------------
+  const loadedOnly = corpus.filter((r) => JSON.parse(r.prefixes_json ?? '[]')[0] !== 'Bodyweight');
+  const loadedIds = new Set(loadedOnly.map((r) => Number(r.movement_id)));
+  const loadedRepsBaseline = slotsOf(baseline)
+    .filter((s) => loadedIds.has(s.movement_id)).map((s) => `${s.movement_id}:${s.reps}:${s.sets}`);
+  const loadedRepsWithIntent = slotsOf(planFor(poolWithIntent({ 'Push-up': 'Bodyweight' })))
+    .filter((s) => loadedIds.has(s.movement_id)).map((s) => `${s.movement_id}:${s.reps}:${s.sets}`);
+  check('[28] declaring one bodyweight intent leaves every loaded prescription unchanged',
+    loadedRepsBaseline.length > 0
+    && JSON.stringify(loadedRepsBaseline) === JSON.stringify(loadedRepsWithIntent),
+    `${loadedRepsBaseline.length} loaded slots compared`);
+
+  // --- [29] W4 bodyweight rep law: working-week reps never fall while target
+  // RPE rises on a slot with NO external-load channel (owner's device finding:
+  // gpp + WAVE gave 3x10 @ 6.5 in week 1 and 3x8 @ 7.5 in week 2). Deload
+  // stays exempt; loaded slots keep the WAVE shrink because their load
+  // channel is real. ---
+  console.log('[29] bodyweight rep law (no rep fall with rising RPE without a load channel)');
+  {
+    const planW4 = (pool, over = {}, schema = 'WAVE') =>
+      generateBlock({ profile: prof(over), movements: pool, startDate: START, schemaType: schema });
+
+    // The owner's exact case: gpp, WAVE, three-day split, Push-up planned
+    // bodyweight on the upper day (week 1: 10 @ 6.5, week 2 would be 8 @ 7.5).
+    const bwPool = focusedOn('Push-up', { 'Push-up': 'Bodyweight' });
+    const bwPlan = planW4(bwPool, { objective: 'gpp', weekly_frequency: 3, session_duration_cap_min: 90 });
+    const pushupId = Number(byName.get('Push-up').movement_id);
+    const routed = bwPlan.sessions.flatMap((s) =>
+      s.slots.filter((sl) => sl.movement_id === pushupId).map((sl) => ({
+        week: s.week_index, phase: s.phase, sets: sl.sets, reps: sl.reps, rpe: sl.target_rpe,
+      })));
+    const week1 = routed.find((r) => r.week === 1);
+    const week2 = routed.find((r) => r.week === 2);
+    const deloadWeek = routed.find((r) => r.phase === 'deload');
+    check('[29] the owner regression reproduces the start point: WAVE gpp week 1 is 10 reps @ 6.5',
+      week1 !== undefined && week1.reps === 10 && week1.rpe === 6.5, JSON.stringify(week1));
+    check('[29] week 2 does NOT become 8 reps at 7.5 — reps hold while effort rises',
+      week2 !== undefined && week2.rpe > week1.rpe && week2.reps >= week1.reps, JSON.stringify(week2));
+    // The general conditional law across ALL working weeks of the block:
+    // whenever target RPE rises week-over-week, reps must not fall.
+    const working = routed.filter((r) => r.phase !== 'deload');
+    const lawHolds = working.every((r, i) =>
+      i === 0 || r.rpe <= working[i - 1].rpe || r.reps >= working[i - 1].reps);
+    check('[29] the conditional law holds across every working-week pair (RPE up => reps never down)',
+      lawHolds, JSON.stringify(working));
+    check('[29] deload volume cut lands on SETS, never as a rep claim',
+      deloadWeek !== undefined && deloadWeek.sets < working[working.length - 1].sets,
+      JSON.stringify(deloadWeek));
+
+    // Loaded counter-check: with a real load channel the WAVE rep shrink is
+    // preserved (that is the "fewer reps at higher external load" route).
+    const loadedPlan = planW4(focusedOn('Romanian Deadlift', {}),
+      { objective: 'gpp', weekly_frequency: 3, session_duration_cap_min: 90 });
+    const rdlId = Number(byName.get('Romanian Deadlift').movement_id);
+    const rdl = loadedPlan.sessions.flatMap((s) =>
+      s.slots.filter((sl) => sl.movement_id === rdlId).map((sl) => ({
+        week: s.week_index, reps: sl.reps, rpe: sl.target_rpe,
+      })));
+    check('[29] loaded WAVE shrink is preserved (10 -> 8 with a real load channel)',
+      rdl.some((r) => r.week === 1 && r.reps === 10) && rdl.some((r) => r.week === 2 && r.reps === 8),
+      JSON.stringify(rdl));
+
+    // Weekly legibility: every representative slot gets one honest line, and
+    // no bodyweight slot is ever explained as an external-load trade.
+    const resolveMovement = (id) => {
+      const row = bwPool.find((m) => m.movement_id === id);
+      return row === undefined ? undefined
+        : { name: row.name, bodyweight: row.plannedImplement === 'Bodyweight' };
+    };
+    const summary = weeklyProgressionSummary(bwPlan, resolveMovement);
+    check('[29] weekly progression summary explains the deload and never claims a bodyweight load trade',
+      summary.some((line) => line.includes('deload'))
+      && !summary.some((line) => line.includes('external load') && line.includes('Bodyweight')),
+      JSON.stringify(summary));
+  }
+}
+
+// --- P1: the implement-to-equipment resolver is TOTAL and fail-closed --------
+// A movement equipment requirement gates the MOVEMENT, never the implement, so
+// this resolver is the only thing standing between a declaration and planning
+// an implement the athlete does not own. It must cover every prefix in the
+// canonical vocabulary, and every item it names must be a real equipment item.
+{
+  const { MOVEMENT_PREFIXES, EQUIPMENT_ITEMS, IMPLEMENT_REQUIREMENT, implementAvailable } =
+    require('./.build/types.js');
+  const missing = MOVEMENT_PREFIXES.filter((p) => IMPLEMENT_REQUIREMENT[p] === undefined);
+  check('[P1-equip] every MOVEMENT_PREFIX has an equipment requirement (resolver is total)',
+    missing.length === 0, missing.join(',') || `${MOVEMENT_PREFIXES.length} prefixes covered`);
+
+  const bogus = [];
+  for (const prefix of MOVEMENT_PREFIXES) {
+    const req = IMPLEMENT_REQUIREMENT[prefix];
+    if (req.kind !== 'anyOf') continue;
+    for (const item of req.items) if (!EQUIPMENT_ITEMS.includes(item)) bogus.push(`${prefix}->${item}`);
+  }
+  check('[P1-equip] every named requirement is a real EQUIPMENT_ITEMS entry',
+    bogus.length === 0, bogus.join(',') || 'all canonical');
+
+  // Bodyweight is the only implement an empty inventory can perform, and an
+  // unverifiable implement is never assumed available.
+  const emptyOk = MOVEMENT_PREFIXES.filter((p) => implementAvailable(p, []));
+  check('[P1-equip] an empty inventory can perform Bodyweight and nothing else',
+    emptyOk.length === 1 && emptyOk[0] === 'Bodyweight', emptyOk.join(','));
+  const unverifiable = MOVEMENT_PREFIXES.filter((p) => IMPLEMENT_REQUIREMENT[p].kind === 'unverifiable');
+  check('[P1-equip] an unverifiable implement is never available, on any inventory',
+    unverifiable.every((p) => !implementAvailable(p, [...EQUIPMENT_ITEMS])),
+    unverifiable.join(',') || 'none');
+
+  // The reviewer counterexample, at the resolver level.
+  check('[P1-equip] Walking Lunge implements resolve against inventory, not the movement',
+    implementAvailable('Bodyweight', []) === true
+      && implementAvailable('DB', []) === false
+      && implementAvailable('BB', []) === false
+      && implementAvailable('DB', ['dumbbells']) === true
+      && implementAvailable('BB', ['dumbbells']) === false
+      && implementAvailable('BB', ['barbell']) === true);
+}
+
+// --- F2: the corpus divergence figure quoted in types.ts is MEASURED ----------
+// types.ts justifies IMPLEMENT_REQUIREMENT's existence with a number. That
+// number was wrong once already: it read "15 of 17" until Gemini 3.8's round-1
+// audit refuted it (F2) and a re-derivation returned 17 of 17 — the two missed
+// were Chin-up and Weighted Pull-up, which require a pull-up bar yet offer
+// Banded, and Banded needs bands. A prose number nobody recomputes is a claim,
+// not evidence, so it is derived from the live corpus here instead.
+//
+// [OW-017] rides along on the same query, and guards a CORPUS invariant rather
+// than the code defect it was written for. HISTORICALLY, plannedImplementFor's
+// sole-supported-prefix fallback did not consult implementAvailable, so a
+// movement whose only implement needs equipment its own movement_equipment rows
+// never require would have been planned with a tool the athlete may not own.
+// That check now exists (useStore.ts, the `sole` branch), so the code hole is
+// closed. What this gate preserves is the separate, still-useful fact that the
+// shipped corpus contains no such movement at all — defence in depth from the
+// other side. A library correction that introduces one fails here, which is the
+// signal that the guard has stopped being theoretical and started firing.
+{
+  const { IMPLEMENT_REQUIREMENT } = require('./.build/types.js');
+  // NOT the module-level `db`: that one stops at migration 015, so it holds the
+  // old 010-era library rather than the shipped corpus. Migration 049 narrows
+  // several supported_prefixes lists, and the truncated DB reports 19
+  // multi-implement movements where the shipped one has 17. The claim in
+  // types.ts is about what reaches an athlete's device, so this gate applies the
+  // WHOLE chain to its own database.
+  const corpus = new DatabaseSync(':memory:');
+  corpus.exec('PRAGMA foreign_keys = ON;');
+  // 004 is NOT a migration — migrations.ts:4 records it as the parameterized
+  // daily upsert the DAO executes, so it carries unbound parameters. Section
+  // [28] already excludes it; this block once counted it as a migration.
+  // Migration 064 legitimately advanced the executable chain to 63 entries;
+  // 065 (session preparation side-car), 066 (focus and goals) and 067 (sport
+  // profile and block emphasis record) add no
+  // library rows and advance it to 65.
+  const chain = readdirSync(SCHEMA_DIR)
+    .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
+    .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
+  for (const f of chain) corpus.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+
+  const rows = corpus.prepare(`
+    SELECT m.movement_id AS id, m.name AS name, d.supported_prefixes AS prefixes
+      FROM movement m JOIN movement_detail d ON d.movement_id = m.movement_id
+  `).all();
+  // Pin the corpus itself, so a library change cannot move the figures below
+  // without announcing itself.
+  check('[F2-corpus] the shipped catalogue is the one being measured',
+    rows.length === 300 && chain.length === 68,
+    `${rows.length} movements from ${chain.length} migrations`);
+
+  // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against
+  // MOVEMENT_PREFIXES, but it reads the module-level `db` and pins
+  // detailRows.length === 30, so it sees only the 001-015 fixture. An invalid
+  // token introduced by a LATER migration — the 270 movements added by 016,
+  // 037-048 and 049 — is invisible to it. Nothing else enforces membership:
+  // 010's CHECK is json_valid() only, and the membership rule lives in a
+  // comment. So the full-corpus check belongs here, where the whole chain is
+  // already applied.
+  const badTokens = [];
+  const seen = new Set();
+  for (const r of rows) {
+    for (const token of JSON.parse(r.prefixes)) {
+      seen.add(token);
+      if (!MOVEMENT_PREFIXES.includes(token)) badTokens.push(`${r.name}:${token}`);
+    }
+  }
+  check('[F2-corpus] every supported_prefixes token in the SHIPPED corpus is a MOVEMENT_PREFIX',
+    badTokens.length === 0,
+    badTokens.join(',') || `${seen.size} distinct tokens over ${rows.length} movements`);
+  const equipOf = new Map();
+  for (const r of corpus.prepare('SELECT movement_id, item FROM movement_equipment').all()) {
+    if (!equipOf.has(r.movement_id)) equipOf.set(r.movement_id, new Set());
+    equipOf.get(r.movement_id).add(r.item);
+  }
+  // UNIMPLIED: nothing the movement itself requires guarantees the equipment
+  // this implement needs. 'unverifiable' is never implied by anything.
+  const unimplied = (prefix, owned) => {
+    const req = IMPLEMENT_REQUIREMENT[prefix];
+    if (req === undefined || req.kind === 'unverifiable') return true;
+    if (req.kind === 'none') return false;
+    return !req.items.some((item) => owned.has(item));
+  };
+
+  const multi = rows.filter((r) => JSON.parse(r.prefixes).length > 1);
+  const diverging = multi.filter((r) =>
+    JSON.parse(r.prefixes).some((p) => unimplied(p, equipOf.get(r.id) ?? new Set())));
+  check('[F2-corpus] every multi-implement movement offers an unimplied implement (17 of 17)',
+    multi.length === 17 && diverging.length === multi.length,
+    `${diverging.length} of ${multi.length}`);
+
+  // The DENOMINATOR is pinned too, not just the violation count. "0 of 235" is
+  // the figure the register quotes, and a migration could hold violations at
+  // zero while moving the candidate set — leaving the register's number stale
+  // with every gate still green. Same principle as chain.length above: a number
+  // that only gets printed is decoration.
+  const soleCandidates = rows.filter((r) => {
+    const p = JSON.parse(r.prefixes);
+    return p.length === 1 && p[0] !== 'Bodyweight';
+  });
+  const soleHole = soleCandidates.filter((r) =>
+    unimplied(JSON.parse(r.prefixes)[0], equipOf.get(r.id) ?? new Set()));
+  check('[OW-017] no sole-prefix movement needs equipment its own requirement omits (0 of 235)',
+    soleHole.length === 0 && soleCandidates.length === 235,
+    soleHole.map((r) => `${r.name}:${JSON.parse(r.prefixes)[0]}`).join(',')
+      || `${soleHole.length} of ${soleCandidates.length}`);
+}
+
+// --- OW-006: the bodyweight fatigue branch is DEAD, and this is the tripwire ---
+// blockGenerator computes bodyweightDominant from the whole movement catalogue,
+// not the block's slots, so it is always false in production and the branch
+// never evaluates. That is harmless ONLY because both branches resolve to the
+// same table. This pins that alias deliberately, as a signpost rather than a
+// contract: if it ever fails, a real bodyweight coefficient has been ratified
+// (OW-026) and blockGenerator's reachability must be fixed in the SAME change,
+// or the ratified numbers will sit in code that cannot be reached.
+{
+  const { schemaFatigueCost } = require('./.build/blockGenerator.js');
+  const schemas = Object.keys(SCHEMA_FATIGUE_COST);
+  const phases = Object.keys(SCHEMA_FATIGUE_COST[schemas[0]]);
+  const divergent = [];
+  for (const schema of schemas) {
+    for (const phase of phases) {
+      const loaded = schemaFatigueCost(schema, phase, false);
+      const bodyweight = schemaFatigueCost(schema, phase, true);
+      if (loaded !== bodyweight) divergent.push(`${schema}/${phase}: ${loaded} vs ${bodyweight}`);
+    }
+  }
+  check('[OW-006] no bodyweight fatigue coefficient is ratified yet - if this FAILS, OW-026 landed and bodyweightDominant must be made reachable in the same change',
+    divergent.length === 0 && schemas.length > 0 && phases.length > 0,
+    divergent.join('; ') || `${schemas.length} schemas x ${phases.length} phases identical`);
+}
+
+try { verifyR05Blocks(); } catch (error) { check('R05 experience-only block workload', false, error.message); }
+try { verifyR05Eligibility(); } catch (error) { check('R05 eligibility unchanged by D02', false, error.message); }
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

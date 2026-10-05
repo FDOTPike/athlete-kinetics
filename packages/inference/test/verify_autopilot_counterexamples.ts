@@ -458,10 +458,13 @@ expectPass(
     same(actions(normalAlignment), Array<ActionName>(8).fill('neutral')),
 );
 expectPass(
-  'R2 shifted peak week-1 deload settles neutral',
+  'R2 shifted peak case settles identical to normal peak under Calibration Policy v1',
   shiftedAlignment.trajectory === 'converged_neutral' &&
-    shiftedAlignment.blocks.every((block) => block.peakShifted) &&
-    same(phi4(shiftedAlignment), Array<number>(8).fill(0)) &&
+    shiftedAlignment.blocks.every((block) => !block.peakShifted) &&
+    same(phi4(shiftedAlignment), [
+      -0.0296, -0.0357, -0.0343, -0.0329,
+      -0.032, -0.0316, -0.0313, -0.0312,
+    ]) &&
     same(actions(shiftedAlignment), Array<ActionName>(8).fill('neutral')),
 );
 if (failed > 0) {

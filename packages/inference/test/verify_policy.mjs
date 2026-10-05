@@ -80,12 +80,30 @@ for (const acwr of [null, 0.9, 1.2, 1.4]) {
   }
 }
 check('load_modifier monotone non-decreasing in readiness', mono);
-let hardCut = true;
-for (const r of [0, 30, 50, 70, 90, 100]) {
-  const v = policy.evaluatePolicy(row(r, 1.51, 1.5, 95));
-  if (v.load_modifier !== 0.85 || v.set_modifier !== -2) hardCut = false;
+// ACWR observational invariance (Calibration Policy v1):
+// Across any ACWR value in {null, 0.1, 0.79, 1.0, 1.31, 1.5, 1.51, 2.5, 9.9},
+// evaluatePolicy output (including coaching_cue) must be strictly identical for fixed non-ACWR inputs.
+let acwrInvariant = true;
+let acwrMismatch = null;
+const acwrValues = [null, 0.1, 0.79, 1.0, 1.31, 1.5, 1.51, 2.5, 9.9];
+for (const r of [20, 38.2, 45, 60, 75, 85, 90, 100]) {
+  for (const hrvz of [null, -2.0, -1.0, 0, 0.5, 1.5]) {
+    for (const slp of [null, 65, 85, 95]) {
+      const baseline = policy.evaluatePolicy(row(r, null, hrvz, slp));
+      for (const acwr of acwrValues) {
+        const current = policy.evaluatePolicy(row(r, acwr, hrvz, slp));
+        if (JSON.stringify(current) !== JSON.stringify(baseline)) {
+          acwrInvariant = false;
+          if (acwrMismatch === null) {
+            acwrMismatch = { r, hrvz, slp, acwr, baseline, current };
+          }
+        }
+      }
+    }
+  }
 }
-check('ACWR > 1.5 always forces 0.85 load / -2 sets regardless of readiness', hardCut);
+check('ACWR observational invariance: evaluatePolicy output deep-equal across ACWR values (incl cue)',
+  acwrInvariant, acwrMismatch ? JSON.stringify(acwrMismatch).slice(0, 120) : 'all sweep states equal');
 const naNeutral = policy.evaluatePolicy(row(90, null, null, null));
 check('all-NA telemetry at R=90 -> hold (1.00 load, 0 sets), never boost',
   naNeutral.load_modifier === 1.0 && naNeutral.set_modifier === 0,
@@ -359,6 +377,97 @@ check('a recorded halt survives every training-age change (never relaxed)',
 check('control: the same report WITHOUT the recorded-halt flag does not halt a tolerant age',
   derivePrescription({ vector: boostRow, profile: { ...DEFAULT_PROFILE, training_age: 'beginner' },
     ctx: ctx0, reports: [{ entry: entryOf('soreness-doms'), severity: 4, wasHalt: false }] }).directive === null);
+
+// --- [8] Calibration Policy v1: Retrospective signal invariants -----------------
+console.log('[8] Calibration Policy v1: Retrospective signal invariants');
+const prospectivePlannerFiles = [
+  'blockGenerator.ts',
+  'routineComposer.ts',
+  'routineMicrocycle.ts',
+  'derivePrescription.ts',
+  'profileLimits.ts',
+  'policyReference.ts',
+];
+let retrospectiveSourceLeak = null;
+for (const pf of prospectivePlannerFiles) {
+  const code = readFileSync(join(import.meta.dirname, '..', 'src', pf), 'utf-8');
+  if (/\bhard_sets\b/.test(code) || /\bsession_rpe\b/.test(code)) {
+    retrospectiveSourceLeak = pf;
+  }
+}
+check('source tripwire: hard_sets and session_rpe appear in NO prospective planner',
+  retrospectiveSourceLeak === null, retrospectiveSourceLeak ? `leaked in ${retrospectiveSourceLeak}` : '6 files clean');
+
+const cleanPolicyResult = policy.evaluatePolicy(boostRow);
+const poisonedPolicyResult = policy.evaluatePolicy({ ...boostRow, hard_sets: 9999, session_rpe: 10.0 });
+check('policy evaluation is invariant to poisoned retrospective signals (pure function of StateVectorRow)',
+  JSON.stringify(cleanPolicyResult) === JSON.stringify(poisonedPolicyResult));
+
+const cleanPrescription = derivePrescription({ vector: boostRow, profile: DEFAULT_PROFILE, ctx: ctx0, reports: [] });
+const poisonedPrescription = derivePrescription({
+  vector: { ...boostRow, hard_sets: 9999, session_rpe: 10.0 },
+  profile: { ...DEFAULT_PROFILE, hard_sets: 9999, session_rpe: 10.0 },
+  ctx: { ...ctx0, hard_sets: 9999, session_rpe: 10.0 },
+  reports: [],
+});
+check('derivePrescription output is byte-identical when retrospective signals are poisoned',
+  JSON.stringify(cleanPrescription) === JSON.stringify(poisonedPrescription));
+
+// --- [9] Calibration Policy v1: 21-day return check-in evaluation ---------------
+console.log('[9] Calibration Policy v1: 21-day return check-in evaluation');
+const returnMod = require('./.build/returnFromLayoff.js');
+const { evaluateReturn, LAYOFF_GAP_DAYS, RETURN_OPTIONS } = returnMod;
+check('LAYOFF_GAP_DAYS is 21', LAYOFF_GAP_DAYS === 21);
+check('evaluateReturn(0) is not a layoff', evaluateReturn(0).isLayoff === false);
+check('evaluateReturn(20) is not a layoff', evaluateReturn(20).isLayoff === false);
+check('evaluateReturn(21) is a layoff', evaluateReturn(21).isLayoff === true);
+check('evaluateReturn(45) is a layoff', evaluateReturn(45).isLayoff === true);
+check('a missing/NaN gap is never a layoff (missingness stays missing)',
+  evaluateReturn(Number.NaN).isLayoff === false);
+check('options are the two ratified actions',
+  JSON.stringify(RETURN_OPTIONS) === JSON.stringify(['continue_plan', 'review_first_session']) &&
+  JSON.stringify(evaluateReturn(21).options) === JSON.stringify(RETURN_OPTIONS));
+// Numerical return modifiers are DEFERRED under Calibration Policy v1 section 4/5.
+// The engine must expose no dose value at all, and no field beyond the three below.
+check('the return engine exports NO dose modifier of any kind',
+  !('FRESH_BLOCK_MODIFIER' in returnMod) &&
+  Object.keys(returnMod).sort().join(',') === 'LAYOFF_GAP_DAYS,RETURN_OPTIONS,evaluateReturn');
+check('a return evaluation carries no load/RPE/dose field',
+  Object.keys(evaluateReturn(30)).sort().join(',') === 'daysSinceLastTrained,isLayoff,options');
+const returnSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'returnFromLayoff.ts'), 'utf-8');
+check('source tripwire: no multiplier/cap/dose vocabulary in returnFromLayoff.ts',
+  !/[Mm]ultiplier|[Rr]peCap|week1|generateBlock|slot_override/.test(returnSrc));
+
+// --- [10] Calibration Policy v1: Coefficient Governance & Invariant Pinning -----
+console.log('[10] Calibration Policy v1: Coefficient Governance & Invariant Pinning');
+const autopilot = require('./.build/kinematicAutopilot.js');
+check('FLAW_DETECTION_CONSTANTS.LAMBDA is 0.88', autopilot.FLAW_DETECTION_CONSTANTS.LAMBDA === 0.88);
+check('FLAW_DETECTION_CONSTANTS.E_MAX is 3.0', autopilot.FLAW_DETECTION_CONSTANTS.E_MAX === 3.0);
+check('FLAW_DETECTION_CONSTANTS.J_MAX is 10', autopilot.FLAW_DETECTION_CONSTANTS.J_MAX === 10);
+check('FLAW_DETECTION_CONSTANTS.DELTA is 0.15', autopilot.FLAW_DETECTION_CONSTANTS.DELTA === 0.15);
+check('FLAW_DETECTION_CONSTANTS.W_BASE is 0.7', autopilot.FLAW_DETECTION_CONSTANTS.W_BASE === 0.7);
+check('FLAW_DETECTION_CONSTANTS.W_TREND is 0.3', autopilot.FLAW_DETECTION_CONSTANTS.W_TREND === 0.3);
+check('FLAW_DETECTION_CONSTANTS.MIN_OBSERVATIONS is 5', autopilot.FLAW_DETECTION_CONSTANTS.MIN_OBSERVATIONS === 5);
+check('FLAW_DETECTION_CONSTANTS.THETA_DEFICIT is 0.3', autopilot.FLAW_DETECTION_CONSTANTS.THETA_DEFICIT === 0.3);
+check('FLAW_DETECTION_CONSTANTS.THETA_HEADROOM is 0.3', autopilot.FLAW_DETECTION_CONSTANTS.THETA_HEADROOM === 0.3);
+
+check('CONTROL_AUTHORITY.MAX_ADDED_SETS is 2', autopilot.CONTROL_AUTHORITY.MAX_ADDED_SETS === 2);
+check('CONTROL_AUTHORITY.LOAD_STEP is 0.05', autopilot.CONTROL_AUTHORITY.LOAD_STEP === 0.05);
+check('CONTROL_AUTHORITY.RPE_STEP is 0.5', autopilot.CONTROL_AUTHORITY.RPE_STEP === 0.5);
+check('CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE is 2.5', autopilot.CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE === 2.5);
+check('CONTROL_AUTHORITY.SET_STEP is 1', autopilot.CONTROL_AUTHORITY.SET_STEP === 1);
+check('CONTROL_AUTHORITY.DEADBAND is 0.15', autopilot.CONTROL_AUTHORITY.DEADBAND === 0.15);
+check('CONTROL_AUTHORITY.STRONG_THRESHOLD is 0.4', autopilot.CONTROL_AUTHORITY.STRONG_THRESHOLD === 0.4);
+
+// Readiness schema weights verification from 004_state_vector_materialize.sql
+const schema004 = readFileSync(join(import.meta.dirname, '..', '..', 'core-db', 'src', 'schema', '004_state_vector_materialize.sql'), 'utf-8');
+check('004 schema readiness weights contain 0.35 HRV and 0.25 sleep',
+  schema004.includes('0.35 * hrv_component') &&
+  schema004.includes('0.25 * sleep_component') &&
+  schema004.includes('0.35') && schema004.includes('0.25'));
+const readinessCase = schema004.slice(schema004.indexOf('round(CASE'), schema004.indexOf('END, 1)'));
+check('004 schema readiness excludes load component from readiness_score calculation',
+  !readinessCase.includes('load_component'));
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

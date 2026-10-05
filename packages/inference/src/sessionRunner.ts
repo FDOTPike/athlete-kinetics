@@ -122,7 +122,13 @@ export class RunnerCheckpointError extends Error {
   }
 }
 
-const TIER_REST_SCALE: Record<TrainingAge, number> = {
+/**
+ * Rest multipliers that applied before the 2026-09-15 tier-neutral rest ruling
+ * (docs/decisions/REST_DURATION_TIER_NEUTRAL_2026-09-15.md). Automatic rest never
+ * uses them. They exist only so a checkpoint saved mid-rest by an earlier build
+ * restores with the rest it was already counting down.
+ */
+const PRE_RULING_CHECKPOINT_REST_SCALE: Record<TrainingAge, number> = {
   beginner: 0.75,
   intermediate: 1,
   advanced: 1,
@@ -470,7 +476,12 @@ function normalizeState(value: unknown): RunnerState {
     allSlotsResolved(slots, state.slotSetCounts, skipped)) {
     throw new RunnerCheckpointError('resting state must follow a logged, non-final session set');
   }
-  if (state.restSecondsTarget !== (state.restSecondsOverride ?? restSecondsFor(current, state.tier, state.restRpe))) {
+  const prescribedRest = state.restSecondsOverride ?? restSecondsFor(current, state.tier, state.restRpe);
+  // A checkpoint saved mid-rest before the tier-neutral rest ruling keeps the
+  // rest it was already counting down; every later rest is tier-neutral.
+  const savedPreRulingRest = state.restSecondsOverride === null
+    && state.restSecondsTarget === preRulingCheckpointRestSecondsFor(state.tier, state.restRpe ?? current.targetRpe);
+  if (state.restSecondsTarget !== prescribedRest && !savedPreRulingRest) {
     throw new RunnerCheckpointError('resting state violates the rest prescription');
   }
   return state;
@@ -490,10 +501,22 @@ function cloneState(state: RunnerState): RunnerState {
   });
 }
 
+/** RPE-band rest in seconds, before snapping to the rest contract. */
+function rpeBandRestSeconds(rpe: number): number {
+  return rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
+}
+
+/** Snap to a 15-second step in the inclusive 45..300 second contract. */
+function snapRestSeconds(seconds: number): number {
+  return Math.min(300, Math.max(45, Math.round(seconds / 15) * 15));
+}
+
 /**
  * Deterministic rest prescription. Actual set RPE takes precedence when
- * provided; otherwise the slot target RPE is used. The result is always a
- * 15-second step in the inclusive 45..300 second contract.
+ * provided; otherwise the slot target RPE is used. The training tier is still
+ * validated but never changes the duration (2026-09-15 tier-neutral rest
+ * ruling). The result is always a 15-second step in the inclusive 45..300
+ * second contract.
  */
 export function restSecondsFor(
   slot: Pick<RunnerSlot, 'targetRpe'>,
@@ -503,9 +526,12 @@ export function restSecondsFor(
   if (!isTrainingAge(tier)) throw new RunnerCheckpointError('invalid training tier');
   const rpe = actualRpe ?? slot.targetRpe;
   if (!isRpe(rpe)) throw new RunnerCheckpointError('RPE must be a finite value from 0 to 10');
-  const base = rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
-  const snapped = Math.round((base * TIER_REST_SCALE[tier]) / 15) * 15;
-  return Math.min(300, Math.max(45, snapped));
+  return snapRestSeconds(rpeBandRestSeconds(rpe));
+}
+
+/** The rest an earlier build prescribed; used only to accept a restored mid-rest checkpoint. */
+function preRulingCheckpointRestSecondsFor(tier: TrainingAge, rpe: number): number {
+  return snapRestSeconds(rpeBandRestSeconds(rpe) * PRE_RULING_CHECKPOINT_REST_SCALE[tier]);
 }
 
 /** Start a runner from a frozen ordered session plan. */

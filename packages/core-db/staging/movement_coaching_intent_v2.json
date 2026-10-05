@@ -1,0 +1,2645 @@
+{
+  "schemaVersion": 2,
+  "movements": [
+    {
+      "name": "3/4 Sit-Up",
+      "coachingIntent": "Train abdominals with the specific loading and range of 3/4 Sit-Up while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up 3/4 Sit-Up with a stable bodyweight start position and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "ff65e5db47f5b70a62ebae2cd996b8ab109a48bd0c6cde1bd50d6e2d12cb840f"
+    },
+    {
+      "name": "Alternate Hammer Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Alternate Hammer Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Alternate Hammer Curl with dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "fd90d16099f2fc0d2a85192df96ed130488018137f8e9ac51572d63e425d9e31"
+    },
+    {
+      "name": "Alternating Cable Shoulder Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Alternating Cable Shoulder Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Alternating Cable Shoulder Press with cable machine and choose a load or range you can control.",
+        "Organise the load at shoulder height, then press overhead while staying tall through the trunk.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Stay tall through the torso.",
+        "Stack the wrists over the elbows.",
+        "Finish overhead with a quiet ribcage."
+      ],
+      "contentSha256": "8d6f90cbb427dd25ae2d89751137659a329b81a85f461a59d9e5cf51e225a94c"
+    },
+    {
+      "name": "Alternating Floor Press",
+      "coachingIntent": "Train chest with the specific loading and range of Alternating Floor Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Alternating Floor Press with kettlebell and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "090a5672129607e274aab418b4fb46959cc949bd415acdbb422abb15c1e2dd91"
+    },
+    {
+      "name": "Alternating Kettlebell Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Alternating Kettlebell Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Alternating Kettlebell Press with kettlebell and choose a load or range you can control.",
+        "Organise the load at shoulder height, then press overhead while staying tall through the trunk.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Stay tall through the torso.",
+        "Stack the wrists over the elbows.",
+        "Finish overhead with a quiet ribcage."
+      ],
+      "contentSha256": "c28a96d8ddb0d150fe90915a47b6b8e8aa80ea77ca3f62795a9752201abe2b37"
+    },
+    {
+      "name": "Alternating Kettlebell Row",
+      "coachingIntent": "Train middle back with the specific loading and range of Alternating Kettlebell Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Alternating Kettlebell Row with kettlebell and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "6ac8581f59a31d0f7186e36097ae13d6f22f030a55ff6c5575297fb606e92069"
+    },
+    {
+      "name": "Back Flyes - With Bands",
+      "coachingIntent": "Train shoulders with the specific loading and range of Back Flyes - With Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Back Flyes - With Bands with bands, squat rack and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "5556551d8ee3b14b8b32651e270d72877cde4006e0dd203f1f1d6a3d3a0463a6"
+    },
+    {
+      "name": "Band Good Morning (Pull Through)",
+      "coachingIntent": "Train hamstrings with the specific loading and range of Band Good Morning (Pull Through) while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Band Good Morning (Pull Through) with bands and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "0f32a27e05ad62c55f11c593e61749bf07bb80bac067576aad79bb5a0bcbe561"
+    },
+    {
+      "name": "Barbell Bench Press - Medium Grip",
+      "coachingIntent": "Train chest with the specific loading and range of Barbell Bench Press - Medium Grip while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Barbell Bench Press - Medium Grip with barbell, bench, squat rack and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "07bad4bdebf3d3400a99669ebb36776b9f87d0e2b4732d80460b06da8be6367b"
+    },
+    {
+      "name": "Barbell Incline Bench Press - Medium Grip",
+      "coachingIntent": "Train chest with the specific loading and range of Barbell Incline Bench Press - Medium Grip while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Barbell Incline Bench Press - Medium Grip with barbell, bench, squat rack and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "2ad8d923d7eebd07a6936d96fcaa3c46a7db4e91a34d66037c03e5c72aef64fe"
+    },
+    {
+      "name": "Barbell Incline Shoulder Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Barbell Incline Shoulder Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Barbell Incline Shoulder Raise with barbell, bench, squat rack and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "029e03d4f382d01c2e4372e95803a21b74ef6b75ccfc00b9e5942701bec60d86"
+    },
+    {
+      "name": "Barbell Lunge",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Barbell Lunge while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Barbell Lunge with barbell, squat rack and choose a load or range you can control.",
+        "Move into a stable split stance, lower under control, and drive through the working foot to finish.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Build a stable split stance.",
+        "Track the knee over the working foot.",
+        "Drive through the whole foot to finish."
+      ],
+      "contentSha256": "eea1f53a0decacf752219bfe38306ed232e2991d728915b23c1ba22619479639"
+    },
+    {
+      "name": "Barbell Rollout from Bench",
+      "coachingIntent": "Train abdominals with the specific loading and range of Barbell Rollout from Bench while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Barbell Rollout from Bench with barbell, bench and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "c84db2eb2ff55c62002cecaf1d32d936fd0e27a9bc32bc2b2180613dd52c1ca6"
+    },
+    {
+      "name": "Barbell Shrug Behind The Back",
+      "coachingIntent": "Train traps with the specific loading and range of Barbell Shrug Behind The Back while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Barbell Shrug Behind The Back with barbell and choose a load or range you can control.",
+        "Raise the shoulders up and back, pause behind the ears, and lower through the same path.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Stand tall before the shrug.",
+        "Drive the shoulders up and back behind the ears.",
+        "Own the pause before lowering."
+      ],
+      "contentSha256": "104ba157e03e422b7280f38ef235a586522b753ed7128894aeb346209b494221"
+    },
+    {
+      "name": "Barbell Side Split Squat",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Barbell Side Split Squat while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Barbell Side Split Squat with barbell and choose a load or range you can control.",
+        "Move into a stable split stance, lower under control, and drive through the working foot to finish.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Build a stable split stance.",
+        "Track the knee over the working foot.",
+        "Drive through the whole foot to finish."
+      ],
+      "contentSha256": "a786f9ad65fa5598306b2f679a59abf369dd06ff6f84a0243c7fdfd09a2b4961"
+    },
+    {
+      "name": "Barbell Squat To A Bench",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Barbell Squat To A Bench while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Barbell Squat To A Bench with barbell, bench, squat rack and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "af4bb3930f3f51308878385b082669d9a33019113ca9b35ad8f761c9ab768c43"
+    },
+    {
+      "name": "Bench Press - With Bands",
+      "coachingIntent": "Train chest with the specific loading and range of Bench Press - With Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bench Press - With Bands with bands, bench and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "0b0f8367d8b00318ca8135ab33bfa01cbc63afbf2f0665da1a184d407e30f698"
+    },
+    {
+      "name": "Bent Over Barbell Row",
+      "coachingIntent": "Train middle back with the specific loading and range of Bent Over Barbell Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent Over Barbell Row with barbell and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "dab658b1fa3b0f57367d9d7371fde91ad045354eec3c9038a4a2570e0b4f42e6"
+    },
+    {
+      "name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
+      "coachingIntent": "Train shoulders with the specific loading and range of Bent Over Dumbbell Rear Delt Raise With Head On Bench while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent Over Dumbbell Rear Delt Raise With Head On Bench with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "4f74d0dbce667a809b0593eedc858eae1de2affb15497dc802d8eedf785ce245"
+    },
+    {
+      "name": "Bent Over One-Arm Long Bar Row",
+      "coachingIntent": "Train middle back with the specific loading and range of Bent Over One-Arm Long Bar Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent Over One-Arm Long Bar Row with barbell and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "dc351eb837c905a5fabc20b72523738e681110532886e42ac4e527100e42c68c"
+    },
+    {
+      "name": "Bent Over Two-Arm Long Bar Row",
+      "coachingIntent": "Train middle back with the specific loading and range of Bent Over Two-Arm Long Bar Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent Over Two-Arm Long Bar Row with barbell, cable machine and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "cc656d81af9f93991cc2069aef3afdd9e0926792a4179449c6a5b27e636ae91f"
+    },
+    {
+      "name": "Bent Over Two-Dumbbell Row",
+      "coachingIntent": "Train middle back with the specific loading and range of Bent Over Two-Dumbbell Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent Over Two-Dumbbell Row with dumbbells and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "1fe9c9e3cfbcaa21c2df2b9101d672447db9520bb08138a350f74761248e656b"
+    },
+    {
+      "name": "Bent Over Two-Dumbbell Row With Palms In",
+      "coachingIntent": "Train middle back with the specific loading and range of Bent Over Two-Dumbbell Row With Palms In while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent Over Two-Dumbbell Row With Palms In with dumbbells and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "3428cef51c0bab46805ffe11348c305ca5df710f45a558666fee853cedf90670"
+    },
+    {
+      "name": "Bent-Arm Barbell Pullover",
+      "coachingIntent": "Train lats with the specific loading and range of Bent-Arm Barbell Pullover while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent-Arm Barbell Pullover with barbell, bench and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "04e0fc57c065e442d5374126e5cc7b430bad3f1732a10a23dd3891e5af07464b"
+    },
+    {
+      "name": "Bent-Arm Dumbbell Pullover",
+      "coachingIntent": "Train chest with the specific loading and range of Bent-Arm Dumbbell Pullover while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent-Arm Dumbbell Pullover with bench, dumbbells and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "e061f9dc83ef0737cfbd871a073c2545e53513d018e2a1805e92a4f86e4e2300"
+    },
+    {
+      "name": "Bent-Knee Hip Raise",
+      "coachingIntent": "Train abdominals with the specific loading and range of Bent-Knee Hip Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Bent-Knee Hip Raise with a stable bodyweight start position and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "d04cc4a18236043250fbf924c9281c31019cc322faef84fa40a753a5b39deaf5"
+    },
+    {
+      "name": "Board Press",
+      "coachingIntent": "Train triceps with the specific loading and range of Board Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Board Press with bands, barbell, bench, squat rack and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "6199bdb77a280040d61bd4a0f6ad52aa7da83f310e48398ab06ae97a57898736"
+    },
+    {
+      "name": "Body Tricep Press",
+      "coachingIntent": "Train triceps with the specific loading and range of Body Tricep Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Body Tricep Press with squat rack and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "3b8c1a52e15f9056310fe08bf95613521466c5014bcc024e9f013474495b2bc7"
+    },
+    {
+      "name": "Box Squat with Bands",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Box Squat with Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Box Squat with Bands with bands, barbell, dumbbells, squat rack and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "75fd779492f445db07748b2c5c66541c0db4133add57aebb28f44722b1984801"
+    },
+    {
+      "name": "Cable Incline Pushdown",
+      "coachingIntent": "Train lats with the specific loading and range of Cable Incline Pushdown while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Incline Pushdown with bench, cable machine and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "6ae77b3458e2f7b3d5aae917d4abec9f514ae113e14443a96551cb7ba679cf68"
+    },
+    {
+      "name": "Cable Incline Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Cable Incline Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Incline Triceps Extension with bench, cable machine and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "9beb44bd41ca478292db08d2913417d10a13eee9e7183dd82dd9a92003e38b31"
+    },
+    {
+      "name": "Cable Lying Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Cable Lying Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Lying Triceps Extension with bench, cable machine and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "fbecf644b347a14e9e4dfad913aefa3dba778aaf2b4cebc11fcd611b8d119c51"
+    },
+    {
+      "name": "Cable One Arm Tricep Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Cable One Arm Tricep Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable One Arm Tricep Extension with cable machine and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "e9766a9d0be5708579f43fb1cb345ba286f28351db151c5b3cad0022148e9341"
+    },
+    {
+      "name": "Cable Preacher Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Cable Preacher Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Preacher Curl with bench, cable machine and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "aedf8e405e01036f12ddb0d22e76c8817b17f8a98dedde4ba2fdd53b36c92ab6"
+    },
+    {
+      "name": "Cable Rear Delt Fly",
+      "coachingIntent": "Train shoulders with the specific loading and range of Cable Rear Delt Fly while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Rear Delt Fly with cable machine and choose a load or range you can control.",
+        "Move at a sustainable pace while keeping each stride and change of direction deliberate.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Set a repeatable starting position.",
+        "Keep every stride smooth and quiet.",
+        "Finish with the same posture you started with."
+      ],
+      "contentSha256": "03daa8929f4257f4608ae330c0003ed635942246759382eeab9a99912744741b"
+    },
+    {
+      "name": "Cable Russian Twists",
+      "coachingIntent": "Train abdominals with the specific loading and range of Cable Russian Twists while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Russian Twists with cable machine and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "2843aa29717c695edfb44af30a5d597959d2dc5d6a79029d1625cf332acbf9a9"
+    },
+    {
+      "name": "Cable Seated Crunch",
+      "coachingIntent": "Train abdominals with the specific loading and range of Cable Seated Crunch while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Seated Crunch with bench, cable machine and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "dfd6dde717e4650b44a3e3c34dcc9ec72a367beef2246ad12143f4513f5875de"
+    },
+    {
+      "name": "Cable Seated Lateral Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Cable Seated Lateral Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Seated Lateral Raise with bench, cable machine and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "9fb6aab968c4cbd35ba6dd10216e9e56e24549d6e57061bea502a602df6b1e08"
+    },
+    {
+      "name": "Cable Shrugs",
+      "coachingIntent": "Train traps with the specific loading and range of Cable Shrugs while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Shrugs with cable machine and choose a load or range you can control.",
+        "Raise the shoulders up and back, pause behind the ears, and lower through the same path.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Stand tall before the shrug.",
+        "Drive the shoulders up and back behind the ears.",
+        "Own the pause before lowering."
+      ],
+      "contentSha256": "960cfa7775cfcf14d44bfb61380770007203a741a52f9a29c025f817e1b78231"
+    },
+    {
+      "name": "Cable Wrist Curl",
+      "coachingIntent": "Train forearms with the specific loading and range of Cable Wrist Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cable Wrist Curl with bench, cable machine and choose a load or range you can control.",
+        "Support the forearms and move the load through the available wrist or finger range without shifting the elbows.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Support the forearms before the rep.",
+        "Move through the wrists with a relaxed grip.",
+        "Own the full return."
+      ],
+      "contentSha256": "73f4ac7af45c7b1ece8fd350c3b654c9060e23a4a28fe855098af75f19e07d30"
+    },
+    {
+      "name": "Calf Raise On A Dumbbell",
+      "coachingIntent": "Train calves with the specific loading and range of Calf Raise On A Dumbbell while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Calf Raise On A Dumbbell with dumbbells and choose a load or range you can control.",
+        "Rise through the ball of the working foot, pause at the top, and lower the heel under control.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Keep pressure through the ball of the foot.",
+        "Rise as tall as the ankle allows.",
+        "Lower through a controlled stretch."
+      ],
+      "contentSha256": "ef389a04d21b3576b329bee46e74c4fbe18a734bf5890fedd6e012d9d64340c5"
+    },
+    {
+      "name": "Clock Push-Up",
+      "coachingIntent": "Train chest with the specific loading and range of Clock Push-Up while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Clock Push-Up with a stable bodyweight start position and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "da161309b1f76f40d33bfc752c7c2c59626afda729d2c5da2a7d733dd75ca431"
+    },
+    {
+      "name": "Close-Grip EZ Bar Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Close-Grip EZ Bar Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Close-Grip EZ Bar Curl with barbell and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "d544a783aba20c5c535e550fc42d273cd7b3f5786ba4d05c106603f8a48408e6"
+    },
+    {
+      "name": "Close-Grip EZ-Bar Press",
+      "coachingIntent": "Train triceps with the specific loading and range of Close-Grip EZ-Bar Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Close-Grip EZ-Bar Press with barbell, bench and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "8f176ddbad1f895858b2e8f82ff056b36ddacaadf13b3c23f95300237be1c819"
+    },
+    {
+      "name": "Close-Grip Front Lat Pulldown",
+      "coachingIntent": "Train lats with the specific loading and range of Close-Grip Front Lat Pulldown while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Close-Grip Front Lat Pulldown with cable machine and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "e7f223b2e90b5bcac7788a1c0f3eccb5ef848ae8979ad51ef1ade5b13a05deaa"
+    },
+    {
+      "name": "Close-Grip Push-Up off of a Dumbbell",
+      "coachingIntent": "Train triceps with the specific loading and range of Close-Grip Push-Up off of a Dumbbell while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Close-Grip Push-Up off of a Dumbbell with dumbbells and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "b26b5077067bb156a26ff0fee618996ca6604b4c5ef8c8dcf1a41c0773cdfa97"
+    },
+    {
+      "name": "Concentration Curls",
+      "coachingIntent": "Train biceps with the specific loading and range of Concentration Curls while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Concentration Curls with bench, dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "b626ef2cc5b7c6a4444e9e98f0769ad4945da7508fe23aaccd943f2b7f451608"
+    },
+    {
+      "name": "Cross Body Hammer Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Cross Body Hammer Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cross Body Hammer Curl with dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "844b4ada124604b83b4de509d27dd5696398acbdf0c298b84093e37d02a08f65"
+    },
+    {
+      "name": "Cross-Body Crunch",
+      "coachingIntent": "Train abdominals with the specific loading and range of Cross-Body Crunch while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Cross-Body Crunch with a stable bodyweight start position and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "535ddd3edb85bd174e2626b23e603c9968e0ad2fe002bc85c3d514dfbb9597f8"
+    },
+    {
+      "name": "Crunch - Hands Overhead",
+      "coachingIntent": "Train abdominals with the specific loading and range of Crunch - Hands Overhead while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Crunch - Hands Overhead with a stable bodyweight start position and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "e70cb69b8a536bba641a5811a4cf825a5e7248cb724877e7afe380a75a0dc174"
+    },
+    {
+      "name": "Crunches",
+      "coachingIntent": "Train abdominals with the specific loading and range of Crunches while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Crunches with bench and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "7b7855c3b0be059040f436431097d9aa7e8b46bf18ed840aa3f301fb13644e8a"
+    },
+    {
+      "name": "Deadlift with Bands",
+      "coachingIntent": "Train lower back with the specific loading and range of Deadlift with Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Deadlift with Bands with bands, barbell, dumbbells, squat rack and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "10baae01dcb638d4be29e5547b452ec2b809b00d4a4df867bcba8bbffe328ede"
+    },
+    {
+      "name": "Decline Close-Grip Bench To Skull Crusher",
+      "coachingIntent": "Train triceps with the specific loading and range of Decline Close-Grip Bench To Skull Crusher while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Decline Close-Grip Bench To Skull Crusher with barbell, bench, squat rack and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "743fa032797bc17f4fcdc30f28242b223c80a5503746125c141c08ae5d30b598"
+    },
+    {
+      "name": "Decline Dumbbell Flyes",
+      "coachingIntent": "Train chest with the specific loading and range of Decline Dumbbell Flyes while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Decline Dumbbell Flyes with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "34e5935309ec9d0a04aaf0ed6e117fbfaacf989305c1002f28beb4c6d6f6c910"
+    },
+    {
+      "name": "Decline Dumbbell Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Decline Dumbbell Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Decline Dumbbell Triceps Extension with bench, dumbbells and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "85b6199ea98038fb8f64d09cd276054a67dd8304b54bb61728b05f6702c8399a"
+    },
+    {
+      "name": "Decline EZ Bar Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Decline EZ Bar Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Decline EZ Bar Triceps Extension with barbell, bench, squat rack and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "9b33146ccfbe3cb646b072db31eec32571b91ba696e0758de149edac7ca9d266"
+    },
+    {
+      "name": "Decline Oblique Crunch",
+      "coachingIntent": "Train abdominals with the specific loading and range of Decline Oblique Crunch while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Decline Oblique Crunch with bench and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "5acc318f5c7537f40b5a39bf2a7341b7576ff4272de3244c892c0bb97d6a700f"
+    },
+    {
+      "name": "Decline Push-Up",
+      "coachingIntent": "Train chest with the specific loading and range of Decline Push-Up while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Decline Push-Up with bench and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "1dc710084cb3f53182ca11557f02f8e4c03bd55a43dd37204a741d4505ea9ce6"
+    },
+    {
+      "name": "Decline Reverse Crunch",
+      "coachingIntent": "Train abdominals with the specific loading and range of Decline Reverse Crunch while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Decline Reverse Crunch with bench and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "6d5e04edd62c3b0019ca65430bcfa144cec756dbfcf3e7888c16fae0731cb7ce"
+    },
+    {
+      "name": "Drag Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Drag Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Drag Curl with barbell and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "956d62a343dfad3818b55ec39329cf7f67723b086144f51cba17b4cc2f525a8c"
+    },
+    {
+      "name": "Dumbbell Bench Press with Neutral Grip",
+      "coachingIntent": "Train chest with the specific loading and range of Dumbbell Bench Press with Neutral Grip while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell Bench Press with Neutral Grip with bench, dumbbells and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "e951f1e4224342c79242d3475a4ebe0b14a92ae4708fd6dc43b07c74a0eb336b"
+    },
+    {
+      "name": "Dumbbell Bicep Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Dumbbell Bicep Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell Bicep Curl with dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "90e455805722657be45b02b45b49941077fa9135963a05e7051ec8e255215bf2"
+    },
+    {
+      "name": "Dumbbell Incline Shoulder Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Dumbbell Incline Shoulder Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell Incline Shoulder Raise with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "67dbeb755e2ce4c355c84a7899f0f7725fa9b9cc45a59914a34de550db12855a"
+    },
+    {
+      "name": "Dumbbell Lying Rear Lateral Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Dumbbell Lying Rear Lateral Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell Lying Rear Lateral Raise with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "123ba40eb9a6353319526694d58fb5a00360d07df172cdbfc4e71713063164a0"
+    },
+    {
+      "name": "Dumbbell One-Arm Shoulder Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Dumbbell One-Arm Shoulder Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell One-Arm Shoulder Press with bench, dumbbells and choose a load or range you can control.",
+        "Organise the load at shoulder height, then press overhead while staying tall through the trunk.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Stay tall through the torso.",
+        "Stack the wrists over the elbows.",
+        "Finish overhead with a quiet ribcage."
+      ],
+      "contentSha256": "9ccf566a1a27e98d01a0879ba82cbdebebb8106d206810adbe86ba086dd461f0"
+    },
+    {
+      "name": "Dumbbell Prone Incline Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Dumbbell Prone Incline Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell Prone Incline Curl with bench, dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "61d7436dfe0bce533e58de10a15c71728e5a6494c6e9e02430e33bf38d5fabf0"
+    },
+    {
+      "name": "Dumbbell Seated One-Leg Calf Raise",
+      "coachingIntent": "Train calves with the specific loading and range of Dumbbell Seated One-Leg Calf Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell Seated One-Leg Calf Raise with bench, dumbbells and choose a load or range you can control.",
+        "Rise through the ball of the working foot, pause at the top, and lower the heel under control.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Keep pressure through the ball of the foot.",
+        "Rise as tall as the ankle allows.",
+        "Lower through a controlled stretch."
+      ],
+      "contentSha256": "5de4149383b3337303d83d0f5b5a47601182b1530c6b9e6f1a8133f14549a97a"
+    },
+    {
+      "name": "Dumbbell Squat To A Bench",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Dumbbell Squat To A Bench while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell Squat To A Bench with bench, dumbbells and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "6176f4d6f7698a64c6aedc352a5a953e1e57c1f3d688c3d2e7eea1fea207db09"
+    },
+    {
+      "name": "Dumbbell Tricep Extension -Pronated Grip",
+      "coachingIntent": "Train triceps with the specific loading and range of Dumbbell Tricep Extension -Pronated Grip while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Dumbbell Tricep Extension -Pronated Grip with bench, dumbbells and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "9a1306002710d1d3d7f3175daccef8cdd8e81b8a468a48fb61f3ec7c90a64246"
+    },
+    {
+      "name": "Elevated Back Lunge",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Elevated Back Lunge while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Elevated Back Lunge with barbell, squat rack and choose a load or range you can control.",
+        "Move into a stable split stance, lower under control, and drive through the working foot to finish.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Build a stable split stance.",
+        "Track the knee over the working foot.",
+        "Drive through the whole foot to finish."
+      ],
+      "contentSha256": "37d29f3faeb7bcb3c7a047e3695f6893289ed3f294d4447cdce62c1b04a70b74"
+    },
+    {
+      "name": "Elevated Cable Rows",
+      "coachingIntent": "Train lats with the specific loading and range of Elevated Cable Rows while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Elevated Cable Rows with cable machine and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "ae5d3c3d0f4962963e3cf44e4b27df9b6136ae38bd1adaa4c5f965b3c4bd5e1b"
+    },
+    {
+      "name": "Extended Range One-Arm Kettlebell Floor Press",
+      "coachingIntent": "Train chest with the specific loading and range of Extended Range One-Arm Kettlebell Floor Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Extended Range One-Arm Kettlebell Floor Press with kettlebell and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "eaf553c14a8d2d518c3f99ea2c1da7707f74ec57438226c45b31e548913327d8"
+    },
+    {
+      "name": "External Rotation",
+      "coachingIntent": "Train shoulders with the specific loading and range of External Rotation while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up External Rotation with bench, dumbbells and choose a load or range you can control.",
+        "Keep the elbow anchored and rotate the forearm through the range the shoulder can own.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Pin the elbow in place.",
+        "Rotate through an owned range.",
+        "Keep the torso quiet on the return."
+      ],
+      "contentSha256": "b10b70e99de1d963e4e923e1da9c5ebc9e677c418ba6f7e74eb5b6397871e517"
+    },
+    {
+      "name": "External Rotation with Cable",
+      "coachingIntent": "Train shoulders with the specific loading and range of External Rotation with Cable while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up External Rotation with Cable with bands, cable machine and choose a load or range you can control.",
+        "Keep the elbow anchored and rotate the forearm through the range the shoulder can own.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Pin the elbow in place.",
+        "Rotate through an owned range.",
+        "Keep the torso quiet on the return."
+      ],
+      "contentSha256": "e2517e4bcd07a3b93eb9e2a9f8db25f38c82e81b3afa62ec7efbc41a5bbac75e"
+    },
+    {
+      "name": "EZ-Bar Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of EZ-Bar Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up EZ-Bar Curl with barbell and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "b6c1dfb5380436294ef597704372d05c3182dc7dc72319421d72490d22ec6592"
+    },
+    {
+      "name": "Finger Curls",
+      "coachingIntent": "Train forearms with the specific loading and range of Finger Curls while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Finger Curls with barbell and choose a load or range you can control.",
+        "Support the forearms and move the load through the available wrist or finger range without shifting the elbows.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Support the forearms before the rep.",
+        "Move through the wrists with a relaxed grip.",
+        "Own the full return."
+      ],
+      "contentSha256": "a84e3bd2db77f3a37a34f66b717242b829ac80de21e2cbe6d6d4ca754d2c6906"
+    },
+    {
+      "name": "Flat Bench Cable Flyes",
+      "coachingIntent": "Train chest with the specific loading and range of Flat Bench Cable Flyes while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Flat Bench Cable Flyes with bench, cable machine and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "b17afbb545dc1921b1c4749d34c9b22b1a09cb6ae3c705c32161e84cb74a1c73"
+    },
+    {
+      "name": "Floor Glute-Ham Raise",
+      "coachingIntent": "Train hamstrings with the specific loading and range of Floor Glute-Ham Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Floor Glute-Ham Raise with a stable bodyweight start position and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "9685a24215713f9e1b92aff6b8f1b6310bcb1a46d7f31589ce9367cfb40556f0"
+    },
+    {
+      "name": "Floor Press",
+      "coachingIntent": "Train triceps with the specific loading and range of Floor Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Floor Press with barbell, squat rack and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "adba8597541caad99758658f9f40e1e76c1cb0d765384451c5603218ca12b247"
+    },
+    {
+      "name": "Frog Sit-Ups",
+      "coachingIntent": "Train abdominals with the specific loading and range of Frog Sit-Ups while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Frog Sit-Ups with a stable bodyweight start position and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "98fd1691c1ee270a91084328d0c08edc618f072474987761882e9bc09b854392"
+    },
+    {
+      "name": "Front Barbell Squat To A Bench",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Front Barbell Squat To A Bench while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Front Barbell Squat To A Bench with barbell, bench, squat rack and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "baa008767b3c138a23d9f8b33a96da5bd13905b2e33920a444b1bc499f778403"
+    },
+    {
+      "name": "Front Cable Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Front Cable Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Front Cable Raise with cable machine and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "110dce053523b3b16ebe1ec8ce70b0952f777be3e58dc8d10cb40f6de6a24473"
+    },
+    {
+      "name": "Front Incline Dumbbell Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Front Incline Dumbbell Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Front Incline Dumbbell Raise with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "2c5d0df869916283483d9c0053695ea9a5dae869e3f60718ef60212d55be46e9"
+    },
+    {
+      "name": "Front Squat (Clean Grip)",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Front Squat (Clean Grip) while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Front Squat (Clean Grip) with barbell, squat rack and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "6f2df1e1f0b258131c53cf5a04433f0f4b8fb8477987b532eab9bd4d4d3ad412"
+    },
+    {
+      "name": "Full Range-Of-Motion Lat Pulldown",
+      "coachingIntent": "Train lats with the specific loading and range of Full Range-Of-Motion Lat Pulldown while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Full Range-Of-Motion Lat Pulldown with bench, cable machine and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "fa05c236caa50469e59e08fdc1cf7314cbef89c76204446b1bfbd750b67d1e86"
+    },
+    {
+      "name": "Good Morning off Pins",
+      "coachingIntent": "Train hamstrings with the specific loading and range of Good Morning off Pins while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Good Morning off Pins with barbell, squat rack and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "1ab47f39c868e56026490fe7ab2bfa84e6cb783a8555716e7cb92a84adb49763"
+    },
+    {
+      "name": "Gorilla Chin/Crunch",
+      "coachingIntent": "Train abdominals with the specific loading and range of Gorilla Chin/Crunch while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Gorilla Chin/Crunch with pullup bar and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "618136672bfacf30ff19457e0623f4b36c2a12178efd509ec442d1a6622e237b"
+    },
+    {
+      "name": "Hammer Grip Incline DB Bench Press",
+      "coachingIntent": "Train chest with the specific loading and range of Hammer Grip Incline DB Bench Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Hammer Grip Incline DB Bench Press with bench, dumbbells and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "d7b0956d84e031c2c29fd1421143d9c6aa7367c58a81bd97c496cea9e0ae5284"
+    },
+    {
+      "name": "High Cable Curls",
+      "coachingIntent": "Train biceps with the specific loading and range of High Cable Curls while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up High Cable Curls with cable machine and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "41db94ea710b710af07ca0ab7ef56e6a20727a6dbbfdab254bfc1d59546450ef"
+    },
+    {
+      "name": "Hip Extension with Bands",
+      "coachingIntent": "Train glutes with the specific loading and range of Hip Extension with Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Hip Extension with Bands with bands and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "4bbf44f4dd82bb3d6f12eedc6d518ba9504a3066c43f22d36cb050383be9d690"
+    },
+    {
+      "name": "Incline Barbell Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Incline Barbell Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Barbell Triceps Extension with barbell, bench and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "8c7b0a0fc02e1260605b27f602f76e402b6d35693e22ebb6fa2e0c05286107a6"
+    },
+    {
+      "name": "Incline Cable Chest Press",
+      "coachingIntent": "Train chest with the specific loading and range of Incline Cable Chest Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Cable Chest Press with cable machine and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "4bcac36df9af45b2317949b9a9c59e9c1aadd098ab2476c1824b20f801edd602"
+    },
+    {
+      "name": "Incline Cable Flye",
+      "coachingIntent": "Train chest with the specific loading and range of Incline Cable Flye while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Cable Flye with bench, cable machine and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "099b349eb364464c0bafec8d4271f231f7e892592609125ef1623d40b297d2fe"
+    },
+    {
+      "name": "Incline Dumbbell Bench With Palms Facing In",
+      "coachingIntent": "Train chest with the specific loading and range of Incline Dumbbell Bench With Palms Facing In while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Dumbbell Bench With Palms Facing In with bench, dumbbells and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "e760b272444095dc76c040b5cb53b3ace9823b746be5c50fbfa0db587d65ff0e"
+    },
+    {
+      "name": "Incline Dumbbell Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Incline Dumbbell Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Dumbbell Curl with bench, dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "4d76fbb1c204f97eb203c71f502f9d1ef412a0bc2e40da33552d44af52b98b44"
+    },
+    {
+      "name": "Incline Dumbbell Flyes",
+      "coachingIntent": "Train chest with the specific loading and range of Incline Dumbbell Flyes while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Dumbbell Flyes with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "c4cd1bc1651a5022b46be75606ecca64469c7c8bf87420015343200680c8031e"
+    },
+    {
+      "name": "Incline Hammer Curls",
+      "coachingIntent": "Train biceps with the specific loading and range of Incline Hammer Curls while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Hammer Curls with bench, dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "f52a31b0fbe75a4cd8fd7023b4a759b8e3b740770992b002c0c847a935cd9ed9"
+    },
+    {
+      "name": "Incline Push-Up Close-Grip",
+      "coachingIntent": "Train triceps with the specific loading and range of Incline Push-Up Close-Grip while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Push-Up Close-Grip with a stable bodyweight start position and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "7ced08f5ccd3ff6d6e5f3e61c09a3eed147a9d4458c264b0e9d569ceb5e05eff"
+    },
+    {
+      "name": "Incline Push-Up Wide",
+      "coachingIntent": "Train chest with the specific loading and range of Incline Push-Up Wide while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Incline Push-Up Wide with a stable bodyweight start position and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "ac1ac96ec22972fb15baa96941c2f91c5f30a1489cda9e1cada4e84e25114d1c"
+    },
+    {
+      "name": "Internal Rotation with Band",
+      "coachingIntent": "Train shoulders with the specific loading and range of Internal Rotation with Band while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Internal Rotation with Band with bands and choose a load or range you can control.",
+        "Keep the elbow anchored and rotate the forearm through the range the shoulder can own.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Pin the elbow in place.",
+        "Rotate through an owned range.",
+        "Keep the torso quiet on the return."
+      ],
+      "contentSha256": "c3a3df821701ac83d6273d99f346854213e8c5db4a53ea68a4238f749697894f"
+    },
+    {
+      "name": "Jackknife Sit-Up",
+      "coachingIntent": "Train abdominals with the specific loading and range of Jackknife Sit-Up while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Jackknife Sit-Up with a stable bodyweight start position and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "2b54b12fa7232c5d082da1345f761ad1cbae74e9252a797640ee1032716fd431"
+    },
+    {
+      "name": "Janda Sit-Up",
+      "coachingIntent": "Train abdominals with the specific loading and range of Janda Sit-Up while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Janda Sit-Up with a stable bodyweight start position and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "2e1d568451dd95932b4fe47980915a4320e2eaf61c528e62b1ea41b7010201f2"
+    },
+    {
+      "name": "JM Press",
+      "coachingIntent": "Train triceps with the specific loading and range of JM Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up JM Press with barbell, bench and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "af689d681167bac9c140f4726f98eed7127ad98e0a5e34829edb77d31db1d829"
+    },
+    {
+      "name": "Kettlebell Arnold Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Kettlebell Arnold Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Kettlebell Arnold Press with kettlebell and choose a load or range you can control.",
+        "Organise the load at shoulder height, then press overhead while staying tall through the trunk.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Stay tall through the torso.",
+        "Stack the wrists over the elbows.",
+        "Finish overhead with a quiet ribcage."
+      ],
+      "contentSha256": "d61a95470fe2a0ce7034db8fd76804ae4b68003d8ebe41206c8c0becf5ae6605"
+    },
+    {
+      "name": "Kettlebell Seated Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Kettlebell Seated Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Kettlebell Seated Press with kettlebell and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "d0a80d975bed4ee1c42e0fdb139395164581872ce969b68d0e595b7da56def6c"
+    },
+    {
+      "name": "Kettlebell Seesaw Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Kettlebell Seesaw Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Kettlebell Seesaw Press with kettlebell and choose a load or range you can control.",
+        "Organise the load at shoulder height, then press overhead while staying tall through the trunk.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Stay tall through the torso.",
+        "Stack the wrists over the elbows.",
+        "Finish overhead with a quiet ribcage."
+      ],
+      "contentSha256": "7ef4f3e928a9e086165334c99079d6c1172fa5266a59fbcb482229acbcbc46f2"
+    },
+    {
+      "name": "Kettlebell Turkish Get-Up (Lunge style)",
+      "coachingIntent": "Train shoulders with the specific loading and range of Kettlebell Turkish Get-Up (Lunge style) while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Kettlebell Turkish Get-Up (Lunge style) with kettlebell and choose a load or range you can control.",
+        "Move into a stable split stance, lower under control, and drive through the working foot to finish.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Build a stable split stance.",
+        "Track the knee over the working foot.",
+        "Drive through the whole foot to finish."
+      ],
+      "contentSha256": "26496e297f8813a741ca36105ff99d3c74653324b34ba4eff02c680e827bd51c"
+    },
+    {
+      "name": "Kneeling Cable Crunch With Alternating Oblique Twists",
+      "coachingIntent": "Train abdominals with the specific loading and range of Kneeling Cable Crunch With Alternating Oblique Twists while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Kneeling Cable Crunch With Alternating Oblique Twists with cable machine and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "8830c2ae50c2ffcdb4bd0b963fc3a60227cd5b6316e0f4b7b541d80d4b4ea943"
+    },
+    {
+      "name": "Kneeling Cable Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Kneeling Cable Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Kneeling Cable Triceps Extension with bench, cable machine and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "61d4b281991db810fc37be8ad82c74597bb8d30f1d6c6e154fa4e107caddb45b"
+    },
+    {
+      "name": "Kneeling High Pulley Row",
+      "coachingIntent": "Train lats with the specific loading and range of Kneeling High Pulley Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Kneeling High Pulley Row with cable machine and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "5956ff75f1b7837e7353cf7d2a45f705cdb3987a32347bcbef26e581d30970d2"
+    },
+    {
+      "name": "Kneeling Squat",
+      "coachingIntent": "Train glutes with the specific loading and range of Kneeling Squat while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Kneeling Squat with barbell, squat rack and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "6873d6d2af27c28203183d2f8fe9db56f50d320dafc5056e3fed5d6e0f7576a5"
+    },
+    {
+      "name": "Lateral Raise - With Bands",
+      "coachingIntent": "Train shoulders with the specific loading and range of Lateral Raise - With Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Lateral Raise - With Bands with bands and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "e0c515fbf699e05c7cbda5b33fbd56977e3b8e114c1d68f2f2b68fcb37f07ec7"
+    },
+    {
+      "name": "Low Cable Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Low Cable Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Low Cable Triceps Extension with bench, cable machine and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "2a020733430a298b68a08084531ea9aecb7801e13eabd559fcb3be3aabeceb48"
+    },
+    {
+      "name": "Low Pulley Row To Neck",
+      "coachingIntent": "Train shoulders with the specific loading and range of Low Pulley Row To Neck while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Low Pulley Row To Neck with cable machine and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "c6377fa82bd370c0978fc147605c2a41a39df608ffb1dca3a47d9d66104232f3"
+    },
+    {
+      "name": "Lunge Pass Through",
+      "coachingIntent": "Train hamstrings with the specific loading and range of Lunge Pass Through while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Lunge Pass Through with kettlebell and choose a load or range you can control.",
+        "Move into a stable split stance, lower under control, and drive through the working foot to finish.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Build a stable split stance.",
+        "Track the knee over the working foot.",
+        "Drive through the whole foot to finish."
+      ],
+      "contentSha256": "7933c49d828906125fda7a78af87211aa45be14243aeb25a6770d2b8097116bc"
+    },
+    {
+      "name": "Lying Cable Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Lying Cable Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Lying Cable Curl with cable machine and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "a3b0f1839171411b2b50b09bc76ffc98cdafef42aa6cb07c8ebb498497834b8c"
+    },
+    {
+      "name": "Lying Rear Delt Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Lying Rear Delt Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Lying Rear Delt Raise with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "a91e802da5d27cb7e15eafe009c0ef24753c218c66dbfd52a38c6ea2325ae7ea"
+    },
+    {
+      "name": "Lying Triceps Press",
+      "coachingIntent": "Train triceps with the specific loading and range of Lying Triceps Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Lying Triceps Press with barbell, bench and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "7974558e9f9e1b915e8a25df9b8bb8eccde161792bd9262f165809630c440d39"
+    },
+    {
+      "name": "Middle Back Shrug",
+      "coachingIntent": "Train middle back with the specific loading and range of Middle Back Shrug while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Middle Back Shrug with bench, dumbbells and choose a load or range you can control.",
+        "Raise the shoulders up and back, pause behind the ears, and lower through the same path.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Stand tall before the shrug.",
+        "Drive the shoulders up and back behind the ears.",
+        "Own the pause before lowering."
+      ],
+      "contentSha256": "a4984cf933ec3a0049de46e9be5450d40bed4a1fc0ff28efad5be502a30cdf17"
+    },
+    {
+      "name": "Natural Glute Ham Raise",
+      "coachingIntent": "Train hamstrings with the specific loading and range of Natural Glute Ham Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Natural Glute Ham Raise with bands, bench and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "d3261f0836947242f99ed3d4dfb070060ccad4911e1115c4d3a89c0e799ebd85"
+    },
+    {
+      "name": "Oblique Crunches",
+      "coachingIntent": "Train abdominals with the specific loading and range of Oblique Crunches while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Oblique Crunches with a stable bodyweight start position and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "c9aa697c185cb0b5d2ce0ab6d54d6e372e985fb7f55aa7365b75af4e24cadd59"
+    },
+    {
+      "name": "One Arm Dumbbell Bench Press",
+      "coachingIntent": "Train chest with the specific loading and range of One Arm Dumbbell Bench Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up One Arm Dumbbell Bench Press with bench, dumbbells and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "d0d6a83fc9f665cd708094d2259fe877b2329aa72f953c1dcba7b0927f58fe6c"
+    },
+    {
+      "name": "One-Arm Dumbbell Row",
+      "coachingIntent": "Train middle back with the specific loading and range of One-Arm Dumbbell Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up One-Arm Dumbbell Row with bench, dumbbells and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "7f61062ac9059c6815ec35f173dddbe8ba52ec0f1adef8696a77984d881a1555"
+    },
+    {
+      "name": "One-Arm High-Pulley Cable Side Bends",
+      "coachingIntent": "Train abdominals with the specific loading and range of One-Arm High-Pulley Cable Side Bends while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up One-Arm High-Pulley Cable Side Bends with cable machine and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "3496b8f9a157271639ec8525eac9172ab6c2c0442784de6a179e0812f956bfd0"
+    },
+    {
+      "name": "One-Arm Kettlebell Floor Press",
+      "coachingIntent": "Train chest with the specific loading and range of One-Arm Kettlebell Floor Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up One-Arm Kettlebell Floor Press with kettlebell and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "dc43704823fb67c5e3c7b739780b50ac1422344ea01c578a5c56fe02d40aa5c7"
+    },
+    {
+      "name": "One-Arm Kettlebell Swings",
+      "coachingIntent": "Train hamstrings with the specific loading and range of One-Arm Kettlebell Swings while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up One-Arm Kettlebell Swings with kettlebell and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "2c6ed8a612c357af79920d50b7d98afcd6b17accfee108ca7697d1e94088d994"
+    },
+    {
+      "name": "Pallof Press With Rotation",
+      "coachingIntent": "Train abdominals with the specific loading and range of Pallof Press With Rotation while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Pallof Press With Rotation with cable machine and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "42d9c32778c1e071e22930d00c19b2c116672ec32d8d80fa8810fcd0753b1b2c"
+    },
+    {
+      "name": "Pin Presses",
+      "coachingIntent": "Train triceps with the specific loading and range of Pin Presses while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Pin Presses with barbell, bench, squat rack and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "211efa5bcc93e24e84704a7c1f8cfc29b34412b412f2748b11ed48f9686e5e14"
+    },
+    {
+      "name": "Preacher Hammer Dumbbell Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Preacher Hammer Dumbbell Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Preacher Hammer Dumbbell Curl with bench, dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "b2dca96d8da28b6b418b0c4f6eecb3d9089e7ee117807989167c271d5bce9a07"
+    },
+    {
+      "name": "Push Up to Side Plank",
+      "coachingIntent": "Train chest with the specific loading and range of Push Up to Side Plank while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Push Up to Side Plank with a stable bodyweight start position and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "7df0cf7f3d3371cbbc304958ad3ccf646bf82b02c580738d6f2904ced2d1084d"
+    },
+    {
+      "name": "Push-Up Wide",
+      "coachingIntent": "Train chest with the specific loading and range of Push-Up Wide while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Push-Up Wide with a stable bodyweight start position and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "7144e1370acf56c4a57264efa6e2814ded6bd74b480f98a5c12d08f1a1f0ae6f"
+    },
+    {
+      "name": "Reverse Band Box Squat",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Reverse Band Box Squat while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Reverse Band Box Squat with bands, barbell, squat rack and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "c2c2833c2780b10d8cd577aca82071734b6c7c4b0c36560724c65bed6a7ba787"
+    },
+    {
+      "name": "Reverse Band Deadlift",
+      "coachingIntent": "Train lower back with the specific loading and range of Reverse Band Deadlift while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Reverse Band Deadlift with bands, barbell, squat rack and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "aa2a1f3022f5b81a77c4b62f7f439ed29d27cbeb17626a34e3472cc080da4b43"
+    },
+    {
+      "name": "Reverse Band Sumo Deadlift",
+      "coachingIntent": "Train hamstrings with the specific loading and range of Reverse Band Sumo Deadlift while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Reverse Band Sumo Deadlift with bands, barbell, squat rack and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "a7a7360933151d5cf3c2270527428dd9e41f23e277b0281b23a644324d6da705"
+    },
+    {
+      "name": "Reverse Barbell Preacher Curls",
+      "coachingIntent": "Train biceps with the specific loading and range of Reverse Barbell Preacher Curls while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Reverse Barbell Preacher Curls with barbell, bench and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "9a8738fc3502b08ccd408189ce6e69f1082323cc9c8c838ee6c4a081cb3f5d1b"
+    },
+    {
+      "name": "Reverse Cable Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Reverse Cable Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Reverse Cable Curl with cable machine and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "dfeaa3ed2ec5e85ebc86f688c809ceaba005b11df1766d5dffb0c19c588bda51"
+    },
+    {
+      "name": "Reverse Flyes",
+      "coachingIntent": "Train shoulders with the specific loading and range of Reverse Flyes while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Reverse Flyes with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "447311554333729206d01c4fc1e6046b95eefe92dc03ee087df5441e217c545d"
+    },
+    {
+      "name": "Reverse Grip Triceps Pushdown",
+      "coachingIntent": "Train triceps with the specific loading and range of Reverse Grip Triceps Pushdown while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Reverse Grip Triceps Pushdown with cable machine and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "e78f5ce731a144bebfe06d39d6f05f6ff3357b1ed724f0d29087fa54312cf471"
+    },
+    {
+      "name": "Rope Crunch",
+      "coachingIntent": "Train abdominals with the specific loading and range of Rope Crunch while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Rope Crunch with cable machine and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "c9e57faa59810d74af812ef5acdc8a473faa214341be34f4a5fcd33fd9ff67e6"
+    },
+    {
+      "name": "Rope Straight-Arm Pulldown",
+      "coachingIntent": "Train lats with the specific loading and range of Rope Straight-Arm Pulldown while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Rope Straight-Arm Pulldown with cable machine and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "bcff11a60737db5e882b53155010b61d49ce87277116ac3311c2df536b8c22fe"
+    },
+    {
+      "name": "Seated Bent-Over Rear Delt Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Seated Bent-Over Rear Delt Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Seated Bent-Over Rear Delt Raise with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "266e1bc7e779f4a6a7a4d226647ffc55b779a7a449af24e9fa6793ebf460941c"
+    },
+    {
+      "name": "Seated Cable Rows",
+      "coachingIntent": "Train middle back with the specific loading and range of Seated Cable Rows while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Seated Cable Rows with cable machine and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "3cb41a3720346a3f29714dc0666dbd7fac63736a396f613f635b40c85a1dcb9f"
+    },
+    {
+      "name": "Seated Cable Shoulder Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Seated Cable Shoulder Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Seated Cable Shoulder Press with cable machine and choose a load or range you can control.",
+        "Organise the load at shoulder height, then press overhead while staying tall through the trunk.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Stay tall through the torso.",
+        "Stack the wrists over the elbows.",
+        "Finish overhead with a quiet ribcage."
+      ],
+      "contentSha256": "5df6880bb98f4c1fa5fa47cae8495f076dab43d70ba5373572ed751a9d28cac3"
+    },
+    {
+      "name": "Seated Dumbbell Palms-Down Wrist Curl",
+      "coachingIntent": "Train forearms with the specific loading and range of Seated Dumbbell Palms-Down Wrist Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Seated Dumbbell Palms-Down Wrist Curl with bench, dumbbells and choose a load or range you can control.",
+        "Support the forearms and move the load through the available wrist or finger range without shifting the elbows.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Support the forearms before the rep.",
+        "Move through the wrists with a relaxed grip.",
+        "Own the full return."
+      ],
+      "contentSha256": "235cd71c960a5aaa005e3e8bb147b72781ae2b5500d8be31dfd26027808da032"
+    },
+    {
+      "name": "Seated Dumbbell Palms-Up Wrist Curl",
+      "coachingIntent": "Train forearms with the specific loading and range of Seated Dumbbell Palms-Up Wrist Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Seated Dumbbell Palms-Up Wrist Curl with bench, dumbbells and choose a load or range you can control.",
+        "Support the forearms and move the load through the available wrist or finger range without shifting the elbows.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Support the forearms before the rep.",
+        "Move through the wrists with a relaxed grip.",
+        "Own the full return."
+      ],
+      "contentSha256": "2d242975b25a9265b20f107dec8450ecf0ae0e1c3fc3b1136090071b069358d9"
+    },
+    {
+      "name": "Seated Dumbbell Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Seated Dumbbell Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Seated Dumbbell Press with bench, dumbbells and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "ec6cbb3ccfcace162bc5efafced14c2d2ed9848c4863d19a7c68cfef730eb2fb"
+    },
+    {
+      "name": "Seated Good Mornings",
+      "coachingIntent": "Train lower back with the specific loading and range of Seated Good Mornings while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Seated Good Mornings with barbell, squat rack and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "c8ae30a8767557bed77aa623ef8a18f6def77558dd8ccefb88ccd8c11c96d8e3"
+    },
+    {
+      "name": "Seated Side Lateral Raise",
+      "coachingIntent": "Train shoulders with the specific loading and range of Seated Side Lateral Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Seated Side Lateral Raise with bench, dumbbells and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "2664b8f3366dd00f36a9422e9d2de79a293d930b4699e7231e4bf3b432e0e9a8"
+    },
+    {
+      "name": "Shotgun Row",
+      "coachingIntent": "Train lats with the specific loading and range of Shotgun Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Shotgun Row with cable machine and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "a62b83d15f20970db300f738ef2d8135aa2acabc92b03da9c8ec41b18ad8fb77"
+    },
+    {
+      "name": "Shoulder Press - With Bands",
+      "coachingIntent": "Train shoulders with the specific loading and range of Shoulder Press - With Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Shoulder Press - With Bands with bands and choose a load or range you can control.",
+        "Organise the load at shoulder height, then press overhead while staying tall through the trunk.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Stay tall through the torso.",
+        "Stack the wrists over the elbows.",
+        "Finish overhead with a quiet ribcage."
+      ],
+      "contentSha256": "80813e06ffaf66fd31dff81dd217bb15d2b627f8f220e1d445b7b4e23c98652b"
+    },
+    {
+      "name": "Speed Box Squat",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Speed Box Squat while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Speed Box Squat with bands, barbell and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "b7d2e750f2e3b6a8c741d7e0448f82c374149bd63939e4e029f76ac5208321be"
+    },
+    {
+      "name": "Spider Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Spider Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Spider Curl with barbell, bench and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "95df3a845f6289e03140ed0cfdc52b00454fe0b63584fe4aa2ff3180549ff814"
+    },
+    {
+      "name": "Squat with Bands",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Squat with Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Squat with Bands with bands, barbell, dumbbells, squat rack and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "6a764670a6265c62d8f6ddd3c19424297ec46b656316bf6a396a9f4038a4f71f"
+    },
+    {
+      "name": "Standing Biceps Cable Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Standing Biceps Cable Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Standing Biceps Cable Curl with cable machine and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "20f001b62e3f54492035d14df114f39a8157199bd43dc5f48097af0c3b159be1"
+    },
+    {
+      "name": "Standing Cable Chest Press",
+      "coachingIntent": "Train chest with the specific loading and range of Standing Cable Chest Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Standing Cable Chest Press with cable machine and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "3815ca35575204e894f7576fac0690ae89543c6e4dea5b45f30ab7aa09eb8c9c"
+    },
+    {
+      "name": "Standing Dumbbell Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Standing Dumbbell Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Standing Dumbbell Press with dumbbells and choose a load or range you can control.",
+        "Lower into the working range with the shoulders supported, then press through the intended line.",
+        "When the press path shifts or the setup lifts, the set is finished; reset before continuing."
+      ],
+      "cues": [
+        "Keep the chest open and shoulder blades set.",
+        "Stack the wrists over the press line.",
+        "Finish every rep through the same path."
+      ],
+      "contentSha256": "d891c7ee8780e4166275a858bf0a2957743d95d3f6f7bffde5b0a5c72a50ee8d"
+    },
+    {
+      "name": "Standing Dumbbell Reverse Curl",
+      "coachingIntent": "Train biceps with the specific loading and range of Standing Dumbbell Reverse Curl while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Standing Dumbbell Reverse Curl with dumbbells and choose a load or range you can control.",
+        "Hold the upper arms still, curl the load through the forearms, and squeeze without lifting the shoulders.",
+        "When the shoulders roll forward or the elbows travel, the load is ahead of the curl; reset lighter."
+      ],
+      "cues": [
+        "Keep the upper arms quiet.",
+        "Curl through the forearms.",
+        "Own the lowering phase."
+      ],
+      "contentSha256": "cb1d113c2bbefd4ff4c9af6e2c1e5283ff1151670b09f0d413c84bf35b564c22"
+    },
+    {
+      "name": "Standing Dumbbell Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Standing Dumbbell Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Standing Dumbbell Triceps Extension with dumbbells and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "98327acf9c3116d879afbf79872c3e46eebac27b3e6baa152cc375c340aede9f"
+    },
+    {
+      "name": "Standing Overhead Barbell Triceps Extension",
+      "coachingIntent": "Train triceps with the specific loading and range of Standing Overhead Barbell Triceps Extension while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Standing Overhead Barbell Triceps Extension with barbell and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "7bcd09d08f18531a545837e9ba3d27de886aca6454d3edf0aaab4b7ce4f39c77"
+    },
+    {
+      "name": "Standing Palm-In One-Arm Dumbbell Press",
+      "coachingIntent": "Train shoulders with the specific loading and range of Standing Palm-In One-Arm Dumbbell Press while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Standing Palm-In One-Arm Dumbbell Press with bench, dumbbells and choose a load or range you can control.",
+        "Move at a sustainable pace while keeping each stride and change of direction deliberate.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Set a repeatable starting position.",
+        "Keep every stride smooth and quiet.",
+        "Finish with the same posture you started with."
+      ],
+      "contentSha256": "e2cb1d0570fedbc1201a3bd52c82a350799ddb518bb46eecd585dc4c94f19064"
+    },
+    {
+      "name": "Standing Rope Crunch",
+      "coachingIntent": "Train abdominals with the specific loading and range of Standing Rope Crunch while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Standing Rope Crunch with cable machine and choose a load or range you can control.",
+        "Brace before moving, then complete the trunk action through a range you can own without momentum.",
+        "When momentum starts the rep, shorten the range and rebuild the brace."
+      ],
+      "cues": [
+        "Set the pelvis before the rep.",
+        "Move through a braced trunk.",
+        "Own the return without momentum."
+      ],
+      "contentSha256": "a838c5565e03f4522ef52691507cd7f70be162a46a1d4bf4b4d75bfcde71b102"
+    },
+    {
+      "name": "Step-up with Knee Raise",
+      "coachingIntent": "Train glutes with the specific loading and range of Step-up with Knee Raise while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Step-up with Knee Raise with bench and choose a load or range you can control.",
+        "Move the arms through the intended arc with soft elbows and a shoulder position that stays set.",
+        "When the torso swings, the load is stealing the rep; reset with less weight."
+      ],
+      "cues": [
+        "Set the shoulder blades before moving.",
+        "Lead the rep through the elbows.",
+        "Lower with the same smooth path."
+      ],
+      "contentSha256": "600a38c66cb1dd279e21a368354c8cc97cd282c72a77406754c86b84d445be3f"
+    },
+    {
+      "name": "Stiff Leg Barbell Good Morning",
+      "coachingIntent": "Train lower back with the specific loading and range of Stiff Leg Barbell Good Morning while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Stiff Leg Barbell Good Morning with barbell, squat rack and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "11fbe31eee0fd810d20cd72e4a4365e35b3e844237d0db1e161b485bbc1b83dc"
+    },
+    {
+      "name": "Stiff-Legged Barbell Deadlift",
+      "coachingIntent": "Train hamstrings with the specific loading and range of Stiff-Legged Barbell Deadlift while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Stiff-Legged Barbell Deadlift with barbell and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "0dae038f216036746b4488f1c3b5db9df5c34c00329b8e36106e50a17386fc80"
+    },
+    {
+      "name": "Straight-Arm Dumbbell Pullover",
+      "coachingIntent": "Train chest with the specific loading and range of Straight-Arm Dumbbell Pullover while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Straight-Arm Dumbbell Pullover with bench, dumbbells and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "a8174023ff6389b037f8f538148cff1344fd52887468087336a1abfff26d1ce0"
+    },
+    {
+      "name": "Sumo Deadlift with Bands",
+      "coachingIntent": "Train hamstrings with the specific loading and range of Sumo Deadlift with Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Sumo Deadlift with Bands with bands, barbell and choose a load or range you can control.",
+        "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+        "When the load leaves the hips and moves into the back, reduce the range or weight before the next rep."
+      ],
+      "cues": [
+        "Set the ribs down and brace first.",
+        "Send the hips back into the load.",
+        "Finish tall through the glutes."
+      ],
+      "contentSha256": "edc414051875b90ccab88a43552384ff9f752da3d17f0e95795fc20e4ef89bc1"
+    },
+    {
+      "name": "Trail Running/Walking",
+      "coachingIntent": "Build sustainable locomotion capacity with Trail Running/Walking while keeping posture and foot strike repeatable across the interval.",
+      "setupSteps": [
+        "Set up Trail Running/Walking with a stable bodyweight start position and choose a load or range you can control.",
+        "Move at a sustainable pace while keeping each stride and change of direction deliberate.",
+        "When posture or foot strike changes, slow the pace before continuing."
+      ],
+      "cues": [
+        "Set a repeatable starting position.",
+        "Keep every stride smooth and quiet.",
+        "Finish with the same posture you started with."
+      ],
+      "contentSha256": "f84590d2f26fb3815144c1f2c39eee04700a92983b748ba8ba0c26e72e107f15"
+    },
+    {
+      "name": "Triceps Pushdown - Rope Attachment",
+      "coachingIntent": "Train triceps with the specific loading and range of Triceps Pushdown - Rope Attachment while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Triceps Pushdown - Rope Attachment with cable machine and choose a load or range you can control.",
+        "Keep the elbows organised while the forearms extend, then return into a controlled stretch.",
+        "When the elbows chase the load, the extension has lost its line; shorten the range or load."
+      ],
+      "cues": [
+        "Aim the elbows through one steady line.",
+        "Extend through the forearms.",
+        "Control the return into the stretch."
+      ],
+      "contentSha256": "593f83826d8a01077dcc3711df9a94d138033aaf81bdd7fa9cb84408165ff4b2"
+    },
+    {
+      "name": "Two-Arm Kettlebell Row",
+      "coachingIntent": "Train middle back with the specific loading and range of Two-Arm Kettlebell Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Two-Arm Kettlebell Row with kettlebell and choose a load or range you can control.",
+        "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the torso before the pull.",
+        "Lead with the elbows.",
+        "Pause with the upper back engaged."
+      ],
+      "contentSha256": "9064f7395c2fa023f0a2fd07ae1ef869a3128421195ccac19fb8f53d8112f0d9"
+    },
+    {
+      "name": "Underhand Cable Pulldowns",
+      "coachingIntent": "Train lats with the specific loading and range of Underhand Cable Pulldowns while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Underhand Cable Pulldowns with cable machine and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "8ddf30652527b526c67036ced372a59defcd1a6d534d7f68528c80d45e343f1d"
+    },
+    {
+      "name": "Upright Barbell Row",
+      "coachingIntent": "Train shoulders with the specific loading and range of Upright Barbell Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Upright Barbell Row with barbell and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "453939161da3e2e276ae98191e74e366df62d7b51a577a450c5ce77290478970"
+    },
+    {
+      "name": "Upright Cable Row",
+      "coachingIntent": "Train traps with the specific loading and range of Upright Cable Row while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Upright Cable Row with cable machine and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "69992087d13ed55cb66580603de28def044c4071f37aa1f176e28e365909325c"
+    },
+    {
+      "name": "Upright Row - With Bands",
+      "coachingIntent": "Train traps with the specific loading and range of Upright Row - With Bands while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Upright Row - With Bands with bands and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "41a63c3eed7440baf20df54c6adb5ffcbabc7b17d4172363c6fb00f684c55112"
+    },
+    {
+      "name": "V-Bar Pullup",
+      "coachingIntent": "Train lats with the specific loading and range of V-Bar Pullup while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up V-Bar Pullup with pullup bar and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "00c3a56f666de05970db370729f62a2f27b97819d428da1a15ad6f561dee414c"
+    },
+    {
+      "name": "Wide Stance Barbell Squat",
+      "coachingIntent": "Train quadriceps with the specific loading and range of Wide Stance Barbell Squat while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Wide Stance Barbell Squat with barbell, squat rack and choose a load or range you can control.",
+        "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+        "When foot pressure rolls away from the working base, shorten the range and rebuild the next rep."
+      ],
+      "cues": [
+        "Brace before the descent.",
+        "Keep pressure through the whole foot.",
+        "Drive the floor away to stand."
+      ],
+      "contentSha256": "8b0e76c7e43255128e3e49ff125e0985bd2d5465f8d3e3468b497b140ae99836"
+    },
+    {
+      "name": "Wide-Grip Lat Pulldown",
+      "coachingIntent": "Train lats with the specific loading and range of Wide-Grip Lat Pulldown while keeping each rep technically honest.",
+      "setupSteps": [
+        "Set up Wide-Grip Lat Pulldown with cable machine and choose a load or range you can control.",
+        "Set the shoulders before bending the elbows, then pull through the full available range.",
+        "When the hands finish before the elbows, the load is too ambitious; reset and own the pull."
+      ],
+      "cues": [
+        "Set the shoulders before bending the elbows.",
+        "Pull through the elbows, not the hands.",
+        "Reach long under control."
+      ],
+      "contentSha256": "5d1b7245b10c87a684d70147ed1c4548e91535ebcec5c4df0f9be634b7ed3fe0"
+    }
+  ]
+}

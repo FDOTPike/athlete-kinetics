@@ -159,9 +159,10 @@ check('rest matrix honors actual RPE before target RPE and stays within the cont
   assert.equal(restSecondsFor({ targetRpe: 8 }, 'intermediate'), 180);
   assert.equal(restSecondsFor({ targetRpe: 7 }, 'intermediate'), 120);
   assert.equal(restSecondsFor({ targetRpe: 6 }, 'intermediate'), 90);
-  assert.equal(restSecondsFor({ targetRpe: 9 }, 'beginner'), 180);
-  assert.equal(restSecondsFor({ targetRpe: 9 }, 'elite'), 300);
-  assert.equal(restSecondsFor({ targetRpe: 6 }, 'beginner'), 75);
+  // 2026-09-15 tier-neutral rest ruling: tier alone never lengthens or shortens rest.
+  assert.equal(restSecondsFor({ targetRpe: 9 }, 'beginner'), 240);
+  assert.equal(restSecondsFor({ targetRpe: 9 }, 'elite'), 240);
+  assert.equal(restSecondsFor({ targetRpe: 6 }, 'beginner'), 90);
   assert.equal(restSecondsFor(rpe8, 'intermediate', 6), 90);
   for (const tier of ['beginner', 'intermediate', 'advanced', 'elite']) {
     for (const rpe of [0, 7, 8, 9, 10]) {
@@ -169,6 +170,78 @@ check('rest matrix honors actual RPE before target RPE and stays within the cont
       assert.ok(seconds >= 45 && seconds <= 300 && seconds % 15 === 0, `${tier} RPE ${rpe}`);
     }
   }
+});
+
+// R5 - 2026-09-15 owner ruling (docs/decisions/REST_DURATION_TIER_NEUTRAL_2026-09-15.md):
+// for identical RPE and session inputs, automatic rest duration is identical for
+// beginner, intermediate, advanced and elite athletes.
+const R5_TIERS = ['beginner', 'intermediate', 'advanced', 'elite'];
+const R5_REST_BANDS = [
+  [0, 90], [5, 90], [6, 90], [6.5, 90], [6.99, 90], [7, 120], [7.5, 120],
+  [8, 180], [8.5, 180], [9, 240], [9.5, 240], [10, 240],
+];
+
+check('R5 tier-neutral rest: every tier gets the same RPE-band rest for target, actual and null-actual RPE', () => {
+  let cases = 0;
+  const bands = new Set();
+  for (const [rpe, expected] of R5_REST_BANDS) {
+    bands.add(expected);
+    const otherBandTarget = rpe >= 8 ? 6 : 9;
+    for (const tier of R5_TIERS) {
+      assert.equal(restSecondsFor({ targetRpe: rpe }, tier), expected, `R5 tier-only rest: target ${tier} RPE ${rpe}`);
+      assert.equal(restSecondsFor({ targetRpe: rpe }, tier, null), expected, `R5 tier-only rest: null actual ${tier} RPE ${rpe}`);
+      assert.equal(restSecondsFor({ targetRpe: otherBandTarget }, tier, rpe), expected, `R5 tier-only rest: actual precedence ${tier} RPE ${rpe}`);
+      cases += 3;
+    }
+  }
+  assert.deepEqual([...bands].sort((a, b) => a - b), [90, 120, 180, 240], 'R5 non-vacuity: every RPE band exercised');
+  assert.equal(cases, R5_REST_BANDS.length * R5_TIERS.length * 3, 'R5 non-vacuity: full tier x band matrix');
+  assert.throws(() => restSecondsFor({ targetRpe: 8 }, 'novice'), RunnerCheckpointError, 'R5 tier validation retained');
+  assert.throws(() => startRunner([repSlot(1, 2, 5, 8)], { tier: 'novice', startedAtMs: 0 }), RunnerCheckpointError);
+});
+
+check('R5 tier-neutral rest: live logged-set rests and explicit overrides are identical across tiers', () => {
+  for (const [rpe, expected] of R5_REST_BANDS) {
+    for (const tier of R5_TIERS) {
+      const started = startRunner([repSlot(801, 3, 5, 8)], { tier, startedAtMs: 0 });
+      const actual = advance(started, event('LOG_SET', 10, { actualRpe: rpe }));
+      const targetOnly = advance(startRunner([repSlot(802, 3, 5, rpe)], { tier, startedAtMs: 0 }), event('LOG_SET', 10));
+      const overridden = advance(advance(started, event('SET_REST_OVERRIDE', 5, { seconds: 150 })), event('LOG_SET', 10, { actualRpe: rpe }));
+      assert.deepEqual(
+        [actual.phase, actual.restSecondsTarget, targetOnly.restSecondsTarget, overridden.restSecondsTarget],
+        ['resting', expected, expected, 150],
+        `R5 tier-only rest: live runner ${tier} RPE ${rpe}`,
+      );
+    }
+  }
+});
+
+check('R5 checkpoint compatibility: a mid-rest checkpoint saved under the pre-ruling tier scale still restores', () => {
+  for (const [tier, rpe, preRulingSeconds, neutralSeconds] of [
+    ['beginner', 9, 180, 240], ['beginner', 6, 75, 90], ['elite', 9, 300, 240], ['elite', 6, 120, 90],
+  ]) {
+    const resting = advance(startRunner([repSlot(901, 3, 5, 8)], { tier, startedAtMs: 0 }), event('LOG_SET', 10, { actualRpe: rpe }));
+    assert.equal(resting.restSecondsTarget, neutralSeconds);
+    assert.deepEqual(restoreRunnerCheckpoint(JSON.parse(serializeRunner(resting))), resting);
+
+    const saved = JSON.parse(serializeRunner(resting));
+    saved.state.restSecondsTarget = preRulingSeconds;
+    const restored = restoreRunnerCheckpoint(saved);
+    assert.equal(restored.restSecondsTarget, preRulingSeconds, `R5 checkpoint: ${tier} in-progress rest keeps its saved duration`);
+    const next = advance(advance(restored, event('SKIP_REST', 20)), event('LOG_SET', 30, { actualRpe: rpe }));
+    assert.equal(next.restSecondsTarget, neutralSeconds, `R5 checkpoint: ${tier} next rest is tier-neutral`);
+
+    const corrupt = JSON.parse(serializeRunner(resting));
+    corrupt.state.restSecondsTarget = 195;
+    assert.throws(() => restoreRunnerCheckpoint(corrupt), RunnerCheckpointError, 'R5 checkpoint: other rest values stay rejected');
+  }
+  const intermediate = JSON.parse(serializeRunner(advance(startRunner([repSlot(902, 3, 5, 8)], { tier: 'intermediate', startedAtMs: 0 }), event('LOG_SET', 10, { actualRpe: 9 }))));
+  intermediate.state.restSecondsTarget = 180;
+  assert.throws(() => restoreRunnerCheckpoint(intermediate), RunnerCheckpointError, 'R5 checkpoint: intermediate had no pre-ruling scale');
+  const overridden = advance(advance(startRunner([repSlot(903, 3, 5, 8)], { tier: 'beginner', startedAtMs: 0 }), event('SET_REST_OVERRIDE', 5, { seconds: 150 })), event('LOG_SET', 10, { actualRpe: 9 }));
+  const overriddenSaved = JSON.parse(serializeRunner(overridden));
+  overriddenSaved.state.restSecondsTarget = 180;
+  assert.throws(() => restoreRunnerCheckpoint(overriddenSaved), RunnerCheckpointError, 'R5 checkpoint: an explicit override still governs');
 });
 
 check('timestamped rest cannot elapse early and advances exactly at its supplied deadline', () => {
@@ -399,10 +472,10 @@ check('athlete tier is frozen at session start; per-athlete preference changes c
     tierState = advance(tierState, e);
     assert.equal(tierState.tier, 'beginner', `tier must remain 'beginner' after ${e.kind}`);
   }
-  // Rest matrix uses the frozen tier. Beginner scale is 0.75x intermediate.
-  const restForBeginner = restSecondsFor({ targetRpe: 9 }, 'beginner');
-  const restForIntermediate = restSecondsFor({ targetRpe: 9 }, 'intermediate');
-  assert.ok(restForBeginner < restForIntermediate, 'beginner rest must be shorter than intermediate');
+  // The frozen tier is still validated, but under the 2026-09-15 tier-neutral
+  // rest ruling it no longer changes rest duration.
+  assert.equal(restSecondsFor({ targetRpe: 9 }, 'beginner'), restSecondsFor({ targetRpe: 9 }, 'intermediate'),
+    'R5 beginner rest equals intermediate rest for identical RPE');
   // Serialization preserves the tier.
   const restoredTier = deserializeRunner(serializeRunner(tierState));
   assert.equal(restoredTier.tier, 'beginner');
