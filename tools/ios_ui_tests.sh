@@ -75,6 +75,17 @@ for test in "${TESTS[@]}"; do
     > "$OUT/$test.log" 2>&1 || code=$?
   kill "$LOG_PID" >/dev/null 2>&1 || true
   echo "$test exit=$code"
+  # test3 may accept that HealthKit never answered ONLY if the app's own trace
+  # proves no answer arrived; an answer the UI did not show is a failure.
+  if [ "$test" = test3_healthDenialAndAthleteSwitching ] && grep -q 'AKUI HEALTH-UNANSWERED' "$OUT/$test.log"; then
+    if grep -q '\[ak-health\] request settled' "$OUT/$test.system.log"; then
+      echo "::error title=ui $test::the app DID receive HealthKit's answer (trace: request settled) but the UI never showed it"
+      code=1
+      FAILED=1
+    else
+      echo "::warning title=ui $test HealthKit unanswered::healthd never answered the app on this simulator (no 'request settled' in the app trace). Real-sheet denial needs a physical-device check (owner). The app claimed nothing and kept the request pending."
+    fi
+  fi
   if [ "$code" -ne 0 ] && [ "$test" = test3_healthDenialAndAthleteSwitching ]; then
     grep -E 'ak-health|HealthKit:auth|ViewServices.*HealthPrivacy' "$OUT/$test.system.log" | tail -30 | cut -c1-240 > "$OUT/$test.health-excerpt.txt" || true
     echo "::warning title=ui $test system log (HealthKit)::$(tr '\n' '~' < "$OUT/$test.health-excerpt.txt" | cut -c1-5500)"

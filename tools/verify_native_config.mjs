@@ -227,6 +227,9 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && /let fieldTypes: \[XCUIElement\.ElementType\] = \[\.textField, \.secureTextField, \.searchField\]/.test(suite)
       && suite.includes('a text field did not scale with the accessibility text size')
       && (suite.match(/A11Y-MEASURED/g) ?? []).length === 1, `early returns: ${classified}`);
+  check('an unanswered HealthKit sheet is accepted only when the app trace proves no answer arrived',
+    suite.includes('HEALTH-UNANSWERED') && runner.includes("grep -q 'AKUI HEALTH-UNANSWERED'")
+      && runner.includes("request settled") && /code=1\n\s+FAILED=1/.test(runner));
   const ci = read('.github/workflows/ci.yml');
   check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)

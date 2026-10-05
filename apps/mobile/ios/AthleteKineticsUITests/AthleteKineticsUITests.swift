@@ -313,6 +313,9 @@ final class AthleteKineticsUITests: XCTestCase {
           inventories += 1
           log("health hint absent at t=\(second)s; app{\(visibleLabels(app).prefix(700))} springboard{\(visibleLabels(XCUIApplication(bundleIdentifier: "com.apple.springboard")).prefix(300))}")
         }
+        for claim in ["Connected", "granted"] where now.contains(claim) {
+          XCTFail("the Health wording claimed access ('\(claim)') while the request was open: \(now)")
+        }
         if now.hasPrefix("Apple Health access requested") { answered = true; break }
         if now.hasPrefix("The Apple Health request did not complete") { break }
         sleep(1)
@@ -320,14 +323,23 @@ final class AthleteKineticsUITests: XCTestCase {
       // Only ask again once the first request has visibly settled.
       if !answered && !(healthHint.exists && healthHint.label.hasPrefix("The Apple Health request did not complete")) { break }
     }
-    XCTAssertTrue(answered, "the person's answer on HealthKit's sheet was never reflected in the app")
-    // HealthKit never tells an app that reading was denied, so the honest
-    // wording is 'requested' plus where to check — never 'connected'.
-    let hintA = settledLabel(element(labelBeginsWith: "Apple Health access requested"),
-                             beginsWith: "Apple Health access requested", "health wording after denial (A)", timeout: 30)
-    XCTAssertTrue(hintA.contains("does not tell apps whether you allowed reading"), "the denial-safe explanation is missing: \(hintA)")
-    for claim in ["Connected", "granted"] {
-      XCTAssertFalse(hintA.contains(claim), "after a denial the wording claimed access ('\(claim)'): \(hintA)")
+    // CI evidence (2580fb6): after the Don't Allow tap the simulator's healthd
+    // kept the authorization transaction open until teardown (Code=5) and
+    // never answered the app. That alone is not an app defect. The marker
+    // below is checked by tools/ios_ui_tests.sh against the app's own trace:
+    // it is accepted ONLY when the app provably received no answer ("request
+    // settled" absent); an answer the UI failed to show is still a failure.
+    if answered {
+      // HealthKit never tells an app that reading was denied, so the honest
+      // wording is 'requested' plus where to check — never 'connected'.
+      let hintA = settledLabel(element(labelBeginsWith: "Apple Health access requested"),
+                               beginsWith: "Apple Health access requested", "health wording after denial (A)", timeout: 30)
+      XCTAssertTrue(hintA.contains("does not tell apps whether you allowed reading"), "the denial-safe explanation is missing: \(hintA)")
+      for claim in ["Connected", "granted"] {
+        XCTAssertFalse(hintA.contains(claim), "after a denial the wording claimed access ('\(claim)'): \(hintA)")
+      }
+    } else {
+      log("HEALTH-UNANSWERED HealthKit returned no answer to the app on this simulator; the app kept its request pending and claimed nothing")
     }
     XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 2), "the permission sheet stayed open")
 
@@ -357,9 +369,11 @@ final class AthleteKineticsUITests: XCTestCase {
     openProfile()
     XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 5),
                    "switching athlete reopened the Health permission sheet")
-    let hintBack = settledLabel(element(labelBeginsWith: "Apple Health access requested"),
-                                beginsWith: "Apple Health access requested", "health wording after switching back (A)", timeout: 30)
-    XCTAssertFalse(hintBack.contains("Connected"), "athlete A's wording claimed access after the switch: \(hintBack)")
+    let hintBack = answered
+      ? settledLabel(element(labelBeginsWith: "Apple Health access requested"),
+                     beginsWith: "Apple Health access requested", "health wording after switching back (A)", timeout: 30)
+      : settledLabel(element(labelBeginsWith: "Apple Health"), beginsWith: "Apple Health", "health wording after switching back (A, unanswered)", timeout: 30)
+    XCTAssertFalse(hintBack.contains("Connected") || hintBack.contains("granted"), "athlete A's wording claimed access after the switch: \(hintBack)")
     let switched = expandCoachMode()
     XCTAssertTrue(switched.hasPrefix("Coach mode, 2 athletes"), "an athlete was lost across the switch: \(switched)")
     XCTAssertTrue(element("Athlete UITest B, tap to switch").exists, "athlete B is not listed as switchable after switching to A")
@@ -420,9 +434,16 @@ final class AthleteKineticsUITests: XCTestCase {
         lastRestoreStatus = now
       }
       if now.hasPrefix("Restore complete.") || !(now.hasPrefix("Creating") || now.hasPrefix("Recovery") || now.hasPrefix("Replacing") || now == "<absent>") { break }
+      // The restore reopens the app on the restored active athlete; without a
+      // program that athlete is offered set-up, which covers the Profile.
+      if now == "<absent>" && element("Cancel").exists && element("Create program").exists {
+        log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: set-up offered for the restored athlete; cancelled")
+        element("Cancel").tap()
+        openProfile()
+      }
       sleep(2)
     }
-    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 5)
+    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)
     wait(element("shell-root"), "the app after restore")
     openProfile()
     let after = expandCoachMode()
