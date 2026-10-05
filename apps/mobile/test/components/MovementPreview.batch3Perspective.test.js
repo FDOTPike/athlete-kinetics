@@ -18,6 +18,7 @@ const draft=read('acceptance-evidence/wo09/batch3-perspective/draft-manifest.jso
 // R2 Part C: the merged preview data comes from the app's own module.
 const production=previewManifest;
 const baseline=read('acceptance-evidence/wo09/batch3-perspective/base-primitives.json');
+const baselineNeutral=read('acceptance-evidence/wo09/batch3-perspective/base-primitives-neutral.json');
 const clone=v=>JSON.parse(JSON.stringify(v));
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 const mid=p=>[(p.x1+p.x2)/2,(p.y1+p.y2)/2];
@@ -84,20 +85,17 @@ function identity(e,p) {
   if(e.movementId===2 && Math.abs(p.b[0]-56)>.02) throw Error('deadlift path');
   if(e.movementId===5 && (dist(p.nk,e.frames[0].joints.nk)>.02 || dist(p.hp,e.frames[0].joints.hp)>.02)) throw Error('row hinge');
 }
-test.skip('all 12 existing canonical legacy male/female drawings stay byte-identical at 20ms intervals [SUPERSEDED by neutral-only standard]',()=>{
-  for(const row of baseline.rows) {
-    const e=production.entries.find(e=>e.movementId===row.id),draws=[];
-    const ds=rig.segmentDurations(e.frames.length,e.segmentDurationsMs);
-    const total=ds.reduce((a,b)=>a+b,0);
-    const poses=e.frames.map(f=>f.joints);
-    expect(rig.poseAtTime(poses,total,ds)).toEqual(poses[poses.length-1]);
-    for(const body of ['male','female']) for(let t=0;t<=total;t+=20) {
-      // This frozen historical digest includes the now-repaired exact-stop
-      // bug (the penultimate frame at total). Reconstruct ONLY that old sample
-      // for the geometry comparison; independently assert the corrected stop
-      // above. Every other drawing must retain the original bytes.
-      const pose=t===total ? poses[poses.length-2] : rig.poseAtTime(poses,t,ds);
-      draws.push(rig.layoutCanonicalFigure(pose,{body:rig.DUAL_BODY_PARAMETERS[body],view:e.view,assetKey:e.assetKey}));
+test('all 12 existing canonical neutral drawings stay byte-identical at 20ms intervals', () => {
+  for (const row of baselineNeutral.rows) {
+    const e = production.entries.find((e) => e.movementId === row.id);
+    const draws = [];
+    const ds = rig.segmentDurations(e.frames.length, e.segmentDurationsMs);
+    const total = ds.reduce((a, b) => a + b, 0);
+    const poses = e.frames.map((f) => f.joints);
+    expect(rig.poseAtTime(poses, total, ds)).toEqual(poses[poses.length - 1]);
+    for (let t = 0; t <= total; t += 20) {
+      const pose = rig.poseAtTime(poses, t, ds);
+      draws.push(rig.layoutCanonicalFigure(pose, { body: rig.CANONICAL_BODY_PARAMETERS, view: e.view, assetKey: e.assetKey }));
     }
     expect(createHash('sha256').update(JSON.stringify(draws)).digest('hex')).toBe(row.sha256);
   }
