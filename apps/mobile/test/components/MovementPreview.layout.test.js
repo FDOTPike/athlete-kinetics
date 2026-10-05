@@ -45,7 +45,7 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // Original120 plus pushdowns, pulldown, flyes ankle kickback84 and reverse lunge52.
   expect(CANONICAL.length).toBe(129);
   for (const entry of CANONICAL) {
-    for (const bodyName of ['male', 'female']) {
+    for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {
         const prims = layoutCanonicalFigure(frame.joints, {
           view: entry.view,
@@ -59,12 +59,12 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   }
 });
 
-test('the side-on lat pulldown draws its end-on bar and its cable exactly once, for every keyframe and both bodies', () => {
+test('the side-on lat pulldown draws its end-on bar and its cable exactly once, for every keyframe on the neutral body', () => {
   const entry = CANONICAL.find((e) => e.assetKey === 'movement/lat-pulldown/demo/v1');
   expect(entry).toBeDefined();
   expect(entry.view).toBe('side');
   expect(entry.frames.length).toBeGreaterThanOrEqual(13);
-  for (const bodyName of ['male', 'female']) {
+  for (const bodyName of ['neutral']) {
     for (const frame of entry.frames) {
       const prims = layoutCanonicalFigure(frame.joints, {
         view: entry.view,

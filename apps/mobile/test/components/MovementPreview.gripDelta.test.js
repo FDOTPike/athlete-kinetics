@@ -127,7 +127,7 @@ const VARIANT = (() => {
     captionOverrides,
   };
 })();
-const BODIES = ['neutral', 'male', 'female'];
+const BODIES = ['neutral'];
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 const variantWith = (change) => ({ ...VARIANT, ...change });
@@ -352,9 +352,8 @@ describe('the drawn pose (re-solved at draw time, lengths held)', () => {
     expect(GRIP_ELBOW_STEP_MAX_FACTOR).toBe(1.5);
     // Entry 0183: the pinned pose's reach hands now sit on the drawn 24.5 reach,
     // so its largest keyframe elbow step and the grip variant's steps were
-    // re-measured on the variant's own keyed arm. Measured per body: male 1.236,
-    // female 1.398, neutral 1.302.
-    const MEASURED = { male: 1.236, female: 1.398, neutral: 1.302 };
+    // re-measured on the variant's own keyed arm. Measured for neutral: 1.302.
+    const MEASURED = { neutral: 1.302 };
     for (const body of BODIES) {
       let step = 0;
       let baseStep = 0;
@@ -498,9 +497,9 @@ describe('the contract refuses a gripDelta it cannot honour', () => {
 
   test('an elbow path that jumps, proven from both sides of the 1.5x bound', () => {
     // A close grip folds the elbow inside the shoulder (the dropped 169):
-    // measured 1.53x (female) at -3, 1.41x (male) at -2.
+    // measured 1.53x at -3 (neutral), 1.41x at -2.
     expect(() => deriveVariantEntry(variantWith({ gripDelta: -3 }), BASE))
-      .toThrow(/gripDelta -3 moves the (near|far) elbow \d+\.\d+ between keyframes \S+ and \S+ \((neutral|male|female)\), more than 1\.5x the base's largest keyframe elbow step 5\.348/);
+      .toThrow(/gripDelta -3 moves the (near|far) elbow \d+\.\d+ between keyframes \S+ and \S+ \(neutral\), more than 1\.5x the base's largest keyframe elbow step 5\.348/);
     expect(() => deriveVariantEntry(variantWith({ gripDelta: -2 }), BASE)).not.toThrow();
     expect(() => deriveVariantEntry(variantWith({ gripDelta: 5 }), BASE)).not.toThrow();
   });

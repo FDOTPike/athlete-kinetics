@@ -122,7 +122,7 @@ export type BodyType = 'neutral' | LegacyBodyType;
 // The body-parameter contract lives with the layout it parameterizes;
 // manifest.ts re-exports it so existing import sites keep working. The
 // production manifest's historical dualBody metadata remains legacy-only.
-export { DUAL_BODY_PARAMETERS } from './canonicalFigure';
+export { CANONICAL_BODY_PARAMETERS, DUAL_BODY_PARAMETERS } from './canonicalFigure';
 export type { BodyParameters } from './canonicalFigure';
 
 /** Strict chalk accent color and usage policy rules. */

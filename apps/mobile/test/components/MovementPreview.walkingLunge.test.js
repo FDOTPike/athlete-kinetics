@@ -8,7 +8,7 @@ import { previewManifest } from './previewManifest';
 const raw = previewManifest;
 const entry = raw.entries.find((e) => e.movementId === 17);
 
-test.each(['male', 'female'])('Walking Lunge retains rigid legs through the full in-plane stride (%s)', (body) => {
+test.each(['neutral'])('Walking Lunge retains rigid legs through the full in-plane stride (%s)', (body) => {
   const frames = entry.frames.map((f) => f.joints);
   const total = segmentDurations(frames.length, entry.segmentDurationsMs).reduce((a, b) => a + b, 0);
   const opts = { view: entry.view, body: DUAL_BODY_PARAMETERS[body], assetKey: entry.assetKey };

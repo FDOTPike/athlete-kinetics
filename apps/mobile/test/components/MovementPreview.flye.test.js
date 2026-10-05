@@ -12,7 +12,7 @@ test.each(entries)('$movementId flye uses shoulder opening with fixed soft elbow
   expect(entry.status).toBe('pending');
   const total = entry.segmentDurationsMs.reduce((a,b) => a+b,0);
   const ticks = [...Array.from({length:Math.ceil(total/33)},(_,i) => i*33),total];
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) {
     const opts = {...entry,body};
     const first = resolveFigureJoints(entry.frames[0].joints,opts);
     for (const t of ticks) {
@@ -51,7 +51,7 @@ test.each(entries)('$movementId flye uses shoulder opening with fixed soft elbow
 });
 
 test('flye setups distinguish flat/incline floor feet and secured decline legs', () => {
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) {
     const flat = flyeGeometry(0,body,0), incline = flyeGeometry(0,body,30), decline = flyeGeometry(0,body,-15);
     expect(flat.joints.nk[1]).toBe(flat.joints.hp[1]);
     expect(incline.joints.nk[1]).toBeLessThan(incline.joints.hp[1]);

@@ -65,7 +65,7 @@
  */
 
 import {
-  DUAL_BODY_PARAMETERS, drawnSegmentLengths, resolveFigureJoints, resolveGripArms,
+  CANONICAL_BODY_PARAMETERS, DUAL_BODY_PARAMETERS, drawnSegmentLengths, resolveFigureJoints, resolveGripArms,
 } from './canonicalFigure';
 import type { CanonicalPose, ViewName } from './canonicalFigure';
 
@@ -231,21 +231,19 @@ function checkJointOffsets(
   const view = (entry.view !== undefined ? entry.view : base.view) as ViewName;
   for (const frame of frames) {
     const pose = frame.joints as unknown as CanonicalPose;
-    for (const bodyName of ['neutral', 'male', 'female'] as const) {
-      const body = DUAL_BODY_PARAMETERS[bodyName];
-      const own = drawnSegmentLengths(pose, { view, body, assetKey: String(base.assetKey) });
-      const drawn = drawnSegmentLengths(pose, {
-        view, body, assetKey: String(entry.assetKey), jointOffsets: offsets,
-      });
-      for (const segment of Object.keys(own)) {
-        const reference = own[segment];
-        const change = reference > 0
-          ? Math.abs(drawn[segment] - reference) / reference
-          : (drawn[segment] > 0 ? Infinity : 0);
-        if (change > JOINT_OFFSET_MAX_SEGMENT_CHANGE) {
-          fail(where,
-            `jointOffsets change the drawn ${segment} of frame ${frame.id} (${bodyName}) from ${reference.toFixed(3)} to ${drawn[segment].toFixed(3)}, more than ${JOINT_OFFSET_MAX_SEGMENT_CHANGE * 100}%`);
-        }
+    const body = CANONICAL_BODY_PARAMETERS;
+    const own = drawnSegmentLengths(pose, { view, body, assetKey: String(base.assetKey) });
+    const drawn = drawnSegmentLengths(pose, {
+      view, body, assetKey: String(entry.assetKey), jointOffsets: offsets,
+    });
+    for (const segment of Object.keys(own)) {
+      const reference = own[segment];
+      const change = reference > 0
+        ? Math.abs(drawn[segment] - reference) / reference
+        : (drawn[segment] > 0 ? Infinity : 0);
+      if (change > JOINT_OFFSET_MAX_SEGMENT_CHANGE) {
+        fail(where,
+          `jointOffsets change the drawn ${segment} of frame ${frame.id} (neutral) from ${reference.toFixed(3)} to ${drawn[segment].toFixed(3)}, more than ${JOINT_OFFSET_MAX_SEGMENT_CHANGE * 100}%`);
       }
     }
   }
@@ -301,40 +299,38 @@ function checkGripDelta(
   const offsets = entry.jointOffsets === undefined
     ? undefined : readJointOffsetsShape(where, entry.jointOffsets);
   const dist = (a: readonly number[], b: readonly number[]): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
-  for (const bodyName of ['neutral', 'male', 'female'] as const) {
-    const body = DUAL_BODY_PARAMETERS[bodyName];
-    let baseStep = 0;
-    let step = { size: 0, arm: '', from: '', to: '' };
-    let previous: { id: string; own: { el: readonly number[]; ef: readonly number[] };
-      drawn: { el: readonly number[]; ef: readonly number[] } } | undefined;
-    for (const frame of frames) {
-      const pose = frame.joints as unknown as CanonicalPose;
-      const own = resolveFigureJoints(pose, { view, body, assetKey: String(base.assetKey), jointOffsets: offsets });
-      const grip = resolveGripArms(own, delta);
-      for (const [arm, solution, shoulder] of [
-        ['near', grip.near, own.nArm], ['far', grip.far, own.fArm],
-      ] as const) {
-        if (!solution.reachable) {
-          const reach = dist(shoulder, arm === 'near' ? own.el : own.ef)
-            + dist(arm === 'near' ? own.el : own.ef, arm === 'near' ? own.wr : own.wf);
-          fail(where,
-            `gripDelta ${delta} puts the ${arm} grip of frame ${frame.id} (${bodyName}) beyond the arm's full reach of ${reach.toFixed(3)}`);
-        }
+  const body = CANONICAL_BODY_PARAMETERS;
+  let baseStep = 0;
+  let step = { size: 0, arm: '', from: '', to: '' };
+  let previous: { id: string; own: { el: readonly number[]; ef: readonly number[] };
+    drawn: { el: readonly number[]; ef: readonly number[] } } | undefined;
+  for (const frame of frames) {
+    const pose = frame.joints as unknown as CanonicalPose;
+    const own = resolveFigureJoints(pose, { view, body, assetKey: String(base.assetKey), jointOffsets: offsets });
+    const grip = resolveGripArms(own, delta);
+    for (const [arm, solution, shoulder] of [
+      ['near', grip.near, own.nArm], ['far', grip.far, own.fArm],
+    ] as const) {
+      if (!solution.reachable) {
+        const reach = dist(shoulder, arm === 'near' ? own.el : own.ef)
+          + dist(arm === 'near' ? own.el : own.ef, arm === 'near' ? own.wr : own.wf);
+        fail(where,
+          `gripDelta ${delta} puts the ${arm} grip of frame ${frame.id} (neutral) beyond the arm's full reach of ${reach.toFixed(3)}`);
       }
-      const drawn = { el: grip.near.el, ef: grip.far.el };
-      if (previous !== undefined) {
-        baseStep = Math.max(baseStep, dist(previous.own.el, own.el), dist(previous.own.ef, own.ef));
-        for (const arm of ['el', 'ef'] as const) {
-          const size = dist(previous.drawn[arm], drawn[arm]);
-          if (size > step.size) step = { size, arm: arm === 'el' ? 'near' : 'far', from: previous.id, to: frame.id };
-        }
+    }
+    const drawn = { el: grip.near.el, ef: grip.far.el };
+    if (previous !== undefined) {
+      baseStep = Math.max(baseStep, dist(previous.own.el, own.el), dist(previous.own.ef, own.ef));
+      for (const arm of ['el', 'ef'] as const) {
+        const size = dist(previous.drawn[arm], drawn[arm]);
+        if (size > step.size) step = { size, arm: arm === 'el' ? 'near' : 'far', from: previous.id, to: frame.id };
       }
-      previous = { id: frame.id, own, drawn };
     }
-    if (step.size > GRIP_ELBOW_STEP_MAX_FACTOR * baseStep) {
-      fail(where,
-        `gripDelta ${delta} moves the ${step.arm} elbow ${step.size.toFixed(3)} between keyframes ${step.from} and ${step.to} (${bodyName}), more than ${GRIP_ELBOW_STEP_MAX_FACTOR}x the base's largest keyframe elbow step ${baseStep.toFixed(3)}`);
-    }
+    previous = { id: frame.id, own, drawn };
+  }
+  if (step.size > GRIP_ELBOW_STEP_MAX_FACTOR * baseStep) {
+    fail(where,
+      `gripDelta ${delta} moves the ${step.arm} elbow ${step.size.toFixed(3)} between keyframes ${step.from} and ${step.to} (neutral), more than ${GRIP_ELBOW_STEP_MAX_FACTOR}x the base's largest keyframe elbow step ${baseStep.toFixed(3)}`);
   }
 }
 

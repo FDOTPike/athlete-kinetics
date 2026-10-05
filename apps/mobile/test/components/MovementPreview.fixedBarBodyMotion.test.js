@@ -32,7 +32,7 @@ suite('Batch B3b: Fixed-Bar Body Motion', () => {
     expect(entry152.equipment).toBe('squat_rack');
   });
 
-  test.each(Object.keys(DUAL_BODY_PARAMETERS))('66 maintains rigid body plank, fixed heel contact, and chest-to-bar pull (%s)', name => {
+  test.each(['neutral'])('66 maintains rigid body plank, fixed heel contact, and chest-to-bar pull (%s)', name => {
     const body = DUAL_BODY_PARAMETERS[name];
     const opts = { ...entry66, body };
     const total = entry66.segmentDurationsMs.reduce((a, b) => a + b, 0);
@@ -78,7 +78,7 @@ suite('Batch B3b: Fixed-Bar Body Motion', () => {
     expect(top.plankAngleDeg).toBeGreaterThan(bottom.plankAngleDeg);
   });
 
-  test.each(Object.keys(DUAL_BODY_PARAMETERS))('152 isolates elbow extension against fixed bar with quiet body plank (%s)', name => {
+  test.each(['neutral'])('152 isolates elbow extension against fixed bar with quiet body plank (%s)', name => {
     const body = DUAL_BODY_PARAMETERS[name];
     const opts = { ...entry152, body };
     const total = entry152.segmentDurationsMs.reduce((a, b) => a + b, 0);

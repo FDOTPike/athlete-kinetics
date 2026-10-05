@@ -15,7 +15,7 @@ test.each([53, 82, 138, 163])('shrug%i has stationary head/trunk/legs, extended 
   const entry = source(id);
   expect(entry.status).toBe('pending');
   expect(entry.segmentDurationsMs[2]).toBeGreaterThanOrEqual(1000);
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) {
     const opts = options(entry, body);
     const initial = resolveFigureJoints(entry.frames[0].joints, opts);
     for (const t of times(entry)) {
@@ -42,7 +42,7 @@ test.each([92, 158, 253])('preacher%i keeps supported elbows and forearm radius,
   expect(entry.frames.at(-1).joints).toEqual(entry.frames[0].joints);
   expect(entry.segmentDurationsMs.at(-1)).toBe(3000);
   expect(entry.segmentDurationsMs[2]).toBeGreaterThanOrEqual(1000);
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) {
     const opts = options(entry, body);
     const first = resolveFigureJoints(entry.frames[0].joints, opts);
     const pad = layoutCanonicalFigure(entry.frames[0].joints, opts).find(p => p.kind === 'bone' && p.w === 5 && p.color === 'textMid');
@@ -72,7 +72,7 @@ test.each([92, 158, 253])('preacher%i keeps supported elbows and forearm radius,
 
 test.each([82, 138, 92, 158, 163])('bar%i spans both actual hands and cable variants attach once to its center', id => {
   const entry = source(id);
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) for (const t of times(entry)) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) for (const t of times(entry)) {
     const pose = poseAtTime(entry.frames.map(f => f.joints), t, entry.segmentDurationsMs);
     const f = resolveFigureJoints(pose, options(entry, body));
     const prims = layoutCanonicalFigure(pose, options(entry, body));
@@ -92,7 +92,7 @@ test.each([82, 138, 92, 158, 163])('bar%i spans both actual hands and cable vari
 
 test.each([53, 143, 253])('dumbbell%i emits its one load depiction per hand without the generic horizontal rectangle', id => {
   const entry = source(id);
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) for (const frame of entry.frames) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) for (const frame of entry.frames) {
     const prims = layoutCanonicalFigure(frame.joints, options(entry, body));
     expect(prims.filter(p => p.kind === 'rect' && p.w === 13 && p.h === 4.6)).toHaveLength(0);
     if (id === 143) {
@@ -117,13 +117,13 @@ test.each([53, 143, 253])('dumbbell%i emits its one load depiction per hand with
   }
 });
 
-test('143 is a world-lateral supported raise with fixed bend, quiet torso and actual head-pad contact for every body', () => {
+test('143 is a world-lateral supported raise with fixed bend, quiet torso and actual head-pad contact on the neutral body', () => {
   const entry = source(143);
   expect(entry.view).toBe('oblique');
   expect(entry.segmentDurationsMs[2]).toBe(1000);
   expect(entry.frames.at(-1).joints).toEqual(entry.frames[0].joints);
   const distance3 = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
-  for (const body of Object.values(DUAL_BODY_PARAMETERS)) {
+  for (const body of [DUAL_BODY_PARAMETERS.neutral]) {
     const initial = resolveFigureJoints(entry.frames[0].joints, options(entry, body));
     expect(initial.nk[1]).toEqual(initial.hp[1]);
     expect(initial.nk[0] - initial.hp[0]).toBeGreaterThan(16);

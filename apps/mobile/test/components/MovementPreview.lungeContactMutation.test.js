@@ -6,7 +6,7 @@ import { measureLungeContacts, assertLungeContacts } from './lungeContactProbe';
 const entry = raw.entries.find((e) => e.movementId === 17);
 const rig = require('../../src/components/movementPreview/canonicalFigure');
 
-test.each(['male', 'female'])('drawn contact check rejects drift, lift, and sinking (%s)', (body) => {
+test.each(['neutral'])('drawn contact check rejects drift, lift, and sinking (%s)', (body) => {
   for (const id of ['wl-13', 'wl-31']) for (const key of ['an', 'af']) {
     for (const [axis, delta] of [[0, 3], [1, -8], [1, 8]]) {
       const mutant = structuredClone(entry);

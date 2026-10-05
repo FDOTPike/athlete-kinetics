@@ -39,7 +39,7 @@ const RAW = require('../../src/components/movementPreview/movementPreviewManifes
 const rawEntryFor = (movementId) => RAW.find((entry) => entry.movementId === movementId);
 const BASE = rawEntryFor(9);
 const VARIANT = rawEntryFor(113);
-const BODIES = ['neutral', 'male', 'female'];
+const BODIES = ['neutral'];
 const GROUND_LINE = 96.4;
 const PULLEY_FORWARD = 9;
 const PULLEY_R = 1.8;

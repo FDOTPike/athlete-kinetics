@@ -44,7 +44,7 @@ function torsoOf(pose, options) {
   return torso;
 }
 
-test.each(['male', 'female'])('one opaque seam-free trunk replaces the outlined rings (%s)', (body) => {
+test.each(['neutral'])('one opaque seam-free trunk replaces the outlined rings (%s)', (body) => {
   const torso = torsoOf(entry.frames[0].joints, {
     body: DUAL_BODY_PARAMETERS[body], view: entry.view, assetKey: entry.assetKey,
   });
@@ -111,7 +111,7 @@ test.each(canonicals.map((e) => [e.name, e]))('%s: both bodies retain connected,
 
 test('continuity check rejects a missing middle bar, a ring stroke, transparent fill and empty output', () => {
   const pose = entry.frames[0].joints;
-  const torso = torsoOf(pose, { body: DUAL_BODY_PARAMETERS.male, view: entry.view, assetKey: entry.assetKey });
+  const torso = torsoOf(pose, { body: DUAL_BODY_PARAMETERS.neutral, view: entry.view, assetKey: entry.assetKey });
   expect(connected(torso, pose)).toBe(true);
   const middle = Math.floor(torso.length / 2);
   expect(connected(torso.filter((_, i) => i !== middle), pose)).toBe(false);
@@ -146,7 +146,7 @@ test.each(frontBaseline.cases.filter(c => ![92, 158, 253].includes(c.movementId)
   expect(createHash('sha256').update(JSON.stringify(drawings)).digest('hex')).toBe(baseline.sha256);
 });
 
-const subjects = canonicals.flatMap((e) => ['male', 'female'].map((body) => [e.movementId, body]));
+const subjects = canonicals.flatMap((e) => ['neutral'].map((body) => [e.movementId, body]));
 test.each(subjects)('production View mapping and still/motion navigation: movement %i / %s', async (id, bodyType) => {
   const e = raw.entries.find((v) => v.movementId === id);
   const subject = { movement_id: id, media: { assetKey: e.assetKey, status: 'ready' } };

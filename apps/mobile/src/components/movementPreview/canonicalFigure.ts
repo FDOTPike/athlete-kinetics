@@ -36,10 +36,21 @@ export type CanonicalPoint = readonly [number, number];
  * Neutral production silhouette plus the ratified M2 §6.1 male/female
  * compatibility inputs. Technique is invariant across every parameter set.
  */
+export const CANONICAL_BODY_PARAMETERS: BodyParameters = Object.freeze({
+  sw: 10.2,
+  hw: 8.5,
+  lw: 4.8,
+  hr: 6.2,
+});
+
+/**
+ * Neutral production silhouette is the sole geometry. Legacy 'male' and 'female'
+ * inputs map to the identical neutral parameters at the boundary.
+ */
 export const DUAL_BODY_PARAMETERS: Readonly<Record<'neutral' | 'male' | 'female', BodyParameters>> = {
-  neutral: { sw: 10.2, hw: 8.5, lw: 4.8, hr: 6.2 },
-  male: { sw: 11.4, hw: 7.8, lw: 5.2, hr: 6.4 },
-  female: { sw: 9.0, hw: 9.2, lw: 4.4, hr: 6.0 },
+  neutral: CANONICAL_BODY_PARAMETERS,
+  male: CANONICAL_BODY_PARAMETERS,
+  female: CANONICAL_BODY_PARAMETERS,
 } as const;
 
 export interface CanonicalPose {
@@ -451,7 +462,7 @@ const NOFEET: ReadonlySet<string> = new Set(['cable-crunch']);
 
 export interface FigureOptions {
   view: ViewName;
-  body: BodyParameters;
+  body?: BodyParameters;
   /** Media asset key, e.g. `movement/cable-crunch/demo/v1` (drives overrides). */
   assetKey: string;
   /**
@@ -922,7 +933,7 @@ export interface FigureJoints {
 }
 
 export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): FigureJoints {
-  const { view, body } = opts;
+  const { view, body = CANONICAL_BODY_PARAMETERS } = opts;
   const front = view === 'front';
   const slug = slugOf(opts.assetKey);
 
@@ -1141,7 +1152,7 @@ export function drawnSegmentLengths(pose: CanonicalPose, opts: FigureOptions): R
  * Order of the returned array IS the z-order (paint back to front).
  */
 export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions): FigurePrim[] {
-  const { view, body } = opts;
+  const { view, body = CANONICAL_BODY_PARAMETERS } = opts;
   const front = view === 'front';
   const slug = slugOf(opts.assetKey);
 

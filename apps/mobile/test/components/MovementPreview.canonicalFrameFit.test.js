@@ -2,7 +2,7 @@
  * Regression test for Finding A: Canonical frame and stage enclosure.
  *
  * Verifies that:
- * 1. For Movement 52 (Dumbbell Reverse Lunge) across all 3 bodies (neutral, male, female)
+ * 1. For Movement 52 (Dumbbell Reverse Lunge) on the neutral body
  *    and throughout every 33 ms tick of the full cycle, figureFrame height strictly matches
  *    the canonical stage height (240 dp), the floor line's full height (floor.top + floor.height)
  *    fits completely, and all painted primitives (accounting for rotation and rounded caps)
@@ -207,7 +207,7 @@ describe('Finding A: Canonical Frame-Fit Enclosure and Stage Integrity', () => {
 
       const residual = TRACKED_RESIDUALS[entry.movementId];
 
-      for (const bodyName of ['neutral', 'male', 'female']) {
+      for (const bodyName of ['neutral']) {
         const body = DUAL_BODY_PARAMETERS[bodyName];
         const opts = {
           view: entry.view,
