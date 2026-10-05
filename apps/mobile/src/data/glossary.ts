@@ -1,0 +1,502 @@
+/**
+ * glossary.ts — Canonical Learning Glossary for S&C terminology.
+ *
+ * Single source of truth for inline InfoTip components and the offline
+ * Glossary screen. No network requests, no remote wiki dependencies.
+ */
+
+export type GlossaryCategory =
+  | 'effort'
+  | 'loading'
+  | 'structure'
+  | 'role'
+  | 'goal'
+  | 'movement'
+  | 'metric'
+  | 'general';
+
+export interface GlossaryEntry {
+  readonly id: string;
+  readonly term: string;
+  readonly category: GlossaryCategory;
+  readonly definition: string;
+  readonly aliases?: readonly string[];
+}
+
+export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
+  // --- Effort ---
+  {
+    id: 'RPE',
+    term: 'RPE',
+    category: 'effort',
+    definition:
+      'How hard did that feel? 1 is very easy. 10 is your hardest effort. RPE is the stored technical name for this athlete-reported effort scale.',
+    aliases: ['rate of perceived exertion', 'effort rating', 'rpe scale'],
+  },
+  {
+    id: 'RIR',
+    term: 'RIR',
+    category: 'effort',
+    definition:
+      'Reps in Reserve — how many more clean repetitions you could have completed before technical failure. 0 RIR means no more clean reps.',
+    aliases: ['reps in reserve', 'clean reps', 'clean reps left'],
+  },
+  {
+    id: 'TARGET RPE',
+    term: 'TARGET RPE',
+    category: 'effort',
+    definition:
+      'The planned effort the program asks you to aim for on a set. It guides intended intensity for the exercise, but is never assumed to be your actual reported effort.',
+    aliases: ['target rpe', 'planned rpe', 'prescribed rpe'],
+  },
+  {
+    id: 'ACTUAL RPE',
+    term: 'ACTUAL RPE',
+    category: 'effort',
+    definition:
+      'The effort you actually experienced on a completed set, reported directly by you or translated from your clean reps in reserve.',
+    aliases: ['actual rpe', 'reported rpe', 'logged rpe'],
+  },
+  {
+    id: 'RPE CAP',
+    term: 'RPE CAP',
+    category: 'effort',
+    definition:
+      'The maximum permitted effort ceiling for a session or block. Unlike a target RPE that you aim for, a cap is a strict upper boundary that sets should not exceed.',
+    aliases: ['rpe cap', 'rpe ceiling', 'effort ceiling'],
+  },
+  {
+    id: 'RPE START',
+    term: 'RPE START',
+    category: 'effort',
+    definition:
+      'Where the first working set should sit. Not a maximum — the block builds from here.',
+    aliases: ['rpe start', 'starting rpe'],
+  },
+  {
+    id: 'RPE MAX',
+    term: 'RPE MAX',
+    category: 'effort',
+    definition:
+      'The hardest any set should feel this block. A ceiling, not a target.',
+    aliases: ['rpe max', 'maximum rpe', 'highest rpe'],
+  },
+
+  // --- Onboarding choices ---
+  { id: 'NEW TO THIS', term: 'NEW TO THIS', category: 'general', definition: 'Choose this if structured training is still new, or you are returning after a long break. The coach starts with a simpler progression.' },
+  { id: 'SOME MILEAGE', term: 'SOME MILEAGE', category: 'general', definition: 'Choose this if you have trained consistently for about one to three years and the basic lifts feel familiar.' },
+  { id: 'EXPERIENCED', term: 'EXPERIENCED', category: 'general', definition: 'Choose this if you have at least three years of consistent, structured training.' },
+  { id: 'COMPETITIVE', term: 'COMPETITIVE', category: 'general', definition: 'Choose this if you compete, or your training is planned and monitored at a competitive level.' },
+  { id: 'FULL GYM', term: 'FULL GYM', category: 'general', definition: 'Selects the standard equipment found in a broad commercial gym setup. You can customize individual items afterward.' },
+  { id: 'HOME BASIC', term: 'HOME BASIC', category: 'general', definition: 'Selects a compact home setup with dumbbells, a kettlebell, bands, and mats. You can customize individual items afterward.' },
+  { id: 'MINIMAL', term: 'MINIMAL', category: 'general', definition: 'Selects no equipment. The coach can still use movements that need only your bodyweight.' },
+  { id: 'BARBELL', term: 'BARBELL', category: 'movement', definition: 'A straight bar loaded with weight plates.' },
+  { id: 'SQUAT RACK', term: 'SQUAT RACK', category: 'movement', definition: 'A stable rack that supports a barbell at adjustable heights.' },
+  { id: 'BENCH', term: 'BENCH', category: 'movement', definition: 'A flat or adjustable weight-training bench.' },
+  { id: 'DUMBBELLS', term: 'DUMBBELLS', category: 'movement', definition: 'A pair or range of handheld free weights.' },
+  { id: 'KETTLEBELL', term: 'KETTLEBELL', category: 'movement', definition: 'A handled free weight used for strength and conditioning.' },
+  { id: 'PULL-UP BAR', term: 'PULL-UP BAR', category: 'movement', definition: 'A fixed overhead bar for hanging and pulling movements.' },
+  { id: 'NORDIC BENCH', term: 'NORDIC BENCH', category: 'movement', definition: 'A bench that anchors the lower legs for Nordic curls.' },
+  { id: 'BANDS', term: 'BANDS', category: 'movement', definition: 'Elastic resistance bands in one or more strengths.' },
+  { id: 'CABLE MACHINE', term: 'CABLE MACHINE', category: 'movement', definition: 'An adjustable pulley machine with a weight stack.' },
+  { id: 'MATS', term: 'MATS', category: 'movement', definition: 'Floor padding for kneeling, lying, or grappling work.' },
+  { id: 'BOARDS', term: 'BOARDS', category: 'movement', definition: 'Stable training boards used for supported movement variations.' },
+
+  // --- Metrics & Prescription ---
+  {
+    id: '1RM',
+    term: '1RM',
+    category: 'metric',
+    definition:
+      'One-rep max — the heaviest load you can lift once with solid form. Target weights are calculated from it, so keep it honest and current.',
+    aliases: ['one-rep max', 'one rep max', '1-rm', 'max lift'],
+  },
+  {
+    id: 'LOAD',
+    term: 'LOAD',
+    category: 'metric',
+    definition:
+      'The amount of weight or resistance used for an exercise. In session planning, a separate load multiplier adjustment (such as ×0.85) can scale your working weight up or down for the day.',
+    aliases: ['load multiplier', 'weight multiplier', 'intensity multiplier'],
+  },
+  {
+    id: 'SETS',
+    term: 'SETS',
+    category: 'metric',
+    definition:
+      'A group of consecutive repetitions of an exercise followed by a rest interval. In session planning, a separate set-count adjustment can modify your planned number of sets for the day.',
+    aliases: ['set count', 'planned sets'],
+  },
+  {
+    id: 'REPS',
+    term: 'REPS',
+    category: 'metric',
+    definition:
+      'Repetitions — the number of times you perform an exercise movement consecutively within a single set.',
+    aliases: ['repetitions', 'rep count'],
+  },
+  {
+    id: 'TONNAGE',
+    term: 'TONNAGE',
+    category: 'metric',
+    definition:
+      'Total work for the session: reps × load, summed over every set.',
+    aliases: ['volume load', 'total work', 'session tonnage'],
+  },
+  {
+    id: 'ACWR',
+    term: 'ACWR',
+    category: 'metric',
+    definition:
+      'Acute:Chronic Workload Ratio — recent recorded external load compared with the preceding four-week average. Bodyweight, conditioning, grappling, and unlogged training may be incomplete.',
+    aliases: ['workload ratio', 'acute chronic ratio'],
+  },
+  {
+    id: 'ATP-PC',
+    term: 'ATP-PC',
+    category: 'metric',
+    definition:
+      'The phosphagen energy system — maximal efforts under ~10 seconds (heavy singles, sprints, throws).',
+    aliases: ['phosphagen', 'alactic system'],
+  },
+  {
+    id: 'READINESS',
+    term: 'READINESS',
+    category: 'metric',
+    definition:
+      'A subjective and contextual signal of how prepared you feel to train today. A guide for daily adjustments, not an absolute guarantee of performance.',
+    aliases: ['readiness score', 'daily readiness', 'recovery signal'],
+  },
+  {
+    id: 'HRV',
+    term: 'HRV',
+    category: 'metric',
+    definition:
+      'Heart Rate Variability — beat-to-beat variation in heart rhythm. A contextual trend signal reflecting training and life stress, not a diagnosis or proof of recovery.',
+    aliases: ['heart rate variability', 'hrv score', 'recovery trend'],
+  },
+
+  // --- Loading Methods ---
+  {
+    id: 'LINEAR',
+    term: 'Linear',
+    category: 'loading',
+    definition:
+      'A structured loading method where planned load or effort increases steadily across the first three working weeks of a block, followed by a planned deload in week four.',
+    aliases: ['linear loading', 'linear progression'],
+  },
+  {
+    id: 'UNDULATING',
+    term: 'Undulating',
+    category: 'loading',
+    definition:
+      'Reps and effort trade off across the block, with a shorter, harder middle week between two longer, easier ones.',
+    aliases: ['wave', 'wave loading'],
+  },
+  {
+    id: 'STEP',
+    term: 'STEP',
+    category: 'loading',
+    definition:
+      'The same load for a stretch of weeks, then a single jump up. Good when technique needs time.',
+    aliases: ['step loading', 'step progression'],
+  },
+  {
+    id: 'APRE',
+    term: 'Autoregulated',
+    category: 'loading',
+    definition:
+      "Autoregulated. The set you actually perform decides the next set's load, so a bad day costs less.",
+    aliases: ['autoregulated', 'autoregulation', 'apre loading'],
+  },
+  {
+    id: 'DELOAD',
+    term: 'DELOAD',
+    category: 'loading',
+    definition:
+      'A planned easy week. Sets drop and the RPE cap comes down so you absorb the block instead of digging a hole.',
+    aliases: ['deload week', 'recovery week', 'unloading'],
+  },
+
+  // --- Structure ---
+  {
+    id: 'BLOCK',
+    term: 'BLOCK',
+    category: 'structure',
+    definition:
+      'Four to six weeks of training that build on each other, ending in a deload.',
+    aliases: ['training block', 'mesocycle'],
+  },
+  {
+    id: 'MICROCYCLE',
+    term: 'MICROCYCLE',
+    category: 'structure',
+    definition:
+      'One week inside a block — the repeating pattern of days.',
+    aliases: ['training week', 'weekly microcycle'],
+  },
+  {
+    id: 'MACROCYCLE',
+    term: 'MACROCYCLE',
+    category: 'structure',
+    definition:
+      'The long arc, eight blocks, that carries you from general fitness toward a peak.',
+    aliases: ['macro-cycle', 'macro cycle', 'long term plan'],
+  },
+  {
+    id: 'BUILD',
+    term: 'BUILD',
+    category: 'structure',
+    definition:
+      'Volume weeks. More total work at moderate effort to accumulate fitness.',
+    aliases: ['accumulation phase', 'volume block'],
+  },
+  {
+    id: 'INTENSIFICATION',
+    term: 'INTENSIFICATION',
+    category: 'structure',
+    definition:
+      "Volume comes down, effort goes up. You do less work but it's harder.",
+    aliases: ['intensification phase', 'transmutation'],
+  },
+  {
+    id: 'REALISE',
+    term: 'REALISE',
+    category: 'structure',
+    definition:
+      "The peak week. Lowest volume, highest effort — this is where the block's work shows up.",
+    aliases: ['realization phase', 'peak week', 'realize'],
+  },
+
+  // --- Goals ---
+  {
+    id: 'STRENGTH',
+    term: 'STRENGTH',
+    category: 'goal',
+    definition:
+      'Maximal force production against heavy external resistance with high movement control.',
+    aliases: ['maximal strength', 'strength training'],
+  },
+  {
+    id: 'HYPERTROPHY',
+    term: 'HYPERTROPHY',
+    category: 'goal',
+    definition:
+      'Muscle growth and volume accumulation through targeted mechanical tension and muscular fatigue.',
+    aliases: ['muscle building', 'mass building'],
+  },
+  {
+    id: 'POWER',
+    term: 'POWER',
+    category: 'goal',
+    definition:
+      'Speed and rate of force development — moving a load or your body with explosive intent.',
+    aliases: ['explosive power', 'rate of force development'],
+  },
+  {
+    id: 'ENDURANCE',
+    term: 'ENDURANCE',
+    category: 'goal',
+    definition:
+      'Sustained muscular work and cardiovascular capacity over extended durations.',
+    aliases: ['stamina', 'aerobic capacity', 'muscular endurance'],
+  },
+  {
+    id: 'GPP',
+    term: 'GPP',
+    category: 'goal',
+    definition:
+      'General Physical Preparedness — broad, balanced fitness (strength, conditioning, mobility) rather than peaking for one quality.',
+    aliases: ['general physical preparedness', 'all round fitness'],
+  },
+  {
+    id: 'HYBRID',
+    term: 'HYBRID',
+    category: 'goal',
+    definition:
+      'Blended training combining strength and endurance qualities concurrently within one balanced plan.',
+    aliases: ['concurrent training', 'hybrid athlete'],
+  },
+  {
+    id: 'RETURN TO TRAINING',
+    term: 'RETURN TO TRAINING',
+    category: 'goal',
+    definition:
+      'Gradual, progressive rebuilding of training tolerance and movement confidence after time off or injury.',
+    aliases: ['return to training', 'reconditioning', 'rehab progression'],
+  },
+
+  // --- Slot Roles ---
+  {
+    id: 'MAJOR',
+    term: 'MAJOR',
+    category: 'role',
+    definition:
+      'The main lift of the day. Everything else is arranged around it.',
+    aliases: ['main lift', 'primary movement'],
+  },
+  {
+    id: 'SUPPLEMENTARY',
+    term: 'SUPPLEMENTARY',
+    category: 'role',
+    definition:
+      'Direct support for the major — same pattern, different angle or implement.',
+    aliases: ['secondary lift', 'assistance exercise'],
+  },
+  {
+    id: 'ACCESSORY',
+    term: 'ACCESSORY',
+    category: 'role',
+    definition:
+      'Smaller work for a specific muscle or weak point. First to be cut when time is short.',
+    aliases: ['accessory lift', 'isolation work'],
+  },
+  {
+    id: 'CONDITIONAL',
+    term: 'CONDITIONAL',
+    category: 'role',
+    definition:
+      'Only appears when a condition is met — an injury restriction, or equipment you have today.',
+    aliases: ['conditional lift', 'situational exercise'],
+  },
+
+  // --- Movement Patterns ---
+  {
+    id: 'SQUAT',
+    term: 'SQUAT',
+    category: 'movement',
+    definition:
+      'Knees bend and hips drop straight down. Quads and glutes do the work.',
+    aliases: ['squat pattern', 'knee flexion'],
+  },
+  {
+    id: 'LUNGE',
+    term: 'LUNGE',
+    category: 'movement',
+    definition:
+      'One leg in front of the other. Builds single-leg strength and balance the squat can hide.',
+    aliases: ['lunge pattern', 'split squat', 'single leg'],
+  },
+  {
+    id: 'HINGE',
+    term: 'HINGE',
+    category: 'movement',
+    definition:
+      'Hips push back with a flat back, knees only slightly bent. Hamstrings and glutes.',
+    aliases: ['hip hinge', 'deadlift pattern', 'posterior chain'],
+  },
+  {
+    id: 'HORIZONTAL PUSH',
+    term: 'HORIZONTAL PUSH',
+    category: 'movement',
+    definition:
+      'Pressing away from your chest — bench press, push-up. Chest, front shoulder, triceps.',
+    aliases: ['chest press', 'push-up', 'horizontal press'],
+  },
+  {
+    id: 'ROW',
+    term: 'ROW',
+    category: 'movement',
+    definition:
+      'Pulling toward your stomach. Mid-back and lats. The balance to horizontal pushing.',
+    aliases: ['horizontal pull', 'rowing pattern'],
+  },
+  {
+    id: 'OVERHEAD PRESS',
+    term: 'OVERHEAD PRESS',
+    category: 'movement',
+    definition:
+      'Pressing above your head. Shoulders and triceps, with the trunk holding you steady.',
+    aliases: ['vertical push', 'shoulder press', 'overhead'],
+  },
+  {
+    id: 'VERTICAL PULL',
+    term: 'VERTICAL PULL',
+    category: 'movement',
+    definition:
+      'Pulling down from above — pull-up, lat pulldown. Lats and biceps.',
+    aliases: ['vertical pull pattern', 'pull-up', 'lat pulldown'],
+  },
+  {
+    id: 'CARRY',
+    term: 'CARRY',
+    category: 'movement',
+    definition:
+      'Holding a load and walking. Trains the grip and trunk under time, not reps.',
+    aliases: ['loaded carry', "farmer's walk", 'carry pattern'],
+  },
+] as const;
+
+/** Alias for backward compatibility and alternate naming */
+export const glossary: readonly GlossaryEntry[] = GLOSSARY_ENTRIES;
+
+/**
+ * Retrieve a canonical glossary entry by its ID, visible term, or alias.
+ * Case-insensitive. Returns undefined if not found.
+ */
+export function getGlossaryEntry(key: string): GlossaryEntry | undefined {
+  if (!key || typeof key !== 'string') return undefined;
+  const normalized = key.trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  // 1. Direct match on id or term
+  const exact = GLOSSARY_ENTRIES.find(
+    (entry) =>
+      entry.id.toLowerCase() === normalized ||
+      entry.term.toLowerCase() === normalized,
+  );
+  if (exact) return exact;
+
+  // 2. Direct match on aliases
+  const aliasMatch = GLOSSARY_ENTRIES.find((entry) =>
+    entry.aliases?.some((alias) => alias.toLowerCase() === normalized),
+  );
+  if (aliasMatch) return aliasMatch;
+
+  // 3. Special legacy keys
+  if (normalized === 'wave') {
+    return GLOSSARY_ENTRIES.find((entry) => entry.id === 'UNDULATING');
+  }
+  if (normalized === 'macro-cycle' || normalized === 'macro cycle') {
+    return GLOSSARY_ENTRIES.find((entry) => entry.id === 'MACROCYCLE');
+  }
+
+  return undefined;
+}
+
+/**
+ * Search the glossary offline across term, aliases, category, and definition.
+ * Case-insensitive with predictable sorting.
+ * If query is empty or whitespace, returns all entries sorted alphabetically by term.
+ */
+export function searchGlossary(query: string): readonly GlossaryEntry[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return [...GLOSSARY_ENTRIES].sort((a, b) => a.term.localeCompare(b.term));
+  }
+
+  return GLOSSARY_ENTRIES.filter((entry) => {
+    if (entry.term.toLowerCase().includes(normalized)) return true;
+    if (entry.id.toLowerCase().includes(normalized)) return true;
+    if (entry.category.toLowerCase().includes(normalized)) return true;
+    if (entry.definition.toLowerCase().includes(normalized)) return true;
+    if (entry.aliases?.some((alias) => alias.toLowerCase().includes(normalized))) {
+      return true;
+    }
+    return false;
+  }).sort((a, b) => {
+    const aTermLower = a.term.toLowerCase();
+    const bTermLower = b.term.toLowerCase();
+    const aExact = aTermLower === normalized;
+    const bExact = bTermLower === normalized;
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
+
+    const aStarts = aTermLower.startsWith(normalized);
+    const bStarts = bTermLower.startsWith(normalized);
+    if (aStarts && !bStarts) return -1;
+    if (!aStarts && bStarts) return 1;
+
+    return a.term.localeCompare(b.term);
+  });
+}

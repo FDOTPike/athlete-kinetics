@@ -3,7 +3,7 @@
  *
  * Zero navigation library: five tabs, NavigationProvider stack, 64pt tab targets.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AppState,
   KeyboardAvoidingView,
@@ -15,25 +15,58 @@ import {
   Text,
   View,
 } from 'react-native';
-import { tryCreateHealthConnectBridge } from '@ak/biometrics';
+import { tryCreateBiometricsBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
 import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
+import TodayScreen from './screens/TodayScreen';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
+import ProgressScreen from './screens/ProgressScreen';
 import ProgramSetupScreen from './screens/ProgramSetupScreen';
 import BlockScreen from './screens/BlockScreen';
 import LibraryScreen from './screens/LibraryScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
+import { statusBarPaddingTop } from './layout/statusBarPadding';
+import { useBackupStore } from './state/backupStore';
+import { bootAfterSafeRecovery } from './state/backupStartup';
+import { authorizeAthleteDataBoot } from './state/dataMaintenanceLock';
+import { startDeviceBackupExclusion } from './state/deviceBackupPolicy';
+import { nativeSmokeRequested, runNativeSmoke } from './diagnostics/nativeSmoke';
+import { QuietAction } from './components/ui';
 
-const TABS: readonly { key: Tab; label: string }[] = [
-  { key: 'readiness', label: 'READY' },
-  { key: 'session', label: 'SESSION' },
-  { key: 'coach', label: 'COACH' },
-  { key: 'library', label: 'LIBRARY' },
-  { key: 'athlete', label: 'ATHLETE' },
+/**
+ * W4: exactly THREE primary destinations. PLAN is the coach/program-management
+ * route ('coach') presented under its athlete-facing name; Progress is the
+ * read-only facts surface. Readiness detail, the live session, the Library,
+ * and Profile/settings keep their existing route identities and are reached
+ * from the header controls, so no capability is unreachable.
+ */
+const PRIMARY_TABS: readonly { key: Tab; label: string }[] = [
+  { key: 'today', label: 'TODAY' },
+  { key: 'coach', label: 'PLAN' },
+  { key: 'progress', label: 'PROGRESS' },
 ];
+
+/** Header controls: every non-primary surface keeps one stable way back. */
+const HEADER_CONTROLS: readonly { key: Tab; label: string }[] = [
+  { key: 'readiness', label: 'READY' },
+  { key: 'session', label: 'WORKOUT' },
+  { key: 'library', label: 'LIBRARY' },
+  { key: 'athlete', label: 'PROFILE' },
+];
+
+/** D7: descriptive accessible names for the header controls. */
+const HEADER_ACCESS: Record<Tab, string> = {
+  readiness: 'Open readiness details',
+  session: 'Open the workout',
+  library: 'Open the exercise library',
+  athlete: 'Open profile and settings',
+  today: 'Today',
+  coach: 'Plan',
+  progress: 'Progress',
+};
 
 /** Root boundary: a render-time throw becomes a readable screen with the
  *  actual error message — release builds otherwise die silently. */
@@ -75,7 +108,7 @@ export default function App(): React.JSX.Element {
   );
 }
 
-function AppShell(): React.JSX.Element {
+export function AppShell(): React.JSX.Element {
   const programSetupPending = useStore((s) =>
     s.status === 'ready' && s.onboarded && s.block === null && s.program === null);
   // "No block and no program" is NOT only a first-run state: archiving a
@@ -83,31 +116,75 @@ function AppShell(): React.JSX.Element {
   // nothing but archived blocks. Program setup is therefore an invitation, not
   // a gate — without a dismissal it hides the tab bar and strands the athlete
   // away from BlockScreen, routine templates, and the ATHLETE tab with no way
-  // back. Dismissal is per-visit: it resets as soon as the athlete leaves the
-  // state, so archiving again re-offers setup.
+  // back (ProgramSetupScreen hides its own Cancel button when no onCancel is
+  // supplied). Dismissal is per-visit: it resets when the athlete really leaves
+  // the state (a block or program exists, so archiving again re-offers setup)
+  // or another athlete becomes active. A store reload is NOT leaving it:
+  // creating an encrypted backup closes and reopens the database (ready ->
+  // booting -> ready), and that must not pull the athlete off the screen they
+  // were on and back into setup.
   const [setupDismissed, setSetupDismissed] = useState(false);
+  const hasPlan = useStore((s) => s.status === 'ready' && (s.block !== null || s.program !== null));
+  const activeAthleteId = useStore((s) => s.activeAthleteId);
   useEffect(() => {
-    if (!programSetupPending) setSetupDismissed(false);
-  }, [programSetupPending]);
+    if (hasPlan) setSetupDismissed(false);
+  }, [hasPlan]);
+  useEffect(() => {
+    setSetupDismissed(false);
+  }, [activeAthleteId]);
   const showProgramSetup = programSetupPending && !setupDismissed;
   const { tab, setTab } = useNavigation();
   const boot = useStore((s) => s.boot);
+  const backupStartupSafe = useBackupStore((s) => s.startupSafe);
+  const backupStartupMessage = useBackupStore((s) => s.message);
+  // PR #18 review: a persistent recovery failure must not be a dead end. One
+  // bounded, user-started attempt at a time reruns the same startup recovery
+  // authority; athlete data stays closed unless that recovery succeeds.
+  const recoveryRetryInFlight = useRef(false);
+  const [recoveryRetrying, setRecoveryRetrying] = useState(false);
+  const retryProtectedRecovery = (): void => {
+    if (recoveryRetryInFlight.current) return;
+    recoveryRetryInFlight.current = true;
+    setRecoveryRetrying(true);
+    void bootAfterSafeRecovery(
+      () => useBackupStore.getState().initialize(), authorizeAthleteDataBoot, boot,
+    ).catch(() => false).finally(() => {
+      recoveryRetryInFlight.current = false;
+      setRecoveryRetrying(false);
+    });
+  };
   const status = useStore((s) => s.status);
   const onboarded = useStore((s) => s.onboarded);
+  // W4: the header SESSION control shows a live-workout marker from the same
+  // persisted-session fact TodayScreen already uses — never a guess.
+  const session = useStore((s) => s.session);
   // First run (or a fresh Coach Mode athlete): the questionnaire replaces the
   // tabbed app until the profile is saved once. Existing installs never see it.
   const showOnboarding = status === 'ready' && !onboarded;
 
   useEffect(() => {
-    boot();
+    // iOS: keep health databases, registry and recovery files out of iCloud
+    // device backup (Android: allowBackup="false"). Idempotent, never blocks;
+    // the outcome is kept and a failure is logged.
+    void startDeviceBackupExclusion();
+    // CI-only: the macOS job launches the simulator build with -AKNativeSmoke 1.
+    if (nativeSmokeRequested()) void runNativeSmoke();
+    // Resolve an interrupted replace journal before any athlete database is
+    // opened. A cold-start rollback therefore never races normal hydration.
+    // Recovery failure keeps the normal store closed. Opening athlete data
+    // after a failed rollback could turn recoverable files into a mixed state.
+    void bootAfterSafeRecovery(
+      () => useBackupStore.getState().initialize(), authorizeAthleteDataBoot, boot,
+    ).catch(() => undefined);
     // Async, optional: wires subjective-report triage when the embedding
     // model is reachable; the app is fully functional without it.
     void tryCreateDeviceEmbedder().then((e) => {
       useStore.getState().setEmbedder(e);
     });
-    // Health Connect is optional by contract: a null bridge (APK missing,
-    // permission machinery broken, non-Android) costs nothing but telemetry.
-    void tryCreateHealthConnectBridge().then((bridge) => {
+    // Health data is optional by contract: Health Connect on Android, Apple
+    // Health on iOS. A null bridge (service missing, permission machinery
+    // broken, unsupported platform) costs nothing but telemetry.
+    void tryCreateBiometricsBridge().then((bridge) => {
       void useStore.getState().connectBiometrics(bridge);
     });
     // Foreground lifecycle: date rollover + biometric ingestion. No
@@ -121,12 +198,82 @@ function AppShell(): React.JSX.Element {
     return () => sub.remove();
   }, [boot]);
 
+  if (backupStartupSafe !== true) {
+    return (
+      <SafeAreaView style={styles.root} testID="backup-recovery-gate">
+        <View style={styles.crashBox}>
+          <Text style={styles.crashTitle}>{backupStartupSafe === false ? 'RECOVERY NEEDED' : 'CHECKING DATA'}</Text>
+          <Text style={styles.crashText}>{backupStartupSafe === false
+            ? (backupStartupMessage ?? 'Athlete data stays closed until restore recovery succeeds.')
+            : 'Checking for an interrupted restore before opening athlete data.'}</Text>
+          {backupStartupSafe === false && (
+            <QuietAction
+              label={recoveryRetrying ? 'RETRYING PROTECTED RECOVERY' : 'RETRY PROTECTED RECOVERY'}
+              accessibilityLabel="Retry protected recovery"
+              testID="backup-recovery-retry"
+              disabled={recoveryRetrying}
+              onPress={retryProtectedRecovery}
+            />
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // The shell root stays a SafeAreaView. `styles.root.paddingTop` only covers
+  // Android (statusBarPaddingTop returns 0 off-Android), so SafeAreaView is the
+  // ONLY source of the iOS notch and home-indicator insets; replacing it with a
+  // plain View put the top header under the status bar and the primary tab bar
+  // under the home indicator. The `shell-root` testID belongs on it directly —
+  // the shell-order test walks HOST ancestors and does not require a plain View.
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={styles.root} testID="shell-root">
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
+      {/* D7: the secondary control bar is a real TOP HEADER, above the body.
+          Visible labels are the beginner-readable short forms; accessibility
+          labels stay descriptive. No truncation, no font-scale capping. */}
+      {!showOnboarding && !showProgramSetup && (
+        <View style={styles.headerBar} accessibilityRole="toolbar" testID="shell-top-header">
+          {HEADER_CONTROLS.map((t) => {
+            const active = t.key === tab;
+            const sessionLive = t.key === 'session' && session !== null;
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => setTab(t.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={sessionLive
+                  ? 'Open the workout — workout in progress'
+                  : HEADER_ACCESS[t.key]}
+                accessibilityLiveRegion={t.key === 'session' ? 'polite' : undefined}
+                testID={`header-${t.key}`}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.tabBtnPressed]}
+              >
+                {/* R1: the active dot is a separate badge beside the label, not
+                    part of the accessible text. It is decorative, so it is
+                    hidden from accessibility and consumes no label width the
+                    screen reader would announce. */}
+                {sessionLive && (
+                  <View
+                    testID="header-session-live-dot"
+                    style={styles.liveDot}
+                    accessibilityElementsHidden={true}
+                    importantForAccessibility="no-hide-descendants"
+                  />
+                )}
+                <Text style={[styles.headerText, active && styles.headerTextActive]}>
+                  {t.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
       <KeyboardAvoidingView
         style={styles.body}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        testID="shell-body"
       >
         {showOnboarding ? (
           <OnboardingScreen />
@@ -134,24 +281,50 @@ function AppShell(): React.JSX.Element {
           <ProgramSetupScreen onCancel={() => setSetupDismissed(true)} />
         ) : (
           <>
+            {/* R2: the route marker lives INSIDE the session branch, so a test
+                that finds it proves the real Session surface rendered. */}
+            {tab === 'today' && (
+              <TodayScreen
+                onOpenSession={() => setTab('session')}
+                onOpenPlan={() => setTab('coach')}
+              />
+            )}
             {tab === 'readiness' && (
               <ReadinessScreen
                 onOpenSession={() => setTab('session')}
                 onOpenCoach={() => setTab('coach')}
               />
             )}
-            {tab === 'session' && <SessionScreen />}
+            {/* PR #16 review: SessionScreen and LibraryScreenV2 read movement
+                availability from the database while rendering. An athlete swap
+                closes the database while status is 'booting', with this header
+                still tappable, and a boot that fails leaves it closed under
+                'error' — so, like Progress and Coach, both mount only once the
+                database is ready. */}
+            {tab === 'session' && status === 'ready' && (
+              <View style={{ flex: 1 }} testID="session-screen-shown">
+                <SessionScreen onReturnToToday={() => setTab('today')} />
+              </View>
+            )}
+            {/* PR #13 review: ProgressScreen's loaders read the database on
+                mount, and the primary tabs are live while status is 'booting'
+                — so, like Coach, it mounts only once the database is ready. */}
+            {tab === 'progress' && status === 'ready' && <ProgressScreen />}
             {tab === 'coach' && status === 'ready' && (
               <BlockScreen onSessionStarted={() => setTab('session')} />
             )}
-            {tab === 'library' && <LibraryScreen />}
-            {tab === 'athlete' && <ProfileScreen />}
+            {tab === 'library' && status === 'ready' && <LibraryScreen />}
+            {tab === 'athlete' && (
+              <View style={{ flex: 1 }} testID="athlete-screen-shown">
+                <ProfileScreen />
+              </View>
+            )}
           </>
         )}
       </KeyboardAvoidingView>
       {!showOnboarding && !showProgramSetup && (
-        <View style={styles.tabBar} accessibilityRole="tablist">
-          {TABS.map((t) => {
+        <View style={styles.tabBar} accessibilityRole="tablist" testID="shell-primary-tabs">
+          {PRIMARY_TABS.map((t) => {
             const active = t.key === tab;
             return (
               <Pressable
@@ -160,6 +333,7 @@ function AppShell(): React.JSX.Element {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`${t.label} tab`}
+                testID={`tab-${t.key}`}
                 style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
               >
                 <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
@@ -177,9 +351,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: palette.bg,
-    // RN's SafeAreaView only pads on iOS; on Android the status bar overlaps
-    // content (seen on hardware) — pad the real inset ourselves.
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0,
+    // RN's SafeAreaView only pads on iOS. Honor Android's reported inset, but
+    // keep the standard minimum when an edge-to-edge runtime reports zero.
+    paddingTop: statusBarPaddingTop(Platform.OS, StatusBar.currentHeight),
   },
   body: { flex: 1 },
   tabBar: {
@@ -187,6 +361,35 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: palette.line,
     backgroundColor: palette.bg,
+  },
+  headerBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: palette.line,
+    backgroundColor: palette.bg,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.text,
+    marginRight: 4,
+  },
+  headerBtn: {
+    flex: 1,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  headerText: {
+    color: palette.faint,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  headerTextActive: {
+    color: palette.text,
   },
   tabBtn: {
     flex: 1,

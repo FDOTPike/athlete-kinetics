@@ -55,6 +55,7 @@ const { QuietAction } = require('../../src/components/ui/QuietAction');
 const { PrimaryButton } = require('../../src/components/ui/PrimaryButton');
 const { Stepper } = require('../../src/components/ui/Stepper');
 const { Disclosure } = require('../../src/components/ui/Disclosure');
+const { statusBarPaddingTop } = require('../../src/layout/statusBarPadding');
 
 // ── Chip ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,21 @@ test('Chip: disabled state is accessible', () => {
   );
   const btn = getByRole('button');
   expect(btn.props.accessibilityState.disabled).toBe(true);
+});
+
+test('Chip: enlarged labels keep their scaled size on one line', () => {
+  render(<Chip label="All equipment" selected={false} onPress={() => {}} />);
+  const label = screen.getByText('All equipment');
+  expect(label.props.numberOfLines).toBe(1);
+  expect(label.props.adjustsFontSizeToFit).toBeUndefined();
+  expect(label.props.minimumFontScale).toBeUndefined();
+});
+
+test('App shell keeps a minimum Android status-bar inset when the runtime reports zero', () => {
+  expect(statusBarPaddingTop('android', 0)).toBe(24);
+  expect(statusBarPaddingTop('android', undefined)).toBe(24);
+  expect(statusBarPaddingTop('android', 32)).toBe(32);
+  expect(statusBarPaddingTop('ios', 32)).toBe(0);
 });
 
 // ── ListRow ───────────────────────────────────────────────────────────────────

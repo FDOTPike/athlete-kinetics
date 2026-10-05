@@ -11,14 +11,16 @@
  * Law 3: Zero red/amber/green anywhere.
  * Law 4: Touch targets >= 56pt.
  */
-import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
-  EQUIPMENT_ITEMS,
+  STANDARD_EQUIPMENT_ITEMS,
+  SPECIALIST_EQUIPMENT_ITEMS,
   EQUIPMENT_PRESETS,
   HISTORY_IMPORT_AI_PROMPT,
+  implementAvailable,
   HISTORY_IMPORT_EXAMPLE,
   OBJECTIVES,
   parseHistoryImport,
@@ -27,11 +29,20 @@ import {
   type HistoryParseResult,
   type UserProfile,
 } from '@ak/inference';
+import { FocusGoalsPanel } from '../components/FocusGoalsPanel';
+import { SportPanel } from '../components/SportPanel';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
 import InfoTip from '../components/InfoTip';
+import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
+import CoachVerificationLabScreen from './CoachVerificationLabScreen';
+import GlossaryScreen from './GlossaryScreen';
+import ActivitiesScreen from './ActivitiesScreen';
+import HealthTrainingSupportForm from '../components/HealthTrainingSupportForm';
+import BackupTransferPanel from '../components/BackupTransferPanel';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -56,8 +67,10 @@ interface ChipRowProps<T extends string> {
   onSelect: (v: T) => void;
   /** Glossary key — renders an ⓘ tooltip next to the label. */
   tip?: string;
+  /** When true, every chip renders disabled and onSelect is not called. */
+  disabled?: boolean;
 }
-function ChipRow<T extends string>({ label, options, value, onSelect, tip }: ChipRowProps<T>): React.JSX.Element {
+function ChipRow<T extends string>({ label, options, value, onSelect, tip, disabled = false }: ChipRowProps<T>): React.JSX.Element {
   return (
     <View style={styles.field}>
       <View style={styles.fieldLabelRow}>
@@ -70,7 +83,8 @@ function ChipRow<T extends string>({ label, options, value, onSelect, tip }: Chi
             key={opt}
             label={opt.replace(/_/g, ' ').toUpperCase()}
             selected={opt === value}
-            onPress={() => onSelect(opt)}
+            disabled={disabled}
+            onPress={() => { if (!disabled) onSelect(opt); }}
             accessibilityLabel={`${label}: ${opt.replace(/_/g, ' ')}`}
           />
         ))}
@@ -141,6 +155,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           <Text style={styles.numBtnText}>−</Text>
         </Pressable>
         <TextInput
+          disableFullscreenUI
           style={styles.oneRmInput}
           value={text}
           onChangeText={setText}
@@ -168,23 +183,88 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
+
+/** Stand-ins for the database-backed store actions below while the athlete
+ *  database is closed: a Coach Mode swap still booting, or a boot that failed.
+ *  Profile stays usable then, because it is where the athlete switches back, so
+ *  its controls do nothing instead of throwing 'kinetics db not booted' from a
+ *  press handler, which no error boundary catches. */
+const inertWhileClosed = (): void => undefined;
+const refusedWhileClosed = (): boolean => false;
+
 export default function ProfileScreen(): React.JSX.Element {
   const profile = useStore((s) => s.profile);
-  const saveProfile = useStore((s) => s.saveProfile);
+  const saveProfile = useStore((s) => (s.status === 'ready' ? s.saveProfile : inertWhileClosed));
   const uiPreferences = useStore((s) => s.uiPreferences);
-  const saveUiPreferences = useStore((s) => s.saveUiPreferences);
+  const saveUiPreferences = useStore((s) => (s.status === 'ready' ? s.saveUiPreferences : inertWhileClosed));
+  const loadPreference = useStore((s) => s.loadPreference);
+  const saveLoadPreference = useStore((s) => (s.status === 'ready' ? s.saveLoadPreference : refusedWhileClosed));
+  const loadIntents = useStore((s) => s.loadIntents);
+  const getMovementAvailabilityVerdicts = useStore((s) => s.getMovementAvailabilityVerdicts);
+  const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
+  const niggles = useStore((s) => s.niggles);
+  // Coach Mode file swap: createAthlete and switchAthlete close the database,
+  // publish PER_ATHLETE_RESET while status is 'booting', and boot() reopens it
+  // only after an awaited registry read; a boot that fails leaves it closed
+  // under 'error'. This screen starts the swap, so it stays mounted through all
+  // of that and re-renders on the reset. Every database read below waits for
+  // 'ready' — reading any earlier throws 'kinetics db not booted' into the root
+  // error boundary.
+  const databaseReady = useStore((s) => s.status === 'ready');
+  // AUDIT W4: action-scoped, like the suspension controls on BlockScreen. The
+  // save can fail (unknown movement, unsupported implement, a database error)
+  // and ProfileScreen mounts NO error surface of its own, so without this the
+  // athlete taps a chip, nothing changes, and nothing says why.
+  const [intentError, setIntentError] = useState<string | null>(null);
+  const saveMovementLoadIntent = useStore((s) => (s.status === 'ready' ? s.saveMovementLoadIntent : refusedWhileClosed));
   const bandLadder = useStore((s) => s.bandLadder);
-  const saveBandLevel = useStore((s) => s.saveBandLevel);
-  const deleteBandLevel = useStore((s) => s.deleteBandLevel);
+  const saveBandLevel = useStore((s) => (s.status === 'ready' ? s.saveBandLevel : inertWhileClosed));
+  const deleteBandLevel = useStore((s) => (s.status === 'ready' ? s.deleteBandLevel : inertWhileClosed));
   const movements = useStore((s) => s.movements);
+  // OW-001: exactly the movements that have a choice to make. A single
+  // supported implement is not a choice, so those never appear — which is also
+  // why nothing here can be read as taking element zero of a dropdown.
+  const ambiguousMovements = useMemo(
+    () => {
+      if (!databaseReady) return [];
+      // AUDIT W3.5-3.7: offer a choice only for movements this athlete can
+      // actually do. `library` is the authoritative athlete-facing availability
+      // context — LibraryScreenV2 gates its browse list on exactly this — so
+      // this reuses an existing contract rather than inventing an eligibility
+      // policy. It constrains which movements are OFFERED; it never touches
+      // what the answer is, which is what L1(a) forbids inferring.
+      const available = new Set(
+        getMovementAvailabilityVerdicts('library')
+          .filter((v) => v.state === 'available')
+          .map((v) => v.movementId),
+      );
+      // A movement's own equipment requirement gates the MOVEMENT, never the
+      // implement, and the two diverge constantly: Walking Lunge requires
+      // nothing yet offers BB, Overhead Press requires a barbell yet offers KB.
+      // So each option is filtered by what the athlete can actually equip, and
+      // a movement is only worth showing when at least two options survive —
+      // otherwise there is nothing left to choose between.
+      return movements
+        .filter((m) => available.has(m.movement_id))
+        .map((m) => ({
+          ...m,
+          offerablePrefixes: m.supportedPrefixes
+            .filter((p) => implementAvailable(p, profile.equipment_inventory)),
+        }))
+        .filter((m) => m.offerablePrefixes.length > 1)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+    [databaseReady, movements, getMovementAvailabilityVerdicts, movementAvailabilityRevision, niggles, profile],
+  );
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
-  const saveOneRepMax = useStore((s) => s.saveOneRepMax);
+  const saveOneRepMax = useStore((s) => (s.status === 'ready' ? s.saveOneRepMax : inertWhileClosed));
   const biometricsStatus = useStore((s) => s.biometricsStatus);
+  const healthCopy = biometricsCopy(providerForPlatform(Platform.OS), biometricsStatus);
   const syncBiometrics = useStore((s) => s.syncBiometrics);
   const requestBiometricsAccess = useStore((s) => s.requestBiometricsAccess);
   const profileSlots = useStore((s) => s.profileSlots);
-  const switchProfile = useStore((s) => s.switchProfile);
-  const wipeActiveBlockState = useStore((s) => s.wipeActiveBlockState);
+  const switchProfile = useStore((s) => (s.status === 'ready' ? s.switchProfile : inertWhileClosed));
+  const wipeActiveBlockState = useStore((s) => (s.status === 'ready' ? s.wipeActiveBlockState : inertWhileClosed));
   const session = useStore((s) => s.session);
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
@@ -192,21 +272,25 @@ export default function ProfileScreen(): React.JSX.Element {
   const createAthlete = useStore((s) => s.createAthlete);
   const renameAthleteEntry = useStore((s) => s.renameAthleteEntry);
   const deleteAthlete = useStore((s) => s.deleteAthlete);
+  const advancedToolsUnlocked = useStore((s) => s.advancedToolsUnlocked);
+  const setAdvancedToolsUnlocked = useStore((s) => s.setAdvancedToolsUnlocked);
   const loadRecentOutcomes = useStore((s) => s.loadRecentOutcomes);
   const today = useStore((s) => s.today);
   const importHistory = useStore((s) => s.importHistory);
-  const saveBodyweight = useStore((s) => s.saveBodyweight);
+  const saveBodyweight = useStore((s) => (s.status === 'ready' ? s.saveBodyweight : inertWhileClosed));
   const loadMeasuredHistory = useStore((s) => s.loadMeasuredHistory);
 
   // Hydrate recent outcomes in effect (never query directly in render body!)
+  // Both reads wait for the database (see databaseReady) and re-run when it
+  // returns, so a swap shows the new athlete's rows, never the previous one's.
   const [recentOutcomes, setRecentOutcomes] = useState<{ outcomeKind: string; finalizedAtMs: number }[]>([]);
   useEffect(() => {
-    setRecentOutcomes(loadRecentOutcomes(20));
-  }, [activeAthleteId, session, loadRecentOutcomes]);
+    setRecentOutcomes(databaseReady ? loadRecentOutcomes(20) : []);
+  }, [activeAthleteId, session, loadRecentOutcomes, databaseReady]);
 
   useEffect(() => {
-    setRecentMeasures(loadMeasuredHistory(14));
-  }, [activeAthleteId, loadMeasuredHistory]);
+    setRecentMeasures(databaseReady ? loadMeasuredHistory(14) : []);
+  }, [activeAthleteId, loadMeasuredHistory, databaseReady]);
   // In-canvas double-confirm states (P2 & P5)
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
@@ -219,10 +303,28 @@ export default function ProfileScreen(): React.JSX.Element {
   const [includeImportReadiness, setIncludeImportReadiness] = useState(false);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
   const [bodyweightText, setBodyweightText] = useState('');
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [activitiesOpen, setActivitiesOpen] = useState(false);
+  const [labOpen, setLabOpen] = useState(false);
+  const buildTapCount = useRef(0);
+  const buildTapReset = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (buildTapReset.current !== null) clearTimeout(buildTapReset.current);
+  }, []);
 
-  const hasConfirm = confirmingDeleteAthleteId !== null || confirmingWipeBlock || confirmingSwitchProfileId !== null || confirmingDeleteBandLevel !== null;
-  useSubViewBack(hasConfirm, () => {
-    if (confirmingDeleteAthleteId !== null) setConfirmingDeleteAthleteId(null);
+  const hasSubView =
+    glossaryOpen ||
+    activitiesOpen ||
+    labOpen ||
+    confirmingDeleteAthleteId !== null ||
+    confirmingWipeBlock ||
+    confirmingSwitchProfileId !== null ||
+    confirmingDeleteBandLevel !== null;
+  useSubViewBack(hasSubView, () => {
+    if (glossaryOpen) setGlossaryOpen(false);
+    else if (activitiesOpen) setActivitiesOpen(false);
+    else if (labOpen) setLabOpen(false);
+    else if (confirmingDeleteAthleteId !== null) setConfirmingDeleteAthleteId(null);
     else if (confirmingWipeBlock) setConfirmingWipeBlock(false);
     else if (confirmingSwitchProfileId !== null) setConfirmingSwitchProfileId(null);
     else if (confirmingDeleteBandLevel !== null) setConfirmingDeleteBandLevel(null);
@@ -261,15 +363,54 @@ export default function ProfileScreen(): React.JSX.Element {
           : { region: line, note: '' };
       });
 
+  const recordBuildTap = (): void => {
+    if (advancedToolsUnlocked) return;
+    buildTapCount.current += 1;
+    if (buildTapReset.current !== null) clearTimeout(buildTapReset.current);
+    if (buildTapCount.current >= 7) {
+      buildTapCount.current = 0;
+      buildTapReset.current = null;
+      setAdvancedToolsUnlocked(true);
+      return;
+    }
+    buildTapReset.current = setTimeout(() => { buildTapCount.current = 0; }, 5000);
+  };
+
+  if (glossaryOpen) {
+    return <GlossaryScreen onClose={() => setGlossaryOpen(false)} />;
+  }
+
+  if (activitiesOpen) {
+    return <ActivitiesScreen onClose={() => setActivitiesOpen(false)} />;
+  }
+
+  if (labOpen && advancedToolsUnlocked) {
+    return <CoachVerificationLabScreen onClose={() => setLabOpen(false)} />;
+  }
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
       <Text style={styles.subheading}>
-        These answers are hard limits on every prescription — the coach can tighten
-        them day to day, never exceed them.
+        Your training settings guide the coach. Health notes and preferences stay
+        in your records; instructions can place coach suggestions on hold.
       </Text>
 
+      <View
+        accessible
+        accessibilityLabel="Training guidance safety notice. pikeMethods provides training guidance, not medical advice. It is not a medical device. Stop if something feels unsafe and seek qualified professional advice when needed."
+        style={styles.safetyNotice}
+        testID="training-guidance-safety-notice"
+      >
+        <Text style={styles.safetyTitle}>TRAINING GUIDANCE</Text>
+        <Text style={styles.safetyText}>
+          pikeMethods provides training guidance, not medical advice. It is not a medical device.
+          Stop if something feels unsafe and seek qualified professional advice when needed.
+        </Text>
+      </View>
+
+      <HealthTrainingSupportForm />
       <ChipRow
         label="1 · OBJECTIVE"
         tip="GPP"
@@ -277,12 +418,24 @@ export default function ProfileScreen(): React.JSX.Element {
         value={profile.objective}
         onSelect={(objective) => saveProfile({ objective })}
       />
+      {/* Work order 2: the focus question and SMART goals, reviewable and
+          editable here without rewriting any existing plan. */}
+      <FocusGoalsPanel />
+      {/* Work order 3: the sport answer and the weekly sport workload the next
+          block will be planned with. */}
+      <SportPanel />
       <ChipRow
         label="2 · TRAINING AGE"
         options={TRAINING_AGES}
         value={profile.training_age}
+        disabled={session !== null}
         onSelect={(training_age) => saveProfile({ training_age })}
       />
+      {session !== null && (
+        <Text style={styles.fieldHint}>
+          Training age cannot change during a session because it can change load authority.
+        </Text>
+      )}
       <NumberRow
         label="3 · TRAINING DAYS PER WEEK"
         display={String(profile.weekly_frequency)}
@@ -302,7 +455,7 @@ export default function ProfileScreen(): React.JSX.Element {
         onInc={() => saveProfile({ session_duration_cap_min: profile.session_duration_cap_min + 15 })}
       />
       <NumberRow
-        label="6 · BASE EFFORT CEILING (RPE)"
+        label="6 · EFFORT CEILING"
         tip="RPE"
         display={profile.base_rpe_cap.toFixed(1)}
         onDec={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap - 0.5 })}
@@ -320,6 +473,7 @@ export default function ProfileScreen(): React.JSX.Element {
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>8 · HISTORICAL INJURIES (one per line, &quot;region: note&quot;)</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.notesInput}
           value={injuryText}
           onChangeText={(t) => {
@@ -338,6 +492,7 @@ export default function ProfileScreen(): React.JSX.Element {
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>9 · MOBILITY LIMITS (one per line)</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.notesInput}
           value={mobilityText}
           onChangeText={(t) => {
@@ -355,26 +510,16 @@ export default function ProfileScreen(): React.JSX.Element {
       </View>
       <View style={styles.field}>
         <View style={styles.fieldLabelRow}>
-          <Text style={styles.fieldLabel}>BIOMETRICS — HEALTH CONNECT</Text>
-          <InfoTip term="HRV" />
+          <Text style={styles.fieldLabel}>{healthCopy.title}</Text>
+          {healthCopy.showHrvTip && <InfoTip term="HRV" />}
         </View>
-        <Text style={styles.fieldHint}>
-          {biometricsStatus === 'ready'
-            ? 'Connected. Overnight HRV, resting heart rate, and sleep feed your readiness score automatically — synced when the app comes to the foreground.'
-            : biometricsStatus === 'idle'
-              ? 'Health Connect is available. Tap CONNECT to grant read access to overnight HRV, resting heart rate, and sleep — the coach works fully without it.'
-              : biometricsStatus === 'denied'
-                ? 'Permission not granted. The coach still works fully from training data and your reports. Tap TRY AGAIN, or grant read access in Health Connect settings.'
-                : biometricsStatus === 'unavailable'
-                  ? 'Health Connect is not available on this device. The coach runs on training data and your reports — nothing else changes.'
-                  : 'Checking Health Connect…'}
-        </Text>
-        {(biometricsStatus === 'idle' || biometricsStatus === 'denied') && (
+        <Text style={styles.fieldHint}>{healthCopy.hint}</Text>
+        {healthCopy.connectLabel !== null && (
           <Chip
-            label={biometricsStatus === 'idle' ? 'CONNECT' : 'TRY AGAIN'}
+            label={healthCopy.connectLabel}
             selected={false}
             onPress={() => { void requestBiometricsAccess(); }}
-            accessibilityLabel="Connect Health Connect and grant read permissions"
+            accessibilityLabel={healthCopy.connectAccessibilityLabel}
           />
         )}
         {biometricsStatus === 'ready' && (
@@ -382,7 +527,7 @@ export default function ProfileScreen(): React.JSX.Element {
             label="SYNC NOW"
             selected={false}
             onPress={() => { void syncBiometrics(); }}
-            accessibilityLabel="Sync biometrics from Health Connect now"
+            accessibilityLabel={healthCopy.syncAccessibilityLabel}
           />
         )}
       </View>
@@ -463,10 +608,107 @@ export default function ProfileScreen(): React.JSX.Element {
             />
           ))}
         </View>
+        {profile.training_age !== 'beginner' && (
+          <View testID="profile-load-selection-row">
+            <Text style={[styles.fieldLabel, styles.preferenceLabel]}>LOAD SELECTION</Text>
+            <View style={styles.chipWrap}>
+              <Chip
+                testID="profile-load-pref-auto"
+                label="COACH SUGGESTS"
+                selected={loadPreference === 'auto'}
+                disabled={session !== null}
+                onPress={() => saveLoadPreference('auto')}
+                accessibilityLabel="Coach suggests loads from your numbers and history"
+              />
+              <Chip
+                testID="profile-load-pref-manual"
+                label="I CHOOSE"
+                selected={loadPreference === 'manual'}
+                disabled={session !== null}
+                onPress={() => saveLoadPreference('manual')}
+                accessibilityLabel="You choose every load yourself, with coach suggestions as reference"
+              />
+            </View>
+            <Text style={styles.fieldHint}>
+              {session !== null
+                ? 'Finish the active session before changing load selection.'
+                : 'Coach suggests loads from your numbers and history, or you choose every load yourself. Applies to your next session.'}
+            </Text>
+          </View>
+        )}
         <Text style={styles.fieldHint}>
           Your device accessibility text size is always respected; this adds an optional app preference on top.
         </Text>
       </View>
+
+      {/* OW-001 / L1(a). Some movements can be trained with or without external
+          load, and loading is NOT a property of the movement — it is this
+          athlete's choice. Nothing infers it: not the dropdown order, not the
+          taxonomy, not the equipment you own, not what you lifted last time.
+          Until you say, the coach assumes the loaded version, which is the
+          conservative read. Declarations are PROSPECTIVE: they change what the
+          coach plans next and never rewrite a block you already have. */}
+      {ambiguousMovements.length > 0 && (
+        <View style={styles.mgmtSection} testID="profile-load-intent-section">
+          <Text style={styles.mgmtHeading}>HOW YOU LOAD THESE</Text>
+          <Text style={styles.fieldHint}>
+            These movements work with or without added weight, and only you know which you do.
+            Anything you leave unset is planned as the loaded version. Your choice applies to
+            blocks the coach plans from now on.
+          </Text>
+          {ambiguousMovements.map((m) => (
+            <View key={m.movement_id} testID={`load-intent-row-${m.movement_id}`}>
+              <Text style={[styles.fieldLabel, styles.preferenceLabel]}>{m.name.toUpperCase()}</Text>
+              <View style={styles.chipWrap}>
+                {m.offerablePrefixes.map((prefix) => (
+                  <Chip
+                    key={prefix}
+                    testID={`load-intent-${m.movement_id}-${prefix}`}
+                    label={implementLabel(prefix).toUpperCase()}
+                    selected={loadIntents[m.movement_id] === prefix}
+                    onPress={() => {
+                      // The store returns false for a refusal, but an unexpected
+                      // throw must not escape the handler either — that is the
+                      // OW-007 failure mode, and it would leave the athlete with
+                      // a chip that did not move and no explanation.
+                      try {
+                        setIntentError(
+                          saveMovementLoadIntent(m.movement_id, prefix)
+                            ? null
+                            : `Could not save your choice for ${m.name}. Try again.`,
+                        );
+                      } catch {
+                        setIntentError(`Could not save your choice for ${m.name}. Try again.`);
+                      }
+                    }}
+                    accessibilityLabel={`Plan ${m.name} with ${implementLabel(prefix)}`}
+                  />
+                ))}
+                <Chip
+                  testID={`load-intent-${m.movement_id}-unset`}
+                  label="NOT SET"
+                  selected={loadIntents[m.movement_id] === undefined}
+                  onPress={() => {
+                    try {
+                      setIntentError(
+                        saveMovementLoadIntent(m.movement_id, null)
+                          ? null
+                          : `Could not clear your choice for ${m.name}. Try again.`,
+                      );
+                    } catch {
+                      setIntentError(`Could not clear your choice for ${m.name}. Try again.`);
+                    }
+                  }}
+                  accessibilityLabel={`Leave ${m.name} unset, so it is planned with added weight`}
+                />
+              </View>
+            </View>
+          ))}
+          {intentError !== null && (
+            <Text style={styles.fieldHint} testID="load-intent-error">{intentError}</Text>
+          )}
+        </View>
+      )}
 
       <View style={styles.mgmtSection}>
         <Text style={styles.mgmtHeading}>BAND LADDER</Text>
@@ -477,6 +719,7 @@ export default function ProfileScreen(): React.JSX.Element {
           <View key={band.level} style={styles.bandRow}>
             <Text style={styles.bandLevel}>LEVEL {band.level}</Text>
             <TextInput
+              disableFullscreenUI
               defaultValue={band.label}
               onEndEditing={(event) => saveBandLevel(band.level, event.nativeEvent.text)}
               maxLength={48}
@@ -538,7 +781,7 @@ export default function ProfileScreen(): React.JSX.Element {
           ))}
         </View>
         <View style={[styles.chipWrap, styles.inventoryWrap]}>
-          {EQUIPMENT_ITEMS.map((item: EquipmentItem) => {
+          {STANDARD_EQUIPMENT_ITEMS.map((item: EquipmentItem) => {
             const owned = profile.equipment_inventory.includes(item);
             return (
               <Chip
@@ -557,6 +800,32 @@ export default function ProfileScreen(): React.JSX.Element {
             );
           })}
         </View>
+        {/* Specialist equipment is an explicit opt-in kept out of every preset,
+            default and parse fallback: movements needing it stay teaching-only
+            until it is deliberately selected. */}
+        <Text style={styles.fieldHint}>
+          Specialist equipment — off unless you turn it on. No preset selects it.
+        </Text>
+        <View style={[styles.chipWrap, styles.inventoryWrap]}>
+          {SPECIALIST_EQUIPMENT_ITEMS.map((item: EquipmentItem) => {
+            const owned = profile.equipment_inventory.includes(item);
+            return (
+              <Chip
+                key={item}
+                label={item.replace(/_/g, ' ').toUpperCase()}
+                selected={owned}
+                onPress={() =>
+                  saveProfile({
+                    equipment_inventory: owned
+                      ? profile.equipment_inventory.filter((i) => i !== item)
+                      : [...profile.equipment_inventory, item],
+                  })
+                }
+                accessibilityLabel={`Specialist equipment ${item.replace(/_/g, ' ')}, ${owned ? 'owned' : 'not owned'}`}
+              />
+            );
+          })}
+        </View>
       </View>
 
       <View style={styles.mgmtSection}>
@@ -567,10 +836,14 @@ export default function ProfileScreen(): React.JSX.Element {
         <Text style={styles.fieldLabel}>BODYWEIGHT TODAY (KG)</Text>
         <View style={styles.numberRow}>
           <TextInput
+            disableFullscreenUI
             style={styles.oneRmInput}
             value={bodyweightText}
             onChangeText={setBodyweightText}
+            editable={databaseReady}
             onEndEditing={() => {
+              // A focused input can still end editing after the database closed.
+              if (!databaseReady) return;
               const value = Number.parseFloat(bodyweightText.replace(',', '.'));
               saveBodyweight(today, Number.isFinite(value) && value >= 20 ? value : null);
               setRecentMeasures(loadMeasuredHistory(14));
@@ -602,6 +875,7 @@ export default function ProfileScreen(): React.JSX.Element {
             {HISTORY_IMPORT_EXAMPLE}
           </Text>
           <TextInput
+            disableFullscreenUI
             style={styles.importInput}
             value={historyText}
             onChangeText={(value) => { setHistoryText(value); setHistoryPreview(null); setHistoryNotice(null); }}
@@ -650,7 +924,9 @@ export default function ProfileScreen(): React.JSX.Element {
               <Chip
                 label="COMMIT IMPORT"
                 selected={false}
+                disabled={!databaseReady}
                 onPress={() => {
+                  if (!databaseReady) return;
                   const result = importHistory(historyText, importVerified, includeImportReadiness);
                   setHistoryPreview(result.preview);
                   setHistoryNotice(result.committed
@@ -682,6 +958,50 @@ export default function ProfileScreen(): React.JSX.Element {
             ))
           )}
         </Disclosure>
+      </View>
+
+      {/* ---- Learning & Terminology Glossary ---- */}
+      <View style={styles.mgmtSection} testID="existing-activities-section">
+        <Text style={styles.mgmtHeading}>EXISTING ACTIVITIES</Text>
+        <Text style={styles.fieldHint}>
+          Keep sport, walking, swimming, cycling, outside gym work, and other activities separate from equipment.
+          Record only what you know; missing time, duration, or effort stays unknown.
+        </Text>
+        <QuietAction
+          label="OPEN YOUR ACTIVITIES"
+          onPress={() => setActivitiesOpen(true)}
+          disabled={!databaseReady}
+          accessibilityLabel="Open your existing activities"
+        />
+      </View>
+
+      <BackupTransferPanel />
+
+      {/* ---- Learning & Terminology Glossary ---- */}
+      <View style={styles.mgmtSection} testID="learning-terminology-section">
+        <Text style={styles.mgmtHeading}>LEARNING &amp; TERMINOLOGY</Text>
+        <Text style={styles.fieldHint}>
+          Look up strength and conditioning concepts, loading methods, effort scales, and movement patterns offline anytime.
+        </Text>
+        <QuietAction
+          label="OPEN TERMINOLOGY GLOSSARY"
+          onPress={() => setGlossaryOpen(true)}
+          accessibilityLabel="Open terminology glossary"
+        />
+      </View>
+
+      {/* ---- Offline catalogue attribution ---- */}
+      <View style={styles.mgmtSection} testID="data-sources-acknowledgement">
+        <Text style={styles.mgmtHeading}>DATA SOURCES</Text>
+        <Text style={styles.fieldHint}>
+          Movement names and source taxonomy were adapted from free-exercise-db,
+          released under the Unlicense. Coaching instructions, tier decisions,
+          and safety wording are curated for pikeMethods. Source snapshot imported
+          12 July 2026; the app remains fully offline.
+        </Text>
+        <Text selectable style={styles.fieldHint}>
+          github.com/yuhonas/free-exercise-db · unlicense.org
+        </Text>
       </View>
 
       {/* ---- Profile Management (local multi-tenancy + state wipe) ---- */}
@@ -761,8 +1081,9 @@ export default function ProfileScreen(): React.JSX.Element {
         )}
       </View>
 
-      {/* ---- Coach Mode (Phase 15): one database file per athlete ---- */}
-      <View style={styles.mgmtSection}>
+      {/* Advanced athlete-database management stays hidden until the local
+          seven-tap build gesture is deliberately completed. */}
+      {advancedToolsUnlocked && <View style={styles.mgmtSection} testID="advanced-athlete-manager">
         <Pressable
           onPress={() => setCoachOpen((o) => !o)}
           accessibilityRole="button"
@@ -770,7 +1091,7 @@ export default function ProfileScreen(): React.JSX.Element {
           accessibilityLabel={`Coach mode, ${athletes.length} athletes, ${coachOpen ? 'expanded' : 'collapsed'}`}
           style={styles.coachHeader}
         >
-          <Text style={styles.mgmtHeading}>COACH MODE</Text>
+          <Text style={styles.mgmtHeading}>MANAGE ATHLETES</Text>
           <Text style={styles.coachToggle}>
             {athletes.length} {coachOpen ? '▾' : '▸'}
           </Text>
@@ -791,6 +1112,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 return (
                   <View key={a.id} style={styles.athleteRow}>
                     <TextInput
+                      disableFullscreenUI
                       style={styles.athleteEditInput}
                       value={editAthleteName}
                       onChangeText={setEditAthleteName}
@@ -869,6 +1191,7 @@ export default function ProfileScreen(): React.JSX.Element {
             })}
             <View style={styles.athleteRow}>
               <TextInput
+                disableFullscreenUI
                 style={styles.athleteEditInput}
                 value={newAthleteName}
                 onChangeText={setNewAthleteName}
@@ -889,12 +1212,61 @@ export default function ProfileScreen(): React.JSX.Element {
             </View>
           </View>
         )}
-      </View>
-    </ScrollView>
+      </View>}
+
+      {advancedToolsUnlocked && (
+        <View style={styles.mgmtSection} testID="advanced-tools-section">
+          <Text style={styles.mgmtHeading}>ADVANCED TOOLS</Text>
+          <Text style={styles.fieldHint}>Coach verification is sandbox-only. Athlete training remains in the focused app screens.</Text>
+          <QuietAction
+            label="OPEN COACH VERIFICATION LAB"
+            onPress={() => setLabOpen(true)}
+            disabled={!databaseReady}
+            accessibilityLabel="Open Coach Verification Lab"
+          />
+          <QuietAction
+            label="RELOCK ADVANCED TOOLS"
+            onPress={() => {
+              setLabOpen(false);
+              setCoachOpen(false);
+              setAdvancedToolsUnlocked(false);
+            }}
+            accessibilityLabel="Relock advanced tools"
+          />
+        </View>
+      )}
+
+      <Pressable
+        onPress={recordBuildTap}
+        accessibilityRole="button"
+        accessibilityLabel="Build 0.1.0"
+        style={styles.buildLabel}
+      >
+        <Text style={styles.buildText}>BUILD 0.1.0</Text>
+      </Pressable>
+    </KeyboardAwareScrollView>
   );
 }
 
 // ---------------------------------------------------------------------------
+/** AUDIT W4: athlete-readable names for the canonical implement vocabulary.
+ *  DB / BB / KB are internal shorthand and must not be the only thing an athlete
+ *  is asked to choose between. Presentation only — the stored value is always
+ *  the canonical MOVEMENT_PREFIXES token, never this string. */
+const IMPLEMENT_LABEL: Record<string, string> = {
+  DB: 'Dumbbell',
+  BB: 'Barbell',
+  KB: 'Kettlebell',
+  'Free Weight': 'Free weight',
+  Banded: 'Band',
+  Bodyweight: 'Bodyweight only',
+  Cable: 'Cable',
+  'Earthquake Bar': 'Earthquake bar',
+  Chains: 'Chains',
+  'Bottom-Up': 'Bottom-up',
+};
+const implementLabel = (prefix: string): string => IMPLEMENT_LABEL[prefix] ?? prefix;
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.color.ink0 },
   content: { padding: theme.space[4], paddingBottom: theme.space[6] }, // 32 — matches other screens
@@ -904,6 +1276,16 @@ const styles = StyleSheet.create({
     marginBottom: theme.space[1],
   },
   heading: { ...theme.font.title, color: theme.color.textHi },
+  safetyNotice: {
+    backgroundColor: theme.color.ink1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.control,
+    borderWidth: 1,
+    marginBottom: theme.space[4],
+    padding: theme.space[3],
+  },
+  safetyTitle: { ...theme.font.eyebrow, color: theme.color.textHi, marginBottom: theme.space[1] },
+  safetyText: { ...theme.font.label, color: theme.color.textMid },
   mgmtSection: {
     marginTop: theme.space[3],
     paddingTop: theme.space[4],
@@ -1047,4 +1429,11 @@ const styles = StyleSheet.create({
   clinicalRow: {
     borderBottomColor: theme.color.ink1,
   },
+  buildLabel: {
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.space[4],
+  },
+  buildText: { ...theme.font.eyebrow, color: theme.color.textLow },
 });

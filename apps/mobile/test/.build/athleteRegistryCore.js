@@ -30,6 +30,7 @@ exports.addAthlete = addAthlete;
 exports.renameAthlete = renameAthlete;
 exports.removeAthlete = removeAthlete;
 exports.setActiveAthlete = setActiveAthlete;
+exports.setAdvancedToolsUnlocked = setAdvancedToolsUnlocked;
 exports.activeEntry = activeEntry;
 exports.REGISTRY_FILE = 'coach_athletes.json';
 /** Mirrors DB_NAME in packages/core-db/src/pragmas.ts (cross-checked by
@@ -41,6 +42,7 @@ function defaultRegistry() {
     return {
         version: 1,
         activeId: exports.DEFAULT_ATHLETE_ID,
+        advancedToolsUnlocked: false,
         athletes: [
             { id: exports.DEFAULT_ATHLETE_ID, name: 'Athlete 1', dbName: exports.LEGACY_DB_NAME, createdAtMs: 0 },
         ],
@@ -59,6 +61,7 @@ function sanitizeName(raw, fallback) {
 function parseRegistry(json) {
     let entries = [];
     let activeId = exports.DEFAULT_ATHLETE_ID;
+    let advancedToolsUnlocked = false;
     try {
         const o = JSON.parse(json);
         if (Array.isArray(o.athletes)) {
@@ -89,6 +92,7 @@ function parseRegistry(json) {
         }
         if (typeof o.activeId === 'string')
             activeId = o.activeId;
+        advancedToolsUnlocked = o.advancedToolsUnlocked === true;
     }
     catch {
         entries = [];
@@ -98,7 +102,7 @@ function parseRegistry(json) {
     }
     if (!entries.some((e) => e.id === activeId))
         activeId = exports.DEFAULT_ATHLETE_ID;
-    return { version: 1, activeId, athletes: entries };
+    return { version: 1, activeId, athletes: entries, advancedToolsUnlocked };
 }
 function serializeRegistry(reg) {
     return JSON.stringify(reg);
@@ -153,6 +157,10 @@ function setActiveAthlete(reg, id) {
     if (!reg.athletes.some((e) => e.id === id))
         return reg;
     return { ...reg, activeId: id };
+}
+/** Persist the hidden-surface preference without changing the active athlete. */
+function setAdvancedToolsUnlocked(reg, unlocked) {
+    return { ...reg, advancedToolsUnlocked: unlocked };
 }
 function activeEntry(reg) {
     return reg.athletes.find((e) => e.id === reg.activeId) ?? reg.athletes[0];

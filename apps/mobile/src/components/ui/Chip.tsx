@@ -56,11 +56,14 @@ export function Chip({
         style,
       ]}
     >
-      <Text style={[
-        styles.label,
-        selected && styles.labelSelected,
-        disabled && styles.labelDisabled,
-      ]}>
+      <Text
+        style={[
+          styles.label,
+          selected && styles.labelSelected,
+          disabled && styles.labelDisabled,
+        ]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </Pressable>

@@ -9,17 +9,34 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-AthleteKinetics.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-AthleteKinetics.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		45F4269811BB60E613544267 /* AthleteKineticsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBA7496A07C6D5078523B0E /* AthleteKineticsUITests.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		7C2D4BC9900220701FB333FC /* Archivo-VariableFont_wdth,wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 08F7436BBC74E03F9A94182B /* Archivo-VariableFont_wdth,wght.ttf */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		DA5B3C1D1882EE96047395AA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		8E28AAC0183AC691379EE609 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
+			remoteInfo = AthleteKinetics;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		08F7436BBC74E03F9A94182B /* Archivo-VariableFont_wdth,wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file.ttf; name = "Archivo-VariableFont_wdth,wght.ttf"; path = "../assets/fonts/Archivo/Archivo-VariableFont_wdth,wght.ttf"; sourceTree = SOURCE_ROOT; };
 		13B07F961A680F5B00A75B9A /* AthleteKinetics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AthleteKinetics.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = AthleteKinetics/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = AthleteKinetics/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = AthleteKinetics/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1BBA7496A07C6D5078523B0E /* AthleteKineticsUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AthleteKineticsUITests.swift; sourceTree = "<group>"; };
+		36DCD6EA5A0FAA4AF39D8600 /* AthleteKineticsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AthleteKineticsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B4392A12AC88292D35C810B /* Pods-AthleteKinetics.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AthleteKinetics.debug.xcconfig"; path = "Target Support Files/Pods-AthleteKinetics/Pods-AthleteKinetics.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-AthleteKinetics.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AthleteKinetics.release.xcconfig"; path = "Target Support Files/Pods-AthleteKinetics/Pods-AthleteKinetics.release.xcconfig"; sourceTree = "<group>"; };
+		5B694EC68E3E8C315EF6D765 /* AthleteKinetics.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = AthleteKinetics.entitlements; path = AthleteKinetics/AthleteKinetics.entitlements; sourceTree = SOURCE_ROOT; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-AthleteKinetics.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-AthleteKinetics.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = AthleteKinetics/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = AthleteKinetics/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -35,6 +52,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F397D7ACE08EBE4D79C38682 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -46,6 +70,8 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				08F7436BBC74E03F9A94182B /* Archivo-VariableFont_wdth,wght.ttf */,
+				5B694EC68E3E8C315EF6D765 /* AthleteKinetics.entitlements */,
 			);
 			name = AthleteKinetics;
 			sourceTree = "<group>";
@@ -74,6 +100,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				A6552D4217500473F1E7F3C2 /* AthleteKineticsUITests */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -84,8 +111,18 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* AthleteKinetics.app */,
+				36DCD6EA5A0FAA4AF39D8600 /* AthleteKineticsUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A6552D4217500473F1E7F3C2 /* AthleteKineticsUITests */ = {
+			isa = PBXGroup;
+			children = (
+				1BBA7496A07C6D5078523B0E /* AthleteKineticsUITests.swift */,
+			);
+			name = AthleteKineticsUITests;
+			path = AthleteKineticsUITests;
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -108,6 +145,7 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
+				7A1E5B0D2C6F4A3B9E8D1C01 /* Stage embedder model */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
@@ -121,6 +159,24 @@
 			productReference = 13B07F961A680F5B00A75B9A /* AthleteKinetics.app */;
 			productType = "com.apple.product-type.application";
 		};
+		2FD7FBD88E0DC778D2BBE645 /* AthleteKineticsUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 82F2F0ED04BE8A0672625BFF /* Build configuration list for PBXNativeTarget "AthleteKineticsUITests" */;
+			buildPhases = (
+				846C4DB4B094337C79B3A87D /* Sources */,
+				F397D7ACE08EBE4D79C38682 /* Frameworks */,
+				BEC9E3C873E0FF5FBD1182F2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B64BEACF51ECB9FC755CE7EA /* PBXTargetDependency */,
+			);
+			name = AthleteKineticsUITests;
+			productName = AthleteKineticsUITests;
+			productReference = 36DCD6EA5A0FAA4AF39D8600 /* AthleteKineticsUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -131,6 +187,10 @@
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1120;
+					};
+					2FD7FBD88E0DC778D2BBE645 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 13B07F861A680F5B00A75B9A;
 					};
 				};
 			};
@@ -148,6 +208,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* AthleteKinetics */,
+				2FD7FBD88E0DC778D2BBE645 /* AthleteKineticsUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -159,6 +220,15 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				7C2D4BC9900220701FB333FC /* Archivo-VariableFont_wdth,wght.ttf in Resources */,
+				DA5B3C1D1882EE96047395AA /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BEC9E3C873E0FF5FBD1182F2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -196,6 +266,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-AthleteKinetics/Pods-AthleteKinetics-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		7A1E5B0D2C6F4A3B9E8D1C01 /* Stage embedder model */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+			);
+			name = "Stage embedder model";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/minilm.onnx",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n# Pinned, byte-verified MiniLM model -> <App>.app/minilm.onnx (deviceEmbedder reads it in place).\n# Release REQUIRES it; Debug without it builds policy-only (triage inactive).\n. \"$SRCROOT/.xcode.env\"\nif [ -f \"$SRCROOT/.xcode.env.local\" ]; then . \"$SRCROOT/.xcode.env.local\"; fi\nREQUIRED=\"\"\nif [ \"$CONFIGURATION\" = \"Release\" ]; then REQUIRED=\"--required\"; fi\n\"$NODE_BINARY\" \"$SRCROOT/../../../scripts/stage-native-embedder.mjs\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/minilm.onnx\" $REQUIRED\n";
 			showEnvVarsInLog = 0;
 		};
 		C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */ = {
@@ -248,17 +336,69 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		846C4DB4B094337C79B3A87D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				45F4269811BB60E613544267 /* AthleteKineticsUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		B64BEACF51ECB9FC755CE7EA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = AthleteKinetics;
+			target = 13B07F861A680F5B00A75B9A /* AthleteKinetics */;
+			targetProxy = 8E28AAC0183AC691379EE609 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		0308E1FC35369E0749547B9B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AthleteKinetics;
+			};
+			name = Debug;
+		};
+		0B6863E363BDE6EA474DBB38 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AthleteKinetics;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-AthleteKinetics.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = AthleteKinetics/AthleteKinetics.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = AthleteKinetics/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -271,7 +411,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;
 				PRODUCT_NAME = AthleteKinetics;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -285,7 +425,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = AthleteKinetics/AthleteKinetics.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = AthleteKinetics/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -298,7 +440,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;
 				PRODUCT_NAME = AthleteKinetics;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -374,7 +516,10 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				USE_HERMES = true;
 			};
 			name = Debug;
 		};
@@ -439,7 +584,9 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -452,6 +599,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		82F2F0ED04BE8A0672625BFF /* Build configuration list for PBXNativeTarget "AthleteKineticsUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0B6863E363BDE6EA474DBB38 /* Release */,
+				0308E1FC35369E0749547B9B /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

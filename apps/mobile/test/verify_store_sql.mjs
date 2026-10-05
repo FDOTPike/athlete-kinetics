@@ -7,18 +7,17 @@
  * Run:  node apps/mobile/test/verify_store_sql.mjs
  */
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
+import { checkWorkflowStructure } from '../../../tools/verify_ci_structure.mjs';
+import { checkInstallScriptPolicy } from '../../../tools/verify_install_scripts.mjs';
+import { createRequire } from 'node:module';
+import { readFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 const SCHEMA_DIR = join(ROOT, 'packages', 'core-db', 'src', 'schema');
 
-const db = new DatabaseSync(':memory:');
-try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
-  db.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
-  db.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
-}
-for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
+const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
   '005_subjective_report.sql', '006_user_profile.sql', '007_program_engine.sql',
   '008_taxonomy.sql', '009_periodization.sql', '010_movement_library.sql',
   '011_niggle_tracking.sql', '012_report_severity.sql', '013_profile_slot.sql',
@@ -32,7 +31,56 @@ for (const f of ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vec
   '028_capability_graph.sql', '029_routine_history_analytics.sql',
   '030_readiness_import_integration.sql', '031_planned_session_method.sql',
   '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
-  '058_suspension_episode.sql']) {
+  '035_profile_load_preference.sql', '036_movement_media.sql',
+  '037_movement_library_v2_batch.sql', '038_movement_library_v2_batch.sql',
+  '039_movement_library_v2_batch.sql', '040_movement_library_v2_batch.sql',
+  '041_movement_library_v2_batch.sql', '042_movement_library_v2_batch.sql',
+  '043_movement_library_v2_batch.sql', '044_movement_library_v2_batch.sql',
+  '045_movement_library_v2_batch.sql', '046_movement_library_v2_batch.sql',
+  '047_movement_library_v2_batch.sql', '048_movement_library_v2_batch.sql',
+  '049_movement_content_correction_v1.sql', '050_movement_role_convergence.sql',
+  '051_routine_access_context.sql', '052_bounded_microcycle_roles.sql',
+  '053_routine_role_compatibility.sql',
+  '054_contract_cutoff_provenance.sql',
+  '055_return_checkin_ack.sql',
+  '056_movement_taxonomy_backfill.sql',
+  // 057 closes OW-011. It was deliberately absent while 058 was added, because
+  // it installs fail-closed block_meta triggers requiring macro_phase to match
+  // macro_block_index on every INSERT and UPDATE — so any seed in this file that
+  // planted a mismatched pair would start aborting. That is exactly why it
+  // belongs here: the store writes block_meta, and without 057 this verifier
+  // could not have caught a phase/index drift the real device would reject.
+  '057_block_meta_phase_invariant.sql',
+  '058_suspension_episode.sql',
+  // 059 adds suspension_episode_program, block_suspension_origin and
+  // planned_slot_load_intent, which the store now reads and writes. It does not
+  // depend on 057, which is why 058 and 059 could be added while 057 was still
+  // absent; 057 is present above now that OW-011 closed that gap.
+  '059_suspension_state_and_load_intent.sql',
+  // 062 closes the 059 side-car mutation surface. It is included because the
+  // reset probe below EXECUTES the store's exact delete sequence: with 062
+  // present, an ordering regression that named a side-car before its parents
+  // aborts here instead of passing quietly. It depends only on tables 007/033/
+  // 058/059 already create, so it applies cleanly without 060/061.
+  '062_suspension_sidecar_immutability.sql',
+  // 063 adds movement_load_intent, which the store now reads on boot and writes
+  // from the athlete's declaration (OW-001), so its statements are validated
+  // against the real table here.
+  '063_movement_load_intent.sql',
+  // 064 is the shared neutral activity/support persistence contract. Feature
+  // adapters are separate modules, but the real store database must migrate it.
+  '064_accessible_coach_support.sql',
+  // 069 adds resting_hr_daily, which the store writes on every biometrics sync,
+  // reads for measured history and empties on reset. It depends only on 001.
+  '069_resting_heart_rate.sql'];
+
+
+const db = new DatabaseSync(':memory:');
+try { db.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
+  db.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+  db.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+}
+for (const f of SCHEMA_FILES) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 }
 
@@ -76,6 +124,188 @@ for (const sql of statements) {
     fail += 1;
   }
 }
+
+// --- P2-1: executable profile_load_preference production behavior -----------
+// The production helper is compiled before this verifier. These checks invoke
+// the exact hydration, upsert, transition, and guarded-save code used by
+// useStore against an op-sqlite-shaped adapter over a real node:sqlite DB.
+console.log('[profile_load_preference executable behavior]');
+{
+  const require = createRequire(import.meta.url);
+  const production = require(join(ROOT, 'packages', 'core-db', 'test', '.build', 'loadPreferenceStore.js'));
+  const inference = require(join(ROOT, 'packages', 'inference', 'test', '.build', 'loadSelection.js'));
+  const raw = new DatabaseSync(':memory:');
+  try { raw.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
+    raw.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+    raw.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+  }
+  for (const file of SCHEMA_FILES) raw.exec(readFileSync(join(SCHEMA_DIR, file), 'utf-8'));
+
+  const calls = [];
+  const productionDb = {
+    executeSync(sql, params) {
+      calls.push({ sql, params: params ?? [] });
+      if (/^\s*SELECT/i.test(sql)) {
+        return { rows: raw.prepare(sql).all(...(params ?? [])) };
+      }
+      if (params && params.length > 0) raw.prepare(sql).run(...params);
+      else raw.exec(sql);
+      return { rows: [] };
+    },
+  };
+  const activate = (slotId) => {
+    raw.exec('UPDATE profile_slot SET is_active = 0');
+    raw.prepare('UPDATE profile_slot SET is_active = 1 WHERE slot_id = ?').run(slotId);
+  };
+
+  check('active slot is slot 2 (intermediate)',
+    raw.prepare('SELECT slot_id FROM profile_slot WHERE is_active = 1').get()?.slot_id === 2);
+
+  raw.exec('DELETE FROM profile_load_preference WHERE profile_slot_id = 2');
+  production.persistLoadPreferenceRow(productionDb, 'manual', true);
+  production.persistLoadPreferenceRow(productionDb, 'auto', false);
+  const upserted = raw.prepare('SELECT preference, is_explicit FROM profile_load_preference WHERE profile_slot_id = 2').get();
+  check('production active-slot upsert inserts then conflict-updates both fields',
+    upserted?.preference === 'auto' && upserted?.is_explicit === 0);
+
+  activate(3);
+  production.persistLoadPreferenceRow(productionDb, 'auto', true);
+  const advancedAuto = production.readActiveLoadPreference(productionDb, 'advanced', inference.defaultLoadPreference);
+  check('production hydration preserves persisted advanced auto over manual default',
+    advancedAuto.preference === 'auto' && advancedAuto.explicit === true);
+  production.persistLoadPreferenceRow(productionDb, 'manual', true);
+  const advancedManual = production.readActiveLoadPreference(productionDb, 'advanced', inference.defaultLoadPreference);
+  check('production non-beginner manual round-trips as manual',
+    advancedManual.preference === 'manual' && advancedManual.explicit === true);
+
+  activate(4);
+  raw.exec('DELETE FROM profile_load_preference WHERE profile_slot_id = 4');
+  const missingElite = production.readActiveLoadPreference(productionDb, 'elite', inference.defaultLoadPreference);
+  check('production missing-row hydration falls back to the elite manual default',
+    missingElite.preference === 'manual' && missingElite.explicit === false);
+  const malformedElite = production.loadPreferenceFromRow(
+    { preference: 'poison', is_explicit: 1 }, 'elite', inference.defaultLoadPreference,
+  );
+  check('production malformed-row hydration falls back without retaining invalid explicitness',
+    malformedElite.preference === 'manual' && malformedElite.explicit === false);
+
+  activate(2);
+  production.persistLoadPreferenceRow(productionDb, 'auto', true);
+  activate(3);
+  production.persistLoadPreferenceRow(productionDb, 'manual', true);
+  const switchedAdvanced = production.readActiveLoadPreference(productionDb, 'advanced', inference.defaultLoadPreference);
+  activate(2);
+  const switchedIntermediate = production.readActiveLoadPreference(productionDb, 'intermediate', inference.defaultLoadPreference);
+  check('production hydration is isolated per active profile slot',
+    switchedAdvanced.preference === 'manual' && switchedIntermediate.preference === 'auto');
+
+  const explicitDefault = production.planProfileLoadTransition(
+    'intermediate', 'advanced', switchedIntermediate, inference.transitionLoadPreference,
+  );
+  check('explicit same-as-default survives round-trip and non-beginner transition',
+    explicitDefault.preference === 'auto' && explicitDefault.explicit === true && explicitDefault.changed === false);
+  production.persistLoadPreferenceRow(productionDb, 'auto', false);
+  const defaultedIntermediate = production.readActiveLoadPreference(productionDb, 'intermediate', inference.defaultLoadPreference);
+  const redefaulted = production.planProfileLoadTransition(
+    'intermediate', 'advanced', defaultedIntermediate, inference.transitionLoadPreference,
+  );
+  check('non-explicit non-beginner transition independently re-defaults',
+    redefaulted.preference === 'manual' && redefaulted.explicit === false && redefaulted.changed === true);
+
+  const directStart = calls.length;
+  let directCommit = 0;
+  const beginnerManual = production.executeDirectLoadPreferenceSave({
+    getDb: () => productionDb,
+    sessionActive: false,
+    trainingAge: 'beginner',
+    preference: 'manual',
+    commitState: () => { directCommit += 1; },
+  });
+  check('production direct-save rejects beginner manual without DB or state mutation',
+    beginnerManual.ok === false && beginnerManual.error === null
+      && calls.length === directStart && directCommit === 0);
+
+  const assertActiveRejection = (label, priorAge, nextAge, current) => {
+    const next = production.planProfileLoadTransition(
+      priorAge, nextAge, current, inference.transitionLoadPreference,
+    );
+    let getDbCalls = 0;
+    let profileWrites = 0;
+    let stateCommits = 0;
+    const result = production.executeProfileLoadSave({
+      getDb: () => { getDbCalls += 1; return productionDb; },
+      sessionActive: true,
+      current,
+      next,
+      persistProfile: () => { profileWrites += 1; },
+      commitState: () => { stateCommits += 1; },
+    });
+    check(label, result.ok === false
+      && result.error === production.ACTIVE_LOAD_PREFERENCE_ERROR
+      && getDbCalls === 0 && profileWrites === 0 && stateCommits === 0);
+  };
+  assertActiveRejection(
+    'production guard rejects active advanced/manual/explicit -> beginner before all mutations',
+    'advanced', 'beginner', { preference: 'manual', explicit: true },
+  );
+  assertActiveRejection(
+    'production guard rejects active beginner/auto/non-explicit -> advanced before all mutations',
+    'beginner', 'advanced', { preference: 'auto', explicit: false },
+  );
+
+  const unchanged = production.planProfileLoadTransition(
+    'intermediate', 'advanced', { preference: 'auto', explicit: true }, inference.transitionLoadPreference,
+  );
+  const profileRow = () => raw.prepare(
+    'SELECT session_duration_cap_min, updated_at_ms, objective, training_age, weekly_frequency, max_sessions_per_day, base_rpe_cap, target_energy_system, progression_methodology, injury_flags, mobility_limits, equipment_inventory FROM athlete_profile WHERE profile_id = 1',
+  ).get();
+  const prefRow = () => raw.prepare(
+    'SELECT preference, is_explicit FROM profile_load_preference WHERE profile_slot_id = 2',
+  ).get();
+  const profileBefore = profileRow();
+  const prefBefore = prefRow();
+  check('athlete_profile row 1 exists before the ordinary active-session edit', profileBefore !== undefined);
+  const editedProfile = {
+    objective: profileBefore.objective,
+    training_age: profileBefore.training_age,
+    weekly_frequency: profileBefore.weekly_frequency,
+    max_sessions_per_day: profileBefore.max_sessions_per_day,
+    session_duration_cap_min: profileBefore.session_duration_cap_min === 60 ? 90 : 60,
+    base_rpe_cap: profileBefore.base_rpe_cap,
+    target_energy_system: profileBefore.target_energy_system,
+    progression_methodology: profileBefore.progression_methodology,
+    injury_flags: JSON.parse(profileBefore.injury_flags),
+    mobility_limits: JSON.parse(profileBefore.mobility_limits),
+    equipment_inventory: JSON.parse(profileBefore.equipment_inventory),
+  };
+  let ordinaryProfileWrites = 0;
+  let ordinaryStateCommits = 0;
+  const ordinary = production.executeProfileLoadSave({
+    getDb: () => productionDb,
+    sessionActive: true,
+    current: { preference: 'auto', explicit: true },
+    next: unchanged,
+    persistProfile: (db) => {
+      ordinaryProfileWrites += 1;
+      production.persistProfileFields(db, editedProfile);
+    },
+    commitState: () => { ordinaryStateCommits += 1; },
+  });
+  const profileAfter = profileRow();
+  const prefAfter = prefRow();
+  check('production guard permits an active-session profile edit when the preference tuple is unchanged',
+    ordinary.ok === true && ordinaryProfileWrites === 1 && ordinaryStateCommits === 1);
+  check('ordinary active-session edit durably persists the profile row via the production seam',
+    profileAfter !== undefined
+      && profileAfter.session_duration_cap_min === editedProfile.session_duration_cap_min
+      && profileAfter.session_duration_cap_min !== profileBefore.session_duration_cap_min
+      && profileAfter.updated_at_ms > profileBefore.updated_at_ms);
+  check('ordinary active-session edit leaves the preference row and tuple unchanged',
+    prefAfter?.preference === prefBefore?.preference
+      && prefAfter?.is_explicit === prefBefore?.is_explicit
+      && prefAfter?.preference === 'auto' && prefAfter?.is_explicit === 0);
+}
+
 // Wiring tripwires: mutation testing (2026-06-12) proved the layer-3 chain
 // could be silently unwired with every gate green. The pure derivation is
 // verified in verify:policy [6]; these assert the store actually routes
@@ -109,44 +339,23 @@ check(
   /tab === 'coach' && status === 'ready' && \(\s*<BlockScreen/.test(appSrc),
 );
 
-/** Slice one store action's body out of useStore.ts between two anchors.
- *
- *  `indexOf` returns -1 for a missing anchor, and an unguarded
- *  `src.slice(start, end)` then silently produces the WRONG region rather than
- *  failing: `slice(start, -1)` hands back nearly the whole file (so an
- *  `includes()` contract can PASS on text from an unrelated action), and a
- *  missing start anchor yields `''` (so a NEGATIVE contract like "this action
- *  never writes block tables" passes with no code inspected at all). This
- *  stack renames and moves store actions, so both failure modes are live.
- *  Fail loudly on a missing anchor instead — a broken anchor is a broken
- *  contract, not a passing one. */
-function sliceBetween(label, startAnchor, endAnchor) {
-  const start = src.indexOf(startAnchor);
-  const end = start < 0 ? -1 : src.indexOf(endAnchor, start);
-  const resolved = start >= 0 && end > start;
-  check(`${label}: both source anchors resolve`, resolved,
-    resolved ? '' : `start=${start} end=${end}`);
-  if (!resolved) {
-    throw new Error(
-      `verify:store anchor drift — cannot slice ${label} `
-      + `(start ${JSON.stringify(startAnchor)} at ${start}, `
-      + `end ${JSON.stringify(endAnchor)} at ${end}). `
-      + 'Update the anchors to match the current useStore.ts.',
-    );
-  }
-  return src.slice(start, end);
-}
-
 console.log('[onboarding guided-program contract]');
-const onboardingBody = sliceBetween(
-  'completeOnboarding',
-  'completeOnboarding: (patch, athleteName) => {',
-  'previewTrainingProgram: (input) => {',
-);
-const onboardingSave = onboardingBody.indexOf('get().saveProfile(patch)');
+const onboardingStart = src.indexOf('completeOnboarding: (patch, athleteName');
+const onboardingEnd = src.indexOf('previewTrainingProgram: (input) => {', onboardingStart);
+const onboardingBody = onboardingStart >= 0 && onboardingEnd > onboardingStart
+  ? src.slice(onboardingStart, onboardingEnd)
+  : '';
+const onboardingSave = onboardingBody.indexOf('persistProfileFields(d, merged)');
 check(
   'completed questionnaire persists its profile',
   onboardingSave >= 0,
+);
+check(
+  'onboarding commits profile, preference, and explicit-choice metadata in one transaction',
+  onboardingBody.includes("d.executeSync('BEGIN')")
+    && onboardingBody.includes('persistLoadPreferenceRow(d, pref, prefExplicit)')
+    && onboardingBody.includes("d.executeSync('COMMIT')")
+    && onboardingBody.includes("d.executeSync('ROLLBACK')"),
 );
 check(
   'completed questionnaire does not silently generate a LINEAR block',
@@ -162,45 +371,84 @@ check(
     && appSrc.includes('onCancel={() => setSetupDismissed(true)}'),
 );
 
-const previewProgramBody = sliceBetween(
-  'previewTrainingProgram',
-  'previewTrainingProgram: (input) => {',
-  'createTrainingProgram: (input) => {',
+// --- BlockScreen source contracts (ported with the PR #6 remediation) -------
+// None of the three bugs below had a gate, which is why they survived. Each
+// check pins the FIX, and every anchor is compared by index so that a rename
+// yields -1 and fails the check rather than silently matching nothing.
+const blockSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'screens', 'BlockScreen.tsx'), 'utf-8');
+
+const manageGateAt = blockSrc.indexOf('{program == null && (');
+const gateCloseAt = blockSrc.indexOf('\n        )}\n', manageGateAt);
+const unplannedAt = blockSrc.indexOf('<Disclosure label="Start without a planned session">');
+const feelsOffAt = blockSrc.indexOf('label="Something feels off"');
+check(
+  'the ad-hoc session path is never gated behind an active program',
+  manageGateAt >= 0
+    && gateCloseAt > manageGateAt
+    && unplannedAt > gateCloseAt
+    && feelsOffAt > unplannedAt,
+  `gate=${manageGateAt} close=${gateCloseAt} unplanned=${unplannedAt} feelsOff=${feelsOffAt}`,
 );
+check(
+  'confirming the next block settles on the store result instead of clearing the card outright',
+  blockSrc.includes('setContinuationPending(true)')
+    && blockSrc.includes('const storeError = useStore((s) => s.error)')
+    && blockSrc.includes('styles.errorText}>{continuationError}')
+    && !/continueTrainingProgram\(\);\s*\n\s*setNextProgramPreview\(null\);/.test(blockSrc),
+);
+// hitSlop is NOT an acceptable fix here and the gate says so: React Native
+// clips a child's extended touch region to its ancestors' bounds, and these
+// markers sit in label-height rows, so the slop was never dispatched. The
+// negative clause keeps a future "fix" from regressing to it.
+check(
+  'both attribution markers reserve a real theme.touch.min box, not a clipped hitSlop',
+  (blockSrc.match(/style=\{styles\.attributionTouchTarget\}/g) ?? []).length === 2
+    && /attributionTouchTarget:\s*\{[^}]*minWidth:\s*theme\.touch\.min[^}]*minHeight:\s*theme\.touch\.min/.test(blockSrc)
+    && !/hitSlop=/.test(blockSrc),
+);
+
+const previewProgramStart = src.indexOf('previewTrainingProgram: (input) => {');
+const previewProgramEnd = src.indexOf('createTrainingProgram: (input) => {', previewProgramStart);
+const previewProgramBody = src.slice(previewProgramStart, previewProgramEnd);
 check(
   'program preview session guard lives on the preview action, not onboarding registry failure',
   previewProgramBody.includes('get().session !== null')
     && previewProgramBody.includes('End the active session before previewing program changes.')
     && !onboardingBody.includes('End the active session before previewing program changes.'),
 );
+check(
+  'program preview rejects a preferred movement outside the shared tier/capability boundary',
+  previewProgramBody.includes('!permittedForProfile(movement, profile, accessContext)')
+    && previewProgramBody.includes('!capabilityAvailable.has(movement.movement_id)')
+    && previewProgramBody.includes('accessContextForBlockFocus')
+    && previewProgramBody.includes('A preferred movement is teaching-only for this athlete.'),
+);
 
 console.log('[planned-session completion contract]');
 const completionSql = statements.find((sql) => sql.includes('END AS completion_status')) ?? '';
 
 console.log('[guided goal-program contract]');
-const shapeBody = sliceBetween(
-  'trainingProgramShape',
-  'const trainingProgramShape =',
-  '/** Everything per-athlete',
-);
+const shapeStart = src.indexOf('const trainingProgramShape =');
+const shapeEnd = src.indexOf('/** Everything per-athlete', shapeStart);
+const shapeBody = src.slice(shapeStart, shapeEnd);
 check('date horizon rejects under 4 and over 32 weeks and rounds up to a complete block boundary',
+  // The arithmetic lives in @ak/inference normalizeProgramHorizon (behaviour
+  // verified in verify:blocks); the store must route through it and, when a
+  // program is active, measure from the stable anchor rather than today
+  // (master 7bebc15 behaviour preserved through the lineage integration).
   shapeBody.includes('normalizeProgramHorizon(horizonAnchorDate, input.horizon)')
     && previewProgramBody.includes('programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount)'),
 );
-const createBody = sliceBetween(
-  'createTrainingProgram',
-  'createTrainingProgram: (input) => {',
-  'rolloverDay: () => {',
-);
+const createStart = src.indexOf('createTrainingProgram: (input) => {');
+const createEnd = src.indexOf('rolloverDay: () => {', createStart);
+const createBody = src.slice(createStart, createEnd);
 check('program creation refuses active sessions and existing blocks/programs',
   createBody.includes('get().session !== null')
     && createBody.includes('get().block !== null || get().program !== null'),
 );
-const generatorBody = sliceBetween(
-  'generateNewBlock',
-  'generateNewBlock: (schemaType =',
-  'refreshBlock:',
-);
+const generatorStart = src.indexOf('generateNewBlock: (schemaType =');
+const generatorEnd = src.indexOf('refreshBlock:', generatorStart);
+const generatorBody = src.slice(generatorStart, generatorEnd);
 check('program creation is transactional and calls the SHARED programTx helpers',
   generatorBody.includes("d.executeSync('BEGIN')")
     && generatorBody.includes('insertTrainingProgram(d, {')
@@ -208,11 +456,9 @@ check('program creation is transactional and calls the SHARED programTx helpers'
     && generatorBody.includes('archiveActiveTrainingBlock(d)')
     && generatorBody.includes("d.executeSync('COMMIT')"),
 );
-const updateBody = sliceBetween(
-  'updateProgramPreferences',
-  'updateProgramPreferences: (input) => {',
-  'previewNextProgramBlock:',
-);
+const updateStart = src.indexOf('updateProgramPreferences: (input) => {');
+const updateEnd = src.indexOf('previewNextProgramBlock:', updateStart);
+const updateBody = src.slice(updateStart, updateEnd);
 check('future preference edits never write current or historical block tables',
   !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(training_block|block_meta|planned_session|planned_slot)\b/i.test(updateBody),
 );
@@ -234,28 +480,57 @@ check('continuation carries the program anchor, never re-reads the global cycle'
 check('standalone block generation still advances the athlete global cycle',
   src.includes('nextMacroPosition(d).macroBlockIndex'),
 );
+// R3 (REVIEW_BOUNDARY, ratified 2026-08-22): the selected date sets the review
+// horizon and block COUNT. It confers NO peak authority, so no macro position may
+// be derived from it. Dedicated competition preparation is deferred; a future
+// implementation needs its own ratification, not a quiet reintroduction here.
+check('no macro position is derived from the selected date (REVIEW_BOUNDARY)',
+  !src.includes('datedProgramMacroAnchor'));
+check('dated and undated programs both take the athlete rotation position',
+  [...src.matchAll(/nextMacroPosition\(d\)\.macroBlockIndex/g)].length >= 2,
+  `${[...src.matchAll(/nextMacroPosition\(d\)\.macroBlockIndex/g)].length} rotation sites`);
+check('the persisted program anchor comes from the generated plan, not the date',
+  src.includes('startingMacroBlockIndex: plan.macroBlockIndex'));
 
-console.log('[058 suspension store contract]');
-check('nextMacroPosition consults the open suspension before advancing',
-  /const nextMacroPosition[\s\S]{0,700}?openSuspension\(d\)[\s\S]{0,500}?ORDER BY block_id DESC/.test(src));
-const sqlBearingLines = src.split('\n').filter((line) => /SELECT|INSERT|UPDATE|CREATE/i.test(line));
-check('is_suspended is derived, never stored as a column',
+// --- RR-02 (058): the suspending state, ratified 2026-08-27 ------------------
+// TRAINING_PROGRESSION_LAYERS.md 4.1 ratified that rehab SUSPENDS rather than
+// consuming an L3 position. These are source tripwires, not behaviour tests:
+// they pin the shape that makes the freeze impossible to lose silently.
+check('nextMacroPosition consults the open suspension BEFORE advancing',
+  /const nextMacroPosition[\s\S]{0,900}?openSuspension\(d\)[\s\S]{0,1200}?ORDER BY bm\.block_id DESC/.test(src));
+// S6(b) 2026-08-29: the fall-through read must EXCLUDE blocks generated during
+// an episode, or a suspension block consumes the very position the athlete is
+// meant to resume at. Pinned because losing this clause is silent.
+check('the macro fall-through excludes blocks attributed to a suspension episode',
+  /FROM block_meta bm[\s\S]{0,300}?NOT EXISTS[\s\S]{0,200}?block_suspension_origin/.test(src));
+// Scoped to SQL-bearing lines: the identifier legitimately appears in prose
+// explaining that it is DERIVED. What must never exist is a COLUMN by that name.
+const sqlBearingLines = src.split('\n').filter((l) => /SELECT|INSERT|UPDATE|CREATE/i.test(l));
+check('is_suspended is DERIVED from an open episode, never stored as a column',
   src.includes('WHERE ended_at_ms IS NULL')
-    && !sqlBearingLines.some((line) => line.includes('is_suspended')));
-check('the frozen macro index drives suspended progression',
+  && !sqlBearingLines.some((l) => l.includes('is_suspended')));
+check('the frozen macro index is what a suspended athlete resumes at',
   src.includes('frozen_macro_index'));
-check('episodes require explicit begin/end timestamps',
+check('an episode is opened only with an explicit reason and timestamp',
   src.includes('beginSuspension: (reason, atMs)')
-    && src.includes('endSuspension: (atMs)'));
-check('the store refuses a second open episode',
-  /beginSuspension[\s\S]{0,300}?openSuspension\(d\) !== null[\s\S]{0,180}?throw new Error/.test(src));
-check('suspension adds no dose modifier',
-  !/dLoad|dRpe|dSet|multiplier|deload/i.test(src.slice(
-    src.indexOf('beginSuspension: (reason, atMs)'),
-    src.indexOf('beginSuspension: (reason, atMs)') + 1200,
-  )));
-check('activeSuspension returns the full episode shape',
-  src.includes('SELECT episode_id, started_at_ms, ended_at_ms, reason, frozen_macro_index'));
+  && src.includes('endSuspension: (atMs)'));
+check('opening a second episode is refused in the store, not only in SQL',
+  /beginSuspension[\s\S]{0,400}?openSuspension\(d\) !== null[\s\S]{0,200}?throw new Error/.test(src));
+// The app is a coach in the athlete's pocket: suspension freezes PROGRESSION,
+// never training. Nothing in the suspension path may reach dose.
+check('suspension carries no dose modifier of its own',
+  !/suspension[\s\S]{0,600}?(dLoad|dRpe|dSet|multiplier|deload)/i.test(
+    src.slice(src.indexOf('beginSuspension: (reason, atMs)'),
+              src.indexOf('beginSuspension: (reason, atMs)') + 1400)));
+// Scoped to the suspension implementation: 'expired' appears in unrelated prose
+// about block expiry elsewhere in this file, and a whole-file match is noise.
+const SUSP_ANCHOR = 'beginSuspension: (reason, atMs)';
+const suspensionSlice = src.slice(src.indexOf(SUSP_ANCHOR), src.indexOf(SUSP_ANCHOR) + 1400);
+check('no auto-expiry: nothing closes an episode on elapsed time',
+  suspensionSlice.length > 0
+  && !/autoResume|expire|setTimeout|setInterval/i.test(suspensionSlice));
+check('the episode timestamp is supplied by the caller, never read from a clock',
+  !/Date\.now|new Date/.test(suspensionSlice));
 
 check(
   'planned completion is joined through exact session_origin provenance and immutable session_outcome',
@@ -358,14 +633,18 @@ console.log('[autopilot attribution hydration]');
 const slotHydrationSql = statements.find((sql) =>
   sql.includes('SELECT sl.slot_index') && sql.includes('planned_slot_autopilot'),
 );
+const attributionInsertSql = statements.find((sql) =>
+  sql.includes('INSERT INTO planned_slot_autopilot'),
+);
 a('store exposes the planned-slot attribution hydration SQL', Boolean(slotHydrationSql));
-if (slotHydrationSql) {
+a('store exposes the planned-slot attribution persistence SQL', Boolean(attributionInsertSql));
+if (slotHydrationSql && attributionInsertSql) {
   db.exec('BEGIN');
   db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (930,'Attribution Squat','squat',1),(931,'Untouched Press','push_h',1)");
   db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (930, '2030-03-01','strength',0)");
   db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (930,930,1,1,'lower','accumulation','2030-03-01')");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (930,930,1,930,3,5,7.5),(931,930,2,931,3,5,7.5)");
-  db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (930,-0.5,-1,'eased')");
+  db.prepare(attributionInsertSql).run(930, -0.5, -1, 'eased');
   const hydratedSlots = db.prepare(slotHydrationSql).all(930);
   a('store hydration round-trips one delta and leaves an untouched slot absent',
     hydratedSlots.length === 2
@@ -379,48 +658,6 @@ if (slotHydrationSql) {
   db.exec('ROLLBACK');
 }
 
-const plannedSlotInsertSql = statements.find((sql) =>
-  sql.includes('INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES'));
-const attributionInsertSql = statements.find((sql) =>
-  sql.includes('INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES'));
-a('store exposes the exact planned-slot and attribution INSERT statements',
-  Boolean(plannedSlotInsertSql) && Boolean(attributionInsertSql));
-if (plannedSlotInsertSql && attributionInsertSql) {
-  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (940,'Atomic Attribution Squat','squat',1)");
-  db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (940,'2030-04-01','strength',0)");
-  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (940,940,1,1,'lower','accumulation','2030-04-01')");
-  db.exec('BEGIN');
-  db.prepare(plannedSlotInsertSql).run(940, 1, 940, 2, 5, 7.5);
-  const validPlannedSlotId = Number(db.prepare('SELECT last_insert_rowid() AS id').get().id);
-  db.prepare(attributionInsertSql).run(validPlannedSlotId, -0.5, -1, 'eased');
-  db.exec('COMMIT');
-  const validAttribution = db.prepare(
-    'SELECT ps.sets, pa.rpe_delta, pa.set_delta, pa.reason FROM planned_slot ps JOIN planned_slot_autopilot pa USING (planned_slot_id) WHERE ps.planned_slot_id = ?',
-  ).get(validPlannedSlotId);
-  a('production plan transaction stores the exact effective target and attribution together',
-    Number(validAttribution?.sets) === 2
-      && Number(validAttribution?.rpe_delta) === -0.5
-      && Number(validAttribution?.set_delta) === -1
-      && validAttribution?.reason === 'eased',
-    JSON.stringify(validAttribution));
-
-  let poisonedPlannedSlotId = 0;
-  let poisonedInsertRejected = false;
-  db.exec('BEGIN');
-  try {
-    db.prepare(plannedSlotInsertSql).run(940, 2, 940, 3, 5, 7.5);
-    poisonedPlannedSlotId = Number(db.prepare('SELECT last_insert_rowid() AS id').get().id);
-    db.prepare(attributionInsertSql).run(poisonedPlannedSlotId, 0, 0, 'raised');
-    db.exec('COMMIT');
-  } catch {
-    poisonedInsertRejected = true;
-    db.exec('ROLLBACK');
-  }
-  a('invalid attribution rolls its parent planned slot back atomically',
-    poisonedInsertRejected && poisonedPlannedSlotId > 0
-      && Number(db.prepare('SELECT COUNT(*) AS c FROM planned_slot WHERE planned_slot_id = ?').get(poisonedPlannedSlotId).c) === 0);
-  db.exec('DELETE FROM training_block WHERE block_id = 940; DELETE FROM movement WHERE movement_id = 940');
-}
 // --- [Phase 13 Step 4] immutability + bounded-read source invariants -------------
 console.log('[autopilot wiring invariants]');
 const stripComments = (s) => s.replace(/\/\/[^\n]*/g, '');
@@ -434,47 +671,194 @@ a('the ONLY write targets are forward plan/program tables plus weekly frequency'
   [...gnb.matchAll(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi)]
     .every((m) => ['training_block', 'block_meta', 'planned_session', 'planned_slot', 'planned_slot_target',
       'training_program', 'training_program_day', 'training_program_movement_preference',
-      'training_block_program', 'planned_slot_autopilot', 'athlete_profile'].includes(m[1])));
-const hydRaw = (() => {
-  const i = src.indexOf('const hydrateAutopilotFlawReport =');
-  const j = src.indexOf('interface PendingProgramCreation', i);
-  return i >= 0 && j > i ? src.slice(i, j) : '';
-})();
-const hyd = stripComments(hydRaw);
-a('preview and committed generation share the exact autopilot hydration helper',
-  previewProgramBody.includes('hydrateAutopilotFlawReport(')
-    && gnbRaw.includes('hydrateAutopilotFlawReport('));
+      'training_block_program', 'planned_slot_autopilot', 'athlete_profile',
+      // 059, both forward-plan side-cars: the suspension attribution for the
+      // block being minted, and this plan's prospective per-slot load intent.
+      'block_suspension_origin', 'planned_slot_load_intent'].includes(m[1])));
+const hyd = stripComments((() => { const i = gnbRaw.indexOf('autopilot hydration'); const j = gnbRaw.indexOf('generateBlock({'); return i >= 0 && j > i ? gnbRaw.slice(i, j) : ''; })());
 a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match(/GROUP BY s\.session_date, m\.pattern/g) || []).length === 1);
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
 a('bounded: the set-aggregate carries a session_date window predicate', /WHERE s\.session_date >= \? AND s\.session_date <= \?/.test(hyd));
 a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for\s*\(|\.forEach\s*\(|\.map\s*\()[^;{]*executeSync/.test(hyd));
-a('generated slot set caps are applied before persistence and attribution',
-  previewProgramBody.includes('set_cap: m.timePolicy?.defaultSets')
-    && gnbRaw.includes('set_cap: m.timePolicy?.defaultSets')
-    && gnbRaw.includes('const plannedSets = sl.sets;'));
+
+// --- [Work Order C] Next Block Panel read-only store invariants ----------------
+console.log('[Work Order C — Next Block Panel store invariants]');
+const getAdjustmentsRaw = (() => {
+  const i = src.indexOf('getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[]');
+  const j = src.indexOf('\n  },', i);
+  return i >= 0 && j > i ? src.slice(i, j) : '';
+})();
+const getAdjustmentsBody = stripComments(getAdjustmentsRaw);
+a('getPendingAutopilotAdjustments body located', getAdjustmentsBody.length > 0);
+a('NULL-DB GUARD: getPendingAutopilotAdjustments returns [] when database is null / unbooted',
+  /if\s*\(\s*db\s*===\s*null\s*\)\s*return\s*\[\s*\];/.test(getAdjustmentsBody));
+a('READ-ONLY: getPendingAutopilotAdjustments contains NO INSERT, UPDATE, or DELETE statements',
+  !/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b/i.test(getAdjustmentsBody));
+
+const adjustmentsQuerySql = statements.find((sql) =>
+  sql.includes('FROM planned_slot_autopilot') && sql.includes('JOIN movement') && sql.includes("WHERE tb.status = 'active'"),
+);
+a('store exposes the next block autopilot adjustments query SQL', Boolean(adjustmentsQuerySql));
+a('refreshBlock stores pendingAutopilotAdjustments in store state',
+  /pendingAutopilotAdjustments\s*=\s*get\(\)\.getPendingAutopilotAdjustments\(\)/.test(src));
+if (adjustmentsQuerySql) {
+  db.exec('BEGIN');
+  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (940,'Overhead Barbell Press','push_v',1),(941,'Barbell Deadlift','hinge',1)");
+  db.exec("INSERT INTO training_block (block_id,start_date,objective,status,created_at_ms) VALUES (940, '2030-04-01','strength','active',0)");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (940,940,1,1,'upper','accumulation','2030-04-01'),(941,940,1,2,'lower','accumulation','2030-04-02')");
+  db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (940,940,1,940,3,5,7.5),(941,941,1,941,3,5,7.5)");
+  db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (940,-0.5,-1,'eased'),(941,0.5,1,'raised')");
+  const adjustmentsRows = db.prepare(adjustmentsQuerySql).all();
+  a('getPendingAutopilotAdjustments returns exactly the seeded rows with byte-identical reason',
+    adjustmentsRows.length === 2
+      && adjustmentsRows[0].planned_slot_id === 940
+      && adjustmentsRows[0].movement_name === 'Overhead Barbell Press'
+      && adjustmentsRows[0].reason === 'eased'
+      && adjustmentsRows[1].planned_slot_id === 941
+      && adjustmentsRows[1].movement_name === 'Barbell Deadlift'
+      && adjustmentsRows[1].reason === 'raised',
+    JSON.stringify(adjustmentsRows));
+  db.exec('ROLLBACK');
+}
+
+// --- Calibration Policy v1 store invariants -------------------------------------
+console.log('[Calibration Policy v1 store invariants]');
+a('source tripwire: "recentAcwr" does not appear in useStore.ts', !src.includes('recentAcwr'));
+a('boot rematerialization loop window is exactly 14 days', /demoDates\(localToday\(\),\s*14\)/.test(src));
+
+// --- R4: every load-preference writer shares ONE fail-closed policy -------------
+console.log('[R4 load-preference write policy]');
+{
+  // Anchor on the IMPLEMENTATION (it has destructured params) — not the
+  // interface declaration, which appears first in the file.
+  const onboardingBody = stripComments((() => {
+    const i = src.indexOf('completeOnboarding: (patch, athleteName, loadPreference');
+    return i < 0 ? '' : src.slice(i, src.indexOf('\n  },', i));
+  })());
+  a('completeOnboarding body located', onboardingBody.length > 0);
+  a('completeOnboarding consults the shared refusal policy before writing',
+    onboardingBody.includes('loadPreferenceWriteRefusal('));
+  a('completeOnboarding refuses BEFORE opening its transaction (no partial write)',
+    onboardingBody.indexOf('loadPreferenceWriteRefusal(') <
+      onboardingBody.indexOf("d.executeSync('BEGIN')"));
+  a('the refusal is keyed on an active session',
+    /loadPreferenceWriteRefusal\(\{\s*sessionActive: get\(\)\.session !== null/.test(onboardingBody));
+  // Both writers must resolve the SAME policy; a second inline guard would drift.
+  a('exactly the two known writers reach persistLoadPreferenceRow',
+    [...src.matchAll(/persistLoadPreferenceRow\(/g)].length === 1,
+    `${[...src.matchAll(/persistLoadPreferenceRow\(/g)].length} direct call(s) in useStore`);
+}
+
+// --- e1RM store surface: REMOVED (R10 + R5) --------------------------------------
+// getMovementE1rmSeries loaded every historical set for a movement with no LIMIT and
+// no date predicate, then allocated a Map, an array and a sort over that result —
+// an allocation scaling with history, which the ratified memory ceiling forbids (512 MiB
+// hard, 450,000,000 B preferred target — see tools/memory-audit/budget.json). It had no
+// runtime consumer, so the surface was withdrawn rather than bounded with an
+// unratified window. The pure derivation in packages/inference/src/e1rm.ts remains
+// and is still gated in verify_blocks.mjs [8b].
+// DEFERRED with it (not fixed): R5's imported-set inclusion and missing/partial
+// coverage metadata. Re-landing this surface requires a ratified history window,
+// source-scoped session/set keys (native and imported ids can collide) and explicit
+// provenance — see docs/decisions/TRAINING_PROGRESSION_LAYERS.md.
+a('the unbounded e1RM store getter is not reintroduced without a ratified window',
+  !src.includes('getMovementE1rmSeries'));
 
 // --- resetTrainingData: EXECUTE the store's wipe on seeded data -----------------
 // Proves the reset clears ALL history (so the demo can re-load) while KEEPING the
 // athlete_profile + movement library (the user's settings survive).
+// --- OW-011: 057 is in the chain, and it is actually ENFORCING ------------------
+// Adding the file to SCHEMA_FILES would be cosmetic if nothing proved the
+// triggers are live. The store writes block_meta on every generated block, so
+// this verifier must reject the exact phase/index drift the device rejects.
+{
+  const phaseOf = (i) => (i <= 2 ? 'gpp' : i <= 4 ? 'hypertrophy' : i <= 6 ? 'volume' : 'peak');
+  const refusedHere = (sql) => { try { db.exec(sql); return false; } catch { return true; } };
+  db.exec("INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms) VALUES (911, '2030-06-01', 'strength', 4, 'archived', 1)");
+  a('057 in chain: a matched block_meta pair is accepted',
+    !refusedHere(`INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (911, 3, '${phaseOf(3)}', 'WAVE', 0)`));
+  // The captured field row was (macro_block_index=3, macro_phase='volume'); the
+  // production mapping requires index 3 -> hypertrophy.
+  db.exec("INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms) VALUES (912, '2030-06-01', 'strength', 4, 'archived', 1)");
+  a('057 in chain: the captured drift (index 3, volume) is REFUSED on insert',
+    refusedHere("INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (912, 3, 'volume', 'WAVE', 0)"));
+  a('057 in chain: drifting an existing row by UPDATE is REFUSED',
+    refusedHere("UPDATE block_meta SET macro_phase = 'volume' WHERE block_id = 911"));
+  db.exec('DELETE FROM block_meta WHERE block_id IN (911, 912)');
+  db.exec('DELETE FROM training_block WHERE block_id IN (911, 912)');
+}
+
 console.log('[resetTrainingData — executed against seeded rows]');
 const resetBody = (() => {
   const i = src.indexOf('resetTrainingData: () => {');
-  const j = src.indexOf('loadDemoAthlete: () => {', i);
+  // R8 §2.2 gave loadDemoAthlete an explicit return type
+  // ((): DemoLoadResult => {...}); match it with or without the annotation.
+  const j = src.indexOf("loadDemoAthlete: (", i);
   return i >= 0 && j > i ? src.slice(i, j) : '';
 })();
 const resetTables = [...resetBody.matchAll(/DELETE FROM (\w+)'/g)].map((m) => m[1]);
 a('resetTrainingData body found with its unconditional DELETEs', resetTables.length >= 15, `${resetTables.length} tables`);
 a('reset NEVER clears athlete_profile / movement / profile_slot (settings survive)',
   !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
+a('reset NEVER clears the load preference (035) or UI preferences (023) — profile settings survive',
+  !['profile_load_preference', 'profile_ui_preference'].some((t) => resetTables.includes(t)));
 a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',
   resetTables.includes('planned_slot_autopilot'));
+a('reset explicitly clears frozen legacy-role snapshots before their planned slots',
+  resetTables.includes('planned_slot_legacy_role_allowance')
+    && resetTables.indexOf('planned_slot_legacy_role_allowance') < resetTables.indexOf('planned_slot'));
 a('reset removes each immutable side-car only after its parent',
   resetTables.indexOf('set_record') >= 0
     && resetTables.indexOf('set_dose_target') > resetTables.indexOf('set_record')
     && resetTables.indexOf('session') >= 0
     && resetTables.indexOf('session_outcome') > resetTables.indexOf('session'));
+// 062 applies the same rule to the 059 side-cars, and here it is enforced by
+// the database rather than by convention: both are undeletable while a parent
+// survives, so naming either one before training_program / training_block
+// aborts the reset instead of wiping live suspension attribution. With FKs ON
+// the parent cascades have already emptied them and these two statements are
+// no-ops; they exist for the FK-OFF path, where a surviving
+// block_suspension_origin row would attribute a BRAND NEW post-reset block
+// (training_block reuses rowids once emptied) and hide it from
+// nextMacroPosition for good.
+a('reset clears all three 059 side-cars',
+  ['suspension_episode_program', 'block_suspension_origin', 'planned_slot_load_intent']
+    .every((t) => resetTables.includes(t)),
+  resetTables.filter((t) => t.startsWith('suspension_') || t.startsWith('block_susp') || t === 'planned_slot_load_intent').join(',') || 'none named');
+// planned_slot_id is INTEGER PRIMARY KEY with no AUTOINCREMENT, so ids are
+// REUSED once planned_slot is emptied. An intent row orphaned by an FK-OFF reset
+// would re-attach a declared implement to a brand new slot the athlete never
+// chose it for. Deleted with the other planned_slot children, before the parent.
+a('reset clears the L1(a) load intent before its planned_slot parent',
+  resetTables.indexOf('planned_slot_load_intent') >= 0
+    && resetTables.indexOf('planned_slot') >= 0
+    && resetTables.indexOf('planned_slot_load_intent') < resetTables.indexOf('planned_slot'));
+a('reset clears the 059 side-cars only AFTER training_program and training_block',
+  resetTables.indexOf('training_program') >= 0
+    && resetTables.indexOf('training_block') >= 0
+    && resetTables.indexOf('suspension_episode_program') > resetTables.indexOf('training_program')
+    && resetTables.indexOf('block_suspension_origin') > resetTables.indexOf('training_block'));
+// The open episode is deleted CONDITIONALLY (059 refuses a closed one, and that
+// abort would roll the whole reset back), so it never appears in resetTables —
+// which is why it is asserted against the body text instead.
+// Exactly ONE suspension_episode delete, and it is the conditional one. Counting
+// is what makes this future-proof: a later unconditional or IS NOT NULL delete
+// would satisfy a presence-plus-absence pair while aborting the whole reset at
+// 059's no-delete-closed trigger. `\b` does not match inside
+// suspension_episode_program, because `_` is a word character.
+const episodeDeletes = [...resetBody.matchAll(/DELETE FROM suspension_episode\b[^']*/g)].map((m) => m[0]);
+a('reset issues exactly ONE suspension_episode delete, and it is the open-episode one',
+  episodeDeletes.length === 1
+    && episodeDeletes[0] === 'DELETE FROM suspension_episode WHERE ended_at_ms IS NULL',
+  episodeDeletes.join(' | ') || 'none');
+a('the open-episode delete precedes training_program and training_block',
+  resetBody.indexOf('DELETE FROM suspension_episode WHERE') >= 0
+    && resetBody.indexOf('DELETE FROM suspension_episode WHERE') < resetBody.indexOf("DELETE FROM training_program'")
+    && resetBody.indexOf('DELETE FROM suspension_episode WHERE') < resetBody.indexOf("DELETE FROM training_block'"));
+a('reset re-reads suspension into memory after the wipe',
+  /refreshSuspension\(\)/.test(resetBody));
 if (resetTables.length >= 15) {
   const MAT = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8').replace(/^--.*$/gm, '');
   db.exec('BEGIN');
@@ -497,15 +881,17 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO planned_session_method (planned_session_id,schema_type,routine_template_id,template_name,frozen_at_ms) VALUES (701,'APRE',NULL,'Reset probe',0)");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
   db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (701,-0.5,-1,'eased')");
+  db.exec("INSERT INTO planned_slot_routine_decision (planned_slot_id,role,lift_family,stress_purpose,stress_coefficient,equivalent_volume,stress_dose,adaptations_json) VALUES (701,'supplementary',NULL,NULL,0,0,0,'[]')");
+  db.exec("INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id,role) VALUES (701,'supplementary')");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
   a('reset cleared EVERY history table (demo can re-load)', resetTables.every((t) => cnt(t) === 0), seeded.map((t) => `${t}=${cnt(t)}`).filter((s) => !s.endsWith('=0')).join(',') || 'all empty');
   a('athlete_profile + movement library SURVIVE the reset',
-    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 124, // 30 shipped + 51 (016) + 15 (017) + 13 (019) + 15 (020)
+    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 300,
     `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}`);
   db.exec('ROLLBACK');
 }
@@ -534,8 +920,16 @@ if (resetTables.length >= 15) {
     ['boot is single-flight', 'bootInFlight'],
     ['registry write failures surface to the athlete', 'registry write failed'],
     ['time-mode movements enforce seconds at the log boundary', 'is time-based'],
+    ['set logging rejects non-finite or negative load at the store boundary', 'Enter a finite load of 0 kg or more before logging the set.'],
     ['boot resumes an unfinished session (crash recovery)', 'RESUMES it on restart'],
     ['missing readiness vector clears the stale prescription', "vector === null) { set({ prescription: null })"],
+    ['direct preference saves delegate to the executable production seam', 'executeDirectLoadPreferenceSave('],
+    ['profile transitions delegate to the executable production seam', 'planProfileLoadTransition('],
+    ['guarded profile persistence delegates to the executable production seam', 'executeProfileLoadSave('],
+    ['preference hydration delegates to the executable production seam', 'readActiveLoadPreference('],
+    ['same-as-default explicit choices are persisted independently', 'loadPreferenceExplicit: prefExplicit'],
+    ['current-session carry-forward chooses the latest logged set', 'candidate.set_id > latest.set_id'],
+    ['screens resolve loads through the pure resolver', 'resolveLoadSelection('],
   ];
   for (const [label, needle] of guards) {
     const ok = src.includes(needle);
@@ -565,7 +959,8 @@ if (resetTables.length >= 15) {
     '026_phase18_session_outcome.sql', '027_operational_safeguards.sql',
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
-    '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql'
+    '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
+    '035_profile_load_preference.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
@@ -707,6 +1102,54 @@ if (resetTables.length >= 15) {
     lDb.exec("ROLLBACK;");
   }
   check('lifecycle test: transaction rolls back on constraint violation', transactionThrew);
+
+  // Sol R4 F4: execute the store's REAL post-session summary SELECT (extracted
+  // from useStore.ts, not re-typed) against this lifecycle, which already holds
+  // a planned set (slot 1) and a substituted set (slot 2). The summary groups by
+  // movement, so it must carry each set's slot identity for the pure
+  // groupSummaryExercises to attribute planned_sets per SLOT.
+  {
+    const sqlStart = src.indexOf('`SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,');
+    const sqlEnd = src.indexOf('ORDER BY sr.movement_id, sr.set_index`', sqlStart);
+    const summarySql = sqlStart >= 0 && sqlEnd > sqlStart
+      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.movement_id, sr.set_index'.length)
+      : '';
+    check('F4: summary set SELECT located in useStore.ts', summarySql.length > 0);
+    let summaryRows = [];
+    try { summaryRows = summarySql.length > 0 ? lDb.prepare(summarySql).all(1) : []; } catch (e) { summaryRows = []; }
+    const slotIdsOk = summaryRows.length >= 2
+      && summaryRows.every((r) => 'session_plan_slot_id' in r)
+      && summaryRows.some((r) => r.session_plan_slot_id === 1)
+      && summaryRows.some((r) => r.session_plan_slot_id === 2);
+    check('F4: summary SELECT returns each set\'s session_plan_slot_id (planned slot 1 and substituted slot 2)', slotIdsOk);
+
+    // PR #13 review: the lifecycle's two slots both plan 3 sets, so a wrong
+    // slot-to-value join would still pass. An ISOLATED session with DISTINCT
+    // planned_sets (4 vs 2) proves each set is joined to its OWN slot's value.
+    // Slot 72 was substituted from 901 to 902 mid-slot, so it holds sets of
+    // both movements — the exact F4 shape.
+    lDb.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (7, '2026-07-16', 2000000);");
+    lDb.exec(`INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date)
+              VALUES (71, 7, 0, 901, 4, 5, 'planned', 8.0, 101, null, '2026-07-16');`);
+    lDb.exec(`INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date)
+              VALUES (72, 7, 1, 902, 2, 5, 'substituted', 8.0, 102, 901, '2026-07-16');`);
+    const seed = [[701, 901, 1, 71], [702, 901, 2, 72], [703, 902, 3, 72]];
+    for (const [setId, movementId, setIndex, slotId] of seed) {
+      lDb.exec(`INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (${setId}, 7, ${movementId}, ${setIndex}, 5, 60.0, 8.0, ${2000000 + setIndex});`);
+      lDb.exec(`INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (${setId}, ${slotId}, 'planned', 8.0, ${slotId === 71 ? 101 : 102}, ${2000000 + setIndex});`);
+    }
+    let isolated = [];
+    try { isolated = summarySql.length > 0 ? lDb.prepare(summarySql).all(7) : []; } catch (e) { isolated = []; }
+    const expectedPlanned = { 71: 4, 72: 2 };
+    const slotValuesOk = isolated.length === 3
+      && isolated.every((r) => r.session_plan_slot_id in expectedPlanned
+        && r.planned_sets === expectedPlanned[r.session_plan_slot_id]);
+    check('F4: each summary row carries the planned_sets of ITS OWN slot (slot 71 → 4, slot 72 → 2), never of another slot', slotValuesOk);
+    const slotCounts = isolated.reduce((m, r) => ({ ...m, [r.session_plan_slot_id]: (m[r.session_plan_slot_id] ?? 0) + 1 }), {});
+    const substitutedOk = slotCounts[71] === 1 && slotCounts[72] === 2
+      && isolated.filter((r) => r.session_plan_slot_id === 72).map((r) => r.movement_id).sort().join(',') === '901,902';
+    check('F4: the substituted slot 72 carries sets of BOTH movements under one slot id', substitutedOk);
+  }
   if (!transactionThrew) fail += 1;
 
   // --- P1 #1 regression: training-block delete must not fail due to FK/CHECK clash --------
@@ -789,6 +1232,21 @@ if (resetTables.length >= 15) {
   const persistOutcomeBody = sliceBetween('const persistSessionOutcome =', 'const applyApreFinalization =');
   const applyApreBody = sliceBetween('const applyApreFinalization =', 'const runnerSelection =');
   const endSessionBody = sliceBetween('endSession: () => {', 'computePrescription: (_patterns) => {');
+  const continueProgramBody = sliceBetween('continueTrainingProgram: () => {', 'archiveTrainingProgram: () => {');
+
+  // `error` is SHARED store state and BlockScreen settles its continuation
+  // confirmation on it, so a terminal continuation that succeeds while a stale
+  // error is still set would be reported to the athlete as a failure. The
+  // non-terminal path clears it before generating; the terminal path must clear
+  // it after COMMIT and before the refreshes, so that an error raised BY a
+  // refresh still surfaces.
+  a('the terminal program-continuation body is located', continueProgramBody.length > 0);
+  a('a successful terminal continuation clears the shared error before refreshing',
+    ordered(continueProgramBody, [
+      "d.executeSync('COMMIT')",
+      'set({ error: null })',
+      'get().refreshBlock()',
+    ]));
 
   a('Phase 18 implementation bodies are located',
     [logSetBody, editSetBody, hydrateBody, persistOutcomeBody, applyApreBody, endSessionBody]
@@ -1222,42 +1680,210 @@ if (resetTables.length >= 15) {
     db.exec('ROLLBACK');
   }
 
-  // --- [F2] Android 16 KB ELF audit fail-closed contract ---
-  console.log('[Android ELF alignment audit contract]');
-  const elfAuditSrc = readFileSync(join(ROOT, 'tools', 'inspect_elf_alignment.sh'), 'utf-8');
-  a(
-    'zipalign receives a Windows-compatible APK path and a failed check marks the audit failed',
-    elfAuditSrc.includes('WINAPK="$(cygpath -w "$APK"')
-      && elfAuditSrc.includes('"$ZIPALIGN" -c -P 16 4 "$WINAPK"')
-      && /zipalign -P 16: FAIL[\s\S]{0,80}FAIL=1/.test(elfAuditSrc),
-  );
-  a(
-    'every ELF64 PT_LOAD segment is checked exactly and unknown inspection state fails closed',
-    elfAuditSrc.includes('for segment_align in')
-      && elfAuditSrc.includes('if [ "$segment_align" != "0x4000" ]')
-      && !elfAuditSrc.includes('*0x4000*')
-      && elfAuditSrc.includes('unknown ELF class')
-      && elfAuditSrc.includes('zero 64-bit libraries inspected'),
-  );
+  // --- [T6] 051 prior-experience lifecycle + state propagation --------------
+  console.log('[051 prior-experience lifecycle and context propagation]');
+  const experienceUpsertSql = statements.find((s) => s.includes('INSERT INTO movement_prior_experience'));
+  const experienceRevokeSql = statements.find((s) => s.includes('UPDATE movement_prior_experience'));
+  a('store exposes the reconfirming UPSERT and non-destructive revoke SQL',
+    Boolean(experienceUpsertSql) && Boolean(experienceRevokeSql));
+  if (experienceUpsertSql && experienceRevokeSql) {
+    db.exec('BEGIN');
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (973,'Experience Target','push_v',1)");
+    db.prepare(experienceUpsertSql).run(973, 100);
+    let declaration = db.prepare('SELECT * FROM movement_prior_experience WHERE movement_id = 973').get();
+    a('confirmation creates one active local declaration', declaration?.confirmed_at_ms === 100
+      && declaration?.revoked_at_ms === null && declaration?.basis === 'local_user_confirmation');
+    db.prepare(experienceRevokeSql).run(200, 973);
+    declaration = db.prepare('SELECT * FROM movement_prior_experience WHERE movement_id = 973').get();
+    a('revocation preserves the row and records an ordered timestamp', declaration?.confirmed_at_ms === 100
+      && declaration?.revoked_at_ms === 200);
+    db.prepare(experienceUpsertSql).run(973, 300);
+    declaration = db.prepare('SELECT * FROM movement_prior_experience WHERE movement_id = 973').get();
+    a('reconfirmation updates the timestamp and clears revocation', declaration?.confirmed_at_ms === 300
+      && declaration?.revoked_at_ms === null);
+    db.exec('ROLLBACK');
+  }
+  a('training-data reset deletes declarations but block/profile-slot wipes preserve them',
+    src.includes("d.executeSync('DELETE FROM movement_prior_experience')")
+      && !src.slice(src.indexOf('const runBlockWipe ='), src.indexOf('const defaultUiPreferences'))
+        .includes('movement_prior_experience')
+      && !src.slice(src.indexOf('switchProfile: (slotId)'), src.indexOf('resolveGoalRung:'))
+        .includes('movement_prior_experience'));
+  a('availability revision is independent of refreshVector and updates on declarations, attestations, imports, finalization, and reset',
+    (src.match(/movementAvailabilityRevision: state\.movementAvailabilityRevision \+ 1/g) ?? []).length >= 5
+      && src.includes('movementAvailabilityRevision: get().movementAvailabilityRevision + 1')
+      && !src.slice(
+        src.indexOf('  confirmMovementPriorExperience: (movementId, context) => {'),
+        src.indexOf('  // --- Coach Mode (Phase 15)'),
+      )
+        .includes('refreshVector()'));
+  const startBody = src.slice(src.indexOf('startSession: (repeatPlanned)'), src.indexOf('selectMovement: (movementId)'));
+  a('start computes consumePlan before validating only the plan it will consume',
+    startBody.indexOf('const consumePlan') >= 0
+      && startBody.indexOf('const planToConsume') > startBody.indexOf('const consumePlan')
+      && startBody.indexOf('planToConsume !== null && planToConsume.slots.some') > startBody.indexOf('const planToConsume'));
+  a('Beginner routine provenance survives source-template deletion and still blocks start',
+    startBody.includes('SELECT psm.routine_template_id, prc.routine_day_index')
+      && startBody.includes("routineProvenance !== undefined && profile.training_age === 'beginner'")
+      && !startBody.includes("profile.training_age === 'beginner' && routineProvenance?.routine_template_id"));
+  a('routine start fails closed when source roles are missing, ambiguous, or no longer eligible',
+    startBody.includes('const frozenTemplateRoles =')
+      && startBody.includes('const currentRoleEligibility = routineRoleEligibility(d)')
+      && startBody.includes('isRoutineRoleSnapshotExecutable('));
+  a('routine start revalidates the frozen contextual family role contract',
+    startBody.includes('const planningContract = routinePlanningContract(d)')
+      && startBody.includes('contextualRoutineRoles(')
+      && startBody.includes('planned_slot_routine_decision'));
+  a('active sessions persist one frozen access context and restoration derives planned focus or free-form weight room',
+    src.includes('activeSessionAccessContext: executionContext')
+      && src.includes('activeSessionAccessContext: restoredAccessContext')
+      && src.includes("restoredOrigin?.origin_kind === 'planned'")
+      && src.includes("? accessContextForBlockFocus(restoredOrigin.focus as BlockFocus)")
+      && src.includes(": 'weight_room'"));
+
+  // --- [T7] logSet access boundary: ORDERING pin -----------------------------
+  // The behaviour is proved executably against the real store, the real
+  // migration chain and the real capability law in
+  // apps/mobile/test/components/SessionAccessBoundary.test.js. What a
+  // behavioural test can only show indirectly is WHERE the guard sits, so pin
+  // the ordering here: after the identity/halt checks, before the runner
+  // advance, and before the write transaction opens.
+  console.log('[logSet store-boundary access revalidation]');
+  const logSetAccessBody = src.slice(src.indexOf('  logSet: (movementId, reps, loadKg, rpe,'), src.indexOf('  deleteSet: (setId)'));
+  const atGuard = logSetAccessBody.indexOf('const logAccessContext = executionContextForState(state);');
+  const atVerdict = logSetAccessBody.indexOf('const logAvailability = capabilityMovementAvailability(');
+  const atIdentity = logSetAccessBody.indexOf("set({ error: 'This set is not the current session step.' });");
+  const atHalt = logSetAccessBody.indexOf("set({ error: 'Training is halted. Finish the session before logging more work.' });");
+  const atAdvance = logSetAccessBody.indexOf('advanceSessionRunner(state.runner, {');
+  const atBegin = logSetAccessBody.indexOf("d.executeSync('BEGIN');");
+  a('logSet resolves the frozen access context and one shared capability verdict',
+    atGuard >= 0 && atVerdict >= 0);
+  a('logSet revalidates AFTER the slot-identity and halt guards',
+    atHalt >= 0 && atIdentity >= 0 && atGuard > atIdentity && atGuard > atHalt);
+  a('logSet revalidates BEFORE the runner advance and before the write transaction',
+    atAdvance > atVerdict && atBegin > atVerdict);
+  a('logSet fails closed on a missing verdict and never infers a fallback context',
+    logSetAccessBody.includes("if (logAvailability?.state !== 'available') {")
+      && logSetAccessBody.includes('set({ error: formatTeachingOnlyReason(logAvailability) });')
+      && logSetAccessBody.includes('The active session access context cannot be verified. Reopen the session before logging more work.')
+      && !/logAccessContext\s*(\?\?|\|\|)\s*'weight_room'/.test(logSetAccessBody));
+  a('logSet feeds the shared law the live profile, niggles and prior-experience declarations',
+    logSetAccessBody.includes('state.movements,')
+      && logSetAccessBody.includes('state.profile,')
+      && logSetAccessBody.includes('new Set(state.activePriorExperienceMovementIds),')
+      && logSetAccessBody.includes('safetyExcludedMovementIdsFor(state.movements, state.profile, state.niggles),'));
 
   // --- [F3] Gate count & documentation drift assertion ---
   console.log('[documentation & CI gate count drift check]');
   const pkgJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
-  const verifyAllScript = pkgJson.scripts['verify:all'] ?? '';
-  const verifyInvocations = (verifyAllScript.match(/npm run verify:(?!all\b)[a-z0-9-]+/g) ?? []).length;
+  const verifyCiScript = pkgJson.scripts['verify:ci'] ?? '';
+  const verifyComponentsScript = pkgJson.scripts['verify:components'] ?? '';
+  const verifyInvocations = (verifyCiScript
+    .match(/npm run verify:(?!all\b|ci\b|release\b)[a-z0-9-]+/g) ?? []).length;
 
   const agentWorkflowContent = readFileSync(join(ROOT, 'AGENT_WORKFLOW.md'), 'utf-8');
   const ciYmlContent = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf-8');
 
-  const workflowMatch = agentWorkflowContent.match(/npm run verify:all\s+#\s+(\d+)\s+gates/);
+  const workflowMatch = agentWorkflowContent.match(/npm run verify:ci\s+#\s+(\d+)\s+gates/);
   const workflowGateCount = workflowMatch ? Number(workflowMatch[1]) : null;
 
   const ciMatches = Array.from(ciYmlContent.matchAll(/\((\d+)\s+gates/g));
   const ciGateCounts = ciMatches.map((m) => Number(m[1]));
 
-  a('verify:all script invokes exactly 20 verify:* targets', verifyInvocations === 20, `got ${verifyInvocations}`);
-  a('AGENT_WORKFLOW.md documents exact verify:all gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
-  a('ci.yml documents exact verify:all gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
+  // 23 since verify:preparation joined the suite (session-time contract + preparation policy);
+  // 24 since verify:native-config (static iOS/native contract, 2026-10-04 integration).
+  a('verify:ci script invokes exactly 24 verify:* targets', verifyInvocations === 24, `got ${verifyInvocations}`);
+  a('verify:components bypasses stale transformed migration caches',
+    /(?:^|\s)--no-cache(?:\s|$)/.test(verifyComponentsScript), verifyComponentsScript);
+  a('AGENT_WORKFLOW.md documents exact verify:ci gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
+  a('ci.yml documents exact verify:ci gate count at all occurrences', ciGateCounts.length >= 1 && ciGateCounts.every((c) => c === verifyInvocations), `ci.yml counts: ${ciGateCounts.join(',')}`);
+
+  // --- [F3b] merge-vs-release separation (ratified 2026-08-24) --------------
+  // verify:ci is the DETERMINISTIC host suite and must be green to merge.
+  // verify:release adds the two checks CI structurally cannot make honestly:
+  // the ratified memory contract [A] and measured device evidence [D], which
+  // needs an authorized packet no runner possesses. Keeping them in separate
+  // scripts is the whole point; silently folding either back into verify:ci,
+  // or quietly dropping one from verify:release, is the drift this gate exists
+  // to catch.
+  const releaseScript = pkgJson.scripts['verify:release'] ?? '';
+  const ciScript = pkgJson.scripts['verify:ci'] ?? '';
+  a('verify:release builds on verify:ci rather than restating it',
+    releaseScript.includes('npm run verify:ci'), releaseScript);
+  a('verify:release adds the memory contract [A]/[D] gate',
+    releaseScript.includes('npm run verify:memory-contract'), releaseScript);
+  a('verify:release adds the REAL candidate APK gate',
+    releaseScript.includes('npm run verify:qa-candidate'), releaseScript);
+  a('verify:ci does NOT contain the memory contract or the real-APK gate',
+    !ciScript.includes('verify:memory-contract') && !ciScript.includes('verify:qa-candidate'),
+    ciScript.slice(0, 80));
+  a('verify:ci DOES contain the deterministic memory + QA fixtures',
+    ciScript.includes('npm run verify:memory-fixtures') && ciScript.includes('npm run verify:qa-artifact'));
+  a('verify:all remains a strict alias for verify:release, never a weaker set',
+    (pkgJson.scripts['verify:all'] ?? '').trim() === 'npm run verify:release',
+    pkgJson.scripts['verify:all'] ?? '(absent)');
+
+  // --- [F3c] CI workflow STRUCTURE, not just its labels --------------------
+  // Delegated to tools/verify_ci_structure.mjs, which is PURE and has its own
+  // falsifiers (tools/test_verify_ci_structure.mjs). The inline version of this
+  // gate proved the gate command APPEARED and RAN, but not that its failure
+  // stopped anything: `continue-on-error:` and a job-level `if:` each removed
+  // its effect while leaving every asserted string in place (Hermes r5 H-2).
+  // A gate with no fixtures is a gate nobody has tried to break, so the checks
+  // now live somewhere they can be attacked directly.
+  const ciStructure = checkWorkflowStructure(ciYmlContent, { gateCount: verifyInvocations });
+  a('CI workflow structure: candidate is built, GATED and published, and the gate can fail',
+    ciStructure.ok, ciStructure.problems.join(' | ').slice(0, 200));
+  a('CI structure gate identified the prerequisite job',
+    ciStructure.observed.prereq !== null, String(ciStructure.observed.prereq));
+
+  // --- [F3d] npm install-script policy -------------------------------------
+  // A package with an install script runs arbitrary code on `npm install`,
+  // before any test does. npm >= 11.6 refuses to run one that is not reviewed
+  // in `allowScripts`. That refusal is only real if the map is pinned, agrees
+  // with the lockfile IN BOTH DIRECTIONS, and `.npmrc` makes it strict.
+  //
+  // This gate was DELETED by a text splice during the round-6 CI-structure
+  // extraction (Hermes r6, R6-1). Nothing went red; only the total check count
+  // moved, 618 -> 600. It is restored here against the real manifests, and its
+  // logic now lives in a module with its own falsifiers
+  // (tools/test_verify_install_scripts.mjs) so that removing it again fails a
+  // test instead of quietly subtracting nine checks.
+  const installPolicy = checkInstallScriptPolicy({
+    pkgJson,
+    lockJson: JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf-8')),
+    npmrc: existsSync(join(ROOT, '.npmrc')) ? readFileSync(join(ROOT, '.npmrc'), 'utf-8') : '',
+  });
+  for (const { label, ok: passed, detail } of installPolicy.checks) a(label, passed, detail);
+
+  const androidBuildContent = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'build.gradle'), 'utf-8');
+  const releaseBuildBlock = androidBuildContent.slice(androidBuildContent.lastIndexOf('release {'));
+  const signingNames = [
+    'AK_UPLOAD_STORE_FILE', 'AK_UPLOAD_STORE_PASSWORD',
+    'AK_UPLOAD_KEY_ALIAS', 'AK_UPLOAD_KEY_PASSWORD',
+  ];
+  a('Android release build never uses the committed debug signing config',
+    !releaseBuildBlock.includes('signingConfig signingConfigs.debug'));
+  a('Android release signing requires all four external secret inputs',
+    signingNames.every((name) => androidBuildContent.includes(name))
+      && androidBuildContent.includes('Release signing is not configured.')
+      && androidBuildContent.includes('gradle.taskGraph.whenReady'));
+  a('CI artifacts are debug-signed only and never invoke assembleRelease',
+    ciYmlContent.includes('assembleDebug')
+      && ciYmlContent.includes('athlete-kinetics-debug-qa-apk')
+      && ciYmlContent.includes('athlete-kinetics-qa-candidate-apk')
+      && !ciYmlContent.includes('assembleRelease'));
+
+  const gitignoreContent = readFileSync(join(ROOT, '.gitignore'), 'utf-8');
+  a('upload keystores and local release credentials are ignored',
+    gitignoreContent.includes('*.jks')
+      && gitignoreContent.includes('**/keystore.properties')
+      && gitignoreContent.includes('.env.release'));
+
+  const profileScreenContent = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'screens', 'ProfileScreen.tsx'), 'utf-8');
+  a('ATHLETE surface carries visible medical-device and medical-advice positioning',
+    profileScreenContent.includes('not medical advice')
+      && profileScreenContent.includes('It is not a medical device.'));
 
   // --- [T11] _chain_projection.sql.tpl equivalence check ---
   console.log('[SQL chain projection template equivalence check]');
@@ -1269,5 +1895,570 @@ if (resetTables.length >= 15) {
   db.exec(tplSql);
   const sqlProgressionRows = db.prepare('SELECT movement_id, progression_group, progression_rank FROM movement_progression ORDER BY progression_group, progression_rank').all();
 }
+
+// --- [049] the store's movement query, prepared against the LIVE schema ------
+// MOVEMENT_LIBRARY_SQL is passed to executeSync by NAME, so the literal-scraping
+// pass above never sees it. Extract and prepare it explicitly: a typo in the
+// movement_scope LEFT JOIN would otherwise only surface on a device.
+console.log('[049 movement library query + full-body scope projection]');
+{
+  const literal = src.match(/const MOVEMENT_LIBRARY_SQL = `([\s\S]*?)`;/);
+  check('MOVEMENT_LIBRARY_SQL literal located in the store', literal !== null);
+  if (literal !== null) {
+    const librarySql = literal[1];
+    try {
+      const columns = db.prepare(librarySql).all();
+      check('MOVEMENT_LIBRARY_SQL prepares and runs against the live 001-049 schema', true);
+      check('the query projects a scope column for all 300 movements',
+        columns.length === 300 && columns.every((row) => 'scope' in row),
+        `${columns.length} rows`);
+      const scoped = columns.filter((row) => row.scope === 'full_body').map((row) => row.name).sort();
+      check('exactly the two ratified Turkish Get-Ups project scope full_body',
+        JSON.stringify(scoped) === JSON.stringify([
+          'Kettlebell Turkish Get-Up', 'Kettlebell Turkish Get-Up (Lunge style)']),
+        JSON.stringify(scoped));
+      check('every unscoped movement projects scope NULL (LEFT JOIN, row absent = not scoped)',
+        columns.filter((row) => row.scope !== 'full_body').every((row) => row.scope === null));
+      check('the scope LEFT JOIN adds no duplicate rows (one legal scope value per movement)',
+        new Set(columns.map((row) => row.movement_id)).size === columns.length);
+    } catch (e) {
+      check(`MOVEMENT_LIBRARY_SQL prepares against the live schema — ${e instanceof Error ? e.message : e}`, false);
+    }
+  }
+  a('movementFromRow narrows scope to the single legal value',
+    /scope: r\.scope === 'full_body' \? 'full_body' : null/.test(src));
+  a('both generator projections cross the null -> undefined boundary explicitly',
+    (src.match(/scope: m\.scope \?\? undefined/g) ?? []).length === 2);
+}
+
+// --- [O3] fail-closed inventory parsing (the specialist-equipment guarantee) --
+console.log('[O3 fail-closed equipment inventory parsing]');
+{
+  const requireCjs = createRequire(import.meta.url);
+  const { inventoryFromRowCell, inventoryFromSnapshot, inventoryToSnapshot } = requireCjs(
+    join(ROOT, 'apps', 'mobile', 'test', '.build', 'equipmentInventory.js'));
+  const { EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS, SPECIALIST_EQUIPMENT_ITEMS, EQUIPMENT_PRESETS, DEFAULT_PROFILE } =
+    requireCjs(join(ROOT, 'packages', 'inference', 'test', '.build', 'types.js'));
+  const parseInventory = (json) => inventoryFromRowCell(json, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
+  const eq = (a2, b2) => JSON.stringify(a2) === JSON.stringify(b2);
+
+  check('the specialist vocabulary is a strict, non-empty subset of the persisted union',
+    SPECIALIST_EQUIPMENT_ITEMS.length > 0
+      && SPECIALIST_EQUIPMENT_ITEMS.every((i) => EQUIPMENT_ITEMS.includes(i))
+      && SPECIALIST_EQUIPMENT_ITEMS.every((i) => !STANDARD_EQUIPMENT_ITEMS.includes(i))
+      && EQUIPMENT_ITEMS.length === STANDARD_EQUIPMENT_ITEMS.length + SPECIALIST_EQUIPMENT_ITEMS.length);
+  check('malformed inventory JSON falls back to STANDARD items and grants no specialist item',
+    eq(parseInventory('{not json'), [...STANDARD_EQUIPMENT_ITEMS]),
+    JSON.stringify(parseInventory('{not json')));
+  const nonArrays = ['{}', '"x"', '7', 'null', 'true', '{"boards":true}'];
+  check('every non-array inventory cell falls back to STANDARD items, granting no specialist item',
+    nonArrays.every((json) => eq(parseInventory(json), [...STANDARD_EQUIPMENT_ITEMS])
+      && SPECIALIST_EQUIPMENT_ITEMS.every((i) => !parseInventory(json).includes(i))),
+    nonArrays.join(' '));
+  check('DEFAULT_PROFILE grants no specialist equipment',
+    SPECIALIST_EQUIPMENT_ITEMS.every((i) => !DEFAULT_PROFILE.equipment_inventory.includes(i))
+      && eq(DEFAULT_PROFILE.equipment_inventory, [...STANDARD_EQUIPMENT_ITEMS]));
+  check('the full_gym preset grants no specialist equipment',
+    eq(EQUIPMENT_PRESETS.full_gym, STANDARD_EQUIPMENT_ITEMS));
+  check('no preset anywhere grants specialist equipment',
+    Object.values(EQUIPMENT_PRESETS).every((bundle) =>
+      SPECIALIST_EQUIPMENT_ITEMS.every((i) => !bundle.includes(i))));
+  check('unknown persisted items are dropped rather than carried into the CHECK domain',
+    eq(parseInventory(JSON.stringify(['sled', 'boards', 'mats'])), ['mats', 'boards']));
+
+  // --- the two REAL persistence boundaries, driven through live SQLite -------
+  // These write to athlete_profile / profile_slot and read back out, so the
+  // claim being proved is "survives persistence", not "the parser is a
+  // function". The helpers below are the exact ones useStore calls at
+  // profileFromRow / profileToJsonString / profileFromJsonString; the
+  // source-text guards afterwards keep the test from drifting off production.
+  const CANONICAL_WITH_BOARDS = ['barbell', 'bands', 'boards'];
+  const hydrateProfileRow = (cell) => {
+    db.exec('BEGIN');
+    db.prepare('UPDATE athlete_profile SET equipment_inventory = ? WHERE profile_id = 1').run(cell);
+    const row = db.prepare('SELECT equipment_inventory FROM athlete_profile WHERE profile_id = 1').get();
+    db.exec('ROLLBACK');
+    return inventoryFromRowCell(row.equipment_inventory, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
+  };
+  const slotRoundTrip = (inventory) => {
+    // SAVE: exactly what profileToJsonString writes into profile_slot.profile_json.
+    const snapshot = JSON.stringify({
+      objective: 'gpp', training_age: 'intermediate', weekly_frequency: 4,
+      max_sessions_per_day: 1, session_duration_cap_min: 90, base_rpe_cap: 9.0,
+      target_energy_system: 'hybrid', progression_methodology: 'autoregulated',
+      injury_flags: [], mobility_limits: [],
+      equipment_inventory: inventoryToSnapshot(inventory),
+    });
+    db.exec('BEGIN');
+    db.prepare('UPDATE profile_slot SET profile_json = ?, updated_at_ms = ? WHERE slot_id = 1')
+      .run(snapshot, 1);
+    // LOAD: read the row back and parse it as profileFromJsonString does.
+    const row = db.prepare('SELECT profile_json FROM profile_slot WHERE slot_id = 1').get();
+    db.exec('ROLLBACK');
+    const parsed = JSON.parse(row.profile_json);
+    return inventoryFromSnapshot(parsed.equipment_inventory, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
+  };
+
+  const hydrated = hydrateProfileRow(JSON.stringify(['boards', 'bands', 'barbell']));
+  check('an explicit boards selection survives athlete_profile hydration, in canonical order',
+    eq(hydrated, CANONICAL_WITH_BOARDS), JSON.stringify(hydrated));
+  const slotted = slotRoundTrip(CANONICAL_WITH_BOARDS);
+  check('an explicit boards selection survives a real profile_slot save then load',
+    eq(slotted, CANONICAL_WITH_BOARDS), JSON.stringify(slotted));
+  check('the slot round trip preserves canonical order even when saved out of order',
+    eq(slotRoundTrip(['boards', 'barbell', 'bands']), CANONICAL_WITH_BOARDS));
+  check('boards survives a profile_slot -> athlete_profile -> profile_slot cycle',
+    eq(slotRoundTrip(hydrateProfileRow(JSON.stringify(slotRoundTrip(CANONICAL_WITH_BOARDS)))),
+      CANONICAL_WITH_BOARDS));
+  check('an empty inventory stays empty across BOTH boundaries, never repopulated',
+    eq(hydrateProfileRow('[]'), []) && eq(slotRoundTrip([]), []));
+  // Damage at either boundary must recover to STANDARD only — no boards.
+  // The 007 column CHECK is the first line: json_valid() means a non-JSON cell
+  // can never be STORED, so the parser's malformed-JSON branch is defence in
+  // depth for values that predate the CHECK or arrive by direct edit. The
+  // reachable damage through SQL is "valid JSON that is not an array".
+  let nonJsonRejected = false;
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE athlete_profile SET equipment_inventory = ? WHERE profile_id = 1').run('{not json');
+  } catch { nonJsonRejected = true; }
+  db.exec('ROLLBACK');
+  check('007 json_valid CHECK refuses to store a non-JSON inventory cell at all', nonJsonRejected);
+  check('the parser still fails closed if a non-JSON cell ever reaches it (defence in depth)',
+    eq(parseInventory('{not json'), [...STANDARD_EQUIPMENT_ITEMS]));
+  const storableDamage = ['{}', '"x"', '7', 'null', '{"boards":true}', '{"0":"boards"}'];
+  check('a storable non-array athlete_profile cell hydrates to STANDARD items and grants no boards',
+    storableDamage.every((cell) => eq(hydrateProfileRow(cell), [...STANDARD_EQUIPMENT_ITEMS])),
+    storableDamage.join(' '));
+  // Two distinct slot-damage shapes, with deliberately different results —
+  // both fail closed, one strictly harder than the other:
+  //   ABSENT  (missing key / null)  -> [] via the `?? []` coercion. "Own
+  //                                    nothing" is the strictest outcome there
+  //                                    is, so this is safe by construction.
+  //   PRESENT but not an array      -> the STANDARD recovery set. This was the
+  //                                    live hole: it used to return the FULL
+  //                                    union and would now have granted boards.
+  const loadSnapshot = (value) =>
+    inventoryFromSnapshot(value, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS);
+  check('an absent or null profile_slot inventory loads to the empty set, not a granted default',
+    [undefined, null].every((value) => eq(loadSnapshot(value), [])));
+  const nonArraySnapshots = [{}, 'boards', 7, { boards: true }, true];
+  check('a present-but-non-array profile_slot inventory loads to STANDARD items',
+    nonArraySnapshots.every((value) => eq(loadSnapshot(value), [...STANDARD_EQUIPMENT_ITEMS])),
+    JSON.stringify(nonArraySnapshots));
+  check('NO damaged profile_slot inventory shape grants boards, whichever branch it takes',
+    [undefined, null, ...nonArraySnapshots].every((value) =>
+      SPECIALIST_EQUIPMENT_ITEMS.every((i) => !loadSnapshot(value).includes(i))));
+  check('a slot whose JSON omits equipment_inventory entirely grants nothing at all', (() => {
+    db.exec('BEGIN');
+    db.prepare('UPDATE profile_slot SET profile_json = ? WHERE slot_id = 1')
+      .run(JSON.stringify({ objective: 'gpp', training_age: 'elite' }));
+    const row = db.prepare('SELECT profile_json FROM profile_slot WHERE slot_id = 1').get();
+    db.exec('ROLLBACK');
+    return eq(loadSnapshot(JSON.parse(row.profile_json).equipment_inventory), []);
+  })());
+  check('the snapshot writer COPIES the inventory (a later mutation cannot reach a saved slot)', (() => {
+    const live = ['barbell', 'boards'];
+    const saved = inventoryToSnapshot(live);
+    live.push('mats');
+    return eq(saved, ['barbell', 'boards']);
+  })());
+  // Production-drift guards: the helpers exercised above must be the ones the
+  // store actually calls at each boundary.
+  a('profileFromRow hydrates through inventoryFromRowCell',
+    /inventoryFromRowCell\(json, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS\)/.test(src)
+      && /equipment_inventory: parseInventory\(r\.equipment_inventory\)/.test(src));
+  a('profileToJsonString saves through inventoryToSnapshot',
+    /equipment_inventory: inventoryToSnapshot\(p\.equipment_inventory\)/.test(src));
+  a('profileFromJsonString loads through inventoryFromSnapshot',
+    /equipment_inventory: inventoryFromSnapshot\(\s*o\.equipment_inventory, EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS,?\s*\)/.test(src));
+
+  // SQL defaults are already standard-only and must stay that way as the union
+  // widens — pinned here so nothing silently backfills a specialist item.
+  const sql007 = readFileSync(join(SCHEMA_DIR, '007_program_engine.sql'), 'utf-8');
+  const columnDefault = sql007.match(/equipment_inventory\s+TEXT NOT NULL DEFAULT\s+'(\[[^']+\])'/)?.[1];
+  const legacyFullGym = sql007.match(/ELSE '(\[[^']+\])'/)?.[1];
+  check('007 athlete_profile inventory default is exactly the STANDARD set',
+    columnDefault === JSON.stringify(STANDARD_EQUIPMENT_ITEMS), String(columnDefault));
+  check("007 legacy equipment_access 'full_gym' branch is exactly the STANDARD set",
+    legacyFullGym === JSON.stringify(STANDARD_EQUIPMENT_ITEMS), String(legacyFullGym));
+
+  // Live SQL proof: the persisted domain must ACCEPT a specialist item even
+  // though nothing defaults to it — otherwise an explicit opt-in could never
+  // be stored against a movement.
+  const boardPress = db.prepare("SELECT movement_id FROM movement WHERE name = 'Board Press'").get();
+  check('the persisted movement_equipment domain accepts the specialist item',
+    Number(db.prepare('SELECT COUNT(*) AS c FROM movement_equipment WHERE movement_id = ? AND item = ?')
+      .get(boardPress.movement_id, 'boards').c) === 1);
+}
+
+// --- [Calibration Policy v1: 21-Day Return Check-in] -------------------------
+// The check-in is an ACKNOWLEDGEMENT prompt. Numerical return modifiers are
+// deferred under the ratification, so the decisive assertions here are the
+// negative ones: no modifier value, no dose write, no plan regeneration.
+{
+  console.log('[Calibration Policy v1: 21-Day Return Check-in]');
+  check('useStore imports evaluateReturn from @ak/inference',
+    /import \{[^}]*evaluateReturn[^}]*\} from '@ak\/inference'/.test(src));
+  check('useStore defines returnCheckin state and the two ratified actions',
+    /returnCheckin: ReturnCheckinState \| null/.test(src) &&
+    /refreshReturnCheckin: \(\) => void/.test(src) &&
+    /confirmReturnCheckin: \(action: ReturnAction\) => void/.test(src) &&
+    /dismissReturnCheckin: \(\) => void/.test(src));
+  check('useStore persists acknowledgements with INSERT OR IGNORE (one row per detected gap)',
+    /INSERT OR IGNORE INTO return_checkin_ack\s*\n?\s*\(last_qualifying_date, acknowledged_action, acknowledged_at_ms\)/.test(src));
+  check('useStore wipes return_checkin_ack in resetTrainingData',
+    /DELETE FROM return_checkin_ack/.test(src));
+
+  // Qualifying evidence = a session carrying at least one logged set OR eligible
+  // imported history with sets. A bare session shell is not training evidence.
+  // R6: the imported branch requires BOTH integrity verification and the explicit
+  // readiness_eligible policy flag. 029's CHECK is (readiness_eligible = 0 OR
+  // verified = 1), so eligibility implies verification but never the converse —
+  // "verified = 1" alone admitted readiness-ineligible imports.
+  const qualifyingSql = (() => {
+    const i = src.indexOf('SELECT MAX(qualifying_date) AS max_date FROM (');
+    return i < 0 ? '' : stripComments(src.slice(i, src.indexOf(')`', i) + 1)).replace(/\s+/g, ' ');
+  })();
+  check('the layoff gap is measured from local sessions WITH sets and READINESS-ELIGIBLE verified imports WITH sets',
+    qualifyingSql.includes('FROM session s WHERE EXISTS (SELECT 1 FROM set_record r WHERE r.session_id = s.session_id)')
+    && qualifyingSql.includes('UNION ALL')
+    && qualifyingSql.includes('FROM history_import_session his')
+    && qualifyingSql.includes('WHERE hi.verified = 1 AND hi.readiness_eligible = 1')
+    && qualifyingSql.includes('EXISTS (SELECT 1 FROM history_import_set hiset'),
+    qualifyingSql.slice(0, 80));
+
+  // Behavioral test: imported-only athlete within 21 days vs beyond 21 days, newer wins
+  const testDb = new DatabaseSync(':memory:');
+  for (const f of SCHEMA_FILES) {
+    testDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+  // Execute the PRODUCTION literal, not a copy. The previous hand-maintained
+  // duplicate silently went stale when the production predicate changed, so the
+  // behavioural cases below were exercising SQL the app no longer runs.
+  const qualQuery = (() => {
+    const i = src.indexOf('SELECT MAX(qualifying_date) AS max_date FROM (');
+    return src.slice(i, src.indexOf(')`', i) + 1); // +1 keeps the closing paren
+  })();
+  check('behavioural cases execute the production qualifying SQL, not a copy',
+    qualQuery.includes('hi.readiness_eligible = 1'), `${qualQuery.length} chars extracted`);
+
+  // 1. Unverified import -> null
+  testDb.prepare("INSERT INTO history_import (history_import_id, content_fingerprint, format_version, verified, readiness_eligible, created_at_ms) VALUES (1, '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'AK_HISTORY_V1', 0, 0, 1000)").run();
+  testDb.prepare("INSERT INTO history_import_session (history_import_session_id, history_import_id, source_ordinal, session_date, source_line) VALUES (1, 1, 1, '2026-07-10', 1)").run();
+  testDb.prepare("INSERT INTO history_import_set (history_import_set_id, history_import_session_id, movement_id, set_index, reps, load_kg, source_line) VALUES (1, 1, 1, 1, 5, 100, 1)").run();
+  check('unverified import is not qualifying evidence', testDb.prepare(qualQuery).get().max_date === null);
+
+  // 2. R6 truth table. 029's CHECK is (readiness_eligible = 0 OR verified = 1),
+  // so the (0,1) row is unreachable by construction and fail-closed by the
+  // schema itself; the decisive new row is (1,0) — verified but NOT readiness
+  // eligible — which previously qualified and must not.
+  const setFlags = (v, e) => testDb.prepare(
+    'UPDATE history_import SET verified = ?, readiness_eligible = ? WHERE history_import_id = 1',
+  ).run(v, e);
+  const qualifies = () => testDb.prepare(qualQuery).get().max_date === '2026-07-10';
+
+  setFlags(0, 0);
+  check('R6 truth table (verified=0, eligible=0): does NOT qualify', !qualifies());
+  setFlags(1, 0);
+  check('R6 truth table (verified=1, eligible=0): does NOT qualify — the regression', !qualifies());
+  setFlags(1, 1);
+  check('R6 truth table (verified=1, eligible=1): qualifies', qualifies());
+  check('R6 (verified=0, eligible=1) is unreachable — 029 CHECK fails closed', (() => {
+    try { setFlags(0, 1); return false; } catch { setFlags(1, 1); return true; }
+  })());
+
+  // A readiness-INELIGIBLE verified import must still be able to support
+  // capability evidence: that is a different policy domain and is deliberately
+  // unchanged. Proven against the production capability read.
+  const capQuery = (() => {
+    const i = src.indexOf('SELECT ice.history_import_session_id');
+    return src.slice(i, src.indexOf('`)', i));
+  })();
+  setFlags(1, 0);
+  check('a verified but readiness-INELIGIBLE import still qualifies for capability evidence',
+    capQuery.includes('hi.verified = 1') && !capQuery.includes('readiness_eligible')
+    && !qualifies());
+  setFlags(1, 1);
+
+  // 3. Local session older than imported -> imported (newer) wins
+  testDb.prepare("INSERT INTO session (session_id, session_date) VALUES (101, '2026-06-01')").run();
+  testDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, logged_at_ms) VALUES (201, 101, 1, 1, 5, 80, 1000)").run();
+  check('imported history newer than local session wins',
+    testDb.prepare(qualQuery).get().max_date === '2026-07-10');
+
+  // 4. Local session newer than imported -> local wins
+  testDb.prepare("INSERT INTO session (session_id, session_date) VALUES (102, '2026-07-14')").run();
+  testDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, logged_at_ms) VALUES (202, 102, 1, 1, 5, 85, 2000)").run();
+  check('local session newer than imported history wins',
+    testDb.prepare(qualQuery).get().max_date === '2026-07-14');
+
+  // NEGATIVE INVARIANTS — the ratification forbids an automatic dose change.
+  const confirmFn = stripComments((() => {
+    const i = src.indexOf('confirmReturnCheckin: (action)');
+    const j = src.indexOf('dismissReturnCheckin: () => {', i);
+    return i >= 0 && j > i ? src.slice(i, j) : '';
+  })());
+  check('confirmReturnCheckin body was located for the negative invariants', confirmFn.length > 0);
+  check('NO return modifier constant exists anywhere in the store',
+    !/week1LoadMultiplier|week1RpeCap|FRESH_BLOCK_MODIFIER/.test(src));
+  check('acknowledging NEVER regenerates the block', !/generateNewBlock\(/.test(confirmFn));
+  check('acknowledging writes ONLY the ack ledger (no dose or plan table)',
+    [...confirmFn.matchAll(/(?:INSERT(?:\s+OR\s+IGNORE)?\s+INTO|UPDATE|DELETE\s+FROM)\s+([a-z_]+)/gi)]
+      .every((m) => m[1] === 'return_checkin_ack'));
+  check('generateNewBlock takes no dose-modifier parameter',
+    /generateNewBlock: \(schemaType\?: SchemaType\) => void/.test(src)
+    && /generateNewBlock: \(schemaType = 'LINEAR'\) => \{/.test(src));
+
+  db.prepare(`
+    INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-07-01', 'review_first_session', ?)
+  `).run(Date.now());
+  const ackRow = db.prepare(
+    "SELECT * FROM return_checkin_ack WHERE last_qualifying_date = '2026-07-01'").get();
+  check('return_checkin_ack inserts and selects correctly',
+    ackRow !== undefined && ackRow.acknowledged_action === 'review_first_session');
+
+  // INSERT OR IGNORE keyed on the qualifying date is what suppresses a re-prompt
+  // for the SAME detected gap.
+  db.prepare(`
+    INSERT OR IGNORE INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-07-01', 'continue_plan', ?)
+  `).run(Date.now());
+  const ackCount = db.prepare(
+    "SELECT COUNT(*) AS c FROM return_checkin_ack WHERE last_qualifying_date = '2026-07-01'").get().c;
+  check('a second acknowledgement for the same gap is ignored, not duplicated',
+    Number(ackCount) === 1, `${ackCount} rows`);
+
+  // --- Step 4b: Athlete Isolation Test with Per-Athlete DB Files ------------
+  const isoDir = mkdtempSync(join(tmpdir(), 'ak-athlete-isolation-'));
+  const fileA = join(isoDir, 'athlete_a.db');
+  const fileB = join(isoDir, 'athlete_b.db');
+  const dbAthleteA = new DatabaseSync(fileA);
+  const dbAthleteB = new DatabaseSync(fileB);
+  for (const f of SCHEMA_FILES) {
+    const sql = readFileSync(join(SCHEMA_DIR, f), 'utf-8');
+    dbAthleteA.exec(sql);
+    dbAthleteB.exec(sql);
+  }
+  dbAthleteA.prepare(`
+    INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-06-01', 'continue_plan', 12345)
+  `).run();
+  dbAthleteB.prepare(`
+    INSERT INTO return_checkin_ack (last_qualifying_date, acknowledged_action, acknowledged_at_ms)
+    VALUES ('2026-05-15', 'review_first_session', 99999)
+  `).run();
+
+  const ackA = dbAthleteA.prepare("SELECT COUNT(*) AS c FROM return_checkin_ack").get().c;
+  const ackB = dbAthleteB.prepare("SELECT COUNT(*) AS c FROM return_checkin_ack").get().c;
+  check('athlete isolation: separate database files hold independent acknowledgements',
+    Number(ackA) === 1 && Number(ackB) === 1);
+
+  // Execute resetTrainingData on Athlete A only
+  for (const t of resetTables) {
+    dbAthleteA.prepare(`DELETE FROM ${t}`).run();
+  }
+  const ackAAfterReset = dbAthleteA.prepare("SELECT COUNT(*) AS c FROM return_checkin_ack").get().c;
+  const ackBAfterReset = dbAthleteB.prepare("SELECT COUNT(*) AS c FROM return_checkin_ack").get().c;
+  check('athlete isolation: resetTrainingData on Athlete A wipes A and does NOT touch Athlete B',
+    Number(ackAAfterReset) === 0 && Number(ackBAfterReset) === 1);
+
+  dbAthleteA.close();
+  dbAthleteB.close();
+  rmSync(isoDir, { recursive: true, force: true });
+
+  // --- Step 1: Retrospective SQL Signals & Trigger Threshold Invariants -----
+  console.log('[Calibration Policy v1: Retrospective SQL Signals]');
+  const retroDb = new DatabaseSync(':memory:');
+  for (const f of SCHEMA_FILES) {
+    retroDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+  retroDb.prepare("INSERT INTO session (session_id, session_date) VALUES (1, '2026-07-15')").run();
+  const sessRowBefore = retroDb.prepare("SELECT session_rpe FROM session WHERE session_id = 1").get();
+  check('session.session_rpe is NULL on creation (never 0, never imputed)',
+    sessRowBefore.session_rpe === null);
+
+  // Set with NULL RPE
+  retroDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (1, 1, 1, 1, 10, 50, NULL, 1000)").run();
+  const mechNull = retroDb.prepare("SELECT hard_sets, reps_with_rpe, rpe_x_reps FROM mech_daily WHERE date = '2026-07-15'").get();
+  check('set with NULL RPE yields hard_sets = 0, reps_with_rpe = 0',
+    mechNull.hard_sets === 0 && mechNull.reps_with_rpe === 0 && mechNull.rpe_x_reps === 0);
+
+  // Set with RPE 7.5 (< 8 threshold)
+  retroDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (2, 1, 1, 2, 10, 50, 7.5, 2000)").run();
+  const mech75 = retroDb.prepare("SELECT hard_sets, reps_with_rpe FROM mech_daily WHERE date = '2026-07-15'").get();
+  check('set with RPE 7.5 (< 8) does NOT increment hard_sets',
+    mech75.hard_sets === 0 && mech75.reps_with_rpe === 10);
+
+  // Set with RPE 8.0 (>= 8 threshold)
+  retroDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (3, 1, 1, 3, 10, 50, 8.0, 3000)").run();
+  const mech80 = retroDb.prepare("SELECT hard_sets, reps_with_rpe FROM mech_daily WHERE date = '2026-07-15'").get();
+  check('set with RPE 8.0 (>= 8) increments hard_sets to 1',
+    mech80.hard_sets === 1 && mech80.reps_with_rpe === 20);
+
+  // Set with RPE 9.5 (>= 8 threshold)
+  retroDb.prepare("INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (4, 1, 1, 4, 5, 60, 9.5, 4000)").run();
+  const mech95 = retroDb.prepare("SELECT hard_sets, reps_with_rpe FROM mech_daily WHERE date = '2026-07-15'").get();
+  check('set with RPE 9.5 increments hard_sets to 2',
+    mech95.hard_sets === 2 && mech95.reps_with_rpe === 25);
+
+  // --- Work Order A: Split Transparency and Day Focus Overrides -------------
+  console.log('[Work Order A: Split Transparency and Day Focus Overrides]');
+  const woaDb = new DatabaseSync(':memory:');
+  for (const f of SCHEMA_FILES) {
+    woaDb.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
+  }
+  const woaProductionDb = {
+    executeSync(sql, params) {
+      if (/^\s*SELECT/i.test(sql)) {
+        return { rows: woaDb.prepare(sql).all(...(params ?? [])) };
+      }
+      if (params && params.length > 0) woaDb.prepare(sql).run(...params);
+      else woaDb.exec(sql);
+      return { rows: [] };
+    },
+  };
+
+  const req = createRequire(import.meta.url);
+  const { insertTrainingProgram } = req(join(ROOT, 'packages', 'core-db', 'test', '.build', 'programTx.js'));
+  const { generateBlock } = req(join(ROOT, 'packages', 'inference', 'test', '.build', 'blockGenerator.js'));
+  const { DEFAULT_PROFILE } = req(join(ROOT, 'packages', 'inference', 'test', '.build', 'types.js'));
+
+  // 1. A per-day focus override round-trips through training_program_day
+  const overriddenDays = [
+    { dayIndex: 1, focus: 'conditioning' },
+    { dayIndex: 2, focus: 'full' },
+    { dayIndex: 4, focus: 'bjj' },
+    { dayIndex: 5, focus: 'upper' },
+    { dayIndex: 6, focus: 'lower' },
+  ];
+  const programId = insertTrainingProgram(woaProductionDb, {
+    objective: 'strength',
+    startDate: '2026-08-01',
+    horizonKind: 'weeks',
+    requestedReviewDate: null,
+    plannedEndDate: '2026-08-28',
+    plannedBlockCount: 1,
+    startingMacroBlockIndex: 1,
+    schemaType: 'LINEAR',
+    days: overriddenDays,
+    movementPreferences: [],
+    weeklyFrequency: 5,
+    now: 1000,
+  });
+
+  const readBackDays = woaDb.prepare(
+    'SELECT day_index, focus FROM training_program_day WHERE program_id = ? ORDER BY day_index',
+  ).all(programId);
+
+  check('per-day focus override round-trips through training_program_day',
+    readBackDays.length === 5
+      && readBackDays[0].day_index === 1 && readBackDays[0].focus === 'conditioning'
+      && readBackDays[1].day_index === 2 && readBackDays[1].focus === 'full'
+      && readBackDays[2].day_index === 4 && readBackDays[2].focus === 'bjj'
+      && readBackDays[3].day_index === 5 && readBackDays[3].focus === 'upper'
+      && readBackDays[4].day_index === 6 && readBackDays[4].focus === 'lower',
+    JSON.stringify(readBackDays));
+
+  // 2. The generated planned_session rows carry the OVERRIDDEN focus, not the default from programFocuses
+  // Default strength 5-day split is ['lower', 'upper', 'lower', 'upper', 'full'] on days [1, 2, 4, 5, 6]
+  const movements = woaDb.prepare(`
+    SELECT m.movement_id, m.name, m.pattern, m.is_compound,
+           COALESCE(d.difficulty_rating, 'beginner') AS difficulty
+    FROM movement m
+    LEFT JOIN movement_detail d ON d.movement_id = m.movement_id
+  `).all().map((m) => ({
+    movement_id: m.movement_id,
+    name: m.name,
+    pattern: m.pattern,
+    is_compound: m.is_compound === 1,
+    difficulty: m.difficulty,
+    beginner_ok: true,
+    sportTracking: false,
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: true,
+    required: [],
+  }));
+
+  const plan = generateBlock({
+    profile: { ...DEFAULT_PROFILE, objective: 'strength', weekly_frequency: 5 },
+    movements,
+    startDate: '2026-08-01',
+    schemaType: 'LINEAR',
+    macroBlockIndex: 1,
+    programDays: overriddenDays.map((d) => ({
+      day_index: d.dayIndex,
+      focus: d.focus,
+    })),
+  });
+
+  const week1Sessions = plan.sessions.filter((s) => s.week_index === 1);
+  const week1Focuses = week1Sessions.map((s) => ({ day: s.day_index, focus: s.focus }));
+  check('generated planned_session rows carry the OVERRIDDEN focus, not default from programFocuses',
+    week1Focuses.length === 5
+      && week1Focuses[0].focus === 'conditioning'
+      && week1Focuses[1].focus === 'full'
+      && week1Focuses[2].focus === 'bjj'
+      && week1Focuses[3].focus === 'upper'
+      && week1Focuses[4].focus === 'lower',
+    JSON.stringify(week1Focuses));
+}
+
+// ---------------------------------------------------------------------------
+// [R8 §2.6/§2.7] Permanent Play identity + offline release posture — static
+// source checks. The PACKAGED artifact is proven by verify_qa_artifact.mjs
+// (aapt dump: package id, no INTERNET); these checks pin the SOURCE the
+// artifact must be built from, so a regression fails CI before any build.
+// ---------------------------------------------------------------------------
+console.log('[R8 identity + offline posture (static sources)]');
+{
+  const mainManifest = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf-8');
+  const debugManifestPath = join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'debug', 'AndroidManifest.xml');
+  const debugManifest = existsSync(debugManifestPath)
+    ? readFileSync(debugManifestPath, 'utf-8') : '';
+  const stringsXml = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml'), 'utf-8');
+  const appJson = JSON.parse(readFileSync(join(ROOT, 'apps', 'mobile', 'app.json'), 'utf-8'));
+  const gradleContent2 = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'app', 'build.gradle'), 'utf-8');
+
+  a('production manifest does NOT declare android.permission.INTERNET',
+    !/uses-permission\s+android:name="android\.permission\.INTERNET"\s*\/>?\s*$/.test(
+      mainManifest.split('\n').filter((l) => !l.includes('tools:node')).join('\n'),
+    ) || /tools:node="remove"/.test(mainManifest));
+  a('debug-only manifest grants INTERNET for Metro and nothing else actively declares it',
+    /uses-permission\s+android:name="android\.permission\.INTERNET"/.test(debugManifest)
+      && (!/uses-permission\s+android:name="android\.permission\.INTERNET"/.test(
+        mainManifest.split('\n').filter((l) => !l.includes('tools:node')).join('\n'),
+      ) || /tools:node="remove"/.test(mainManifest)));
+  a('production applicationId is com.pikemethods.training',
+    /applicationId\s+"com\.pikemethods\.training"/.test(gradleContent2));
+  a('QA package identity is com.pikemethods.training.qa',
+    gradleContent2.includes("'com.pikemethods.training.qa'")
+      || gradleContent2.includes('"com.pikemethods.training.qa"'));
+  a('first closed-beta version code is 1 and version name 1.0.0-beta.1',
+    /def appVersionCode = project\.findProperty\('AK_VERSION_CODE'\) \?: System\.getenv\('AK_VERSION_CODE'\) \?: '1'/.test(gradleContent2)
+      && /def appVersionName = project\.findProperty\('AK_VERSION_NAME'\) \?: System\.getenv\('AK_VERSION_NAME'\) \?: '1\.0\.0-beta\.1'/.test(gradleContent2),
+    'gradle version defaults');
+  a('launcher label is pikeMethods in native resources and RN app config',
+    stringsXml.includes('>pikeMethods</string>')
+      && appJson?.name === 'pikeMethods' && appJson?.displayName === 'pikeMethods');
+
+  // Cold-launch parity (regression: 2026-08-25 device crash). The activity's
+  // getMainComponentName() MUST equal the AppRegistry component name that
+  // index.js registers from app.json. A mismatch builds cleanly and fails
+  // only at cold launch with 'Invariant Violation ... not registered'.
+  const mainActivityPath = join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'main', 'java', 'com', 'athletekinetics', 'MainActivity.kt');
+  if (existsSync(mainActivityPath)) {
+    const mainActivitySrc = readFileSync(mainActivityPath, 'utf-8');
+    const componentMatch = /getMainComponentName\(\): String = "([^"]+)"/.exec(mainActivitySrc);
+    a('MainActivity.getMainComponentName matches the JS-registered app.json name',
+      componentMatch !== null && componentMatch[1] === appJson?.name,
+      `native=${componentMatch?.[1] ?? 'unparsed'} js=${appJson?.name ?? 'missing'}`);
+  } else {
+    a('MainActivity.getMainComponentName matches the JS-registered app.json name',
+      false, 'MainActivity.kt not found');
+  }
+}
+
 console.log(`verify:store SQL — ${pass}/${pass + fail} checks green`);
 process.exit(fail ? 1 : 0);

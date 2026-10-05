@@ -6,28 +6,56 @@
  * resolving movement availability via capabilityResolver verdicts, and
  * composing/freezing sessions into planned_session/planned_slot.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
+  Alert,
+  FlatList,
+  findNodeHandle,
+  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import {
+
   composeRoutine,
+  composeRoutineMicrocycle,
+  contextualRoutineRoles,
+  mapImplementToTier,
+  projectRoutineMajorRpe,
+  rankRoutineAccessoryRecommendations,
+  rankRoutineSupplementaryRecommendations,
+  sortPickerMovements,
+  PICKER_TIER_NAMES,
+  SELECTABLE_SCHEMA_TYPES,
+  TIER_3_CAPTION,
+  DIFFICULTY_RANK,
   type MovementAvailability,
+  type PickerTier,
+  type RoutineAccessoryRecommendation,
+  type RoutineMicrocyclePrescription,
+  type RoutineSupplementaryRecommendation,
   type RoutineRole,
   type SchemaType,
 } from '@ak/inference';
-import { useStore, type RoutineTemplate } from '../state/useStore';
+import { formatTeachingOnlyReason, useStore, type Movement, type RoutineTemplate } from '../state/useStore';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView, {
+  KEYBOARD_DISMISS_MODE,
+  KEYBOARD_TAP_BEHAVIOR,
+} from './KeyboardAwareScrollView';
+import InfoTip from './InfoTip';
 import {
   PrimaryButton,
   SecondaryButton,
   Chip,
 } from './ui';
+
+const MAJOR_EXCLUDED_PATTERNS = new Set(['isolation', 'rotation', 'carry']);
+
 
 const SCHEMA_LABELS: Record<SchemaType, string> = {
   LINEAR: 'Linear',
@@ -36,15 +64,29 @@ const SCHEMA_LABELS: Record<SchemaType, string> = {
   APRE: 'Autoregulated',
 };
 
-const SCHEMAS: SchemaType[] = ['LINEAR', 'WAVE', 'STEP', 'APRE'];
+// Selection offers the non-retired schemas only. SCHEMA_LABELS above stays keyed
+// by the full SchemaType so a template that already chose a retired schema still
+// renders its name.
+const SCHEMAS: readonly SchemaType[] = SELECTABLE_SCHEMA_TYPES;
 
 interface SlotItem {
   id: string;
+  dayIndex: number;
   role: RoutineRole;
   movementId: number | null;
   sets?: number;
   reps?: number;
   targetRpe?: number;
+  legacyRoleAllowed?: boolean;
+}
+
+interface PickerRow {
+  movement: Movement;
+  verdict: MovementAvailability | undefined;
+  selectedElsewhere: boolean;
+  executable: boolean;
+  recommendation: (RoutineSupplementaryRecommendation | RoutineAccessoryRecommendation) | undefined;
+  tier: PickerTier;
 }
 
 interface RoutineTemplateBuilderProps {
@@ -53,7 +95,20 @@ interface RoutineTemplateBuilderProps {
   onCancel?: () => void;
 }
 
-export function RoutineTemplateBuilder({
+export function RoutineTemplateBuilder(props: RoutineTemplateBuilderProps): React.JSX.Element {
+  const state = useStore((s) => s);
+  const decision = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision() : { status: 'support_unavailable' as const };
+  if (decision.status !== 'available') return <View accessibilityRole="alert">
+    <Text style={{ color: theme.color.textHi }}>Health and training support: routine suggestions are on hold. Your saved routines remain available in history.</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel="Close routine builder" onPress={props.onCancel} style={{ minHeight: 56 }}>
+      <Text style={{ color: theme.color.textHi }}>Close</Text>
+    </Pressable>
+  </View>;
+  return <AvailableRoutineTemplateBuilder key={state.activeAthleteId} {...props} />;
+}
+
+function AvailableRoutineTemplateBuilder({
   initialTemplate,
   onSaved,
   onCancel,
@@ -61,13 +116,18 @@ export function RoutineTemplateBuilder({
   const profile = useStore((s) => s.profile);
   const movements = useStore((s) => s.movements);
   const niggles = useStore((s) => s.niggles);
+  const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
+  const activePriorExperienceMovementIds = useStore((s) => s.activePriorExperienceMovementIds);
   const saveRoutineTemplate = useStore((s) => s.saveRoutineTemplate);
+  const confirmMovementPriorExperience = useStore((s) => s.confirmMovementPriorExperience);
+  const revokeMovementPriorExperience = useStore((s) => s.revokeMovementPriorExperience);
   const getMovementAvailabilityVerdicts = useStore(
     (s) => s.getMovementAvailabilityVerdicts,
   );
   const getRoutineRoleEligibleMovementIds = useStore(
     (s) => s.getRoutineRoleEligibleMovementIds,
   );
+  const getRoutinePlanningContract = useStore((s) => s.getRoutinePlanningContract);
 
   const [name, setName] = useState(initialTemplate?.name ?? '');
   const [schemaType, setSchemaType] = useState<SchemaType>(
@@ -79,26 +139,49 @@ export function RoutineTemplateBuilder({
     if (initialTemplate && initialTemplate.slots.length > 0) {
       return initialTemplate.slots.map((s, idx) => ({
         id: `slot-${idx}-${s.movementId}`,
+        dayIndex: s.dayIndex,
         role: s.role,
         movementId: s.movementId,
         sets: s.sets,
         reps: s.reps,
-        targetRpe: s.targetRpe,
+        targetRpe: Math.min(s.targetRpe, profile.base_rpe_cap),
+        legacyRoleAllowed: s.legacyRoleAllowed,
       }));
     }
     return [
-      { id: 'slot-0', role: 'major', movementId: null },
-      { id: 'slot-1', role: 'supplementary', movementId: null },
-      { id: 'slot-2', role: 'supplementary', movementId: null },
+      { id: 'slot-0', dayIndex: 1, role: 'major', movementId: null },
+      { id: 'slot-1', dayIndex: 1, role: 'supplementary', movementId: null },
+      { id: 'slot-2', dayIndex: 1, role: 'supplementary', movementId: null },
     ];
   });
 
+  const [activeDay, setActiveDay] = useState(() => initialTemplate?.slots[0]?.dayIndex ?? 1);
   const [pickerSlotIndex, setPickerSlotIndex] = useState<number | null>(null);
+  // The movement picker follows the InfoTip accessibility-modal pattern: on show,
+  // screen-reader focus moves to the picker heading. The search field is not
+  // focused, so the keyboard stays closed until the athlete chooses to search.
+  const pickerTitleRef = useRef<React.ElementRef<typeof Text>>(null);
+  const focusPickerTitle = useCallback(() => {
+    const titleHandle = findNodeHandle(pickerTitleRef.current);
+    if (titleHandle !== null) AccessibilityInfo.setAccessibilityFocus(titleHandle);
+  }, []);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerView, setPickerView] = useState<'available' | 'all'>('available');
+  const [expandedMovementDetailId, setExpandedMovementDetailId] = useState<number | null>(null);
+  const [collapsedTiers, setCollapsedTiers] = useState<Record<PickerTier, boolean>>({
+    1: false,
+    2: false,
+    3: false,
+  });
   const [errorText, setErrorText] = useState<string | null>(null);
 
+  const normalizedRpeSlots = initialTemplate?.slots.filter(
+    (slot) => slot.targetRpe > profile.base_rpe_cap,
+  ).length ?? 0;
+
   const verdicts: readonly MovementAvailability[] = useMemo(
-    () => getMovementAvailabilityVerdicts(),
-    [getMovementAvailabilityVerdicts, movements, profile, niggles],
+    () => getMovementAvailabilityVerdicts('weight_room'),
+    [getMovementAvailabilityVerdicts, movements, profile, niggles, movementAvailabilityRevision],
   );
   const verdictMap = useMemo(
     () => new Map<number, MovementAvailability>(verdicts.map((verdict) => [verdict.movementId, verdict])),
@@ -111,54 +194,383 @@ export function RoutineTemplateBuilder({
   const roleEligibleSets = useMemo(() => ({
     major: new Set(roleEligibleIds.major),
     supplementary: new Set(roleEligibleIds.supplementary),
+    accessory: new Set(roleEligibleIds.accessory),
     conditional: new Set(roleEligibleIds.conditional),
   }), [roleEligibleIds]);
+  const planningContract = useMemo(
+    () => getRoutinePlanningContract(),
+    [getRoutinePlanningContract, movements],
+  );
   const availableSet = useMemo(
     () => new Set(verdicts.filter((verdict) => verdict.state === 'available').map((verdict) => verdict.movementId)),
     [verdicts],
   );
 
-  // Live routine composition preview
+  const activeSlots = useMemo(() => slots
+    .map((slot, index) => ({ slot, index }))
+    .filter((entry) => entry.slot.dayIndex === activeDay), [activeDay, slots]);
+  const activeMajorIds = useMemo(() => activeSlots
+    .filter((entry): entry is { slot: SlotItem & { movementId: number }; index: number } =>
+      entry.slot.role === 'major' && entry.slot.movementId !== null)
+    .map((entry) => entry.slot.movementId), [activeSlots]);
+  const selectedMajor = useMemo(() => {
+    const majorId = activeMajorIds[0];
+    return majorId === undefined ? undefined : movements.find((movement) => movement.movement_id === majorId);
+  }, [activeMajorIds, movements]);
+
+  const contextualRolesFor = (movementId: number): ReadonlySet<RoutineRole> => contextualRoutineRoles(
+    movementId,
+    activeMajorIds,
+    planningContract.liftFamilies,
+    planningContract.assistance,
+    roleEligibleSets,
+  );
+
+  const supplementaryRecommendationMap = useMemo(() => {
+    if (pickerSlotIndex === null || slots[pickerSlotIndex]?.role !== 'supplementary'
+        || selectedMajor === undefined) {
+      return new Map<number, RoutineSupplementaryRecommendation>();
+    }
+    const candidates = movements.filter((movement) =>
+      contextualRolesFor(movement.movement_id).has('supplementary')
+      && availableSet.has(movement.movement_id)
+      && !slots.some((slot, index) => slot.dayIndex === activeDay
+        && index !== pickerSlotIndex && slot.movementId === movement.movement_id));
+    const recommendations = rankRoutineSupplementaryRecommendations(
+      {
+        movementId: selectedMajor.movement_id,
+        name: selectedMajor.name,
+        pattern: selectedMajor.pattern,
+        targetMuscles: selectedMajor.targetMuscles,
+        isCompound: selectedMajor.is_compound,
+      },
+      candidates.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+    );
+    return new Map(recommendations.map((recommendation) => [recommendation.movementId, recommendation]));
+  }, [activeDay, activeMajorIds, availableSet, movements, pickerSlotIndex,
+    planningContract, roleEligibleSets, selectedMajor, slots]);
+
+  const accessoryRecommendationMap = useMemo(() => {
+    if (pickerSlotIndex === null || slots[pickerSlotIndex]?.role !== 'accessory'
+        || activeMajorIds.length === 0) {
+      return new Map<number, RoutineAccessoryRecommendation>();
+    }
+    const selectedMovementIds = activeSlots
+      .map((entry) => entry.slot.movementId)
+      .filter((movementId): movementId is number => movementId !== null);
+    const positions = new Map<number, number>();
+    const stressPreview = composeRoutineMicrocycle({
+      selections: slots.flatMap((slot) => {
+        if (slot.movementId === null) return [];
+        const slotIndex = (positions.get(slot.dayIndex) ?? 0) + 1;
+        positions.set(slot.dayIndex, slotIndex);
+        return [{
+          dayIndex: slot.dayIndex,
+          slotIndex,
+          movementId: slot.movementId,
+          role: slot.role,
+          sets: slot.sets,
+          reps: slot.reps,
+          targetRpe: slot.targetRpe,
+        }];
+      }),
+      movements: movements.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+      liftFamilies: planningContract.liftFamilies,
+      assistance: planningContract.assistance,
+      roleEligibility: roleEligibleSets,
+      schemaType,
+      objective: profile.objective,
+      trainingAge: profile.training_age,
+      durationCapMin: profile.session_duration_cap_min,
+      baseRpeCap: profile.base_rpe_cap,
+      availableMovementIds: availableSet,
+      legacyRoleAllowances: slots.flatMap((slot) =>
+        slot.movementId !== null && slot.role === 'supplementary'
+          && slot.legacyRoleAllowed === true
+          ? [{ dayIndex: slot.dayIndex, movementId: slot.movementId, role: slot.role }]
+          : []),
+    });
+    const activePrescriptions = stressPreview.prescriptions.filter((row) => row.dayIndex === activeDay);
+    // The day's estimate already counts preparation, rest and changeovers
+    // (shared session-time contract); no private formula is kept here.
+    const activeComposedMinutes = stressPreview.dayTimes
+      .find((day) => day.dayIndex === activeDay)?.estimatedMin ?? 0;
+    const alreadyConstrained = stressPreview.blockers.length > 0
+      || activePrescriptions.some((row) => !row.included
+        || row.adaptations.some((adaptation) => adaptation.startsWith('Dose bounded from')));
+    const activeHeadroom = stressPreview.familyDecisions.flatMap((decision) => {
+      const session = decision.sessions.find((candidate) => candidate.dayIndex === activeDay);
+      return session === undefined ? [] : [Math.max(0, (session.budget - session.finalStress) / 5)];
+    });
+    const remainingFatigue = alreadyConstrained || activeHeadroom.length === 0
+      ? 0
+      : Math.min(5, ...activeHeadroom);
+    const candidates = movements.filter((movement) =>
+      contextualRolesFor(movement.movement_id).has('accessory')
+      && availableSet.has(movement.movement_id));
+    const recommendations = rankRoutineAccessoryRecommendations({
+      majorMovementIds: activeMajorIds,
+      selectedMovementIds,
+      candidates: candidates.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+      allMovements: movements.map((movement) => ({
+        movementId: movement.movement_id,
+        name: movement.name,
+        pattern: movement.pattern,
+        targetMuscles: movement.targetMuscles,
+        isCompound: movement.is_compound,
+      })),
+      liftFamilies: planningContract.liftFamilies,
+      assistance: planningContract.assistance,
+      objective: profile.objective,
+      remainingMinutes: Math.max(0, profile.session_duration_cap_min - activeComposedMinutes),
+      remainingFatigue,
+    });
+    return new Map(recommendations.map((recommendation) => [recommendation.movementId, recommendation]));
+  }, [activeDay, activeMajorIds, activeSlots, availableSet, movements, pickerSlotIndex,
+    planningContract, profile.base_rpe_cap, profile.objective, profile.session_duration_cap_min,
+    profile.training_age, roleEligibleSets, schemaType, slots]);
+
+  const pickerTierBuckets = useMemo((): Record<PickerTier, PickerRow[]> => {
+    if (pickerSlotIndex === null) return { 1: [], 2: [], 3: [] };
+    const pickerRole = slots[pickerSlotIndex]?.role ?? 'supplementary';
+    const query = pickerSearch.trim().toLocaleLowerCase();
+    const rows = movements
+      // Role eligibility is the first predicate: non-role rows never reach the
+      // virtualized picker or its counts.
+      .filter((movement) => contextualRolesFor(movement.movement_id).has(pickerRole))
+      // Major slots must not offer pattern isolation, rotation, or carry (Step 3).
+      .filter((movement) => pickerRole !== 'major' || !MAJOR_EXCLUDED_PATTERNS.has(movement.pattern))
+      .filter((movement) => query.length === 0 || [
+        movement.name,
+        movement.baseName,
+        movement.pattern,
+        movement.cues,
+        ...movement.targetMuscles,
+      ].some((value) => value.toLocaleLowerCase().includes(query)))
+      .map((movement): PickerRow => {
+        const verdict = verdictMap.get(movement.movement_id);
+        const selectedElsewhere = slots.some((slot, index) => slot.dayIndex === activeDay
+          && index !== pickerSlotIndex && slot.movementId === movement.movement_id);
+        const tier = mapImplementToTier(movement.implement);
+        return {
+          movement,
+          verdict,
+          selectedElsewhere,
+          executable: verdict?.state === 'available' && !selectedElsewhere,
+          recommendation: pickerRole === 'accessory'
+            ? accessoryRecommendationMap.get(movement.movement_id)
+            : supplementaryRecommendationMap.get(movement.movement_id),
+          tier,
+        };
+      });
+
+    const filteredRows = pickerView === 'available' ? rows.filter((row) => row.executable) : rows;
+
+    const sortTier = (tierItems: PickerRow[], tier: PickerTier): PickerRow[] => {
+      return [...tierItems].sort((a, b) => {
+        // 1. Usable first: movements the athlete can currently use sort ABOVE locked or unavailable
+        if (a.executable !== b.executable) {
+          return a.executable ? -1 : 1;
+        }
+        // 2. Recommendation rank (if any)
+        const recA = a.recommendation?.rank ?? Number.MAX_SAFE_INTEGER;
+        const recB = b.recommendation?.rank ?? Number.MAX_SAFE_INTEGER;
+        if (recA !== recB) {
+          return recA - recB;
+        }
+        // 3. Difficulty rating: Tier 1 DESC (Adv > Int > Beg), Tiers 2 & 3 ASC (Beg > Int > Adv)
+        const rankA = DIFFICULTY_RANK[a.movement.difficulty] ?? 1;
+        const rankB = DIFFICULTY_RANK[b.movement.difficulty] ?? 1;
+        if (rankA !== rankB) {
+          return tier === 1 ? rankB - rankA : rankA - rankB;
+        }
+        // 4. Ties break alphabetically by name so ordering is deterministic
+        return a.movement.name.localeCompare(b.movement.name, undefined, { sensitivity: 'base' });
+      });
+    };
+
+    return {
+      1: sortTier(filteredRows.filter((r) => r.tier === 1), 1),
+      2: sortTier(filteredRows.filter((r) => r.tier === 2), 2),
+      3: sortTier(filteredRows.filter((r) => r.tier === 3), 3),
+    };
+  }, [accessoryRecommendationMap, activeDay, activeMajorIds, movements, pickerSearch,
+    pickerSlotIndex, pickerView, planningContract, roleEligibleSets, slots,
+    supplementaryRecommendationMap, verdictMap]);
+
+  const pickerRows = useMemo((): PickerRow[] => {
+    const list: PickerRow[] = [];
+    if (!collapsedTiers[1]) list.push(...pickerTierBuckets[1]);
+    if (!collapsedTiers[2]) list.push(...pickerTierBuckets[2]);
+    if (!collapsedTiers[3]) list.push(...pickerTierBuckets[3]);
+    return list;
+  }, [collapsedTiers, pickerTierBuckets]);
+
+  const pickerCounts = useMemo(() => {
+    if (pickerSlotIndex === null) return { available: 0, teaching: 0, total: 0 };
+    const role = slots[pickerSlotIndex]?.role ?? 'supplementary';
+    const query = pickerSearch.trim().toLocaleLowerCase();
+    const rows = movements
+      .filter((movement) => contextualRolesFor(movement.movement_id).has(role))
+      .filter((movement) => role !== 'major' || !MAJOR_EXCLUDED_PATTERNS.has(movement.pattern))
+      .filter((movement) => query.length === 0 || [movement.name, movement.baseName,
+        movement.pattern, movement.cues, ...movement.targetMuscles]
+        .some((value) => value.toLocaleLowerCase().includes(query)));
+    const available = rows.filter((movement) => {
+      const selectedElsewhere = slots.some((slot, index) => slot.dayIndex === activeDay
+        && index !== pickerSlotIndex && slot.movementId === movement.movement_id);
+      return verdictMap.get(movement.movement_id)?.state === 'available' && !selectedElsewhere;
+    }).length;
+    const teaching = rows.filter((movement) =>
+      verdictMap.get(movement.movement_id)?.state !== 'available').length;
+    return { available, teaching, total: rows.length };
+  }, [activeDay, activeMajorIds, movements, pickerSearch, pickerSlotIndex,
+    planningContract, roleEligibleSets, slots, verdictMap]);
+
+
   const validSelections = slots.filter(
     (slot): slot is SlotItem & { movementId: number } => slot.movementId !== null,
   );
-
-  const composed = composeRoutine({
-    selections: validSelections,
+  const dayPositions = new Map<number, number>();
+  const microcycleSelections = validSelections.map((slot) => {
+    const slotIndex = (dayPositions.get(slot.dayIndex) ?? 0) + 1;
+    dayPositions.set(slot.dayIndex, slotIndex);
+    return {
+      dayIndex: slot.dayIndex,
+      slotIndex,
+      movementId: slot.movementId,
+      role: slot.role,
+      sets: slot.sets,
+      reps: slot.reps,
+      targetRpe: slot.targetRpe,
+      preserveLegacyRoleAllowance: slot.legacyRoleAllowed,
+    };
+  });
+  const composed = composeRoutineMicrocycle({
+    selections: microcycleSelections,
+    movements: movements.map((movement) => ({
+      movementId: movement.movement_id,
+      name: movement.name,
+      pattern: movement.pattern,
+      targetMuscles: movement.targetMuscles,
+      isCompound: movement.is_compound,
+    })),
+    liftFamilies: planningContract.liftFamilies,
+    assistance: planningContract.assistance,
+    roleEligibility: roleEligibleSets,
     schemaType,
     objective: profile.objective,
     trainingAge: profile.training_age,
     durationCapMin: profile.session_duration_cap_min,
     baseRpeCap: profile.base_rpe_cap,
     availableMovementIds: availableSet,
+    legacyRoleAllowances: slots.flatMap((slot) =>
+      slot.movementId !== null && slot.role === 'supplementary'
+        && slot.legacyRoleAllowed === true
+        ? [{ dayIndex: slot.dayIndex, movementId: slot.movementId, role: slot.role }]
+        : []),
   });
-  const defaultComposition = composeRoutine({
-    selections: validSelections,
-    schemaType,
-    objective: profile.objective,
-    trainingAge: profile.training_age,
-    durationCapMin: Math.max(profile.session_duration_cap_min, 66),
-    baseRpeCap: profile.base_rpe_cap,
-    availableMovementIds: availableSet,
-  });
+  const defaultBySlotId = new Map<string, RoutineMicrocyclePrescription>();
+  for (const slot of validSelections) {
+    const fallback = composeRoutine({
+      selections: [slot],
+      schemaType,
+      objective: profile.objective,
+      trainingAge: profile.training_age,
+      // A single selection is never shed, so the real limit is passed: the
+      // default dose no longer needs a widened cap to survive.
+      durationCapMin: profile.session_duration_cap_min,
+      baseRpeCap: profile.base_rpe_cap,
+      availableMovementIds: availableSet,
+    }).slots[0];
+    if (fallback !== undefined) {
+      defaultBySlotId.set(slot.id, {
+        dayIndex: slot.dayIndex,
+        sourceSlotIndex: 1,
+        executionSlotIndex: 1,
+        movementId: fallback.movementId,
+        role: fallback.role,
+        authoredSets: fallback.sets,
+        authoredReps: fallback.reps,
+        authoredTargetRpe: fallback.targetRpe,
+        sets: fallback.sets,
+        reps: fallback.reps,
+        targetRpe: fallback.targetRpe,
+        included: true,
+        family: null,
+        stressCoefficient: 0,
+        purpose: null,
+        equivalentVolume: 0,
+        stressDose: 0,
+        adaptations: [],
+      });
+    }
+  }
 
-  // A role with no ratified movements is not offered. Conditional work is
-  // seeded empty (028 leaves it curator-owned), so offering the slot produced a
-  // picker where all 124 movements rendered disabled. Re-enables itself the
-  // moment conditional movements are ratified -- no code change needed.
-  const roleMaxima: Record<RoutineRole, number> = {
-    major: 1,
-    supplementary: 2,
-    conditional: roleEligibleSets.conditional.size === 0 ? 0 : 3,
+  const toggleTier = (tier: PickerTier): void => {
+    setCollapsedTiers((prev) => ({ ...prev, [tier]: !prev[tier] }));
   };
-  const roleCount = (role: RoutineRole): number => slots.filter((slot) => slot.role === role).length;
+
+  const renderTierHeader = (tier: PickerTier): React.JSX.Element => {
+    const isCollapsed = collapsedTiers[tier];
+    const count = pickerTierBuckets[tier].length;
+    return (
+      <View key={`tier-header-${tier}`} style={styles.tierHeaderContainer}>
+        <Pressable
+          testID={`picker-tier-${tier}-header`}
+          onPress={() => toggleTier(tier)}
+          accessibilityRole="button"
+          accessibilityLabel={`Toggle ${PICKER_TIER_NAMES[tier]} tier, ${count} movements, currently ${isCollapsed ? 'collapsed' : 'expanded'}`}
+          style={styles.tierHeaderButton}
+        >
+          <Text style={styles.tierHeaderTitle}>
+            {PICKER_TIER_NAMES[tier]} ({count})
+          </Text>
+          <Text style={styles.tierHeaderChevron}>{isCollapsed ? '▶' : '▼'}</Text>
+        </Pressable>
+        {tier === 3 && (
+          <Text style={styles.tier3CaptionText}>
+            {TIER_3_CAPTION}
+          </Text>
+        )}
+      </View>
+    );
+  };
 
   const addSlot = (role: RoutineRole): void => {
-    if (slots.length >= 6 || roleCount(role) >= roleMaxima[role]) return;
+
     setSlots([
       ...slots,
-      { id: `slot-${Date.now()}-${Math.random()}`, role, movementId: null },
+      { id: `slot-${Date.now()}-${slots.length}`, dayIndex: activeDay, role, movementId: null },
     ]);
+  };
+
+  const addTrainingDay = (): void => {
+    const populated = new Set(slots.map((slot) => slot.dayIndex));
+    const nextDay = [1, 2, 3, 4, 5, 6, 7].find((day) => !populated.has(day));
+    if (nextDay === undefined) return;
+    setSlots([...slots, {
+      id: `slot-day-${nextDay}-${Date.now()}`, dayIndex: nextDay, role: 'major', movementId: null,
+    }]);
+    setActiveDay(nextDay);
   };
 
   const removeSlot = (index: number): void => {
@@ -166,25 +578,30 @@ export function RoutineTemplateBuilder({
   };
 
   const moveSlot = (index: number, direction: -1 | 1): void => {
-    const destination = index + direction;
-    if (destination < 0 || destination >= slots.length) return;
+    const activeIndices = slots
+      .map((slot, slotIndex) => ({ slot, slotIndex }))
+      .filter((entry) => entry.slot.dayIndex === activeDay)
+      .map((entry) => entry.slotIndex);
+    const activeIndex = activeIndices.indexOf(index);
+    const destination = activeIndices[activeIndex + direction];
+    if (destination === undefined) return;
     const updated = [...slots];
     [updated[index], updated[destination]] = [updated[destination], updated[index]];
     setSlots(updated);
   };
 
   const updateRole = (index: number, role: RoutineRole): void => {
-    if (slots[index].role !== role && roleCount(role) >= roleMaxima[role]) {
-      setErrorText(`A routine supports at most ${roleMaxima[role]} ${role} movement${roleMaxima[role] === 1 ? '' : 's'}.`);
-      return;
-    }
     const updated = [...slots];
     const movementId = updated[index].movementId;
+    const sameRole = updated[index].role === role;
     updated[index] = {
       ...updated[index],
       role,
-      movementId: movementId !== null && roleEligibleSets[role].has(movementId) ? movementId : null,
-      ...(updated[index].role === role ? {} : { sets: undefined, reps: undefined, targetRpe: undefined }),
+      movementId: sameRole
+        ? movementId
+        : movementId !== null && contextualRolesFor(movementId).has(role) ? movementId : null,
+      legacyRoleAllowed: sameRole ? updated[index].legacyRoleAllowed : undefined,
+      ...(sameRole ? {} : { sets: undefined, reps: undefined, targetRpe: undefined }),
     };
     setErrorText(null);
     setSlots(updated);
@@ -196,12 +613,59 @@ export function RoutineTemplateBuilder({
     updated[pickerSlotIndex] = {
       ...updated[pickerSlotIndex],
       movementId,
+      legacyRoleAllowed: undefined,
       sets: undefined,
       reps: undefined,
       targetRpe: undefined,
     };
     setSlots(updated);
     setPickerSlotIndex(null);
+    setPickerSearch('');
+    setPickerView('available');
+    setExpandedMovementDetailId(null);
+  };
+
+  const closePicker = (): void => {
+    setPickerSlotIndex(null);
+    setPickerSearch('');
+    setPickerView('available');
+    setExpandedMovementDetailId(null);
+  };
+
+  const openPicker = (index: number): void => {
+    setPickerSearch('');
+    setPickerView('available');
+    setExpandedMovementDetailId(null);
+    setPickerSlotIndex(index);
+  };
+
+  const requestPriorExperienceConfirmation = (movement: Movement): void => {
+    Alert.alert(
+      'Confirm prior experience?',
+      'This is a local declaration of prior experience. It cannot override movement tier, equipment, active injuries or niggles, routine role, or required attestation.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () => {
+            if (!confirmMovementPriorExperience(movement.movement_id, 'weight_room')) {
+              setErrorText('Prior experience could not clear every current access requirement.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const requestPriorExperienceRevocation = (movement: Movement): void => {
+    Alert.alert(
+      'Revoke prior experience?',
+      `${movement.name} will require capability evidence again. Saved templates remain stored but cannot be used while blocked.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Revoke', style: 'destructive', onPress: () => revokeMovementPriorExperience(movement.movement_id) },
+      ],
+    );
   };
 
   const updateDose = (index: number, field: 'sets' | 'reps' | 'targetRpe', value: string): void => {
@@ -223,8 +687,16 @@ export function RoutineTemplateBuilder({
       setErrorText('Please select at least one movement for your routine template.');
       return;
     }
-    if (validSelections.filter((selection) => selection.role === 'major').length !== 1) {
-      setErrorText('Choose exactly one major movement.');
+    const populatedDays = [...new Set(validSelections.map((selection) => selection.dayIndex))];
+    const missingMajorDay = populatedDays.find((dayIndex) => !validSelections.some(
+      (selection) => selection.dayIndex === dayIndex && selection.role === 'major',
+    ));
+    if (missingMajorDay !== undefined) {
+      setErrorText(`Choose at least one major movement for day ${missingMajorDay}.`);
+      return;
+    }
+    if (composed.blockers.length > 0) {
+      setErrorText(composed.blockers[0]);
       return;
     }
 
@@ -233,15 +705,7 @@ export function RoutineTemplateBuilder({
         routineTemplateId: initialTemplate?.routineTemplateId,
         name: trimmed,
         schemaType,
-        slots: validSelections.map((s, idx) => ({
-          dayIndex: 1,
-          slotIndex: idx + 1,
-          role: s.role,
-          movementId: s.movementId,
-          sets: s.sets,
-          reps: s.reps,
-          targetRpe: s.targetRpe,
-        })),
+        slots: microcycleSelections,
       });
       onSaved?.(saved);
     } catch (e) {
@@ -249,8 +713,22 @@ export function RoutineTemplateBuilder({
     }
   };
 
+  if (profile.training_age === 'beginner') {
+    return (
+      <View style={[styles.container, styles.lockedContainer]} testID="routine-builder-beginner-lock">
+        <Text style={styles.title}>Standalone routines are locked</Text>
+        <Text style={styles.lockedBody}>
+          Generated training is available now. Standalone routine building unlocks after the Beginner stage.
+        </Text>
+        {onCancel !== undefined && (
+          <SecondaryButton label="Back" onPress={onCancel} accessibilityLabel="Back from routine builder" />
+        )}
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>
         {initialTemplate ? 'Edit Routine Template' : 'Build Routine Template'}
       </Text>
@@ -261,10 +739,19 @@ export function RoutineTemplateBuilder({
         </View>
       )}
 
+      {normalizedRpeSlots > 0 && (
+        <View style={styles.errorCard} testID="routine-rpe-normalization-notice">
+          <Text style={styles.warningText}>
+            {normalizedRpeSlots} stored routine RPE value{normalizedRpeSlots === 1 ? '' : 's'} exceeded the athlete's current cap and {normalizedRpeSlots === 1 ? 'was' : 'were'} normalized to {profile.base_rpe_cap.toFixed(1)} for review. Newly entered values above the cap are not accepted.
+          </Text>
+        </View>
+      )}
+
       {/* Template Name Input */}
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Template Name</Text>
         <TextInput
+          disableFullscreenUI
           style={styles.textInput}
           value={name}
           onChangeText={setName}
@@ -282,77 +769,111 @@ export function RoutineTemplateBuilder({
           {SCHEMAS.map((st) => {
             const selected = st === schemaType;
             return (
-              <Pressable
+              <View
                 key={st}
-                onPress={() => {
-                  setSchemaType(st);
-                  setSlots((current) => current.map((slot) => ({
-                    ...slot, sets: undefined, reps: undefined, targetRpe: undefined,
-                  })));
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityLabel={`${SCHEMA_LABELS[st]} loading method`}
-                style={[
-                  styles.schemaChip,
-                  selected && styles.schemaChipSelected,
-                ]}
+                testID={`loading-method-option-${st}`}
+                style={styles.schemaChipContainer}
               >
-                <Text
+                <Pressable
+                  onPress={() => {
+                    setSchemaType(st);
+                    setSlots((current) => current.map((slot) => ({
+                      ...slot, sets: undefined, reps: undefined, targetRpe: undefined,
+                    })));
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${SCHEMA_LABELS[st]} loading method`}
                   style={[
-                    styles.schemaChipText,
-                    selected && styles.schemaChipTextSelected,
+                    styles.schemaChip,
+                    selected && styles.schemaChipSelected,
                   ]}
                 >
-                  {SCHEMA_LABELS[st]}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={[
+                      styles.schemaChipText,
+                      selected && styles.schemaChipTextSelected,
+                    ]}
+                  >
+                    {SCHEMA_LABELS[st]}
+                  </Text>
+                </Pressable>
+                <InfoTip term={st === 'WAVE' ? 'Undulating' : st} />
+              </View>
             );
           })}
         </View>
       </View>
 
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Microcycle Days</Text>
+        <View style={styles.pickerViewRow}>
+          {[1, 2, 3, 4, 5, 6, 7]
+            .filter((dayIndex) => dayIndex === activeDay || slots.some((slot) => slot.dayIndex === dayIndex))
+            .map((dayIndex) => (
+              <Chip
+                key={dayIndex}
+                label={`Day ${dayIndex}`}
+                selected={dayIndex === activeDay}
+                onPress={() => setActiveDay(dayIndex)}
+              />
+            ))}
+          <Chip
+            label="+ Training day"
+            selected={false}
+            disabled={new Set(slots.map((slot) => slot.dayIndex)).size >= 7}
+            onPress={addTrainingDay}
+          />
+        </View>
+        <Text style={styles.reasonText}>
+          Major selection and weekly exposure are uncapped within the seven-day microcycle; the engine bounds dose and recovery burden.
+        </Text>
+      </View>
+
       {/* Session Slots Manager */}
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Ordered Movements ({slots.length}/6)</Text>
+        <Text style={styles.label}>Day {activeDay} Ordered Movements ({activeSlots.length})</Text>
 
-        {slots.map((slot, index) => {
+        {activeSlots.map(({ slot, index }, activeSlotIndex) => {
           const m = movements.find((item) => item.movement_id === slot.movementId);
           return (
             <View key={slot.id} style={styles.slotCard}>
+                {slot.legacyRoleAllowed === true && (
+                  <Text style={styles.warningText} testID={`legacy-role-notice-${activeSlotIndex + 1}`}>
+                    Preserved legacy supplementary selection. It remains valid only in this existing day/role pairing and will not appear for new selections.
+                  </Text>
+                )}
               <View style={styles.slotHeader}>
-                <Text style={styles.slotIndexLabel}>Slot {index + 1}</Text>
+                <Text style={styles.slotIndexLabel}>Slot {activeSlotIndex + 1}</Text>
                 <View style={styles.roleRow}>
                   <Pressable
-                    disabled={index === 0}
+                    disabled={activeSlotIndex === 0}
                     onPress={() => moveSlot(index, -1)}
-                    style={[styles.orderButton, index === 0 && styles.orderButtonDisabled]}
+                    style={[styles.orderButton, activeSlotIndex === 0 && styles.orderButtonDisabled]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Move slot ${index + 1} up`}
+                    accessibilityLabel={`Move day ${activeDay} slot ${activeSlotIndex + 1} up`}
                   >
                     <Text style={styles.orderButtonText}>Up</Text>
                   </Pressable>
                   <Pressable
-                    disabled={index === slots.length - 1}
+                    disabled={activeSlotIndex === activeSlots.length - 1}
                     onPress={() => moveSlot(index, 1)}
-                    style={[styles.orderButton, index === slots.length - 1 && styles.orderButtonDisabled]}
+                    style={[styles.orderButton, activeSlotIndex === activeSlots.length - 1 && styles.orderButtonDisabled]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Move slot ${index + 1} down`}
+                    accessibilityLabel={`Move day ${activeDay} slot ${activeSlotIndex + 1} down`}
                   >
                     <Text style={styles.orderButtonText}>Down</Text>
                   </Pressable>
-                  {(['major', 'supplementary', 'conditional'] as const).map((r) => (
+                  {(['major', 'supplementary', 'conditional', 'accessory'] as const).map((r) => (
                     <Pressable
                       key={r}
-                      disabled={slot.role !== r && roleCount(r) >= roleMaxima[r]}
                       onPress={() => updateRole(index, r)}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: slot.role === r, disabled: slot.role !== r && roleCount(r) >= roleMaxima[r] }}
-                      accessibilityLabel={`Set slot ${index + 1} role to ${r}`}
+                      accessibilityState={{ selected: slot.role === r }}
+                      accessibilityLabel={`Set day ${activeDay} slot ${activeSlotIndex + 1} role to ${r}`}
                       style={[
                         styles.roleChip,
                         slot.role === r && styles.roleChipSelected,
-                        slot.role !== r && roleCount(r) >= roleMaxima[r] && styles.orderButtonDisabled,
                       ]}
                     >
                       <Text
@@ -368,7 +889,7 @@ export function RoutineTemplateBuilder({
                   <Pressable
                     onPress={() => removeSlot(index)}
                     style={styles.removeButton}
-                    accessibilityLabel={`Remove slot ${index + 1}`}
+                    accessibilityLabel={`Remove day ${activeDay} slot ${activeSlotIndex + 1}`}
                   >
                     <Text style={styles.removeText}>X</Text>
                   </Pressable>
@@ -376,49 +897,84 @@ export function RoutineTemplateBuilder({
               </View>
 
               <Pressable
-                onPress={() => setPickerSlotIndex(index)}
+                onPress={() => openPicker(index)}
                 style={styles.pickerButton}
                 accessibilityRole="button"
-                accessibilityLabel={`Select movement for slot ${index + 1}`}
+                accessibilityLabel={`Select movement for day ${activeDay} slot ${activeSlotIndex + 1}`}
               >
                 <Text style={styles.pickerButtonText}>
                   {m ? m.name : 'Select movement...'}
                 </Text>
               </Pressable>
               {m !== undefined && (() => {
-                const defaults = defaultComposition.slots.find((candidate) => candidate.movementId === m.movement_id);
+                const defaults = defaultBySlotId.get(slot.id);
+                const peakRpe = slot.targetRpe ?? defaults?.targetRpe;
+                const majorProjection = slot.role === 'major' && peakRpe !== undefined
+                  ? projectRoutineMajorRpe(peakRpe, schemaType, profile.base_rpe_cap)
+                  : undefined;
                 return (
-                  <View style={styles.doseRow}>
-                    <View style={styles.doseField}>
-                      <Text style={styles.captionText}>Sets</Text>
-                      <TextInput
-                        style={styles.doseInput}
-                        value={String(slot.sets ?? defaults?.sets ?? '')}
-                        onChangeText={(value) => updateDose(index, 'sets', value)}
-                        keyboardType="number-pad"
-                        accessibilityLabel={`Sets for slot ${index + 1}`}
-                      />
+                  <View style={styles.doseGroup}>
+                    <View style={styles.doseRow}>
+                      <View style={styles.doseField}>
+                        <Text style={styles.captionText}>Sets</Text>
+                        <TextInput
+                          disableFullscreenUI
+                          style={styles.doseInput}
+                          value={String(slot.sets ?? defaults?.sets ?? '')}
+                          onChangeText={(value) => updateDose(index, 'sets', value)}
+                          keyboardType="number-pad"
+                          accessibilityLabel={`Sets for day ${activeDay} slot ${activeSlotIndex + 1}`}
+                        />
+                      </View>
+                      <View style={styles.doseField}>
+                        <Text style={styles.captionText}>Reps</Text>
+                        <TextInput
+                          disableFullscreenUI
+                          style={styles.doseInput}
+                          value={String(slot.reps ?? defaults?.reps ?? '')}
+                          onChangeText={(value) => updateDose(index, 'reps', value)}
+                          keyboardType="number-pad"
+                          accessibilityLabel={`Reps for day ${activeDay} slot ${activeSlotIndex + 1}`}
+                        />
+                      </View>
+                      {majorProjection !== undefined && (
+                        <View style={styles.doseField}>
+                          <View style={styles.doseFieldLabelRow}>
+                            <Text style={styles.captionText}>RPE START</Text>
+                            <InfoTip term="RPE START" />
+                          </View>
+                          <View
+                            style={[styles.doseInput, styles.projectedDose]}
+                            accessible
+                            accessibilityRole="text"
+                            accessibilityLabel={`Projected starting RPE for day ${activeDay} slot ${activeSlotIndex + 1}: ${majorProjection.startRpe.toFixed(1)}`}
+                          >
+                            <Text style={styles.projectedDoseText}>{majorProjection.startRpe.toFixed(1)}</Text>
+                          </View>
+                        </View>
+                      )}
+                      <View style={styles.doseField}>
+                        <View style={styles.doseFieldLabelRow}>
+                          <Text style={styles.captionText}>{majorProjection === undefined ? 'RPE' : 'RPE MAX'}</Text>
+                          <InfoTip term={majorProjection === undefined ? 'RPE' : 'RPE MAX'} />
+                        </View>
+                        <TextInput
+                          disableFullscreenUI
+                          style={styles.doseInput}
+                          value={String(peakRpe ?? '')}
+                          onChangeText={(value) => updateDose(index, 'targetRpe', value)}
+                          keyboardType="decimal-pad"
+                          accessibilityLabel={majorProjection === undefined
+                            ? `Target RPE for day ${activeDay} slot ${activeSlotIndex + 1}`
+                            : `Maximum RPE for day ${activeDay} slot ${activeSlotIndex + 1}`}
+                        />
+                      </View>
                     </View>
-                    <View style={styles.doseField}>
-                      <Text style={styles.captionText}>Reps</Text>
-                      <TextInput
-                        style={styles.doseInput}
-                        value={String(slot.reps ?? defaults?.reps ?? '')}
-                        onChangeText={(value) => updateDose(index, 'reps', value)}
-                        keyboardType="number-pad"
-                        accessibilityLabel={`Reps for slot ${index + 1}`}
-                      />
-                    </View>
-                    <View style={styles.doseField}>
-                      <Text style={styles.captionText}>RPE</Text>
-                      <TextInput
-                        style={styles.doseInput}
-                        value={String(slot.targetRpe ?? defaults?.targetRpe ?? '')}
-                        onChangeText={(value) => updateDose(index, 'targetRpe', value)}
-                        keyboardType="decimal-pad"
-                        accessibilityLabel={`Target RPE for slot ${index + 1}`}
-                      />
-                    </View>
+                    {majorProjection !== undefined && (
+                      <Text style={styles.projectionNote} testID={`major-rpe-projection-note-${activeSlotIndex + 1}`}>
+                        Projected loading range: RPE {majorProjection.startRpe.toFixed(1)} start to {majorProjection.maxRpe.toFixed(1)} max. Week 4 deloads to RPE {majorProjection.weekTargets[3].toFixed(1)}; readiness and autoregulation can lower the live target.
+                      </Text>
+                    )}
                   </View>
                 );
               })()}
@@ -426,38 +982,84 @@ export function RoutineTemplateBuilder({
           );
         })}
 
-        {/* Add Slot Actions */}
-        {slots.length < 6 && (
-          <View style={styles.addSlotRow}>
-            <Text style={styles.captionText}>Add slot:</Text>
-            <Chip label="+ Major" selected={false} disabled={roleCount('major') >= roleMaxima.major} onPress={() => addSlot('major')} />
-            <Chip label="+ Supp" selected={false} disabled={roleCount('supplementary') >= roleMaxima.supplementary} onPress={() => addSlot('supplementary')} />
-            <Chip label="+ Cond" selected={false} disabled={roleCount('conditional') >= roleMaxima.conditional} onPress={() => addSlot('conditional')} />
+        {/* Add Slot Actions: accessory remains last because it depends on all chosen work. */}
+        <View style={styles.addSlotRow}>
+          <Text style={styles.captionText}>Add slot:</Text>
+          <View style={styles.addSlotChipWrapper}>
+            <Chip label="+ Major" selected={false} onPress={() => addSlot('major')} />
+            <InfoTip term="MAJOR" />
           </View>
-        )}
+          <View style={styles.addSlotChipWrapper}>
+            <Chip label="+ Supp" selected={false} onPress={() => addSlot('supplementary')} />
+            <InfoTip term="SUPPLEMENTARY" />
+          </View>
+          <View style={styles.addSlotChipWrapper}>
+            <Chip label="+ Cond" selected={false} disabled={roleEligibleSets.conditional.size === 0} onPress={() => addSlot('conditional')} />
+            <InfoTip term="CONDITIONAL" />
+          </View>
+          <View style={styles.addSlotChipWrapper}>
+            <Chip label="+ Accessory last" selected={false} disabled={activeMajorIds.length === 0} onPress={() => addSlot('accessory')} />
+            <InfoTip term="ACCESSORY" />
+          </View>
+        </View>
       </View>
 
       {/* Composition Preview */}
-      {composed.slots.length > 0 && (
+      {validSelections.length > 0 && (
         <View style={styles.previewCard}>
-          <Text style={styles.previewTitle}>Prescription Preview</Text>
+          <Text style={styles.previewTitle}>Complete Microcycle Stress Review</Text>
+          {composed.blockers.map((blocker, i) => (
+            <Text key={`blocker-${i}`} style={styles.errorText}>Blocked: {blocker}</Text>
+          ))}
           {composed.warnings.map((warn, i) => (
-            <Text key={i} style={styles.warningText}>
+            <Text key={`warning-${i}`} style={styles.warningText}>
               Warning: {warn}
             </Text>
           ))}
-          {composed.slots.map((s) => {
-            const m = movements.find((item) => item.movement_id === s.movementId);
-            const authored = slots.find((slot) => slot.movementId === s.movementId);
-            const sets = authored?.sets ?? s.sets;
-            const reps = authored?.reps ?? s.reps;
-            const targetRpe = authored?.targetRpe ?? s.targetRpe;
+          {composed.recommendations.map((recommendation, i) => (
+            <Text key={`recommendation-${i}`} style={styles.reasonText}>
+              Recommendation: {recommendation}
+            </Text>
+          ))}
+          {composed.familyDecisions.map((decision) => {
+            const session = decision.sessions.find((candidate) => candidate.dayIndex === activeDay);
             return (
-              <View key={s.slotIndex} style={styles.previewSlotRow}>
+              <View key={decision.family} style={styles.suggestionNote} testID={`family-stress-${decision.family}`}>
+                <Text style={styles.suggestionTitle}>
+                  {decision.family.replace('_', ' ')}: week {decision.initialStress.toFixed(1)} → {decision.finalStress.toFixed(1)}/{decision.weeklyBudget.toFixed(1)} ({decision.level})
+                </Text>
+                <Text style={styles.reasonText}>
+                  {decision.exposureCount} weekly exposure{decision.exposureCount === 1 ? '' : 's'} · {decision.variationCount} distinct variation{decision.variationCount === 1 ? '' : 's'} · {decision.equivalentVolume.toFixed(1)} weighted equivalent reps
+                </Text>
+                {session !== undefined && (
+                  <Text style={styles.reasonText}>
+                    Day {activeDay}: {session.initialStress.toFixed(1)} → {session.finalStress.toFixed(1)}/{session.budget.toFixed(1)} · one family exposure across {session.variationCount} variation{session.variationCount === 1 ? '' : 's'}
+                  </Text>
+                )}
+                {decision.adaptations.map((adaptation, index) => (
+                  <Text key={index} style={styles.warningText}>Adaptation: {adaptation}</Text>
+                ))}
+              </View>
+            );
+          })}
+          <Text style={styles.previewTitle}>Day {activeDay} Prescription</Text>
+          {composed.prescriptions.filter((s) => s.dayIndex === activeDay).map((s) => {
+            const m = movements.find((item) => item.movement_id === s.movementId);
+            const majorProjection = s.role === 'major'
+              ? projectRoutineMajorRpe(s.targetRpe, schemaType, profile.base_rpe_cap)
+              : undefined;
+            return (
+              <View key={`${s.dayIndex}:${s.sourceSlotIndex}`} style={styles.previewSlotRow}>
                 <Text style={styles.previewSlotName}>{m?.name ?? `Movement ${s.movementId}`}</Text>
                 <Text style={styles.previewSlotDose}>
-                  {sets} sets x {reps} reps @ RPE {targetRpe.toFixed(1)}
+                  {s.included ? `${s.sets} sets x ${s.reps} reps @ ` : 'OMITTED · '}{majorProjection === undefined
+                    ? `RPE ${s.targetRpe.toFixed(1)}`
+                    : `RPE ${majorProjection.startRpe.toFixed(1)} start / ${majorProjection.maxRpe.toFixed(1)} max`}
+                  {s.family === null ? '' : ` · ${s.stressCoefficient.toFixed(2)}x · ${s.purpose?.replace('_', '-')}`}
                 </Text>
+                {s.adaptations.map((adaptation, index) => (
+                  <Text key={index} style={styles.reasonText}>{adaptation}</Text>
+                ))}
               </View>
             );
           })}
@@ -465,70 +1067,247 @@ export function RoutineTemplateBuilder({
       )}
 
       {/* Movement Picker Overlay */}
-      {pickerSlotIndex !== null && (
-        <View style={styles.pickerOverlay}>
+      <Modal
+        visible={pickerSlotIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closePicker}
+        onShow={focusPickerTitle}
+        statusBarTranslucent
+      >
+        <View
+          testID="movement-picker-dialog"
+          style={styles.pickerOverlay}
+          accessibilityViewIsModal
+          onAccessibilityEscape={closePicker}
+        >
           <View testID="movement-picker-card" style={styles.pickerCard}>
-            <Text style={styles.pickerTitle}>Choose Movement</Text>
-            <ScrollView testID="movement-picker-list" style={styles.pickerList}>
-              {movements.length === 0 && (
-                <Text style={styles.reasonText}>No movements are available.</Text>
+            <View style={styles.pickerHeaderRow}>
+              <View>
+                <Text
+                  ref={pickerTitleRef}
+                  testID="movement-picker-title"
+                  accessible
+                  accessibilityRole="header"
+                  style={styles.pickerTitle}
+                >
+                  Choose Movement
+                </Text>
+                <Text style={styles.reasonText} accessibilityLabel={`${pickerCounts.available} available and ${pickerCounts.teaching} teaching only`}>
+                  {pickerCounts.available} available · {pickerCounts.teaching} teaching only
+                </Text>
+              </View>
+              <SecondaryButton label="Close" onPress={closePicker} accessibilityLabel="Close movement picker" />
+            </View>
+            <TextInput
+              disableFullscreenUI
+              testID="movement-picker-search"
+              value={pickerSearch}
+              onChangeText={setPickerSearch}
+              placeholder="Search name, pattern, cues, muscles"
+              placeholderTextColor={theme.color.textLow}
+              style={styles.textInput}
+              accessibilityLabel="Search routine movements"
+            />
+            <View style={styles.pickerViewRow}>
+              <Chip label={`Available (${pickerCounts.available})`} selected={pickerView === 'available'} onPress={() => setPickerView('available')} />
+              <Chip label={`All / Learn (${pickerCounts.total})`} selected={pickerView === 'all'} onPress={() => setPickerView('all')} />
+            </View>
+            {selectedMajor !== undefined && supplementaryRecommendationMap.size > 0
+              && pickerSlotIndex !== null && slots[pickerSlotIndex]?.role === 'supplementary' && (
+              <View style={styles.suggestionNote} testID="supplementary-recommendation-note">
+                <Text style={styles.suggestionTitle}>Top 3 for {selectedMajor.name}</Text>
+                <Text style={styles.reasonText}>
+                  Ranked only from supplementary movements currently available to this athlete.
+                </Text>
+              </View>
+            )}
+            {accessoryRecommendationMap.size > 0
+              && pickerSlotIndex !== null && slots[pickerSlotIndex]?.role === 'accessory' && (
+              <View style={styles.suggestionNote} testID="accessory-recommendation-note">
+                <Text style={styles.suggestionTitle}>Accessories offered last</Text>
+                <Text style={styles.reasonText}>
+                  Ranked from uncovered stimulus, goal, current availability, duplication, time and remaining fatigue. Zero recommendations is valid.
+                </Text>
+              </View>
+            )}
+            <FlatList
+              key={`movement-picker-${pickerSlotIndex ?? 'closed'}-${activeMajorIds.join('-') || 'none'}`}
+              testID="movement-picker-list"
+              style={styles.pickerList}
+              data={pickerRows}
+              keyExtractor={(row) => String(row.movement.movement_id)}
+              initialNumToRender={14}
+              maxToRenderPerBatch={18}
+              windowSize={7}
+              keyboardShouldPersistTaps={KEYBOARD_TAP_BEHAVIOR}
+              keyboardDismissMode={KEYBOARD_DISMISS_MODE}
+              ListEmptyComponent={(
+                <View>
+                  {(collapsedTiers[1] || pickerTierBuckets[1].length === 0) && renderTierHeader(1)}
+                  {(collapsedTiers[2] || pickerTierBuckets[2].length === 0) && renderTierHeader(2)}
+                  {(collapsedTiers[3] || pickerTierBuckets[3].length === 0) && renderTierHeader(3)}
+                  <Text style={styles.emptyPickerText} accessibilityRole="text">
+                    {pickerView === 'available'
+                      ? 'No currently available movements match this role and search.'
+                      : 'No movements match this role and search.'}
+                  </Text>
+                </View>
               )}
-              {movements.map((m) => {
-                const verdict = verdictMap.get(m.movement_id);
-                const pickerRole = slots[pickerSlotIndex]?.role ?? 'supplementary';
-                const roleEligible = roleEligibleSets[pickerRole].has(m.movement_id);
-                const selectedElsewhere = slots.some((slot, index) =>
-                  index !== pickerSlotIndex && slot.movementId === m.movement_id);
-                const isAvailable = verdict?.state === 'available' && roleEligible && !selectedElsewhere;
-                const reasons = [
-                  ...(verdict?.reasons ?? []),
-                  ...(!roleEligible ? [`not ratified for ${pickerRole}`] : []),
-                  ...(selectedElsewhere ? ['already selected'] : []),
-                ];
+              ListFooterComponent={(() => {
+                if (pickerRows.length === 0) return null;
+                const lastTier = pickerRows[pickerRows.length - 1]?.tier;
                 return (
-                  <Pressable
-                    key={m.movement_id}
-                    testID={`movement-picker-row-${m.movement_id}`}
-                    disabled={!isAvailable}
-                    onPress={() => selectMovementForSlot(m.movement_id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Choose ${m.name}`}
-                    accessibilityState={{ disabled: !isAvailable }}
-                    style={[
-                      styles.pickerItem,
-                      !isAvailable && styles.pickerItemDisabled,
-                    ]}
-                  >
-                    <View style={styles.pickerItemMain}>
-                      <Text
-                        style={[
-                          styles.pickerItemName,
-                          !isAvailable && styles.pickerItemNameDisabled,
-                        ]}
-                      >
-                        {m.name}
-                      </Text>
-                      {!isAvailable && (
-                        <Text style={styles.reasonText}>
-                          Teaching only ({reasons.join(', ')})
-                        </Text>
+                  <View>
+                    {lastTier === 1 && (collapsedTiers[2] || pickerTierBuckets[2].length === 0) && renderTierHeader(2)}
+                    {lastTier !== 3 && (collapsedTiers[3] || pickerTierBuckets[3].length === 0) && renderTierHeader(3)}
+                  </View>
+                );
+              })()}
+              renderItem={({ item: row, index }) => {
+                const { movement, verdict, selectedElsewhere, executable, recommendation, tier } = row;
+                const canConfirm = !selectedElsewhere
+                  && verdict?.state === 'teaching_only'
+                  && verdict.confirmationWouldClear
+                  && !verdict.separateAttestationRequired
+                  && verdict.reasons.length === 1
+                  && verdict.reasons[0] === 'capability';
+                const confirmed = activePriorExperienceMovementIds.includes(movement.movement_id);
+                const reason = selectedElsewhere
+                  ? 'Already selected in another slot.'
+                  : formatTeachingOnlyReason(verdict);
+
+                const isFirstOfTier = index === 0 || pickerRows[index - 1]?.tier !== tier;
+                const showTier1BeforeTier2 = isFirstOfTier && tier === 2 && index === 0 && (collapsedTiers[1] || pickerTierBuckets[1].length === 0);
+                const showTier1BeforeTier3 = isFirstOfTier && tier === 3 && index === 0 && (collapsedTiers[1] || pickerTierBuckets[1].length === 0);
+                const showTier2BeforeTier3 = isFirstOfTier && tier === 3 && (
+                  (index === 0 && (collapsedTiers[2] || pickerTierBuckets[2].length === 0)) ||
+                  (index > 0 && pickerRows[index - 1]?.tier === 1 && (collapsedTiers[2] || pickerTierBuckets[2].length === 0))
+                );
+
+                return (
+                  <View key={`row-wrap-${movement.movement_id}`}>
+                    {showTier1BeforeTier2 && renderTierHeader(1)}
+                    {showTier1BeforeTier3 && renderTierHeader(1)}
+                    {showTier2BeforeTier3 && renderTierHeader(2)}
+                    {isFirstOfTier && renderTierHeader(tier)}
+                    <View
+                      testID={`movement-picker-row-${movement.movement_id}`}
+                      style={[styles.pickerItem, !executable && styles.pickerItemDisabled]}
+                    >
+                      <View style={styles.pickerItemRow}>
+                        <Pressable
+                          disabled={!executable}
+                          onPress={() => selectMovementForSlot(movement.movement_id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Choose ${movement.name}`}
+                          accessibilityHint={executable ? `Available ${movement.difficulty} movement` : reason}
+                          accessibilityState={{ disabled: !executable }}
+                          style={styles.pickerItemMain}
+                        >
+                          <Text style={[styles.pickerItemName, !executable && styles.pickerItemNameDisabled]}>
+                            {movement.name}
+                          </Text>
+                          {recommendation !== undefined && (
+                            <Text
+                              style={styles.suggestionBadgeText}
+                              accessibilityLabel={`Suggested ${slots[pickerSlotIndex ?? 0]?.role ?? 'movement'} rank ${recommendation.rank}: ${recommendation.reason}`}
+                            >
+                              #{recommendation.rank} SUGGESTED · {recommendation.reason}
+                            </Text>
+                          )}
+                          <Text style={styles.reasonText}>
+                            {executable ? `${movement.difficulty} · Available` : reason}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          testID={`toggle-movement-detail-${movement.movement_id}`}
+                          onPress={() => setExpandedMovementDetailId((current) => current === movement.movement_id ? null : movement.movement_id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={expandedMovementDetailId === movement.movement_id ? `Hide details for ${movement.name}` : `View details for ${movement.name}`}
+                          accessibilityState={{ expanded: expandedMovementDetailId === movement.movement_id }}
+                          style={styles.detailToggleButton}
+                        >
+                          <Text style={styles.detailToggleText}>
+                            {expandedMovementDetailId === movement.movement_id ? 'Hide details ▴' : 'Details ▾'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      {expandedMovementDetailId === movement.movement_id && (
+                        <View style={styles.movementDetailCard} testID={`movement-detail-card-${movement.movement_id}`}>
+                          {Boolean(movement.cues && movement.cues.trim().length > 0) && (
+                            <View style={styles.movementDetailSection}>
+                              <Text style={styles.movementDetailSectionTitle}>Coaching cues</Text>
+                              <Text style={styles.movementDetailBody}>{movement.cues}</Text>
+                            </View>
+                          )}
+                          {Boolean(movement.instructions && movement.instructions.trim().length > 0) && (
+                            <View style={styles.movementDetailSection}>
+                              <Text style={styles.movementDetailSectionTitle}>How to do it</Text>
+                              <Text style={styles.movementDetailBody}>{movement.instructions}</Text>
+                            </View>
+                          )}
+                          {Boolean(movement.targetMuscles && movement.targetMuscles.length > 0) && (
+                            <View style={styles.movementDetailSection}>
+                              <Text style={styles.movementDetailSectionTitle}>Works</Text>
+                              <Text style={styles.movementDetailBody}>{movement.targetMuscles.join(', ')}</Text>
+                            </View>
+                          )}
+                          <View style={styles.movementDetailSection}>
+                            <Text style={styles.movementDetailSectionTitle}>Difficulty</Text>
+                            <Text style={styles.movementDetailBody}>{movement.difficulty}</Text>
+                          </View>
+                          {!movement.cues && !movement.instructions && (!movement.targetMuscles || movement.targetMuscles.length === 0) && (
+                            <Text style={styles.movementDetailEmpty}>No notes for this movement yet.</Text>
+                          )}
+                          {executable && (
+                            <Pressable
+                              testID={`select-from-detail-${movement.movement_id}`}
+                              onPress={() => selectMovementForSlot(movement.movement_id)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Select ${movement.name}`}
+                              style={styles.selectFromDetailButton}
+                            >
+                              <Text style={styles.selectFromDetailButtonText}>Select movement</Text>
+                            </Pressable>
+                          )}
+                        </View>
+                      )}
+                      {canConfirm && (
+                        <Pressable
+                          testID={`confirm-prior-experience-${movement.movement_id}`}
+                          onPress={() => requestPriorExperienceConfirmation(movement)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Confirm prior experience for ${movement.name}`}
+                          style={styles.declarationButton}
+                        >
+                          <Text style={styles.declarationButtonText}>CONFIRM PRIOR EXPERIENCE</Text>
+                        </Pressable>
+                      )}
+                      {pickerView === 'all' && confirmed && (
+                        <Pressable
+                          testID={`revoke-prior-experience-${movement.movement_id}`}
+                          onPress={() => requestPriorExperienceRevocation(movement)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Revoke prior experience for ${movement.name}`}
+                          style={styles.declarationButton}
+                        >
+                          <Text style={styles.declarationButtonText}>REVOKE EXPERIENCE</Text>
+                        </Pressable>
                       )}
                     </View>
-                    <Text style={styles.badgeText}>
-                      {isAvailable ? 'Available' : 'Teaching Only'}
-                    </Text>
-                  </Pressable>
+                  </View>
                 );
-              })}
-            </ScrollView>
+              }}
+            />
             <SecondaryButton
               label="Close"
-              onPress={() => setPickerSlotIndex(null)}
+              onPress={closePicker}
               accessibilityLabel="Close movement picker"
             />
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* Actions */}
       <View style={styles.actionRow}>
@@ -545,7 +1324,7 @@ export function RoutineTemplateBuilder({
           />
         )}
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -557,6 +1336,16 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.space[4],
     gap: theme.space[4],
+  },
+  lockedContainer: {
+    padding: theme.space[5],
+    justifyContent: 'center',
+    gap: theme.space[4],
+  },
+  lockedBody: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    lineHeight: 22,
   },
   title: {
     ...theme.font.title,
@@ -591,7 +1380,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[3],
   },
   schemaRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: theme.space[2],
   },
   schemaChip: {
@@ -603,6 +1392,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.ink1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
   },
   schemaChipSelected: {
     borderColor: theme.color.textHi,
@@ -624,9 +1415,10 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   slotHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    // Give wrapped controls the full card width, including at large font scales.
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: theme.space[2],
   },
   slotIndexLabel: {
     ...theme.font.label,
@@ -637,7 +1429,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.space[1],
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
   },
   orderButton: {
     minHeight: 36,
@@ -700,6 +1492,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space[2],
   },
+  doseGroup: {
+    gap: theme.space[2],
+  },
   doseField: {
     flex: 1,
     gap: theme.space[1],
@@ -714,11 +1509,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: theme.space[2],
   },
+  projectedDose: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  projectedDoseText: {
+    ...theme.font.body,
+    color: theme.color.textHi,
+  },
+  projectionNote: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    lineHeight: 17,
+  },
   addSlotRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space[2],
     marginTop: theme.space[1],
+    flexWrap: 'wrap',
   },
   captionText: {
     ...theme.font.label,
@@ -741,9 +1550,8 @@ const styles = StyleSheet.create({
     color: theme.color.chalk,
   },
   previewSlotRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingVertical: theme.space[1],
+    gap: theme.space[1],
   },
   previewSlotName: {
     ...theme.font.body,
@@ -776,16 +1584,102 @@ const styles = StyleSheet.create({
     ...theme.font.title,
     color: theme.color.textHi,
   },
+  pickerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.space[3],
+  },
+  pickerViewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  suggestionNote: {
+    borderLeftWidth: 2,
+    borderLeftColor: theme.color.textHi,
+    paddingLeft: theme.space[2],
+    gap: theme.space[1],
+  },
+  suggestionTitle: {
+    ...theme.font.eyebrow,
+    color: theme.color.textHi,
+  },
+  suggestionBadgeText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textHi,
+    fontSize: 10,
+  },
   pickerList: {
     flex: 1,
   },
-  pickerItem: {
+  tierHeaderContainer: {
+    marginTop: theme.space[3],
+    marginBottom: theme.space[1],
+  },
+  tierHeaderButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: theme.space[2],
+    paddingHorizontal: theme.space[3],
+    backgroundColor: theme.color.ink0,
+    borderRadius: theme.radius.chip,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+  },
+  tierHeaderTitle: {
+    ...theme.font.eyebrow,
+    color: theme.color.textHi,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  tierHeaderChevron: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    fontSize: 12,
+  },
+  tier3CaptionText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: theme.space[1],
+    paddingHorizontal: theme.space[1],
+  },
+  schemaChipContainer: {
+    // The container must flex: its child chip uses flex: 1, which resolves
+    // flexBasis to 0. Without a definite width to grow into, the chip collapsed
+    // to its border box (~5 px) while the intrinsically-sized InfoTip kept its
+    // width, leaving the loading-method labels invisible and untappable.
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space[2],
+  },
+  addSlotChipWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  doseFieldLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pickerItem: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    paddingVertical: theme.space[2],
     borderBottomWidth: 1,
     borderBottomColor: theme.color.line,
+    gap: theme.space[2],
+  },
+  pickerItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    gap: theme.space[2],
   },
   pickerItemDisabled: {
     opacity: 0.5,
@@ -793,6 +1687,8 @@ const styles = StyleSheet.create({
   pickerItemMain: {
     flex: 1,
     gap: 2,
+    minHeight: theme.touch.min,
+    justifyContent: 'center',
   },
   pickerItemName: {
     ...theme.font.body,
@@ -800,6 +1696,59 @@ const styles = StyleSheet.create({
   },
   pickerItemNameDisabled: {
     color: theme.color.textLow,
+  },
+  detailToggleButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailToggleText: {
+    ...theme.font.label,
+    color: theme.color.chalk,
+    fontSize: 12,
+  },
+  movementDetailCard: {
+    width: '100%',
+    marginTop: theme.space[1],
+    padding: theme.space[3],
+    backgroundColor: theme.color.ink1,
+    borderRadius: theme.radius.control,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    gap: theme.space[2],
+  },
+  movementDetailSection: {
+    gap: 2,
+  },
+  movementDetailSectionTitle: {
+    ...theme.font.eyebrow,
+    color: theme.color.textLow,
+  },
+  movementDetailBody: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  movementDetailEmpty: {
+    ...theme.font.body,
+    color: theme.color.textLow,
+    fontStyle: 'italic',
+    fontSize: 13,
+  },
+  selectFromDetailButton: {
+    marginTop: theme.space[2],
+    backgroundColor: theme.color.chalk,
+    paddingVertical: theme.space[2],
+    paddingHorizontal: theme.space[3],
+    borderRadius: theme.radius.control,
+    alignItems: 'center',
+  },
+  selectFromDetailButtonText: {
+    ...theme.font.label,
+    color: theme.color.onChalk,
+    fontWeight: '700',
   },
   reasonText: {
     ...theme.font.label,
@@ -809,6 +1758,28 @@ const styles = StyleSheet.create({
   badgeText: {
     ...theme.font.eyebrow,
     color: theme.color.textMid,
+  },
+  declarationButton: {
+    minHeight: 36,
+    maxWidth: 132,
+    paddingHorizontal: theme.space[2],
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  declarationButtonText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textHi,
+    fontSize: 9,
+    textAlign: 'center',
+  },
+  emptyPickerText: {
+    ...theme.font.body,
+    color: theme.color.textMid,
+    paddingVertical: theme.space[5],
+    textAlign: 'center',
   },
   actionRow: {
     gap: theme.space[2],

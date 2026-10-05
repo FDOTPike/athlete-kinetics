@@ -1,13 +1,36 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { BackHandler, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
+import { NavigationProvider } from '../../src/navigation/navigation';
 
 let mockState;
+const mockBackupState = {
+  status: 'idle', startupSafe: true, recoveryAvailable: false, message: null, lastSuccessfulBackupAt: null, preview: null,
+  initialize: jest.fn(), createBackup: jest.fn(), chooseRestore: jest.fn(),
+  reviewRecovery: jest.fn(), confirmRestore: jest.fn(), cancelRestore: jest.fn(),
+};
+
+jest.mock('@ak/inference', () => ({
+  ...jest.requireActual('@ak/inference'),
+  defaultLoadPreference: (age) => age === 'advanced' || age === 'elite' ? 'manual' : 'auto',
+  transitionLoadPreference: (from, to, current, explicit) => {
+    if (to === 'beginner') return 'auto';
+    if (from === 'beginner') return to === 'advanced' || to === 'elite' ? 'manual' : 'auto';
+    if (explicit) return current;
+    return to === 'advanced' || to === 'elite' ? 'manual' : 'auto';
+  },
+}));
 
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
   useStore: (selector) => selector(mockState),
+}));
+
+jest.mock('../../src/state/backupStore', () => ({
+  useBackupStore: (selector) => selector(mockBackupState),
 }));
 
 const baseProfile = {
@@ -24,21 +47,64 @@ const baseProfile = {
   equipment_inventory: ['barbell', 'dumbbells', 'bench'],
 };
 
+
+// R2: capture the hardwareBackPress listener NavigationProvider registers, then
+// press it the way Android does (newest listener first).
+function captureHardwareBack() {
+  const listeners = [];
+  const spy = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((eventName, listener) => {
+    if (eventName === 'hardwareBackPress') listeners.push(listener);
+    return { remove: () => { const index = listeners.indexOf(listener); if (index >= 0) listeners.splice(index, 1); } };
+  });
+  return {
+    press: () => {
+      let handled = false;
+      act(() => {
+        for (let index = listeners.length - 1; index >= 0 && !handled; index -= 1) handled = listeners[index]() === true;
+      });
+      return handled;
+    },
+    restore: () => spy.mockRestore(),
+  };
+}
+
+// The focus screen (coaching work order 2) sits between goal and experience.
+// The tests in this file predate it and are about OTHER screens, so these two
+// helpers walk straight through it, leaving its default answer (balanced whole
+// body) in place. The focus and target screens themselves are covered in
+// OnboardingFocusGoal.test.js.
+const pressNext = () => {
+  fireEvent.press(screen.getByLabelText('Next'));
+  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Next'));
+};
+const pressBack = () => {
+  fireEvent.press(screen.getByLabelText('Back'));
+  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Back'));
+};
+
 describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   let deleteAthleteMock;
   let wipeBlockStateMock;
   let switchProfileMock;
+  let saveLoadPreferenceMock;
 
   beforeEach(() => {
     deleteAthleteMock = jest.fn();
     wipeBlockStateMock = jest.fn();
     switchProfileMock = jest.fn();
+    saveLoadPreferenceMock = jest.fn();
 
     mockState = {
+      // A booted store: ProfileScreen reads the database (availability verdicts,
+      // recent outcomes, measured history) only once status is 'ready'.
+      status: 'ready',
       profile: baseProfile,
       saveProfile: jest.fn(),
       uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
       saveUiPreferences: jest.fn(),
+      loadPreference: 'auto',
+      loadPreferenceExplicit: false,
+      saveLoadPreference: saveLoadPreferenceMock,
       bandLadder: [{ level: 1, label: 'Red Band' }],
       saveBandLevel: jest.fn(),
       deleteBandLevel: jest.fn(),
@@ -46,9 +112,30 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       oneRepMaxes: {},
       saveOneRepMax: jest.fn(),
       today: '2026-07-15',
+      activityLedger: {
+        definitions: [], series: [], occurrences: [], completedLast28Days: 0,
+        knownMinutesLast28Days: 0, completedWithUnknownDuration: 0,
+        scheduledKnownMinutesPerWeek: 0, scheduledWithUnknownDuration: 0,
+      },
+      saveWeeklyActivity: jest.fn(),
+      saveOneOffActivity: jest.fn(),
+      completeActivityOccurrence: jest.fn(),
+      setActivityOccurrenceState: jest.fn(),
+      endActivitySeries: jest.fn(),
       importHistory: jest.fn(() => ({ committed: false, duplicate: false, preview: { sessions: [], errors: [], warnings: [], unknownMovementNames: [], formatVersion: null } })),
       saveBodyweight: jest.fn(),
       loadMeasuredHistory: jest.fn(() => []),
+      loadCoachDiagnosticContext: jest.fn(() => ({ sessionsToday: 0, trainedDaysLast7: 0 })),
+      loadCoachMovementAccessContext: jest.fn(() => ({
+        edges: [],
+        evidence: [],
+        attestedEdgeKeys: [],
+        safetyExcludedMovementIds: [],
+        priorExperienceMovementIds: [],
+      })),
+      vector: null,
+      blockSessions: [],
+      getMovementAvailabilityVerdicts: jest.fn(() => []),
       biometricsStatus: 'idle',
       syncBiometrics: jest.fn(),
       requestBiometricsAccess: jest.fn(),
@@ -68,7 +155,10 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       createAthlete: jest.fn(),
       renameAthleteEntry: jest.fn(),
       deleteAthlete: deleteAthleteMock,
+      advancedToolsUnlocked: false,
+      setAdvancedToolsUnlocked: jest.fn(),
       completeOnboarding: jest.fn(),
+      beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(),
       loadRecentOutcomes: () => [
         { outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 },
@@ -83,12 +173,16 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<ProfileScreen />);
 
     expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+    expect(screen.getByTestId('training-guidance-safety-notice')).toBeOnTheScreen();
+    expect(screen.getByLabelText(/Training guidance safety notice/)).toBeOnTheScreen();
+    expect(screen.getByText(/pikeMethods provides training guidance, not medical advice/)).toBeOnTheScreen();
     // Steppers render with Decrease/Increase accessibility labels
     expect(screen.getByLabelText('Decrease 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
     expect(screen.getByLabelText('Increase 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
   });
 
   test('b) Coach Mode athlete delete requires two presses before store action fires', () => {
+    mockState.advancedToolsUnlocked = true;
     render(<ProfileScreen />);
 
     // Expand Coach Mode
@@ -108,6 +202,34 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
 
     // Assert action IS called on 2nd press
     expect(deleteAthleteMock).toHaveBeenCalledWith('ath-2');
+  });
+
+  test('advanced athlete management and Lab are hidden until the seven-tap gesture', () => {
+    render(<ProfileScreen />);
+
+    expect(screen.queryByTestId('advanced-athlete-manager')).toBeNull();
+    expect(screen.queryByTestId('advanced-tools-section')).toBeNull();
+    for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Build 0.1.0'));
+    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledTimes(1);
+    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(true);
+  });
+
+  test('unlocked tools expose the sandbox Lab and explicit relock', () => {
+    mockState.advancedToolsUnlocked = true;
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('advanced-athlete-manager')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Open Coach Verification Lab'));
+    expect(screen.getByTestId('coach-verification-lab')).toBeOnTheScreen();
+    expect(screen.getByTestId('lab-no-write-notice')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Run all verification scenarios'));
+    expect(screen.getByTestId('lab-module-prescription')).toBeOnTheScreen();
+    expect(screen.getByTestId('lab-module-session')).toBeOnTheScreen();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+    expect(mockState.saveBodyweight).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Close Coach Verification Lab'));
+    fireEvent.press(screen.getByLabelText('Relock advanced tools'));
+    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(false);
   });
 
   test('b) Block wipe requires two presses before store action fires', () => {
@@ -154,14 +276,665 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.queryByText(/docs\/AK_HISTORY_V1\.md/)).toBeNull();
   });
 
+  test('ships the offline movement catalogue data-source acknowledgement', () => {
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('data-sources-acknowledgement')).toBeOnTheScreen();
+    expect(screen.getByText('DATA SOURCES')).toBeOnTheScreen();
+    expect(screen.getAllByText(/free-exercise-db/)).toHaveLength(2);
+    expect(screen.getByText(/released under the Unlicense/)).toBeOnTheScreen();
+  });
+
   test('renders OnboardingScreen wizard correctly using shared primitives', () => {
     render(<OnboardingScreen />);
 
+    expect(screen.getByTestId('onboarding-scroll-view')).toBeOnTheScreen();
     expect(screen.getByText(/YOUR COACH\./)).toBeOnTheScreen();
     expect(screen.getByPlaceholderText('Your name')).toBeOnTheScreen();
 
     // Navigate to goal step
-    fireEvent.press(screen.getByLabelText('Next'));
+    pressNext();
     expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
+  });
+
+  test('WO-02 uses supportive weight-loss and week-ceiling copy exactly', () => {
+    render(<OnboardingScreen />);
+    pressNext();
+    expect(screen.getByLabelText(/WEIGHT-LOSS SUPPORT/)).toBeOnTheScreen();
+    const goal = screen.getByRole('button', { name: /WEIGHT-LOSS SUPPORT\. Stay active/ });
+    expect(StyleSheet.flatten(goal.props.style)).toMatchObject({ minHeight: 56, flex: 1 });
+    expect(screen.getByText('WEIGHT-LOSS SUPPORT').props.numberOfLines).toBeUndefined();
+    expect(screen.getByText('Stay active and keep your muscle').props.numberOfLines).toBeUndefined();
+    expect(screen.queryByText(/fat[- ]loss/i)).toBeNull();
+    pressNext();
+    pressNext();
+    expect(screen.getByText('Choose a week that feels manageable. A realistic ceiling beats an optimistic one. You can change this later in Athlete Profile.')).toBeOnTheScreen();
+  });
+
+  test('WO-02 experience choices wrap vertically and expose distinct selection and information actions', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+
+    const selection = screen.getByRole('button', { name: /NEW TO THIS\. Under a year/ });
+    const info = screen.getByRole('button', { name: 'What does NEW TO THIS mean?' });
+    expect(screen.getAllByLabelText(/^What does (NEW TO THIS|SOME MILEAGE|EXPERIENCED|COMPETITIVE) mean\?$/)).toHaveLength(4);
+    expect(selection).not.toBe(info);
+    expect(selection.props.accessibilityState.selected).toBe(false);
+    expect(StyleSheet.flatten(selection.props.style)).toMatchObject({ minHeight: 56, flex: 1 });
+    expect(screen.getByText('Under a year of consistent training, or returning after a long break').props.numberOfLines).toBeUndefined();
+
+    fireEvent.press(info);
+    expect(screen.getByRole('header', { name: 'NEW TO THIS' })).toBeOnTheScreen();
+    expect(screen.getByText(/Choose this if structured training is still new/).props.accessible).toBe(true);
+    expect(selection.props.accessibilityState.selected).toBe(false);
+    fireEvent.press(screen.getByLabelText('Dismiss explanation'));
+    fireEvent.press(selection);
+    expect(screen.getByRole('button', { name: /NEW TO THIS\. Under a year/ }).props.accessibilityState.selected).toBe(true);
+  });
+
+  test('WO-02 equipment presets and visible custom items are stacked, wrapping choices with separate information actions', () => {
+    render(<OnboardingScreen />);
+    advance(4);
+
+    const preset = screen.getByRole('button', { name: /FULL GYM\. A broad setup/ });
+    expect(StyleSheet.flatten(preset.props.style)).toMatchObject({ minHeight: 56, flex: 1 });
+    expect(screen.getByRole('button', { name: 'What does FULL GYM mean?' })).not.toBe(preset);
+    fireEvent.press(screen.getByLabelText('Customize equipment'));
+    expect(screen.getByRole('header', { name: 'SPECIALIST' })).toBeOnTheScreen();
+    const barbell = screen.getByRole('button', { name: /BARBELL\. A straight bar/ });
+    const boards = screen.getByRole('button', { name: /Specialist equipment BOARDS\. Stable training boards/ });
+    expect(screen.getByRole('button', { name: 'What does BARBELL mean?' })).not.toBe(barbell);
+    expect(boards.props.accessibilityState.selected).toBe(false);
+    expect(screen.getAllByLabelText(/^What does .* mean\?$/)).toHaveLength(14);
+    expect(screen.getByText('A straight bar loaded with weight plates.').props.numberOfLines).toBeUndefined();
+  });
+
+  test('WO-02 review uses scrollable sections and edit routing preserves the complete draft', () => {
+    render(<OnboardingScreen />);
+    fireEvent.changeText(screen.getByLabelText('Your name'), 'Ari');
+    pressNext();
+    fireEvent.press(screen.getByLabelText(/WEIGHT-LOSS SUPPORT/));
+    pressNext();
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    pressNext();
+    fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
+    pressNext();
+    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. No equipment/ }));
+    pressNext();
+    fireEvent.press(screen.getByLabelText('No, nothing to note'));
+    pressNext();
+
+    for (const heading of ['GOAL', 'EXPERIENCE', 'YOUR WEEK', 'EQUIPMENT', 'TRAINING SUPPORT']) {
+      expect(screen.getByRole('header', { name: heading })).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: `Edit ${heading.toLowerCase()}` })).toBeOnTheScreen();
+    }
+    const scroll = screen.getByTestId('onboarding-scroll-view');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+    fireEvent.press(screen.getByLabelText('Edit experience'));
+    expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: /EXPERIENCED\. 3\+ years/ }).props.accessibilityState.selected).toBe(true);
+    pressBack();
+    expect(screen.getByRole('button', { name: /WEIGHT-LOSS SUPPORT/ }).props.accessibilityState.selected).toBe(true);
+  });
+
+  test.each([
+    ['goal', 'WHAT ARE WE TRAINING FOR?'],
+    ['experience', 'HOW LONG HAVE YOU BEEN TRAINING?'],
+    ['your week', 'YOUR WEEK'],
+    ['equipment', 'WHAT CAN YOU GET YOUR HANDS ON?'],
+    ['training support', 'ANY TRAINING NOTES TO RECORD?'],
+  ])('WO-02 Edit %s returns to its source field', (section, expectedHeading) => {
+    render(<OnboardingScreen />);
+    advanceAnsweringLimits(6, 0);
+    fireEvent.press(screen.getByLabelText(`Edit ${section}`));
+    expect(screen.getByText(expectedHeading)).toBeOnTheScreen();
+  });
+
+  test('training notes are described as non-executable records, not coaching adaptations', () => {
+    render(<OnboardingScreen />);
+    advance(5);
+
+    expect(screen.getByText('ANY TRAINING NOTES TO RECORD?')).toBeOnTheScreen();
+    expect(screen.getByText("Optional notes for your records. These notes do not change the coach's recommendations or replace medical advice.")).toBeOnTheScreen();
+    expect(screen.getByText('Choose YES or NO to continue. This records your answer; it does not change recommendations.')).toBeOnTheScreen();
+    expect(screen.queryByText(/coach should respect/i)).toBeNull();
+    expect(screen.queryByText(/coach plans around limitations/i)).toBeNull();
+  });
+
+  test('Profile load selection is editable for non-beginners when no session is active', () => {
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('profile-load-selection-row')).toBeOnTheScreen();
+    expect(screen.getByTestId('profile-load-pref-auto').props.accessibilityState.selected).toBe(true);
+    fireEvent.press(screen.getByTestId('profile-load-pref-manual'));
+    expect(saveLoadPreferenceMock).toHaveBeenCalledWith('manual');
+    expect(screen.getByText(/Applies to your next session\./)).toBeOnTheScreen();
+  });
+
+  test('profile multiline and numeric drafts survive editing and commit valid values', () => {
+    mockState.movements = [{ movement_id: 11, name: 'Competition Squat' }];
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('keyboard-aware-scroll-view')).toBeOnTheScreen();
+    const injury = screen.getByLabelText('Historical injuries, one per line');
+    fireEvent.changeText(injury, 'knee: old ACL\nshoulder: old dislocation');
+    expect(screen.getByLabelText('Historical injuries, one per line').props.value)
+      .toBe('knee: old ACL\nshoulder: old dislocation');
+    expect(mockState.saveProfile).toHaveBeenLastCalledWith({
+      injury_flags: [
+        { region: 'knee', note: 'old ACL' },
+        { region: 'shoulder', note: 'old dislocation' },
+      ],
+    });
+
+    const squat = screen.getByLabelText('SQUAT one rep max in kilograms, type to set');
+    expect(squat.props.keyboardType).toBe('numeric');
+    fireEvent.changeText(squat, '142.5');
+    expect(screen.getByLabelText('SQUAT one rep max in kilograms, type to set').props.value).toBe('142.5');
+    fireEvent(squat, 'endEditing', { nativeEvent: { text: '142.5' } });
+    expect(mockState.saveOneRepMax).toHaveBeenCalledWith(11, 142.5);
+  });
+
+  test('Profile load selection is disabled during an active session', () => {
+    mockState.session = { sessionId: 10, sets: [] };
+    render(<ProfileScreen />);
+
+    expect(screen.getByTestId('profile-load-pref-auto').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('profile-load-pref-manual').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByText('Finish the active session before changing load selection.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByTestId('profile-load-pref-manual'));
+    expect(saveLoadPreferenceMock).not.toHaveBeenCalled();
+  });
+
+  test('Profile omits the load-selection choice for beginners', () => {
+    mockState.profile = { ...baseProfile, training_age: 'beginner' };
+    render(<ProfileScreen />);
+    expect(screen.queryByTestId('profile-load-selection-row')).toBeNull();
+  });
+
+  const advance = (count) => {
+    for (let i = 0; i < count; i += 1) pressNext();
+  };
+  const retreat = (count) => {
+    for (let i = 0; i < count; i += 1) pressBack();
+  };
+  // Round 2 (ledger 0060): the limitations screen requires an explicit
+  // no/yes answer BEFORE NEXT enables — a full walk to review must answer
+  // it. Helpers that pass through the limits screen press the explicit No.
+  const advanceAnsweringLimits = (count, fromStep) => {
+    for (let i = 0; i < count; i += 1) {
+      pressNext();
+      if (fromStep + i === 4) { // arriving at limits (0-based step 5)
+        fireEvent.press(screen.getByLabelText('No, nothing to note'));
+      }
+    }
+  };
+
+  test('onboarding omits the load question for beginners and explains first-use history on summary', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    advanceAnsweringLimits(4, 2); // beginner flow is 7 screens; review is the 7th
+
+    expect(screen.queryByTestId('onboarding-loads-step')).toBeNull();
+    expect(screen.getByTestId('onboarding-summary-loads-row').props.children)
+      .toBe('LOADS — you choose the first; next time starts from what you logged');
+  });
+
+  test('onboarding preserves an explicit same-as-default choice across non-beginner tier churn', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
+    advanceAnsweringLimits(4, 2);
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
+
+    // Press the already-selected default: this is now an explicit athlete
+    // choice and must survive the destination tier's different default.
+    fireEvent.press(screen.getByTestId('onboarding-loads-auto'));
+    retreat(4);
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    advanceAnsweringLimits(4, 2);
+
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(false);
+  });
+
+  test('onboarding re-defaults a non-explicit preference after a non-beginner tier change', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
+    advanceAnsweringLimits(4, 2);
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
+
+    // No load chip was pressed, so the intermediate auto value is only a
+    // default. Advanced must independently derive its manual default.
+    retreat(4);
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    advanceAnsweringLimits(4, 2);
+
+    expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(false);
+  });
+
+  test('active session disables all TRAINING AGE chips and shows the load-authority hint', () => {
+    mockState = { ...mockState, session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] } };
+    render(<ProfileScreen />);
+    // Every TRAINING AGE chip must be disabled
+    for (const age of TRAINING_AGES) {
+      const chip = screen.getByLabelText(`2 · TRAINING AGE: ${age}`);
+      expect(chip.props.accessibilityState.disabled).toBe(true);
+    }
+    expect(screen.getByText('Training age cannot change during a session because it can change load authority.')).toBeOnTheScreen();
+  });
+
+  test('active session pressing a disabled TRAINING AGE chip does not call saveProfile', () => {
+    mockState = { ...mockState, session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] } };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('2 · TRAINING AGE: advanced'));
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+  });
+
+  test('LOAD SELECTION chips remain disabled during active session', () => {
+    mockState = {
+      ...mockState,
+      session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },
+      profile: { ...baseProfile, training_age: 'intermediate' },
+      loadPreference: 'auto',
+      saveLoadPreference: jest.fn(),
+    };
+    render(<ProfileScreen />);
+    expect(screen.getByTestId('profile-load-pref-auto').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('profile-load-pref-manual').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByText('Finish the active session before changing load selection.')).toBeOnTheScreen();
+  });
+
+  // R8 §2.4 — ChipRow is a permitted composition wrapper over the FROZEN Chip
+  // primitive. These assertions prove the wrapper forwards real Chip
+  // accessibility semantics for both a selected and an unselected option
+  // (the Stepper assertions in UIComponents cover NumberRow's other half).
+  test('ChipRow exposes shared Chip selected-state semantics for exactly one option', () => {
+    const { getByRole } = render(<ProfileScreen />);
+
+    // OBJECTIVES renders one chip per objective; 'hybrid' is baseProfile's value.
+    const objectives = ['strength', 'hypertrophy', 'power', 'endurance', 'gpp', 'hybrid', 'rehab', 'weight_loss'];
+    const selected = getByRole('button', { name: '1 · OBJECTIVE: hybrid' });
+    expect(selected.props.accessibilityState.selected).toBe(true);
+
+    const unselected = getByRole('button', { name: '1 · OBJECTIVE: strength' });
+    expect(unselected.props.accessibilityState.selected).toBe(false);
+    expect(unselected.props.accessibilityState.disabled).toBe(false);
+
+    // Exactly ONE of the row's chips claims the selected state.
+    const selectedCount = objectives.filter(
+      (o) => getByRole('button', {
+        name: `1 · OBJECTIVE: ${o.replace(/_/g, ' ')}`,
+      }).props.accessibilityState.selected,
+    ).length;
+    expect(selectedCount).toBe(1);
+  });
+
+  test('TRAINING AGE ChipRow keeps shared semantics and disables every chip during a session', () => {
+    mockState.session = { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] };
+    const { getByRole } = render(<ProfileScreen />);
+
+    for (const age of TRAINING_AGES) {
+      const chip = getByRole('button', { name: `2 · TRAINING AGE: ${age}` });
+      expect(chip.props.accessibilityState.disabled).toBe(true);
+      expect(chip.props.accessibilityState.selected).toBe(age === 'intermediate');
+    }
+  });
+
+  // --- The first-run screen contract ------------------------------------------
+  // WO §2.1 shortened the interview to seven screens. Coaching work order 2
+  // (owner-authorised, 2026-10-02) adds ONE screen for everyone — the focus
+  // question — so the flow is eight; a ninth appears only when the athlete says
+  // they have a specific target (covered in OnboardingFocusGoal.test.js).
+
+  test('first-run flow is eight screens, asks the focus question third, and combines days with minutes', () => {
+    render(<OnboardingScreen />);
+    expect(screen.getByLabelText('Step 1 of 8')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Next')); // goal
+    expect(screen.getByLabelText('Step 2 of 8')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Next')); // focus
+    expect(screen.getByLabelText('Step 3 of 8')).toBeOnTheScreen();
+    expect(screen.getByText('Is there an area that you want to work on?')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Next')); // experience
+    expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
+    pressNext(); // logistics
+    expect(screen.getByText('TRAINING DAYS PER WEEK')).toBeOnTheScreen();
+    expect(screen.getByText('MINUTES IN A SESSION, TOPS')).toBeOnTheScreen();
+    // The retired per-decision screens never appear anywhere in the flow.
+    for (const retired of ['HOW HARD SHOULD HARD DAYS GET?', 'THE SCIENCE BITS', 'WHO PICKS THE WEIGHTS?', 'MAX SESSIONS IN ONE DAY', 'HOW LONG IS A SESSION?']) {
+      expect(screen.queryByText(retired)).toBeNull();
+    }
+    pressNext(); // equipment
+    // Round 2: NEXT is disabled on limitations until an explicit answer.
+    pressNext(); // limits
+    expect(screen.getByLabelText('Next')).toBeDisabled();
+    fireEvent.press(screen.getByLabelText('No, nothing to note'));
+    expect(screen.getByLabelText('Next')).not.toBeDisabled();
+    pressNext();
+    expect(screen.getByLabelText('Step 8 of 8')).toBeOnTheScreen();
+  });
+
+  test('limitations asks one explicit no/yes; yes reveals notes, no clears drafts, review discloses', () => {
+    render(<OnboardingScreen />);
+    advance(3); // -> logistics
+    pressNext(); // equipment
+    pressNext(); // limits
+    expect(screen.queryByLabelText('Past injuries, one per line as region colon note')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Yes, let me add notes'));
+    expect(screen.getByLabelText('Past injuries, one per line as region colon note')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByLabelText('Past injuries, one per line as region colon note'), 'knee: old ACL');
+    expect(screen.getByLabelText('Past injuries, one per line as region colon note').props.value).toBe('knee: old ACL');
+    // "No" is an explicit clearing of the draft notes, not a silent skip.
+    fireEvent.press(screen.getByLabelText('No, nothing to note'));
+    expect(screen.queryByLabelText('Past injuries, one per line as region colon note')).toBeNull();
+    pressNext(); // review
+    expect(screen.getByTestId('onboarding-summary-limits-row').props.children.join(''))
+      .toBe('LIMITATIONS — none noted');
+  });
+
+  test('limitations drafts survive keyboard-era back and forward navigation until completion', () => {
+    render(<OnboardingScreen />);
+    advance(5);
+    fireEvent.press(screen.getByLabelText('Yes, let me add notes'));
+    fireEvent.changeText(
+      screen.getByLabelText('Past injuries, one per line as region colon note'),
+      'knee: old ACL',
+    );
+    fireEvent.changeText(
+      screen.getByLabelText('Mobility limits, one per line as region colon note'),
+      'ankle: limited dorsiflexion',
+    );
+
+    pressBack();
+    pressNext();
+    expect(screen.getByLabelText('Past injuries, one per line as region colon note').props.value)
+      .toBe('knee: old ACL');
+    expect(screen.getByLabelText('Mobility limits, one per line as region colon note').props.value)
+      .toBe('ankle: limited dorsiflexion');
+  });
+
+  test('nothing persists before Finish and back navigation keeps the draft', () => {
+    mockState.completeOnboarding = jest.fn();
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    fireEvent.press(screen.getByLabelText(/ALL-ROUND FITNESS/));
+    pressNext(); // goal -> experience
+    fireEvent.press(screen.getByRole('button', { name: /SOME MILEAGE\. 1–3 years/ }));
+    expect(mockState.completeOnboarding).not.toHaveBeenCalled();
+    // Android/back navigation walks the DRAFT back a step, keeping answers.
+    pressBack();
+    expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
+    expect(screen.getByLabelText(/ALL-ROUND FITNESS/).props.accessibilityState.selected).toBe(true);
+    expect(mockState.completeOnboarding).not.toHaveBeenCalled();
+  });
+
+  test('non-beginner load preference is visible and changeable on the review screen', () => {
+    render(<OnboardingScreen />);
+    advance(2);
+    fireEvent.press(screen.getByRole('button', { name: /SOME MILEAGE\. 1–3 years/ }));
+    advanceAnsweringLimits(4, 2); // review
+    expect(screen.getByTestId('onboarding-loads-step')).toBeOnTheScreen();
+    expect(screen.getByTestId('onboarding-loads-auto').props.accessibilityState.selected).toBe(true);
+    fireEvent.press(screen.getByTestId('onboarding-loads-manual'));
+    expect(screen.getByTestId('onboarding-loads-manual').props.accessibilityState.selected).toBe(true);
+    // Coach defaults are disclosed honestly with their later-editability.
+    expect(screen.getByText(/EDIT ANYTIME IN ATHLETE PROFILE/)).toBeOnTheScreen();
+  });
+
+  // --- W1 Red Test: Athlete/Profile Offline Glossary Sub-view (WO §7.2 Item 15) ---
+
+  test('[Item 15] Athlete/Profile contains an entry point to open offline Glossary sub-view without a sixth root tab, and sub-view back returns without tab change', () => {
+    const { getByRole, getByText } = render(
+      <NavigationProvider initialTab="athlete">
+        <ProfileScreen />
+      </NavigationProvider>,
+    );
+
+    // ProfileScreen must contain an accessible button/row to open Glossary
+    const glossaryButton = getByRole('button', { name: /glossary|terminology/i });
+    expect(glossaryButton).toBeOnTheScreen();
+
+    // Opening Glossary sub-view renders Glossary screen
+    fireEvent.press(glossaryButton);
+    expect(getByText(/GLOSSARY/i)).toBeOnTheScreen();
+
+    // Closing Glossary via back button returns to Athlete Profile without tab change
+    const backButton = getByRole('button', { name: /back to athlete/i });
+    expect(backButton).toBeOnTheScreen();
+    fireEvent.press(backButton);
+
+    // ProfileScreen content is restored
+    expect(getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+  });
+
+  test('WO-05 opens the factual activity ledger from Profile and returns without adding a root tab', () => {
+    render(
+      <NavigationProvider initialTab="athlete">
+        <ProfileScreen />
+      </NavigationProvider>,
+    );
+    fireEvent.press(screen.getByRole('button', { name: 'Open your existing activities' }));
+    expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'YOUR ACTIVITIES' })).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Back to athlete profile' }));
+    expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+  });
+
+  test('R2 inside Profile, hardware Back closes Activities completion, then the entry form, keeps both drafts, and only then leaves Activities', () => {
+    mockState.activityLedger = { ...mockState.activityLedger, occurrences: [{
+        occurrenceId: 'occurrence-plan', activityId: 'activity-1', displayName: 'Walk',
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: 30, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      }] };
+    const hardwareBack = captureHardwareBack();
+    try {
+      const tree = () => (
+        <NavigationProvider initialTab="athlete">
+          <ProfileScreen />
+        </NavigationProvider>
+      );
+      const view = render(tree());
+      fireEvent.press(screen.getByRole('button', { name: 'Open your existing activities' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      fireEvent.changeText(screen.getByLabelText('Activity name shown in the app'), 'Rock climbing');
+      fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+      fireEvent.changeText(screen.getByLabelText('Actual activity duration in minutes'), '25');
+      // A later re-render of the Profile host (for example a store update) must
+      // not move its "close Activities" handler ahead of the nested views.
+      view.rerender(tree());
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-completion-form')).toBeNull();
+      expect(screen.getByTestId('activity-entry-form')).toBeOnTheScreen();
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-entry-form')).toBeNull();
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      expect(screen.getByLabelText('Activity name shown in the app').props.value).toBe('Rock climbing');
+      fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+      expect(screen.getByLabelText('Actual activity duration in minutes').props.value).toBe('25');
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activities-screen')).toBeNull();
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(mockState.saveOneOffActivity).not.toHaveBeenCalled();
+      expect(mockState.saveWeeklyActivity).not.toHaveBeenCalled();
+      expect(mockState.completeActivityOccurrence).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+    }
+  }, 30000);
+});
+
+// ---------------------------------------------------------------------------
+// OW-001 load-intent declaration surface (audit W3/W4)
+//
+// Three defects this covers, all found by the stacked-PR audit against the
+// first implementation of this section:
+//   * it offered choices for movements the athlete cannot currently do, while
+//     an authoritative athlete-facing availability contract already existed;
+//   * it labelled the options with the internal vocabulary (DB / BB / KB);
+//   * a failed save was completely silent, because ProfileScreen mounts no
+//     error surface of its own — the same defect class as OW-007's resume path.
+// ---------------------------------------------------------------------------
+describe('OW-001 load-intent declaration surface', () => {
+  // Real shipped-corpus shapes. WALKING_LUNGE is the reviewer counterexample:
+  // it requires NO equipment, so the movement-level availability gate always
+  // says "available", yet it offers BB and DB.
+  const WALKING_LUNGE = { movement_id: 40, name: 'Walking Lunge', supportedPrefixes: ['Bodyweight', 'DB', 'BB'] };
+  const PUSH_UP = { movement_id: 41, name: 'Push-up', supportedPrefixes: ['Bodyweight', 'Banded'] };
+  const OVERHEAD_PRESS = { movement_id: 42, name: 'Overhead Press', supportedPrefixes: ['BB', 'DB', 'KB'] };
+  const BENCH = { movement_id: 43, name: 'Bench Press', supportedPrefixes: ['BB'] };
+  const LOCKED = { movement_id: 44, name: 'Nordic Curl', supportedPrefixes: ['Bodyweight', 'Banded'] };
+
+  // The three inventories the reviewer named.
+  const MINIMAL = [];
+  const HOME = ['dumbbells', 'bands', 'mats'];
+  const FULL_GYM = ['barbell', 'squat_rack', 'bench', 'dumbbells', 'kettlebell', 'pullup_bar', 'nordic_bench', 'bands', 'cable_machine', 'mats'];
+
+  let saveIntent;
+
+  const setup = (overrides = {}) => {
+    saveIntent = overrides.saveMovementLoadIntent ?? jest.fn(() => true);
+    mockState = {
+      ...mockState,
+      profile: { ...baseProfile, equipment_inventory: overrides.inventory ?? FULL_GYM },
+      movements: [WALKING_LUNGE, PUSH_UP, OVERHEAD_PRESS, BENCH, LOCKED],
+      loadIntents: overrides.loadIntents ?? {},
+      saveMovementLoadIntent: saveIntent,
+      movementAvailabilityRevision: 0,
+      niggles: [],
+      // LOCKED is deliberately unavailable at movement level.
+      getMovementAvailabilityVerdicts: jest.fn(() => [
+        { movementId: WALKING_LUNGE.movement_id, state: 'available' },
+        { movementId: PUSH_UP.movement_id, state: 'available' },
+        { movementId: OVERHEAD_PRESS.movement_id, state: 'available' },
+        { movementId: BENCH.movement_id, state: 'available' },
+        { movementId: LOCKED.movement_id, state: 'blocked' },
+      ]),
+    };
+    render(<ProfileScreen />);
+  };
+
+  const offered = (m) => ['Bodyweight', 'DB', 'BB', 'KB', 'Banded', 'Cable']
+    .filter((p) => screen.queryByTestId(`load-intent-${m.movement_id}-${p}`) !== null);
+
+  // --- P1: implement options must respect the inventory ---------------------
+  // A movement equipment requirement gates the MOVEMENT, never the implement.
+  // Walking Lunge requires nothing, so the availability gate alone let an
+  // athlete with no barbell see, and save, a barbell lunge.
+
+  test('P1 minimal inventory: Walking Lunge offers no loaded option, so it is not shown at all', () => {
+    setup({ inventory: MINIMAL });
+    // Only Bodyweight survives, and one option is not a choice.
+    expect(screen.queryByTestId(`load-intent-row-${WALKING_LUNGE.movement_id}`)).toBeNull();
+    // Nothing at all is offered: no equipment means no implement decisions.
+    expect(screen.queryByTestId('profile-load-intent-section')).toBeNull();
+  });
+
+  test('P1 home inventory: Walking Lunge offers Bodyweight and Dumbbell, never Barbell', () => {
+    setup({ inventory: HOME });
+    expect(screen.getByTestId(`load-intent-row-${WALKING_LUNGE.movement_id}`)).toBeOnTheScreen();
+    expect(offered(WALKING_LUNGE)).toEqual(['Bodyweight', 'DB']);
+    expect(screen.queryByTestId(`load-intent-${WALKING_LUNGE.movement_id}-BB`)).toBeNull();
+    // Overhead Press supports BB/DB/KB but this athlete owns only dumbbells,
+    // so a single survivor means nothing to choose and no row.
+    expect(screen.queryByTestId(`load-intent-row-${OVERHEAD_PRESS.movement_id}`)).toBeNull();
+  });
+
+  test('P1 full gym: every supported implement is offered', () => {
+    setup({ inventory: FULL_GYM });
+    expect(offered(WALKING_LUNGE)).toEqual(['Bodyweight', 'DB', 'BB']);
+    expect(offered(OVERHEAD_PRESS)).toEqual(['DB', 'BB', 'KB']);
+    expect(offered(PUSH_UP)).toEqual(['Bodyweight', 'Banded']);
+  });
+
+  test('P1 a bandless athlete is never offered the Banded option', () => {
+    setup({ inventory: ['barbell', 'dumbbells', 'bench'] });
+    // Push-up is Bodyweight/Banded; without bands only one survives.
+    expect(screen.queryByTestId(`load-intent-row-${PUSH_UP.movement_id}`)).toBeNull();
+    expect(screen.queryByTestId(`load-intent-${PUSH_UP.movement_id}-Banded`)).toBeNull();
+    // Walking Lunge still has a real choice for this athlete.
+    expect(offered(WALKING_LUNGE)).toEqual(['Bodyweight', 'DB', 'BB']);
+  });
+
+  // --- the surface itself ---------------------------------------------------
+
+  test('offers a choice only for AVAILABLE movements that genuinely have one', () => {
+    setup();
+    expect(screen.getByTestId(`load-intent-row-${WALKING_LUNGE.movement_id}`)).toBeOnTheScreen();
+    expect(screen.getByTestId(`load-intent-row-${PUSH_UP.movement_id}`)).toBeOnTheScreen();
+    // Only one way to load it: nothing to choose.
+    expect(screen.queryByTestId(`load-intent-row-${BENCH.movement_id}`)).toBeNull();
+    // Ambiguous but the athlete cannot currently do the movement at all.
+    expect(screen.queryByTestId(`load-intent-row-${LOCKED.movement_id}`)).toBeNull();
+  });
+
+  test('labels the options in words, never the internal DB/BB/KB vocabulary', () => {
+    setup();
+    expect(screen.getByTestId(`load-intent-${WALKING_LUNGE.movement_id}-DB`)).toHaveTextContent('DUMBBELL');
+    expect(screen.getByTestId(`load-intent-${WALKING_LUNGE.movement_id}-BB`)).toHaveTextContent('BARBELL');
+    expect(screen.getByTestId(`load-intent-${OVERHEAD_PRESS.movement_id}-KB`)).toHaveTextContent('KETTLEBELL');
+    expect(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Banded`)).toHaveTextContent('BAND');
+    expect(screen.queryByText('DB')).toBeNull();
+    expect(screen.queryByText('BB')).toBeNull();
+  });
+
+  test('selected, unselected and NOT SET are distinguishable to a screen reader', () => {
+    setup({ loadIntents: { [PUSH_UP.movement_id]: 'Bodyweight' } });
+    const stateOf = (id) => screen.getByTestId(id).props.accessibilityState;
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-Bodyweight`).selected).toBe(true);
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-Banded`).selected).toBe(false);
+    expect(stateOf(`load-intent-${PUSH_UP.movement_id}-unset`).selected).toBe(false);
+    expect(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Bodyweight`).props.accessibilityRole)
+      .toBe('button');
+    // An undeclared movement reads as NOT SET, not as a silent bodyweight pick.
+    expect(stateOf(`load-intent-${WALKING_LUNGE.movement_id}-unset`).selected).toBe(true);
+  });
+
+  test('accessibility labels name the movement and the readable implement', () => {
+    setup();
+    expect(screen.getByLabelText('Plan Push-up with Bodyweight only')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Plan Walking Lunge with Dumbbell')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
+  });
+
+  test('copy says the choice applies to FUTURE programming and what unset means', () => {
+    setup();
+    expect(screen.getByText(/planned as the loaded version/i)).toBeOnTheScreen();
+    expect(screen.getByText(/from now on/i)).toBeOnTheScreen();
+  });
+
+  test('a failed save is visible and actionable, and a later success clears it', () => {
+    const failing = jest.fn(() => false);
+    setup({ saveMovementLoadIntent: failing });
+    expect(screen.queryByTestId('load-intent-error')).toBeNull();
+
+    fireEvent.press(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Bodyweight`));
+    expect(failing).toHaveBeenCalledWith(PUSH_UP.movement_id, 'Bodyweight');
+    expect(screen.getByTestId('load-intent-error'))
+      .toHaveTextContent('Could not save your choice for Push-up. Try again.');
+
+    failing.mockReturnValue(true);
+    fireEvent.press(screen.getByTestId(`load-intent-${PUSH_UP.movement_id}-Banded`));
+    expect(screen.queryByTestId('load-intent-error')).toBeNull();
+  });
+
+  test('choosing and clearing both reach the store with the canonical token', () => {
+    setup();
+    fireEvent.press(screen.getByTestId(`load-intent-${WALKING_LUNGE.movement_id}-BB`));
+    expect(saveIntent).toHaveBeenCalledWith(WALKING_LUNGE.movement_id, 'BB');
+    fireEvent.press(screen.getByTestId(`load-intent-${WALKING_LUNGE.movement_id}-unset`));
+    expect(saveIntent).toHaveBeenCalledWith(WALKING_LUNGE.movement_id, null);
   });
 });
