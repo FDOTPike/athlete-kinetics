@@ -1,0 +1,26 @@
+Commit: 7754e1507f3688d17b57552810554c07a4269b15
+Command: git grep -n -E "male|female" apps/mobile/src/components/movementPreview/canonicalFigure.ts apps/mobile/src/components/movementPreview/MovementPreview.tsx apps/mobile/src/components/movementPreview/derivation.ts apps/mobile/src/components/movementPreview/manifest.ts apps/mobile/src/components/movementPreview/index.ts tools/
+
+apps/mobile/src/components/movementPreview/MovementPreview.tsx:334:  /** Neutral by default; male/female remain explicit compatibility inputs. */
+apps/mobile/src/components/movementPreview/canonicalFigure.ts:23: *  - neutral morphology by default, with the original male/female parameter
+apps/mobile/src/components/movementPreview/canonicalFigure.ts:36: * Neutral production silhouette plus the ratified M2 §6.1 male/female
+apps/mobile/src/components/movementPreview/canonicalFigure.ts:47: * Neutral production silhouette is the sole geometry. Legacy 'male' and 'female'
+apps/mobile/src/components/movementPreview/canonicalFigure.ts:50:export const DUAL_BODY_PARAMETERS: Readonly<Record<'neutral' | 'male' | 'female', BodyParameters>> = {
+apps/mobile/src/components/movementPreview/canonicalFigure.ts:52:  male: CANONICAL_BODY_PARAMETERS,
+apps/mobile/src/components/movementPreview/canonicalFigure.ts:53:  female: CANONICAL_BODY_PARAMETERS,
+apps/mobile/src/components/movementPreview/canonicalFigure.ts:1029:  // male and female shoulder roots sit off it, so a grip variant would have drawn
+apps/mobile/src/components/movementPreview/canonicalFigure.ts:1711: * a different radius for the male and female bodies - the neutral figure held
+apps/mobile/src/components/movementPreview/manifest.ts:119:export type LegacyBodyType = 'male' | 'female';
+tools/rendering/lib/evidenceCard.mjs:46:export const LEGACY_BODIES = ['male', 'female'];
+tools/rendering/test_verify_movement_evidence.mjs:285:    name: 'M16 legacy male filename injected into neutral evidence',
+tools/rendering/test_verify_movement_evidence.mjs:289:      const maleSvg = svgPath.replace('_neutral_', '_male_');
+tools/rendering/test_verify_movement_evidence.mjs:290:      const malePng = pngPath.replace('_neutral_', '_male_');
+tools/rendering/test_verify_movement_evidence.mjs:291:      fs.renameSync(svgPath, maleSvg);
+tools/rendering/test_verify_movement_evidence.mjs:292:      fs.renameSync(pngPath, malePng);
+tools/rendering/test_verify_movement_evidence.mjs:293:      card.svgPath = card.svgPath.replace('_neutral_', '_male_');
+tools/rendering/test_verify_movement_evidence.mjs:294:      card.pngPath = card.pngPath.replace('_neutral_', '_male_');
+tools/rendering/test_verify_movement_evidence.mjs:303:      index.bodies = ['male'];
+tools/rendering/test_verify_movement_evidence.mjs:416:  || stems.some((stem) => !stem.includes('_neutral_') || /_(?:male|female)_/.test(stem))) {
+tools/rendering/test_verify_movement_evidence.mjs:426:  || JSON.stringify(cleanIndex).includes('"male"') || JSON.stringify(cleanIndex).includes('"female"')) {
+
+Exit code: 0

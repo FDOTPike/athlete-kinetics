@@ -1,0 +1,8 @@
+Commit: 7754e1507f3688d17b57552810554c07a4269b15
+Baseline Commit: a1a073f6a08ce0c1f9921ba385579856348b3923
+Baseline Neutral Primitives SHA-256: 7d55b6bf97ebec89b1a657310fbe0b908a05a3752675368ff20f9332a2e72139
+Current Neutral Primitives SHA-256:  7d55b6bf97ebec89b1a657310fbe0b908a05a3752675368ff20f9332a2e72139
+Equal: true
+Total canonical/derived movements: 132
+Total keyframes evaluated: 945
+Exit code: 0
