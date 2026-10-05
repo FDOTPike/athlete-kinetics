@@ -16,15 +16,19 @@ Claude Desktop cannot be woken by mail. Whoever resumes: read this, then
 - Coverage at this source: 138 records. 129 canonical drafts and 3 derived
   have frames, 3 are legacy-rig prototypes, 3 are marked unsuitable. All 132
   drafts are `pending`; technique review status is `pending`, so nothing is
-  athlete-visible. The all-300 ledger has not been recomputed yet.
+  athlete-visible.
+- All-300 first cut: `ALL_300_LEDGER.json`, computed from the manifest. Of 300
+  catalogue movements, 162 have no draft yet. Statuses there are data states,
+  not approvals; the holds and exclusion reassessments still need reading
+  against the sources.
 
 ## Next actions, in order
 
 1. Read the `MOV-B000` reply and check it against Gemini's checkout.
 2. Send `MOV-B001` (neutral-only), then `MOV-B002` (frame guard and the
    fifteen clipped movements) once B001 is frozen and checked.
-3. Recompute the all-300 ledger from `ALL_300_MOTION_MAP.json` and
-   `ORDERED_BACKLOG.json` against the current manifest.
+3. Reconcile the holds and the exclusion reassessments in `ALL_300_LEDGER.json`
+   against the actual sources.
 4. Then the ordered backlog: Inverted Row, fixed-bar body triceps press, the
    source-specific raises, and the remaining families.
 5. Two separate final audits (technique, runtime) only on a frozen candidate.
