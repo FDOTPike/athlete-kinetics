@@ -32,7 +32,7 @@ acceptance.
 | Batch | Type | Baseline | Sent | Acknowledged | Outcome |
 | --- | --- | --- | --- | --- | --- |
 | MOV-B000 | STATUS (handshake) | `a1a073f6` | 2026-10-05 14:02 +11:00, message `2026-10-05_140225_claude_to_antigravity_mov-b000-status-handshake-repl` | yes, 14:39 +11:00, message `2026-10-05_143944_antigravity_to_claude_mov-b000-ack-status-handshake-` | CLOSED. Reply checked against the checkout: path, branch, HEAD `a1a073f6`, clean tree all match. Worker reports model Gemini 3.8 Flash (High), conversation `3faf5eed-a7cd-4eac-86fc-925378062def`, no other writer. Round trip verified. |
-| MOV-B001 | REPAIR (neutral-only) | `a1a073f6` | 2026-10-05 14:40 +11:00, message `2026-10-05_144019_claude_to_antigravity_mov-b001-repair-neutral-only-r` | no | open: `batches/MOV-B001.md` |
+| MOV-B001 | REPAIR (neutral-only) | `a1a073f6` | 2026-10-05 14:40 +11:00, message `2026-10-05_144019_claude_to_antigravity_mov-b001-repair-neutral-only-r` | yes, 14:41 +11:00, baseline `a1a073f6` clean confirmed | in progress: `batches/MOV-B001.md`. Orchestrator baseline for the identity check: `evidence/b001-neutral-identity/` (132 movements, aggregate `0a9b82025be8eac3...`) |
 | MOV-B002 | REPAIR (frame guard, 15 clipped movements) | accepted B001 commit | not sent, waits for B001 | no | prepared: `batches/MOV-B002.md` |
 
 ### MOV-B000: handshake
