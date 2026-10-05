@@ -33,7 +33,7 @@ acceptance.
 | --- | --- | --- | --- | --- | --- |
 | MOV-B000 | STATUS (handshake) | `a1a073f6` | 2026-10-05 14:02 +11:00, message `2026-10-05_140225_claude_to_antigravity_mov-b000-status-handshake-repl` | yes, 14:39 +11:00, message `2026-10-05_143944_antigravity_to_claude_mov-b000-ack-status-handshake-` | CLOSED. Reply checked against the checkout: path, branch, HEAD `a1a073f6`, clean tree all match. Worker reports model Gemini 3.8 Flash (High), conversation `3faf5eed-a7cd-4eac-86fc-925378062def`, no other writer. Round trip verified. |
 | MOV-B001 | REPAIR (neutral-only) | `a1a073f6` | 2026-10-05 14:40 +11:00 | yes, 14:41; completion 15:27, message `2026-10-05_152752_antigravity_to_claude_mov-b001-complete-neutral-only` | ACCEPTED at source `7754e1507f3688d17b57552810554c07a4269b15`, evidence commit `ee5bca7143e922b491024972f9f8e81875e83824`. Orchestrator re-run on that commit: typecheck 0; MovementPreview suites 0 (700 passed, 4 skipped); evidence gate 0; rendered-output probe 0 of 132 changed. Three follow-ups carried into MOV-B002 (skipped regression lock, unused import and stale comment, misreported SHA). Evidence: `evidence/b001-neutral-identity/`. |
-| MOV-B002 | REPAIR (B001 follow-ups, frame guard, 15 clipped movements) | `ee5bca7143e922b491024972f9f8e81875e83824` | 2026-10-05 15:31 +11:00 | no | open: `batches/MOV-B002.md` |
+| MOV-B002 | REPAIR (B001 follow-ups, frame guard, 15 clipped movements) | `ee5bca7143e922b491024972f9f8e81875e83824` | 2026-10-05 15:31 +11:00 | yes, 15:51 +11:00, but the ack named 8 wrong movement IDs (141, 100, 39, 174, 175, 263, 113, 282) | in progress. Correction `batches/MOV-B002-C1.md` sent 15:5x with the exact fifteen IDs; other movements must stay byte-identical. |
 
 ### MOV-B000: handshake
 
