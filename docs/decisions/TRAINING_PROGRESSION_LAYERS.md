@@ -278,7 +278,7 @@ docket; both records must be checked before authorizing work that crosses the tw
 | 2026-08-20 | **Taper is derived, not a fifth phase value** (§4.2), following the `recovery` precedent. |
 | 2026-08-20 | **A competition date drives phase selection.** Count back from a dated horizon; fall back to the rotation when no date exists (§5A). |
 | 2026-08-27 | **The macro phase's set delta biases to primary slots (RR-04).** `PHASE_MODS.volume`'s `+1` lands only on slots below `ACCESSORY_SLOT_FROM`; accessories stay flat. This is what makes `volume` differ from `hypertrophy`. No new number — only the placement of an existing ratified delta changed. |
-| 2026-08-27 | **Bodyweight rep prescriptions are floored at the capability ladder's advancement bar.** `PHASE_MODS`' rep deltas encode a load↔rep trade a bodyweight movement cannot make, so bodyweight slots were prescribed below the level at which their own capability is measured (7 in gpp, 5 in volume, 3 in peak, against 8). The floor is IMPORTED from `DEFAULT_ADVANCEMENT_POLICY`, never restated, so prescription and criterion cannot drift. Loaded movements and every deload are untouched. |
+| 2026-08-27 | **Bodyweight rep prescriptions are floored at the capability ladder's advancement bar.** `PHASE_MODS`' rep deltas encode a load↔rep trade a bodyweight movement cannot make, so bodyweight slots were prescribed below the level at which their own capability is measured (7 in gpp, 5 in volume, 3 in peak, against 8). The floor is IMPORTED from `DEFAULT_ADVANCEMENT_POLICY`, never restated, so prescription and criterion cannot drift. Loaded movements and every deload are untouched. *Scope narrowed by owner ruling L2(b) (`RELEASE_CANDIDATE_C1_DOCKET.md`): the floor applies only to capability-chain movements, at the chain's own bar (a per-chain `progression_policy` when one exists), future plans only; off-chain bodyweight movements keep their phase prescription.* |
 | 2026-08-20 | **An autopilot halt prompts rather than auto-suspends.** The halt already deloads the whole block, so the athlete is protected either way; suspension changes weeks of future plan and should not happen silently. |
 
 **Net effect: `MACRO_PHASES` stays at its four frozen values and no migration is required for
@@ -317,7 +317,8 @@ any of the above.** The one exception is the suspended-state flag — see open q
    corresponding accessory-tax adjustment. The exposure is bounded to hybrid athletes, bodyweight
    slots, weeks 2-3, one set. Ratifying a coefficient is a table edit at that alias, not a
    refactor.
-   Currently it adds a set uniformly (§4). This is a behaviour change to a shipped engine.
+   *Historical:* when this was written it added a set uniformly (§4); RR-04 (2026-08-27, ruling table
+   above) since biased the delta to primary slots. This is a behaviour change to a shipped engine.
 5. **`progression_methodology`**: redefine as a system selector, or record as dead? Blocked on
    question 6.
 6. **Is conjugate in scope at all?** Supporting it properly means one selection overriding all

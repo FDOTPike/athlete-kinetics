@@ -107,6 +107,13 @@ assert.throws(
   () => summarizeCompletedActivities({ occurrences: [], completions: [completion('orphan', 20, 4)] }),
   /has no occurrence/,
 );
+for (const state of ['planned', 'cancelled', 'missed']) {
+  assert.throws(
+    () => summarizeCompletedActivities({ occurrences: [occurrence('linked', state)], completions: [completion('linked', 20, 4)] }),
+    new RegExp(`linked to a ${state} occurrence`),
+    `a completion on a ${state} occurrence is rejected, never silently dropped`,
+  );
+}
 
 const sources = indexExplicitActivitySources([
   { occurrenceId: 'basketball-friday', sourceKind: 'manual', sourceIdentity: 'manual-1' },

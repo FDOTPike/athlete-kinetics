@@ -91,6 +91,19 @@ console.log('\n[2] HERMES H-2 — neutralisers that leave every string in place'
 }
 
 {
+  // The same neutraliser written as the step's first key, on its `- ` line.
+  const y = SOUND.replace(`      - name: verify:qa-candidate (real artifact, fails closed)
+        run: ${GATE_COMMAND}`,
+  `      - continue-on-error: true
+        name: verify:qa-candidate (real artifact, fails closed)
+        run: ${GATE_COMMAND}`);
+  const r = checkWorkflowStructure(y, { gateCount: 21 });
+  check('`continue-on-error` on the gate step\'s list-marker line is REJECTED',
+    r.ok === false && r.problems.some((p) => p.includes('continue-on-error')),
+    r.problems.join('; ').slice(0, 100));
+}
+
+{
   // CI4, reproduced by Hermes: the job never runs at all.
   const y = SOUND.replace('    needs: verify\n', '    needs: verify\n    if: ${{ false }}\n');
   const r = checkWorkflowStructure(y, { gateCount: 21 });

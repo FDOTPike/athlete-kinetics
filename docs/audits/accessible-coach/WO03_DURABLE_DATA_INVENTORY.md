@@ -2,7 +2,7 @@
 
 Date: 2026-09-13
 Originally frozen at `87624d9e43189ddd87db317e24d4379ef5a13fae`; updated by the Accessible Coach integration candidate.
-Live chain: migration files through `064`; `004` is a parameterized materializer, not a migration. The migration array therefore has 63 entries and a fully migrated database reports `PRAGMA user_version = 63`. Slot `064` is the product-ratified neutral activity/support capture contract; it contains no executable clinical limit or screening schema.
+Live chain (release integration, 2026-10-04): migration files through `069`; `004` is a parameterized materializer, not a migration. The migration array therefore has 68 entries and a fully migrated database reports `PRAGMA user_version = 68` (backup contract v68, 118 tables). Slot `064` is the product-ratified neutral activity/support capture contract; it contains no executable clinical limit or screening schema. When first frozen, the chain ended at `064` (`user_version = 63`).
 
 ## Discovery result and candidate disposition
 

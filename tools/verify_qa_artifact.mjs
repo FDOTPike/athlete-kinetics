@@ -886,7 +886,13 @@ export async function verifyQaArtifact(apkPath, options = {}) {
   for (const [name, entry] of zip.entries) {
     if (!name.startsWith('lib/') || !name.endsWith('.so')) continue;
     const bytes = extractEntryToBuffer(apkPath, entry);
-    if (bytes.length < 64 || bytes[0] !== 0x7f) continue; // not ELF
+    // A packaged native library that is not ELF (truncated, corrupt or not a
+    // library at all) fails closed; it is never silently skipped.
+    if (bytes.length < 64 || bytes[0] !== 0x7f || bytes[1] !== 0x45 || bytes[2] !== 0x4c || bytes[3] !== 0x46) {
+      inspected += 1;
+      check(`${name}: is an ELF shared object`, false, `${bytes.length} bytes, magic ${[...bytes.subarray(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join(' ')}`);
+      continue;
+    }
     try {
       const minAlign = minElfLoadAlignment(bytes);
       if (minAlign === null) continue; // ELF32 informational

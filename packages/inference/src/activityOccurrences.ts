@@ -44,6 +44,11 @@ export function summarizeCompletedActivities(input: {
 
   for (const occurrence of occurrences.values()) {
     if (occurrence.state !== 'completed') {
+      // The 064 contract: a completion references a completed occurrence only.
+      // Inconsistent data fails like an orphan completion, never silently.
+      if (completions.has(occurrence.occurrenceId)) {
+        throw new Error(`activity completion is linked to a ${occurrence.state} occurrence: ${occurrence.occurrenceId}`);
+      }
       excludedOccurrenceCount += 1;
       continue;
     }

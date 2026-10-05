@@ -33,7 +33,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -289,4 +289,4 @@ function main() {
   console.log(`content correction v2: ${overlay.records.length} corrections valid and generated output is current (${overlay.ratification.state})`);
 }
 
-if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === join(process.argv[1])) main();
+if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1])) main();

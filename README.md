@@ -52,7 +52,8 @@ more conservative**; halts (sharp pain, dizziness, chest symptoms) end it.
 
 ```powershell
 npm ci                 # requires npm >= 11.16 (install-script policy is enforced)
-npm run verify:ci      # 22 gates + typecheck; semantic/embedder need network
+npm run fetch:embedder # the only network step: stages the pinned, hash-verified embedder
+npm run verify:ci      # 24 gates + typecheck, offline once the embedder is fetched
 npm run seed           # deterministic 180-day athlete -> athlete_kinetics.seed.db
 ```
 

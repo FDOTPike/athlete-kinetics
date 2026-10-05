@@ -126,9 +126,18 @@ if (fail > embedderFailStart || REMOTE_ARTIFACTS.some((rel) => !existsSync(
 
 // --- [4] device outputs where current consumers require them ------------------
 const DEVICE_OUT = join(ROOT, 'packages', 'inference', 'assets', 'minilm');
-for (const name of ['model_quantized.onnx', 'tokenizer.full.json']) {
+// Byte copies of the pinned artefacts (scripts/fetch-embedder.mjs DEVICE_OUTPUTS):
+// verified against the same pins as [3], so a corrupt device model fails here.
+for (const [name, rel] of [['model_quantized.onnx', 'onnx/model_quantized.onnx'], ['tokenizer.full.json', 'tokenizer.json']]) {
   const p = join(DEVICE_OUT, name);
-  check(`device output present: packages/inference/assets/minilm/${name}`, existsSync(p));
+  if (!existsSync(p)) { check(`device output present: packages/inference/assets/minilm/${name}`, false); continue; }
+  try {
+    const actual = sha256File(p);
+    check(`device output verified: packages/inference/assets/minilm/${name}`, actual === KNOWN_SHA256[rel],
+      actual === KNOWN_SHA256[rel] ? 'sha256 ok' : `sha256 ${actual} != pin`);
+  } catch (e) {
+    check(`device output verified: packages/inference/assets/minilm/${name}`, false, String(e.message).slice(0, 120));
+  }
 }
 const minPath = join(DEVICE_OUT, 'tokenizer.min.json');
 if (!existsSync(minPath)) {

@@ -1,7 +1,7 @@
 # Progression measurement — open owner decisions
 
 Date: 2026-08-26  
-Status: **owner decisions required — no option selected and no implementation authority**
+Status: **six owner rulings ratified 2026-08-26/27** (each marked "Owner ruling — ratified"). As originally issued this document selected no option; the ratifications do not by themselves grant implementation authority — any implementation they allow is deferred to later work.
 
 ## 1. Decision boundary
 

@@ -907,9 +907,18 @@ if (fail > 0) {
     assert.equal(isRoutineRoleSnapshotExecutable(planMovementIds, sourceRows, eligible), true);
   });
 
-  mcheck('the invariance gate: selectable movement ID set is byte-identical across (role, profile, equipment, niggle) except major demotions', () => {
+  mcheck('the invariance gate: per role, the selectable movement set equals live role eligibility, minus only the production major exclusions', () => {
     const roles = ['major', 'supplementary', 'accessory', 'conditional'];
-    const MAJOR_EXCLUDED = new Set(['isolation', 'rotation', 'carry']);
+    // Bound to PRODUCTION: the picker's exclusion set is read from the
+    // component, and both picker call sites must apply it. A local copy alone
+    // made this check a tautology (it could never fail).
+    const builderSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8');
+    const declared = builderSrc.match(/const MAJOR_EXCLUDED_PATTERNS = new Set\(\[([^\]]*)\]\)/);
+    assert.ok(declared, 'RoutineTemplateBuilder.tsx no longer declares MAJOR_EXCLUDED_PATTERNS');
+    const MAJOR_EXCLUDED = new Set([...declared[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
+    assert.ok(MAJOR_EXCLUDED.size > 0, 'the production major exclusion set is empty');
+    const applied = builderSrc.match(/\.filter\(\(movement\) => \w+ !== 'major' \|\| !MAJOR_EXCLUDED_PATTERNS\.has\(movement\.pattern\)\)/g) ?? [];
+    assert.equal(applied.length, 2, `both picker call sites must apply the major exclusion (found ${applied.length})`);
 
     const movements = mdb.prepare('SELECT movement_id, pattern FROM movement ORDER BY movement_id').all();
     const movementsById = new Map(movements.map((m) => [Number(m.movement_id), m]));

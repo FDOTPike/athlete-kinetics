@@ -84,7 +84,8 @@ const stepContaining = (steps, needle) => steps.find((s) => s.includes(needle));
 function neutralisers(block, { level }) {
   const found = [];
   // Job keys sit at 4 spaces; step keys at 8.
-  const indent = level === 'job' ? ' {4}' : ' {8}';
+  // A step's first key may also sit on its `- ` list-marker line (6 spaces).
+  const indent = level === 'job' ? ' {4}' : '(?: {8}| {6}- )';
   if (new RegExp(`\\n${indent}continue-on-error:`).test(block)) found.push('continue-on-error');
   if (new RegExp(`\\n${indent}if:`).test(block)) found.push('if');
   return found;

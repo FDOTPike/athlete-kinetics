@@ -273,14 +273,14 @@ clean.
 |---|---|
 | `npm run typecheck` | exit 0 |
 | `npm run verify:migrations` | ALL CHECKS PASSED |
-| `npm run verify:blocks` | 0 | ALL CHECKS PASSED — new `verify_programQualityRound2.mjs`: 32/32 checks (20 Round 2: [P1] 7 + [P2] 6 + [P3] 7, plus 3 [P1b] review-proof and 9 [P4a]/[P4b]/[P4c] audit-remediation checks added in d4e043d) |
-| `npm run verify:store` | 0 | ALL CHECKS PASSED (638/638 + routine templates) |
+| `npm run verify:blocks` | exit 0 — ALL CHECKS PASSED — new `verify_programQualityRound2.mjs`: 32/32 checks (20 Round 2: [P1] 7 + [P2] 6 + [P3] 7, plus 3 [P1b] review-proof and 9 [P4a]/[P4b]/[P4c] audit-remediation checks added in d4e043d) |
+| `npm run verify:store` | exit 0 — ALL CHECKS PASSED (638/638 + routine templates) |
 | `npm run verify:pipeline` | 51/51 |
 | `npm run verify:progression` | 17/17 |
 | `npm run verify:components` | 19 suites / 247 tests |
 | `npm run verify:ci` | exit 0 (FINAL_EXIT=0; the qa-artifact FAIL lines are the suite's own negative probes, each followed by a PASS "rejected" check) |
 | `git diff --check` | clean |
-| matrix_harness.mjs | 14/14 PASS (GENERATED_PROGRAM_MATRIX.md regenerated) |
+| matrix_harness.mjs | 16/16 PASS (14 acceptance cases + 2 negative probes PQ-NEG-1/PQ-NEG-2; GENERATED_PROGRAM_MATRIX.md regenerated) |
 
 ## Files changed (product)
 
@@ -317,7 +317,7 @@ clean.
 IMPLEMENTATION: COMPLETE
 TARGETED TESTS: PASS
 FULL VERIFY: PASS (verify:ci exit 0)
-PROGRAM MATRIX: PASS (14/14, semantic PQ-04/05/06)
+PROGRAM MATRIX: PASS (14/14 acceptance cases; harness 16/16 including PQ-NEG-1/PQ-NEG-2; semantic PQ-04/05/06)
 READY FOR INDEPENDENT AUDIT: YES — two fresh isolated reviewer runs required; conclusions
 kept separate until reconciliation; reduced model diversity (same model) is disclosed.
 PUSH / RELEASE: NOT PERFORMED

@@ -318,6 +318,18 @@ async function main() {
       check('failure lists are independent between invocations',
         bad.result.failures.length > 0 && good.result.failures.length === 0);
     }
+    {
+      // A packaged native library that is not ELF (truncated or corrupt) beside a
+      // valid one used to be skipped, so the artifact still verified.
+      const garbage = buildZip([...fixtureEntries().filter((e) => !e.name.endsWith('libonnxruntimejsi.so')),
+        { name: 'lib/arm64-v8a/libonnxruntimejsi.so', data: Buffer.from('not an elf shared object at all, just text padding....................') }]);
+      const p = join(scratch, 'non-elf.apk');
+      writeFileSync(p, garbage);
+      const r = await runVerify(p);
+      check('a packaged .so that is not ELF FAILS (never skipped)',
+        r.outcome === 'failed' && r.result.failures.some((f) => f.includes('is an ELF shared object')),
+        r.result?.failures?.join('; ').slice(0, 90) ?? r.outcome);
+    }
 
     // =====================================================================
     console.log('\n[2] structural rejections');

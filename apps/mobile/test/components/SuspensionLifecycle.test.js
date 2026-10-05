@@ -69,26 +69,30 @@ const ageActiveBlockPastContinuationGate = () => {
   useStore.getState().refreshProgram();
 };
 
+// Module scope: babel-jest hoists jest.mock only within its enclosing block,
+// so mocks inside beforeEach registered after useStore's static import.
+// The factories read mockDriver lazily, per test.
+jest.mock('@op-engineering/op-sqlite', () => ({ open: () => mockDriver }));
+jest.mock('../../src/state/athleteRegistry', () => {
+  const core = jest.requireActual('../../src/state/athleteRegistryCore');
+  return {
+    loadRegistry: async () => ({
+      version: 1,
+      activeId: core.DEFAULT_ATHLETE_ID,
+      advancedToolsUnlocked: false,
+      athletes: [{
+        id: core.DEFAULT_ATHLETE_ID,
+        name: 'Athlete 1',
+        dbName: core.LEGACY_DB_NAME,
+        createdAtMs: 0,
+      }],
+    }),
+    saveRegistry: async () => undefined,
+  };
+});
+
 beforeEach(() => {
   mockDriver = makeNodeSqliteDriver();
-  jest.mock('@op-engineering/op-sqlite', () => ({ open: () => mockDriver }));
-  jest.mock('../../src/state/athleteRegistry', () => {
-    const core = jest.requireActual('../../src/state/athleteRegistryCore');
-    return {
-      loadRegistry: async () => ({
-        version: 1,
-        activeId: core.DEFAULT_ATHLETE_ID,
-        advancedToolsUnlocked: false,
-        athletes: [{
-          id: core.DEFAULT_ATHLETE_ID,
-          name: 'Athlete 1',
-          dbName: core.LEGACY_DB_NAME,
-          createdAtMs: 0,
-        }],
-      }),
-      saveRegistry: async () => undefined,
-    };
-  });
 });
 
 // ---------------------------------------------------------------------------

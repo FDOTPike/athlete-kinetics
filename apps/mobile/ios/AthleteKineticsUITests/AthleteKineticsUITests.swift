@@ -159,6 +159,11 @@ final class AthleteKineticsUITests: XCTestCase {
   private func unlockAdvancedTools() {
     if element("advanced-athlete-manager").exists { return }
     let build = element("Build 0.1.0")
+    // The label sits at the foot of the full Profile form, beyond reveal()'s
+    // fifteen slow swipes; scroll down at normal speed first.
+    wait(build, "the build label")
+    var tries = 0
+    while !build.isHittable && tries < 40 { app.swipeUp(); tries += 1 }
     reveal(build, "the build label")
     for _ in 1...7 { build.tap() }
     wait(element("advanced-athlete-manager"), "the advanced athlete manager after the seven-tap gesture")

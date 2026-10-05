@@ -42,7 +42,7 @@ The current modeled component envelope resolves as follows, based on `budget.jso
 
 # Measurement protocol
 
-To establish the **Measured M (authorized-device evidence)**, you must use a physical device running a non-debuggable, signed build (the `qa` variant, `com.athletekinetics.qa`).
+To establish the **Measured M (authorized-device evidence)**, you must use a physical device running a non-debuggable, signed build (the `qa` variant, `com.pikemethods.training.qa`, from `applicationIdSuffix ".qa"` in `apps/mobile/android/app/build.gradle`).
 
 **Primary metrics:** Android `Private Dirty` (via `dumpsys meminfo`), iOS `phys_footprint`.
 **Why not APK size or Java Heap?** APK size is storage, not RAM. Java Heap ignores native C++ allocations (which ONNX and SQLite heavily use). RSS includes shared libraries. Private Dirty represents RAM that this process *alone* owns and cannot be paged to disk.

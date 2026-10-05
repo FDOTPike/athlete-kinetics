@@ -803,8 +803,8 @@ export default function OnboardingScreen(): React.JSX.Element {
             </View>
 
             <Text style={styles.pDim}>
-              Change any of this later in Athlete Profile. Your first prescription
-              is waiting on the READY tab.
+              Change any of this later in Profile. Your first prescription is
+              waiting on Today.
             </Text>
             <PrimaryButton
               label="START TRAINING"

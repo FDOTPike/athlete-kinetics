@@ -167,7 +167,7 @@ AAB SHA-256 alongside the version code/name used for the build.
 - Confirm the app remains functional without Health Connect data.
 - Exercise beginner and advanced profiles without tier or database-state bleed.
 - Test OS text scaling and screen-reader labels on primary actions.
-- Measure dirty RAM on a 4 GB target device and retain evidence that it stays below 450 MB.
+- Measure dirty RAM on a 4 GB target device and retain the evidence: the ratified hard ceiling is 536,870,912 B (512 MiB); 450,000,000 B is the preferred target, and an envelope between them needs device evidence and review (`tools/memory-audit/memory_gate.mjs`).
 - Verify arm64-v8a native libraries meet the repository's 16 KB ELF-alignment gate.
 
 ## 5. Decisions required before the first store candidate
