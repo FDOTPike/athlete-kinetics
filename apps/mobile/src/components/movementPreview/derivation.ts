@@ -65,7 +65,7 @@
  */
 
 import {
-  CANONICAL_BODY_PARAMETERS, DUAL_BODY_PARAMETERS, drawnSegmentLengths, resolveFigureJoints, resolveGripArms,
+  CANONICAL_BODY_PARAMETERS, drawnSegmentLengths, resolveFigureJoints, resolveGripArms,
 } from './canonicalFigure';
 import type { CanonicalPose, ViewName } from './canonicalFigure';
 

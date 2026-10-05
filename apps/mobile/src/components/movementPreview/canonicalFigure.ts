@@ -33,8 +33,8 @@ import type { FrameRole, ImplementCount, ImplementOrientation, JointOffsets } fr
 export type CanonicalPoint = readonly [number, number];
 
 /**
- * Neutral production silhouette plus the ratified M2 §6.1 male/female
- * compatibility inputs. Technique is invariant across every parameter set.
+ * Canonical gender-neutral figure morphology (MOV-B001 single-figure standard).
+ * The sole production silhouette used for all movement rendering and verification.
  */
 export const CANONICAL_BODY_PARAMETERS: BodyParameters = Object.freeze({
   sw: 10.2,

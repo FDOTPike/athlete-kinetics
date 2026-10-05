@@ -17,20 +17,22 @@ const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const entry66 = previewManifest.entries.find(e => e.movementId === 66);
 const entry152 = previewManifest.entries.find(e => e.movementId === 152);
 
-const suite = (entry66 && entry152) ? describe : describe.skip;
+describe('Batch B3b: Fixed-Bar Body Motion', () => {
+  if (!entry66 || !entry152) {
+    test.todo('66 Inverted Row: horizontal pulling under fixed bar with heels planted and rigid body plank');
+    test.todo('152 Body Tricep Press: elbow extension pressing body away from fixed chest-height bar on planted toes');
+  } else {
+    test('Entries 66 and 152 exist in manifest with pending status and correct equipment', () => {
+      expect(entry66).toBeDefined();
+      expect(entry66.status).toBe('pending');
+      expect(entry66.view).toBe('side');
+      expect(entry66.equipment).toBe('barbell');
 
-suite('Batch B3b: Fixed-Bar Body Motion', () => {
-  test('Entries 66 and 152 exist in manifest with pending status and correct equipment', () => {
-    expect(entry66).toBeDefined();
-    expect(entry66.status).toBe('pending');
-    expect(entry66.view).toBe('side');
-    expect(entry66.equipment).toBe('barbell');
-
-    expect(entry152).toBeDefined();
-    expect(entry152.status).toBe('pending');
-    expect(entry152.view).toBe('side');
-    expect(entry152.equipment).toBe('squat_rack');
-  });
+      expect(entry152).toBeDefined();
+      expect(entry152.status).toBe('pending');
+      expect(entry152.view).toBe('side');
+      expect(entry152.equipment).toBe('squat_rack');
+    });
 
   test.each(['neutral'])('66 maintains rigid body plank, fixed heel contact, and chest-to-bar pull (%s)', name => {
     const body = DUAL_BODY_PARAMETERS[name];
@@ -123,4 +125,5 @@ suite('Batch B3b: Fixed-Bar Body Motion', () => {
     expect(lockout.elbowFlexionDeg).toBeLessThan(10); // Nearly straight at lockout
     expect(flexed.elbowFlexionDeg).toBeGreaterThan(70); // Deep elbow flexion
   });
+  }
 });
