@@ -1,0 +1,7 @@
+{
+  "locked_at_utc": "2026-08-26T03:45:00Z",
+  "scope": "Independent verdicts on the two original reports only; reconciliation materials and code baseline not yet read.",
+  "antigravity_verdict": "NOT SAFE AS EVIDENCE OR DECISION INPUT. It contains unsupported/incorrect source characterisations, invalid source-to-claim upgrades, and auditor-derived MDC/persistence values presented as recommendations.",
+  "hermes_verdict": "CONDITIONALLY USABLE ONLY AFTER CLAIM-LEVEL REWRITE. Its central no-MDC/no-persistence conclusion is directionally defensible, but several positive/negative claims are only partially verified or rely on inadequate searches/secondary access.",
+  "independent_sources_read": "PubMed abstracts and Crossref metadata captured in source_metadata.json; no reconciliation document, Opus output, prior audit, or code baseline read before this lock."
+}

@@ -11,6 +11,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { offlineTransformersLoad } from './embedder-integrity.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 const ASSETS = join(ROOT, 'packages', 'inference', 'assets');
@@ -25,7 +26,14 @@ cb.entries.forEach((e, entryIndex) => {
 
 console.log(`embedding ${rows.length} phrases with ${cb.embeddingModel} ...`);
 const { pipeline } = await import('@xenova/transformers');
-const embed = await pipeline('feature-extraction', cb.embeddingModel, { quantized: true });
+const transformerLoad = offlineTransformersLoad(
+  cb.embeddingModel,
+  process.env.AK_EMBEDDER_CACHE,
+);
+const embed = await pipeline('feature-extraction', transformerLoad.modelId, {
+  quantized: true,
+  ...transformerLoad.options,
+});
 
 const vectors = [];
 for (const r of rows) {

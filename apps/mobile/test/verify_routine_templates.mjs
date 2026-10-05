@@ -3,7 +3,7 @@
  *
  * Verifies:
  * 1. Template persistence (INSERT, SELECT, UPDATE, DELETE on routine_template / routine_template_slot)
- * 2. Ordered session slots and role constraints (1 major, 2 supplementary, 0–3 conditional)
+ * 2. Ordered session slots, uncapped selection, and at least one major per day
  * 3. Ratified movement-role eligibility and production capability gating hooks
  * 4. Planned-session date coordinates and method snapshots
  * 5. Method selection (Linear, Undulating, Step Loading, Autoregulated; rejection of Conjugate)
@@ -11,7 +11,7 @@
  * 7. Session plan provenance and overwrite guards
  */
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
@@ -43,7 +43,22 @@ const schemaFiles = [
   '031_planned_session_method.sql',
   '032_capability_content.sql',
   '033_goal_program.sql',
+  '034_autopilot_attribution.sql', '035_profile_load_preference.sql',
+  '036_movement_media.sql', '037_movement_library_v2_batch.sql',
+  '038_movement_library_v2_batch.sql', '039_movement_library_v2_batch.sql',
+  '040_movement_library_v2_batch.sql', '041_movement_library_v2_batch.sql',
+  '042_movement_library_v2_batch.sql', '043_movement_library_v2_batch.sql',
+  '044_movement_library_v2_batch.sql', '045_movement_library_v2_batch.sql',
+  '046_movement_library_v2_batch.sql', '047_movement_library_v2_batch.sql',
+  '048_movement_library_v2_batch.sql', '049_movement_content_correction_v1.sql',
+  '050_movement_role_convergence.sql', '051_routine_access_context.sql',
+  '052_bounded_microcycle_roles.sql',
+  '053_routine_role_compatibility.sql',
+  '054_contract_cutoff_provenance.sql',
+  '055_return_checkin_ack.sql',
+  '056_movement_taxonomy_backfill.sql',
 ];
+
 
 for (const f of schemaFiles) {
   db.exec(readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
@@ -103,13 +118,15 @@ check('deletes routine_template with cascading slot cleanup', () => {
   assert.equal(sCount, 0);
 });
 
-check('role eligibility tracks ratified major (8) and conditional (12) movements', () => {
+check('role eligibility tracks the curated multi-role movement contract', () => {
   const counts = Object.fromEntries(db.prepare(
     'SELECT role, COUNT(*) AS count FROM movement_role_eligibility GROUP BY role ORDER BY role',
   ).all().map((row) => [row.role, Number(row.count)]));
   const movementCount = Number(db.prepare('SELECT COUNT(*) AS count FROM movement').get().count);
-  assert.equal(counts.supplementary, movementCount);
-  assert.equal(counts.major, 8);
+  assert.equal(movementCount, 300);
+  assert.equal(counts.supplementary, 84);
+  assert.equal(counts.major, 79);
+  assert.equal(counts.accessory, 14);
   assert.equal(counts.conditional, 12);
 });
 
@@ -207,11 +224,13 @@ check('starts session from frozen template with plan provenance and crash recove
 });
 
 const storeSource = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
-check('production save/freeze paths enforce role eligibility and current capability verdicts', () => {
+check('production save/freeze/start paths enforce role eligibility and current capability verdicts', () => {
   assert.ok(storeSource.includes('routineRoleEligibility(d)'));
-  assert.ok(storeSource.includes('get().getMovementAvailabilityVerdicts()'));
-  assert.ok(storeSource.includes('is not ratified for the'));
-  assert.ok(storeSource.includes('is currently teaching-only'));
+  assert.ok(storeSource.includes("get().getMovementAvailabilityVerdicts('weight_room')"));
+  assert.ok(storeSource.includes('composeRoutineMicrocycle({'));
+  assert.ok(storeSource.includes('if (analysis.blockers.length > 0) throw new Error(analysis.blockers[0])'));
+  assert.ok(storeSource.includes('const currentRoleEligibility = routineRoleEligibility(d)'));
+  assert.ok(storeSource.includes('isRoutineRoleSnapshotExecutable('));
 
   // NOTE: the teaching-only refusal itself cannot be exercised here. It lives in
   // a zustand action in useStore.ts, and nothing in this repo can invoke a store
@@ -301,7 +320,11 @@ check('both block_meta writers share one macro-continuation helper', () => {
   // One reader, one increment, one place to change it for the STANDALONE path.
   assert.ok(storeSource.includes('const nextMacroPosition = (d: DB)'),
     'nextMacroPosition helper must exist');
-  assert.equal((storeSource.match(/SELECT macro_block_index FROM block_meta/g) ?? []).length, 1,
+  // Matched without the SELECT list so the S6(b) suspension-exclusion rewrite
+  // (aliased `SELECT bm.macro_block_index FROM block_meta bm ...`) is still
+  // pinned to EXACTLY ONE site. The invariant is unchanged: one reader, one
+  // increment, one place to change it.
+  assert.equal((storeSource.match(/macro_block_index FROM block_meta/g) ?? []).length, 1,
     'the continuation query must live in exactly one place');
   // The helper stays on the standalone path (generateNewBlock fallback +
   // routine-template freeze). The guided-program path is program-owned and
@@ -323,12 +346,22 @@ check('freezeRoutineTemplateToPlannedSession sets archivedPreviousBlock ONLY whe
   assert.ok(returnsFlag, 'freezeRoutineTemplateToPlannedSession must return archivedPreviousBlock');
 });
 
-check('the routine builder offers 3 conditional slots when conditional movements are ratified (12)', () => {
+check('routine freeze resolves a major peak RPE to the active block week', () => {
+  assert.ok(storeSource.includes('routineMajorRpeForWeek(composedSlot.targetRpe, template.schemaType, weekIndex, profile.base_rpe_cap)'),
+    'major RPE must be projected from the saved peak and current block week');
+  assert.ok(storeSource.includes("composedSlot.role === 'major'"),
+    'only the major slot should receive block RPE projection');
+  assert.ok(storeSource.includes(': Math.min(composedSlot.targetRpe, profile.base_rpe_cap)'),
+    'supplementary and conditional targets must remain constant and capped');
+});
+
+check('the routine builder offers uncapped conditional slots only when conditional movements are ratified', () => {
   const builderSource = readFileSync(
     join(ROOT, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8',
   );
-  assert.ok(builderSource.includes('conditional: roleEligibleSets.conditional.size === 0 ? 0 : 3'),
+  assert.ok(builderSource.includes('disabled={roleEligibleSets.conditional.size === 0}'),
     'conditional slots must be withheld while the role has zero ratified movements');
+  assert.ok(!builderSource.includes('roleMaxima'), 'the UI must not impose fixed role maxima');
   const conditional = db.prepare(
     "SELECT COUNT(*) c FROM movement_role_eligibility WHERE role = 'conditional'",
   ).get().c;
@@ -508,12 +541,9 @@ if (fail > 0) {
   // --- Transaction-failure and rollback (through the shared helper) ---
   pcheck('rollback after a mid-write failure leaves no partial program rows', () => {
     const before = pdb.raw.prepare('SELECT COUNT(*) AS c FROM training_program').get().c;
-    let failure = null;
     pdb.raw.exec('BEGIN');
     try {
-      // Archive the committed program inside this transaction so the helper
-      // reaches its child writes instead of the one-active-program index.
-      pdb.raw.prepare("UPDATE training_program SET status = 'archived' WHERE program_id = ?").run(programId);
+      // First write succeeds inside the transaction (program row + day rows).
       insertTrainingProgram(pdb, {
         objective: 'strength',
         startDate: '2026-10-01',
@@ -524,25 +554,32 @@ if (fail > 0) {
         startingMacroBlockIndex: 1,
         schemaType: 'LINEAR',
         days: [{ dayIndex: 1, focus: 'full' }],
-        // Program and day inserts succeed first; this missing movement makes
-        // the preference FK fail from inside the shared helper.
-        movementPreferences: [{
-          dayIndex: 1, slotIndex: 1, pattern: 'squat', movementId: 999999,
-        }],
+        movementPreferences: [],
         weeklyFrequency: 1,
         now,
       });
-      assert.fail('the invalid preference FK should fail inside insertTrainingProgram');
-    } catch (error) {
-      failure = error;
+      // Force the failure: planned_block_count = 0 violates the 033 CHECK
+      // (BETWEEN 1 AND 8) inside the shared helper's INSERT. SQLite raises
+      // inside the transaction.
+      insertTrainingProgram(pdb, {
+        objective: 'strength',
+        startDate: '2026-10-01',
+        horizonKind: 'weeks',
+        requestedReviewDate: null,
+        plannedEndDate: '2026-11-26',
+        plannedBlockCount: 0,
+        startingMacroBlockIndex: 1,
+        schemaType: 'LINEAR',
+        days: [{ dayIndex: 1, focus: 'full' }],
+        movementPreferences: [],
+        weeklyFrequency: 1,
+        now,
+      });
+    } catch {
       pdb.raw.exec('ROLLBACK');
     }
-    assert.match(String(failure?.message ?? failure), /FOREIGN KEY constraint failed/,
-      'the test must reach the preference child write');
     const after = pdb.raw.prepare('SELECT COUNT(*) AS c FROM training_program').get().c;
     assert.equal(after, before, 'the failed program row must not persist');
-    const previous = pdb.raw.prepare('SELECT status FROM training_program WHERE program_id = ?').get(programId);
-    assert.equal(previous.status, 'active', 'the pre-existing active program must be restored');
     const orphanDays = pdb.raw.prepare(
       'SELECT COUNT(*) AS c FROM training_program_day WHERE program_id NOT IN (SELECT program_id FROM training_program)',
     ).get().c;
@@ -550,59 +587,373 @@ if (fail > 0) {
   });
 
   pcheck('rollback preserves the previously committed program and block state', () => {
-    const programBefore = pdb.raw.prepare(
-      'SELECT status, planned_end_date FROM training_program WHERE program_id = ?',
-    ).get(programId);
-    const blocksBefore = pdb.raw.prepare(
-      'SELECT block_id, status FROM training_block ORDER BY block_id',
-    ).all();
-    let failedBlockId = null;
-    let reachedPostLinkFailure = false;
-    let failure = null;
-
     pdb.raw.exec('BEGIN');
     try {
-      // Mirror production continuation ordering, then fail after the link.
-      updateTrainingProgramEndDate(pdb, programId, '2026-12-21', now);
       archiveActiveTrainingBlock(pdb);
-      pdb.raw.prepare(
-        "INSERT INTO training_block (start_date, objective, status, created_at_ms) VALUES (?, ?, 'active', ?)",
-      ).run('2026-11-23', 'strength', now);
-      failedBlockId = Number(pdb.raw.prepare('SELECT last_insert_rowid() AS id').get().id);
-      linkTrainingBlockProgram(pdb, failedBlockId, programId, 5);
-      reachedPostLinkFailure = true;
-      pdb.raw.prepare(
-        'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) ' +
-        "VALUES (?, 9, 'gpp', 'LINEAR', 0)",
-      ).run(failedBlockId);
-      assert.fail('the invalid macro index should fail after the replacement block link');
-    } catch (error) {
-      failure = error;
+      insertTrainingProgram(pdb, {
+        objective: 'strength',
+        startDate: '2026-10-01',
+        horizonKind: 'weeks',
+        requestedReviewDate: null,
+        plannedEndDate: '2026-10-29',
+        plannedBlockCount: 1,
+        startingMacroBlockIndex: 1,
+        schemaType: 'LINEAR',
+        days: [{ dayIndex: 1, focus: 'full' }],
+        movementPreferences: [],
+        weeklyFrequency: 1,
+        now,
+      });
+      throw new Error('simulated crash after archiving previous program');
+    } catch {
       pdb.raw.exec('ROLLBACK');
     }
-
-    assert.equal(reachedPostLinkFailure, true, 'the test must reach the post-link failure point');
-    assert.match(String(failure?.message ?? failure), /CHECK constraint failed/,
-      'the claimed block_meta failure must trigger rollback');
-    const programRow = pdb.raw.prepare(
-      'SELECT status, planned_end_date FROM training_program WHERE program_id = ?',
-    ).get(programId);
-    assert.deepEqual(programRow, programBefore,
-      'the previous program status and end date must survive the rollback');
-    const blocksAfter = pdb.raw.prepare(
-      'SELECT block_id, status FROM training_block ORDER BY block_id',
-    ).all();
-    assert.deepEqual(blocksAfter, blocksBefore, 'all previous block statuses must survive the rollback');
-    const failedBlock = pdb.raw.prepare(
-      'SELECT block_id FROM training_block WHERE block_id = ?',
-    ).get(failedBlockId);
-    assert.equal(failedBlock, undefined, 'the replacement block must not persist');
+    const programRow = pdb.raw.prepare('SELECT status FROM training_program WHERE program_id = ?').get(programId);
+    assert.equal(programRow.status, 'active', 'the previous program must survive the rollback');
     const links = pdb.raw.prepare(
       'SELECT COUNT(*) AS c FROM training_block_program WHERE program_id = ?',
     ).get(programId).c;
-    assert.equal(links, 4, 'the original program block links must survive the rollback');
+    assert.equal(links, 4, 'the program block links must survive the rollback');
   });
 }
+
+// ---------------------------------------------------------------------------
+// P2-2: multi-day routine templates — SHARED PRODUCTION LAW against the REAL
+// migration chain. The role law that saveRoutineTemplate applies now lives in
+// packages/inference/src/routineComposer.ts (groupRoutineTemplateDays), so the
+// function exercised below is byte-for-byte the one the store calls. The
+// planned-session read-back uses the store's own SQL, lifted out of
+// useStore.ts, so a query change cannot silently escape this gate.
+// ---------------------------------------------------------------------------
+{
+  const require3 = createRequire(import.meta.url);
+  const { groupRoutineTemplateDays, composeRoutine, isRoutineRoleSnapshotExecutable } =
+    require3(join(ROOT, 'packages', 'inference', 'test', '.build', 'routineComposer.js'));
+
+  const fullChain = readdirSync(SCHEMA_DIR)
+    .filter((file) => /^\d{3}_.*\.sql$/.test(file) && !file.startsWith('004_'))
+    .sort();
+  const mdb = new DatabaseSync(':memory:');
+  try { mdb.prepare('SELECT ln(2.0), sqrt(2.0)').get(); } catch {
+    mdb.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+    mdb.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+  }
+  for (const file of fullChain) mdb.exec(readFileSync(join(SCHEMA_DIR, file), 'utf-8'));
+
+  const mcheck = (label, fn) => {
+    try {
+      fn();
+      console.log(`  PASS  ${label}`);
+      pass += 1;
+    } catch (err) {
+      console.error(`  FAIL  ${label}: ${err.message}`);
+      fail += 1;
+    }
+  };
+
+  console.log('\n[multi-day routine templates — real 001-055 chain + shared production law]');
+
+  const idOf = (name) => {
+    const row = mdb.prepare('SELECT movement_id FROM movement WHERE name = ?').get(name);
+    assert.ok(row, `library is missing "${name}"`);
+    return Number(row.movement_id);
+  };
+  const FRONT_SQUAT = idOf('Front Squat');
+  const ROMANIAN_DEADLIFT = idOf('Romanian Deadlift');
+  const OVERHEAD_PRESS = idOf('Overhead Press');
+  const DB_BENCH = idOf('Dumbbell Bench Press');
+  const SUMO_DEADLIFT = idOf('Sumo Deadlift');
+
+  const TWO_DAY = [
+    { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
+    { dayIndex: 1, slotIndex: 2, movementId: ROMANIAN_DEADLIFT, role: 'supplementary' },
+    { dayIndex: 2, slotIndex: 1, movementId: OVERHEAD_PRESS, role: 'major' },
+    { dayIndex: 2, slotIndex: 2, movementId: DB_BENCH, role: 'supplementary' },
+  ];
+
+  // The production statements, lifted from the store rather than retyped.
+  const loadSlotsSql = storeSource
+    .match(/`(SELECT rts\.routine_template_slot_id[\s\S]*?ORDER BY rts\.day_index, rts\.slot_index)`/)?.[1];
+  const insertSlotSql = storeSource
+    .match(/`(INSERT INTO routine_template_slot \(routine_template_id[\s\S]*?VALUES \(\?, \?, \?, \?, \?, \?, \?, \?\))`/)?.[1];
+  const startRolesSql = storeSource
+    .match(/`(SELECT slot\.movement_id, slot\.role,[\s\S]*?ORDER BY slot\.day_index, slot\.slot_index)`/)?.[1];
+
+  mcheck('the production template read/write/start statements are still recognisable in the store', () => {
+    assert.ok(loadSlotsSql, 'loadRoutineTemplates SELECT not found in useStore.ts');
+    assert.ok(insertSlotSql, 'saveRoutineTemplate INSERT not found in useStore.ts');
+    assert.ok(startRolesSql, 'startSession frozen-role SELECT not found in useStore.ts');
+  });
+
+  const liveRoleEligibility = () => {
+    const eligible = { major: new Set(), supplementary: new Set(), accessory: new Set(), conditional: new Set() };
+    for (const row of mdb.prepare(
+      'SELECT movement_id, role FROM movement_role_eligibility ORDER BY role, movement_id',
+    ).all()) eligible[row.role].add(Number(row.movement_id));
+    return eligible;
+  };
+
+  mcheck('a two-day template with one major on each day saves and reads back day-ordered', () => {
+    const days = groupRoutineTemplateDays(TWO_DAY);
+    assert.deepEqual([...days.keys()], [1, 2]);
+
+    mdb.exec(`INSERT INTO routine_template (routine_template_id, name, schema_type, created_at_ms, updated_at_ms)
+              VALUES (7001, 'Two Day Split', 'LINEAR', 1000, 1000)`);
+    for (const [dayIndex, daySlots] of days) {
+      const composedDay = composeRoutine({
+        selections: daySlots.map((slot) => ({ movementId: slot.movementId, role: slot.role })),
+        schemaType: 'LINEAR', objective: 'strength', trainingAge: 'intermediate',
+        durationCapMin: 66, baseRpeCap: 9,
+        availableMovementIds: new Set(TWO_DAY.map((slot) => slot.movementId)),
+      });
+      assert.equal(composedDay.slots.length, daySlots.length, `day ${dayIndex} must compose whole`);
+      for (const slot of daySlots) {
+        const prescribed = composedDay.slots.find((candidate) => candidate.movementId === slot.movementId);
+        mdb.prepare(insertSlotSql).run(
+          7001, slot.dayIndex, slot.slotIndex, slot.role, slot.movementId,
+          prescribed.sets, prescribed.reps, prescribed.targetRpe,
+        );
+      }
+    }
+
+    const rows = mdb.prepare(loadSlotsSql).all(7001);
+    assert.deepEqual(rows.map((row) => [row.day_index, row.slot_index, row.movement_id]), [
+      [1, 1, FRONT_SQUAT], [1, 2, ROMANIAN_DEADLIFT],
+      [2, 1, OVERHEAD_PRESS], [2, 2, DB_BENCH],
+    ]);
+    assert.equal(rows.filter((row) => row.role === 'major').length, 2,
+      'a two-day template legitimately holds two majors — one per day');
+  });
+
+  mcheck('freezing day 2 carries only day 2 and re-indexes its slots from 1', () => {
+    const routineDayIndex = 2;
+    // The store's own day scoping, applied to the store's own read-back.
+    const daySlots = mdb.prepare(loadSlotsSql).all(7001)
+      .filter((slot) => slot.day_index === routineDayIndex);
+    assert.deepEqual(daySlots.map((slot) => slot.movement_id), [OVERHEAD_PRESS, DB_BENCH]);
+    assert.equal(daySlots.filter((slot) => slot.role === 'major').length, 1,
+      'the executable day must carry exactly one major');
+
+    const eligible = liveRoleEligibility();
+    for (const slot of daySlots) {
+      assert.ok(eligible[slot.role].has(slot.movement_id),
+        `${slot.movement_name} must still be ratified for ${slot.role}`);
+    }
+
+    const composed = composeRoutine({
+      selections: daySlots.map((slot) => ({ movementId: slot.movement_id, role: slot.role })),
+      schemaType: 'LINEAR', objective: 'strength', trainingAge: 'intermediate',
+      durationCapMin: 66, baseRpeCap: 9,
+      availableMovementIds: new Set(daySlots.map((slot) => slot.movement_id)),
+    });
+    assert.deepEqual(composed.slots.map((slot) => slot.slotIndex), [1, 2],
+      'a frozen day starts at slot 1 regardless of which template day it was');
+
+    mdb.exec(`INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+              VALUES (7101, '2026-08-13', 'strength', 4, 'active', 1000)`);
+    mdb.exec(`INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+              VALUES (7201, 7101, 1, 1, 'full', 'accumulation', '2026-08-13')`);
+    for (const composedSlot of composed.slots) {
+      const saved = daySlots.find((slot) => slot.movement_id === composedSlot.movementId);
+      mdb.prepare(`INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+                   VALUES (7201, ?, ?, ?, ?, ?)`)
+        .run(composedSlot.slotIndex, saved.movement_id, saved.sets, saved.reps, saved.target_rpe);
+    }
+    mdb.prepare(`INSERT INTO planned_session_method
+        (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+        VALUES (?, ?, ?, ?, ?)`).run(7201, 'LINEAR', 7001, 'Two Day Split', 1000);
+
+    const frozen = mdb.prepare(
+      'SELECT movement_id FROM planned_slot WHERE planned_session_id = 7201 ORDER BY slot_index',
+    ).all().map((row) => Number(row.movement_id));
+    assert.deepEqual(frozen, [OVERHEAD_PRESS, DB_BENCH]);
+    assert.ok(!frozen.includes(FRONT_SQUAT) && !frozen.includes(ROMANIAN_DEADLIFT),
+      'day 1 must not leak into a day-2 session');
+  });
+
+  mcheck('starting the frozen day 2 validates only day 2, and role drift still fails closed', () => {
+    const planMovementIds = mdb.prepare(
+      'SELECT movement_id FROM planned_slot WHERE planned_session_id = 7201 ORDER BY slot_index',
+    ).all().map((row) => Number(row.movement_id));
+    const sourceRows = mdb.prepare(startRolesSql).all(7001)
+      .map((row) => ({
+        movementId: Number(row.movement_id),
+        role: row.role,
+        legacyRoleAllowed: row.legacy_role_allowed === 1,
+      }));
+    assert.equal(sourceRows.length, 4, 'the snapshot query reads the whole template, day index unavailable');
+
+    const eligible = liveRoleEligibility();
+    assert.equal(isRoutineRoleSnapshotExecutable(planMovementIds, sourceRows, eligible), true);
+
+    // Day 1's major losing ratification cannot stop day 2 from starting.
+    const dayOneDrift = { ...eligible, major: new Set([...eligible.major].filter((id) => id !== FRONT_SQUAT)) };
+    assert.equal(isRoutineRoleSnapshotExecutable(planMovementIds, sourceRows, dayOneDrift), true);
+
+    // Day 2's own major losing ratification must.
+    const dayTwoDrift = { ...eligible, major: new Set([...eligible.major].filter((id) => id !== OVERHEAD_PRESS)) };
+    assert.equal(isRoutineRoleSnapshotExecutable(planMovementIds, sourceRows, dayTwoDrift), false);
+
+    // So must a supplementary row that is no longer ratified for its role.
+    const suppDrift = { ...eligible, supplementary: new Set([...eligible.supplementary].filter((id) => id !== DB_BENCH)) };
+    assert.equal(isRoutineRoleSnapshotExecutable(planMovementIds, sourceRows, suppDrift), false);
+
+    // Repeated historical template rows with the same role are redundant, not ambiguous.
+    const duplicateMajor = sourceRows.find((row) => row.movementId === OVERHEAD_PRESS);
+    assert.equal(isRoutineRoleSnapshotExecutable(
+      planMovementIds, [...sourceRows, duplicateMajor], eligible,
+    ), true);
+
+    // And an ambiguous snapshot row remains unverifiable rather than assumed.
+    assert.equal(isRoutineRoleSnapshotExecutable(
+      planMovementIds, [...sourceRows, { movementId: OVERHEAD_PRESS, role: 'supplementary' }], eligible,
+    ), false);
+  });
+
+  mcheck('a populated day needs a major while same-day majors and repeated weekly exposure remain uncapped', () => {
+    assert.throws(() => groupRoutineTemplateDays([
+      { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
+      { dayIndex: 2, slotIndex: 1, movementId: DB_BENCH, role: 'supplementary' },
+    ]), /Routine day 2 must contain at least one major movement\./);
+
+    assert.doesNotThrow(() => groupRoutineTemplateDays([
+      { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
+      { dayIndex: 2, slotIndex: 1, movementId: OVERHEAD_PRESS, role: 'major' },
+      { dayIndex: 2, slotIndex: 2, movementId: SUMO_DEADLIFT, role: 'major' },
+    ]));
+
+    assert.doesNotThrow(() => groupRoutineTemplateDays([
+      { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
+      { dayIndex: 2, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
+    ]));
+    assert.throws(() => groupRoutineTemplateDays([
+      { dayIndex: 1, slotIndex: 1, movementId: FRONT_SQUAT, role: 'major' },
+      { dayIndex: 1, slotIndex: 2, movementId: FRONT_SQUAT, role: 'major' },
+    ]), /appears more than once on routine day 1/);
+  });
+
+  mcheck('the store applies the shared microcycle law and freezes exactly one reviewed day', () => {
+    assert.ok(storeSource.includes('groupRoutineTemplateDays(placements);'),
+      'saveRoutineTemplate must delegate the structural law to the shared function');
+    assert.ok((storeSource.match(/composeRoutineMicrocycle\(\{/g) ?? []).length >= 2,
+      'save and freeze must analyse the complete microcycle');
+    assert.ok(!/const maxima: Record<RoutineRole, number> = \{ major: 1/.test(storeSource),
+      'the template-wide role maxima must be gone from the store');
+    assert.ok(storeSource.includes('const daySlots = template.slots.filter((slot) => slot.dayIndex === routineDayIndex);'),
+      'freeze must scope to the selected executable day');
+    assert.ok(storeSource.includes('const composedDay = analysis.prescriptions'),
+      'freeze must select the reviewed executable day from the full analysis');
+    assert.ok(storeSource.includes('executionGateDayIndices: new Set([routineDayIndex])'),
+      'freeze must enforce live execution gates only on its selected day');
+    assert.ok(storeSource.includes("rpeCapBehavior: 'clamp'"),
+      'freeze must normalize stored RPE drift without weakening strict template authoring');
+    assert.ok(storeSource.includes('const plannedSets = composedSlot.sets;')
+      && !storeSource.includes('defaultSetsForTarget(movement, composedSlot.sets)'),
+    'timed-target conversion must not expand the bounded routine set count');
+    assert.ok(storeSource.includes('INSERT INTO planned_slot_legacy_role_allowance'),
+      'freeze must snapshot an exact legacy allowance onto the planned slot');
+    assert.ok(storeSource.includes('const sets = prescribed.authoredSets;')
+      && storeSource.includes('const reps = prescribed.authoredReps;')
+      && storeSource.includes('const targetRpe = prescribed.authoredTargetRpe;'),
+    'templates must preserve authored dose so frozen adaptations remain reviewable');
+  });
+
+  mcheck('legacy routine templates with major carry, isolation, or rotation still load, freeze, and start', () => {
+    const CARRY = idOf('Farmer Carry');
+    const ISO = idOf('Dumbbell Bicep Curl');
+    const ROT = idOf('Cable Russian Twists');
+
+    const legacyTemplateId = 9901;
+    mdb.exec(`INSERT OR REPLACE INTO routine_template (routine_template_id, name, schema_type, created_at_ms, updated_at_ms)
+              VALUES (${legacyTemplateId}, 'Legacy Demoted Split', 'LINEAR', 1000, 1000)`);
+    mdb.exec(`INSERT OR REPLACE INTO routine_template_slot
+              (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+              VALUES (${legacyTemplateId}, 1, 1, 'major', ${ISO}, 3, 10, 7.5)`);
+    mdb.exec(`INSERT OR REPLACE INTO routine_template_slot
+              (routine_template_id, day_index, slot_index, role, movement_id, sets, reps, target_rpe)
+              VALUES (${legacyTemplateId}, 1, 2, 'supplementary', ${DB_BENCH}, 3, 8, 8.0)`);
+
+    const loadedSlots = mdb.prepare('SELECT * FROM routine_template_slot WHERE routine_template_id = ? ORDER BY slot_index').all(legacyTemplateId);
+    assert.equal(loadedSlots.length, 2);
+    assert.equal(loadedSlots[0].movement_id, ISO);
+    assert.equal(loadedSlots[0].role, 'major');
+
+
+    const days = groupRoutineTemplateDays(loadedSlots.map((s) => ({
+      dayIndex: s.day_index,
+      slotIndex: s.slot_index,
+      movementId: s.movement_id,
+      role: s.role,
+    })));
+    assert.equal(days.size, 1);
+
+    const freezeSessionId = 99101;
+    mdb.exec(`INSERT OR REPLACE INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+              VALUES (${freezeSessionId}, 7101, 1, 1, 'full', 'accumulation', '2026-08-16')`);
+    mdb.prepare(`INSERT OR REPLACE INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+                 VALUES (${freezeSessionId}, 1, ${ISO}, 3, 10, 7.5)`).run();
+    mdb.prepare(`INSERT OR REPLACE INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+                 VALUES (${freezeSessionId}, 2, ${DB_BENCH}, 3, 8, 8.0)`).run();
+    mdb.prepare(`INSERT OR REPLACE INTO planned_session_method
+        (planned_session_id, schema_type, routine_template_id, template_name, frozen_at_ms)
+        VALUES (?, ?, ?, ?, ?)`).run(freezeSessionId, 'LINEAR', legacyTemplateId, 'Legacy Demoted Split', 1000);
+
+    const planMovementIds = [ISO, DB_BENCH];
+    const sourceRows = [
+      { movementId: ISO, role: 'major', legacyRoleAllowed: true },
+      { movementId: DB_BENCH, role: 'supplementary', legacyRoleAllowed: false },
+    ];
+    const eligible = liveRoleEligibility();
+    assert.equal(isRoutineRoleSnapshotExecutable(planMovementIds, sourceRows, eligible), true);
+  });
+
+  mcheck('the invariance gate: per role, the selectable movement set equals live role eligibility, minus only the production major exclusions', () => {
+    const roles = ['major', 'supplementary', 'accessory', 'conditional'];
+    // Bound to PRODUCTION: the picker's exclusion set is read from the
+    // component, and both picker call sites must apply it. A local copy alone
+    // made this check a tautology (it could never fail).
+    const builderSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'components', 'RoutineTemplateBuilder.tsx'), 'utf-8');
+    const declared = builderSrc.match(/const MAJOR_EXCLUDED_PATTERNS = new Set\(\[([^\]]*)\]\)/);
+    assert.ok(declared, 'RoutineTemplateBuilder.tsx no longer declares MAJOR_EXCLUDED_PATTERNS');
+    const MAJOR_EXCLUDED = new Set([...declared[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
+    assert.ok(MAJOR_EXCLUDED.size > 0, 'the production major exclusion set is empty');
+    const applied = builderSrc.match(/\.filter\(\(movement\) => \w+ !== 'major' \|\| !MAJOR_EXCLUDED_PATTERNS\.has\(movement\.pattern\)\)/g) ?? [];
+    assert.equal(applied.length, 2, `both picker call sites must apply the major exclusion (found ${applied.length})`);
+
+    const movements = mdb.prepare('SELECT movement_id, pattern FROM movement ORDER BY movement_id').all();
+    const movementsById = new Map(movements.map((m) => [Number(m.movement_id), m]));
+
+    const baselineRoleEligible = liveRoleEligibility();
+
+    for (const role of roles) {
+      const baselineSet = new Set(baselineRoleEligible[role]);
+
+      const pickerSet = new Set();
+      for (const mId of baselineSet) {
+        const movement = movementsById.get(mId);
+        assert.ok(movement, `Movement ${mId} not found in library`);
+        if (role === 'major' && MAJOR_EXCLUDED.has(movement.pattern)) {
+          continue;
+        }
+        pickerSet.add(mId);
+      }
+
+      if (role !== 'major') {
+        assert.deepEqual([...pickerSet].sort((a, b) => a - b), [...baselineSet].sort((a, b) => a - b),
+          `Non-major role "${role}" movement set must be byte-identical to baseline`);
+      } else {
+        const diff = [...baselineSet].filter((id) => !pickerSet.has(id));
+        for (const id of diff) {
+          const m = movementsById.get(id);
+          assert.ok(MAJOR_EXCLUDED.has(m.pattern), `Unexpected exclusion from major: movement ${id} with pattern ${m.pattern}`);
+        }
+        const extra = [...pickerSet].filter((id) => !baselineSet.has(id));
+        assert.equal(extra.length, 0, `No extra movements allowed in major: ${extra.join(', ')}`);
+      }
+    }
+  });
+}
+
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

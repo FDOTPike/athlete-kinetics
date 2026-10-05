@@ -5,8 +5,9 @@
  * four-week trajectory (liquid calendar), and inline disclosures for management and context.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SCHEMA_TYPES, addDaysIso, targetLoadKg, type BlockPlan, type SchemaType } from '@ak/inference';
+import { SELECTABLE_SCHEMA_TYPES, addDaysIso, targetLoadKg, splitExplainer, SPLIT_EXPLAINER_FOOTER, type BlockPlan, type SchemaType } from '@ak/inference';
 import {
   useStore,
   type BlockSessionSummary,
@@ -16,7 +17,13 @@ import {
 import { RoutineTemplateBuilder } from '../components/RoutineTemplateBuilder';
 import { useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
+import NewBlockChooserScreen from './NewBlockChooserScreen';
+import InfoTip from '../components/InfoTip';
+import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { theme } from '../theme/theme';
+import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
+import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -46,6 +53,25 @@ const PHASE_LABEL: Record<string, string> = {
   deload: 'Deload',
 };
 
+const ACTIVITY_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+const activityTime = (minute: number | null): string => {
+  if (minute === null) return 'time not set';
+  const hour = Math.floor(minute / 60);
+  const suffix = hour >= 12 ? 'pm' : 'am';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${String(minute % 60).padStart(2, '0')} ${suffix}`;
+};
+
+const GLOSSARY_PHASE_TERM: Record<string, 'BUILD' | 'INTENSIFICATION' | 'REALISE' | 'DELOAD'> = {
+  accumulation: 'BUILD',
+  build: 'BUILD',
+  intensification: 'INTENSIFICATION',
+  realization: 'REALISE',
+  realise: 'REALISE',
+  deload: 'DELOAD',
+};
+
 interface BlockScreenProps {
   /** Called after a session starts here so the shell can switch tabs. */
   onSessionStarted?: () => void;
@@ -73,6 +99,16 @@ const focusName = (focus: string): string => focus
 
 const phaseLabel = (phase: string): string => PHASE_LABEL[phase] ?? phase;
 
+/** The 058 CHECK domain, in the athlete's words. `life` is deliberate: travel,
+ *  work and bereavement are the commonest reasons for a gap, and restricting
+ *  the pause to injury would leave them burning the progression track. */
+const SUSPENSION_REASONS = ['injury', 'illness', 'life'] as const;
+const SUSPENSION_REASON_LABEL: Record<(typeof SUSPENSION_REASONS)[number], string> = {
+  injury: 'an injury',
+  illness: 'illness',
+  life: 'life events',
+};
+
 function targetLabel(slot: TodaySlot): string {
   return slot.target.kind === 'time'
     ? `${slot.sets} x ${slot.target.seconds}s`
@@ -92,29 +128,11 @@ function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): strin
   }`;
 }
 
-/** Both attribution disclosures are a bare "·" glyph at theme.font.label, whose
- *  laid-out box is far under theme.touch.min (56). Growing the Pressable to 56
- *  would push a 56pt box into a text row that is otherwise label-height, so
- *  extend the touchable region instead: 20pt on every side takes a ~16pt glyph
- *  past the 56pt minimum without moving a single pixel of layout. */
-const ATTRIBUTION_HIT_SLOP = { top: 20, bottom: 20, left: 20, right: 20 } as const;
-
-const AUTOPILOT_BUDGET_NOTE ='Autopilot still eases effort and adjusts sets whenever your sessions call for it. Only upward RPE moves are rationed, and those grants are spent over the first five blocks of each cycle.';
+const AUTOPILOT_BUDGET_NOTE = 'Held steady — effort only rises early in a cycle.';
 
 function autopilotExplanation(slot: TodaySlot): string | null {
-  if (slot.autopilot === undefined) return null;
-  const reason = slot.autopilot.reason === 'eased'
-    ? 'Eased off — your recent sets felt harder than planned.'
-    : slot.autopilot.reason === 'raised'
-      ? 'Nudged up — your recent sets felt easier than planned.'
-      : 'Held back — a recent safety signal limited this target.';
-  const changes = [
-    slot.autopilot.rpeDelta === 0 ? null : `RPE ${signed(slot.autopilot.rpeDelta)}`,
-    slot.autopilot.setDelta === 0
-      ? null
-      : `${signed(slot.autopilot.setDelta)} set${Math.abs(slot.autopilot.setDelta) === 1 ? '' : 's'}`,
-  ].filter((value): value is string => value !== null);
-  return `${reason} ${changes.join(', ')}.`;
+  // Shared with Today (Sol R4 F2) so both surfaces read the same fact the same way.
+  return autopilotReasonCopy(slot.autopilot?.reason);
 }
 
 function AutopilotAttribution({
@@ -132,7 +150,7 @@ function AutopilotAttribution({
     <View style={styles.attribution}>
       <Pressable
         onPress={onPress}
-        hitSlop={ATTRIBUTION_HIT_SLOP}
+        style={styles.attributionTouchTarget}
         accessibilityRole="button"
         accessibilityLabel={`Why ${slot.movementName} target changed`}
         accessibilityState={{ expanded }}
@@ -143,6 +161,7 @@ function AutopilotAttribution({
     </View>
   );
 }
+
 function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
   return [1, 2, 3, 4].map((week) => {
     const inWeek = sessions.filter((session) => session.weekIndex === week);
@@ -156,10 +175,26 @@ function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
   });
 }
 
-export default function BlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX.Element {
+export default function BlockScreen(props: BlockScreenProps): React.JSX.Element {
+  const state = useStore((s) => s);
+  const decision = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision() : { status: 'support_unavailable' as const };
+  if (decision.status !== 'available') return <TrainingSupportNotice unavailable={decision.status === 'support_unavailable'}
+    onOpenSession={state.session !== null ? props.onSessionStarted : undefined} />;
+  return <AvailableBlockScreen key={state.activeAthleteId} {...props} />;
+}
+
+function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX.Element {
   const vector = useStore((s) => s.vector);
+  // Read through the hook, not useStore.getState(): the component tests mock
+  // the store with a bare selector function, which getState() would bypass.
   const storeError = useStore((s) => s.error);
   const today = useStore((s) => s.today);
+  const profile = useStore((s) => s.profile);
+  const activityLedger = useStore((s) => s.activityLedger ?? EMPTY_ACTIVITY_LEDGER);
+  // Work order 3: the explanation frozen with the active block (null when the
+  // block was created with no focus, sport or goal exercise, or before 067).
+  const blockEmphasis = useStore((s) => s.blockEmphasis) ?? null;
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
   const triageReady = useStore((s) => s.triageReady);
@@ -179,11 +214,17 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   const previewNextProgramBlock = useStore((s) => s.previewNextProgramBlock);
   const continueTrainingProgram = useStore((s) => s.continueTrainingProgram);
   const archiveTrainingProgram = useStore((s) => s.archiveTrainingProgram);
+  const suspension = useStore((s) => s.suspension);
+  const beginSuspension = useStore((s) => s.beginSuspension);
+  const endSuspension = useStore((s) => s.endSuspension);
+  const [suspendError, setSuspendError] = useState<string | null>(null);
   const [editingProgram, setEditingProgram] = useState(false);
   const [nextProgramPreview, setNextProgramPreview] = useState<BlockPlan | null>(null);
   const [continuationError, setContinuationError] = useState<string | null>(null);
   const [continuationPending, setContinuationPending] = useState(false);
   const startSession = useStore((s) => s.startSession);
+  const pendingAdjustments = useStore((s) => s.pendingAutopilotAdjustments) ?? [];
+  const blockEndDate = blockSessions.length > 0 ? blockSessions[blockSessions.length - 1].sessionDate : null;
 
   const routineTemplates = useStore((s) => s.routineTemplates) ?? [];
   const freezeRoutineTemplateToPlannedSession = useStore(
@@ -208,15 +249,19 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     RoutineTemplate | 'new' | null
   >(null);
   const [confirmRoutineAction, setConfirmRoutineAction] = useState<{
-    kind: 'use' | 'delete'; routineTemplateId: number;
+    kind: 'use' | 'delete'; routineTemplateId: number; routineDayIndex?: number;
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
+  const [awaitingSessionStart, setAwaitingSessionStart] = useState(false);
+  const [sessionStartError, setSessionStartError] = useState<string | null>(null);
+  const sessionStartPendingRef = useRef(false);
+  const sessionIdBeforeStartRef = useRef<number | null>(null);
 
   // continueTrainingProgram reports every refusal through the store's `error`
   // and returns without creating a block, so dismissing the preview card the
-  // moment the button is pressed would leave the athlete with no next block,
-  // no message, and nothing to retry. The store's post-call error is only
+  // moment the button is pressed would leave the athlete with no next block, no
+  // message, and nothing to retry. The store's post-call error is only
   // observable on the NEXT render, so settle the confirmation here: close the
   // card once the continuation actually landed, keep it up and surface the
   // reason when it did not.
@@ -230,7 +275,29 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     setNextProgramPreview(null);
   }, [continuationPending, storeError]);
 
+  // Starting a session can legitimately fail closed in the store. Keep the
+  // athlete on Plan until a NEW active session exists, then navigate exactly
+  // once. The ref closes the double-tap window before React commits the local
+  // pending state; the existing active-session action remains a separate
+  // resume path and never calls startSession.
+  useEffect(() => {
+    if (!awaitingSessionStart) return;
+    setAwaitingSessionStart(false);
+    sessionStartPendingRef.current = false;
+    const newlyActive = session !== null
+      && session.sessionId !== sessionIdBeforeStartRef.current;
+    if (newlyActive) {
+      onSessionStarted?.();
+      return;
+    }
+    if (storeError !== null && storeError !== undefined) {
+      setSessionStartError(storeError);
+    }
+  }, [awaitingSessionStart, session, storeError, onSessionStarted]);
+  const [showChooser, setShowChooser] = useState(false);
+
   const hasSubView =
+    showChooser ||
     editingProgram ||
     nextProgramPreview !== null ||
     detail !== null ||
@@ -241,7 +308,8 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     confirmRoutineAction !== null;
 
   useSubViewBack(hasSubView, () => {
-    if (editingProgram) setEditingProgram(false);
+    if (showChooser) setShowChooser(false);
+    else if (editingProgram) setEditingProgram(false);
     else if (nextProgramPreview !== null) setNextProgramPreview(null);
     else if (editingTemplate !== null) setEditingTemplate(null);
     else if (confirmRoutineAction !== null) setConfirmRoutineAction(null);
@@ -251,10 +319,16 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     else if (confirmUnplannedStart) setConfirmUnplannedStart(false);
   });
 
-  const requestRoutineAction = (kind: 'use' | 'delete', routineTemplateId: number): void => {
+  const requestRoutineAction = (
+    kind: 'use' | 'delete', routineTemplateId: number, routineDayIndex?: number,
+  ): void => {
+    if (kind === 'use' && profile.training_age === 'beginner') {
+      setRoutineActionMessage('Standalone routines unlock after the Beginner stage. Generated training remains available.');
+      return;
+    }
     setRoutineActionMessage(null);
     setBlockArchivedNotice(null);
-    setConfirmRoutineAction({ kind, routineTemplateId });
+    setConfirmRoutineAction({ kind, routineTemplateId, routineDayIndex });
   };
 
   const confirmSelectedRoutineAction = (template: RoutineTemplate): void => {
@@ -266,8 +340,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         setRoutineActionMessage(`${template.name} was deleted.`);
         setBlockArchivedNotice(null);
       } else {
-        const result = freezeRoutineTemplateToPlannedSession(template.routineTemplateId);
-        setRoutineActionMessage(`${template.name} is frozen into today's plan.`);
+        const routineDayIndex = action.routineDayIndex ?? 1;
+        const result = freezeRoutineTemplateToPlannedSession(template.routineTemplateId, undefined, routineDayIndex);
+        setRoutineActionMessage(`${template.name} day ${routineDayIndex} is frozen into today's plan.`);
         if (result.archivedPreviousBlock) {
           setBlockArchivedNotice('Your previous block had ended. A new block was started.');
         } else {
@@ -282,10 +357,28 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     }
   };
 
+  if (showChooser) {
+    return (
+      <NewBlockChooserScreen
+        onSelectAuto={() => {
+          setShowChooser(false);
+          setEditingProgram(true);
+        }}
+        onSelectCustom={() => {
+          setShowChooser(false);
+          setEditingTemplate('new');
+        }}
+        onCancel={() => setShowChooser(false)}
+      />
+    );
+  }
+
   if (editingProgram) {
     return (
       <ProgramSetupScreen
-        editing
+        // Create mode when there is no program yet ("Build your first block"):
+        // edit mode would submit to updateProgramPreferences, which refuses.
+        editing={program !== null}
         onComplete={() => setEditingProgram(false)}
         onCancel={() => setEditingProgram(false)}
       />
@@ -304,18 +397,25 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
   if (vector === null) {
     return (
-      <View style={styles.center}>
+      // The no-vector gate is an early return INSIDE the real screen, so the
+      // route identity (coach-screen) is still asserted by tests even when
+      // readiness data has not arrived yet.
+      <View style={styles.center} testID="coach-screen">
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
           <Text style={styles.bodyText}>
             Sync telemetry or load the demo athlete before asking Coach to adjust today's plan.
           </Text>
-          <SecondaryButton
-            label="Build a standalone routine"
-            onPress={() => setEditingTemplate('new')}
-            accessibilityLabel="Build a standalone routine template"
-          />
+          {profile.training_age === 'beginner' ? (
+            <Text style={styles.captionText}>Standalone routines unlock after the Beginner stage. Generated training remains available.</Text>
+          ) : (
+            <SecondaryButton
+              label="Build a standalone routine"
+              onPress={() => setEditingTemplate('new')}
+              accessibilityLabel="Build a standalone routine template"
+            />
+          )}
         </View>
       </View>
     );
@@ -354,14 +454,13 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
     setDetail({ summary: nextPlanned, slots: loadSessionSlots(nextPlanned.plannedSessionId) });
   };
 
-  const startPlannedSession = (): void => {
+  const startAndOpenSession = (): void => {
+    if (sessionStartPendingRef.current || session !== null) return;
+    sessionStartPendingRef.current = true;
+    sessionIdBeforeStartRef.current = null;
+    setSessionStartError(null);
+    setAwaitingSessionStart(true);
     startSession();
-    onSessionStarted?.();
-  };
-
-  const startUnplannedSession = (): void => {
-    startSession();
-    onSessionStarted?.();
   };
 
   let todayTitle = 'Recovery day';
@@ -384,11 +483,46 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
   }
 
   return (
-    <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled" testID="coach-screen">
+    <KeyboardAwareScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.screenContent} testID="coach-screen">
       {/* Header Wordmark */}
       <View style={styles.header}>
         <Text style={styles.wordmark}>pikeMethods</Text>
       </View>
+
+      {activityLedger.series.some((row) => row.effectiveEndDate === null) && (
+        <Disclosure
+          label="YOUR OTHER WEEKLY ACTIVITIES"
+          hint="Recorded commitments shown beside this plan"
+          testID="plan-existing-activities"
+        >
+          {activityLedger.series.filter((row) => row.effectiveEndDate === null).map((row) => (
+            <View key={row.seriesId}>
+              <Text style={styles.cardTitle}>{row.displayName}</Text>
+              <Text style={styles.bodyText}>
+                {ACTIVITY_WEEKDAYS[row.localWeekday]} · {activityTime(row.localStartMinute)} · {row.timing}
+                {row.expectedDurationMin === null ? ' · duration unknown' : ` · ${row.expectedDurationMin} expected minutes`}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.bodyText}>
+            These are your reported facts. This version shows them alongside the plan but does not silently
+            move, add, remove, or intensify coach sessions.
+          </Text>
+        </Disclosure>
+      )}
+
+      {block !== null && blockEmphasis !== null && (
+        <Disclosure
+          label="WHY THIS PLAN LOOKS THE WAY IT DOES"
+          hint="What your focus, goals and sport changed"
+          testID="plan-emphasis-disclosure"
+        >
+          <EmphasisReportCard report={blockEmphasis.report} testID="plan-emphasis" />
+          <Text style={styles.bodyText}>
+            This was recorded when the block was created and does not change if you edit your focus, goals or sport later. Those edits are used for your next block.
+          </Text>
+        </Disclosure>
+      )}
 
       {block === null && hasArchivedBlock && (
         <View style={styles.card}>
@@ -397,6 +531,26 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.bodyText}>
             A short four-week block gives Coach a clear trajectory to follow.
           </Text>
+          <PrimaryButton
+            label="Start a new block"
+            onPress={() => setShowChooser(true)}
+            accessibilityLabel="Start a new block"
+          />
+        </View>
+      )}
+
+      {block === null && !hasArchivedBlock && (
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>PERIODIZATION</Text>
+          <Text style={styles.cardTitle}>Build your first block</Text>
+          <Text style={styles.bodyText}>
+            A short four-week block gives Coach a clear trajectory to follow.
+          </Text>
+          <PrimaryButton
+            label="Start a new block"
+            onPress={() => setShowChooser(true)}
+            accessibilityLabel="Start a new block"
+          />
         </View>
       )}
 
@@ -415,6 +569,77 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
           {lastTriage.directive.followUp !== null && (
             <Text style={styles.followUpText}>{lastTriage.directive.followUp}</Text>
+          )}
+        </View>
+      )}
+
+      {/* RR-02 suspension. Athlete-owned in BOTH directions: the app never
+          infers an episode and never ends one. Suspension freezes the macro
+          position and NOTHING else — training, substitution, the RPE ceiling
+          and halt supremacy all keep working, which is why this card offers no
+          "stop training" affordance. */}
+      {suspension != null ? (
+        <View style={[styles.card, styles.haltCard]}>
+          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.cardTitle}>Your place is being held</Text>
+          <Text style={styles.bodyText}>
+            Paused for {SUSPENSION_REASON_LABEL[suspension.reason]}. You are held at block{' '}
+            {suspension.frozen_macro_index} of 8 and will come back to it — training you do now
+            will not use it up. Keep training if you can; everything else works as normal.
+          </Text>
+          <PrimaryButton
+            label="Resume my programme"
+            onPress={() => {
+              // Same action-scoped try/catch the pause controls use below. The
+              // resume path had none, so a database failure escaped the handler
+              // and the athlete saw this card unchanged with no explanation —
+              // in the one flow that is athlete-owned in BOTH directions.
+              try {
+                setSuspendError(null);
+                endSuspension(Date.now());
+              } catch (e) {
+                setSuspendError(e instanceof Error ? e.message : String(e));
+              }
+            }}
+            accessibilityLabel={`Resume the programme and return to block ${suspension.frozen_macro_index} of 8`}
+            testID="suspension-resume"
+          />
+          {/* Mounted INSIDE the suspended branch. The resume button exists only
+              here, so an error node living only in the other branch could never
+              be seen by the athlete whose resume just failed — the second,
+              independent reason the message was invisible. */}
+          {suspendError !== null && (
+            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
+          )}
+        </View>
+      ) : (
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>PAUSE</Text>
+          <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
+          <Text style={styles.bodyText}>
+            Pausing holds your place in the programme so a gap does not cost you a block. You can
+            still train while paused.
+          </Text>
+          {SUSPENSION_REASONS.map((reason) => (
+            <PrimaryButton
+              key={reason}
+              label={`Pause — ${SUSPENSION_REASON_LABEL[reason]}`}
+              onPress={() => {
+                try {
+                  setSuspendError(null);
+                  beginSuspension(reason, Date.now());
+                } catch (e) {
+                  setSuspendError(e instanceof Error ? e.message : String(e));
+                }
+              }}
+              accessibilityLabel={`Pause my programme for ${SUSPENSION_REASON_LABEL[reason]}`}
+              testID={`suspension-begin-${reason}`}
+            />
+          ))}
+          {/* Action-scoped, not the global error channel: an unrelated store
+              error must never read as a refusal of this control. */}
+          {suspendError !== null && (
+            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
           )}
         </View>
       )}
@@ -473,7 +698,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               accessibilityLabel="Review program continuation"
             />
           ) : todayPlan !== null ? (
-            <PrimaryButton label="Start session" onPress={startPlannedSession} accessibilityLabel="Start session" />
+            <PrimaryButton label="Start session" onPress={startAndOpenSession} accessibilityLabel="Start session" />
           ) : block === null ? (
             <PrimaryButton label="Set up a four-week block" onPress={openManageBlock} accessibilityLabel="Set up a four-week block" />
           ) : (
@@ -484,13 +709,29 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             />
           )}
           {block !== null && (
-            <SecondaryButton
-              label={program == null ? 'Manage block' : 'Manage program'}
-              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
-              accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
-            />
+            <>
+              <SecondaryButton
+                label={program == null ? 'Manage block' : 'Manage program'}
+                onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+                accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
+              />
+              <SecondaryButton
+                label="Plan a new block"
+                onPress={() => setShowChooser(true)}
+                accessibilityLabel="Plan a new block"
+              />
+            </>
           )}
         </View>
+        {sessionStartError !== null && (
+          <Text
+            style={styles.errorText}
+            testID="plan-start-error"
+            accessibilityRole="alert"
+          >
+            {sessionStartError}
+          </Text>
+        )}
       </View>
 
       {nextProgramPreview !== null && (
@@ -528,14 +769,21 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
         style={styles.section}
         onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
       >
-        <Text style={styles.sectionTitle}>Four-week trajectory</Text>
+        <View style={styles.trajectoryHeaderRow}>
+          <Text style={styles.sectionTitle}>Four-week trajectory</Text>
+          {block !== null && blockEndDate !== null && (
+            <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
+              <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
+            </View>
+          )}
+        </View>
         {blockMeta !== null && blockMeta.macroBlockIndex >= 6 && (
           <View style={styles.blockAttribution}>
             <Pressable
               onPress={() => setMacroBudgetOpen((open) => !open)}
-              hitSlop={ATTRIBUTION_HIT_SLOP}
+              style={styles.attributionTouchTarget}
               accessibilityRole="button"
-              accessibilityLabel="Why RPE is held steady"
+              accessibilityLabel="Why effort is held steady"
               accessibilityState={{ expanded: macroBudgetOpen }}
             >
               <Text style={styles.attributionMarker}>·</Text>
@@ -550,23 +798,60 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           </View>
         ) : (
           <>
-            {rows.map((row) => (
-              <View key={row.week} style={styles.weekContainer}>
-                <View style={styles.weekRow}>
-                  <View style={styles.weekMeta}>
-                    <Text style={styles.weekTitle}>Week {row.week}</Text>
-                    <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
-                  </View>
-                  <View style={styles.dayRail}>
+            {(() => {
+              const seenPhaseTerms = new Set<string>();
+              return rows.map((row) => {
+                const phaseTerm = GLOSSARY_PHASE_TERM[row.phase.toLowerCase()];
+                const showPhaseTip = phaseTerm !== undefined && !seenPhaseTerms.has(phaseTerm);
+                if (phaseTerm) seenPhaseTerms.add(phaseTerm);
+
+                return (
+                  <View key={row.week} style={styles.weekContainer}>
+                    <View testID={`trajectory-week-${row.week}`} style={styles.weekRow}>
+                      <View style={styles.weekMeta}>
+                        <Text style={styles.weekTitle}>Week {row.week}</Text>
+                        <View style={styles.weekPhaseRow}>
+                          <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
+                          {showPhaseTip && <InfoTip term={phaseTerm} />}
+                        </View>
+                      </View>
+                      <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
                     {row.cells.map((cell, dayIndex) => {
+                      // Every trajectory position owns a calendar date derived
+                      // from the block start, week and day index (same formula
+                      // as the generator's session_date), so rest cells can be
+                      // today-aware too.
+                      const cellDate = addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex);
+                      const isToday = cellDate === today;
                       if (cell === null) {
+                        if (!isToday) {
+                          return (
+                            <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
+                              <Text style={styles.dayMarkRestText}>-</Text>
+                            </View>
+                          );
+                        }
+                        // Today on a recovery/rest day: exactly one today-marker,
+                        // chalk left spine, accessible label, 'Today' not '-'.
                         return (
-                          <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
-                            <Text style={styles.dayMarkRestText}>-</Text>
+                          <View
+                            key={`rest-${dayIndex}`}
+                            testID="today-marker"
+                            accessibilityRole="text"
+                            accessibilityLabel="Today — recovery day"
+                            style={[styles.dayMark, styles.dayMarkRest, styles.dayMarkToday]}
+                          >
+                            <Text
+                              style={[styles.dayMarkRestText, styles.dayMarkTextToday]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                              minimumFontScale={0.7}
+                            >
+                              Today
+                            </Text>
                           </View>
                         );
                       }
-                      const isToday = cell.sessionDate === today;
                       const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
                       return (
                         <Pressable
@@ -581,6 +866,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                                 : ''
                           }`}
                           accessibilityState={{ expanded: isExpanded, selected: isToday }}
+                          testID={isToday ? 'today-marker' : undefined}
                           style={({ pressed }) => [
                             styles.dayMark,
                             cell.completionStatus !== null && styles.dayMarkFinalized,
@@ -595,6 +881,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                               cell.completionStatus !== null && styles.dayMarkTextFinalized,
                               isToday && styles.dayMarkTextToday,
                             ]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.7}
                           >
                             {cell.completionStatus === 'complete'
                               ? 'Done'
@@ -635,7 +924,9 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                           />
                         </View>
                         {slot.overrideLoadKg !== null && (
-                          <Chip label="SUBSTITUTED" selected={false} onPress={() => {}} />
+                          <View style={styles.substitutedBadge} accessibilityRole="text">
+                            <Text style={styles.substitutedBadgeText}>SUBSTITUTED</Text>
+                          </View>
                         )}
                       </View>
                     ))}
@@ -643,11 +934,40 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   </View>
                 )}
               </View>
-            ))}
+            );
+          });
+        })()}
             <Text style={styles.trajectoryHint}>Tap a planned day to see its movements.</Text>
           </>
         )}
       </View>
+
+      {/* What changes next block panel */}
+      {block !== null && (
+        <View style={styles.section}>
+          <View style={styles.nextBlockPanel} testID="next-block-adjustments-panel">
+            <Text style={styles.nextBlockHeading}>What changes next block</Text>
+            <Text style={styles.nextBlockIntro}>
+              Your current block is fixed. These adjustments apply when the next one is built.
+            </Text>
+            {pendingAdjustments.length === 0 ? (
+              <Text style={styles.nextBlockEmpty}>
+                Nothing queued. Your next block will follow the plan as written.
+              </Text>
+            ) : (
+              <View style={styles.adjustmentsList}>
+                {pendingAdjustments.map((adj) => (
+                  <View key={adj.plannedSlotId} style={styles.adjustmentRow}>
+                    <Text style={styles.adjustmentText}>
+                      {adj.movementName}: {adj.reason}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Disclosures Section */}
       <View style={styles.section}>
@@ -691,6 +1011,19 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   <View style={styles.slotMain}>
                     <Text style={styles.slotName}>{slot.movementName}</Text>
                     <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes)}</Text>
+                    {slot.routineDecision !== undefined && (
+                      <>
+                        <Text style={styles.captionText}>
+                          {slot.routineDecision.role.toUpperCase()}
+                          {slot.routineDecision.family === null ? '' : ` · ${slot.routineDecision.family.replace('_', ' ')}`}
+                          {slot.routineDecision.purpose === null ? '' : ` · ${slot.routineDecision.purpose.replace('_', '-')}`}
+                          {slot.routineDecision.family === null ? '' : ` · ${slot.routineDecision.stressCoefficient.toFixed(2)}x coefficient · ${slot.routineDecision.equivalentVolume.toFixed(1)} equivalent reps`}
+                        </Text>
+                        {slot.routineDecision.adaptations.map((adaptation, index) => (
+                          <Text key={index} style={styles.adjustedText}>Adaptation: {adaptation}</Text>
+                        ))}
+                      </>
+                    )}
                     <AutopilotAttribution
                       slot={slot}
                       expanded={attributionSlotId === slot.plannedSlotId}
@@ -699,13 +1032,47 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   </View>
                 </View>
               ))}
+              {todayPlan.routineStress != null && (
+                <View style={styles.disclosureContent} testID="today-routine-stress-review">
+                  <Text style={styles.eyebrow}>ROUTINE DAY {todayPlan.routineStress.routineDayIndex} STRESS</Text>
+                  {todayPlan.routineStress.familyDecisions.map((decision) => {
+                    const sessionDecision = decision.sessions.find(
+                      (sessionStress) => sessionStress.dayIndex === todayPlan.routineStress?.routineDayIndex,
+                    );
+                    return (
+                      <View key={decision.family}>
+                        <Text style={styles.slotName}>{decision.family.replace('_', ' ')}</Text>
+                        <Text style={styles.captionText}>
+                          Week {decision.initialStress.toFixed(1)} → {decision.finalStress.toFixed(1)}/{decision.weeklyBudget.toFixed(1)} · {decision.exposureCount} exposure{decision.exposureCount === 1 ? '' : 's'} · {decision.variationCount} distinct variation{decision.variationCount === 1 ? '' : 's'}
+                        </Text>
+                        {sessionDecision !== undefined && (
+                          <Text style={styles.captionText}>
+                            Session {sessionDecision.initialStress.toFixed(1)} → {sessionDecision.finalStress.toFixed(1)}/{sessionDecision.budget.toFixed(1)} · one family exposure across {sessionDecision.variationCount} variation{sessionDecision.variationCount === 1 ? '' : 's'}
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                  {todayPlan.routineStress.warnings.map((warning, index) => (
+                    <Text key={`warning-${index}`} style={styles.adjustedText}>Warning: {warning}</Text>
+                  ))}
+                  {todayPlan.routineStress.recommendations.map((recommendation, index) => (
+                    <Text key={`recommendation-${index}`} style={styles.captionText}>Recommendation: {recommendation}</Text>
+                  ))}
+                  {todayPlan.routineStress.adaptations.map((adaptation, index) => (
+                    <Text key={`adaptation-${index}`} style={styles.adjustedText}>Adaptation: {adaptation}</Text>
+                  ))}
+                </View>
+              )}
             </View>
           </Disclosure>
         )}
 
         <Disclosure
           label="Routine templates"
-          hint="Create, edit, and freeze custom routine templates"
+          hint={profile.training_age === 'beginner'
+            ? 'Stored templates can be deleted; use and editing unlock later'
+            : 'Create, edit, and freeze custom routine templates'}
         >
           <View style={styles.disclosureContent}>
             {routineTemplates.length === 0 ? (
@@ -716,14 +1083,16 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                   <View style={styles.slotMain}>
                     <Text style={styles.slotName}>{t.name}</Text>
                     <Text style={styles.slotTarget}>
-                      {SCHEMA_LABEL[t.schemaType]} - {t.slots.length} movements
+                      {SCHEMA_LABEL[t.schemaType]} - {t.slots.length} movements across {new Set(t.slots.map((slot) => slot.dayIndex)).size} day{new Set(t.slots.map((slot) => slot.dayIndex)).size === 1 ? '' : 's'}
                     </Text>
                   </View>
                   <View style={styles.routineActions}>
                     {confirmRoutineAction?.routineTemplateId === t.routineTemplateId ? (
                       <>
                         <Chip
-                          label={confirmRoutineAction.kind === 'delete' ? 'Confirm delete' : 'Confirm replace'}
+                          label={confirmRoutineAction.kind === 'delete'
+                            ? 'Confirm delete'
+                            : `Confirm day ${confirmRoutineAction.routineDayIndex ?? 1}`}
                           selected={false}
                           onPress={() => confirmSelectedRoutineAction(t)}
                         />
@@ -731,8 +1100,19 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                       </>
                     ) : (
                       <>
-                        <Chip label="Use today" selected={false} onPress={() => requestRoutineAction('use', t.routineTemplateId)} />
-                        <Chip label="Edit" selected={false} onPress={() => setEditingTemplate(t)} />
+                        {profile.training_age !== 'beginner' && (
+                          <>
+                            {[...new Set(t.slots.map((slot) => slot.dayIndex))].sort((a, b) => a - b).map((dayIndex) => (
+                              <Chip
+                                key={dayIndex}
+                                label={`Use day ${dayIndex} today`}
+                                selected={false}
+                                onPress={() => requestRoutineAction('use', t.routineTemplateId, dayIndex)}
+                              />
+                            ))}
+                            <Chip label="Edit" selected={false} onPress={() => setEditingTemplate(t)} />
+                          </>
+                        )}
                         <Chip label="Delete" selected={false} onPress={() => requestRoutineAction('delete', t.routineTemplateId)} />
                       </>
                     )}
@@ -743,11 +1123,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             {routineActionMessage !== null && (
               <Text style={styles.captionText}>{routineActionMessage}</Text>
             )}
-            <PrimaryButton
-              label="+ Build new routine template"
-              onPress={() => setEditingTemplate('new')}
-              accessibilityLabel="Build new routine template"
-            />
+            {profile.training_age === 'beginner' ? (
+              <Text style={styles.captionText}>Generated training stays available while standalone routines are locked.</Text>
+            ) : (
+              <PrimaryButton
+                label="+ Build new routine template"
+                onPress={() => setEditingTemplate('new')}
+                accessibilityLabel="Build new routine template"
+              />
+            )}
           </View>
         </Disclosure>
 
@@ -782,7 +1166,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
             )}
             <Text style={styles.schemaLabel}>Choose a loading structure</Text>
             <View style={styles.schemaRow}>
-              {SCHEMA_TYPES.map((type) => {
+              {SELECTABLE_SCHEMA_TYPES.map((type) => {
                 const selected = type === schema;
                 return (
                   <Pressable
@@ -803,16 +1187,15 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
 
             {!confirmRegenerate ? (
               <PrimaryButton
-                label={block === null ? 'Create four-week block' : 'Generate next block'}
+                label={block === null ? 'Start a new block' : 'Generate next block'}
                 onPress={() => {
                   if (block === null) {
-                    generateNewBlock(schema);
-                    setManageOpen(false);
+                    setShowChooser(true);
                   } else {
                     setConfirmRegenerate(true);
                   }
                 }}
-                accessibilityLabel={block === null ? 'Create four-week block' : 'Generate next block'}
+                accessibilityLabel={block === null ? 'Start a new block' : 'Generate next block'}
               />
             ) : (
               <View style={styles.confirmation}>
@@ -830,17 +1213,17 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
                 <SecondaryButton label="Keep current block" onPress={() => setConfirmRegenerate(false)} accessibilityLabel="Keep current block" />
               </View>
             )}
-
           </View>
         </Disclosure>
         </View>
         )}
 
-        {/* Deliberately OUTSIDE the program gate above. "Manage block" is hidden
-            while a program is active, and freezeRoutineTemplateToPlannedSession
-            refuses to run then as well — so nesting the unplanned start inside
-            that gate left a program athlete on a rest day with no way to begin
-            an ad-hoc session at all. Only block regeneration is program-gated. */}
+        {/* Deliberately OUTSIDE the `program == null` gate above. "Manage block"
+            is hidden while a program is active, and
+            freezeRoutineTemplateToPlannedSession refuses to run then as well --
+            so nesting the unplanned start inside that gate left a program
+            athlete on a rest day with no ad-hoc session path at all. Only block
+            regeneration stays program-gated. */}
         {(block === null || todayPlan === null) && !halted && session === null && (
           <Disclosure label="Start without a planned session">
             <View style={styles.disclosureContent}>
@@ -858,7 +1241,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               ) : (
                 <>
                   <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
-                  <PrimaryButton label="Start unplanned session" onPress={startUnplannedSession} accessibilityLabel="Start unplanned session" />
+                  <PrimaryButton label="Start unplanned session" onPress={startAndOpenSession} accessibilityLabel="Start unplanned session" />
                   <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
                 </>
               )}
@@ -879,6 +1262,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
               </Text>
             )}
             <TextInput
+              disableFullscreenUI
               style={styles.reportInput}
               value={reportText}
               onChangeText={setReportText}
@@ -954,7 +1338,7 @@ export default function BlockScreen({ onSessionStarted }: BlockScreenProps): Rea
           </View>
         </Disclosure>
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -1019,6 +1403,13 @@ const styles = StyleSheet.create({
     ...theme.font.label,
     color: theme.color.textMid,
   },
+  errorText: {
+    ...theme.font.label,
+    color: theme.color.textHi,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.color.textHi,
+    paddingLeft: theme.space[2],
+  },
   followUpText: {
     ...theme.font.body,
     color: theme.color.textMid,
@@ -1026,13 +1417,6 @@ const styles = StyleSheet.create({
   adjustedText: {
     ...theme.font.label,
     color: theme.color.textMid,
-  },
-  errorText: {
-    ...theme.font.label,
-    color: theme.color.textHi,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.color.textHi,
-    paddingLeft: theme.space[2],
   },
   statusBadge: {
     borderWidth: 1,
@@ -1069,25 +1453,30 @@ const styles = StyleSheet.create({
   },
   weekRow: {
     minHeight: theme.touch.min,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'stretch',
-    gap: theme.space[2],
+    gap: theme.space[1],
   },
   weekMeta: {
-    width: 78,
-    justifyContent: 'center',
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   weekTitle: {
     ...theme.font.label,
     color: theme.color.textHi,
   },
+  weekPhaseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   weekPhase: {
     ...theme.font.eyebrow,
     color: theme.color.textLow,
-    marginTop: theme.space[1],
   },
   dayRail: {
-    flex: 1,
+    width: '100%',
     flexDirection: 'row',
     gap: theme.space[1],
   },
@@ -1101,7 +1490,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.ink1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: theme.space[1],
+    paddingHorizontal: 0,
   },
   dayMarkPressed: {
     backgroundColor: theme.color.pressed,
@@ -1127,6 +1516,7 @@ const styles = StyleSheet.create({
     ...theme.font.eyebrow,
     color: theme.color.textMid,
     textAlign: 'center',
+    letterSpacing: 0,
   },
   dayMarkTextFinalized: {
     color: theme.color.textHi,
@@ -1135,8 +1525,10 @@ const styles = StyleSheet.create({
     color: theme.color.chalk,
   },
   dayMarkRestText: {
-    ...theme.font.body,
+    ...theme.font.eyebrow,
     color: theme.color.line,
+    textAlign: 'center',
+    letterSpacing: 0,
   },
   trajectoryHint: {
     ...theme.font.eyebrow,
@@ -1187,6 +1579,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space[2],
+  },
+  /** Both attribution disclosures are a bare "·" glyph at theme.font.label,
+   *  whose laid-out box is far under theme.touch.min. hitSlop cannot fix that:
+   *  React Native clips a child's extended touch region to the bounds of its
+   *  ancestors, and these markers sit in label-height rows, so most of the slop
+   *  fell outside the parent and was never dispatched — worst on Android. The
+   *  target has to be REAL, so reserve a full theme.touch.min box and centre
+   *  the glyph inside it. The row grows to 56pt; that is the cost of a tappable
+   *  control, and it is paid deliberately rather than faked. */
+  attributionTouchTarget: {
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   attributionMarker: {
     ...theme.font.label,
@@ -1314,5 +1720,75 @@ const styles = StyleSheet.create({
     borderTopColor: theme.color.line,
     paddingTop: theme.space[3],
     gap: theme.space[2],
+  },
+  substitutedBadge: {
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+    paddingHorizontal: theme.space[2],
+    paddingVertical: theme.space[1],
+    backgroundColor: theme.color.ink1,
+  },
+  substitutedBadgeText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+  },
+  trajectoryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  fixedBadge: {
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+    paddingHorizontal: theme.space[2],
+    paddingVertical: theme.space[1],
+    backgroundColor: theme.color.ink1,
+  },
+  fixedBadgeText: {
+    ...theme.font.eyebrow,
+    color: theme.color.textMid,
+    letterSpacing: 1.2,
+  },
+  nextBlockPanel: {
+    backgroundColor: theme.color.ink1,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.sheet,
+    padding: theme.space[4],
+    gap: theme.space[2],
+  },
+  nextBlockHeading: {
+    ...theme.font.cue,
+    color: theme.color.textHi,
+  },
+  nextBlockIntro: {
+    ...theme.font.label,
+    color: theme.color.textMid,
+    lineHeight: 20,
+  },
+  nextBlockEmpty: {
+    ...theme.font.body,
+    color: theme.color.textLow,
+    fontStyle: 'italic',
+    paddingTop: theme.space[1],
+  },
+  adjustmentsList: {
+    gap: theme.space[2],
+    paddingTop: theme.space[1],
+  },
+  adjustmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.space[1],
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.line,
+  },
+  adjustmentText: {
+    ...theme.font.body,
+    color: theme.color.textHi,
   },
 });

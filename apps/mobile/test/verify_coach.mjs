@@ -20,7 +20,8 @@ const core = require(join(import.meta.dirname, '.build', 'athleteRegistryCore.js
 const {
   DEFAULT_ATHLETE_ID, LEGACY_DB_NAME,
   defaultRegistry, parseRegistry, serializeRegistry, sanitizeName,
-  addAthlete, renameAthlete, removeAthlete, setActiveAthlete, activeEntry,
+  addAthlete, renameAthlete, removeAthlete, setActiveAthlete,
+  setAdvancedToolsUnlocked, activeEntry,
 } = core;
 
 let n = 0;
@@ -45,6 +46,7 @@ check('parse: garbage input yields the default registry', () => {
     assert.equal(reg.activeId, DEFAULT_ATHLETE_ID);
     assert.equal(reg.athletes.length, 1);
     assert.equal(reg.athletes[0].dbName, LEGACY_DB_NAME);
+    assert.equal(reg.advancedToolsUnlocked, false);
   }
 });
 
@@ -102,9 +104,19 @@ check('add: generated names/ids/dbs are unique and well-formed', () => {
 });
 
 check('add: round-trips through serialize/parse unchanged', () => {
-  const { reg } = addAthlete(defaultRegistry(), 'Test Athlete B', 1712);
+  const unlocked = setAdvancedToolsUnlocked(defaultRegistry(), true);
+  const { reg } = addAthlete(unlocked, 'Test Athlete B', 1712);
   const back = parseRegistry(serializeRegistry(reg));
   assert.deepEqual(back, reg);
+});
+
+check('advanced tools: strict boolean persists device-wide and explicit relock clears it', () => {
+  const unlocked = setAdvancedToolsUnlocked(defaultRegistry(), true);
+  assert.equal(parseRegistry(serializeRegistry(unlocked)).advancedToolsUnlocked, true);
+  const switched = setActiveAthlete(addAthlete(unlocked, 'Alex', 7).reg, 'default');
+  assert.equal(switched.advancedToolsUnlocked, true);
+  assert.equal(setAdvancedToolsUnlocked(switched, false).advancedToolsUnlocked, false);
+  assert.equal(parseRegistry('{"advancedToolsUnlocked":"true"}').advancedToolsUnlocked, false);
 });
 
 // --- I4: removal guards ----------------------------------------------------
@@ -151,6 +163,89 @@ check('IO shell reads/writes REGISTRY_FILE in the document dir', () => {
   assert.ok(shell.includes('REGISTRY_FILE'), 'shell must use the shared constant');
   assert.ok(shell.includes('DocumentDir'), 'registry must live in the document dir');
   assert.ok(!shell.match(/from 'react-native-blob-util'/), 'blob-util must be deferred-required, not imported');
+});
+
+/**
+ * The Coach Verification Lab's no-write boundary (P2-5).
+ *
+ * This used to be a DENYLIST of mutator names. A denylist can only refuse the
+ * mutators someone already thought of: adding `saveRoutineTemplate` — or any
+ * future write action — to the Lab screen would have passed silently. It is
+ * now a CLOSED ALLOWLIST. Every store access in the screen must be a single
+ * read selector, and the complete sorted selector set must equal the approved
+ * set below. A new selector fails this gate until it is reviewed and listed.
+ */
+const APPROVED_LAB_SELECTORS = [
+  'getMovementAvailabilityVerdicts',
+  'loadCoachDiagnosticContext',
+  'loadCoachMovementAccessContext',
+  'loadMeasuredHistory',
+  'movements',
+  'profile',
+  'today',
+  'vector',
+];
+
+check('verification Lab core is pure and the UI is a CLOSED read-only selector allowlist', () => {
+  const labCore = readFileSync(
+    join(ROOT, 'apps', 'mobile', 'src', 'diagnostics', 'coachVerificationLab.ts'), 'utf-8');
+  const labScreen = readFileSync(
+    join(ROOT, 'apps', 'mobile', 'src', 'screens', 'CoachVerificationLabScreen.tsx'), 'utf-8');
+  for (const forbidden of ['useStore', 'executeSync', 'Date.now', 'saveRegistry', "from 'react-native'"]) {
+    assert.ok(!labCore.includes(forbidden), `pure Lab core must not contain ${forbidden}`);
+  }
+
+  // Structural extraction: every line touching the store must be either the
+  // import or one canonical `const x = useStore((s) => s.name);` binding.
+  // Destructuring, nested property reads, getState/setState and inline
+  // selector expressions are all rejected before the name comparison runs.
+  const importLine = /^import \{ useStore \} from '\.\.\/state\/useStore';$/;
+  const selectorLine = /^\s*const \w+ = useStore\(\((\w+)\) => \1\.(\w+)\);$/;
+  const selectors = [];
+  for (const raw of labScreen.split(/\r?\n/)) {
+    if (!/\buseStore\b/.test(raw)) continue;
+    const line = raw.trimEnd();
+    if (importLine.test(line.trim())) continue;
+    const match = selectorLine.exec(line);
+    assert.ok(match, `Lab store access must be one read selector per line, got: ${line.trim()}`);
+    selectors.push(match[2]);
+  }
+  assert.ok(!/useStore\s*\.\s*(getState|setState)/.test(labScreen),
+    'the Lab must never reach the store outside a subscribed read selector');
+  assert.equal(selectors.length, new Set(selectors).size, 'each Lab selector must be bound once');
+  assert.deepEqual(
+    [...selectors].sort(),
+    APPROVED_LAB_SELECTORS,
+    'the Lab screen selector set changed. Review the new selector for write access, '
+      + 'then add it to APPROVED_LAB_SELECTORS in this file.',
+  );
+
+  // The Lab shares only through the redacting serializer, never the raw report.
+  assert.ok(labScreen.includes('serializeRedactedCoachReport(report)'),
+    'the share sheet must carry the redacted serialization');
+  assert.ok(!/JSON\.stringify\(\s*report/.test(labScreen),
+    'the Lab must never share a raw report object');
+});
+
+check('loadCoachMovementAccessContext is a read-only projection of the access sidecars', () => {
+  const storeSource = readFileSync(
+    join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts'), 'utf-8');
+  const start = storeSource.indexOf('  loadCoachMovementAccessContext: () => {');
+  assert.ok(start >= 0, 'loadCoachMovementAccessContext not found in useStore.ts');
+  // Bound the method at the next sibling store key, not the first two-space
+  // `},`: a nested literal closing at that indentation would end it early and
+  // hide a later write from the forbidden-token scan.
+  const next = storeSource.slice(start + 1).search(/\n  [A-Za-z_]\w*: /);
+  const end = next < 0 ? -1 : start + 1 + next;
+  assert.ok(end > start, 'could not bound loadCoachMovementAccessContext');
+  const body = storeSource.slice(start, end);
+  for (const forbidden of ['INSERT', 'UPDATE', 'DELETE', 'BEGIN', 'COMMIT', 'ROLLBACK', 'DROP', 'set(']) {
+    assert.ok(!body.includes(forbidden), `the Lab access-context reader must not contain ${forbidden}`);
+  }
+  assert.ok(body.includes('loadCapabilityFacts(getDb())'),
+    'the reader must project the compact access sidecars');
+  assert.ok(body.includes('safetyExcludedMovementIdsFor('),
+    'the reader must reuse the shared niggle-to-safety projection');
 });
 
 if (process.exitCode !== 1) console.log(`verify:coach — all ${n} checks green`);

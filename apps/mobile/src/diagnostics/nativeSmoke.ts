@@ -1,0 +1,182 @@
+/**
+ * nativeSmoke.ts — CI-only native smoke for the simulator build.
+ *
+ * Runs ONLY when the app is launched with the launch argument
+ * `-AKNativeSmoke 1` (iOS reads launch arguments into NSUserDefaults, which
+ * React Native's Settings module exposes). A person launching the app from the
+ * home screen cannot pass launch arguments, so this is inert in normal use and
+ * never touches athlete data: it uses its own throwaway database file.
+ *
+ * It proves, on the real native runtime, what host tests cannot:
+ *   - op-sqlite compiled with SQLITE_ENABLE_MATH_FUNCTIONS (ln/sqrt), and the
+ *     production migration chain applies to a fresh native database;
+ *   - the bundled, pinned MiniLM model loads in onnxruntime and a known phrase
+ *     routes to its own codebase entry (tokenizer + inference + routing);
+ *   - the native CSPRNG the encrypted backup uses (mobileBackupCrypto.randomBytes,
+ *     a direct RNGetRandomValues TurboModule call with no fallback) works;
+ *   - the normal store boots to "ready" against a fresh install;
+ *   - this launch's device-backup exclusion of Documents and Library reported
+ *     'excluded' (the CI script then reads the real directory resource values);
+ *   - every Files import type the backup restore passes to the document picker
+ *     resolves through the picker's own native UTType(identifier) lookup.
+ * The result is written to Documents/ak-native-smoke.json and logged with an
+ * `[ak-native-smoke]` marker for the macOS CI job to collect. Content-free:
+ * no athlete data is read or written.
+ */
+import { Platform } from 'react-native';
+import { loadCodebase, triage, type PhraseCodebase } from '@ak/inference';
+import { BACKUP_SCHEMA_USER_VERSION, closeKineticsDb, migrate, openKineticsDb } from '@ak/core-db';
+import { tryCreateDeviceEmbedder } from '../inference/deviceEmbedder';
+import { useStore } from '../state/useStore';
+import { mobileBackupCrypto } from '../state/backupCrypto';
+import { startupDeviceBackupExclusion } from '../state/deviceBackupPolicy';
+import { backupImportTypes } from '../state/backupStore';
+import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
+import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
+
+export const NATIVE_SMOKE_SETTING = 'AKNativeSmoke';
+const SMOKE_DB = 'ak_native_smoke.db';
+const RESULT_FILE = 'ak-native-smoke.json';
+const STARTED_FILE = 'ak-native-smoke.started';
+/** A step that has not settled by then is recorded as failed (the smoke always
+ *  produces a report instead of waiting forever on one native call). */
+const STEP_TIMEOUT_MS = 90_000;
+
+type BlobFs = { dirs: { DocumentDir: string }; writeFile(path: string, data: string, encoding: 'utf8'): Promise<unknown> };
+const blobFs = (): BlobFs => (require('react-native-blob-util') as { default: { fs: BlobFs } }).default.fs;
+
+export function nativeSmokeRequested(): boolean {
+  if (Platform.OS !== 'ios') return false;
+  try {
+    const { Settings } = require('react-native') as { Settings?: { get(key: string): unknown } };
+    const value = Settings?.get(NATIVE_SMOKE_SETTING);
+    return value === 1 || value === '1' || value === true || value === 'YES';
+  } catch {
+    return false;
+  }
+}
+
+type Check = { name: string; ok: boolean; detail: string };
+
+async function step(checks: Check[], name: string, run: () => Promise<string> | string): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`did not settle within ${STEP_TIMEOUT_MS} ms`)), STEP_TIMEOUT_MS);
+    });
+    checks.push({ name, ok: true, detail: await Promise.race([Promise.resolve().then(run), timeout]) });
+  } catch (error) {
+    checks.push({ name, ok: false, detail: error instanceof Error ? error.message : String(error) });
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+export async function runNativeSmoke(): Promise<void> {
+  const checks: Check[] = [];
+  const startedAt = Date.now();
+  // Proof the smoke started at all (CI distinguishes "never ran" from "hung").
+  try { await blobFs().writeFile(`${blobFs().dirs.DocumentDir}/${STARTED_FILE}`, String(startedAt), 'utf8'); } catch { /* reported below */ }
+
+  await step(checks, 'sqlite math functions', () => {
+    const db = openKineticsDb(SMOKE_DB);
+    try {
+      const row = (db.executeSync('SELECT ln(1) AS l, sqrt(4) AS s').rows ?? [])[0] as { l: number; s: number } | undefined;
+      if (row?.l !== 0 || row?.s !== 2) throw new Error(`ln(1)=${row?.l} sqrt(4)=${row?.s}`);
+      return 'ln(1)=0 sqrt(4)=2';
+    } finally { closeKineticsDb(db); }
+  });
+
+  await step(checks, 'fresh migration chain', () => {
+    const db = openKineticsDb(SMOKE_DB);
+    try {
+      migrate(db);
+      const version = Number(((db.executeSync('PRAGMA user_version').rows ?? [])[0] as { user_version: number }).user_version);
+      const movements = Number(((db.executeSync('SELECT COUNT(*) AS c FROM movement').rows ?? [])[0] as { c: number }).c);
+      db.executeSync('SELECT COUNT(*) AS c FROM v_readiness_inputs');
+      if (version !== BACKUP_SCHEMA_USER_VERSION || movements !== 300) throw new Error(`user_version=${version} movements=${movements}`);
+      return `user_version=${version} movements=${movements}`;
+    } finally {
+      closeKineticsDb(db);
+      try {
+        const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
+        open({ name: SMOKE_DB }).delete();
+      } catch { /* throwaway file */ }
+    }
+  });
+
+  await step(checks, 'embedder inference + routing', async () => {
+    const embedder = await tryCreateDeviceEmbedder();
+    if (embedder === null) throw new Error('embedder unavailable (model missing from bundle or ORT failed to load)');
+    const codebase = loadCodebase(phraseCodebaseJson as unknown as PhraseCodebase, phraseVectorsJson.vectors);
+    const entry = (phraseCodebaseJson as unknown as PhraseCodebase).entries[0]!;
+    const vector = await embedder.embed(entry.text);
+    const norm = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
+    const routed = triage(vector, codebase);
+    if (vector.length !== 384 || Math.abs(norm - 1) > 1e-3) throw new Error(`dims=${vector.length} norm=${norm}`);
+    if (!routed.confident || routed.entry?.id !== entry.id) {
+      throw new Error(`routed ${routed.entry?.id ?? 'none'} (${routed.similarity.toFixed(4)}), expected ${entry.id}`);
+    }
+    return `dims=384 norm=${norm.toFixed(6)} routed=${entry.id} similarity=${routed.similarity.toFixed(6)}`;
+  });
+
+  // The exact production entropy path of encrypted backups (no global polyfill
+  // is installed, by design): two independent draws of the documented sizes.
+  await step(checks, 'native CSPRNG (backup provider)', () => {
+    const a = mobileBackupCrypto.randomBytes(32);
+    const b = mobileBackupCrypto.randomBytes(32);
+    if (!(a instanceof Uint8Array) || a.length !== 32 || b.length !== 32) throw new Error(`lengths ${a.length}/${b.length}`);
+    if (a.every((x) => x === 0) || b.every((x) => x === 0)) throw new Error('all-zero random bytes');
+    if (a.every((x, i) => x === b[i])) throw new Error('two draws were identical');
+    return 'RNGetRandomValues via mobileBackupCrypto.randomBytes: 2 x 32 bytes, distinct';
+  });
+
+  // The app's own startup call (App.tsx), not a second call made for the test.
+  // The CI script independently reads the real directory resource values.
+  await step(checks, 'device backup exclusion at startup', async () => {
+    const pending = startupDeviceBackupExclusion();
+    if (pending === null) throw new Error('startup exclusion was never started');
+    const result = await pending;
+    if (result !== 'excluded') throw new Error(`result=${result}`);
+    return 'Documents and Library excluded at startup';
+  });
+
+  // The exact types restore hands the Files sheet, resolved by the installed
+  // picker's native isKnownType (UTType(identifier), the same initializer its
+  // pick() uses). A type that does not resolve would leave nothing selectable.
+  await step(checks, 'Files import types resolve natively', () => {
+    const picker = require('@react-native-documents/picker') as typeof import('@react-native-documents/picker');
+    const sent = backupImportTypes(Platform.OS, picker.types.allFiles);
+    const resolved = sent.map((value) => ({ value, known: picker.isKnownType({ kind: 'UTType', value }) }));
+    const bad = resolved.filter((r) => !r.known.isKnown || r.known.UTType !== r.value);
+    if (sent.length === 0 || bad.length > 0) throw new Error(`unresolved: ${JSON.stringify(bad)}`);
+    const mimeAsIdentifier = picker.isKnownType({ kind: 'UTType', value: 'application/octet-stream' }).isKnown;
+    return `${sent.join(',')} resolved by UTType(identifier); a MIME string as identifier resolves=${mimeAsIdentifier}`;
+  });
+
+  await step(checks, 'store boot', async () => {
+    for (let waited = 0; waited < 30_000 && useStore.getState().status !== 'ready'; waited += 250) {
+      if (useStore.getState().status === 'error') break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const { status, error } = useStore.getState();
+    if (status !== 'ready') throw new Error(`status=${status} ${error ?? ''}`);
+    return 'status=ready';
+  });
+
+  const result = {
+    schema: 'ak.native-smoke/1',
+    platform: Platform.OS,
+    ok: checks.every((c) => c.ok),
+    elapsedMs: Date.now() - startedAt,
+    checks,
+  };
+  const text = JSON.stringify(result);
+  console.log(`[ak-native-smoke] ${text}`);
+  try {
+    await blobFs().writeFile(`${blobFs().dirs.DocumentDir}/${RESULT_FILE}`, text, 'utf8');
+  } catch (error) {
+    // Release builds drop console.log; an error-level log reaches the system log.
+    console.error(`[ak-native-smoke] report write failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

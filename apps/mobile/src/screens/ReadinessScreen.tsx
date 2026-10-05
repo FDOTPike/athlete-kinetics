@@ -5,7 +5,7 @@
  * recommendation stays visible; the underlying vector and history are only
  * available through inline disclosure.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
@@ -21,13 +21,8 @@ export type AthleteState = 'OPTIMAL' | 'OVERREACHED' | 'RECOVERY';
 
 /** Mirrors the LOADCTL policy bands without making this screen an engine. */
 export function classifyReadiness(v: StateVectorRow): AthleteState {
-  if ((v.acwr !== null && v.acwr > 1.5) || v.readiness_score < 40) return 'OVERREACHED';
-  if (
-    v.readiness_score >= 70 &&
-    (v.acwr === null || (v.acwr >= 0.8 && v.acwr <= 1.3))
-  ) {
-    return 'OPTIMAL';
-  }
+  if (v.readiness_score < 40) return 'OVERREACHED';
+  if (v.readiness_score >= 70) return 'OPTIMAL';
   return 'RECOVERY';
 }
 
@@ -43,7 +38,7 @@ const STATE_META: Record<AthleteState, ReadinessMeta> = {
     label: 'Ready',
     title: 'Ready to train',
     recommendation: 'Follow today\'s plan at the effort it prescribes.',
-    explanation: 'Your recent training load and recovery signals support the planned work.',
+    explanation: 'Your recovery signals support the planned work.',
   },
   RECOVERY: {
     label: 'Recovery focus',
@@ -55,7 +50,7 @@ const STATE_META: Record<AthleteState, ReadinessMeta> = {
     label: 'Recovery needed',
     title: 'Make recovery the work',
     recommendation: 'Reduce training stress today and follow the adjusted plan.',
-    explanation: 'Your recent load or readiness score indicates that extra recovery is the useful next step.',
+    explanation: 'Your readiness score indicates that extra recovery is the useful next step.',
   },
 };
 
@@ -72,12 +67,14 @@ const format = (value: number | null, digits: number, suffix = ''): string =>
 const formatSigned = (value: number | null, digits: number): string =>
   value === null ? 'Not available' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
+const formatFocus = (focus: string): string =>
+  focus ? focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase() : '';
+
 export const readinessCoverage = (vector: StateVectorRow): string => {
-  const available = [vector.acwr !== null, vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
+  const available = [vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
     .filter(Boolean).length;
   if (available === 0) return 'No current inputs';
-  if (available === 1 && vector.acwr !== null) return 'Load only · 1 of 3 inputs';
-  return `${available} of 3 inputs`;
+  return `${available} of 2 inputs`;
 };
 export interface ReadinessScreenProps {
   /** Supplied by the shell so the focused action can open a live session. */
@@ -107,8 +104,19 @@ export default function ReadinessScreen({
   const refreshVector = useStore((s) => s.refreshVector);
   const loadDemoAthlete = useStore((s) => s.loadDemoAthlete);
   const resetTrainingData = useStore((s) => s.resetTrainingData);
+  const returnCheckin = useStore((s) => s.returnCheckin);
+  const confirmReturnCheckin = useStore((s) => s.confirmReturnCheckin);
+  const dismissReturnCheckin = useStore((s) => s.dismissReturnCheckin);
   const [confirmReset, setConfirmReset] = useState(false);
+  // Set when a demo load came back 'blocked_existing_data' so the screen can
+  // say so instead of leaving the button looking dead.
+  const [demoBlocked, setDemoBlocked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const attemptDemoLoad = React.useCallback(() => {
+    const result = loadDemoAthlete();
+    setDemoBlocked(result === 'blocked_existing_data');
+  }, [loadDemoAthlete]);
 
   const handleRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -118,10 +126,6 @@ export default function ReadinessScreen({
       setRefreshing(false);
     }
   }, [refreshVector]);
-
-  useEffect(() => {
-    boot();
-  }, [boot]);
 
   if (status === 'booting') {
     return (
@@ -159,9 +163,14 @@ export default function ReadinessScreen({
           </Text>
           <PrimaryButton
             label="Load demo athlete"
-            onPress={loadDemoAthlete}
+            onPress={attemptDemoLoad}
             accessibilityLabel="Load the 180 day demo athlete"
           />
+          {demoBlocked && (
+            <Text style={styles.caption} accessibilityLiveRegion="polite">
+              Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
+            </Text>
+          )}
           <SecondaryButton label="Refresh" onPress={refreshVector} />
           <View style={{ marginTop: theme.space[3] }}>
             <Disclosure label="Reset and load demo">
@@ -184,7 +193,7 @@ export default function ReadinessScreen({
                     label="Reset training data and load demo"
                     onPress={() => {
                       resetTrainingData();
-                      loadDemoAthlete();
+                      attemptDemoLoad();
                       setConfirmReset(false);
                     }}
                     accessibilityLabel="Confirm reset training data and load demo athlete"
@@ -225,13 +234,21 @@ export default function ReadinessScreen({
           detail={`${Math.round(vector.readiness_score)} / 100`}
         />
         <ListRow label="Data coverage" detail={readinessCoverage(vector)} />
-        <ListRow label="Acute to chronic load" detail={format(vector.acwr, 2)} />
+        <ListRow label="Acute to chronic load" detail={format(vector.acwr, 2)}>
+          <Text style={styles.caption}>
+            Recent recorded external load compared with the preceding four-week average. Bodyweight, conditioning, grappling, and unlogged training may be incomplete. Shown as history only: it does not affect the readiness estimate or today&apos;s plan, and there is no target range.
+          </Text>
+        </ListRow>
         <ListRow label="HRV deviation" detail={formatSigned(vector.hrv_z, 1)} />
         <ListRow label="Sleep efficiency" detail={format(vector.sleep_efficiency_pct, 1, '%')} />
         <ListRow label="Acute load" detail={format(vector.acute_load_kg, 0, ' kg')} />
         <ListRow label="Chronic load" detail={format(vector.chronic_load_kg, 0, ' kg')} />
+        {/* R7: load_component is materialised in 004 as a normative ACWR band
+            (100 inside 0.8-1.3, penalties outside) but is EXCLUDED from the
+            readiness score under Calibration Policy v1. Rendering it beside the
+            two contributing components implied a safe range and an authority it
+            does not have. The descriptive ACWR history above remains. */}
         <ListRow label="HRV component" detail={vector.hrv_component.toFixed(1)} />
-        <ListRow label="Load component" detail={vector.load_component.toFixed(1)} />
         <ListRow label="Sleep component" detail={vector.sleep_component.toFixed(1)} />
 
         <View style={{ marginTop: theme.space[3] }}>
@@ -255,6 +272,42 @@ export default function ReadinessScreen({
     );
   };
 
+  const renderReturnCheckinCard = () => {
+    if (returnCheckin == null || returnCheckin.isDismissed) {
+      return null;
+    }
+    return (
+      <View style={styles.card} testID="return-checkin-banner">
+        <Text style={styles.wordmark}>RETURN CHECK-IN</Text>
+        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.body}>
+          It&apos;s been {returnCheckin.daysSinceLastTrained} days since your last logged
+          session. Training you did elsewhere may not be recorded here. Your plan is
+          unchanged — carry on with it, or look over the first session and adjust it
+          yourself.
+        </Text>
+        <SecondaryButton
+          label="Continue current plan"
+          onPress={() => confirmReturnCheckin('continue_plan')}
+          accessibilityLabel="Continue current plan unchanged"
+        />
+        <SecondaryButton
+          label="Review first session"
+          onPress={() => {
+            confirmReturnCheckin('review_first_session');
+            onOpenCoach?.();
+          }}
+          accessibilityLabel="Review the first session before training"
+        />
+        <SecondaryButton
+          label="Dismiss"
+          onPress={dismissReturnCheckin}
+          accessibilityLabel="Dismiss return check-in"
+        />
+      </View>
+    );
+  };
+
   if (isRestDay) {
     return (
       <ScrollView
@@ -267,6 +320,8 @@ export default function ReadinessScreen({
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
         </View>
+
+        {renderReturnCheckinCard()}
 
         {/* Display-type Rest day statement */}
         <Text style={styles.displayMain}>Rest day.</Text>
@@ -309,6 +364,8 @@ export default function ReadinessScreen({
         <Text style={styles.wordmark}>pikeMethods</Text>
       </View>
 
+      {renderReturnCheckinCard()}
+
       <View style={[styles.card, styles.cardActiveSpine]}>
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>{meta.label.toUpperCase()}</Text>
@@ -317,7 +374,7 @@ export default function ReadinessScreen({
         <Text style={styles.body}>{meta.recommendation}</Text>
         {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
         {!hasLiveSession && todayPlan !== null && (
-          <Text style={styles.caption}>{todayPlan.focus} is planned today.</Text>
+          <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
         )}
         {!hasLiveSession && todayPlan === null && !halted && (
           <Text style={styles.caption}>

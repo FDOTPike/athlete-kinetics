@@ -1,0 +1,1314 @@
+{
+  "schemaVersion": 1,
+  "correctionVersion": 1,
+  "mediaExcluded": true,
+  "source": {
+    "dataset": "yuhonas/free-exercise-db",
+    "url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json",
+    "retrieved_at": "2026-08-11",
+    "standing": "corroborating; frozen import revision unknown"
+  },
+  "build": {
+    "applied_at_ms": 1786406400000,
+    "approved_on": "2026-08-11"
+  },
+  "ratificationTemplate": {
+    "approver_name": "Francis Saga Pike",
+    "approver_role": "owner",
+    "approval_basis": "owner_release_decision"
+  },
+  "scopeAssignments": [
+    {
+      "name": "Kettlebell Turkish Get-Up",
+      "scope": "full_body",
+      "content_set": "legacy_v1",
+      "assignment_sha256": "ffff2a42bc54a397462a6658049687003829161e8729d3415a5f09bfb29a186e"
+    },
+    {
+      "name": "Kettlebell Turkish Get-Up (Lunge style)",
+      "scope": "full_body",
+      "content_set": "v2",
+      "assignment_sha256": "70a989b8f162cb0489fff806dfb2706b0fb57f44f660d585d8444f7bc5a71f0a"
+    }
+  ],
+  "records": [
+    {
+      "name": "Barbell Side Split Squat",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "a786f9ad65fa5598306b2f679a59abf369dd06ff6f84a0243c7fdfd09a2b4961",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Barbell_Side_Split_Squat",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train one leg at a time through a wide lateral stance, shifting into the angled lead foot.",
+          "setup_steps": [
+            "Stand tall with a barbell across the back of the shoulders and the feet placed wide apart, the lead foot angled out to the side",
+            "Bend the knee and hip of the lead leg to lower toward that side, keeping the trailing leg only slightly bent",
+            "Return by extending the hip and knee of the lead leg",
+            "Complete the reps on one side, then work the other"
+          ],
+          "cues": [
+            "Angle the lead foot out before you descend",
+            "Shift toward the working side",
+            "Keep the trailing leg long"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "b50758455d04713009e5d6644d38ebf9bc0b71b72ac347aefeb62e6dd6d5c40e"
+      },
+      "correction_sha256": "b50758455d04713009e5d6644d38ebf9bc0b71b72ac347aefeb62e6dd6d5c40e"
+    },
+    {
+      "name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "4f74d0dbce667a809b0593eedc858eae1de2affb15497dc802d8eedf785ce245",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the rear deltoids through a lateral arc with the forehead resting on a bench for support.",
+          "setup_steps": [
+            "Stand holding a dumbbell in each hand with an incline bench in front of you",
+            "Keeping the back in its natural arch, lean forward until the forehead rests on the bench and the arms hang straight down, palms facing each other",
+            "With a slight bend at the elbows, lift the dumbbells straight out to the side until the arms are parallel to the floor",
+            "Hold for a second, then lower along the same path"
+          ],
+          "cues": [
+            "Rest the forehead on the bench throughout",
+            "Lift straight out to the side",
+            "Keep the torso still as the arms move"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "d39f4dce066c5e72c8e73e8cb18a879a7304819e976227d3be44ba41943cf6aa"
+      },
+      "correction_sha256": "d39f4dce066c5e72c8e73e8cb18a879a7304819e976227d3be44ba41943cf6aa"
+    },
+    {
+      "name": "Bent-Arm Dumbbell Pullover",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "e061f9dc83ef0737cfbd871a073c2545e53513d018e2a1805e92a4f86e4e2300",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Bent-Arm_Dumbbell_Pullover",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the chest and lats through an overhead arc with the elbows held at a fixed bend.",
+          "setup_steps": [
+            "Lie perpendicular across a flat bench with only the shoulders on the surface, hips low and feet flat on the floor",
+            "Hold one dumbbell over the chest with both palms pressed against the underside and the elbows bent",
+            "Keeping that elbow bend fixed, lower the dumbbell in an arc behind the head until you feel a stretch across the chest",
+            "Return along the same arc to the start"
+          ],
+          "cues": [
+            "Set the elbow bend before rep one",
+            "Hold that angle the whole set",
+            "Keep the shoulders the only contact with the bench"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "29e3e284812ea3c97259fd713a65f28d6d86b4f5c25b5210e9416f198dcc98eb"
+      },
+      "correction_sha256": "29e3e284812ea3c97259fd713a65f28d6d86b4f5c25b5210e9416f198dcc98eb"
+    },
+    {
+      "name": "Bent-Knee Hip Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d04cc4a18236043250fbf924c9281c31019cc322faef84fa40a753a5b39deaf5",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Bent-Knee_Hip_Raise",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the lower abdominals by rolling the pelvis back to lift the hips off the floor.",
+          "setup_steps": [
+            "Lie flat on the floor with the arms beside you, knees bent to about seventy-five degrees and the feet a couple of inches up",
+            "Draw the knees toward the chest, holding that knee angle, until the pelvis rolls back and the hips leave the floor",
+            "Squeeze at the top for a second, then lower slowly to the start"
+          ],
+          "cues": [
+            "Roll the pelvis back to lift",
+            "Hold the knee angle throughout",
+            "Lower one segment at a time"
+          ]
+        }
+      },
+      "notes": [
+        "Rejected: pattern 'core' (illegal in the movement.pattern CHECK domain).",
+        "Rejected: is_compound 0 (upstream mechanic 'compound' corroborates the shipped 1)."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "9460164a120fd400081098b22e2f89a5dcec456f2b7f215a840888f9ec819f0f"
+      },
+      "correction_sha256": "9460164a120fd400081098b22e2f89a5dcec456f2b7f215a840888f9ec819f0f"
+    },
+    {
+      "name": "Board Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "6199bdb77a280040d61bd4a0f6ad52aa7da83f310e48398ab06ae97a57898736",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Board_Press",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Press from a board-limited range to load the lockout portion of the bench press.",
+          "setup_steps": [
+            "Lie on the bench and band the boards securely to the chest; confirm they remain fixed before unracking. Use a spotter when available",
+            "Set the feet, arch the back, and retract the shoulder blades, then take the bar out of the rack without protracting the shoulders",
+            "Lower the bar under control until it settles on the boards",
+            "Drive the bar up with force, keeping the elbows tucked until lockout"
+          ],
+          "cues": [
+            "Keep the boards banded and fixed",
+            "Let the bar settle on the boards",
+            "Keep the elbows tucked to lockout"
+          ]
+        },
+        "equipment": {
+          "required_items": [
+            "boards",
+            "bands",
+            "barbell",
+            "bench",
+            "squat_rack"
+          ]
+        }
+      },
+      "notes": [
+        "High-risk record, owner-approved (plan 7.1).",
+        "Bands secure the boards: that is the executable configuration and the only retention method the equipment filter enforces. A training partner is not offered as an alternative retention method.",
+        "The spotter sentence is advisory. The app does not enforce, detect, or require a spotter."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "cc145660978190bceb59f0665221f0aa55c3af53b7dfe14f580fdb92b21273c3"
+      },
+      "correction_sha256": "cc145660978190bceb59f0665221f0aa55c3af53b7dfe14f580fdb92b21273c3"
+    },
+    {
+      "name": "Cable Incline Pushdown",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "6ae77b3458e2f7b3d5aae917d4abec9f514ae113e14443a96551cb7ba679cf68",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Cable_Incline_Pushdown",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the lats through shoulder extension while lying on an incline bench facing away from the stack.",
+          "setup_steps": [
+            "Lie back on an incline bench set in front of a high pulley, facing away from the machine, with a straight bar overhead",
+            "Take an overhand shoulder-width grip and bring the arms down so the bar sits just above the thighs",
+            "Keeping the upper arms stationary, let the bar travel back overhead in a semicircle",
+            "Pull it back down to the thighs with the lats and hold the contraction"
+          ],
+          "cues": [
+            "Keep the upper arms stationary",
+            "Move the bar in one smooth semicircle",
+            "Finish the pull with the lats"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "65ad8f64dc27ae96be1904977d618c2f5eeabffd8781989edb5b586cf3c299d5"
+      },
+      "correction_sha256": "65ad8f64dc27ae96be1904977d618c2f5eeabffd8781989edb5b586cf3c299d5"
+    },
+    {
+      "name": "Cable Rear Delt Fly",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "03daa8929f4257f4608ae330c0003ed635942246759382eeab9a99912744741b",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Cable_Rear_Delt_Fly",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the rear deltoids through a horizontal arc with the arms straight.",
+          "setup_steps": [
+            "Set both pulleys above head height and select the load",
+            "Take the left handle in the right hand and the right handle in the left, crossed in front of you",
+            "Keeping the arms straight, move them back and outward until they reach the end of the arc",
+            "Pause, then return the handles to the crossed start position"
+          ],
+          "cues": [
+            "Keep the arms straight throughout",
+            "Sweep back and outward",
+            "Pause at the end of the arc"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "51d5431e48adc9af459fdfc0ccf96fa944c323c4db36d2b08b07df5315f82f38"
+      },
+      "correction_sha256": "51d5431e48adc9af459fdfc0ccf96fa944c323c4db36d2b08b07df5315f82f38"
+    },
+    {
+      "name": "Drag Curl",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "956d62a343dfad3818b55ec39329cf7f67723b086144f51cba17b4cc2f525a8c",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Drag_Curl",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the biceps with the bar kept in contact with the torso by drawing the elbows back as you curl.",
+          "setup_steps": [
+            "Stand tall holding a barbell against the front of the thighs with a shoulder-width underhand grip",
+            "Drag the bar straight up the torso, letting the elbows travel back behind the ribs as it rises",
+            "Lower along the same contact path; when the bar leaves the body, reduce the load"
+          ],
+          "cues": [
+            "Keep the bar touching the torso",
+            "Let the elbows drift back",
+            "Lower along the same line"
+          ]
+        }
+      },
+      "notes": [
+        "Rejected: is_compound 0 (upstream mechanic 'compound' corroborates the shipped 1)."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "1f6dc1c99ff1ff722c91038c895a38614dd54555b8a9ad73961e5b7c941e41df"
+      },
+      "correction_sha256": "1f6dc1c99ff1ff722c91038c895a38614dd54555b8a9ad73961e5b7c941e41df"
+    },
+    {
+      "name": "Dumbbell Bench Press with Neutral Grip",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "e951f1e4224342c79242d3475a4ebe0b14a92ae4708fd6dc43b07c74a0eb336b",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Dumbbell_Bench_Press_with_Neutral_Grip",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Press from a flat bench with the palms facing each other throughout.",
+          "setup_steps": [
+            "Lie back on a flat bench with a dumbbell in each hand, feet flat on the floor and the shoulder blades retracted",
+            "Start with the arms extended straight above you, palms facing each other",
+            "Bend the elbows to lower the upper arms out to the side until the dumbbells reach the torso",
+            "Pause, then extend the elbows back to the start"
+          ],
+          "cues": [
+            "Keep the palms facing each other",
+            "Keep the bench flat and the shoulder blades set",
+            "Pause at the bottom of each rep"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "b97f9dcf9f745328c446128b8eac1401c52f6ae9dfd809cf8745a7e871a8b0b9"
+      },
+      "correction_sha256": "b97f9dcf9f745328c446128b8eac1401c52f6ae9dfd809cf8745a7e871a8b0b9"
+    },
+    {
+      "name": "Dumbbell Lying Rear Lateral Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "123ba40eb9a6353319526694d58fb5a00360d07df172cdbfc4e71713063164a0",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Dumbbell_Lying_Rear_Lateral_Raise",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the rear deltoids from a shallow fifteen degree incline with the chest supported.",
+          "setup_steps": [
+            "Lie chest-down on an adjustable bench set to a shallow incline of about fifteen degrees, a dumbbell in each hand",
+            "Hold the palms facing the torso with the arms extended and the elbows slightly bent",
+            "Raise the arms out to the side until the elbows reach shoulder height and the arms are roughly parallel to the floor",
+            "Hold the contraction for a second, then lower under control"
+          ],
+          "cues": [
+            "Keep the bench shallow and the chest down",
+            "Raise until the elbows reach shoulder height",
+            "Hold the top for a full second"
+          ]
+        }
+      },
+      "notes": [
+        "Not a duplicate of Lying Rear Delt Raise: upstream specifies a ~15 degree incline versus that record's flat bench."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "5f257155cf916968e01f204f860d31886b6dc916cd6463ea593a4e7f633b8714"
+      },
+      "correction_sha256": "5f257155cf916968e01f204f860d31886b6dc916cd6463ea593a4e7f633b8714"
+    },
+    {
+      "name": "Floor Glute-Ham Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "9685a24215713f9e1b92aff6b8f1b6310bcb1a46d7f31589ce9367cfb40556f0",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Floor_Glute-Ham_Raise",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Build hamstring strength by lowering the body forward from a tall kneeling position with the ankles secured.",
+          "setup_steps": [
+            "Kneel tall in a Nordic bench with the ankles locked under the foot pads, hips and shoulders in one line",
+            "Lower yourself forward by extending at the knees, keeping the hips straight rather than folding",
+            "Bring the hands to the floor to catch, then push lightly off the floor to help yourself back up"
+          ],
+          "cues": [
+            "Keep the hips in line with the shoulders",
+            "Lower as slowly as you control",
+            "Let the hands catch and assist the return"
+          ]
+        },
+        "equipment": {
+          "required_items": [
+            "nordic_bench"
+          ]
+        }
+      },
+      "notes": [
+        "High-risk record, owner-approved (plan 7.1).",
+        "Partner and generic-anchor alternatives are removed from the executable configuration.",
+        "Accepted availability deviation: this moves from bodyweight-anywhere to requiring a nordic_bench.",
+        "Rejected: pattern 'hinge' (no-op, already hinge). Upstream mechanic 'isolation' corroborates the shipped is_compound 0."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "9f0856d24a6e4572e395d10abb3bb76eb110d4e0d20eff047d8928d0383ea1c3"
+      },
+      "correction_sha256": "9f0856d24a6e4572e395d10abb3bb76eb110d4e0d20eff047d8928d0383ea1c3"
+    },
+    {
+      "name": "Front Incline Dumbbell Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "2c5d0df869916283483d9c0053695ea9a5dae869e3f60718ef60212d55be46e9",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Front_Incline_Dumbbell_Raise",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the front deltoids by raising the arms straight forward from a supported incline position.",
+          "setup_steps": [
+            "Sit back on an incline bench set between thirty and sixty degrees with a dumbbell in each hand",
+            "Extend the arms straight in front of you, palms facing down, dumbbells just above the thighs",
+            "Keeping the elbows locked, raise the dumbbells straight up until they are slightly above shoulder height",
+            "Squeeze for a second, then lower back to the start"
+          ],
+          "cues": [
+            "Keep the elbows locked straight",
+            "Raise straight up in front",
+            "Keep the head resting on the bench"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "5f42c5b6c3d3394654cede5254491d8cc84e3236988978c394825c51fc01e333"
+      },
+      "correction_sha256": "5f42c5b6c3d3394654cede5254491d8cc84e3236988978c394825c51fc01e333"
+    },
+    {
+      "name": "Hammer Grip Incline DB Bench Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d7b0956d84e031c2c29fd1421143d9c6aa7367c58a81bd97c496cea9e0ae5284",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Hammer_Grip_Incline_DB_Bench_Press",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Press from an incline bench with the palms facing each other throughout.",
+          "setup_steps": [
+            "Lie back on an incline bench with a dumbbell in each hand resting on the thighs, palms facing each other",
+            "Use the thighs to help clean the dumbbells up one at a time until you hold them at shoulder width",
+            "Keeping the neutral grip, set the upper arms in line with the shoulders and the elbows bent to about ninety degrees",
+            "Lower the weights to the sides under full control, then press back up and hold the lockout for a second"
+          ],
+          "cues": [
+            "Keep the palms facing each other",
+            "Keep the elbows in line with the shoulders",
+            "Lower twice as slowly as you press"
+          ]
+        }
+      },
+      "notes": [
+        "Alias pair with 'Incline Dumbbell Bench With Palms Facing In' (O2 approved): upstream instructions are byte-identical, so both records carry the identical correct coaching payload written out in full."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "83e34d6176b3b1c17cb9cfd526d11bf64cdecf59b531968beb61e85840c628a8"
+      },
+      "correction_sha256": "83e34d6176b3b1c17cb9cfd526d11bf64cdecf59b531968beb61e85840c628a8"
+    },
+    {
+      "name": "Incline Dumbbell Bench With Palms Facing In",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "e760b272444095dc76c040b5cb53b3ace9823b746be5c50fbfa0db587d65ff0e",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Incline_Dumbbell_Bench_With_Palms_Facing_In",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Press from an incline bench with the palms facing each other throughout.",
+          "setup_steps": [
+            "Lie back on an incline bench with a dumbbell in each hand resting on the thighs, palms facing each other",
+            "Use the thighs to help clean the dumbbells up one at a time until you hold them at shoulder width",
+            "Keeping the neutral grip, set the upper arms in line with the shoulders and the elbows bent to about ninety degrees",
+            "Lower the weights to the sides under full control, then press back up and hold the lockout for a second"
+          ],
+          "cues": [
+            "Keep the palms facing each other",
+            "Keep the elbows in line with the shoulders",
+            "Lower twice as slowly as you press"
+          ]
+        }
+      },
+      "notes": [
+        "Alias pair with 'Hammer Grip Incline DB Bench Press' (O2 approved). The full literal payload is written out, byte-identical by design, with no prose cross-reference in the shipped copy. The alias relationship is recorded in DEVIATION_LOG.md."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "911bc8ea4c6124456b146f5f98ee2bd3cfa36bd42de0230ed2b8991746fb35bf"
+      },
+      "correction_sha256": "911bc8ea4c6124456b146f5f98ee2bd3cfa36bd42de0230ed2b8991746fb35bf"
+    },
+    {
+      "name": "Janda Sit-Up",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "2e1d568451dd95932b4fe47980915a4320e2eaf61c528e62b1ea41b7010201f2",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Janda_Sit-Up",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the abdominals with the glutes and hamstrings deliberately tightened, so the trunk does the work.",
+          "setup_steps": [
+            "Lie on your back with the knees bent to about ninety degrees and the feet flat on the floor, arms crossed over the chest or resting at your sides",
+            "Tighten the glutes and hamstrings hard and hold that tension, then curl the trunk up over a slow three to six second count",
+            "Lower back down under the same tension across a matching count"
+          ],
+          "cues": [
+            "Squeeze the glutes and hamstrings first",
+            "Hold that tension for the whole rep",
+            "Take the descent as slowly as the climb"
+          ]
+        }
+      },
+      "notes": [
+        "Rejected: the anchor/partner requirement proposed by the audit, and the EQUIPMENT_NOT_REPRESENTABLE finding. Upstream equipment 'body only' matches the shipped empty set."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "a1603d324734aac719dd781ad9d31372437f4aa7ecc42d550a07c48c68ff22a6"
+      },
+      "correction_sha256": "a1603d324734aac719dd781ad9d31372437f4aa7ecc42d550a07c48c68ff22a6"
+    },
+    {
+      "name": "Kettlebell Seated Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d0a80d975bed4ee1c42e0fdb139395164581872ce969b68d0e595b7da56def6c",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Kettlebell_Seated_Press",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "movement": {
+          "pattern": "push_v"
+        },
+        "coaching": {
+          "coaching_intent": "Press a kettlebell overhead from a floor-seated position with the trunk holding you upright.",
+          "setup_steps": [
+            "Sit on the floor with the legs spread comfortably wide for a stable base",
+            "Clean one kettlebell to the shoulder so the bell rests on the forearm",
+            "Press up and out until the arm locks out overhead, then return to the shoulder under control"
+          ],
+          "cues": [
+            "Keep the legs wide and settled",
+            "Finish with the elbow locked overhead",
+            "Lower back to the rack position with intent"
+          ]
+        }
+      },
+      "notes": [
+        "O1 approved: an overhead press is push_v, not push_h."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "d3586fc137e583413ae0b90869fafc06c1f1b2cc0cbc045684fb8e997d934771"
+      },
+      "correction_sha256": "d3586fc137e583413ae0b90869fafc06c1f1b2cc0cbc045684fb8e997d934771"
+    },
+    {
+      "name": "Kettlebell Turkish Get-Up (Lunge style)",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "26496e297f8813a741ca36105ff99d3c74653324b34ba4eff02c680e827bd51c",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Kettlebell_Turkish_Get-Up_Lunge_style",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "movement": {
+          "pattern": "rotation",
+          "is_compound": 1
+        },
+        "detail": {
+          "target_muscles": [
+            "shoulders",
+            "abdominals",
+            "glutes",
+            "hamstrings",
+            "quadriceps",
+            "triceps"
+          ]
+        },
+        "coaching": {
+          "coaching_intent": "Move from lying to standing and back with a kettlebell locked out overhead the whole way.",
+          "setup_steps": [
+            "Lie on your back and press the kettlebell to a locked-out arm, then bend the knee on the same side",
+            "Keeping the arm locked out, pivot to the opposite side and use the free hand to drive forward and push up to a seated position, then to one knee",
+            "Looking up at the kettlebell, stand up from the one-knee position",
+            "Reverse the same sequence back to the floor"
+          ],
+          "cues": [
+            "Keep the arm locked out the whole time",
+            "Look up at the bell as you rise",
+            "Reverse the same path back down"
+          ]
+        },
+        "taxonomy": {
+          "category": "core",
+          "implement": "kettlebell",
+          "family": "turkish_get_up"
+        }
+      },
+      "notes": [
+        "High-risk record, owner-approved (plan 7.1). O4 approved: full-body compound using rotation/core, never lunge/lower-body.",
+        "Full-body scope is assigned through the separate scopeAssignments collection, not through movement.pattern.",
+        "Provenance note: 'glutes' in target_muscles is owner-directed, not source-derived. Upstream lists abdominals, hamstrings, quadriceps and triceps only.",
+        "Name and media identity are preserved unchanged."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "0fe12ef5517daa52df0e21b43c0cc5165fb36466be9e8b5f3aea6c021891c2a4"
+      },
+      "correction_sha256": "0fe12ef5517daa52df0e21b43c0cc5165fb36466be9e8b5f3aea6c021891c2a4"
+    },
+    {
+      "name": "Kneeling Squat",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "6873d6d2af27c28203183d2f8fe9db56f50d320dafc5056e3fed5d6e0f7576a5",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Kneeling_Squat",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train hip extension under load from a kneeling position, with the trunk doing the bracing instead of the legs.",
+          "setup_steps": [
+            "Kneel tall in a rack with the bar on the back and the hips, knees and shoulders stacked",
+            "Sit the hips back toward the heels only as far as the trunk stays braced",
+            "Drive the hips forward to return to tall kneeling; when the ribs flare, shorten the range"
+          ],
+          "cues": [
+            "Set the ribs down before you sit back",
+            "Move at the hips, not the low back",
+            "Finish tall through the glutes"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "86f7db1cad30888774bf11834a745608fecfc04e4e90d9c344a3005de441e936"
+      },
+      "correction_sha256": "86f7db1cad30888774bf11834a745608fecfc04e4e90d9c344a3005de441e936"
+    },
+    {
+      "name": "Lying Rear Delt Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "a91e802da5d27cb7e15eafe009c0ef24753c218c66dbfd52a38c6ea2325ae7ea",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Lying_Rear_Delt_Raise",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the rear deltoids from a flat bench with the chest fully supported.",
+          "setup_steps": [
+            "Lie chest-down on a flat bench with a dumbbell in each hand",
+            "Hold the palms facing the torso with the arms extended and the elbows slightly bent",
+            "Raise the arms out to the side until the elbows reach shoulder height and the arms are roughly parallel to the floor",
+            "Hold the contraction for a second, then lower under control"
+          ],
+          "cues": [
+            "Keep the chest flat on the bench",
+            "Raise until the elbows reach shoulder height",
+            "Hold the top for a full second"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "4894e791b2707d2afc2cfcbfc0ca6dd6d4045800e98e9f5e31e842ba4a7cc3c7"
+      },
+      "correction_sha256": "4894e791b2707d2afc2cfcbfc0ca6dd6d4045800e98e9f5e31e842ba4a7cc3c7"
+    },
+    {
+      "name": "Middle Back Shrug",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "a4984cf933ec3a0049de46e9be5450d40bed4a1fc0ff28efad5be502a30cdf17",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Middle_Back_Shrug",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the mid-back by retracting the shoulder blades with the chest supported, without letting the arms pull.",
+          "setup_steps": [
+            "Lie chest-down on an incline bench holding a dumbbell in each hand with the arms hanging straight",
+            "Pull the shoulder blades back and together without bending the elbows, and pause at the top",
+            "Lower under control; when the elbows bend to move the load, reduce the weight"
+          ],
+          "cues": [
+            "Keep the arms straight throughout",
+            "Squeeze the shoulder blades together",
+            "Let the chest stay on the bench"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "416625095b92b1dd54ec99e13d1960ba86e49a3bc897704503aabeca9481ddda"
+      },
+      "correction_sha256": "416625095b92b1dd54ec99e13d1960ba86e49a3bc897704503aabeca9481ddda"
+    },
+    {
+      "name": "Natural Glute Ham Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d3261f0836947242f99ed3d4dfb070060ccad4911e1115c4d3a89c0e799ebd85",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Natural_Glute_Ham_Raise",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Build hamstring strength by controlling the descent and reversing it with band assistance.",
+          "setup_steps": [
+            "Set up in a Nordic bench with the ankles locked under the foot pads and a band anchored to assist the return",
+            "Start upright with good posture, then lower yourself under control until the knees are almost straight",
+            "Reverse the movement and pull yourself back to upright, letting the band assist only as much as you need"
+          ],
+          "cues": [
+            "Keep the hips in line with the shoulders",
+            "Lower as slowly as you control",
+            "Let the band assist the reversal"
+          ]
+        },
+        "equipment": {
+          "required_items": [
+            "nordic_bench",
+            "bands"
+          ]
+        }
+      },
+      "notes": [
+        "High-risk record, owner-approved (plan 7.1).",
+        "The generic 'bench' is dropped: it does not guarantee secure ankle retention.",
+        "Distinction from Floor Glute-Ham Raise preserved: Floor GHR catches and pushes from the floor; Natural GHR controls and reverses using band assistance.",
+        "Rejected: pattern 'hinge' (no-op) and COMPOUND_FLAG_INCONSISTENT. Upstream mechanic 'compound' corroborates the shipped 1, correctly differing from Floor GHR's 'isolation'."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "7ef766a4317be9b4904c3cfe5cfedca32fe1d72fcb43458dcaa605f87782c539"
+      },
+      "correction_sha256": "7ef766a4317be9b4904c3cfe5cfedca32fe1d72fcb43458dcaa605f87782c539"
+    },
+    {
+      "name": "Reverse Flyes",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "447311554333729206d01c4fc1e6046b95eefe92dc03ee087df5441e217c545d",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Reverse_Flyes",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the rear deltoids through a wide horizontal arc with the chest supported on an incline bench.",
+          "setup_steps": [
+            "Lie chest-down on an incline bench with a dumbbell in each hand, palms facing each other",
+            "Extend the arms so they hang perpendicular to the bench angle",
+            "Holding a slight bend at the elbows, move the weights out and away from each other in an arc until the arms are parallel to the floor",
+            "Squeeze the shoulder blades together, then lower under control"
+          ],
+          "cues": [
+            "Keep the chest on the bench",
+            "Sweep the weights out and apart",
+            "Squeeze the shoulder blades at the top"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "85c337efc8b85079c9b3d3198d56c5d0b685a0c623ee4a6ae676e495ebaa34cf"
+      },
+      "correction_sha256": "85c337efc8b85079c9b3d3198d56c5d0b685a0c623ee4a6ae676e495ebaa34cf"
+    },
+    {
+      "name": "Rope Straight-Arm Pulldown",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "bcff11a60737db5e882b53155010b61d49ce87277116ac3311c2df536b8c22fe",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Rope_Straight-Arm_Pulldown",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the lats through shoulder extension with the elbows locked out, so the arms never take over.",
+          "setup_steps": [
+            "Stand facing a high pulley with a rope, feet staggered, arms extended up and in front of you and a slight hinge at the hips",
+            "Keeping the elbows straight, sweep the rope down in an arc until the hands reach the thighs",
+            "Return overhead under control; when the elbows start to bend, reduce the load"
+          ],
+          "cues": [
+            "Keep the elbows straight the whole rep",
+            "Move from the shoulders",
+            "Feel the lats finish the arc"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "5e5189d79ab81c893792462607e17218324f85bb76634f689dc9c59bcef71f87"
+      },
+      "correction_sha256": "5e5189d79ab81c893792462607e17218324f85bb76634f689dc9c59bcef71f87"
+    },
+    {
+      "name": "Seated Dumbbell Palms-Down Wrist Curl",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "235cd71c960a5aaa005e3e8bb147b72781ae2b5500d8be31dfd26027808da032",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Seated_Dumbbell_Palms-Down_Wrist_Curl",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the wrist extensors through a controlled range with the forearms supported.",
+          "setup_steps": [
+            "Sit on the edge of a flat bench with the forearms resting on the thighs, palms facing down and the wrists just past the knees",
+            "Let the wrists drop, then lift the backs of the hands as far as the range allows without the elbows moving",
+            "Lower slowly; when the elbows lift to help, reduce the load"
+          ],
+          "cues": [
+            "Keep the forearms flat and still",
+            "Lift the backs of the hands",
+            "Own the full return"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "786e7fd8fa513b66d7a142da7002bea6045ac2521249c4ac4fb4c8ad5951a15b"
+      },
+      "correction_sha256": "786e7fd8fa513b66d7a142da7002bea6045ac2521249c4ac4fb4c8ad5951a15b"
+    },
+    {
+      "name": "Seated Dumbbell Palms-Up Wrist Curl",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "2d242975b25a9265b20f107dec8450ecf0ae0e1c3fc3b1136090071b069358d9",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Seated_Dumbbell_Palms-Up_Wrist_Curl",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the wrist flexors through a controlled range with the forearms supported.",
+          "setup_steps": [
+            "Sit on the edge of a flat bench with the forearms resting on the thighs, palms facing up and the wrists just past the knees",
+            "Let the wrists open under the load, then curl the palms up as far as the range allows without the elbows moving",
+            "Lower slowly into the stretch; when the elbows lift to help, reduce the load"
+          ],
+          "cues": [
+            "Keep the forearms flat and still",
+            "Curl the palms toward the forearms",
+            "Own the full return"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "a79d3273500581b8991b56a443cebbfe3cd4c6db97e8e29b16cb0db36dbb40b3"
+      },
+      "correction_sha256": "a79d3273500581b8991b56a443cebbfe3cd4c6db97e8e29b16cb0db36dbb40b3"
+    },
+    {
+      "name": "Seated Dumbbell Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "ec6cbb3ccfcace162bc5efafced14c2d2ed9848c4863d19a7c68cfef730eb2fb",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Seated_Dumbbell_Press",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "movement": {
+          "pattern": "push_v"
+        },
+        "coaching": {
+          "coaching_intent": "Press dumbbells overhead from a supported seated position while the ribcage stays quiet.",
+          "setup_steps": [
+            "Sit on a bench with a back support, a dumbbell in each hand cleaned from the thighs to shoulder height, palms turned to face forward",
+            "Brace, then press both dumbbells overhead until they meet at the top",
+            "Pause, then lower to the shoulders under control; when the back arches off the bench, reduce the load"
+          ],
+          "cues": [
+            "Keep the back on the bench",
+            "Stack the wrists over the elbows",
+            "Finish overhead with a quiet ribcage"
+          ]
+        }
+      },
+      "notes": [
+        "O1 approved: an overhead press is push_v, not push_h."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "da8037f2b028a0b4501e8881c21e0f8cc7c2e9abfd41f0a8aa8acabfed188ee0"
+      },
+      "correction_sha256": "da8037f2b028a0b4501e8881c21e0f8cc7c2e9abfd41f0a8aa8acabfed188ee0"
+    },
+    {
+      "name": "Seated Good Mornings",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "c8ae30a8767557bed77aa623ef8a18f6def77558dd8ccefb88ccd8c11c96d8e3",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Seated_Good_Mornings",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the posterior chain through a seated hip hinge, with the rack pins defining the depth.",
+          "setup_steps": [
+            "Set a bench inside a power rack and set the pins at the depth you intend to reach",
+            "Take the bar across the back of the shoulders, squeeze the shoulder blades together, step back and sit down on the bench",
+            "Keeping the bar tight and the lower back arched, bend forward at the hips until the bar approaches the pins",
+            "Pause just above the pins and reverse the motion until the torso is upright"
+          ],
+          "cues": [
+            "Set the pins before the first rep",
+            "Move at the hips with the back arched",
+            "Pause just above the pins each rep"
+          ]
+        },
+        "equipment": {
+          "required_items": [
+            "barbell",
+            "squat_rack",
+            "bench"
+          ]
+        }
+      },
+      "notes": [
+        "High-risk record, owner-approved (plan 7.1).",
+        "The bench supplies the seated surface/box role; the rack pins define depth.",
+        "Never described as a 'thoracic hinge'.",
+        "difficulty_rating stays Intermediate: upstream level 'intermediate' corroborates the shipped value. No re-rating in this migration."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "3880f5cd394c4e1bba6fefdbf3b7b1b410f5f49c5b9ac25b241a8db1dd38cd58"
+      },
+      "correction_sha256": "3880f5cd394c4e1bba6fefdbf3b7b1b410f5f49c5b9ac25b241a8db1dd38cd58"
+    },
+    {
+      "name": "Seated Side Lateral Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "2664b8f3366dd00f36a9422e9d2de79a293d930b4699e7231e4bf3b432e0e9a8",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Seated_Side_Lateral_Raise",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the side deltoids by raising the arms out to the side from a seated start.",
+          "setup_steps": [
+            "Sit at the end of a flat bench with the feet firmly on the floor and a dumbbell in each hand hanging by your sides, palms facing in",
+            "Keeping the torso still, lift the dumbbells out to the side with a slight bend at the elbow, hands tilted slightly forward as if pouring water",
+            "Continue until the arms are parallel to the floor and pause for a second",
+            "Lower back down slowly to the start"
+          ],
+          "cues": [
+            "Lift out to shoulder level",
+            "Tilt the hands as if pouring water",
+            "Keep the torso quiet throughout"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "f5a703b1c1d69a7d2ace0a563b6e0583f21c500db37f5fd0515a495d17db7f94"
+      },
+      "correction_sha256": "f5a703b1c1d69a7d2ace0a563b6e0583f21c500db37f5fd0515a495d17db7f94"
+    },
+    {
+      "name": "Standing Dumbbell Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "d891c7ee8780e4166275a858bf0a2957743d95d3f6f7bffde5b0a5c72a50ee8d",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Standing_Dumbbell_Press",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "movement": {
+          "pattern": "push_v"
+        },
+        "coaching": {
+          "coaching_intent": "Press dumbbells overhead from a tall standing position while the trunk stays braced.",
+          "setup_steps": [
+            "Stand with the feet shoulder width apart and raise the dumbbells to head height, elbows out at about ninety degrees",
+            "Brace, then press both dumbbells overhead until the arms finish straight, without leg drive or leaning back",
+            "Pause, then lower to the start under control"
+          ],
+          "cues": [
+            "Stay tall through the torso",
+            "Stack the wrists over the elbows",
+            "Finish overhead with a quiet ribcage"
+          ]
+        }
+      },
+      "notes": [
+        "O1 approved: an overhead press is push_v, not push_h."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "03400d1846566719252d57541ecb9d843ce8f8e1b93b558ea9b0241848078718"
+      },
+      "correction_sha256": "03400d1846566719252d57541ecb9d843ce8f8e1b93b558ea9b0241848078718"
+    },
+    {
+      "name": "Standing Palm-In One-Arm Dumbbell Press",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "e2cb1d0570fedbc1201a3bd52c82a350799ddb518bb46eecd585dc4c94f19064",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Standing_Palm-In_One-Arm_Dumbbell_Press",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "movement": {
+          "pattern": "push_v"
+        },
+        "coaching": {
+          "coaching_intent": "Press one dumbbell overhead with a neutral grip while the free hand steadies you on an incline bench.",
+          "setup_steps": [
+            "Stand with the feet shoulder width apart, one dumbbell at shoulder height in a neutral grip, palm facing in",
+            "Hold the incline bench with the free hand to keep your balance throughout the set",
+            "Press until the arm is fully extended overhead, then lower until the elbow returns to about ninety degrees",
+            "Finish all reps on one side, then switch arms"
+          ],
+          "cues": [
+            "Keep the palm facing in throughout",
+            "Let the free hand steady you on the bench",
+            "Keep the forearm stacked under the bell"
+          ]
+        }
+      },
+      "notes": [
+        "O1 approved: an overhead press is push_v, not push_h.",
+        "The bench is intentional (upstream: the free hand holds an incline bench for balance). The shipped 'bench, dumbbells' equipment is correct and is not changed."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "00371501f0a201c3430c741d5d3c188bc8e9baf35e0189740baf0e1da35e3899"
+      },
+      "correction_sha256": "00371501f0a201c3430c741d5d3c188bc8e9baf35e0189740baf0e1da35e3899"
+    },
+    {
+      "name": "Step-up with Knee Raise",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "600a38c66cb1dd279e21a368354c8cc97cd282c72a77406754c86b84d445be3f",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Step-up_with_Knee_Raise",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Build single-leg strength and balance by stepping onto a box and driving the trailing knee up.",
+          "setup_steps": [
+            "Stand facing a box or bench of a height you can control, feet together",
+            "Step up by placing one whole foot on the top and extending the hip and knee to stand tall",
+            "As you stand, drive the opposite knee up as high as you can",
+            "Reverse the motion to step down, then repeat on the other leg"
+          ],
+          "cues": [
+            "Drive through the whole stepping foot",
+            "Stand tall before the knee comes up",
+            "Lower under control on every rep"
+          ]
+        }
+      },
+      "notes": [
+        "Rejected: pattern 'unilateral' (illegal in the movement.pattern CHECK domain).",
+        "Upstream alternates legs each rep; the audit's 'all reps on one side' reading was wrong."
+      ],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "120c678ec47b9811443b371039c77e9f48cad96874dbbd4cff19a25b93e51b9d"
+      },
+      "correction_sha256": "120c678ec47b9811443b371039c77e9f48cad96874dbbd4cff19a25b93e51b9d"
+    },
+    {
+      "name": "Straight-Arm Dumbbell Pullover",
+      "correction_version": 1,
+      "supersedes_v2_sha256": "a8174023ff6389b037f8f538148cff1344fd52887468087336a1abfff26d1ce0",
+      "source_ref": {
+        "dataset": "yuhonas/free-exercise-db",
+        "id": "Straight-Arm_Dumbbell_Pullover",
+        "retrieved_at": "2026-08-11",
+        "standing": "corroborating; frozen import revision unknown"
+      },
+      "changes": {
+        "coaching": {
+          "coaching_intent": "Train the chest and lats through a long overhead arc with the elbows straight.",
+          "setup_steps": [
+            "Lie perpendicular across a flat bench with only the shoulders on the surface, hips low and feet flat on the floor",
+            "Hold one dumbbell over the chest at full extension with both palms pressed against the underside",
+            "Keeping the arms straight, lower the dumbbell in a wide arc behind the head until you feel a stretch across the chest",
+            "Return along the same arc to the start"
+          ],
+          "cues": [
+            "Keep the elbows straight throughout",
+            "Reach long behind the head",
+            "Return along the same arc"
+          ]
+        }
+      },
+      "notes": [],
+      "ratification": {
+        "approver_name": "Francis Saga Pike",
+        "approver_role": "owner",
+        "approval_basis": "owner_release_decision",
+        "approved_on": "2026-08-11",
+        "correction_version": 1,
+        "correction_sha256": "94f454bad821e3e2c357f21856c2d2ffc322f10358735fac909ce15a22827dc6"
+      },
+      "correction_sha256": "94f454bad821e3e2c357f21856c2d2ffc322f10358735fac909ce15a22827dc6"
+    }
+  ]
+}

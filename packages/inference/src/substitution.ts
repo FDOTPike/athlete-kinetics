@@ -40,6 +40,7 @@ import {
   type MovementPreference,
   type TrainingAge,
 } from './types';
+import { isDifficultyAllowed, type ExecutableMovementAccessContext } from './tierPolicy';
 
 // ---------------------------------------------------------------------------
 // Joint model (engine-local safety policy)
@@ -98,7 +99,9 @@ export interface SubstitutionMovement {
    *  staple a beginner may be offered. Absent = not whitelisted. */
   beginnerOk?: boolean;
   /** Shared capability resolver verdict. False stays visible for teaching but cannot be offered. */
-  capabilityAvailable?: boolean;
+  capabilityAvailable: boolean;
+  /** Frozen movement_sport_tracking membership. */
+  sportTracking: boolean;
   name: string;
   pattern: MovementPattern;
   is_compound: boolean;
@@ -145,9 +148,10 @@ export interface SubstitutionInput {
 
   /** CNS tax cap override (clamped 1..DEFAULT_ACCESSORY_RATIO). */
   maxAccessoryRatio?: number;
-  /** Athlete training age — scales the niggle severity thresholds via
-   *  EXPERIENCE_SEVERITY (DOMS-vs-structural). Defaults to 'intermediate'. */
-  trainingAge?: TrainingAge;
+  /** Athlete training age — scales niggle thresholds and the weight-room tier. */
+  trainingAge: TrainingAge;
+  /** Context where every candidate will actually be performed. */
+  accessContext: ExecutableMovementAccessContext;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +246,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   const niggles = input.niggles ?? [];
   // Experience-weighted thresholds (DOMS-vs-structural): a beginner tolerates
   // more before a niggle bars a joint or triages; an elite reacts sooner.
-  const { triageMin, haltMin } = EXPERIENCE_SEVERITY[input.trainingAge ?? 'intermediate'];
+  const { triageMin, haltMin } = EXPERIENCE_SEVERITY[input.trainingAge];
   const injured = injuredJoints(niggles, triageMin);
   const guarded = injured.size > 0;
   const haltAdvised = niggles.some((n) => n.severity >= haltMin);
@@ -251,13 +255,16 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   const blocked = new Set<number>();
 
   const available = (m: SubstitutionMovement): boolean =>
-    m.capabilityAvailable !== false && m.required.every((item) => inventory.has(item));
+    m.capabilityAvailable && m.required.every((item) => inventory.has(item));
   /** Plan P16 S4 tier gate: a beginner is only offered Beginner movements or
    *  whitelisted Intermediate staples — in EVERY layer, triage included. */
-  const beginnerBars = (m: SubstitutionMovement): boolean =>
-    input.trainingAge === 'beginner' &&
-    m.difficulty !== 'Beginner' &&
-    m.beginnerOk !== true;
+  const tierBars = (m: SubstitutionMovement): boolean => !isDifficultyAllowed(
+    input.trainingAge,
+    m.difficulty,
+    m.beginnerOk === true,
+    input.accessContext,
+    m.sportTracking,
+  );
   /** Guardrail predicate with the side effect of recording the block. */
   const guardrailBars = (m: SubstitutionMovement): boolean => {
     if (guarded && jointsOf(m).some((j) => injured.has(j))) {
@@ -276,7 +283,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     if (m.pattern !== input.target.pattern) continue;
     if (isAvoided(m) || !available(m)) continue;
     if (DIFFICULTY_RANK[m.difficulty] > targetRank) continue;
-    if (beginnerBars(m)) continue;
+    if (tierBars(m)) continue;
     if (guardrailBars(m)) continue;
     const easier = DIFFICULTY_RANK[m.difficulty] < targetRank;
     layer1.push({
@@ -287,7 +294,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       rationale:
         `${m.name} (${m.difficulty}) substitutes ${input.target.name}` +
         (easier ? ' with reduced mechanical demand' : ' at matched difficulty, altered torque') +
-        (guarded ? '; cleared the injury guardrail' : ''),
+        (guarded ? '; Passes the app’s current reported-joint checks' : ''),
     });
   }
   layer1.sort(byRegression);
@@ -302,7 +309,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     if (m.movement_id === input.target.movement_id) continue;
     if (PATTERN_TO_CATEGORY[m.pattern] !== targetCategory) continue;
     if (isAvoided(m) || !available(m)) continue;
-    if (beginnerBars(m)) continue;
+    if (tierBars(m)) continue;
     if (guardrailBars(m)) continue;
     layer2.push({
       movement_id: m.movement_id,
@@ -330,7 +337,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       if (m.movement_id === input.target.movement_id) continue;
       if (m.is_compound) continue;                 // isolation/accessory only
       if (isAvoided(m) || !available(m)) continue;
-      if (beginnerBars(m)) continue;               // tier gate holds in triage too
+      if (tierBars(m)) continue;                    // tier gate holds in triage too
       if (guardrailBars(m)) continue;              // never triage onto the niggle
       pool.push(m);
     }

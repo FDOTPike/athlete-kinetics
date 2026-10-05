@@ -72,18 +72,66 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Production signing material must live outside the repository. Gradle accepts
+// either -P properties or same-named environment variables so local builds and
+// CI can use their own secret stores without a checked-in properties file.
+def releaseStoreFile = project.findProperty('AK_UPLOAD_STORE_FILE') ?: System.getenv('AK_UPLOAD_STORE_FILE')
+def releaseStorePassword = project.findProperty('AK_UPLOAD_STORE_PASSWORD') ?: System.getenv('AK_UPLOAD_STORE_PASSWORD')
+def releaseKeyAlias = project.findProperty('AK_UPLOAD_KEY_ALIAS') ?: System.getenv('AK_UPLOAD_KEY_ALIAS')
+def releaseKeyPassword = project.findProperty('AK_UPLOAD_KEY_PASSWORD') ?: System.getenv('AK_UPLOAD_KEY_PASSWORD')
+def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+    .every { it != null && !it.toString().trim().isEmpty() }
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def requestedReleaseArtifact = taskGraph.allTasks.any { candidate ->
+        def task = candidate.name.toLowerCase()
+        candidate.project == project && task.contains('release')
+            && (task.contains('assemble') || task.contains('bundle')
+                || task.contains('install') || task.contains('publish')
+                || task.contains('package'))
+    }
+    if (requestedReleaseArtifact && !hasReleaseSigning) {
+        throw new GradleException(
+            'Release signing is not configured. Set AK_UPLOAD_STORE_FILE, '
+            + 'AK_UPLOAD_STORE_PASSWORD, AK_UPLOAD_KEY_ALIAS, and AK_UPLOAD_KEY_PASSWORD.'
+        )
+    }
+}
+
+def appVersionCode = project.findProperty('AK_VERSION_CODE') ?: System.getenv('AK_VERSION_CODE') ?: '1'
+def appVersionName = project.findProperty('AK_VERSION_NAME') ?: System.getenv('AK_VERSION_NAME') ?: '1.0.0-beta.1'
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
+    externalNativeBuild {
+        cmake {
+            // CMake 3.22.1 hits a Windows ninja regeneration loop
+            // ("manifest 'build.ninja' still dirty after 100 tries").
+            // 3.30.x also ships a newer ninja. Installed via sdkmanager.
+            version rootProject.ext.cmakeVersion
+        }
+    }
 
     namespace "com.athletekinetics"
     defaultConfig {
-        applicationId "com.athletekinetics"
+        // Permanent Play identity (R8 §2.6): com.pikemethods.training is the
+        // production id; the qa variant appends .qa below. Package names become
+        // permanent after the first Play upload — never change casually.
+        applicationId "com.pikemethods.training"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode Integer.parseInt(appVersionCode.toString())
+        // First closed-beta version (R8 §2.6): 1 / 1.0.0-beta.1 unless pinned
+        // explicitly through AK_VERSION_CODE / AK_VERSION_NAME.
+        versionName appVersionName.toString()
+        // NOTE: this app module has no own CMake build (no src/main/cpp), so
+        // these arguments affect nothing in this module. The 16 KB alignment
+        // of autolinked native modules is governed by the NDK version pinned
+        // in the root build.gradle — NDK r28+ aligns ELF LOAD segments to
+        // 16 KB by default. Keep the NDK at r28 or newer; do not rely on
+        // app-level flags to reach op-sqlite / onnxruntime-react-native.
     }
     signingConfigs {
         debug {
@@ -92,18 +140,284 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
-        release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
+        // QA acceptance variant (WO remediation B1): production source/runtime,
+        // NON-debuggable (so the React Native plugin bundles the JS/Hermes
+        // application), debug-key signed, .qa application-id suffix so it
+        // coexists with developer installs. Never a Play artifact; never
+        // described as a Metro-dependent dev shell. Runtime needs no dev
+        // server, Metro, adb reverse, or host connection.
+        qa {
+            initWith buildTypes.release
+            applicationIdSuffix ".qa"
+            versionNameSuffix "-QA"
+            debuggable false
+            jniDebuggable false
+            // Explicitly non-shrinking so the QA binary matches the release
+            // runtime configuration (enableProguardInReleaseBuilds is false).
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // Debug-key signed, clearly labeled non-production (see B1 comment).
             signingConfig signingConfigs.debug
+            // Dependency-resolution fallback so libraries that only publish a
+            // release variant resolve for this non-debuggable build type.
+            matchingFallbacks += "release"
+            // The RN gradle plugin injects the usesCleartextTraffic placeholder
+            // for its debug/release types only; the QA variant must supply it
+            // itself (offline QA artifact: cleartext stays disabled).
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            // Clearly labeled non-production on the launcher.
+            resValue "string", "app_name", "pikeMethods QA"
+        }
+        release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+// --- R8 §2.5: reproducible Archivo packaging ----------------------------------
+// The variable-font source is pinned by hash; exactly one file is copied into
+// src/main/assets/fonts. No npx/react-native-asset dependency, no generated
+// Android res — the raw TTF ships as an app asset that RN resolves through the
+// theme's fontFamily: 'Archivo'. The copy FAILS CLOSED when the source bytes do
+// not match the ratified SHA-256. Self-contained on purpose: it must not depend
+// on helpers declared later in this script.
+def archivoSource = new File(projectDir, '../../assets/fonts/Archivo/Archivo-VariableFont_wdth,wght.ttf').canonicalFile
+def ARCHIVO_SHA256 = 'bc878c6e9e36b848bfa2fb9174acdf812ea6df640fd167f2c95b42674729f6b5'
+def archivoTarget = file("src/main/assets/fonts/Archivo.ttf")
+def archivoSha256 = { File f ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    f.withInputStream { ins ->
+        def buf = new byte[8192]
+        int read
+        while ((read = ins.read(buf)) > 0) { digest.update(buf, 0, read) }
+    }
+    return digest.digest().collect { String.format('%02x', it) }.join()
+}
+
+tasks.register("packageArchivoFont") {
+    group = "verification"
+    description = "Copies the hash-pinned Archivo variable font into main assets."
+    outputs.file(archivoTarget)
+    outputs.upToDateWhen { false }
+    doLast {
+        if (!archivoSource.isFile()) {
+            throw new GradleException("Archivo packaging: tracked source missing: ${archivoSource}")
+        }
+        def actual = archivoSha256(archivoSource)
+        if (actual != ARCHIVO_SHA256) {
+            throw new GradleException(
+                "Archivo packaging: source sha256 ${actual} != ratified pin ${ARCHIVO_SHA256}; refusing to package")
+        }
+        archivoTarget.parentFile.mkdirs()
+        java.nio.file.Files.copy(archivoSource.toPath(), archivoTarget.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        logger.lifecycle("[archivo] packaged ${archivoTarget.name} (${archivoSha256(archivoTarget)})")
+    }
+}
+
+tasks.configureEach { task ->
+    def n = task.name
+    if (n == 'mergeReleaseAssets' || n == 'mergeQaAssets' || n == 'mergeDebugAssets') {
+        task.dependsOn packageArchivoFont
+    }
+    // Lint tasks (lintVital report models / analyze) also read src/main/assets
+    // as an input directory; without this edge Gradle's implicit-dependency
+    // validation fails the build (observed on :app:generateQaLintVitalReportModel).
+    if (n.contains('Lint') || n.contains('lint')) {
+        task.dependsOn packageArchivoFont
+    }
+}
+
+// --- QA candidate identity manifest (WO remediation B2) ----------------------
+// Generated at build time into build/generated (never a maintained source
+// asset) and packaged ONLY into the qa variant. Carries enough correlation to
+// audit the dirty candidate WITHOUT absolute local paths, usernames, .git
+// data, credentials, or report text. Fails closed when any required identity
+// input is absent, malformed, or inconsistent.
+def repoRoot = rootDir.getParentFile().getParentFile().getParentFile() // android -> mobile -> apps -> repo
+
+def gitCapture = { List<String> args ->
+    def stdout = new ByteArrayOutputStream()
+    def stderr = new ByteArrayOutputStream()
+    def proc = new ProcessBuilder(["git"] + args)
+        .directory(repoRoot)
+        .redirectErrorStream(false)
+        .start()
+    proc.inputStream.withCloseable { stdout << it }
+    proc.errorStream.withCloseable { stderr << it }
+    if (proc.waitFor() != 0) {
+        throw new GradleException(
+            "git ${args.join(' ')} failed (${proc.exitValue()}): ${stderr.toString().trim()}") as Object
+    }
+    return stdout.toByteArray()
+}
+
+def gitText = { List<String> args -> new String(gitCapture(args), 'UTF-8').trim() }
+
+def sha256Hex = { byte[] bytes ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    return digest.digest(bytes).collect { String.format('%02x', it) }.join()
+}
+
+def sha256OfFile = { File f -> sha256Hex(f.bytes) }
+
+/** Tracked-diff fingerprint method: SHA-256 over the exact bytes of
+ *  `git diff --full-index --binary HEAD` (byte-preserving, no newline or
+ *  encoding translation anywhere in the pipeline). */
+def EMPTY_DIFF_SHA256 = sha256Hex(new byte[0])
+
+def requirePin = { String label, String value, java.util.regex.Pattern pattern ->
+    if (value == null || !(value ==~ pattern)) {
+        throw new GradleException("QA candidate manifest: malformed ${label}: '${value}'")
+    }
+    return value
+}
+
+def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
+    group = "verification"
+    description = "Generates the non-secret QA candidate identity manifest."
+    def outDir = layout.buildDirectory.dir("generated/candidate_manifest")
+    outputs.dir(outDir)
+    outputs.upToDateWhen { false }
+    doLast {
+        def branch = requirePin('branch name', gitText(['rev-parse', '--abbrev-ref', 'HEAD']), ~/[^\x00]+/)
+        def head = requirePin('HEAD commit', gitText(['rev-parse', 'HEAD']), ~/[0-9a-f]{40}/)
+        def diffBytes = gitCapture(['diff', '--full-index', '--binary', 'HEAD'])
+        def diffSha = sha256Hex(diffBytes)
+        boolean dirty = diffSha != EMPTY_DIFF_SHA256
+
+        // Intended staged/new-file material (WO staging permission): untracked
+        // files except the two pre-existing owner/process artifacts, which are
+        // explicitly NOT candidate inputs. Also includes files STAGED as new
+        // (index-added, absent from HEAD) — once staged they leave ls-files
+        // --others, but they remain new candidate material and must be pinned.
+        def OWNER_ARTIFACTS = ['TASK.md', 'audit_task_b.mjs'] as Set
+        def newFiles = []
+        def addedPaths = gitText(['diff', '--cached', '--name-only', '--diff-filter=A'])
+            .split('\n').findAll { it.trim() }
+            .findAll { !OWNER_ARTIFACTS.contains(it.trim()) }
+        addedPaths.each { rel ->
+            def f = new File(repoRoot, rel.trim())
+            if (!f.isFile()) {
+                throw new GradleException("QA candidate manifest: staged-new path is not a regular file: ${rel}")
+            }
+            newFiles.add([path: rel.trim().replace('\\', '/'), sha256: sha256OfFile(f)])
+        }
+        gitText(['ls-files', '--others', '--exclude-standard']).split('\n')
+            .findAll { it.trim() }
+            .findAll { !OWNER_ARTIFACTS.contains(it.trim()) }
+            .findAll { !addedPaths.contains(it.trim()) }
+            .sort()
+            .each { rel ->
+                def f = new File(repoRoot, rel.trim())
+                if (!f.isFile()) {
+                    throw new GradleException("QA candidate manifest: untracked path is not a regular file: ${rel}")
+                }
+                newFiles.add([path: rel.trim().replace('\\', '/'), sha256: sha256OfFile(f)])
+            }
+
+        // Embedder supply-chain pin — single source of truth remains
+        // scripts/embedder-integrity.mjs; parsed here, never duplicated.
+        def integrityFile = new File(repoRoot, 'scripts/embedder-integrity.mjs')
+        def integritySrc = integrityFile.text
+        def pinMatcher = integritySrc =~ /PINNED_REVISION\s*=\s*'([0-9a-f]{40})'/
+        if (!pinMatcher.find()) {
+            throw new GradleException("QA candidate manifest: cannot parse PINNED_REVISION from embedder-integrity.mjs")
+        }
+        def modelRevision = pinMatcher.group(1)
+        def modelMatcher = integritySrc =~ /'onnx\/model_quantized\.onnx':\s*\n\s*'([0-9a-f]{64})'/
+        if (!modelMatcher.find()) {
+            throw new GradleException("QA candidate manifest: cannot parse pinned model SHA-256 from embedder-integrity.mjs")
+        }
+        def modelSha = modelMatcher.group(1)
+
+        def stagedModel = new File(repoRoot, 'packages/inference/assets/minilm/model_quantized.onnx')
+        if (!stagedModel.isFile()) {
+            throw new GradleException(
+                "QA candidate manifest: ${stagedModel} missing - run 'npm run fetch:embedder' before building the QA artifact")
+        }
+        def stagedModelSha = sha256OfFile(stagedModel)
+        if (stagedModelSha != modelSha) {
+            throw new GradleException(
+                "QA candidate manifest: staged model sha256 ${stagedModelSha} != ratified pin ${modelSha}; refusing to build")
+        }
+
+        def rnPkg = new groovy.json.JsonSlurper()
+            .parse(new File(repoRoot, 'node_modules/react-native/package.json'))
+        def ortRnPkg = new groovy.json.JsonSlurper()
+            .parse(new File(repoRoot, 'node_modules/onnxruntime-react-native/package.json'))
+
+        def manifest = [
+            schema              : 'ak.candidate-manifest/1',
+            label               : 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+            branch              : branch,
+            head                : head,
+            sourceDirty         : dirty,
+            trackedDiffFingerprint: [
+                method: "sha256(git diff --full-index --binary HEAD)",
+                value : diffSha,
+            ],
+            newFiles            : newFiles,
+            qaLifecycleTelemetry: true,
+            model               : [
+                id           : 'Xenova/all-MiniLM-L6-v2',
+                revision     : modelRevision,
+                assetPath    : 'assets/minilm.onnx',
+                sha256       : modelSha,
+                sizeBytes    : 22972370,
+            ],
+            packageId           : 'com.pikemethods.training.qa',
+            versionCode         : android.defaultConfig.versionCode,
+            versionName         : "${android.defaultConfig.versionName}-QA",
+            buildVariant        : 'qa',
+            reactNativeVersion  : rnPkg.version,
+            onnxRuntimeReactNativeVersion: ortRnPkg.version,
+            onnxRuntimeAndroidVersion: rootProject.ext.onnxruntimeAndroidVersion,
+            builtAtUtc          : java.time.Instant.now().toString(),
+        ]
+
+        def dir = outDir.get().asFile
+        dir.mkdirs()
+        def out = new File(dir, 'candidate_manifest.json')
+        out.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(manifest)) + "\n"
+        logger.lifecycle("[qa-manifest] wrote ${out} (head=${head.take(12)} dirty=${dirty})")
+    }
+}
+
+android {
+    sourceSets {
+        qa {
+            // Packaged from build/generated only; source dirs stay clean.
+            assets.srcDir layout.buildDirectory.dir("generated/candidate_manifest")
+        }
+    }
+}
+
+// Every qa-variant task that reads sources/assets/lint inputs must run after
+// the manifest exists (Gradle implicit-dependency validation fails otherwise,
+// since lint scans build/generated).
+tasks.configureEach { task ->
+    def n = task.name
+    if (n == 'mergeQaAssets'
+            || (n.contains('Qa') && (n.contains('Lint') || n.contains('lint')))) {
+        task.dependsOn qaCandidateManifestTask
     }
 }
 
@@ -111,9 +425,156 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // onnxruntime-react-native extracts this AAR to link its JSI shim, but does
+    // not add the AAR to the app runtime classpath. Declare it here so the APK
+    // contains libonnxruntime.so alongside libonnxruntimejsi.so.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:${rootProject.ext.onnxruntimeAndroidVersion}")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+def verifyOnnxRuntimeArchive = { File artifact, String libraryRoot ->
+    if (!artifact.isFile()) {
+        throw new GradleException("Expected Android artifact was not produced: ${artifact}")
+    }
+
+    def failure = null
+    def archive = null
+    try {
+        archive = new java.util.zip.ZipFile(artifact)
+        def jsiEntries = []
+        def entries = archive.entries()
+        while (entries.hasMoreElements()) {
+            def entryName = entries.nextElement().name
+            if (entryName.startsWith(libraryRoot)
+                && entryName.endsWith("/libonnxruntimejsi.so")) {
+                jsiEntries.add(entryName)
+            }
+        }
+        if (jsiEntries.isEmpty()) {
+            failure = "contains no libonnxruntimejsi.so"
+        } else {
+            def missingBaseEntries = jsiEntries.collect { entry ->
+                entry.replace("libonnxruntimejsi.so", "libonnxruntime.so")
+            }.findAll { entry -> archive.getEntry(entry) == null }
+            if (!missingBaseEntries.isEmpty()) {
+                failure = "is missing ONNX Runtime native libraries: ${missingBaseEntries.join(', ')}"
+            }
+        }
+    } catch (Exception error) {
+        failure = "could not be inspected as a ZIP archive (${error.class.simpleName})"
+    } finally {
+        if (archive != null) archive.close()
+    }
+
+    if (failure != null) {
+        // Never leave a failed, apparently uploadable/installable artifact in
+        // the output directory after the build has been rejected.
+        if (artifact.exists() && !artifact.delete()) {
+            throw new GradleException(
+                "Android artifact ${failure}; also failed to delete rejected artifact: ${artifact}"
+            )
+        }
+        throw new GradleException("Android artifact ${failure}: ${artifact}")
+    }
+    logger.lifecycle("[onnx-packaging] verified ${artifact.name}")
+}
+
+def writeOnnxRuntimeFixture = { File artifact, List<String> entries ->
+    artifact.parentFile.mkdirs()
+    def output = new java.util.zip.ZipOutputStream(new FileOutputStream(artifact))
+    try {
+        entries.each { entryName ->
+            output.putNextEntry(new java.util.zip.ZipEntry(entryName))
+            output.write(0)
+            output.closeEntry()
+        }
+    } finally {
+        output.close()
+    }
+}
+
+def onnxPackagingContract = tasks.register("verifyOnnxRuntimePackagingContract") {
+    group = "verification"
+    description = "Exercises APK/AAB ONNX native-library pairing and rejection behavior."
+    outputs.upToDateWhen { false }
+    doLast {
+        def fixtureDir = layout.buildDirectory.dir("tmp/onnx-packaging-contract").get().asFile
+        def restrictedApk = new File(fixtureDir, "restricted.apk")
+        writeOnnxRuntimeFixture(restrictedApk, [
+            "lib/arm64-v8a/libonnxruntimejsi.so",
+            "lib/arm64-v8a/libonnxruntime.so",
+        ])
+        verifyOnnxRuntimeArchive(restrictedApk, "lib/")
+
+        def validBundle = new File(fixtureDir, "valid.aab")
+        writeOnnxRuntimeFixture(validBundle, [
+            "base/lib/arm64-v8a/libonnxruntimejsi.so",
+            "base/lib/arm64-v8a/libonnxruntime.so",
+            "base/lib/x86_64/libonnxruntimejsi.so",
+            "base/lib/x86_64/libonnxruntime.so",
+        ])
+        verifyOnnxRuntimeArchive(validBundle, "base/lib/")
+
+        [
+            [new File(fixtureDir, "missing-apk-base.apk"), "lib/arm64-v8a/libonnxruntimejsi.so", "lib/"],
+            [new File(fixtureDir, "missing-aab-base.aab"), "base/lib/arm64-v8a/libonnxruntimejsi.so", "base/lib/"],
+            [new File(fixtureDir, "missing-jsi.apk"), "lib/arm64-v8a/libonnxruntime.so", "lib/"],
+        ].each { fixture ->
+            def rejectedArtifact = fixture[0] as File
+            writeOnnxRuntimeFixture(rejectedArtifact, [fixture[1] as String])
+            def rejected = false
+            try {
+                verifyOnnxRuntimeArchive(rejectedArtifact, fixture[2] as String)
+            } catch (GradleException expected) {
+                rejected = true
+            }
+            if (!rejected || rejectedArtifact.exists()) {
+                throw new GradleException(
+                    "ONNX packaging contract failed to reject and remove ${rejectedArtifact.name}"
+                )
+            }
+        }
+
+        def corruptArtifact = new File(fixtureDir, "corrupt.aab")
+        corruptArtifact.withOutputStream { output -> output.write(0) }
+        def corruptRejected = false
+        try {
+            verifyOnnxRuntimeArchive(corruptArtifact, "base/lib/")
+        } catch (GradleException expected) {
+            corruptRejected = true
+        }
+        if (!corruptRejected || corruptArtifact.exists()) {
+            throw new GradleException("ONNX packaging contract failed to reject and remove corrupt.aab")
+        }
+    }
+}
+
+// Guard the artifact-producing task itself. APKs are written by package*;
+// final signed AABs are written by sign*Bundle. This covers assemble, bundle,
+// package, installDebug/run-android, and direct producer-task invocations.
+// Force the small packaging step to execute so an old unverified artifact can
+// never be reused solely because Gradle considered the task up to date.
+def onnxArtifactTasks = [
+    packageDebug: ["outputs/apk/debug/app-debug.apk", "lib/"],
+    packageQa: ["outputs/apk/qa/app-qa.apk", "lib/"],
+    packageRelease: ["outputs/apk/release/app-release.apk", "lib/"],
+    signDebugBundle: ["outputs/bundle/debug/app-debug.aab", "base/lib/"],
+    signReleaseBundle: ["outputs/bundle/release/app-release.aab", "base/lib/"],
+]
+
+tasks.configureEach { task ->
+    def artifactSpec = onnxArtifactTasks[task.name]
+    if (artifactSpec != null) {
+        task.dependsOn(onnxPackagingContract)
+        task.outputs.upToDateWhen { false }
+        task.doLast {
+            def artifact = layout.buildDirectory.file(artifactSpec[0]).get().asFile
+            verifyOnnxRuntimeArchive(artifact, artifactSpec[1])
+        }
     }
 }

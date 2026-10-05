@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege: no job pushes, comments or calls the API with this token.
+permissions:
+  contents: read
+
 env:
   # All pinned actions below are Node24-native majors, and runners default to
   # Node24 since 2026-06-16. This flag is now redundant belt-and-suspenders:
@@ -14,10 +18,13 @@ env:
 
 jobs:
   verify:
-    name: Verification suite (20 gates + typecheck)
+    name: Verification suite (24 gates + typecheck)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Nothing later in the job needs authenticated Git.
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -25,20 +32,34 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      # allowScripts / strict-allow-scripts need npm >= 11.16.0; the npm
+      # bundled with the selected Node may be older (engine-strict would then
+      # refuse, correctly). Pin the reviewed npm explicitly.
+      - name: Pin npm 11.16.0 (install-script policy)
+        run: npm install -g npm@11.16.0 && npm --version
       - run: npm ci
       # MiniLM (~25 MB) used by verify:semantic + verify:embedder; cached.
+      # Keyed on the pin-bearing integrity module: any revision/hash change
+      # busts the cache, and there is NO broad restore-keys fallback (a stale
+      # cache may only be rejected/replaced through the pinned-download path).
       - name: Cache embedding model
         uses: actions/cache@v5
         with:
           path: node_modules/@xenova/transformers/.cache
-          key: minilm-${{ hashFiles('packages/inference/assets/phrase-codebase.json') }}
-          restore-keys: minilm-
+          key: minilm-${{ hashFiles('scripts/embedder-integrity.mjs') }}
       # Materialize the gitignored ONNX into assets/minilm (cache-first,
-      # Hugging Face download on a cold cache).
+      # Hugging Face download on a cold cache, always byte-verified).
       - name: Fetch embedder assets
         run: npm run fetch:embedder
-      - name: verify:all (20 gates + typecheck)
-        run: npm run verify:all
+      # verify:ci is the DETERMINISTIC host suite and must exit 0. It excludes
+      # the two checks CI structurally cannot make honestly:
+      #   [A] the memory contract, which is a ratified budget decision, and
+      #   [D] measured physical evidence, which requires an authorized device
+      #       packet (AK_MEM_EVIDENCE_SESSION) that no runner possesses.
+      # Both live in `npm run verify:release`, which is run by the owner before
+      # a release, NOT here. `verify:all` is an alias for `verify:release`.
+      - name: verify:ci (24 gates + typecheck)
+        run: npm run verify:ci
       - name: Seeder physiology — pinned alignment + today's alignment
         run: |
           node scripts/seed-db.ts --end=2026-06-10 --db=/tmp/pinned.db
@@ -53,11 +74,19 @@ jobs:
             --assets-dest build/assets
 
   android-apk:
-    name: Android APK (sideloadable)
+    name: Android QA + debug APKs (sideloadable, never for Play)
     runs-on: ubuntu-latest
+    # `verify` runs verify:ci, which is required to be green. Before the
+    # ci/release split this job depended on a suite that failed on the memory
+    # contract, so it NEVER executed and the QA candidate was never built or
+    # gated in CI. The structure gate in apps/mobile/test/verify_store_sql.mjs
+    # asserts this dependency stays pointed at a green job.
     needs: verify
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Nothing later in the job needs authenticated Git.
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -67,31 +96,244 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: gradle
+      # ubuntu-latest does not guarantee every repository-pinned Android
+      # native-toolchain revision. Install the exact Gradle pins so AGP can
+      # resolve externalNativeBuild for every autolinked native module.
+      - name: Install pinned Android native toolchain
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "cmake;3.30.5" \
+            "ndk;28.2.13676358"
+          test -x "$ANDROID_HOME/cmake/3.30.5/bin/cmake"
+          test -d "$ANDROID_HOME/ndk/28.2.13676358"
+      # allowScripts / strict-allow-scripts need npm >= 11.16.0; the npm
+      # bundled with the selected Node may be older (engine-strict would then
+      # refuse, correctly). Pin the reviewed npm explicitly.
+      - name: Pin npm 11.16.0 (install-script policy)
+        run: npm install -g npm@11.16.0 && npm --version
       - run: npm ci
       # The triage embedding model ships inside the APK (Android assets);
       # cache-first fetch, then stage it where AGP packages assets from.
+      # Cache key is bound to the pin-bearing integrity module; no broad
+      # restore-keys fallback (stale caches fail closed at fetch).
       - name: Cache embedding model
         uses: actions/cache@v5
         with:
           path: node_modules/@xenova/transformers/.cache
-          key: minilm-${{ hashFiles('packages/inference/assets/phrase-codebase.json') }}
-          restore-keys: minilm-
+          key: minilm-${{ hashFiles('scripts/embedder-integrity.mjs') }}
       - name: Stage embedder model into Android assets
         run: |
           npm run fetch:embedder
-          mkdir -p apps/mobile/android/app/src/main/assets
-          cp packages/inference/assets/minilm/model_quantized.onnx \
-             apps/mobile/android/app/src/main/assets/minilm.onnx
-      # Release variant bundles JS + Hermes bytecode; the RN template signs
-      # release with the committed debug keystore, so the artifact installs
-      # directly on a phone with "install unknown apps" enabled.
-      - name: Build release APK
+          node scripts/stage-native-embedder.mjs \
+            apps/mobile/android/app/src/main/assets/minilm.onnx --required
+      # This artifact is deliberately DEBUG-signed for local device QA. Play
+      # release artifacts require the external upload key documented in
+      # docs/PRE_RELEASE_ANDROID.md and are never signed with this key.
+      - name: Build debug QA APK
         working-directory: apps/mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleDebug --no-daemon
+      # The QA variant is the CANDIDATE artifact. verify:qa-artifact (in
+      # verify:ci) only exercises synthetic fixtures; the real candidate must
+      # also be gated, or a stale/incorrect APK can never be caught by CI.
+      # verify:qa-candidate recomputes provenance against this checkout, so a
+      # self-consistent but stale APK fails here.
+      - name: Build QA candidate APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleQa --no-daemon
+      # A hosted release candidate must describe a clean checkout. Catch
+      # build-induced tracked or staged changes before trusting the manifest's
+      # provenance comparison inside the same mutated checkout.
+      - name: Assert QA candidate source stayed clean
+        run: |
+          git diff --exit-code -- .
+          git diff --cached --exit-code -- .
+      - name: verify:qa-candidate (real artifact, fails closed)
+        run: npm run verify:qa-candidate
+      # The CANDIDATE artifact — the one verify:qa-candidate just gated.
       - uses: actions/upload-artifact@v6
         with:
-          name: athlete-kinetics-apk
-          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          name: athlete-kinetics-qa-candidate-apk
+          path: apps/mobile/android/app/build/outputs/apk/qa/app-qa.apk
+          if-no-files-found: error
+      # The debug variant is a separate, UNGATED convenience build. It is named
+      # distinctly so it can never be mistaken for the gated candidate above.
+      - uses: actions/upload-artifact@v6
+        with:
+          name: athlete-kinetics-debug-qa-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  # Unsigned iOS simulator build + native smoke. This is the ONLY native iOS
+  # evidence this repository produces: a Linux host can verify sources
+  # (verify:native-config) but cannot run Xcode. It does NOT sign, archive for
+  # the App Store, or touch TestFlight — those need the owner's Apple team,
+  # registered bundle id and signing credentials (none are configured here).
+  ios-simulator:
+    name: iOS unsigned simulator build + native smoke
+    runs-on: macos-26
+    needs: verify
+    timeout-minutes: 150
+    env:
+      # Xcode/iOS SDK 26+ is the current App Store upload requirement. The job
+      # selects the newest installed Xcode of this major and records it.
+      XCODE_MAJOR: '26'
+      BUNDLE_ID: com.pikemethods.training
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Nothing later in the job needs authenticated Git.
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Select pinned Xcode major
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "error: no Xcode ${XCODE_MAJOR}.x on this runner:"; ls -d /Applications/Xcode*.app; exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphone
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: apps/mobile
+      # allowScripts / strict-allow-scripts need npm >= 11.16.0; the npm
+      # bundled with the selected Node may be older (engine-strict would then
+      # refuse, correctly). Pin the reviewed npm explicitly.
+      - name: Pin npm 11.16.0 (install-script policy)
+        run: npm install -g npm@11.16.0 && npm --version
+      - run: npm ci
+      # Same pin-bound cache and byte-verified fetch as the Android job.
+      - name: Cache embedding model
+        uses: actions/cache@v5
+        with:
+          path: node_modules/@xenova/transformers/.cache
+          key: minilm-${{ hashFiles('scripts/embedder-integrity.mjs') }}
+      - name: Fetch embedder assets
+        run: npm run fetch:embedder
+      # Lock-based when Podfile.lock is committed (--deployment refuses any
+      # drift). Until the first lock is committed, the job resolves one and
+      # uploads it for review rather than pretending to be reproducible.
+      - name: Install pods
+        working-directory: apps/mobile/ios
+        run: |
+          if git ls-files --error-unmatch Podfile.lock >/dev/null 2>&1; then
+            bundle exec pod install --deployment
+          else
+            echo "::warning::Podfile.lock is not committed; resolving a new lock (uploaded as an artifact for review)."
+            bundle exec pod install
+          fi
+      # Reproducibility: with the committed Podfile.lock and the committed
+      # results of React Native's post-install (aggregated privacy manifest,
+      # RCTNewArchEnabled, project settings), pod install must leave every
+      # tracked file unchanged. Any change fails closed and is published
+      # verbatim for review.
+      - name: Pod install leaves tracked files unchanged (fails closed)
+        run: |
+          mkdir -p ios-evidence
+          git status --porcelain --untracked-files=no > ios-evidence/pod-install-tracked-status.txt
+          git diff > ios-evidence/pod-install-tracked.diff
+          if [ -s ios-evidence/pod-install-tracked-status.txt ]; then
+            echo "::notice title=pod install tracked changes::$(tr '\n' ' ' < ios-evidence/pod-install-tracked-status.txt | cut -c1-500) | $(git diff --stat | tail -1)"
+            # The whole diff, verbatim (newlines escaped), in numbered parts,
+            # so the exact mutation can be reviewed and committed.
+            node -e '
+              const d = require("fs").readFileSync("ios-evidence/pod-install-tracked.diff", "utf8");
+              const esc = (t) => t.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+              const parts = []; for (let i = 0; i < d.length; i += 3500) parts.push(d.slice(i, i + 3500));
+              parts.slice(0, 8).forEach((p, i) => console.log(`::notice title=pod install diff ${i + 1}/${parts.length}::${esc(p)}`));'
+            echo "::error title=pod install tracked changes::pod install changed tracked files; commit the published diff or fix its cause"
+            exit 1
+          fi
+          echo "::notice title=pod install tracked changes::none — the tracked tree is unchanged by pod install --deployment"
+      - name: Build unsigned Release for the simulator
+        working-directory: apps/mobile/ios
+        run: |
+          set -o pipefail
+          mkdir -p ../../../ios-evidence
+          xcodebuild -workspace AthleteKinetics.xcworkspace -scheme AthleteKinetics \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
+            build 2>&1 | tee ../../../ios-evidence/xcodebuild.log
+      - name: Inspect the built app (fails closed)
+        run: |
+          node tools/inspect_ios_app.mjs \
+            apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
+            ios-evidence/xcodebuild.log ios-evidence/app-inspection.json
+      - name: Simulator native smoke (fails closed)
+        run: |
+          tools/ios_simulator_smoke.sh \
+            apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
+            "$BUNDLE_ID" ios-evidence
+      # The exact unsigned app the smoke ran, kept before the UI-test build
+      # below rebuilds the same product signed to run locally.
+      - name: Keep the smoked unsigned app
+        run: |
+          (cd apps/mobile/ios/build/Build/Products/Release-iphonesimulator && ditto -c -k --keepParent AthleteKinetics.app "$GITHUB_WORKSPACE/ios-evidence/AthleteKinetics-simulator-unsigned.zip")
+      # XCUITest needs a test runner and an app that carry their entitlements
+      # (HealthKit's real permission sheet only appears for an entitled app).
+      # On the simulator that is ad-hoc "sign to run locally" (identity "-"):
+      # no Apple team, certificate or profile is used or available here.
+      - name: Build the UI tests (simulator, ad-hoc signed to run locally)
+        working-directory: apps/mobile/ios
+        run: |
+          set -o pipefail
+          xcodebuild -workspace AthleteKinetics.xcworkspace -scheme AthleteKinetics \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build COMPILER_INDEX_STORE_ENABLE=NO \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
+            build-for-testing 2>&1 | tee ../../../ios-evidence/xcodebuild-uitests.log
+          APP=build/Build/Products/Release-iphonesimulator/AthleteKinetics.app
+          # Simulator builds carry their entitlements (what the simulator
+          # enforces) in the __TEXT,__entitlements section, not the signature.
+          codesign -d --entitlements - --xml "$APP" > ../../../ios-evidence/uitest-app-signature-entitlements.xml 2>&1 || true
+          node ../../../tools/macho_entitlements.mjs "$APP/AthleteKinetics" > ../../../ios-evidence/uitest-app-entitlements.xml || true
+          if ! grep -q '<key>com.apple.developer.healthkit</key>' ../../../ios-evidence/uitest-app-entitlements.xml; then
+            echo "::error title=ui tests::the UI-test app carries no HealthKit entitlement in __TEXT,__entitlements: $(tr '\n' ' ' < ../../../ios-evidence/uitest-app-entitlements.xml | cut -c1-400) / signature: $(tr '\n' ' ' < ../../../ios-evidence/uitest-app-signature-entitlements.xml | cut -c1-300)"
+            exit 1
+          fi
+          echo "::notice title=ui tests entitlements::$(tr -d '\n\t' < ../../../ios-evidence/uitest-app-entitlements.xml | sed 's/.*<dict>/<dict>/' | cut -c1-400)"
+      - name: UI tests on the simulator (fails closed)
+        run: |
+          XCTESTRUN=$(ls apps/mobile/ios/build/Build/Products/*.xctestrun | head -1)
+          echo "xctestrun=$XCTESTRUN"
+          tools/ios_ui_tests.sh "$XCTESTRUN" \
+            apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
+            "$BUNDLE_ID" ios-evidence/ui-tests
+      # Job logs and artifacts live in blob storage some reviewers cannot reach;
+      # the decisive error lines are re-published as API-visible annotations.
+      - name: Annotate the failure
+        if: failure()
+        run: node tools/ci_annotate_failure.mjs ios-evidence/xcodebuild.log ios-evidence/console.log ios-evidence/xcodebuild-uitests.log
+      - name: Record source and toolchain identity
+        if: always()
+        run: |
+          mkdir -p ios-evidence
+          node -e '
+            const { execSync } = require("child_process");
+            const sh = (c) => { try { return execSync(c, { encoding: "utf8" }).trim(); } catch { return null; } };
+            require("fs").writeFileSync("ios-evidence/identity.json", JSON.stringify({
+              schema: "ak.ios-ci-identity/1",
+              commit: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF, runId: process.env.GITHUB_RUN_ID,
+              trackedTreeClean: sh("git status --porcelain --untracked-files=no") === "",
+              xcode: sh("xcodebuild -version"), node: process.version,
+              podfileLockCommitted: sh("git ls-files apps/mobile/ios/Podfile.lock") !== "",
+            }, null, 2));'
+          cp apps/mobile/ios/Podfile.lock ios-evidence/ 2>/dev/null || true
+          if [ ! -f ios-evidence/AthleteKinetics-simulator-unsigned.zip ] && [ -d apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app ]; then
+            (cd apps/mobile/ios/build/Build/Products/Release-iphonesimulator && ditto -c -k --keepParent AthleteKinetics.app "$GITHUB_WORKSPACE/ios-evidence/AthleteKinetics-simulator-unsigned.zip")
+          fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: athlete-kinetics-ios-simulator-unsigned
+          path: ios-evidence/
           if-no-files-found: error

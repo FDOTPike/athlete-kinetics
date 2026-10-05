@@ -87,7 +87,7 @@ check('guard now refuses a second demo load',
   Number(raw.prepare('SELECT count(*) AS c FROM session').get().c) > 0);
 const before = raw.prepare(
   'SELECT readiness_score r FROM state_vector WHERE date = ?').get(today).r;
-for (const date of demo.demoDates(today, 7)) adapter.run(MATERIALIZE, [date]);
+for (const date of demo.demoDates(today, 14)) adapter.run(MATERIALIZE, [date]);
 const after = raw.prepare(
   'SELECT readiness_score r FROM state_vector WHERE date = ?').get(today).r;
 check('boot catch-up re-run is idempotent', before === after, `${before} == ${after}`);

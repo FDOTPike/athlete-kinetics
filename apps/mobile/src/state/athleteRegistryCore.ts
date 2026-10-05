@@ -38,12 +38,16 @@ export interface AthleteRegistry {
   version: 1;
   activeId: string;
   athletes: AthleteEntry[];
+  /** Device-wide advanced coaching/debug surfaces. This is discoverability,
+   *  not authentication; athlete databases remain independently isolated. */
+  advancedToolsUnlocked: boolean;
 }
 
 export function defaultRegistry(): AthleteRegistry {
   return {
     version: 1,
     activeId: DEFAULT_ATHLETE_ID,
+    advancedToolsUnlocked: false,
     athletes: [
       { id: DEFAULT_ATHLETE_ID, name: 'Athlete 1', dbName: LEGACY_DB_NAME, createdAtMs: 0 },
     ],
@@ -65,6 +69,7 @@ export function sanitizeName(raw: string, fallback: string): string {
 export function parseRegistry(json: string): AthleteRegistry {
   let entries: AthleteEntry[] = [];
   let activeId = DEFAULT_ATHLETE_ID;
+  let advancedToolsUnlocked = false;
   try {
     const o = JSON.parse(json) as Record<string, unknown>;
     if (Array.isArray(o.athletes)) {
@@ -94,6 +99,7 @@ export function parseRegistry(json: string): AthleteRegistry {
       }
     }
     if (typeof o.activeId === 'string') activeId = o.activeId;
+    advancedToolsUnlocked = o.advancedToolsUnlocked === true;
   } catch {
     entries = [];
   }
@@ -101,7 +107,7 @@ export function parseRegistry(json: string): AthleteRegistry {
     entries.unshift(...defaultRegistry().athletes);
   }
   if (!entries.some((e) => e.id === activeId)) activeId = DEFAULT_ATHLETE_ID;
-  return { version: 1, activeId, athletes: entries };
+  return { version: 1, activeId, athletes: entries, advancedToolsUnlocked };
 }
 
 export function serializeRegistry(reg: AthleteRegistry): string {
@@ -163,6 +169,14 @@ export function removeAthlete(
 export function setActiveAthlete(reg: AthleteRegistry, id: string): AthleteRegistry {
   if (!reg.athletes.some((e) => e.id === id)) return reg;
   return { ...reg, activeId: id };
+}
+
+/** Persist the hidden-surface preference without changing the active athlete. */
+export function setAdvancedToolsUnlocked(
+  reg: AthleteRegistry,
+  unlocked: boolean,
+): AthleteRegistry {
+  return { ...reg, advancedToolsUnlocked: unlocked };
 }
 
 export function activeEntry(reg: AthleteRegistry): AthleteEntry {

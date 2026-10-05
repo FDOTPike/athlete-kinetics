@@ -37,17 +37,23 @@ export const OBJECTIVES = [
 ] as const;
 export type Objective = (typeof OBJECTIVES)[number];
 
-/** Why a macro position is frozen (058, RR-02). */
+/** Why a macro position is frozen (058, RR-02 ratified 2026-08-27). A closed
+ *  domain: free text cannot be reasoned about and will not stay clean.
+ *  `life` is deliberate — travel, work, bereavement. Restricting suspension to
+ *  injury would leave the commonest cause of a training gap still consuming the
+ *  athlete's progression track, which is the bug the state exists to fix. */
 export const SUSPENSION_REASONS = ['injury', 'illness', 'life'] as const;
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
 
-/** One athlete-owned suspension episode. An open episode has no end time;
- * `is_suspended` is derived rather than stored. */
+/** One suspension episode. `ended_at_ms === null` means currently suspended —
+ *  `is_suspended` is derived from this and is never stored. */
 export interface SuspensionEpisode {
   episode_id: number;
   started_at_ms: number;
+  /** null = open. */
   ended_at_ms: number | null;
   reason: SuspensionReason;
+  /** The macro position frozen at entry; the athlete resumes here. */
   frozen_macro_index: number;
 }
 
@@ -77,18 +83,114 @@ export const PROGRESSION_METHODS = [
 ] as const;
 export type ProgressionMethod = (typeof PROGRESSION_METHODS)[number];
 
-/** Equipment inventory items — order and spelling MUST mirror the
- *  movement_equipment.item CHECK and the athlete_profile default in
- *  007_program_engine.sql (machine-checked by verify:blocks). */
-export const EQUIPMENT_ITEMS = [
+/** Standard equipment — order and spelling MUST mirror the athlete_profile
+ *  inventory default and the legacy equipment_access CASE map in
+ *  007_program_engine.sql (machine-checked by verify:blocks). This is the
+ *  widest set any DEFAULT, PRESET, or PARSE FALLBACK may ever grant. */
+export const STANDARD_EQUIPMENT_ITEMS = [
   'barbell', 'squat_rack', 'bench', 'dumbbells', 'kettlebell',
   'pullup_bar', 'nordic_bench', 'bands', 'cable_machine', 'mats',
 ] as const;
+
+/** Specialist equipment (owner decision O3, migration 049). Fail-closed: it
+ *  appears in NO preset, NO profile default, NO SQL column default, and NO
+ *  parse fallback — an athlete reaches it only by explicit opt-in. A movement
+ *  requiring it therefore stays teaching-only until it is deliberately
+ *  selected. */
+export const SPECIALIST_EQUIPMENT_ITEMS = ['boards'] as const;
+
+/** The complete persisted domain — mirrors the movement_equipment.item CHECK
+ *  as widened by 049 (machine-checked by verify:blocks). Use this to
+ *  CANONICALIZE an explicit selection; never as a default or a fallback. */
+export const EQUIPMENT_ITEMS = [
+  ...STANDARD_EQUIPMENT_ITEMS, ...SPECIALIST_EQUIPMENT_ITEMS,
+] as const;
 export type EquipmentItem = (typeof EQUIPMENT_ITEMS)[number];
 
-/** UI presets; bundles MUST mirror 007's legacy equipment_access CASE map. */
+/**
+ * What an IMPLEMENT requires from the athlete's inventory. The single
+ * authoritative join between MOVEMENT_PREFIXES and EQUIPMENT_ITEMS.
+ *
+ * WHY THIS EXISTS. A movement's own equipment requirement gates whether the
+ * movement can be trained at all; it says nothing about which IMPLEMENT the
+ * athlete can load it with, and the two diverge constantly. Measured on the
+ * shipped corpus: ALL 17 of the 17 multi-implement movements offer at least one
+ * implement their base requirement never implies — the divergence is total, not
+ * occasional. Walking Lunge and Glute Bridge require NOTHING yet offer BB;
+ * Overhead Press requires a barbell yet offers KB; Suitcase Carry requires a
+ * kettlebell yet offers DB; Face Pull requires a cable machine yet offers
+ * Banded; Chin-up and Weighted Pull-up require a pull-up bar yet offer Banded,
+ * which needs bands. Without this resolver an athlete could declare — and the
+ * generator would honour — an implement they do not own.
+ *
+ * The figure read "15 of 17" until 2026-09-09, when Gemini 3.8's round-1
+ * independent audit refuted it (finding F2) and a re-derivation confirmed 17 of
+ * 17. Round 1 attributed the error to not treating `Banded` as needing
+ * equipment; that cannot be right, because mutating the resolver that way yields
+ * 12 of 17, not 15. Round 2 then reconstructed a hypothesis that yields exactly
+ * 15: assume a `pullup_bar` implies `bands` — an assisted-pull-up-station
+ * assumption — and precisely `Chin-up` and `Weighted Pull-up` stop diverging
+ * while `Push-up`, `Nordic Curl` and `Face Pull` still do. That arithmetic is
+ * exact, and it is still only a reconstruction: the original script is gone and
+ * nothing proves this was the reasoning. It is recorded as the leading
+ * explanation, not as the established cause.
+ *
+ * Which is the point of the gate. This figure is now DERIVED from the live
+ * corpus by `verify:blocks` `[F2-corpus]` rather than asserted in prose, because
+ * prose nobody recomputes is how it stayed wrong for a fortnight.
+ *
+ * `anyOf` is satisfied by owning ANY listed item, not all of them.
+ */
+export type ImplementRequirement =
+  /** Needs nothing. Bodyweight is always performable. */
+  | { readonly kind: 'none' }
+  /** Performable if the inventory contains at least one of these. */
+  | { readonly kind: 'anyOf'; readonly items: readonly EquipmentItem[] }
+  /** The canonical equipment vocabulary cannot express this implement, so
+   *  ownership CANNOT be confirmed. Callers must fail closed rather than assume
+   *  it is available — inventing an equipment item to represent it would be
+   *  inventing policy, which this resolver deliberately does not do. */
+  | { readonly kind: 'unverifiable' };
+
+export const IMPLEMENT_REQUIREMENT: Readonly<Record<MovementPrefix, ImplementRequirement>> = {
+  Bodyweight: { kind: 'none' },
+  DB: { kind: 'anyOf', items: ['dumbbells'] },
+  BB: { kind: 'anyOf', items: ['barbell'] },
+  KB: { kind: 'anyOf', items: ['kettlebell'] },
+  Banded: { kind: 'anyOf', items: ['bands'] },
+  Cable: { kind: 'anyOf', items: ['cable_machine'] },
+  // A bottom-up carry/press is a kettlebell technique; it needs the bell.
+  'Bottom-Up': { kind: 'anyOf', items: ['kettlebell'] },
+  // The one interpretive call here, and it is deliberately PERMISSIVE: "free
+  // weight" is a category rather than a specific tool, so any loadable free
+  // weight satisfies it. It appears on no multi-implement movement in the
+  // shipped corpus, so it changes nothing today; flagged for the owner rather
+  // than settled quietly.
+  'Free Weight': { kind: 'anyOf', items: ['barbell', 'dumbbells', 'kettlebell'] },
+  // No canonical EQUIPMENT_ITEMS entry represents either of these. Neither
+  // appears on a multi-implement movement in the shipped corpus.
+  'Earthquake Bar': { kind: 'unverifiable' },
+  Chains: { kind: 'unverifiable' },
+};
+
+/** True when this athlete's inventory can actually perform the implement.
+ *  Fail-closed: an implement the vocabulary cannot express is never assumed
+ *  available. */
+export const implementAvailable = (
+  implement: MovementPrefix,
+  inventory: readonly EquipmentItem[],
+): boolean => {
+  const requirement = IMPLEMENT_REQUIREMENT[implement];
+  if (requirement === undefined || requirement.kind === 'unverifiable') return false;
+  if (requirement.kind === 'none') return true;
+  return requirement.items.some((item) => inventory.includes(item));
+};
+
+/** UI presets; bundles MUST mirror 007's legacy equipment_access CASE map.
+ *  `full_gym` is deliberately the STANDARD set, not the full union — a preset
+ *  never grants specialist equipment. */
 export const EQUIPMENT_PRESETS: Record<'full_gym' | 'home_basic' | 'minimal', readonly EquipmentItem[]> = {
-  full_gym: EQUIPMENT_ITEMS,
+  full_gym: STANDARD_EQUIPMENT_ITEMS,
   home_basic: ['dumbbells', 'kettlebell', 'pullup_bar', 'bands', 'mats'],
   minimal: ['bands', 'mats'],
 };
@@ -199,6 +301,25 @@ export const PATTERN_TO_CATEGORY: Record<MovementPattern, TaxonomyCategory> = {
 export const SCHEMA_TYPES = ['LINEAR', 'WAVE', 'STEP', 'APRE'] as const;
 export type SchemaType = (typeof SCHEMA_TYPES)[number];
 
+/** Schemas offered for NEW selection — a STRICT subset of SCHEMA_TYPES.
+ *  SCHEMA_TYPES itself must stay at four members: it mirrors the frozen
+ *  block_meta CHECK in 009_periodization.sql and persisted blocks reference
+ *  every one of them. Retirement is selection-only — a retired schema keeps
+ *  generating, loading and rendering for blocks that already chose it.
+ *
+ *  A schema governs ONE layer: how sets, reps and effort move WEEK TO WEEK
+ *  inside a 4-week block. It is texture within a fixed block dose. Long-term
+ *  progress is the job of the block-to-block layer above it, which today is a
+ *  fixed 8-block rotation (macroPhaseOf) with no athlete input. Do not judge a
+ *  schema by whether it drives long-term progress — that is not its layer.
+ *  See docs/decisions/TRAINING_PROGRESSION_LAYERS.md.
+ *
+ *    STEP — retired on product-simplification grounds. STEP adds a set in weeks
+ *           2-3 rather than redistributing a fixed dose, so unlike the others it
+ *           is not volume-equated; it was cut for simplicity, not for evidence. */
+export const SELECTABLE_SCHEMA_TYPES = ['LINEAR', 'WAVE', 'APRE'] as const;
+export type SelectableSchemaType = (typeof SELECTABLE_SCHEMA_TYPES)[number];
+
 /** The 32-week macro-cycle: 8 blocks x 4 weeks, two blocks per phase. */
 export const MACRO_PHASES = ['gpp', 'hypertrophy', 'volume', 'peak'] as const;
 export type MacroPhase = (typeof MACRO_PHASES)[number];
@@ -245,5 +366,6 @@ export const DEFAULT_PROFILE: UserProfile = Object.freeze({
   progression_methodology: 'autoregulated',
   injury_flags: [],
   mobility_limits: [],
-  equipment_inventory: [...EQUIPMENT_ITEMS],
+  // Standard-only: a fresh install never silently owns specialist equipment.
+  equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS],
 });

@@ -113,6 +113,41 @@ describe('BackNavigation Model (Deterministic Stack & SubView Back)', () => {
     expect(screen.getByTestId('current-tab').children[0]).toBe('readiness');
   });
 
+  test('d) re-rendering a parent sub-view never moves it ahead of a nested sub-view opened after it, and it keeps its latest handler', () => {
+    // The outer view is the PARENT of the nested one, as Profile hosts Activities.
+    // On re-render React runs the child's effects before the parent's, so a hook
+    // that re-registered on every render would put the parent's handler last.
+    let navRef = null;
+    const outer = jest.fn();
+    const inner = jest.fn();
+    function ParentSubView({ innerOpen, revision }) {
+      useSubViewBack(true, () => outer(revision));
+      return innerOpen ? <SubViewConsumer active onClose={() => inner(revision)} /> : <Text>Nested closed</Text>;
+    }
+    const Tree = ({ innerOpen, revision }) => (
+      <NavigationProvider initialTab="readiness">
+        <TestNavConsumer onRef={(r) => (navRef = r)} />
+        <ParentSubView innerOpen={innerOpen} revision={revision} />
+      </NavigationProvider>
+    );
+
+    const { rerender } = render(<Tree innerOpen={false} revision={1} />);
+    rerender(<Tree innerOpen revision={1} />);
+    // A later re-render of the parent gives both views new inline handlers.
+    rerender(<Tree innerOpen revision={2} />);
+
+    let handled = false;
+    act(() => { handled = navRef.goBack(); });
+    expect(handled).toBe(true);
+    expect(inner).toHaveBeenCalledWith(2);
+    expect(outer).not.toHaveBeenCalled();
+
+    rerender(<Tree innerOpen={false} revision={3} />);
+    act(() => { handled = navRef.goBack(); });
+    expect(handled).toBe(true);
+    expect(outer).toHaveBeenCalledWith(3);
+  });
+
   test('c) iOS PanResponder edge-swipe handler pops tab stack (fresh goBackRef)', () => {
     const { Platform } = require('react-native');
     const originalOS = Platform.OS;

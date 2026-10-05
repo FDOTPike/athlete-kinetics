@@ -1,22 +1,28 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
 import BlockScreen from '../../src/screens/BlockScreen';
+import { theme } from '../../src/theme/theme';
 
 let mockState;
 
-jest.mock('@ak/inference', () => ({
-  SCHEMA_TYPES: ['LINEAR', 'WAVE', 'STEP', 'APRE'],
-  targetLoadKg: jest.fn(() => 42.5),
-  addDaysIso: jest.fn((iso, days) => {
-    const date = new Date(`${iso}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
-  }),
-}));
+jest.mock('@ak/inference', () => {
+  const actual = jest.requireActual('@ak/inference');
+  return {
+    ...actual,
+    SCHEMA_TYPES: ['LINEAR', 'WAVE', 'STEP', 'APRE'],
+    targetLoadKg: jest.fn(() => 42.5),
+    addDaysIso: jest.fn((iso, days) => {
+      const date = new Date(`${iso}T00:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + days);
+      return date.toISOString().slice(0, 10);
+    }),
+  };
+});
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-  useStore: (selector) => selector(mockState),
+  useStore: (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState }),
 }));
 
 const TODAY = '2026-07-15';
@@ -58,6 +64,16 @@ const baseState = (overrides = {}) => ({
   status: 'ready',
   error: null,
   today: TODAY,
+  activityLedger: {
+    definitions: [], series: [], occurrences: [], completedLast28Days: 0,
+    knownMinutesLast28Days: 0, completedWithUnknownDuration: 0,
+    scheduledKnownMinutesPerWeek: 0, scheduledWithUnknownDuration: 0,
+  },
+  profile: {
+    objective: 'strength', training_age: 'intermediate', weekly_frequency: 4,
+    equipment_inventory: ['barbell', 'dumbbells', 'bench'], base_rpe_cap: 8.5,
+    session_duration_cap_min: 60,
+  },
   vector,
   trend: [{ date: '2026-07-14', readiness_score: 76 }],
   session: null,
@@ -94,10 +110,44 @@ const baseState = (overrides = {}) => ({
   loadSessionSlots: jest.fn(() => [todaySlot]),
   reportSubjective: jest.fn(() => Promise.resolve()),
   startSession: jest.fn(),
+  returnCheckin: null,
+  confirmReturnCheckin: jest.fn(),
+  dismissReturnCheckin: jest.fn(),
+  getMovementAvailabilityVerdicts: jest.fn(() => []),
+  previewTrainingProgram: jest.fn(() => ({ plan: { sessions: [] } })),
+  movements: [],
+  niggles: [],
   ...overrides,
 });
 
 beforeEach(() => { mockState = baseState(); });
+
+test('READY mount is never an independent database boot authority', () => {
+  mockState = baseState({ status: 'booting', boot: jest.fn() });
+  render(<ReadinessScreen />);
+  expect(mockState.boot).not.toHaveBeenCalled();
+  expect(screen.getByText('Preparing your training data.')).toBeOnTheScreen();
+});
+
+test('PLAN shows factual fixed activities without claiming it changed the coach dose', () => {
+  mockState = baseState({
+    activityLedger: {
+      definitions: [], occurrences: [], completedLast28Days: 0, knownMinutesLast28Days: 0,
+      completedWithUnknownDuration: 0, scheduledKnownMinutesPerWeek: 60,
+      scheduledWithUnknownDuration: 0,
+      series: [{
+        seriesId: 'series-basketball', activityId: 'activity-basketball', displayName: 'Basketball',
+        revision: 1, localWeekday: 5, localStartMinute: 1020, timezoneId: 'Australia/Sydney',
+        timing: 'fixed', expectedDurationMin: 60, expectedEffort: null,
+        effectiveStartDate: '2026-07-01', effectiveEndDate: null,
+      }],
+    },
+  });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'YOUR OTHER WEEKLY ACTIVITIES' }));
+  expect(screen.getByText('Friday · 5:00 pm · fixed · 60 expected minutes')).toBeOnTheScreen();
+  expect(screen.getByText(/does not silently move, add, remove, or intensify coach sessions/i)).toBeOnTheScreen();
+});
 
 test('READY keeps one direct action and hides raw metrics until the relevant disclosure opens', () => {
   const openCoach = jest.fn();
@@ -105,12 +155,18 @@ test('READY keeps one direct action and hides raw metrics until the relevant dis
 
   expect(screen.getByText('Ready to train')).toBeOnTheScreen();
   expect(screen.getByText("Follow today's plan at the effort it prescribes.")).toBeOnTheScreen();
+  expect(screen.getByText('Lower session planned today.')).toBeOnTheScreen();
   expect(screen.getByLabelText("Review today's plan")).toBeOnTheScreen();
-  expect(screen.queryByText('Your recent training load and recovery signals support the planned work.')).toBeNull();
+  expect(screen.queryByText('Your recovery signals support the planned work.')).toBeNull();
   expect(screen.queryByText('Acute to chronic load')).toBeNull();
 
   fireEvent.press(screen.getByLabelText('Why this recommendation'));
-  expect(screen.getByText('Your recent training load and recovery signals support the planned work.')).toBeOnTheScreen();
+  // R7: the explanation attributes readiness to the RATIFIED inputs only. Load is
+  // excluded from the readiness score, so it must not be named as supporting the
+  // recommendation, and the normative ACWR-band score must not be rendered.
+  expect(screen.getByText('Your recovery signals support the planned work.')).toBeOnTheScreen();
+  expect(screen.queryByText(/recent training load/i)).toBeNull();
+  expect(screen.queryByText('Load component')).toBeNull();
   expect(screen.queryByText('Acute to chronic load')).toBeNull();
   fireEvent.press(screen.getByLabelText("Review today's plan"));
   expect(openCoach).toHaveBeenCalledTimes(1);
@@ -167,6 +223,82 @@ test('COACH keeps the trajectory compact and expands a session only when its day
   expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
 });
 
+describe('Plan session starts navigate only after the store creates a session', () => {
+  test('a refused planned start stays on Plan, exposes the store error, and never navigates', () => {
+    const onSessionStarted = jest.fn();
+    mockState = baseState();
+    mockState.startSession = jest.fn(() => {
+      mockState.error = 'This planned session cannot start safely.';
+    });
+
+    render(<BlockScreen onSessionStarted={onSessionStarted} />);
+    fireEvent.press(screen.getByLabelText('Start session'));
+
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onSessionStarted).not.toHaveBeenCalled();
+    expect(screen.getByText('Today: Lower')).toBeOnTheScreen();
+    expect(screen.getByTestId('plan-start-error')).toHaveTextContent(
+      'This planned session cannot start safely.',
+    );
+  });
+
+  test('a refused confirmed-unplanned start stays on Plan, exposes the store error, and never navigates', () => {
+    const onSessionStarted = jest.fn();
+    mockState = baseState({ todayPlan: null, prescription: null });
+    mockState.startSession = jest.fn(() => {
+      mockState.error = 'An unplanned session cannot start while training is paused.';
+    });
+
+    render(<BlockScreen onSessionStarted={onSessionStarted} />);
+    fireEvent.press(screen.getByText('Start without a planned session'));
+    fireEvent.press(screen.getByLabelText('Start an unplanned session'));
+    fireEvent.press(screen.getByLabelText('Start unplanned session'));
+
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onSessionStarted).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Recovery day').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('plan-start-error')).toHaveTextContent(
+      'An unplanned session cannot start while training is paused.',
+    );
+  });
+
+  test('a successful planned start navigates exactly once and ignores a duplicate press', () => {
+    const onSessionStarted = jest.fn();
+    mockState = baseState();
+    mockState.startSession = jest.fn(() => {
+      mockState.session = { sessionId: 71, date: TODAY, startedAtMs: 1, sets: [] };
+    });
+
+    render(<BlockScreen onSessionStarted={onSessionStarted} />);
+    const start = screen.getByLabelText('Start session');
+    act(() => {
+      fireEvent.press(start);
+      fireEvent.press(start);
+    });
+
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onSessionStarted).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('plan-start-error')).toBeNull();
+  });
+
+  test('a successful confirmed-unplanned start navigates exactly once', () => {
+    const onSessionStarted = jest.fn();
+    mockState = baseState({ todayPlan: null, prescription: null });
+    mockState.startSession = jest.fn(() => {
+      mockState.session = { sessionId: 72, date: TODAY, startedAtMs: 1, sets: [] };
+    });
+
+    render(<BlockScreen onSessionStarted={onSessionStarted} />);
+    fireEvent.press(screen.getByText('Start without a planned session'));
+    fireEvent.press(screen.getByLabelText('Start an unplanned session'));
+    fireEvent.press(screen.getByLabelText('Start unplanned session'));
+
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(onSessionStarted).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('plan-start-error')).toBeNull();
+  });
+});
+
 test('COACH opens the Manage program editor and saves future preferences', () => {
   const updateProgramPreferences = jest.fn(() => true);
   const activeProgram = {
@@ -203,6 +335,7 @@ test('COACH opens the Manage program editor and saves future preferences', () =>
       objective: 'strength', training_age: 'beginner', weekly_frequency: 1,
       equipment_inventory: [], base_rpe_cap: 9, session_duration_cap_min: 60,
     },
+    suspension: null,
     program: activeProgram,
     movements: [],
     previewTrainingProgram: jest.fn(() => editorPreview),
@@ -221,41 +354,6 @@ test('COACH opens the Manage program editor and saves future preferences', () =>
   expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
 });
 
-test('COACH requires an explicit preview confirmation before continuing a goal program', () => {
-  const continueTrainingProgram = jest.fn();
-  const nextPlan = {
-    objective: 'strength', start_date: TODAY, weeks: 4, schemaType: 'WAVE',
-    macroBlockIndex: 2, macroPhase: 'gpp', peakShifted: false,
-    sessions: [{ week_index: 1, day_index: 1, focus: 'full', phase: 'accumulation', session_date: TODAY, slots: [] }],
-    warnings: ['full: preferred squat movement unavailable; safe fallback used'],
-    recovery: false, autopilotAdjusted: ['squat'],
-  };
-  mockState = baseState({
-    block: { blockId: 1, startDate: '2026-06-01', objective: 'strength', createdAtMs: 1 },
-    program: {
-      programId: 7, objective: 'strength', startDate: '2026-06-01',
-      horizonKind: 'weeks', requestedReviewDate: null, plannedEndDate: '2026-08-10',
-      plannedBlockCount: 2, startingMacroBlockIndex: 1, schemaType: 'WAVE',
-      status: 'active', currentSequenceIndex: 1,
-      days: [{ dayIndex: 1, focus: 'full' }], movementPreferences: [],
-    },
-    previewNextProgramBlock: jest.fn(() => nextPlan),
-    continueTrainingProgram,
-    archiveTrainingProgram: jest.fn(),
-  });
-
-  render(<BlockScreen />);
-  fireEvent.press(screen.getByLabelText('Review program continuation'));
-  expect(mockState.previewNextProgramBlock).toHaveBeenCalledTimes(1);
-  expect(screen.getByText('NEXT BLOCK PREVIEW')).toBeOnTheScreen();
-  expect(screen.getByText('full: preferred squat movement unavailable; safe fallback used')).toBeOnTheScreen();
-  expect(continueTrainingProgram).not.toHaveBeenCalled();
-
-  fireEvent.press(screen.getByLabelText('Confirm and start next program block'));
-  expect(continueTrainingProgram).toHaveBeenCalledTimes(1);
-  expect(screen.queryByText('NEXT BLOCK PREVIEW')).toBeNull();
-});
-
 test('COACH discloses a raised autopilot attribution on demand', () => {
   const raisedSlot = { ...todaySlot, autopilot: { rpeDelta: 0.5, setDelta: 1, reason: 'raised' } };
   mockState = baseState({
@@ -265,9 +363,18 @@ test('COACH discloses a raised autopilot attribution on demand', () => {
   render(<BlockScreen />);
   fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
   expect(screen.getByLabelText('Why Goblet Squat target changed')).toBeOnTheScreen();
-  expect(screen.queryByText('Nudged up — your recent sets felt easier than planned. RPE +0.5, +1 set.')).toBeNull();
+  expect(screen.queryByText('Nudged up — your recent sets felt easier than planned.')).toBeNull();
   fireEvent.press(screen.getByLabelText('Why Goblet Squat target changed'));
-  expect(screen.getByText('Nudged up — your recent sets felt easier than planned. RPE +0.5, +1 set.')).toBeOnTheScreen();
+  expect(screen.getByText('Nudged up — your recent sets felt easier than planned.')).toBeOnTheScreen();
+});
+
+test('COACH discloses eased attribution in today\'s preview', () => {
+  const easedSlot = { ...todaySlot, autopilot: { rpeDelta: -0.5, setDelta: -1, reason: 'eased' } };
+  mockState = baseState({ todayPlan: { ...todayPlan, slots: [easedSlot] } });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText("Preview today's session"));
+  fireEvent.press(screen.getByLabelText('Why Goblet Squat target changed'));
+  expect(screen.getByText('Eased off — your recent sets felt harder than planned.')).toBeOnTheScreen();
 });
 
 test('COACH discloses a held-safety autopilot attribution on demand', () => {
@@ -279,7 +386,60 @@ test('COACH discloses a held-safety autopilot attribution on demand', () => {
   render(<BlockScreen />);
   fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
   fireEvent.press(screen.getByLabelText('Why Goblet Squat target changed'));
-  expect(screen.getByText('Held back — a recent safety signal limited this target. RPE -0.5, -1 set.')).toBeOnTheScreen();
+  expect(screen.getByText('Eased for safety — a recent safety signal lowered this target.')).toBeOnTheScreen();
+});
+
+// Both attribution markers are a bare "·" glyph sitting in a label-height row.
+// hitSlop cannot make them tappable: React Native clips a child's extended touch
+// region to its ancestors' bounds, so slop that reaches past a ~16pt row is
+// simply never dispatched. The target has to be a REAL reserved box. These two
+// tests assert the reserved dimensions AND that the disclosure still toggles —
+// they fail if the style is dropped, and they fail if it is "fixed" by putting
+// hitSlop back instead.
+test('COACH reserves a real touch target for the slot attribution marker', () => {
+  const raisedSlot = { ...todaySlot, autopilot: { rpeDelta: 0.5, setDelta: 1, reason: 'raised' } };
+  mockState = baseState({
+    todayPlan: { ...todayPlan, slots: [raisedSlot] },
+    loadSessionSlots: jest.fn(() => [raisedSlot]),
+  });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
+  const marker = screen.getByLabelText('Why Goblet Squat target changed');
+  expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+  });
+  expect(marker.props.hitSlop).toBeUndefined();
+  // Behaviour is unchanged: the marker still toggles its explanation.
+  expect(screen.queryByText('Nudged up — your recent sets felt easier than planned.')).toBeNull();
+  fireEvent.press(marker);
+  expect(screen.getByText('Nudged up — your recent sets felt easier than planned.')).toBeOnTheScreen();
+});
+
+test('COACH reserves a real touch target for the macro-budget marker', () => {
+  mockState = baseState({
+    blockMeta: { schemaType: 'LINEAR', macroBlockIndex: 6, macroPhase: 'peak', peakShifted: false },
+  });
+  render(<BlockScreen />);
+  const marker = screen.getByLabelText('Why effort is held steady');
+  expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+  });
+  expect(marker.props.hitSlop).toBeUndefined();
+  expect(screen.queryByText('Held steady — effort only rises early in a cycle.')).toBeNull();
+  fireEvent.press(marker);
+  expect(screen.getByText('Held steady — effort only rises early in a cycle.')).toBeOnTheScreen();
+});
+
+test('COACH explains the late-cycle upward-effort budget on demand', () => {
+  mockState = baseState({
+    blockMeta: { schemaType: 'LINEAR', macroBlockIndex: 6, macroPhase: 'peak', peakShifted: false },
+  });
+  render(<BlockScreen />);
+  expect(screen.queryByText('Held steady — effort only rises early in a cycle.')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Why effort is held steady'));
+  expect(screen.getByText('Held steady — effort only rises early in a cycle.')).toBeOnTheScreen();
 });
 
 test('COACH shows only exact finalized plan outcomes as Done or Stopped', () => {
@@ -298,6 +458,40 @@ test('COACH shows only exact finalized plan outcomes as Done or Stopped', () => 
   expect(screen.getByLabelText('Week 1, lower session on 2026-07-02, stopped')).toBeOnTheScreen();
 });
 
+test('COACH keeps trajectory labels on one line across recovery and finalized states', () => {
+  const planned = baseState().blockSessions[0];
+  mockState = baseState({
+    todayPlan: null,
+    block: { blockId: 1, startDate: '2026-07-13', objective: 'strength', createdAtMs: 1 },
+    blockSessions: [
+      { ...planned, plannedSessionId: 1, dayIndex: 1, sessionDate: '2026-07-13', completionStatus: 'complete' },
+      { ...planned, plannedSessionId: 2, dayIndex: 2, sessionDate: '2026-07-14', completionStatus: 'halted' },
+      { ...planned, plannedSessionId: 3, dayIndex: 4, sessionDate: '2026-07-16', focus: 'upper', completionStatus: null },
+    ],
+  });
+  render(<BlockScreen />);
+
+  expect(StyleSheet.flatten(screen.getByTestId('trajectory-week-1').props.style)).toMatchObject({
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  });
+  expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.style)).toMatchObject({
+    width: '100%',
+  });
+
+  for (const label of ['Done', 'Stopped', 'Today', 'UPR']) {
+    const token = screen.getByText(label);
+    expect(token.props.numberOfLines).toBe(1);
+    expect(token.props.adjustsFontSizeToFit).toBe(true);
+    expect(token.props.minimumFontScale).toBe(0.7);
+    expect(StyleSheet.flatten(token.props.style)).toMatchObject({
+      fontSize: theme.font.eyebrow.fontSize,
+      letterSpacing: 0,
+    });
+  }
+  expect(screen.getByLabelText('Week 1, lower session on 2026-07-14, stopped')).toBeOnTheScreen();
+});
+
 test('COACH leaves the safety form behind its explicit action even during a halt', () => {
   mockState = baseState({
     lastTriage: {
@@ -314,6 +508,7 @@ test('COACH leaves the safety form behind its explicit action even during a halt
   expect(screen.getByText('Stop training today')).toBeOnTheScreen();
   expect(screen.queryByLabelText('Describe how your body feels today')).toBeNull();
   fireEvent.press(screen.getByLabelText('Review safety report'));
+  expect(screen.getByTestId('coach-screen').props.keyboardShouldPersistTaps).toBe('handled');
   expect(screen.getByLabelText('Describe how your body feels today')).toBeOnTheScreen();
 });
 
@@ -373,4 +568,243 @@ test('COACH renders archived block card when block is null and hasArchivedBlock 
   expect(screen.getAllByText('Your previous block had ended.').length).toBeGreaterThanOrEqual(1);
   expect(screen.getAllByText('A short four-week block gives Coach a clear trajectory to follow.').length).toBeGreaterThanOrEqual(1);
   expect(screen.queryByText('A new block was started.')).toBeNull();
+});
+
+test('COACH enforces Law-2 assertion by marking only TODAY with chalk in the trajectory', () => {
+  // R8 §2.1: cellDate is DERIVED from block.startDate + week/dayIndex, so the
+  // fixture keeps sessionDate consistent with that formula: a block starting
+  // Mon 2026-07-13 puts today (2026-07-15) on week 1, dayIndex 3.
+  const planned = baseState().blockSessions[0];
+  mockState = baseState({
+    today: TODAY,
+    block: { blockId: 1, startDate: '2026-07-13', objective: 'strength', createdAtMs: 1 },
+    blockSessions: [
+      { ...planned, plannedSessionId: 1, dayIndex: 3, sessionDate: TODAY, focus: 'lower' },
+      { ...planned, plannedSessionId: 2, dayIndex: 5, sessionDate: '2026-07-17', focus: 'upper' },
+      { ...planned, plannedSessionId: 3, dayIndex: 7, sessionDate: '2026-07-19', focus: 'full' },
+    ],
+  });
+  render(<BlockScreen />);
+
+  const todayMarker = screen.getByTestId('today-marker');
+  expect(todayMarker).toBeOnTheScreen();
+  expect(screen.queryAllByTestId('today-marker')).toHaveLength(1);
+
+  const todayPressable = screen.getByLabelText(`Week 1, lower session on ${TODAY}`);
+  expect(todayPressable.props.accessibilityState.selected).toBe(true);
+  expect(StyleSheet.flatten(todayPressable.props.style)).toMatchObject({
+    borderLeftColor: theme.color.chalk,
+    borderLeftWidth: 4,
+  });
+
+  const futurePressable1 = screen.getByLabelText('Week 1, upper session on 2026-07-17');
+  expect(futurePressable1.props.accessibilityState.selected).toBe(false);
+  expect(StyleSheet.flatten(futurePressable1.props.style)).not.toMatchObject({
+    borderLeftColor: theme.color.chalk,
+    borderLeftWidth: 4,
+  });
+
+  const futurePressable2 = screen.getByLabelText('Week 1, full session on 2026-07-19');
+  expect(futurePressable2.props.accessibilityState.selected).toBe(false);
+  expect(StyleSheet.flatten(futurePressable2.props.style)).not.toMatchObject({
+    borderLeftColor: theme.color.chalk,
+    borderLeftWidth: 4,
+  });
+});
+
+test('COACH displays SUBSTITUTED badge element when slot load is overridden', () => {
+  const substitutedSlot = { ...todaySlot, overrideLoadKg: 45.0 };
+  mockState = baseState({
+    loadSessionSlots: jest.fn(() => [substitutedSlot]),
+  });
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
+
+  expect(screen.getByText('SUBSTITUTED')).toBeOnTheScreen();
+});
+
+test('READY renders return check-in card when layoff is detected, with truthful non-dose copy', () => {
+  mockState = baseState({
+    returnCheckin: {
+      lastQualifyingDate: '2026-06-01',
+      daysSinceLastTrained: 44,
+      options: ['continue_plan', 'review_first_session'],
+      isDismissed: false,
+    },
+  });
+  render(<ReadinessScreen />);
+
+  expect(screen.getByTestId('return-checkin-banner')).toBeOnTheScreen();
+  expect(screen.getByText('RETURN CHECK-IN')).toBeOnTheScreen();
+  expect(screen.getByText('Welcome back')).toBeOnTheScreen();
+  expect(screen.getByText(/It's been 44 days since your last logged session/)).toBeOnTheScreen();
+  expect(screen.getByText(/Your plan is unchanged/)).toBeOnTheScreen();
+
+  // Confirm NO claims of automatic dose reduction
+  expect(screen.queryByText(/reduced/i)).toBeNull();
+  expect(screen.queryByText(/scaled/i)).toBeNull();
+  expect(screen.queryByText(/85%/)).toBeNull();
+  expect(screen.queryByText(/deload/i)).toBeNull();
+});
+
+test('READY return check-in card actions confirm and dismiss correctly', () => {
+  const openCoach = jest.fn();
+  const confirmReturnCheckin = jest.fn();
+  const dismissReturnCheckin = jest.fn();
+
+  mockState = baseState({
+    returnCheckin: {
+      lastQualifyingDate: '2026-06-01',
+      daysSinceLastTrained: 44,
+      options: ['continue_plan', 'review_first_session'],
+      isDismissed: false,
+    },
+    confirmReturnCheckin,
+    dismissReturnCheckin,
+  });
+
+  const { rerender } = render(<ReadinessScreen onOpenCoach={openCoach} />);
+
+  // 1. Continue plan
+  fireEvent.press(screen.getByText('Continue current plan'));
+  expect(confirmReturnCheckin).toHaveBeenCalledWith('continue_plan');
+
+  // 2. Review first session
+  fireEvent.press(screen.getByText('Review first session'));
+  expect(confirmReturnCheckin).toHaveBeenCalledWith('review_first_session');
+  expect(openCoach).toHaveBeenCalled();
+
+  // 3. Dismiss
+  fireEvent.press(screen.getByText('Dismiss'));
+  expect(dismissReturnCheckin).toHaveBeenCalled();
+});
+
+test('READY hides return check-in card when dismissed or absent', () => {
+  mockState = baseState({
+    returnCheckin: {
+      lastQualifyingDate: '2026-06-01',
+      daysSinceLastTrained: 44,
+      options: ['continue_plan', 'review_first_session'],
+      isDismissed: true,
+    },
+  });
+  render(<ReadinessScreen />);
+
+  expect(screen.queryByTestId('return-checkin-banner')).toBeNull();
+});
+
+describe('BlockScreen - Chooser Entry (Work Order E)', () => {
+  test('renders Plan a new block action when a block IS active and opens chooser', () => {
+    mockState = baseState({
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
+      program: {
+        programId: 1,
+        status: 'active',
+        currentSequenceIndex: 1,
+        plannedBlockCount: 2,
+        plannedEndDate: '2026-08-26',
+      },
+    });
+
+    render(<BlockScreen />);
+
+    // Action must render when block is active
+    const planNewBlockButton = screen.getByText('Plan a new block');
+    expect(planNewBlockButton).toBeOnTheScreen();
+
+    // Tapping it opens the NewBlockChooserScreen
+    fireEvent.press(planNewBlockButton);
+
+    expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+    expect(screen.getByText('Auto')).toBeOnTheScreen();
+    expect(screen.getByText('Custom')).toBeOnTheScreen();
+    expect(screen.getByText('Guided')).toBeOnTheScreen();
+    expect(screen.getByText('Coming soon')).toBeOnTheScreen();
+  });
+
+  test('inter-block state with block === null and program !== null still opens chooser and routes to handlers', () => {
+    mockState = baseState({
+      block: null,
+      hasArchivedBlock: true,
+      program: {
+        programId: 1,
+        status: 'active',
+        currentSequenceIndex: 1,
+        plannedBlockCount: 2,
+        plannedEndDate: '2026-08-26',
+        days: [
+          { dayIndex: 1, focus: 'lower' },
+          { dayIndex: 2, focus: 'upper' },
+        ],
+        movementPreferences: [],
+      },
+    });
+
+    render(<BlockScreen />);
+
+    // Start a new block button on the inter-block card
+    const startNewBlockButton = screen.getByText('Start a new block');
+    expect(startNewBlockButton).toBeOnTheScreen();
+
+    // Tapping opens chooser
+    fireEvent.press(startNewBlockButton);
+
+    expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+    expect(screen.getByText('Auto')).toBeOnTheScreen();
+    expect(screen.getByText('Custom')).toBeOnTheScreen();
+
+    // Auto opens ProgramSetupScreen in editing mode
+    fireEvent.press(screen.getByText('Auto'));
+    expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OW-007 — the resume path's error surface (audit Finding 5)
+//
+// Two independent reasons a failed resume told the athlete nothing: the press
+// handler called endSuspension bare, with no try/catch, and the only
+// suspension-error node was mounted in the NOT-suspended branch — the one state
+// in which the resume button does not exist. Both are asserted here.
+// ---------------------------------------------------------------------------
+
+const OPEN_EPISODE = { episode_id: 4, started_at_ms: 1_756_000_000_000, ended_at_ms: null, reason: 'injury', frozen_macro_index: 3 };
+
+test('OW-007 a failed resume surfaces an action-scoped message on the suspended card', () => {
+  const endSuspension = jest.fn(() => { throw new Error('database is locked'); });
+  mockState = baseState({ suspension: OPEN_EPISODE, endSuspension });
+  render(<BlockScreen />);
+
+  // Precondition: we are on the suspended card, so the pause controls (and the
+  // error node that used to live only beside them) are not mounted at all.
+  expect(screen.getByTestId('suspension-resume')).toBeOnTheScreen();
+  expect(screen.queryByTestId('suspension-begin-injury')).toBeNull();
+  expect(screen.queryByTestId('suspension-error')).toBeNull();
+
+  fireEvent.press(screen.getByTestId('suspension-resume'));
+
+  expect(endSuspension).toHaveBeenCalledTimes(1);
+  // Before the fix this threw out of the handler and nothing rendered.
+  expect(screen.getByTestId('suspension-error')).toHaveTextContent('database is locked');
+  // The card itself is unchanged, which is correct: the episode is still open.
+  expect(screen.getByTestId('suspension-resume')).toBeOnTheScreen();
+});
+
+test('OW-007 a successful resume shows no error and leaves the global channel alone', () => {
+  const endSuspension = jest.fn();
+  mockState = baseState({ suspension: OPEN_EPISODE, endSuspension });
+  render(<BlockScreen />);
+
+  fireEvent.press(screen.getByTestId('suspension-resume'));
+
+  expect(endSuspension).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId('suspension-error')).toBeNull();
+});
+
+test('OW-007 the resume error is action-scoped: an unrelated store error does not populate it', () => {
+  mockState = baseState({ suspension: OPEN_EPISODE, error: 'some unrelated store failure', endSuspension: jest.fn() });
+  render(<BlockScreen />);
+
+  // The global error channel must never read as a refusal of this control.
+  expect(screen.queryByTestId('suspension-error')).toBeNull();
 });

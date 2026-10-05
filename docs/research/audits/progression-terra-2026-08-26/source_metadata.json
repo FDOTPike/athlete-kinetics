@@ -1,0 +1,394 @@
+{
+  "retrieved_at_utc": "2026-08-26T03:42:50.339834+00:00",
+  "pubmed": [
+    {
+      "pmid": "34542869",
+      "title": "Accuracy in Predicting Repetitions to Task Failure in Resistance Exercise: A Scoping Review and Exploratory Meta-analysis.",
+      "journal": "Sports medicine (Auckland, N.Z.)",
+      "year": "2022",
+      "abstract": "Prescribing repetitions relative to task failure is an emerging approach to resistance training. Under this approach, participants terminate the set based on their prediction of the remaining repetitions left to task failure. While this approach holds promise, an important step in its development is to determine how accurate participants are in their predictions. That is, what is the difference between the predicted and actual number of repetitions remaining to task failure, which ideally should be as small as possible.\nThe aim of this study was to examine the accuracy in predicting repetitions to task failure in resistance exercises.\nScoping review and exploratory meta-analysis.\nA systematic literature search was conducted in January 2021 using the PubMed, SPORTDiscus, and Google Scholar databases. Inclusion criteria included studies with healthy participants who predicted the number of repetitions they can complete to task failure in various resistance exercises, before or during an ongoing set, which was performed to task failure. Sixteen publications were eligible for inclusion, of which 13 publications covering 12 studies, with a total of 414 participants, were included in our meta-analysis.\nThe main multilevel meta-analysis model including all effects sizes (262 across 12 clusters) revealed that participants tended to underpredict the number of repetitions to task failure by 0.95 repetitions (95% confidence interval [CI] 0.17-1.73), but with considerable heterogeneity (Q(261)\u2009=\u20093060, p\u2009<\u20090.0001, I2\u2009=\u200997.9%). Meta-regressions showed that prediction accuracy slightly improved when the predictions were made closer to set failure (\u03b2\u2009=\u2009\u2009-\u20090.025, 95% CI\u2009-\u20090.05 to 0.0014) and when the number of repetitions performed to task failure was lower (\u2264\u200912 repetitions: \u03b2\u2009=\u20090.06, 95% CI 0.04-0.09;\u2009>\u200912 repetitions: \u03b2\u2009=\u20090.47, 95% CI 0.44-0.49). Set number trivially influenced prediction accuracy with slightly increased accuracy in later sets (\u03b2\u2009=\u2009\u2009-\u20090.07 repetitions, 95% CI\u2009-\u20090.14 to\u2009-\u20090.005). In contrast, participants' training status did not seem to influence prediction accuracy (\u03b2\u2009=\u2009\u2009-\u20090.006 repetitions, 95% CI\u2009-\u20090.02 to 0.007) and neither did the implementation of upper or lower body exercises (upper body\u00a0-\u00a0lower body\u2009=\u2009\u2009-\u20090.58 repetitions; 95% CI\u2009-\u20092.32 to 1.16). Furthermore, there was minimal between-participant variation in predictive accuracy (standard deviation 1.45 repetitions, 95% CI 0.99-2.12).\nParticipants were imperfect in their ability to predict proximity to task failure independent of their training background. It remains to be determined whether the observed degree of inaccuracy should be considered acceptable. Despite this, prediction accuracies can be improved if they are provided closer to task failure, when using heavier loads, or in later sets. To reduce the heterogeneity between studies, future studies should include a clear and detailed account of how task failure was explained to participants and how it was confirmed.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "27787474",
+      "title": "Accuracy in Estimating Repetitions to Failure During Resistance Exercise.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2017",
+      "abstract": "Hackett, DA, Cobley, SP, Davies, TB, Michael, SW, and Halaki, M. Accuracy in estimating repetitions to failure during resistance exercise. J Strength Cond Res 31(8): 2162-2168, 2017-The primary aim of this study was to assess the accuracy in estimation of repetitions to failure (ERF) during resistance exercise. Furthermore, this investigation examined whether the accuracy in ERF was affected by training status, sex, or exercise type. Eighty-one adults (men, n = 53 and women, n = 28) with broad range of resistance training experience participated in this study. Subjects performed up to 10 sets of 10 repetitions at 70% 1 repetition maximum (1RM) and 80% 1RM for the chest press and leg press, respectively. At the completion of each set, subjects reported their ERF and then continued repetitions to failure to determine actual repetitions to failure (ARF). The accuracy (amount of error) of ERF was determined over an ARF 0-10. Significant differences were found for error of ERF among ARF (p < 0.001), with the error of ERF \u223c1 repetition at ARF 0-5 compared with >2 repetitions at ARF 7-10. Greater accuracy was found for the chest press compared with leg press, with the error of ERF \u22641 repetition for ARF 0-5 and ARF 0-3, respectively (p = 0.012). Men were found to be more accurate than women at specific ARFs for the leg press (p = 0.008), whereas no interaction was found for the chest press. Resistance training experience did not affect the accuracy in ERF. These results suggest that resistance trainers can accurately estimate repetitions to failure when close to failure and that ERF could importantly be practically used for prescription and monitoring of resistance exercise.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "33424678",
+      "title": "\"Just One More Rep!\" - Ability to Predict Proximity to Task Failure in Resistance Trained Persons.",
+      "journal": "Frontiers in psychology",
+      "year": "2020",
+      "abstract": "In resistance training, the use of predicting proximity to momentary task failure (MF, i.e., maximum effort), and repetitions in reserve scales specifically, is a growing approach to monitoring and controlling effort. However, its validity is reliant upon accuracy in the ability to predict MF which may be affected by congruence of the perception of effort compared with the actual effort required. The present study examined participants with at least 1 year of resistance training experience predicting their proximity to MF in two different experiments using a deception design. Within each experiment participants performed four trials of knee extensions with single sets (i.e., bouts of repetitions) to their self-determined repetition maximum (sdRM; when they predicted they could not complete the next repetition if attempted and thus would reach MF if they did) and MF (i.e., where despite attempting to do so they could not complete the current repetition). For the first experiment (n = 14) participants used loads equal to 70% of a one repetition maximum (1RM; i.e., the heaviest load that could be lifted for a single repetition) performed in a separate baseline session. Aiming to minimize participants between day variability in repetition performances, in the second separate experiment (n = 24) they used loads equal to 70% of their daily isometric maximum voluntary contraction (MVC). Results suggested that participants typically under predicted the number of repetitions they could perform to MF with a meta-analytic estimate across experiments of 2.0 [95%CIs 0.0 to 4.0]. Participants with at least 1 year of resistance training experience are likely not adequately accurate at gauging effort in submaximal conditions. This suggests that perceptions of effort during resistance training task performance may not be congruent with the actual effort required. This has implications for controlling, programming, and manipulating the actual effort in resistance training and potentially on the magnitude of desired adaptations such as improvements in muscular hypertrophy and strength.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "32881842",
+      "title": "Estimating Repetitions in Reserve for Resistance Exercise: An Analysis of Factors Which Impact on Prediction Accuracy.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2020",
+      "abstract": "Mansfield, Sean, K, Peiffer, Jeremiah, J, Hughes, Liam, J, and Scott Brendan, R. Estimating repetitions in reserve for resistance exercise: an analysis of factors which impact on prediction accuracy. J Strength Cond Res XX(X): 000-000, 2020-The purpose of this study was to examine the influence of knowing the load being lifted on the accuracy of repetitions-in-reserve (RIR) estimates, during both moderate- (60% 1 repetition maximum [RM]) and heavy-load (80% 1RM) exercise. Twenty trained men (age: 25.9 \u00b1 4.5 years, height: 181 \u00b1 7 cm, body mass: 86.5 \u00b1 13.7 kg) were assessed for 1RM in bench press (98.4 \u00b1 16.4 kg) and prone row (72.0 \u00b1 11.7 kg), before being randomized into control (i.e., informed of the load; n = 10) or blinded (noninformed; n = 10) conditions. Subjects then completed 2 protocols in a randomized order: 3 sets at 80% 1RM and 3 sets at 60% 1RM. During each set of these protocols, subjects were asked to estimate their RIR before continuing the set to failure. Differences in estimated and actual RIR between sets and conditions were determined via 3-way repeated measures analysis of variance for the 60 and 80% 1RM protocols independently. No differences in RIR accuracy were observed between blinded vs nonblinded conditions. Repetitions-in-reserve estimates were lower than actual RIR for the first set of both exercises in 60 and 80% protocols (p \u2264 0.007, effect size [ES]: 1.30-2.89 [moderate-large]) and for set 2 of the 80% bench press protocol (p = 0.046, ES: 0.39 [small]). Knowing the load during resistance exercise or the %1RM of the load lifted did not influence the estimates of RIR. The ability to accurately determine RIR in the 60 and 80% 1RM protocols improved from sets 1-3, indicating that estimation of RIR is enhanced when an individual is estimating RIR at a closer point to actual failure.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "32681399",
+      "title": "Test-Retest Reliability of the One-Repetition Maximum (1RM) Strength Assessment: a Systematic Review.",
+      "journal": "Sports medicine - open",
+      "year": "2020",
+      "abstract": "The test-retest reliability of the one-repetition maximum (1RM) test varies across different studies. Given the inconsistent findings, it is unclear what the true reliability of the 1RM test is, and to what extent it is affected by measurement-related factors, such as exercise selection for the test, the number of familiarization trials and resistance training experience.\nThe aim of this paper was to review studies that investigated the reliability of the 1RM test of muscular strength and summarize their findings.\nThe PRISMA guidelines were followed for this systematic review. Searches for studies were conducted through eight databases. Studies that investigated test-retest reliability of the 1RM test and presented intra-class correlation coefficient (ICC) and/or coefficient of variation (CV) were included. The COSMIN checklist was used for the assessment of the methodological quality of the included studies.\nAfter reviewing 1024 search records, 32 studies (pooled n\u2009=\u20091595) on test-retest reliability of 1RM assessment were found. All the studies were of moderate or excellent methodological quality. Test-retest ICCs ranged from 0.64 to 0.99 (median ICC\u2009=\u20090.97), where 92% of ICCs were \u2265\u20090.90, and 97% of ICCs were \u2265\u20090.80. The CVs ranged from 0.5 to 12.1% (median CV\u2009=\u20094.2%). ICCs were generally high (\u2265\u20090.90), and most CVs were low (<\u200910%) for 1RM tests: (1) among those without and for those with some resistance training experience, (2) conducted with or without familiarization sessions, (3) with single-joint or multi-joint exercises, (4) for upper- and lower-body strength assessment, (5) among females and males, and (6) among young to middle-aged adults and among older adults. Most studies did not find systematic changes in test results between the trials.\nBased on the results of this review, it can be concluded that the 1RM test generally has good to excellent test-retest reliability, regardless of resistance training experience, number of familiarization sessions, exercise selection, part of the body assessed (upper vs. lower body), and sex or age of participants. Researchers and practitioners, therefore, can use the 1RM test as a reliable test of muscular strength.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "29466268",
+      "title": "Effect of Progressive Calisthenic Push-up Training on Muscle Strength and Thickness.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2018",
+      "abstract": "Kotarsky, CJ, Christensen, BK, Miller, JS, and Hackney, KJ. Effect of progressive calisthenic push-up training on muscle strength and thickness. J Strength Cond Res 32(3): 651-659, 2018-Calisthenics, a form of resistance training, continue to increase in popularity; however, few studies have examined their effectiveness for muscle strength improvement. The purpose of this study was to determine whether progressive calisthenic push-up training (PUSH) is comparable with traditional bench press training (BENCH) as a technique for increasing muscle strength and thickness. Twenty-three healthy, moderately trained men (mean \u00b1 SD: age 23 \u00b1 6.8 years) completed the study. Subjects were randomly assigned to PUSH (n = 14) and BENCH (n = 9) groups and were trained 3 days per week for 4 weeks. Muscle thickness (MT), seated medicine ball put (MBP), 1 repetition maximum (1RM) bench press, and push-up progression (PUP) were measured before and after training. Results revealed significant increases in 1RM (p < 0.001) and PUP (p < 0.001) for both groups after training. The increase in PUP was significantly greater for PUSH (p < 0.001). No significant differences were found within groups for MT and MBP (p > 0.05). This study is the first to demonstrate that calisthenics, using different progressive variations to maintain strength training programming variables, can improve upper-body muscle strength.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "21873902",
+      "title": "Kinetic analysis of several variations of push-ups.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2011",
+      "abstract": "Push-ups are a common and practical exercise that is used to enhance fitness, including upper body strength or endurance. The kinetic characteristics of push-ups and its variations are yet to be quantified. Kinetic quantification is necessary to accurately evaluate the training load, and thus the nature of the training stimulus, for these exercise variations. This study assessed the peak vertical ground reaction forces (GRFs) of push-up variations including the regular push-up and those performed with flexed knee, feet elevated on a 30.48-cm box, and a 60.96-cm box, and hands elevated on a 30.48-cm box and a 60.96-cm box. Twenty-three recreationally fit individuals (14 men, 9 women) performed each of the 6 push-up variations in a randomized order. Peak GRF and peak GRF expressed as a coefficient of subject body mass were obtained with a force platform. Push-ups with the feet elevated produced a higher GRF than all other push-up variations (p \u2264 0.05). Push-ups with hands elevated and push-ups from the flexed knee position produced a lower GRF than all other push-up variations (p \u2264 0.05). No gender differences in response to these push-up variations were found (p > 0.05). Additionally, subject height was not related to the GRF for any of the push-up conditions (p > 0.05) other than the condition where hands were elevated on a 60.96-cm box (p \u2264 0.05; r = 0.63). These data can be used to progress the intensity of push-ups in a program and to quantify the training load as a percentage of body mass.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "20179649",
+      "title": "The effect of position on the percentage of body mass supported during traditional and modified push-up variants.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2011",
+      "abstract": "The push-up is a popular upper-extremity weight-bearing exercise. However, limited information is available regarding its effectiveness. Much of the past research has focused on muscle activation levels, whereas very little has examined the forces encountered during push-up variants. The purpose of the present study was to examine the effect of position within the range of motion on the percentage of body mass (BM) supported by the upper extremities during the traditional and modified (knees-down) push-up. Twenty-eight highly strength-trained male subjects were positioned with their hands on a force platform in 4 static positions, consisting of the up and down position in both the traditional and modified push-up exercise. The performance measures included the average vertical ground reaction force (GRF), expressed as a percentage of BM, supported in each of the 4 static positions and the percentage of change between the up and down positions in each push-up exercise. In both the traditional and modified push-ups, subjects supported less weight in the up vs. the down position. The percentage change in % BM from the up to the down position was greater in the modified push-up variant. The pattern of resistances to the push-up exercises observed in this study may be a result of differing moment arms between the support surface contact point (knees or feet) and the hands. These results may be useful in prescribing programs for strengthening and/or rehabilitation for both the prime movers and stabilizers of the upper extremity. Further, range of motion may need to be altered to accommodate strength differences in beginners and clients rehabilitating from injury.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "27038416",
+      "title": "Effects of velocity loss during resistance training on athletic performance, strength gains and muscle adaptations.",
+      "journal": "Scandinavian journal of medicine & science in sports",
+      "year": "2017",
+      "abstract": "We compared the effects of two resistance training (RT) programs only differing in the repetition velocity loss allowed in each set: 20% (VL20) vs 40% (VL40) on muscle structural and functional adaptations. Twenty-two young males were randomly assigned to a VL20 (n\u00a0=\u00a012) or VL40 (n\u00a0=\u00a010) group. Subjects followed an 8-week velocity-based RT program using the squat exercise while monitoring repetition velocity. Pre- and post-training assessments included: magnetic resonance imaging, vastus lateralis biopsies for muscle cross-sectional area (CSA) and fiber type analyses, one-repetition maximum strength and full load-velocity squat profile, countermovement jump (CMJ), and 20-m sprint running. VL20 resulted in similar squat strength gains than VL40 and greater improvements in CMJ (9.5% vs 3.5%, P\u00a0<\u00a00.05), despite VL20 performing 40% fewer repetitions. Although both groups increased mean fiber CSA and whole quadriceps muscle volume, VL40 training elicited a greater hypertrophy of vastus lateralis and intermedius than VL20. Training resulted in a reduction of myosin heavy chain IIX percentage in VL40, whereas it was preserved in VL20. In conclusion, the progressive accumulation of muscle fatigue as indicated by a more pronounced repetition velocity loss appears as an important variable in the configuration of the resistance exercise stimulus as it influences functional and structural neuromuscular adaptations.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "32049887",
+      "title": "Velocity Loss as a Critical Variable Determining the Adaptations to Strength Training.",
+      "journal": "Medicine and science in sports and exercise",
+      "year": "2020",
+      "abstract": "This study aimed to compare the effects of four resistance training (RT) programs with different velocity loss (VL) thresholds: 0% (VL0), 10% (VL10), 20% (VL20), and 40% (VL40) on sprint and jump performance, muscle strength, neuromuscular, muscle hypertrophy, and architectural adaptations.\nSixty-four young resistance-trained men were randomly assigned into four groups (VL0, VL10, VL20, and VL40) that differed in the VL allowed in each set. Subjects followed an RT program for 8 wk (two sessions per week) using the full-squat (SQ) exercise, with similar relative intensity (70%-85% 1-repetition maximum), number of sets (3), and interset recovery period (4 min). Before and after the RT program, the following tests were performed: 1) muscle hypertrophy and architecture of the vastus lateralis (VLA), 2) tensiomyography, 3) 20-m running sprint, 4) vertical jump, 5) maximal voluntary isometric contraction in SQ, 6) progressive loading test in SQ, and 7) fatigue test.\nNo between-group differences existed for RT-induced gains in sprint, jump, and strength performance despite the differences in the total volume performed by each group. VL20 and VL40 showed significant increases (P < 0.001) in muscle hypertrophy (group-time interaction, P = 0.06). However, only VL40 exhibited a significant slowing (P < 0.001) of the delay time in the VLA muscle (group-time interaction, P = 0.05). Moreover, VL40 showed a significant decrease in the early rate of force development (P = 0.04).\nHigher VL thresholds (i.e., VL20 and VL40) maximized hypertrophic adaptations, although an excessive VL during the set (i.e., VL40) may also induce negative neuromuscular adaptations. Therefore, moderate VL thresholds should be chosen to maximize strength adaptations and to prevent negative neuromuscular adaptations.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "28834797",
+      "title": "Strength and Hypertrophy Adaptations Between Low- vs. High-Load Resistance Training: A Systematic Review and Meta-analysis.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2017",
+      "abstract": "Schoenfeld, BJ, Grgic, J, Ogborn, D, and Krieger, JW. Strength and hypertrophy adaptations between low- vs. high-load resistance training: a systematic review and meta-analysis. J Strength Cond Res 31(12): 3508-3523, 2017-The purpose of this article was to conduct a systematic review of the current body of literature and a meta-analysis to compare changes in strength and hypertrophy between low- vs. high-load resistance training protocols. Searches of PubMed/MEDLINE, Cochrane Library, and Scopus were conducted for studies that met the following criteria: (a) an experimental trial involving both low-load training [\u226460% 1 repetition maximum (1RM)] and high-load training (>60% 1RM); (b) with all sets in the training protocols being performed to momentary muscular failure; (c) at least one method of estimating changes in muscle mass or dynamic, isometric, or isokinetic strength was used; (d) the training protocol lasted for a minimum of 6 weeks; (e) the study involved participants with no known medical conditions or injuries impairing training capacity. A total of 21 studies were ultimately included for analysis. Gains in 1RM strength were significantly greater in favor of high- vs. low-load training, whereas no significant differences were found for isometric strength between conditions. Changes in measures of muscle hypertrophy were similar between conditions. The findings indicate that maximal strength benefits are obtained from the use of heavy loads while muscle hypertrophy can be equally achieved across a spectrum of loading ranges.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "30063555",
+      "title": "Total Number of Sets as a Training Volume Quantification Method for Muscle Hypertrophy: A Systematic Review.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2021",
+      "abstract": "Baz-Valle, E, Fontes-Villalba, M, and Santos-Concejero, J. Total number of sets as a training volume quantification method for muscle hypertrophy: A systematic review. J Strength Cond Res 35(3): 870-878, 2021-This review aimed to determine whether assessing the total number of sets is a valid method to quantify training volume in the context of hypertrophy training. A literature search on 2 databases (PubMed and Scopus) was conducted on May 18, 2018. After analyzing 2,585 resultant articles, studies were included if they met the following criteria: (a) studies were randomized controlled trials, (b) studies compared the total number of sets, repetition range, or training frequency, (c) interventions lasted at least 6 weeks, (d) subjects had a minimum of 1 year of resistance training experience, (e) subjects' age ranged from 18 to 35 years, (f) studies reported morphologic changes through direct or indirect assessment methods, (g) studies involved subjects with no known medical conditions, and (h) studies were published in peer-reviewed journals. Fourteen studies met the inclusion criteria. According to the results of this review, the total number of sets to failure, or near to, seems to be an adequate method to quantify training volume when the repetition range lies between 6 and 20+ if all the other variables are kept constant. This approach requires further development to assess whether specific numbers of sets are key to inducing optimal muscle gains.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "38970765",
+      "title": "Exploring the Dose-Response Relationship Between Estimated Resistance Training Proximity to Failure, Strength Gain, and Muscle Hypertrophy: A Series of Meta-Regressions.",
+      "journal": "Sports medicine (Auckland, N.Z.)",
+      "year": "2024",
+      "abstract": "The proximity to failure in which sets are terminated has gained attention in the scientific literature as a potentially key resistance training variable. Multiple meta-analyses have directly (i.e., failure versus not to failure) or indirectly (e.g., velocity loss, alternative set structures) evaluated the effect of proximity to failure on strength and muscle hypertrophy outcomes categorically; however, the dose-response effects of proximity to failure have not been analyzed collectively in a continuous manner.\nTo meta-analyze the aforementioned areas of relevant research, proximity to failure was quantified as the number of repetitions in reserve (RIR). Importantly, the RIR associated with each effect in the analysis was estimated on the basis of the available descriptions of the training interventions in each study. Data were extracted and a series of exploratory multilevel meta-regressions were performed for outcomes related to both strength and muscle hypertrophy. A range of sensitivity analyses were also performed. All models were adjusted for the effects of load, method of volume equating, duration of intervention, and training status.\nThe best fit models for both strength and muscle hypertrophy outcomes demonstrated modest quality of overall fit. In all of the best-fit models for strength, the confidence intervals of the marginal slopes for estimated RIR contained a null point estimate, indicating a negligible relationship with strength gains. However, in all of the best-fit models for muscle hypertrophy, the marginal slopes for estimated RIR were negative and their confidence intervals did not contain a null point estimate, indicating that changes in muscle size increased as sets were terminated closer to failure.\nThe dose-response relationship between proximity to failure and strength gain appears to differ from the relationship with muscle hypertrophy, with only the latter being meaningfully influenced by RIR. Strength gains were similar across a wide range of RIR, while muscle hypertrophy improves as sets are terminated closer to failure. Considering the RIR estimation procedures used, however, the exact relationship between RIR and muscle hypertrophy and strength remains unclear. Researchers and practitioners should be aware that optimal proximity to failure may differ between strength and muscle hypertrophy outcomes, but caution is warranted when interpreting the present analysis due to its exploratory nature. Future studies deliberately designed to explore the continuous nature of the dose-response effects of proximity to failure in large samples should be considered.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "18714230",
+      "title": "Accuracy of prediction equations for determining one repetition maximum bench press in women before and after resistance training.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2008",
+      "abstract": "Repetitions to fatigue (RTF) using less than a 1 repetition maximum (1RM) load (RepWt) have been shown to be a good predictor of 1RM strength in men, but such information is scarce in women. The purpose of this study was to evaluate the accuracy of current prediction equations to estimate 1RM bench press performance and to determine whether resistance training changes the capability to predict 1RM from muscular endurance repetitions in young women. Members (n = 103) of a required wellness course were measured for 1RM bench press and RTF using randomly assigned percentages between 60% and 90% of the 1RM (RepWt) before and after 12 weeks of progressive resistance training. The %1RM used to perform RTF remained the same for each individual after training (75.6% +/- 10.3%) as before. One repetition maximum bench press increased significantly after training (28% +/- 21%). Although the change in the group average for RTF (0.6 +/- 6.1) was not significant, the correlation between pretraining and posttraining RTF was moderate (r = 0.66; p < 0.01), and individual differences in percentage change in RTF were substantial (27% +/- 99%). The percentage change in 1RM was not significantly related to initial 1RM (r = -0.05), but it was negatively related to the change in RTF (r = -0.40; p < 0.01). Prediction equations were more accurate in the pretraining and posttraining conditions, in which fewer than 10 RTF were used. Resistance training may alter the relationship between strength and muscle endurance across a wide range of RTF in young women without compromising the accuracy of predicting maximal strength.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "37967832",
+      "title": "Accuracy of Intraset Repetitions-in-Reserve Predictions During the Bench Press Exercise in Resistance-Trained Male and Female Subjects.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2024",
+      "abstract": "Refalo, MC, Remmert, JF, Pelland, JC, Robinson, ZP, Zourdos, MC, Hamilton, DL, Fyfe, JJ, and Helms, ER. Accuracy of intraset repetitions-in-reserve predictions during the bench press exercise in resistance-trained male and female subjects. J Strength Cond Res 38(3): e78-e85, 2024-This study assessed the accuracy of intraset repetitions-in-reserve (RIR) predictions to provide evidence for the efficacy of RIR prescription as a set termination method to inform proximity to failure during resistance training (RT). Twenty-four resistance trained male ( n = 12) and female ( n = 12) subjects completed 2 experimental sessions involving 2 sets performed to momentary muscular failure (barbell bench press exercise) with 75% of 1 repetition maximum (1RM), whereby subjects verbally indicated when they perceived to had reached either 1 RIR or 3 RIR. The difference between the predicted RIR and the actual RIR was defined as the \"RIR accuracy\" and was quantified as both raw (i.e., direction of error) and absolute (i.e., magnitude of error) values. High raw and absolute mean RIR accuracy (-0.17 \u00b1 1.00 and 0.65 \u00b1 0.78 repetitions, respectively) for 1-RIR and 3-RIR predictions were observed (including all sets and sessions completed). We identified statistical equivalence (equivalence range of \u00b11 repetition, thus no level of statistical significance was set) in raw and absolute RIR accuracy between (a) 1-RIR and 3-RIR predictions, (b) set 1 and set 2, and (c) session 1 and session 2. No evidence of a relationship was found between RIR accuracy and biological sex, years of RT experience, or relative bench press strength. Overall, resistance-trained individuals are capable of high absolute RIR accuracy when predicting 1 and 3 RIR on the barbell bench press exercise, with a minor tendency for underprediction. Thus, RIR prescriptions may be used in research and practice to inform the proximity to failure achieved upon set termination.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "29204323",
+      "title": "Ability to predict repetitions to momentary failure is not perfectly accurate, though improves with resistance training experience.",
+      "journal": "PeerJ",
+      "year": "2017",
+      "abstract": "'Repetitions in Reserve' (RIR) scales in resistance training (RT) are used to control effort but assume people accurately predict performance a priori (i.e. the number of possible repetitions to momentary failure (MF)). This study examined the ability of trainees with different experience levels to predict number of repetitions to MF. One hundred and forty-one participants underwent a full body RT session involving single sets to MF and were asked to predict the number of repetitions they could complete before reaching MF on each exercise. Participants underpredicted the number of repetitions they could perform to MF (Standard error of measurements [95% confidence intervals] for combined sample ranged between 2.64 [2.36-2.99] and 3.38 [3.02-3.83]). There was a tendency towards improved accuracy with greater experience. Ability to predict repetitions to MF is not perfectly accurate among most trainees though may improve with experience. Thus, RIR should be used cautiously in prescription of RT. Trainers and trainees should be aware of this as it may have implications for the attainment of training goals, particularly muscular hypertrophy.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "38086002",
+      "title": "Assessing the robustness of muscle strength and physical performance measures in women older than 40 years: a test-retest reliability study.",
+      "journal": "Menopause (New York, N.Y.)",
+      "year": "2024",
+      "abstract": "This study investigated the test-retest reliability and minimal detectable change (MDC) of muscle strength and physical performance tests in women older than 40 years.\nA total of 113 women, aged 58 \u00b1 11 years (82% postmenopausal women), with a body mass index of 28.5 \u00b1 5.8 kg/m 2 , participated in this study. One-repetition maximum (1RM) tests were conducted for seven strength exercises: 45\u00b0 leg press, bench press, leg extension, pec deck, wide-grip lateral pull-down, leg curl, and seated cable row, with a retest after 48 hours. Timed Up and Go (TUG), 6-minute walk, and 30-second sit-to-stand tests were performed on the same day and retested after 72 hours. The tests and retests were administered by the same evaluators. Relative reliability (consistency of participant rank between test-retest) was assessed using the intraclass correlation coefficient for consistency and agreement, and absolute reliability (precision of score) was assessed using the MDC based on the standard error of prediction.\nThe 1RM and performance tests exhibited excellent reliability: 45\u00b0 leg press (consistency, 0.99; agreement, 0.98), bench press (consistency, 0.96; agreement, 0.96), leg extension (consistency, 0.93; agreement, 0.91), pec deck (consistency, 0.90; agreement, 0.88), wide-grip lateral pull-down (consistency, 0.91; agreement, 0.89), leg curl (consistency, 0.84; agreement, 0.83), seated cable row (consistency, 0.92; agreement, 0.94), TUG (consistency, 0.87; agreement, 0.87), 6-minute walk (consistency, 0.96; agreement, 0.95), and 30-second sit to stand (consistency, 0.85; agreement, 0.80). These tests showed meaningful MDC values, particularly for the 1RM test performed on the machine and the 30-second sit-to-stand test: 45\u00b0 leg press, 22.2 kg (15%); bench press, 4.9 kg (19%); leg extension, 9.2 kg (35%); pec deck, 8.8 kg (44%); wide-grip lateral pull-down, 9.4 kg (31%); leg curl, 9.2 kg (51%); seated cable row, 11.4 kg (29%); TUG, 1.4 seconds (20%); 6-minute walk, 50.9 m (10%); and 30-second sit to stand, 4.6 reps (30%).\nAlthough the muscle strength and physical performance tests demonstrate excellent relative reliability in women older than 40 years, they exhibit low absolute reliability, particularly the 1RM test performed on the machine and the 30-second sit-to-stand test. Therefore, although these tests show good consistency in the positioning of women within the group after repeated measures, their precision measure is relatively low (high fluctuation). Changes in these tests that are smaller than the MDC may not indicate real changes in women at middle age and older.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "40249908",
+      "title": "Without Fail: Muscular Adaptations in Single-Set Resistance Training Performed to Failure or with Repetitions-in-Reserve.",
+      "journal": "Medicine and science in sports and exercise",
+      "year": "2025",
+      "abstract": "This study compared the effects of single-set resistance training performed with maximal effort (failure) versus submaximal effort on muscular adaptations.\nForty-two young, resistance-trained men and women were randomly assigned to one of two parallel groups: a group that trained to failure on all exercises (FAIL) or a submaximal effort group (2-RIR) that trained with two repetitions in reserve for the same exercises. Participants performed a single set of nine exercises targeting all major muscle groups per session, twice weekly for 8 wk. We assessed pre-post study changes in muscle thickness for the biceps brachii, triceps brachii, and quadriceps femoris, along with measures of muscular strength, power, endurance, and ability to estimate RIR in the bench press and squat.\nResults indicated that both FAIL and 2-RIR elicited appreciable gains in most of the assessed outcomes. Several measures of hypertrophy tended to favor FAIL, although absolute differences between conditions were generally modest. Increases in countermovement jump height favored FAIL, but with no clear statistical support for either the null or alternative hypothesis. Increases in strength and local muscular endurance were similar between conditions. Participants demonstrated greater accuracy in estimating RIR for the bench press compared with the squat and improved their accuracy over the intervention, particularly for the bench press.\nThese findings suggest that single-set routines can be a time-efficient strategy for promoting muscular adaptations in resistance-trained individuals, even when transitioning from higher-volume programs. Training to failure in single-set routines may modestly enhance some measures of muscle hypertrophy and power, but not strength or local muscle endurance.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "42119794",
+      "title": "Validity of the individualized load-velocity profile to predict one-repetition maximum on a pneumatic leg press device in adults aged 55-81\u00a0years.",
+      "journal": "Experimental gerontology",
+      "year": "2026",
+      "abstract": "Resistance exercise is the primary strategy to counteract age-related declines in muscle function. Training loads are typically prescribed relative to an individual's one-repetition maximum (1-RM), but direct 1-RM testing is time-consuming and may increase injury risk in older adults. Because movement velocity can predict relative load, this cross-sectional study examined the accuracy of 1-RM estimation from individual load-velocity (L-v) profiles.\nNinety-six participants (60 males, 36 females; 69\u00a0\u00b1\u00a05.8\u00a0years) performed unilateral explosive repetitions on a pneumatic leg press at five submaximal loads to generate individualized L-v equations, followed by single repetitions to determine 1-RM. The group's sex-specific average measured velocity at 1-RM (V1RM; males: 0.17\u00a0\u00b1\u00a00.08\u00a0m\u00b7s-1, females: 0.18\u00a0\u00b1\u00a00.09\u00a0m\u00b7s-1) was defined. A corrected V1RM, which accounted for non-linearity of the L-v relationship near maximal load, was also calculated (males: 0.31\u00a0\u00b1\u00a00.15\u00a0m\u00b7s-1, females: 0.33\u00a0\u00b1\u00a00.12\u00a0m\u00b7s-1). To estimate 1-RM, measured V1RM and corrected V1RM values were input into the individual L-v equations.\nEstimates based on measured V1RM overestimated 1-RM (mean difference\u00a0=\u00a0-7.7\u00a0\u00b1\u00a07.4\u00a0kg; d\u00a0=\u00a01.05) and did not achieve statistical equivalence. Estimates using corrected V1RM more closely matched measured 1-RM (mean difference\u00a0=\u00a0-0.4\u00a0\u00b1\u00a06.8\u00a0kg; d\u00a0=\u00a00.06) and demonstrated statistical equivalence, with the 90% confidence interval contained within predefined equivalence bounds (\u00b17.2\u00a0kg).\nAlthough 1-RM estimates derived from the corrected V1RM showed minimal average bias, interindividual variability persisted across both estimation methods, limiting the accuracy of 1-RM predictions at the individual level.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "42506841",
+      "title": "Technique-Specific Load-Velocity Profiling and Prediction Equation for the Back Squat in Elite Portuguese Rugby Players.",
+      "journal": "Sports (Basel, Switzerland)",
+      "year": "2026",
+      "abstract": "This study examined whether barbell velocity can accurately predict relative load during a free-weight parallel squat performed with a deliberate pause between the eccentric and concentric phases in elite Portuguese rugby players. A repeated-measures design was used, in which 25 athletes completed an incremental loading protocol up to their one-repetition maximum (1-RM) on two occasions separated by four weeks. The relationship between mean propulsive velocity (MPV) and %1-RM was analyzed using polynomial regression, and a second-order prediction equation was developed. The model showed a very strong association between MPV and %1-RM (R2 = 0.95) with a standard error of estimate of 6.27 %1-RM, indicating good practical accuracy. Test-retest analyses demonstrated high stability of the load-velocity relationship (mean velocity difference: -0.01 \u00b1 0.02 m\u00b7s-1). Compared with values reported in other athletic populations, first-division rugby players displayed distinct load-velocity profiles across the full loading spectrum, underscoring the influence of execution technique and population characteristics on load-velocity behavior. These findings support the use of individualized velocity-based prescriptions rather than generalized equations. In conclusion, this study provides a technique- and population-specific prediction equation for the paused parallel back squat, offering a novel and practical tool for regulating training intensity in elite rugby players.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "42297625",
+      "title": "A Comparison of Fixed Percentage of One-Repetition Maximum, Rating of Perceived Exertion, and Last Repetition Velocity-Based Training Load Prescription on Muscular Adaptations in Older Adults.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2026",
+      "abstract": "Hickmott, LM, Bristol, AR, Davidson, CE, Chaudry, A, Ko, J, Butcher, SJ, and Chilibeck, PD. A Comparison of fixed percentage of One-Repetition Maximum, rating of perceived exertion, and last repetition velocity-based training load prescription on muscular adaptations in older adults. J Strength Cond Res XX(X): 000-000, 2026-The purpose of this pilot study was to compare fixed (percentage-based training; PBT), subjectively autoregulated (rating of perceived exertion-based training via repetitions in reserve; RBT), and objectively autoregulated (last repetition velocity-based training via individualized last repetition average concentric velocities; LRVBT) resistance training (RT) load prescription on muscular adaptations in older adults (mean age: \u223c62 years). A total of 18 males and 18 females were randomized into one of the load prescription groups with matching for baseline strength and administered a 12-week RT intervention. Significance was set at p \u2264 0.05. There was a significant group \u00d7 time interaction for four-repetition maximum (4RM) bench press (p = 0.042). Change in 4RM bench press was greater with LRVBT (12.2 \u00b1 4.9 kg) compared to PBT (6.8 \u00b1 4.5 kg), while change for RBT (8.5 \u00b1 4.4 kg) did not differ from the other groups. There was no significant group \u00d7 time interaction for 4RM back squat (p = 0.106); however, all groups significantly increased 4RM back squat from baseline (p < 0.001; PBT: 17.9 \u00b1 10.6 kg; RBT: 22.3 \u00b1 10.4 kg; LRVBT: 28.5 \u00b1 10.9 kg). Change in knee extensor muscle thickness was significantly greater (p = 0.020) in LRVBT (0.71 \u00b1 0.43 cm) than RBT (0.21 \u00b1 0.42 cm). All groups similarly improved functional performance (i.e., 5-times chair sit-to-stand, timed up-and-go, 6-meter fast gait speed, and stair-climb power test). LRVBT may be superior for increasing bench press strength, but not back squat strength, power, and functional performance in older adults.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "42328880",
+      "title": "Velocity-Based Monitoring Lacks Both Accuracy and Applicability for Estimating Repetitions in Reserve During the Hexagonal Bar Deadlift.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2026",
+      "abstract": "Chen, W, Zhang, H, Li, R, Chen, Z, Zheng, J, Zhang, X, and Li, Z. Velocity-based monitoring lacks both accuracy and applicability for estimating repetitions in reserve during the hexagonal bar deadlift. J Strength Cond Res XX(X): 000-000, 2026-This study evaluated the accuracy and applicability of using barbell mean velocity (MV) to predict repetitions in reserve (RIR) in the hexagonal bar deadlift (HBD). After RIR-MV relationship modeling, 19 well-trained males completed 2 randomized sessions consisting of 4 sets to failure at either 65% or 85% of their 1-repetition maximum load. Methodological accuracy and applicability were rigorously defined by 3 concurrent criteria: a median absolute error \u22642 repetitions, and a minimum probability of 75% for both acceptable estimation (absolute error \u22642 repetitions) and the occurrence of expected velocity thresholds (i.e., the probability that the target RIR-specific MV actually manifests). Our results demonstrate that no experimental condition successfully satisfied all 3 criteria. Predictive performance was significantly compromised by load intensity, the RIR-MV relationship model, and the set number. Crucially, the low probability of threshold occurrence across most conditions renders these models functionally obsolete for real-time monitoring. Therefore, despite the prevalence of velocity-based training, the RIR-MV relationship lacks the requisite precision and reliability for monitoring HBD training. Practitioners should exercise caution when applying general or even individual velocity thresholds to HBD.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "42617172",
+      "title": "Comparative Adaptations to Different Leg Extension Set-termination Strategies in Trained Men and Women: A Unilateral Within-Participant Study.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2026",
+      "abstract": "Vasconcelos, T, Ruivo, A, Refalo, MC, Chaves Lucas, G, Vasconcelos, PR, Brito, JP, Vila\u00e7a-Alves, J, and Oliveira, R. Comparative adaptations to different leg extension set-termination strategies in trained men and women: A unilateral within-participant study. J Strength Cond Res XX(X): 000-000, 2026-The purpose of this study was to compare relative adaptations between two set-termination strategies (momentary muscular failure vs. repetitions in reserve) using a unilateral within-participant design under ecologically realistic resistance-training conditions. Nineteen trained subjects (11 men, eight women; mean age: 22.3 \u00b1 3.9 years; body mass: 69.9 \u00b1 10.3 kg) completed an 8-week unilateral intervention. Each subject performed leg extensions, with one limb randomly assigned to the FAIL protocol and the contralateral limb to the repetitions-in-reserve (RIR) protocol. Muscle thickness (ultrasound) of the knee extensors and 1-repetition maximum strength were assessed pre- and postintervention and analyzed using Bayesian linear mixed-effect models. Estimated between-protocol differences for hypertrophy were negligible (knee extensors: -0.019 cm [-0.094 to 0.054]), as were differences for 1-repetition maximum strength (knee extensors: 0.198 kg [-1.87 to 2.6]). Secondary analyses using standardized mean differences also suggested no clear overall advantage for either protocol. These findings suggest that resistance training performed with a 1- to 3-RIR may produce adaptations comparable with training to momentary muscular failure in knee extensors under applied training conditions. Strength and conditioning professionals may therefore consider RIR-based strategies as a practical approach to manage fatigue while maintaining training effectiveness.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "31009432",
+      "title": "Autoregulation by \"Repetitions in Reserve\" Leads to Greater Improvements in Strength Over a 12-Week Training Program Than Fixed Loading.",
+      "journal": "Journal of strength and conditioning research",
+      "year": "2021",
+      "abstract": "",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "33520457",
+      "title": "Effects of subjective and objective autoregulation methods for intensity and volume on enhancing maximal strength during resistance-training interventions: a systematic review.",
+      "journal": "PeerJ",
+      "year": "2021",
+      "abstract": "Maximal strength is a critical determinant of performance in numerous sports. Autoregulation is a resistance training prescription approach to adjust training variables based on the individuals' daily fluctuations in performance, which are a result of training-induced fitness and fatigue, together with readiness from daily non-training stressors.\nThis review aimed to summarise the effects of different subjective and objective autoregulation methods for intensity and volume on enhancing maximal strength.\nA comprehensive literature search was conducted through SPORTDiscus, PubMed and Google Scholar. Studies had to meet the following criteria to be included in the review: (1) estimation of 1-RM or a 1-RM test for both pre-test and post-test to measure progression in strength assessment during the training intervention, (2) a training comparison group, (3) participants were healthy, (4) the article had a detailed description of training intensity, training volume, and training frequency during the training intervention, (5) the training intervention lasted for more than four weeks, (6) studies with objective autoregulation methods utilised a validated measuring tool to monitor velocity, (7) English-language studies.\nFourteen studies met the inclusion criteria, comprising 30 training groups and 356 participants. Effect size and percentage differences were calculated for 13 out of 14 studies to compare the effects of different training interventions. All autoregulation training protocols resulted in an increase in 1-RM, from small ES to large ES.\nOverall, our findings suggest that using both subjective autoregulation methods for intensity, such as repetitions in reserve rating of perceived exertion and flexible daily undulation periodisation, together with objective autoregulation methods for autoregulation intensity and volume, such as velocity targets and velocity loss, could be effective methods for enhancing maximal strength. It is speculated that this is because the implementation of autoregulation into a periodised plan may take into account the athletes' daily fluctuations, such as fluctuations in fitness, fatigue, and readiness to train. When training with a validated measuring tool to monitor velocity, this may provide objective augmented intra- and interset feedback during the resistance exercise who could be beneficial for increasing maximal strength. Coaches, practitioners, and athletes are encouraged to implement such autoregulation methods into a periodised plan when the goal is to enhance maximal strength.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "32813181",
+      "title": "Autoregulation in Resistance Training: Addressing the Inconsistencies.",
+      "journal": "Sports medicine (Auckland, N.Z.)",
+      "year": "2020",
+      "abstract": "Autoregulation is a process that is used to manipulate training based primarily on the measurement of an individual's performance or their perceived capability to perform. Despite being established as a training framework since the 1940s, there has been limited systematic research investigating its broad utility. Instead, researchers have focused on disparate practices that can be considered specific examples of the broader autoregulation training framework. A primary limitation of previous research includes inconsistent use of key terminology (e.g., adaptation, readiness, fatigue, and response) and associated ambiguity of how to implement different autoregulation strategies. Crucially, this ambiguity in terminology and failure to provide a holistic overview of autoregulation limits the synthesis of existing research findings and their dissemination to practitioners working in both performance and health contexts. Therefore, the purpose of the current review was threefold: first, we provide a broad overview of various autoregulation strategies and their development in both research and practice whilst highlighting the inconsistencies in definitions and terminology that currently exist. Second, we present an overarching conceptual framework that can be used to generate operational definitions and contextualise autoregulation within broader training theory. Finally, we show how previous definitions of autoregulation fit within the proposed framework and provide specific examples of how common practices may be viewed, highlighting their individual subtleties.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "25601394",
+      "title": "Effect of repetition duration during resistance training on muscle hypertrophy: a systematic review and meta-analysis.",
+      "journal": "Sports medicine (Auckland, N.Z.)",
+      "year": "2015",
+      "abstract": "Maximizing the hypertrophic response to resistance training (RT) is thought to be best achieved by proper manipulation of exercise program variables including exercise selection, exercise order, length of rest intervals, intensity of maximal load, and training volume. An often overlooked variable that also may impact muscle growth is repetition duration. Duration amounts to the sum total of the concentric, eccentric, and isometric components of a repetition, and is predicated on the tempo at which the repetition is performed.\nWe conducted a systematic review and meta-analysis to determine whether alterations in repetition duration can amplify the hypertrophic response to RT.\nStudies were deemed eligible for inclusion if they met the following criteria: (1) were an experimental trial published in an English-language refereed journal; (2) directly compared different training tempos in dynamic exercise using both concentric and eccentric repetitions; (3) measured morphologic changes via biopsy, imaging, and/or densitometry; (4) had a minimum duration of 6 weeks; (5) carried out training to muscle failure, defined as the inability to complete another concentric repetition while maintaining proper form; and (6) used human subjects who did not have a chronic disease or injury. A total of eight studies were identified that investigated repetition duration in accordance with the criteria outlined.\nResults indicate that hypertrophic outcomes are similar when training with repetition durations ranging from 0.5 to 8 s.\nFrom a practical standpoint it would seem that a fairly wide range of repetition durations can be employed if the primary goal is to maximize muscle growth. Findings suggest that training at volitionally very slow durations (>10s per repetition) is inferior from a hypertrophy standpoint, although a lack of controlled studies on the topic makes it difficult to draw definitive conclusions.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "27174923",
+      "title": "Neither load nor systemic hormones determine resistance training-mediated hypertrophy or strength gains in resistance-trained young men.",
+      "journal": "Journal of applied physiology (Bethesda, Md. : 1985)",
+      "year": "2016",
+      "abstract": "We reported, using a unilateral resistance training (RT) model, that training with high or low loads (mass per repetition) resulted in similar muscle hypertrophy and strength improvements in RT-na\u00efve subjects. Here we aimed to determine whether the same was true in men with previous RT experience using a whole-body RT program and whether postexercise systemic hormone concentrations were related to changes in hypertrophy and strength. Forty-nine resistance-trained men (23 \u00b1 1 yr, mean \u00b1 SE) performed 12 wk of whole-body RT. Subjects were randomly allocated into a higher-repetition (HR) group who lifted loads of \u223c30-50% of their maximal strength (1RM) for 20-25 repetitions/set (n = 24) or a lower-repetition (LR) group (\u223c75-90% 1RM, 8-12 repetitions/set, n = 25), with all sets being performed to volitional failure. Skeletal muscle biopsies, strength testing, dual-energy X-ray absorptiometry scans, and acute changes in systemic hormone concentrations were examined pretraining and posttraining. In response to RT, 1RM strength increased for all exercises in both groups (P < 0.01), with only the change in bench press being significantly different between groups (HR, 9 \u00b1 1, vs. LR, 14 \u00b1 1 kg, P = 0.012). Fat- and bone-free (lean) body mass and type I and type II muscle fiber cross-sectional area increased following training (P < 0.01) with no significant differences between groups. No significant correlations between the acute postexercise rise in any purported anabolic hormone and the change in strength or hypertrophy were found. In congruence with our previous work, acute postexercise systemic hormonal rises are not related to or in any way indicative of RT-mediated gains in muscle mass or strength. Our data show that in resistance-trained individuals, load, when exercises are performed to volitional failure, does not dictate hypertrophy or, for the most part, strength gains.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "30153194",
+      "title": "Resistance Training Volume Enhances Muscle Hypertrophy but Not Strength in Trained Men.",
+      "journal": "Medicine and science in sports and exercise",
+      "year": "2019",
+      "abstract": "The purpose of this study was to evaluate muscular adaptations between low-, moderate-, and high-volume resistance training protocols in resistance-trained men.\nThirty-four healthy resistance-trained men were randomly assigned to one of three experimental groups: a low-volume group performing one set per exercise per training session (n = 11), a moderate-volume group performing three sets per exercise per training session (n = 12), or a high-volume group performing five sets per exercise per training session (n = 11). Training for all routines consisted of three weekly sessions performed on nonconsecutive days for 8 wk. Muscular strength was evaluated with one repetition maximum (RM) testing for the squat and bench press. Upper-body muscle endurance was evaluated using 50% of subjects bench press 1RM performed to momentary failure. Muscle hypertrophy was evaluated using B-mode ultrasonography for the elbow flexors, elbow extensors, mid-thigh, and lateral thigh.\nResults showed significant preintervention to postintervention increases in strength and endurance in all groups, with no significant between-group differences. Alternatively, while all groups increased muscle size in most of the measured sites from preintervention to postintervention, significant increases favoring the higher-volume conditions were seen for the elbow flexors, mid-thigh, and lateral thigh.\nMarked increases in strength and endurance can be attained by resistance-trained individuals with just three 13-min weekly sessions over an 8-wk period, and these gains are similar to that achieved with a substantially greater time commitment. Alternatively, muscle hypertrophy follows a dose-response relationship, with increasingly greater gains achieved with higher training volumes.",
+      "verification_depth": "PubMed abstract"
+    },
+    {
+      "pmid": "37792272",
+      "title": "Maximal Number of Repetitions at Percentages of the One Repetition Maximum: A Meta-Regression and Moderator Analysis of Sex, Age, Training Status, and Exercise.",
+      "journal": "Sports medicine (Auckland, N.Z.)",
+      "year": "2024",
+      "abstract": "The maximal number of repetitions that can be completed at various percentages of the one repetition maximum (1RM) [REPS\u2009~\u2009%1RM relationship] is foundational knowledge in resistance exercise programming. The current REPS\u2009~\u2009%1RM relationship is based on few studies and has not incorporated uncertainty into estimations or accounted for between-individuals variation. Therefore, we conducted a meta-regression to estimate the mean and between-individuals standard deviation of the number of repetitions that can be completed at various percentages of 1RM. We also explored if the REPS\u2009~\u2009%1RM relationship is moderated by sex, age, training status, and/or exercise. A total of 952 repetitions-to-failure tests, completed by 7289 individuals in 452 groups from 269 studies, were identified. Study groups were predominantly male (66%), healthy (97%),\u2009<\u200959\u00a0years of age (92%), and resistance trained (60%). The bench press (42%) and leg press (14%) were the most commonly studied exercises. The REPS\u2009~\u2009%1RM relationship for mean repetitions and standard deviation of repetitions were best described using natural cubic splines and a linear model, respectively, with mean and standard deviation for repetitions decreasing with increasing %1RM. More repetitions were evident in the leg press than bench press across the loading spectrum, thus separate REPS\u2009~\u2009%1RM tables were developed for these two exercises. Analysis of moderators suggested little influences of sex, age, or training status on the REPS\u2009~\u2009%1RM relationship, thus the general main model REPS\u2009~\u2009%1RM table can be applied to all individuals and to all exercises other than the bench press and leg press. More data are needed to develop REPS\u2009~\u2009%1RM tables for other exercises.",
+      "verification_depth": "PubMed abstract"
+    }
+  ],
+  "crossref": [
+    {
+      "doi": "10.1519/JSC.0000000000002776",
+      "title": "Total Number of Sets as a Training Volume Quantification Method for Muscle Hypertrophy: A Systematic Review",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2021,
+            3
+          ]
+        ]
+      },
+      "publisher": "Ovid Technologies (Wolters Kluwer Health)",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.1007/s40279-021-01559-x",
+      "title": "Accuracy in Predicting Repetitions to Task Failure in Resistance Exercise: A Scoping Review and Exploratory Meta-analysis",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2022,
+            2
+          ]
+        ]
+      },
+      "publisher": "Springer Science and Business Media LLC",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.1519/JSC.0000000000003779",
+      "title": "Estimating Repetitions in Reserve for Resistance Exercise",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2020,
+            8,
+            31
+          ]
+        ]
+      },
+      "publisher": "Ovid Technologies (Wolters Kluwer Health)",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.1519/JSC.0000000000001683",
+      "title": "Accuracy in Estimating Repetitions to Failure During Resistance Exercise",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2017,
+            8
+          ]
+        ]
+      },
+      "publisher": "Ovid Technologies (Wolters Kluwer Health)",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.3389/fpsyg.2020.565416",
+      "title": "\u201cJust One More Rep!\u201d \u2013 Ability to Predict Proximity to Task Failure in Resistance Trained Persons",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2020,
+            12,
+            23
+          ]
+        ]
+      },
+      "publisher": "Frontiers Media SA",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.1519/JSC.0b013e31820c8587",
+      "title": "Kinetic Analysis of Several Variations of Push-Ups",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2011,
+            10
+          ]
+        ]
+      },
+      "publisher": "Ovid Technologies (Wolters Kluwer Health)",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.1519/JSC.0b013e3181bde2cf",
+      "title": "The Effect of Position on the Percentage of Body Mass Supported During Traditional and Modified Push-up Variants",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2011,
+            2
+          ]
+        ]
+      },
+      "publisher": "Ovid Technologies (Wolters Kluwer Health)",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.1007/s40279-020-01330-8",
+      "title": "Autoregulation in Resistance Training: Addressing the Inconsistencies",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2020,
+            11
+          ]
+        ]
+      },
+      "publisher": "Springer Science and Business Media LLC",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.1101/2025.09.22.25336351",
+      "title": "Investigating the impact of less than or greater than 60 seconds of inter-set rest on muscle hypertrophy and strength increases in males with &gt;1 year of resistance training experience: systematic review with meta-analysis",
+      "type": "posted-content",
+      "published": null,
+      "publisher": "openRxiv",
+      "verification_depth": "Crossref metadata"
+    },
+    {
+      "doi": "10.3390/jfmk11010080",
+      "title": "Effects of Advanced Resistance Training Systems on Muscle Hypertrophy and Strength in Recreationally Trained Adults: A Systematic Review and Meta-Analysis",
+      "type": "journal-article",
+      "published": {
+        "date-parts": [
+          [
+            2026,
+            2,
+            16
+          ]
+        ]
+      },
+      "publisher": "MDPI AG",
+      "verification_depth": "Crossref metadata"
+    }
+  ],
+  "errors": []
+}

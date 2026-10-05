@@ -1,25 +1,47 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
+import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
+import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
+import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
+import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
 import SessionScreen from '../../src/screens/SessionScreen';
+import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
+import { restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
 let mockState;
 
-jest.mock('@ak/inference', () => ({
-  JOINTS: ['shoulder', 'knee'],
-  nextUp: jest.fn((runner) => {
-    const current = runner.slots[runner.slotIndex];
-    if (current === undefined) return null;
-    const completed = runner.slotSetCounts[runner.slotIndex] ?? 0;
-    const nextSetIndex = runner.phase === 'working' ? completed + 2 : completed + 1;
-    if (nextSetIndex <= current.sets) return { slot: current, setIndex: nextSetIndex };
-    const next = runner.slots.find((_, index) => index > runner.slotIndex);
-    return next === undefined ? null : { slot: next, setIndex: 1 };
-  }),
-  targetLoadKg: jest.fn(() => 42.5),
-}));
+jest.mock('@ak/inference', () => {
+  const actual = jest.requireActual('@ak/inference');
+  const actualTierPolicy = jest.requireActual('../../../../packages/inference/src/tierPolicy');
+  return {
+    JOINTS: ['shoulder', 'knee'],
+    nextUp: jest.fn((runner) => {
+      const current = runner.slots[runner.slotIndex];
+      if (current === undefined) return null;
+      const completed = runner.slotSetCounts[runner.slotIndex] ?? 0;
+      const nextSetIndex = runner.phase === 'working' ? completed + 2 : completed + 1;
+      if (nextSetIndex <= current.sets) return { slot: current, setIndex: nextSetIndex };
+      const next = runner.slots.find((_, index) => index > runner.slotIndex);
+      return next === undefined ? null : { slot: next, setIndex: 1 };
+    }),
+    targetLoadKg: actual.targetLoadKg,
+    resolveLoadSelection: actual.resolveLoadSelection,
+    isDifficultyAllowed: actualTierPolicy.isDifficultyAllowed,
+    // W5 effort cues: the screen imports them through the alias; the REAL
+    // copy is what the cues tests must assert against.
+    EFFORT_STOP_GUIDANCE: actual.EFFORT_STOP_GUIDANCE,
+    EFFORT_BREATHING_NOTE: actual.EFFORT_BREATHING_NOTE,
+    effortCue: actual.effortCue,
+    mapRirToRpe: actual.mapRirToRpe,
+    RIR_CHOICES: actual.RIR_CHOICES,
+    RIR_OPTIONS: actual.RIR_OPTIONS,
+  };
+});
+const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
 jest.mock('../../src/state/useStore', () => {
-  const storeFunc = (selector) => selector(mockState);
+  const storeFunc = (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState });
   storeFunc.setState = jest.fn((updates) => {
     Object.assign(mockState, updates);
   });
@@ -27,7 +49,7 @@ jest.mock('../../src/state/useStore', () => {
 
   return {
     palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-    formatTeachingOnlyReason: (reasons) => reasons.length === 0 ? 'Teaching only' : `Teaching only — ${reasons.map((r) => r === 'capability' ? 'build the movement below it first' : r).join('; ')}`,
+    formatTeachingOnlyReason: (verdict) => verdict?.reasons.length === 0 ? 'Teaching only' : `Teaching only — ${(verdict?.reasons ?? []).map((r) => r === 'capability' ? 'build the movement below it first' : r).join('; ')}`,
     useStore: storeFunc,
   };
 });
@@ -35,9 +57,10 @@ jest.mock('../../src/state/useStore', () => {
 const movement = (id, name, overrides = {}) => ({
   movement_id: id, name, pattern: 'push_h', is_compound: true, beginnerOk: true,
   loggingMode: 'reps', required: [], baseName: name, supportedPrefixes: ['Bodyweight'],
-  difficulty: 'Beginner', preference: 0,
+  difficulty: 'Beginner', preference: 0, sportTracking: false, scope: null,
   instructions: 'Plant your feet\nBrace your trunk', cues: 'Push the floor away\nKeep ribs down',
-  videoUrl: 'https://www.youtube.com/watch?v=test', coachingIntent: 'Build a simple, repeatable pressing pattern.', timePolicy: null,
+  media: { assetKey: `movement/test-${id}/demo/v1`, status: 'external_fallback', revision: 1, fallbackUrl: 'https://www.youtube.com/watch?v=test' },
+  targetMuscles: ['chest'], coachingIntent: 'Build a simple, repeatable pressing pattern.', timePolicy: null,
   ...overrides,
 });
 const slot = (id, movementId, reps = 5, overrides = {}) => ({
@@ -58,25 +81,79 @@ const runner = (overrides = {}) => ({
   substitutionOfferedForSessionPlanSlotId: null, haltReason: null, skippedSessionPlanSlotIds: [], updatedAtMs: Date.now(),
   ...overrides,
 });
-const state = (overrides = {}) => ({
-  movements: [movement(1, 'First movement'), movement(2, 'Later movement')],
-  session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },
-  sessionPlan: [slot(1, 1), slot(2, 2, 8)], activeSessionPlanSlotId: 1,
-  profile: { training_age: 'beginner', equipment_inventory: [], session_duration_cap_min: 60 },
-  getMovementAvailabilityVerdicts: () => [],
-  oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
-  startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
-  openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
-  reportNiggle: jest.fn(), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
-  runner: runner(), sessionMode: 'guided',
-  uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
-  bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
-  loadSessionOutcome: jest.fn(() => null),
-  dismissOutcome: jest.fn(function() {
-    mockState.lastEndedSessionId = null;
-  }),
-  ...overrides,
-});
+const state = (overrides = {}) => {
+  const base = {
+    movements: [movement(1, 'First movement'), movement(2, 'Later movement')],
+    session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] },
+    sessionPlan: [slot(1, 1), slot(2, 2, 8)], activeSessionPlanSlotId: 1,
+    profile: { training_age: 'beginner', equipment_inventory: [], session_duration_cap_min: 60 },
+    getMovementAvailabilityVerdicts: undefined,
+    movementAvailabilityRevision: 0, activeSessionAccessContext: 'weight_room', niggles: [],
+    oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
+    startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
+    openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
+    reportNiggle: jest.fn(), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
+    runner: runner(), sessionMode: 'guided',
+    uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
+    bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
+    loadSessionOutcome: jest.fn(() => null),
+    dismissOutcome: jest.fn(function() {
+      mockState.lastEndedSessionId = null;
+    }),
+    ...overrides,
+  };
+  base.getMovementAvailabilityVerdicts = overrides.getMovementAvailabilityVerdicts ?? (() =>
+    base.movements.map((item) => {
+      const effectiveContext = base.activeSessionAccessContext ?? 'weight_room';
+      const tierAllowed = actualIsDifficultyAllowed(
+        base.profile.training_age,
+        item.difficulty,
+        item.beginnerOk,
+        effectiveContext,
+        item.sportTracking,
+      );
+      return {
+        movementId: item.movement_id,
+        state: tierAllowed ? 'available' : 'teaching_only',
+        reasons: tierAllowed ? [] : ['tier'],
+        effectiveContext,
+        capabilitySource: 'not_required',
+        blockingPrerequisiteMovementIds: [],
+        confirmationWouldClear: false,
+        separateAttestationRequired: false,
+      };
+    }));
+  // P2-1 (Opus audit): delegate to the REAL exported resolveLoadSelection.
+  // The test adapter gathers store inputs and selects the highest-set_id
+  // current-session load, but does NOT reimplement precedence, honesty,
+  // advisory, timed, beginner, or bodyweight rules.
+  base.loadPreference = base.loadPreference ?? 'auto';
+  base.loadPreferenceExplicit = base.loadPreferenceExplicit ?? false;
+  base.resolveSlotLoad = jest.fn((input) => {
+    const age = base.profile.training_age;
+    const pref = base.loadPreference;
+    const oneRm = base.oneRepMaxes[input.movementId] ?? null;
+    const history = Object.prototype.hasOwnProperty.call(base.lastLoggedLoads, input.movementId)
+      ? base.lastLoggedLoads[input.movementId]
+      : null;
+    const logged = (base.session?.sets ?? []).filter((s) => s.movement_id === input.movementId);
+    const latestLogged = logged.reduce((latest, candidate) => latest === null || candidate.set_id > latest.set_id ? candidate : latest, null);
+    const currentSessionLoad = latestLogged?.load_kg ?? null;
+    return resolveLoadSelectionSpy({
+      trainingAge: age,
+      preference: pref,
+      bodyweightMode: input.bodyweightMode,
+      targetReps: input.targetReps,
+      targetRpe: input.targetRpe,
+      oneRepMaxKg: oneRm,
+      overrideLoadKg: input.overrideLoadKg,
+      lastLoggedLoadKg: history,
+      currentSessionLoadKg: currentSessionLoad,
+      isFirstSet: logged.length === 0,
+    });
+  });
+  return base;
+};
 
 beforeEach(() => { mockState = state(); });
 
@@ -87,11 +164,13 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
     flexDirection: 'column',
   });
 
+  // Open direct RPE entry to inspect both stepper widths in the phone-width stack
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+
   const usablePhoneWidth = 411 - 40;
   [
-    ['current-reps-stepper', 'Reps', 'Reps 5', '5'],
-    ['current-load-stepper', 'Added kg (0 = bodyweight)', 'Added kg (0 = bodyweight) 0.0', '0.0'],
-    ['current-rpe-stepper', 'Actual RPE', 'Actual RPE 8.0', '8.0'],
+    ['current-reps-stepper', 'Actual reps', 'Actual reps 5', '5'],
+    ['current-rpe-stepper', 'Effort', 'Effort —', '—'],
   ].forEach(([testID, label, accessibilityLabel, expectedValue]) => {
     expect(StyleSheet.flatten(screen.getByTestId(testID).props.style)).toMatchObject({
       flex: 0,
@@ -109,14 +188,25 @@ test('keeps all current-set values visible in a phone-width vertical stack', () 
     expect(decrementStyle.width + valueStyle.minWidth + incrementStyle.width)
       .toBeLessThanOrEqual(usablePhoneWidth);
   });
+
+  // Load is a direct-entry field with ±2.5 adjust controls (four-mode load
+  // selection): label uppercase, adjust buttons at the Stepper's 88pt pads,
+  // and the whole composition fits the phone-width stack.
+  expect(screen.getByTestId('session-load-label').props.children).toBe('ADDED KG (0 = BODYWEIGHT)');
+  const inputStyle = StyleSheet.flatten(screen.getByTestId('session-load-input').props.style);
+  const decStyle = StyleSheet.flatten(screen.getByLabelText('Decrease load by 2.5 kilograms').props.style);
+  const incStyle = StyleSheet.flatten(screen.getByLabelText('Increase load by 2.5 kilograms').props.style);
+  expect(decStyle).toMatchObject({ width: 88, flexShrink: 0 });
+  expect(incStyle).toMatchObject({ width: 88, flexShrink: 0 });
+  expect(decStyle.width + inputStyle.minWidth + incStyle.width).toBeLessThanOrEqual(usablePhoneWidth);
 });
 test('bodyweight load is added weight and never a normal 1RM suggestion', () => {
   mockState = state({ oneRepMaxes: { 1: 100 } });
 
   render(<SessionScreen />);
 
-  expect(screen.getByLabelText('Added kg (0 = bodyweight) 0.0')).toBeOnTheScreen();
-  expect(screen.getByText('0 kg means bodyweight only')).toBeOnTheScreen();
+  expect(screen.getByTestId('session-load-input').props.value).toBe('0.0');
+  expect(screen.getByText('0 kg means bodyweight only. Add weight when you need it.')).toBeOnTheScreen();
 });
 
 test('externally loaded movement keeps its normal load and 1RM suggestion', () => {
@@ -126,12 +216,181 @@ test('externally loaded movement keeps its normal load and 1RM suggestion', () =
       movement(2, 'Later movement'),
     ],
     oneRepMaxes: { 1: 100 },
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
   });
 
   render(<SessionScreen />);
 
-  expect(screen.getByLabelText('Load kg 42.5')).toBeOnTheScreen();
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
   expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+test('seeded external load stays blank and cannot log until explicitly entered', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('');
+  expect(screen.getByText('First time on this one — pick a weight you could lift about ten times.')).toBeOnTheScreen();
+  expect(screen.getByText('Enter a load to log this set.')).toBeOnTheScreen();
+  expect(screen.getByLabelText(/Log set 1 for First movement, unavailable/).props.accessibilityState.disabled).toBe(true);
+});
+
+test('history auto source prefills the exact latest logged load, including source accessibility copy', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 37.5 },
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('37.5');
+  expect(screen.getByLabelText('Load source. Last logged 37.5 kg')).toBeOnTheScreen();
+});
+
+test('APRE auto source prefills the absolute prescription ahead of other evidence', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'advanced', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'auto',
+    oneRepMaxes: { 1: 100 },
+    lastLoggedLoads: { 1: 37.5 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: 55 }), slot(2, 2, 8)],
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('55.0');
+  expect(screen.getByText('Prescribed 55.0 kg')).toBeOnTheScreen();
+});
+
+test('manual first set shows APRE as advice without prefilling authoritative entry', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'advanced', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+    oneRepMaxes: { 1: 100 },
+    lastLoggedLoads: { 1: 37.5 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: 55 }), slot(2, 2, 8)],
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('');
+  expect(screen.getByLabelText('Load source. Coach suggests 55.0 kg — your entry stands.')).toBeOnTheScreen();
+  expect(screen.getByLabelText(/Log set 1 for First movement, unavailable/).props.accessibilityState.disabled).toBe(true);
+});
+
+test('manual bodyweight initializes identity load 0.0 and remains loggable', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('0.0');
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('manual subsequent set carries the latest actual current-session load', () => {
+  const loggedSets = [
+    { set_id: 20, movement_id: 1, movement_name: 'First movement', set_index: 2, reps: 5, load_kg: 47.5, rpe: 8, tonnage_kg: 237.5, session_plan_slot_id: 1, timeS: null, bandLevel: null },
+    { set_id: 10, movement_id: 1, movement_name: 'First movement', set_index: 1, reps: 5, load_kg: 40, rpe: 8, tonnage_kg: 200, session_plan_slot_id: 1, timeS: null, bandLevel: null },
+  ];
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+    session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: loggedSets },
+    runner: runner({ setIndex: 3, slotSetCounts: [2, 0], loggedSets: 2 }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('47.5');
+  expect(screen.getByText('Your call. The number you enter is what gets logged.')).toBeOnTheScreen();
+});
+
+test('timed work cannot derive from 1RM and uses interval-specific seeded copy', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'], loggingMode: 'time' }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [
+      slot(1, 1, 5, { target: { kind: 'time', seconds: 30 } }),
+      slot(2, 2, 8),
+    ],
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('');
+  expect(screen.getByText('First time on this one — choose a load you can control for the full interval.')).toBeOnTheScreen();
+  expect(screen.queryByText(/Based on your 100\.0 kg 1RM/)).toBeNull();
+});
+
+test('invalid draft is distinct from blank, while explicit zero is valid and loggable', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+
+  expect(screen.queryByTestId('session-load-validation')).toBeNull();
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '12kg');
+  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 2.5 kg increments.')).toBeOnTheScreen();
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '0');
+  expect(screen.queryByTestId('session-load-validation')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('athlete-entered load survives a rerender and refreshed history evidence', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  const view = render(<SessionScreen />);
+
+  expect(screen.getByTestId('keyboard-aware-scroll-view')).toBeOnTheScreen();
+  expect(screen.getByTestId('session-load-input').props.keyboardType).toBe('numeric');
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '32.5');
+  mockState.lastLoggedLoads = { 1: 80 };
+  view.rerender(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('32.5');
 });
 
 
@@ -146,7 +405,7 @@ test('guided mode keeps only the current movement expanded and future work unava
 test('untouched actual RPE logs null instead of fabricating target equality', () => {
   render(<SessionScreen />);
 
-  expect(screen.getByText('Unanswered RPE is left out of Coach evidence.')).toBeOnTheScreen();
+  expect(screen.getByText('Effort rating is optional; leave it blank if you are unsure.')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
 
   expect(mockState.logSet).toHaveBeenCalledWith(
@@ -155,28 +414,335 @@ test('untouched actual RPE logs null instead of fabricating target equality', ()
   );
 });
 
-test('explicit confirmation records a genuine exact-target RPE', () => {
-  render(<SessionScreen />);
-
-  fireEvent.press(screen.getByLabelText('Confirm actual RPE 8.0'));
-  expect(screen.getByText('This actual RPE will be used as Coach evidence.')).toBeOnTheScreen();
-  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
-
-  expect(mockState.logSet).toHaveBeenCalledWith(
-    1, 5, 0, 8,
-    undefined, undefined, undefined, undefined, 1,
-  );
-});
-
 test('adjusting actual RPE marks and records the changed answer', () => {
   render(<SessionScreen />);
 
-  fireEvent.press(screen.getByLabelText('Increase Actual RPE'));
-  expect(screen.getByLabelText('Actual RPE 8.5')).toBeOnTheScreen();
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+  fireEvent.press(screen.getByLabelText('Increase Effort'));
+  expect(screen.getAllByLabelText('Effort 8.5')).toHaveLength(2);
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
 
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, 8.5,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('WO-02 labels athlete-reported RPE as Effort with the exact scale explanation while retaining strength-set RIR', () => {
+  render(<SessionScreen />);
+
+  expect(screen.getByText('How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.')).toBeOnTheScreen();
+  expect(screen.getByText('How many more clean reps could you have completed?')).toBeOnTheScreen();
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Effort 8.5' })).toBeOnTheScreen();
+  expect(screen.queryByText('Actual RPE')).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// §7.2 W1 — Unanchored RIR/RPE effort entry contract (Items 1–11)
+// ---------------------------------------------------------------------------
+
+test('§7.2 Item 1: a new rep-based set starts with no actual-effort answer selected (effort unanswered)', () => {
+  render(<SessionScreen />);
+
+  // Post-set clean-reps-remaining question must be visible for rep-based work
+  expect(screen.getByText('How many more clean reps could you have completed?')).toBeOnTheScreen();
+
+  // All 5 RIR choices ('0', '1', '2', '3', '4+') plus 'Not sure' must be present and unselected
+  const choices = [
+    { matcher: /^0 clean reps? left/i },
+    { matcher: /^1 clean reps? left/i },
+    { matcher: /^2 clean reps? left/i },
+    { matcher: /^3 clean reps? left/i },
+    { matcher: /^4\+ clean reps? left/i },
+    { matcher: /not sure/i },
+  ];
+
+  choices.forEach(({ matcher }) => {
+    const chip = screen.getByLabelText(matcher);
+    expect(chip).toBeOnTheScreen();
+    expect(chip.props.accessibilityState?.selected).toBeFalsy();
+  });
+
+  // Target RPE must remain visible as prescription guidance, never preselected as actual RPE
+  expect(screen.getByText(/Target.*RPE 8\.0/)).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/Effort 8\.0/i)).toBeNull();
+});
+
+test('§7.2 Item 2: absence of Confirm target RPE action and target is not preselected', () => {
+  render(<SessionScreen />);
+
+  // Confirm target RPE chip/button and target-copy affordances must be absent
+  expect(screen.queryByText(/Confirm target RPE/i)).toBeNull();
+  expect(screen.queryByLabelText(/Confirm actual RPE/i)).toBeNull();
+  expect(screen.queryByTestId('confirm-target-rpe')).toBeNull();
+});
+
+test('§7.2 Item 3: logging without an answer persists null actual RPE (pre-existing passing)', () => {
+  render(<SessionScreen />);
+
+  // Logging without selecting an RIR or RPE answer must persist null RPE
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 4: selecting Not sure persists null actual RPE', () => {
+  render(<SessionScreen />);
+
+  const notSure = screen.getByLabelText(/not sure/i);
+  fireEvent.press(notSure);
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test.each([
+  ['0', 10.0, /^0 clean reps? left/i],
+  ['1', 9.0, /^1 clean reps? left/i],
+  ['2', 8.0, /^2 clean reps? left/i],
+  ['3', 7.0, /^3 clean reps? left/i],
+  ['4+', 6.0, /^4\+ clean reps? left/i],
+])('§7.2 Item 5: clean-reps-remaining choice %s maps to stored actual RPE %s', (choice, expectedRpe, matcher) => {
+  render(<SessionScreen />);
+
+  const option = screen.getByLabelText(matcher);
+  fireEvent.press(option);
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, expectedRpe,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 6: selecting an RIR answer, rerendering the same set, and logging preserves that selected answer', () => {
+  const { rerender } = render(<SessionScreen />);
+
+  const option = screen.getByLabelText(/^2 clean reps? left/i);
+  fireEvent.press(option);
+
+  // Rerender the screen with same set state
+  rerender(<SessionScreen />);
+
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, 8.0,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 7: advancing to the next set resets actual effort to unanswered', () => {
+  const { rerender } = render(<SessionScreen />);
+
+  // Set 1: athlete explicitly answers RIR '1' (actual RPE 9.0)
+  const option = screen.getByLabelText(/^1 clean reps? left/i);
+  fireEvent.press(option);
+
+  // Advance runner to set 2
+  mockState.runner = runner({
+    setIndex: 2,
+    slotSetCounts: [1, 0],
+    loggedSets: 1,
+  });
+  rerender(<SessionScreen />);
+
+  // Set 2 must start unanswered: choices unselected
+  const rir1 = screen.getByLabelText(/^1 clean reps? left/i);
+  expect(rir1.props.accessibilityState?.selected).toBeFalsy();
+
+  // Logging set 2 without answering persists null
+  fireEvent.press(screen.getByLabelText('Log set 2 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 8: changing the planned target does not silently change a selected actual answer', () => {
+  const { rerender } = render(<SessionScreen />);
+
+  // Athlete explicitly chose RIR '3' (RPE 7.0)
+  const option = screen.getByLabelText(/^3 clean reps? left/i);
+  fireEvent.press(option);
+
+  // Plan target changes from 8.0 to 9.0
+  mockState.sessionPlan = [
+    slot(1, 1, 5, { targetRpe: 9 }),
+    slot(2, 2, 8),
+  ];
+  rerender(<SessionScreen />);
+
+  // Logging must persist the athlete's chosen 7.0, not the new target (9.0)
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, 7.0,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 9: optional direct RPE entry supports half-step boundaries without initializing from target RPE', () => {
+  render(<SessionScreen />);
+
+  // Direct entry must be behind an explicit affordance, not exposed as prefilled primary input
+  const directToggle = screen.getByText(/Enter Effort directly/i);
+  fireEvent.press(directToggle);
+
+  // Opening direct entry must NOT prefill or confirm target RPE (8.0)
+  // Logging without an explicit selection persists null
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('F-01 falsifier 1: direct RPE stepper opens from target-independent state, not planned target', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { targetRpe: 6.5 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+
+  // Must NOT display or pin the prescribed target RPE (6.5)
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+});
+
+test('F-01 falsifier 2: first increment from opened direct-entry stepper does not compute from target RPE', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { targetRpe: 6.5 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+  fireEvent.press(screen.getByLabelText('Increase Effort'));
+
+  // First increment must NOT equal targetRpe + 0.5 (6.5 + 0.5 = 7.0)
+  // Instead, computes from neutral base (8.0 + 0.5 = 8.5)
+  expect(screen.getAllByLabelText('Effort 8.5')).toHaveLength(2);
+
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, 8.5,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('target-derived effort cue is not shown when actual effort is unanswered or Not sure', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { targetRpe: 8.0 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  const rpeCue = screen.getByTestId('rpe-cue');
+
+  // target RPE 8 plus no answer must not display "about two good reps left"
+  expect(rpeCue.props.children).not.toMatch(/about two good reps left/i);
+  expect(rpeCue.props.children).toBe('Effort is optional evidence — leave it untouched to skip.');
+
+  // target RPE 8 plus Not sure must remain neutral
+  fireEvent.press(screen.getByRole('button', { name: 'Not sure' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Effort is optional evidence — leave it untouched to skip.',
+  );
+
+  // null persistence remains intact
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('explicit RIR or direct RPE answer derives cue from safeRpe only, restoring neutral guidance on Not sure', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { targetRpe: 6.5 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  // Before an explicit answer: neutral guidance
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Effort is optional evidence — leave it untouched to skip.',
+  );
+
+  // selecting 2 RIR (safeRpe 8.0) displays the RPE-8 cue
+  fireEvent.press(screen.getByRole('button', { name: '2' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Hard but controlled; about two good reps left.',
+  );
+
+  // direct RPE 8.5 displays its corresponding cue
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Very hard; about one good rep left.',
+  );
+
+  // selecting Not sure restores neutral guidance
+  fireEvent.press(screen.getByRole('button', { name: 'Not sure' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Effort is optional evidence — leave it untouched to skip.',
+  );
+
+  // null persistence remains intact
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+test('§7.2 Item 10: timed/non-rep work does not present an RIR conversion', () => {
+  mockState = state({
+    sessionPlan: [
+      slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7.5 }),
+      slot(2, 2, 8),
+    ],
+  });
+  render(<SessionScreen />);
+
+  // Non-rep / timed target must NOT show the clean reps remaining RIR question or choices
+  expect(screen.queryByText('How many more clean reps could you have completed?')).toBeNull();
+  expect(screen.queryByLabelText(/clean reps? left/i)).toBeNull();
+
+  // Target confirmation must be absent on timed work as well
+  expect(screen.queryByText(/Confirm target RPE/i)).toBeNull();
+  expect(screen.queryByLabelText(/Confirm actual RPE/i)).toBeNull();
+});
+
+test('§7.2 Item 11: existing bodyweight actual-reps behavior remains unchanged (invariant check)', () => {
+  render(<SessionScreen />);
+
+  // Initial draft comes from the planned target (5)
+  expect(screen.getByLabelText('Actual reps 5')).toBeOnTheScreen();
+
+  // Increment to 8 and log
+  for (let i = 0; i < 3; i += 1) fireEvent.press(screen.getByLabelText('Increase Actual reps'));
+  expect(screen.getByLabelText('Actual reps 8')).toBeOnTheScreen();
+
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 8, 0, null,
     undefined, undefined, undefined, undefined, 1,
   );
 });
@@ -303,6 +869,107 @@ test('a beginner never renders a legacy plan containing an advanced movement', (
   );
 });
 
+test('an intermediate athlete never renders a plan containing an advanced movement', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [movement(1, 'First movement'), movement(2, 'Advanced movement', { difficulty: 'Advanced', beginnerOk: false })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
+  expect(screen.queryByText('Advanced movement')).toBeNull();
+});
+
+test('an active session with no frozen access context fails closed', () => {
+  mockState = state({ activeSessionAccessContext: null });
+  render(<SessionScreen />);
+  expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
+  expect(screen.queryByText('First movement')).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// W5 — actual reps and plain-language effort cues (WO §2.7)
+// ---------------------------------------------------------------------------
+
+test('bodyweight actual reps initialize from the plan, edit, and reach logSet unchanged (PQ-12)', () => {
+  render(<SessionScreen />);
+  // Initial draft comes from the planned target (5), shown with the honest
+  // planned-vs-actual cue.
+  expect(screen.getByTestId('actual-reps-cue')).toHaveTextContent(
+    'Target: 5 reps. Log the reps you actually completed.',
+  );
+  expect(screen.queryByText(/Planned target/)).toBeNull();
+  expect(screen.queryByText(/the plan stays unchanged/)).toBeNull();
+  expect(screen.getByLabelText('Actual reps 5')).toBeOnTheScreen();
+
+  // The athlete did 12, not the planned 5: increment 7 times and log.
+  for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Increase Actual reps'));
+  expect(screen.getByLabelText('Actual reps 12')).toBeOnTheScreen();
+
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement$/));
+  // The stored set carries the ATHLETE-ENTERED number (12), the bodyweight
+  // identity load (0), and null RPE — the planned target in the plan row is
+  // untouched (it only exists in the slot, not the set).
+  expect(mockState.logSet).toHaveBeenCalledWith(1, 12, 0, null, undefined, undefined, undefined, undefined, 1);
+});
+
+test.each(['planned', 'substituted', 'day_swapped', 'added', 'free_form'])(
+  'the reps cue is provenance-neutral for a %s slot',
+  (provenanceKind) => {
+    mockState = state({
+      sessionPlan: [slot(1, 1, 7, { provenanceKind })],
+      runner: runner({
+        slots: [{ sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 3, target: { kind: 'reps', reps: 7 }, targetRpe: 8 }],
+        slotSetCounts: [0],
+      }),
+    });
+    render(<SessionScreen />);
+
+    expect(screen.getByTestId('actual-reps-cue')).toHaveTextContent(
+      'Target: 7 reps. Log the reps you actually completed.',
+    );
+    expect(screen.queryByText(/Planned target/)).toBeNull();
+    expect(screen.queryByText(/the plan stays unchanged/)).toBeNull();
+  },
+);
+
+test('actual-reps draft survives a rerender until the set is logged (PQ-12)', () => {
+  const { rerender } = render(<SessionScreen />);
+  for (let i = 0; i < 3; i += 1) fireEvent.press(screen.getByLabelText('Increase Actual reps'));
+  expect(screen.getByLabelText('Actual reps 8')).toBeOnTheScreen();
+  rerender(<SessionScreen />);
+  // Same slot, no set logged: the athlete's edit must not reset to the plan.
+  expect(screen.getByLabelText('Actual reps 8')).toBeOnTheScreen();
+});
+
+test('untouched RPE stays null and shows its plain-language cue (PQ-13)', () => {
+  render(<SessionScreen />);
+  expect(screen.getByLabelText(/Log set 1 for First movement$/)).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement$/));
+  const [movementId, , , rpe] = mockState.logSet.mock.calls[0];
+  expect(movementId).toBe(1);
+  expect(rpe).toBeNull();
+  // Cue is informational text, not a second score or an input.
+  expect(screen.getByTestId('rpe-cue')).toBeOnTheScreen();
+});
+
+test('effort cues render plain-language anchors with stop guidance and no biometric claim', () => {
+  mockState.profile = { ...mockState.profile, training_age: 'beginner' };
+  render(<SessionScreen />);
+  // Unanswered set shows neutral guidance, not target-derived cue
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Effort is optional evidence — leave it untouched to skip.',
+  );
+  // Selecting an answer renders the plain-language cue derived from safeRpe
+  fireEvent.press(screen.getByRole('button', { name: '2' }));
+  expect(screen.getByTestId('rpe-cue').props.children).toBe(
+    'Hard but controlled; about two good reps left.',
+  );
+  expect(screen.getByTestId('effort-stop-guidance').props.children).toBe(
+    'Pain, dizziness, or losing control of the movement: stop the set. Pain is not effort — never trade form for the number.',
+  );
+  expect(screen.getByText(/vary by exercise and fitness/)).toBeOnTheScreen();
+});
+
 test('a triage halt on a live runner persists safety before ending the session', () => {
   mockState = state({
     lastTriage: {
@@ -317,6 +984,45 @@ test('a triage halt on a live runner persists safety before ending the session',
   expect(mockState.runnerHalt.mock.invocationCallOrder[0]).toBeLessThan(
     mockState.endSession.mock.invocationCallOrder[0],
   );
+});
+
+test.each([
+  ['manual', 'You chose to stop this session.', null],
+  ['niggle', 'You reported that something felt off, so this session is paused.', null],
+  ['pain', 'You reported pain, so this session is paused.', null],
+  ['safety', 'Stop and reassess this symptom.', 'Stop and reassess this symptom.'],
+])('halt reason %s renders athlete-facing copy and never the raw token', (haltReason, expected, coachingCue) => {
+  mockState = state({
+    runner: runner({ phase: 'halted', haltReason }),
+    lastTriage: coachingCue === null ? null : {
+      kind: 'matched',
+      directive: { halt: true, vector: { coaching_cue: coachingCue } },
+    },
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText(expected)).toBeOnTheScreen();
+  expect(screen.queryByText(new RegExp(`^${haltReason}$`, 'i'))).toBeNull();
+});
+
+test.each([
+  ['safety without a cue', 'safety', '   '],
+  ['an absent halt reason', null, 'A cue must not override an absent reason.'],
+  ['an unknown halt reason', 'unexpected', 'A cue must not override an unknown reason.'],
+])('%s fails closed to the generic safety message', (_caseName, haltReason, coachingCue) => {
+  mockState = state({
+    runner: runner({ phase: 'halted', haltReason }),
+    lastTriage: {
+      kind: 'matched',
+      directive: { halt: true, vector: { coaching_cue: coachingCue } },
+    },
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText('A safety concern paused this session.')).toBeOnTheScreen();
+  if (typeof haltReason === 'string') {
+    expect(screen.queryByText(new RegExp(`^${haltReason}$`, 'i'))).toBeNull();
+  }
 });
 
 test('a completed runner takes precedence over a later triage halt', () => {
@@ -471,7 +1177,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 
   const beginnerOutcomes = [
     { kind: 'followed_plan', expected: "You followed today's plan. Recover well." },
-    { kind: 'adapted_session', expected: "You adjusted the session and kept the work appropriate." },
+    { kind: 'adapted_session', expected: "Session adjusted." },
     { kind: 'stopped_safely', expected: "Stopping was the right call. Recovery is part of the plan." },
     { kind: 'session_recorded', expected: "Your session is saved. Continue from here next time." },
   ];
@@ -490,7 +1196,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 
     const { unmount } = render(<SessionScreen />);
     expect(screen.getByText(expected)).toBeOnTheScreen();
-    expect(screen.getByText('Session saved · Tuesday 21 July')).toBeOnTheScreen();
+    expect(screen.getByText('Session saved · Tuesday 21 July 2026')).toBeOnTheScreen();
     unmount();
   }
 
@@ -498,7 +1204,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
   const nonBeginnerOutcomes = [
     { kind: 'followed_plan', expected: "Plan followed." },
     { kind: 'adapted_session', expected: "Session adapted." },
-    { kind: 'stopped_safely', expected: "Session stopped safely." },
+    { kind: 'stopped_safely', expected: "Session stopped." },
     { kind: 'session_recorded', expected: "Session recorded." },
   ];
 
@@ -532,8 +1238,433 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
   expect(screen.getByText('Session saved')).toBeOnTheScreen();
   
   // Test dismissing the outcome screen (S2)
-  expect(screen.getByLabelText("Back to Ready")).toBeOnTheScreen();
-  fireEvent.press(screen.getByLabelText("Back to Ready"));
+  expect(screen.getByLabelText("Back to Today")).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText("Back to Today"));
   expect(mockState.dismissOutcome).toHaveBeenCalled();
   unmount();
 });
+
+// --- P1-2: grid/range validation tests ---------------------------------------
+test('off-grid load 1 shows validation, disables Log set, and never calls logSet', () => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '1');
+  expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Log set 1 for First movement, unavailable — enter a load first')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test('off-grid load 61 shows validation and never calls logSet', () => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '61');
+  expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test('out-of-range load 500.1 is rejected rather than becoming 500', () => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '500.1');
+  expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['0', 0],
+  ['0.0', 0],
+  ['2.5', 2.5],
+  ['2,5', 2.5],
+  ['60', 60],
+  ['500', 500],
+])('valid grid value %s is loggable and reaches logSet unchanged', (value, expected) => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), value);
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, expected, null, undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+// --- Sol P2-02: direct-entry syntax boundary matrix ---------------------------
+test.each(['-2.5', '-0', '0x1F', 'NaN', 'Infinity', '1e2', '2.5.5'])(
+  'non-decimal draft %s shows validation, retains the draft, and never calls logSet',
+  (raw) => {
+    render(<SessionScreen />);
+    fireEvent.changeText(screen.getByTestId('session-load-input'), raw);
+    expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-load-input').props.value).toBe(raw);
+    expect(screen.getByLabelText('Log set 1 for First movement, unavailable — enter a load first')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+    expect(mockState.logSet).not.toHaveBeenCalled();
+  },
+);
+
+// --- Sol P2-01 falsifier: the adapter passes the persisted preference through -
+test('beginner fixture with persisted manual preference reaches the real resolver unnormalized', () => {
+  const fixture = () => state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+  });
+  mockState = fixture();
+  mockState.loadPreference = 'manual';
+  mockState.loadPreferenceExplicit = true;
+  const first = render(<SessionScreen />);
+  const manualInputs = resolveLoadSelectionSpy.mock.calls.map(([input]) => input);
+  expect(manualInputs.length).toBeGreaterThan(0);
+  expect(manualInputs.every((i) => i.trainingAge === 'beginner' && i.preference === 'manual')).toBe(true);
+  const manualValue = screen.getByTestId('session-load-input').props.value;
+  const manualSource = screen.getByTestId('session-load-source-line').props.children;
+  first.unmount();
+  const priorCallCount = resolveLoadSelectionSpy.mock.calls.length;
+  mockState = fixture();
+  render(<SessionScreen />);
+  const autoInputs = resolveLoadSelectionSpy.mock.calls.slice(priorCallCount).map(([input]) => input);
+  expect(autoInputs.length).toBeGreaterThan(0);
+  expect(autoInputs.every((i) => i.preference === 'auto')).toBe(true);
+  // Beginner authority lives in the resolver: identical output either way.
+  expect(screen.getByTestId('session-load-input').props.value).toBe(manualValue);
+  expect(screen.getByTestId('session-load-source-line').props.children).toBe(manualSource);
+});
+
+// --- P2-2: unknown implement fails toward blank ------------------------------
+test('unknown implement (empty supportedPrefixes) is treated as external load', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: [] }),
+      movement(2, 'Later movement'),
+    ],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-label').props.children).toBe('LOAD KG');
+  expect(screen.getByTestId('session-load-input').props.value).toBe('');
+  expect(screen.getByLabelText('Log set 1 for First movement, unavailable — enter a load first')).toBeOnTheScreen();
+});
+
+// --- P2-4: stable target RPE for provenance ----------------------------------
+test('nullable target RPE uses the same fallback for display and initialization', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { targetRpe: null })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+  const initialResolverInputs = resolveLoadSelectionSpy.mock.calls.map(([input]) => input);
+  expect(initialResolverInputs.length).toBeGreaterThanOrEqual(2);
+  expect(initialResolverInputs.every((input) => input.targetRpe === 8)).toBe(true);
+  expect(new Set(initialResolverInputs.map((input) => JSON.stringify(input))).size).toBe(1);
+
+  const sourceBefore = screen.getByTestId('session-load-source-line').props.children;
+  const draftBefore = screen.getByTestId('session-load-input').props.value;
+  fireEvent.press(screen.getByText(/Enter Effort directly/i));
+  fireEvent.press(screen.getByLabelText('Increase Effort'));
+  expect(screen.getByTestId('session-load-source-line').props.children).toBe(sourceBefore);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(draftBefore);
+  expect(resolveLoadSelectionSpy.mock.calls.every(([input]) => input.targetRpe === 8)).toBe(true);
+});
+
+// --- P2-1: invalid APRE regression via real resolver -------------------------
+test('negative APRE override falls through exactly as production does', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: -5 })],
+  });
+  render(<SessionScreen />);
+  // Invalid APRE falls through to 1RM derivation (real resolver behavior)
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+test('NaN APRE override falls through to 1RM derivation', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: NaN })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+test('infinite APRE override falls through to 1RM derivation', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: Infinity })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+  expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
+});
+
+// --- D1-A: bodyweight 1RM carve-out ------------------------------------------
+test('D1-A: bodyweight + 1RM only in auto mode does not derive (seeded identity zero)', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    oneRepMaxes: { 1: 100 },
+  });
+  render(<SessionScreen />);
+  // Bodyweight movement with 1RM: must NOT derive — identity zero
+  expect(screen.getByTestId('session-load-input').props.value).toBe('0.0');
+  expect(screen.getByText('0 kg means bodyweight only. Add weight when you need it.')).toBeOnTheScreen();
+});
+
+test('D1-A: bodyweight + valid APRE in auto mode derives (absolute prescription)', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    oneRepMaxes: { 1: 100 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: 10 })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('10.0');
+  expect(screen.getByText('Prescribed 10.0 kg added load')).toBeOnTheScreen();
+});
+
+// --- P1-1: a mid-session niggle must not blank the whole active session ------
+// Counterexample from the movement-access audit. The session-wide early
+// blocker used to fire on ANY non-available verdict, so the moment an
+// intermediate athlete reported a knee niggle at their triage minimum the
+// squat slot went safety-excluded and the entire session was replaced by the
+// tier-review screen — destroying the substitution sheet that the same report
+// had just opened. The blocker is tier-only now; safety stays a per-slot gate.
+//
+// Fixtures are deliberately narrow so only the safety law can move: no
+// required equipment, no capability edges, no attestations, no prior
+// experience. Tier is satisfied for every movement at the intermediate ceiling.
+const realVerdictsFor = (context) => {
+  const { movements, profile, niggles } = mockState;
+  const triageMin = EXPERIENCE_SEVERITY[profile.training_age].triageMin;
+  const injured = new Set(
+    (niggles ?? [])
+      .filter((niggle) => niggle.severity >= triageMin)
+      .map((niggle) => niggle.region.trim().toLowerCase())
+      .filter((region) => ACTUAL_JOINTS.includes(region)),
+  );
+  const safetyExcludedMovementIds = new Set(
+    movements
+      .filter((item) => (PATTERN_JOINTS[item.pattern] ?? []).some((joint) => injured.has(joint)))
+      .map((item) => item.movement_id),
+  );
+  return actualResolveMovementAvailability({
+    movements: movements.map((item) => ({
+      movementId: item.movement_id,
+      difficulty: item.difficulty,
+      beginnerOk: item.beginnerOk,
+      sportTracking: item.sportTracking,
+      requiredEquipment: item.required,
+    })),
+    edges: [],
+    evidence: [],
+    attestedEdgeKeys: new Set(),
+    priorExperienceMovementIds: new Set(),
+    trainingAge: profile.training_age,
+    accessContext: context,
+    equipment: new Set(profile.equipment_inventory),
+    safetyExcludedMovementIds,
+  });
+};
+
+const niggleCounterexampleState = () => state({
+  profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  movements: [
+    movement(1, 'Front Squat', { pattern: 'squat', difficulty: 'Intermediate', beginnerOk: false }),
+    movement(2, 'Later movement'),
+    movement(3, 'Goblet Squat', { pattern: 'squat', difficulty: 'Beginner' }),
+    movement(4, 'Hip Thrust', { pattern: 'hinge', difficulty: 'Beginner' }),
+  ],
+  runner: runner({
+    slots: [
+      { sessionPlanSlotId: 1, movementId: 1, movementName: 'Front Squat', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+      { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+    ],
+  }),
+  getMovementAvailabilityVerdicts: realVerdictsFor,
+});
+
+test('a non-halting knee niggle keeps the session and opens substitution instead of blanking it', () => {
+  mockState = niggleCounterexampleState();
+  const view = render(<SessionScreen />);
+
+  // Baseline: nothing is blocked before the report.
+  expect(screen.getByText('Front Squat')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Log set 1 for Front Squat')).toBeOnTheScreen();
+
+  // Report knee discomfort at the intermediate triage minimum (default 4).
+  fireEvent.press(screen.getByLabelText('Report discomfort'));
+  fireEvent.press(screen.getByLabelText('knee'));
+  expect(EXPERIENCE_SEVERITY.intermediate.triageMin).toBe(4);
+  fireEvent.press(screen.getByLabelText('Save discomfort report'));
+  expect(mockState.reportNiggle).toHaveBeenCalledWith('knee', 4);
+
+  // What the store does next: records the niggle (below the intermediate halt
+  // minimum of 8) and opens the substitution sheet for the current movement.
+  mockState.niggles = [{ region: 'knee', severity: 4 }];
+  mockState.substitution = {
+    targetId: 1,
+    result: {
+      haltAdvised: false,
+      layer1Regression: {
+        options: [
+          { movement_id: 3, name: 'Goblet Squat', rationale: 'Same pattern, lighter load.' },
+          { movement_id: 4, name: 'Hip Thrust', rationale: 'Loads the hip without the knee.' },
+        ],
+      },
+      layer2DaySwap: { options: [] },
+    },
+  };
+  view.rerender(<SessionScreen />);
+
+  // The session is still there and the substitution sheet rendered.
+  expect(screen.queryByText('This plan needs Coach review.')).toBeNull();
+  expect(screen.queryByLabelText('Finish the blocked session')).toBeNull();
+  expect(screen.getByText('Front Squat')).toBeOnTheScreen();
+  expect(screen.getByText('0 of 2 exercises complete')).toBeOnTheScreen();
+  expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+
+  // The unsafe movement is still blocked from execution.
+  const logSetButton = screen.getByLabelText(/^Log set 1 for Front Squat, unavailable — Teaching only/);
+  expect(logSetButton.props.accessibilityState.disabled).toBe(true);
+  expect(screen.getByTestId('session-slot-blocked')).toBeOnTheScreen();
+  fireEvent.press(logSetButton);
+  expect(mockState.logSet).not.toHaveBeenCalled();
+
+  // ...and from substitution selection: the knee-loading alternative cannot be
+  // chosen, while the alternative that spares the knee can.
+  const unsafeOption = screen.getByLabelText('Use Goblet Squat instead');
+  expect(unsafeOption.props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(unsafeOption);
+  expect(mockState.applyRegression).not.toHaveBeenCalled();
+
+  const safeOption = screen.getByLabelText('Use Hip Thrust instead');
+  expect(safeOption.props.accessibilityState.disabled).toBe(false);
+  fireEvent.press(safeOption);
+  expect(mockState.applyRegression).toHaveBeenCalledWith(1, 4);
+});
+
+test('equipment, capability and attestation gaps also stay per-slot instead of blanking the session', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [
+      // Barbell is absent from the inventory: equipment alone must not blank
+      // the session the way a tier violation does.
+      movement(1, 'First movement', { required: ['barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    getMovementAvailabilityVerdicts: realVerdictsFor,
+  });
+  render(<SessionScreen />);
+
+  expect(screen.queryByText('This plan needs Coach review.')).toBeNull();
+  expect(screen.getByText('First movement')).toBeOnTheScreen();
+  expect(screen.getByLabelText(/^Log set 1 for First movement, unavailable — Teaching only/)
+    .props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(screen.getByLabelText(/^Log set 1 for First movement, unavailable/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test('an above-tier movement still blanks the session, and the copy matches that predicate', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    movements: [movement(1, 'First movement'), movement(2, 'Advanced movement', { difficulty: 'Advanced', beginnerOk: false })],
+    getMovementAvailabilityVerdicts: realVerdictsFor,
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
+  expect(screen.getByText(
+    'A planned movement sits above this athlete’s difficulty tier, or its tier could not be confirmed, so the session was blocked before it could be shown.',
+  )).toBeOnTheScreen();
+  expect(screen.queryByText('Advanced movement')).toBeNull();
+});
+
+test('a planned movement missing from the library fails the tier check closed', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    sessionPlan: [slot(1, 1), slot(2, 999, 8)],
+    getMovementAvailabilityVerdicts: realVerdictsFor,
+  });
+  render(<SessionScreen />);
+
+  expect(screen.getByText('This plan needs Coach review.')).toBeOnTheScreen();
+  expect(screen.queryByText('First movement')).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// R4 (post-PR #19): the effort explanation must be truthful about both the
+// full 1-10 effort scale and the ratified 5-10 direct working-set entry. The
+// control itself is unchanged: optional, 5.0-10.0 in 0.5 steps, unanchored,
+// and unanswered stays null.
+// ---------------------------------------------------------------------------
+test('R4 explains the 1-10 effort scale truthfully and keeps direct working-set entry optional and bounded to 5-10', () => {
+  render(<SessionScreen />);
+  expect(screen.getByTestId('effort-scale-explanation').props.children).toBe('How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.');
+
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+  expect(screen.getAllByRole('button', { name: /^Effort \d+\.\d$/ }).map((node) => node.props.accessibilityLabel)).toEqual([
+    'Effort 5.0', 'Effort 5.5', 'Effort 6.0', 'Effort 6.5', 'Effort 7.0', 'Effort 7.5',
+    'Effort 8.0', 'Effort 8.5', 'Effort 9.0', 'Effort 9.5', 'Effort 10.0',
+  ]);
+
+  for (let press = 0; press < 12; press += 1) fireEvent.press(screen.getByLabelText('Decrease Effort'));
+  expect(screen.getAllByLabelText('Effort 5.0')).toHaveLength(2);
+  for (let press = 0; press < 12; press += 1) fireEvent.press(screen.getByLabelText('Increase Effort'));
+  expect(screen.getAllByLabelText('Effort 10.0')).toHaveLength(2);
+
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 10.0' }));
+  expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet).toHaveBeenCalledWith(
+    1, 5, 0, null,
+    undefined, undefined, undefined, undefined, 1,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// R5 (2026-09-15 tier-neutral rest ruling): when no runner owns the timer, the
+// local rest fallback uses the runner's RPE bands and ignores training tier.
+// ---------------------------------------------------------------------------
+test('R5 local rest fallback is identical for every tier and equals the runner rest for the same answer', () => {
+  const answers = [
+    ['0 clean reps left', 10], ['1 clean rep left', 9], ['2 clean reps left', 8],
+    ['3 clean reps left', 7], ['4+ clean reps left', 6], [null, null],
+  ];
+  const observed = new Map();
+  for (const tier of ['beginner', 'intermediate', 'advanced', 'elite']) {
+    for (const [answer, rpe] of answers) {
+      mockState = state({ runner: null, profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 } });
+      const view = render(<SessionScreen />);
+      if (answer !== null) fireEvent.press(screen.getByLabelText(answer));
+      fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+      expect(mockState.logSet.mock.calls[0][3]).toBe(rpe);
+      const seconds = screen.UNSAFE_getByType(RestTimerCard).props.totalSeconds;
+      expect(seconds).toBe(runnerRestSecondsFor({ targetRpe: 8 }, 'intermediate', rpe));
+      observed.set(answer, [...(observed.get(answer) ?? []), seconds]);
+      view.unmount();
+    }
+  }
+  expect([...observed.values()].map((values) => new Set(values).size)).toEqual([1, 1, 1, 1, 1, 1]);
+  expect([...observed.values()].map((values) => values[0])).toEqual([240, 240, 180, 120, 90, 180]);
+}, 60000);

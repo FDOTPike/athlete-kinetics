@@ -1,77 +1,163 @@
 /**
  * InfoTip.tsx — reusable ⓘ glossary tooltip for S&C terminology.
  *
- * Tap the icon, get a plain-language card; tap anywhere to dismiss.
+ * Tap the icon, get a plain-language card; tap outside or use Close to dismiss.
  * RN core only (Modal with animationType="none"), no positioning math —
  * a centered card never clips inside ScrollViews or nav strips.
  */
-import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { palette } from '../state/useStore';
+import { theme } from '../theme/theme';
 
-/** The glossary is the single source of tooltip copy — add terms here. */
-export const GLOSSARY: Record<string, string> = {
-  RPE: 'Rate of Perceived Exertion, 1–10. 10 = no reps left in the tank; 8 = two reps in reserve. The cap is a ceiling, not a target.',
-  '1RM': 'One-rep max — the heaviest load you can lift once with solid form. Target weights are calculated from it, so keep it honest and current.',
-  GPP: 'General Physical Preparedness — broad, balanced fitness (strength, conditioning, mobility) rather than peaking for one quality.',
-  ACWR: 'Acute:Chronic Workload Ratio — this week’s training load versus your 4-week average. Above ~1.5 means load is spiking faster than your body has adapted to.',
-  HRV: 'Heart Rate Variability — beat-to-beat variation in heart rhythm. Higher than your baseline usually means recovered; suppressed means accumulated stress.',
-  'ATP-PC': 'The phosphagen energy system — maximal efforts under ~10 seconds (heavy singles, sprints, throws).',
-  TONNAGE: 'Total work for the session: reps × load, summed over every set.',
-  LOAD: 'Multiplier on your planned working weights. ×0.85 means take 15% off the bar today.',
-  SETS: 'Adjustment to your planned set count per movement. −1 means drop one set across the board.',
+const colors = palette ?? {
+  bg: '#000',
+  surface: '#15151A',
+  line: '#26262E',
+  text: '#F4F4F6',
+  dim: '#86868F',
+  green: '#2EE6A8',
+  amber: '#FFB454',
+  red: '#FF5D5D',
 };
 
-interface InfoTipProps {
-  /** Glossary key; the card shows this as its title. */
-  term: keyof typeof GLOSSARY & string;
+import {
+  GLOSSARY_ENTRIES,
+  getGlossaryEntry,
+  type GlossaryEntry,
+} from '../data/glossary';
+
+/** The canonical glossary map — single source of tooltip copy. Kept for backwards compatibility. */
+export const GLOSSARY: Record<string, string> = Object.freeze(
+  GLOSSARY_ENTRIES.reduce<Record<string, string>>(
+    (acc, entry) => {
+      acc[entry.id] = entry.definition;
+      acc[entry.term] = entry.definition;
+      if (entry.aliases) {
+        for (const alias of entry.aliases) {
+          acc[alias.toUpperCase()] = entry.definition;
+          acc[alias] = entry.definition;
+        }
+      }
+      return acc;
+    },
+    {
+      'MACRO-CYCLE':
+        GLOSSARY_ENTRIES.find((e) => e.id === 'MACROCYCLE')?.definition ?? '',
+    },
+  ),
+);
+
+export interface InfoTipProps {
+  /** Glossary key, term, or alias; the card shows the canonical term as its title. */
+  term: string;
 }
 
-export default function InfoTip({ term }: InfoTipProps): React.JSX.Element {
+export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
-  const body = GLOSSARY[term] ?? '';
+  const titleRef = useRef<React.ElementRef<typeof Text>>(null);
+  const close = useCallback(() => setOpen(false), []);
+  const focusExplanation = useCallback(() => {
+    const titleHandle = findNodeHandle(titleRef.current);
+    if (titleHandle !== null) {
+      AccessibilityInfo.setAccessibilityFocus(titleHandle);
+    }
+  }, []);
+  const entry = getGlossaryEntry(term);
+
+  if (!entry) {
+    const isDev =
+      typeof __DEV__ !== 'undefined'
+        ? __DEV__
+        : process.env.NODE_ENV !== 'production';
+    if (isDev) {
+      throw new Error(`InfoTip: unknown glossary term "${term}"`);
+    }
+    return null;
+  }
+
+  const title = entry.term;
 
   return (
     <>
       <Pressable
         onPress={() => setOpen(true)}
-        hitSlop={12}
         accessibilityRole="button"
-        accessibilityLabel={`What does ${term} mean?`}
-        style={styles.icon}
+        accessibilityLabel={`What does ${title} mean?`}
+        style={styles.trigger}
       >
-        <Text style={styles.iconText}>i</Text>
+        <View style={styles.icon}>
+          <Text style={styles.iconText}>i</Text>
+        </View>
       </Pressable>
-      <Modal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
-        <Pressable
+      <Modal
+        visible={open}
+        transparent
+        animationType="none"
+        onRequestClose={close}
+        onShow={focusExplanation}
+      >
+        <View
+          testID="info-tip-dialog"
           style={styles.backdrop}
-          onPress={() => setOpen(false)}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss explanation"
+          accessibilityViewIsModal
+          onAccessibilityEscape={close}
         >
+          <Pressable
+            testID="info-tip-backdrop"
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+            accessible={false}
+            importantForAccessibility="no"
+          />
           <View style={styles.card}>
-            <Text style={styles.cardTerm}>{term}</Text>
-            <Text style={styles.cardBody}>{body}</Text>
-            <Text style={styles.cardHint}>tap anywhere to close</Text>
+            <Text ref={titleRef} accessible accessibilityRole="header" style={styles.cardTerm}>
+              {title}
+            </Text>
+            <Text accessible style={styles.cardBody}>{entry.definition}</Text>
+            <Text accessible style={styles.cardHint}>Tap outside or use Close to return.</Text>
+            <Pressable
+              style={styles.closeButton}
+              onPress={close}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss explanation"
+            >
+              <Text style={styles.closeButtonText}>CLOSE</Text>
+            </Pressable>
           </View>
-        </Pressable>
+        </View>
       </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  // Reserve the full touch target in layout; hitSlop can be clipped by parents.
+  trigger: {
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   icon: {
     width: 18,
     height: 18,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: palette.dim,
+    borderColor: colors.dim,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 6,
   },
-  iconText: { color: palette.dim, fontSize: 11, fontWeight: '800', fontStyle: 'italic' },
+  iconText: { color: colors.dim, fontSize: 11, fontWeight: '800', fontStyle: 'italic' },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
@@ -80,15 +166,24 @@ const styles = StyleSheet.create({
     padding: 28,
   },
   card: {
-    backgroundColor: palette.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: palette.line,
+    borderColor: colors.line,
     padding: 18,
     maxWidth: 360,
     gap: 8,
   },
-  cardTerm: { color: palette.green, fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-  cardBody: { color: palette.text, fontSize: 15, lineHeight: 22 },
-  cardHint: { color: palette.dim, fontSize: 12, marginTop: 4 },
+  cardTerm: { color: colors.green, fontSize: 15, fontWeight: '800', letterSpacing: 2 },
+  cardBody: { color: colors.text, fontSize: 15, lineHeight: 22 },
+  cardHint: { color: colors.dim, fontSize: 12, marginTop: 4 },
+  closeButton: {
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    marginTop: 8,
+  },
+  closeButtonText: { color: colors.text, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
 });

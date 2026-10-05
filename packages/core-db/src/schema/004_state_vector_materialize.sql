@@ -14,7 +14,7 @@
 --                     penalized steeper, 200/unit vs 125/unit)
 --   sleep_component = sleep efficiency mapped from 65% -> 0 to 95% -> 100
 --   spo2_component  = nightly mean mapped from 90% -> 0 to 97% -> 100
---   readiness       = weighted mean of available HRV/load/sleep inputs; no fabricated inputs
+--   readiness       = weighted mean of available HRV/sleep recovery inputs; no fabricated inputs
 -- =============================================================================
 
 WITH feat AS (
@@ -56,15 +56,12 @@ SELECT
   date,
   round(CASE
     WHEN (CASE WHEN hrv_z IS NOT NULL THEN 0.35 ELSE 0 END
-        + CASE WHEN acwr IS NOT NULL THEN 0.30 ELSE 0 END
         + CASE WHEN sleep_efficiency_pct IS NOT NULL THEN 0.25 ELSE 0 END) = 0 THEN 50.0
     ELSE (
         CASE WHEN hrv_z IS NOT NULL THEN 0.35 * hrv_component ELSE 0 END
-      + CASE WHEN acwr IS NOT NULL THEN 0.30 * load_component ELSE 0 END
       + CASE WHEN sleep_efficiency_pct IS NOT NULL THEN 0.25 * sleep_component ELSE 0 END
     ) / (
         CASE WHEN hrv_z IS NOT NULL THEN 0.35 ELSE 0 END
-      + CASE WHEN acwr IS NOT NULL THEN 0.30 ELSE 0 END
       + CASE WHEN sleep_efficiency_pct IS NOT NULL THEN 0.25 ELSE 0 END
     ) END, 1),
   hrv_component, load_component, sleep_component, spo2_component,

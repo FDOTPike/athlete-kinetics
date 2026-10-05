@@ -60,7 +60,7 @@ export interface ClosedLoopConfig {
   profile?: UserProfile;
   /** Normal production macro-cycle when absent; otherwise repeat this real template. */
   fixedMacroBlockIndex?: number;
-  /** Real peak-shift input. Values > OVERREACH_ACWR move deload to week 1. */
+  /** Retained for simulator input compatibility; no longer shifts schedule under Calibration Policy v1. */
   recentAcwr?: number | null;
   /** Non-positive telemetry alignment offset from the scheduled block end. */
   observerEndOffsetDays?: number;
@@ -153,6 +153,10 @@ const movements: readonly GeneratorMovement[] = MOVEMENT_PATTERNS.map(
     pattern,
     is_compound: pattern !== 'isolation' && pattern !== 'locomotion',
     required: [],
+    beginner_ok: false,
+    sportTracking: false,
+    capability_available_weight_room: true,
+    capability_available_sport_conditioning: true,
   }),
 );
 

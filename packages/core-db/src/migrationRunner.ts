@@ -24,11 +24,51 @@ export interface MigrationDb {
   executeSync(sql: string): { rows: Record<string, unknown>[] };
 }
 
-/** Objects whose absence proves the schema is incomplete regardless of
- *  what user_version claims. One per migration that creates core state. */
-export const SENTINELS: readonly { type: string; name: string }[] = [
+interface MigrationSentinel {
+  readonly type: string;
+  readonly name: string;
+  /** A durable-row invariant can be stronger than sqlite_master presence. */
+  readonly presenceSql?: string;
+  /** Applied before a full replay when lost provenance must fail closed. */
+  readonly failClosedRepairSql?: string;
+}
+
+const ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL = `
+  CREATE TABLE IF NOT EXISTS routine_template_contract_cutoff (
+    cutoff_template_id INTEGER NOT NULL CHECK (cutoff_template_id >= 0),
+    capture_epoch       INTEGER PRIMARY KEY CHECK (capture_epoch = 1)
+  ) STRICT, WITHOUT ROWID;
+  DROP TRIGGER IF EXISTS trg_routine_template_contract_cutoff_bu;
+  DROP TRIGGER IF EXISTS trg_routine_template_contract_cutoff_bd;
+  UPDATE routine_template_contract_cutoff
+    SET cutoff_template_id = 0 WHERE capture_epoch = 1;
+  INSERT OR IGNORE INTO routine_template_contract_cutoff
+    (cutoff_template_id, capture_epoch) VALUES (0, 1);`;
+
+/** Objects or durable rows whose absence proves the schema is incomplete
+ *  regardless of what user_version claims. */
+export const SENTINELS: readonly MigrationSentinel[] = [
+  // R1: the original registry carried roughly ONE representative object per
+  // migration, which detects "a migration never applied" but NOT "one table was
+  // lost while user_version still reads latest". Under individual-table loss an
+  // unregistered table is invisible: sentinelsMissing returns empty, no replay
+  // runs, and the table stays gone. Every durable table is therefore registered
+  // below, and DURABLE_TABLE_EXEMPTIONS records the only deliberate omission.
   { type: 'table', name: 'set_record' },          // 001
+  { type: 'table', name: 'macro_cycle' },         // 001
+  { type: 'table', name: 'micro_cycle' },         // 001
+  { type: 'table', name: 'session' },             // 001
+  { type: 'table', name: 'mech_daily' },          // 001
+  { type: 'table', name: 'movement' },            // 001
   { type: 'table', name: 'hrv_daily' },           // 002
+  { type: 'table', name: 'sleep_daily' },         // 002
+  { type: 'table', name: 'spo2_daily' },          // 002
+  { type: 'table', name: 'spo2_sample' },         // 002
+  { type: 'table', name: 'movement_equipment' },  // 007
+  { type: 'table', name: 'planned_session' },     // 007
+  { type: 'table', name: 'planned_slot' },        // 007
+  { type: 'table', name: 'session_note' },        // 009
+  { type: 'table', name: 'slot_override' },       // 009
   { type: 'table', name: 'state_vector' },        // 003
   { type: 'view', name: 'v_readiness_inputs' },   // 003
   { type: 'table', name: 'subjective_report' },   // 005
@@ -41,6 +81,7 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'block_meta' },          // 009
   { type: 'table', name: 'movement_detail' },     // 010
   { type: 'table', name: 'movement_preference' }, // 010
+  { type: 'table', name: 'movement_tier_alignment' }, // 060 — WO §2.3 big-lift difficulty realignment provenance
   { type: 'table', name: 'niggle' },              // 011
   { type: 'table', name: 'report_severity' },     // 012
   { type: 'table', name: 'profile_slot' },        // 013
@@ -74,8 +115,18 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'movement_role_eligibility' }, // 028
   { type: 'table', name: 'movement_capability_edge' },  // 028
   { type: 'table', name: 'capability_session_evidence' }, // 028
+  // R1: 028/029 registered their PARENT tables but not these children, so a
+  // dropped child was invisible to sentinelsMissing and never replayed. The
+  // durable-object drift guard in verify_migrations.mjs now fails when a
+  // durable table is added without recovery coverage.
+  { type: 'table', name: 'movement_capability_family' },      // 028
+  { type: 'table', name: 'movement_capability_attestation' }, // 028
   { type: 'table', name: 'routine_template' },          // 029
+  { type: 'table', name: 'routine_template_slot' },     // 029
   { type: 'table', name: 'history_import' },            // 029
+  { type: 'table', name: 'history_import_session' },    // 029
+  { type: 'table', name: 'history_import_set' },        // 029
+  { type: 'table', name: 'history_import_capability_evidence' }, // 029
   { type: 'table', name: 'bodyweight_daily' },          // 029
   { type: 'view', name: 'v_training_daily_all' },       // 029
   { type: 'table', name: 'import_readiness_daily' },     // 029
@@ -85,12 +136,273 @@ export const SENTINELS: readonly { type: string; name: string }[] = [
   { type: 'table', name: 'training_program_day' },      // 033
   { type: 'table', name: 'training_program_movement_preference' }, // 033
   { type: 'table', name: 'training_block_program' },    // 033
-  { type: 'index', name: 'idx_training_program_one_current' }, // 033 correctness constraint
   { type: 'table', name: 'planned_slot_autopilot' },     // 034
-  { type: 'table', name: 'suspension_episode' },          // 058
+  { type: 'table', name: 'profile_load_preference' },    // 035
+  { type: 'table', name: 'movement_media' },             // 036
+  { type: 'table', name: 'movement_scope' },             // 049
+  { type: 'table', name: 'movement_content_correction' }, // 049
+  { type: 'table', name: 'movement_prior_experience' },       // 051
+  { type: 'table', name: 'movement_sport_tracking' },         // 051
+  { type: 'table', name: 'movement_lift_family' },             // 052
+  { type: 'table', name: 'movement_assistance_relationship' }, // 052
+  { type: 'table', name: 'planned_session_routine_context' },  // 052
+  { type: 'table', name: 'planned_slot_routine_decision' },    // 052
+  { type: 'table', name: 'routine_template_legacy_role_allowance' }, // 053
+  { type: 'table', name: 'planned_slot_legacy_role_allowance' },     // 053
+  {
+    type: 'row',
+    name: 'routine_template_contract_cutoff',                         // 054
+    presenceSql: `SELECT 1 AS ok
+      FROM routine_template_contract_cutoff
+      WHERE capture_epoch = 1`,
+    // If the cutoff table or singleton row is lost after 054 has applied, its
+    // original value cannot be reconstructed safely. Persist zero BEFORE the
+    // full-chain replay so 053 cannot grandfather any current template and so
+    // a failure in an earlier replayed migration cannot later recapture MAX(id).
+    failClosedRepairSql: ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL,
+  },
+  {
+    type: 'trigger',
+    name: 'trg_routine_template_contract_cutoff_bu',                 // 054
+    failClosedRepairSql: ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL,
+  },
+  {
+    type: 'trigger',
+    name: 'trg_routine_template_contract_cutoff_bd',                 // 054
+    failClosedRepairSql: ROUTINE_CONTRACT_CUTOFF_FAIL_CLOSED_SQL,
+  },
+  { type: 'table', name: 'return_checkin_ack' },                      // 055
+  // 057 fail-closed phase/index invariant (DB-BLOCK-META-DRIFT): a dropped
+  // trigger would silently reopen block_meta to phase/index drift.
+  { type: 'trigger', name: 'trg_block_meta_phase_bi' },               // 057
+  { type: 'trigger', name: 'trg_block_meta_phase_bu' },               // 057
+  // 058 suspension episodes. The table is durable athlete state, and the two
+  // triggers are fail-closed invariants (DB-SUSPENSION-DRIFT): losing them
+  // silently reopens double-suspension and episode reopening, either of which
+  // corrupts the frozen macro position the athlete resumes from.
+  { type: 'table', name: 'suspension_episode' },                      // 058
   { type: 'trigger', name: 'trg_suspension_episode_single_open_bi' }, // 058
   { type: 'trigger', name: 'trg_suspension_episode_no_reopen_bu' },   // 058
+  // 059 suspension state + load intent. The three tables are durable athlete
+  // state; the four triggers are fail-closed invariants. Losing the immutability
+  // triggers silently reopens the audit trail 058 claims to keep, and losing
+  // block_suspension_origin makes every block generated during an episode
+  // consume the frozen position again (the exact S6(b) defect).
+  { type: 'table', name: 'suspension_episode_program' },              // 059
+  { type: 'table', name: 'block_suspension_origin' },                 // 059
+  { type: 'table', name: 'planned_slot_load_intent' },                // 059
+  { type: 'trigger', name: 'trg_suspension_episode_immutable_entry_bu' },     // 059
+  { type: 'trigger', name: 'trg_suspension_episode_close_once_bu' },          // 059
+  { type: 'trigger', name: 'trg_suspension_episode_no_delete_closed_bd' },    // 059
+  { type: 'trigger', name: 'trg_suspension_episode_program_immutable_bu' },   // 059
+  // 062 completes the 059 side-car immutability contract. These four are
+  // fail-closed invariants of the same kind: losing the block_suspension_origin
+  // pair lets a suspension-era block's attribution be deleted or re-pointed,
+  // and the position readers work by ABSENCE, so that block silently starts
+  // consuming a macro position again — the exact S6(b) defect. 062 adds no
+  // table, so nothing is owed to DURABLE_TABLE_EXEMPTIONS below.
+  { type: 'trigger', name: 'trg_suspension_episode_program_no_delete_bd' },   // 062
+  { type: 'trigger', name: 'trg_block_suspension_origin_immutable_bu' },      // 062
+  { type: 'trigger', name: 'trg_block_suspension_origin_no_delete_bd' },      // 062
+  { type: 'trigger', name: 'trg_planned_slot_load_intent_no_repoint_bu' },    // 062
+  // 063 the athlete's own declaration (OW-001). Durable athlete state, and the
+  // two triggers are fail-closed: losing them would let a declaration name an
+  // implement the movement does not support. Both reference movement_detail
+  // (010, chain position 10), which a replay recreates long before the earliest
+  // rename at position 48, so neither belongs on REPLAY_BLOCKING_TRIGGERS.
+  { type: 'table', name: 'movement_load_intent' },                            // 063
+  { type: 'trigger', name: 'trg_movement_load_intent_supported_bi' },         // 063
+  { type: 'trigger', name: 'trg_movement_load_intent_supported_bu' },         // 063
+  // 064 neutral external-activity capture and user-reported support records.
+  // Every durable table is a sentinel: losing one must never look like an
+  // empty/cleared athlete profile at latest user_version.
+  { type: 'table', name: 'activity_definition' },                             // 064
+  { type: 'table', name: 'activity_requirement' },                            // 064
+  { type: 'table', name: 'activity_series' },                                 // 064
+  { type: 'table', name: 'activity_occurrence' },                             // 064
+  { type: 'table', name: 'activity_completion' },                             // 064
+  { type: 'table', name: 'activity_source_link' },                            // 064
+  { type: 'table', name: 'activity_typical_week_report' },                    // 064
+  { type: 'table', name: 'activity_typical_week_item' },                      // 064
+  { type: 'table', name: 'health_support_profile' },                          // 064
+  { type: 'table', name: 'health_support_preference' },                       // 064
+  { type: 'table', name: 'health_support_note' },                             // 064
+  { type: 'table', name: 'clinician_instruction' },                           // 064
+  { type: 'table', name: 'clinician_instruction_revision' },                  // 064
+  { type: 'table', name: 'health_support_hold' },                             // 064
+  { type: 'table', name: 'health_support_scope' },                            // 064
+  { type: 'table', name: 'recommendation_support_record' },                  // 064
+  { type: 'table', name: 'recommendation_activity_basis' },                  // 064
+  { type: 'table', name: 'recommendation_hold_basis' },                      // 064
+  { type: 'trigger', name: 'trg_activity_completion_completed_bi' },          // 064
+  { type: 'trigger', name: 'trg_activity_completion_completed_bu' },          // 064
+  { type: 'trigger', name: 'trg_activity_occurrence_completion_consistency_bu' }, // 064
+  { type: 'trigger', name: 'trg_activity_occurrence_origin_immutable_bu' },     // 064
+  { type: 'trigger', name: 'trg_activity_occurrence_source_consistency_bi' },  // 064
+  { type: 'trigger', name: 'trg_activity_source_link_origin_consistency_bi' }, // 064
+  { type: 'trigger', name: 'trg_activity_source_link_identity_immutable_bu' }, // 064
+  { type: 'trigger', name: 'trg_health_support_note_limit_bi' },              // 064
+  { type: 'trigger', name: 'trg_clinician_instruction_limit_bi' },            // 064
+  { type: 'trigger', name: 'trg_clinician_instruction_revision_limit_bi' },   // 064
+  { type: 'trigger', name: 'trg_clinician_instruction_revision_limit_bu' },   // 064
+  { type: 'trigger', name: 'trg_health_support_scope_limit_bi' },             // 064
+  { type: 'trigger', name: 'trg_health_support_scope_limit_bu' },             // 064
+  { type: 'trigger', name: 'trg_health_support_hold_no_delete_held_bd' },     // 064
+  { type: 'trigger', name: 'trg_health_support_hold_versioned_withdrawal_bu' }, // 064
+  { type: 'trigger', name: 'trg_clinician_instruction_delete_bd' },           // 064
+  // 065 movement preparation. Both tables are durable athlete state. The five
+  // triggers are fail-closed invariants: losing the live-session guard would
+  // let a completed or demo session acquire a fabricated preparation record,
+  // and losing the frozen/transition guards would let a recorded outcome or a
+  // frozen protocol be rewritten after the fact.
+  { type: 'table', name: 'session_preparation' },                             // 065
+  { type: 'table', name: 'session_preparation_item' },                        // 065
+  { type: 'trigger', name: 'trg_session_preparation_live_session_bi' },       // 065
+  { type: 'trigger', name: 'trg_session_preparation_frozen_bu' },             // 065
+  { type: 'trigger', name: 'trg_session_preparation_transition_bu' },         // 065
+  { type: 'trigger', name: 'trg_session_preparation_item_frozen_bu' },        // 065
+  { type: 'trigger', name: 'trg_session_preparation_item_open_bu' },          // 065
+  // 066 focus and SMART goals. The three reference tables are SEEDED, so their
+  // sentinels check the rows, not just the table: an emptied muscle_group or
+  // movement_muscle_role would otherwise read as "this athlete has no focus
+  // mapping" at latest user_version. The five athlete tables are durable
+  // athlete state. The triggers are fail-closed: losing the revision or
+  // observation guards would let a recorded goal definition or measurement be
+  // rewritten after the fact.
+  { type: 'table', name: 'muscle_group' },                                    // 066
+  { type: 'table', name: 'muscle_group_alias' },                              // 066
+  { type: 'table', name: 'movement_muscle_role' },                            // 066
+  {
+    type: 'row',
+    name: 'muscle_group seed',                                                // 066
+    presenceSql: `SELECT 1 AS ok WHERE (SELECT COUNT(*) FROM muscle_group) = 17
+      AND (SELECT COUNT(*) FROM muscle_group_alias WHERE alias_kind = 'library_term') = 27`,
+  },
+  {
+    type: 'row',
+    name: 'movement_muscle_role seed',                                        // 066
+    presenceSql: `SELECT 1 AS ok WHERE NOT EXISTS (
+      SELECT 1 FROM movement_detail d
+      JOIN json_each(d.target_muscles) j
+      JOIN muscle_group_alias a ON a.alias = lower(trim(j.value)) AND a.alias_kind = 'library_term'
+      WHERE NOT EXISTS (SELECT 1 FROM movement_muscle_role r
+        WHERE r.movement_id = d.movement_id AND r.muscle_group_id = a.muscle_group_id))`,
+  },
+  { type: 'table', name: 'athlete_focus' },                                   // 066
+  { type: 'table', name: 'athlete_focus_muscle' },                            // 066
+  { type: 'table', name: 'athlete_goal' },                                    // 066
+  { type: 'table', name: 'athlete_goal_revision' },                           // 066
+  { type: 'table', name: 'athlete_goal_observation' },                        // 066
+  { type: 'trigger', name: 'trg_athlete_focus_muscle_limit_bi' },             // 066
+  { type: 'trigger', name: 'trg_athlete_goal_revision_immutable_bu' },        // 066
+  { type: 'trigger', name: 'trg_athlete_goal_revision_no_delete_bd' },        // 066
+  { type: 'trigger', name: 'trg_athlete_goal_revision_forward_bu' },          // 066
+  { type: 'trigger', name: 'trg_athlete_goal_observation_immutable_bu' },     // 066
+  { type: 'trigger', name: 'trg_athlete_goal_active_limit_bi' },              // 066
+  { type: 'trigger', name: 'trg_athlete_goal_active_limit_bu' },              // 066
+  // 067 sport profile, goal exercise link and the frozen block explanation.
+  // All three hold athlete state that nothing else can rebuild: losing
+  // athlete_sport_profile would silently turn a sport athlete's next block
+  // into the standard plan, and losing block_emphasis (or its immutability
+  // guard) would lose or let someone rewrite the explanation of a frozen plan.
+  { type: 'table', name: 'athlete_sport_profile' },                           // 067
+  { type: 'table', name: 'athlete_goal_movement' },                           // 067
+  { type: 'table', name: 'block_emphasis' },                                  // 067
+  { type: 'trigger', name: 'trg_block_emphasis_immutable_bu' },               // 067
+  // 068 content correction v2 adds no table: it rewrites coaching text on 115
+  // seeded movements and appends their provenance at version 2. The provenance
+  // rows are the marker that it ran. Without this sentinel a database whose
+  // user_version claims the latest chain but never applied 068 would keep the
+  // shared "Set up <name> with" template with nothing to notice it.
+  {
+    type: 'row',
+    name: 'movement_content_correction v2',                                   // 068
+    presenceSql: `SELECT 1 AS ok WHERE
+      (SELECT COUNT(*) FROM movement_content_correction WHERE correction_version = 2) = 115`,
+  },
+  // 069 resting heart rate independent of HRV. Losing the table would make
+  // every later sync fail its write and drop the athlete's resting HR.
+  { type: 'table', name: 'resting_hr_daily' },                                // 069
 ];
+
+/** Durable tables deliberately absent from SENTINELS, each with the reason it
+ *  needs no recovery coverage. The drift guard in verify:migrations fails when
+ *  a table exists at latest user_version and appears in neither list, so a new
+ *  migration cannot introduce an unrecoverable table silently. Adding a name
+ *  here is a decision that must be justified in review, not a way to quiet the
+ *  gate. */
+export const DURABLE_TABLE_EXEMPTIONS: readonly { readonly name: string; readonly reason: string }[] = [
+  {
+    name: 'user_profile',
+    reason: '006 creates it; 007 copies it into athlete_profile and DROPs it. '
+      + 'It does not exist at latest user_version, so it can never be missing.',
+  },
+];
+
+/**
+ * Triggers whose WHEN clause names a table that the chain creates LATER than
+ * its last `ALTER TABLE ... RENAME`.
+ *
+ * A full re-apply is, by definition, run against a database that has lost
+ * something, and it replays from index 0. `ALTER TABLE ... RENAME` re-parses
+ * and rewrites the ENTIRE schema, aborting with "error in trigger <name>: no
+ * such table" if any surviving trigger references a table that is absent AT
+ * THAT MOMENT. 049, 052 and 061 each rename, the earliest at chain position 48.
+ *
+ * That position is the whole rule. A trigger referencing a table created BEFORE
+ * position 48 is safe, because the replay has already recreated it by the time
+ * the rename runs: `set_record` and `session` (001), `planned_slot` and
+ * `training_block` (007) and `training_program` (033) all qualify, and 026's
+ * `trg_set_dose_target_bd` / `trg_session_outcome_bd` are therefore NOT exposed
+ * — measured, not assumed. `suspension_episode` is created by 058 at position
+ * 57, AFTER the rename, so a trigger naming it can never be reached by a replay
+ * that has to pass 049 first. Dropping that one table would otherwise abort the
+ * self-heal every time and leave the database permanently unrecoverable.
+ *
+ * Dropping the affected triggers here is safe and self-closing: the replay
+ * recreates each from its own migration (CREATE TRIGGER IF NOT EXISTS), and if
+ * the replay does not complete, the sentinel check reports them missing and
+ * throws. The guard is absent only inside the recovery itself.
+ *
+ * A new cross-table trigger belongs on this list only if its referenced table
+ * is created after chain position 48. verify:migrations [2ab] pins both sides
+ * of that distinction behaviourally.
+ */
+const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
+  // Both name suspension_episode (058, position 57 > 48). Their other parents —
+  // training_program (033) and training_block (007) — are recreated before the
+  // rename and are not what puts them here.
+  'trg_suspension_episode_program_no_delete_bd', // 062 -> suspension_episode
+  'trg_block_suspension_origin_no_delete_bd',    // 062 -> suspension_episode
+  // These name activity_occurrence, created after the chain's rename point.
+  // Drop them only during a full self-heal replay; 064 recreates them before
+  // sentinel validation returns control to the app.
+  'trg_activity_completion_completed_bi',        // 064 -> activity_occurrence
+  'trg_activity_completion_completed_bu',        // 064 -> activity_occurrence
+  // This trigger lives on activity_occurrence and names the later-in-064
+  // activity_completion table, so it has the same replay constraint.
+  'trg_activity_occurrence_completion_consistency_bu', // 064 -> activity_completion
+  'trg_activity_occurrence_source_consistency_bi', // 064 -> activity_source_link
+  'trg_activity_source_link_origin_consistency_bi', // 064 -> activity_occurrence
+  // Deleting a clinician envelope names the later-in-064 scope/hold tables.
+  'trg_clinician_instruction_delete_bd',      // 064 -> health_support_scope/hold
+  // Lives on session_preparation_item and names session_preparation, which is
+  // created at chain position 64 — after the rename point. If the parent table
+  // alone is lost, this surviving trigger would abort the replay's rename.
+  // (065's other triggers name only `session` (001) or their own table.)
+  'trg_session_preparation_item_open_bu',     // 065 -> session_preparation
+  // Lives on athlete_goal_revision and names athlete_goal, both created at
+  // chain position 65. If athlete_goal alone is lost, this surviving trigger
+  // would abort the replay's rename. (066's other triggers name only the table
+  // they live on.)
+  'trg_athlete_goal_revision_no_delete_bd',   // 066 -> athlete_goal
+];
+
+function dropReplayBlockingTriggers(db: MigrationDb): void {
+  for (const name of REPLAY_BLOCKING_TRIGGERS) {
+    db.executeSync(`DROP TRIGGER IF EXISTS ${name};`);
+  }
+}
 
 function userVersion(db: MigrationDb): number {
   return Number(db.executeSync('PRAGMA user_version;').rows[0]?.user_version ?? 0);
@@ -115,19 +427,148 @@ function applyFrom(db: MigrationDb, migrations: readonly string[], start: number
 }
 
 export function sentinelsMissing(db: MigrationDb): string[] {
-  return SENTINELS.filter(
-    (s) =>
-      db.executeSync(
-        `SELECT 1 AS ok FROM sqlite_master WHERE type = '${s.type}' AND name = '${s.name}'`,
-      ).rows.length === 0,
-  ).map((s) => s.name);
+  return SENTINELS.filter((sentinel) => {
+    try {
+      const sql = sentinel.presenceSql
+        ?? `SELECT 1 AS ok FROM sqlite_master WHERE type = '${sentinel.type}' AND name = '${sentinel.name}'`;
+      return db.executeSync(sql).rows.length === 0;
+    } catch {
+      return true;
+    }
+  }).map((sentinel) => sentinel.name);
+}
+
+function applyFailClosedRepairs(db: MigrationDb, missing: readonly string[]): void {
+  const repairs = [...new Set(SENTINELS
+    .filter((sentinel) => missing.includes(sentinel.name))
+    .map((sentinel) => sentinel.failClosedRepairSql)
+    .filter((sql): sql is string => sql !== undefined))];
+  if (repairs.length === 0) return;
+
+  db.executeSync('BEGIN');
+  try {
+    for (const repairSql of repairs) db.executeSync(repairSql);
+    db.executeSync('COMMIT');
+  } catch (error) {
+    try {
+      db.executeSync('ROLLBACK');
+    } catch {
+      /* connection-level failure; nothing left to roll back */
+    }
+    throw error;
+  }
+}
+
+/**
+ * Cross-lineage ordinal reconciliation (integration of master 1da218d with the
+ * feature chain, 2026-10-04).
+ *
+ * Two lineages shipped DIFFERENT entries at the same array index:
+ *
+ *   master  (1da218d): [..., m033, m034, m058]           -> length 34
+ *   feature (12a1fb1): [..., m033, m034, m035, ..., m057, m058, ..., m068]
+ *
+ * Indices 0..32 (001..034) name the same migration in both. Index 33 does not:
+ * master put 058 there, the feature chain put 035 there. A master install
+ * therefore sits at user_version 34 having applied 058 but NOT 035, and on the
+ * unified (feature-ordered) chain user_version 34 would mean "035 applied". Run
+ * unreconciled, that install skips 035 and survives only through the sentinel
+ * full replay — a safety net, not a migration strategy.
+ *
+ * The two states are distinguishable from the schema itself, because each
+ * lineage's index-33 entry creates a table the other's does not have yet:
+ *
+ *   user_version 34 + suspension_episode + NO profile_load_preference
+ *     -> master lineage. Rewind to 33 so the unified chain applies 035..057,
+ *        then re-applies 058 (IF NOT EXISTS: a no-op on master's existing
+ *        table, data and triggers untouched), then 059 onward.
+ *   user_version 34 + profile_load_preference (with or without
+ *   suspension_episode)
+ *     -> 035 is applied, so continuing at 036 is correct whichever history
+ *        produced it: a feature install (no 058 yet), or a master install that
+ *        was rewound, applied 035, and was interrupted before 036 committed
+ *        (058 already present — the unified chain re-applies 058 at ordinal 57
+ *        idempotently). Nothing to do. Treating "both" as ambiguous would lock
+ *        an athlete out after an ordinary interrupted upgrade.
+ *   user_version 34 + neither table
+ *     -> the index-33 object of BOTH lineages is gone, so the lineage cannot
+ *        be identified safely. Fail closed BEFORE any write: no guessing, no
+ *        replay, no deletion. The athlete's file is left exactly as found and
+ *        the boot error names the recovery path.
+ *
+ * Only user_version 34 is ambiguous: every master state below 34 is a prefix
+ * shared byte-for-byte in meaning with the feature chain (034's CHECK text
+ * differs, and 061 converges both to the strict contract), and no master state
+ * exists above 34.
+ *
+ * The reconciliation is self-validating: it only engages when the supplied
+ * chain really is the unified chain (035's table at index 33 and 058's at index
+ * 56). Any other array (tests, partial chains) is left alone.
+ */
+export const MASTER_LINEAGE_USER_VERSION = 34;
+const UNIFIED_035_INDEX = 33;
+const UNIFIED_058_INDEX = 56;
+
+export class MigrationLineageError extends Error {
+  readonly code = 'migration_lineage_ambiguous';
+  constructor(detail: string) {
+    super(
+      `This athlete's database could not be matched to a known app version (${detail}). `
+      + 'Nothing was changed. Keep this app version installed and restore from an encrypted '
+      + 'backup, or contact support with this message before reinstalling.',
+    );
+    this.name = 'MigrationLineageError';
+  }
+}
+
+export type LineageReconciliation = 'not_applicable' | 'feature' | 'master_rewound';
+
+function hasObject(db: MigrationDb, type: string, name: string): boolean {
+  return db.executeSync(
+    `SELECT 1 AS ok FROM sqlite_master WHERE type = '${type}' AND name = '${name}'`,
+  ).rows.length > 0;
+}
+
+function isUnifiedChain(migrations: readonly string[]): boolean {
+  return migrations.length > UNIFIED_058_INDEX
+    && /CREATE TABLE IF NOT EXISTS profile_load_preference\b/.test(migrations[UNIFIED_035_INDEX] ?? '')
+    && /CREATE TABLE IF NOT EXISTS suspension_episode\b/.test(migrations[UNIFIED_058_INDEX] ?? '');
+}
+
+export function reconcileMigrationLineage(
+  db: MigrationDb,
+  migrations: readonly string[],
+): LineageReconciliation {
+  if (!isUnifiedChain(migrations) || userVersion(db) !== MASTER_LINEAGE_USER_VERSION) {
+    return 'not_applicable';
+  }
+  const has058 = hasObject(db, 'table', 'suspension_episode');
+  const has035 = hasObject(db, 'table', 'profile_load_preference');
+  if (has035) return 'feature';
+  if (has058) {
+    db.executeSync('BEGIN');
+    try {
+      db.executeSync(`PRAGMA user_version = ${UNIFIED_035_INDEX};`);
+      db.executeSync('COMMIT');
+    } catch (e) {
+      try { db.executeSync('ROLLBACK'); } catch { /* nothing left to roll back */ }
+      throw e;
+    }
+    return 'master_rewound';
+  }
+  throw new MigrationLineageError('user_version 34 with neither the 035 nor the 058 table');
 }
 
 export function runMigrations(db: MigrationDb, migrations: readonly string[]): void {
+  reconcileMigrationLineage(db, migrations);
   applyFrom(db, migrations, userVersion(db));
-  if (sentinelsMissing(db).length > 0) {
+  const missing = sentinelsMissing(db);
+  if (missing.length > 0) {
     // user_version lied (poisoned field DB) — re-apply everything; all
-    // migrations are idempotent by contract.
+    // migrations are idempotent by contract. Any irrecoverable provenance is
+    // first persisted in its conservative state so replay can never widen it.
+    applyFailClosedRepairs(db, missing);
+    dropReplayBlockingTriggers(db);
     db.executeSync('PRAGMA user_version = 0;');
     applyFrom(db, migrations, 0);
     const still = sentinelsMissing(db);

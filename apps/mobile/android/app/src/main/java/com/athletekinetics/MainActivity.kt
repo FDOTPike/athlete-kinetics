@@ -23,8 +23,13 @@ class MainActivity : ReactActivity() {
   /**
    * Returns the name of the main component registered from JavaScript. This is used to schedule
    * rendering of the component.
+   *
+   * R8 §2.6: MUST equal the `name` in apps/mobile/app.json — that is the string
+   * index.js passes to AppRegistry.registerComponent. A mismatch cold-launches
+   * into 'Invariant Violation: ... has not been registered' (caught on device,
+   * 2026-08-25); verify_store_sql's R8 section pins the parity statically.
    */
-  override fun getMainComponentName(): String = "AthleteKinetics"
+  override fun getMainComponentName(): String = "pikeMethods"
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]
