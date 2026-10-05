@@ -86,6 +86,18 @@ for test in "${TESTS[@]}"; do
       echo "::warning title=ui $test HealthKit unanswered::healthd never answered the app on this simulator (no 'request settled' in the app trace). Real-sheet denial needs a physical-device check (owner). The app claimed nothing and kept the request pending."
     fi
   fi
+  # test3 may accept the app's "did not complete" wording ONLY if healthd's own
+  # log shows it timed out the authorization session (no person answered) and
+  # the app's trace shows the request settled; otherwise it is a failure.
+  if [ "$test" = test3_healthDenialAndAthleteSwitching ] && grep -q 'AKUI HEALTH-TIMEOUT-SHOWN' "$OUT/$test.log"; then
+    if grep -q 'Authorization session timed out' "$OUT/$test.system.log" && grep -q '\[ak-health\] request settled' "$OUT/$test.system.log"; then
+      echo "::warning title=ui $test HealthKit timed out::healthd timed out the authorization session before showing a sheet (Code=100 in its log); the app showed 'did not complete' and claimed nothing. Real-sheet denial needs a physical-device check (owner)."
+    else
+      echo "::error title=ui $test::the app showed 'did not complete' but healthd's log has no authorization timeout (or the app trace has no settled request)"
+      code=1
+      FAILED=1
+    fi
+  fi
   if [ "$code" -ne 0 ] && [ "$test" = test3_healthDenialAndAthleteSwitching ]; then
     grep -E 'ak-health|HealthKit:auth|ViewServices.*HealthPrivacy' "$OUT/$test.system.log" | tail -30 | cut -c1-240 > "$OUT/$test.health-excerpt.txt" || true
     echo "::warning title=ui $test system log (HealthKit)::$(tr '\n' '~' < "$OUT/$test.health-excerpt.txt" | cut -c1-5500)"

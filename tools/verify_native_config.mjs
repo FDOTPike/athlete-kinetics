@@ -230,6 +230,10 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('an unanswered HealthKit sheet is accepted only when the app trace proves no answer arrived',
     suite.includes('HEALTH-UNANSWERED') && runner.includes("grep -q 'AKUI HEALTH-UNANSWERED'")
       && runner.includes("request settled") && /code=1\n\s+FAILED=1/.test(runner));
+  check('a timed-out HealthKit request is accepted only when healthd logged the session timeout',
+    suite.includes('HEALTH-TIMEOUT-SHOWN') && runner.includes("grep -q 'AKUI HEALTH-TIMEOUT-SHOWN'")
+      && runner.includes("grep -q 'Authorization session timed out'")
+      && (runner.match(/code=1\n\s+FAILED=1/g) ?? []).length >= 2);
   const ci = read('.github/workflows/ci.yml');
   check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)

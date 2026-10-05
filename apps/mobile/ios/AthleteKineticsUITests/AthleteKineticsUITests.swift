@@ -151,7 +151,26 @@ final class AthleteKineticsUITests: XCTestCase {
     log("onboarding complete: \(who)")
   }
 
+  /// The Apple Health wording in any state. The failed-request wording begins
+  /// "The Apple Health request did not complete", so a plain "Apple Health"
+  /// prefix would read that state as absent.
+  private func healthWording() -> XCUIElement {
+    app.descendants(matching: .any).matching(NSPredicate(
+      format: "label BEGINSWITH %@ OR label BEGINSWITH %@", "Apple Health", "The Apple Health request")).firstMatch
+  }
+
+  /// An athlete without a program is offered set-up whenever it becomes the
+  /// active athlete (after onboarding, a switch or a restore); that offer
+  /// covers the shell, so it is cancelled before navigating.
+  private func dismissSetUpOfferIfShown(_ context: String) {
+    if element("Create program").exists && element("Cancel").exists {
+      element("Cancel").tap()
+      log("program set-up offer: cancelled (\(context))")
+    }
+  }
+
   private func openProfile() {
+    dismissSetUpOfferIfShown("before opening Profile")
     tap("header-athlete", "Profile")
     wait(element("athlete-screen-shown"), "the Profile screen")
   }
@@ -294,7 +313,7 @@ final class AthleteKineticsUITests: XCTestCase {
     // fails the request ("Authorization session timed out") and the app shows
     // its honest "did not complete — TRY AGAIN" wording. That path is recorded
     // as evidence; the person then taps TRY AGAIN once, as anyone would.
-    let healthHint = element(labelBeginsWith: "Apple Health")
+    let healthHint = healthWording()
     var answered = false
     for attempt in 1...2 where !answered {
       let control = "Choose whether to share sleep and resting heart rate from Apple Health"
@@ -343,6 +362,12 @@ final class AthleteKineticsUITests: XCTestCase {
       for claim in ["Connected", "granted"] {
         XCTAssertFalse(hintA.contains(claim), "after a denial the wording claimed access ('\(claim)'): \(hintA)")
       }
+    } else if healthHint.exists && healthHint.label.hasPrefix("The Apple Health request did not complete") {
+      // CI evidence (c5cf82c): healthd failed both requests with "Authorization
+      // session timed out" (Code=100) before any sheet appeared; the app showed
+      // its honest failure wording. tools/ios_ui_tests.sh accepts this marker
+      // ONLY when healthd's own log shows that timeout.
+      log("HEALTH-TIMEOUT-SHOWN healthd timed out the authorization session before showing a sheet; the app showed 'did not complete' and claimed nothing")
     } else {
       log("HEALTH-UNANSWERED HealthKit returned no answer to the app on this simulator; the app kept its request pending and claimed nothing")
     }
@@ -377,7 +402,12 @@ final class AthleteKineticsUITests: XCTestCase {
     let hintBack = answered
       ? settledLabel(element(labelBeginsWith: "Apple Health access requested"),
                      beginsWith: "Apple Health access requested", "health wording after switching back (A)", timeout: 30)
-      : settledLabel(element(labelBeginsWith: "Apple Health"), beginsWith: "Apple Health", "health wording after switching back (A, unanswered)", timeout: 30)
+      : { () -> String in
+          let el = wait(healthWording(), "athlete A's Apple Health wording after switching back")
+          let label = el.exists ? el.label : "<absent>"
+          log("health wording after switching back (A, not answered): \(label.prefix(220))")
+          return label
+        }()
     XCTAssertFalse(hintBack.contains("Connected") || hintBack.contains("granted"), "athlete A's wording claimed access after the switch: \(hintBack)")
     let switched = expandCoachMode()
     XCTAssertTrue(switched.hasPrefix("Coach mode, 2 athletes"), "an athlete was lost across the switch: \(switched)")
@@ -433,19 +463,22 @@ final class AthleteKineticsUITests: XCTestCase {
     let restoreStart = Date()
     var lastRestoreStatus = ""
     while Date().timeIntervalSince(restoreStart) < 900 {
+      // The restore reopens the app on the restored active athlete; without a
+      // program that athlete is offered set-up, which covers the Profile.
+      // Checked first: while the offer is up, its text is not a status
+      // (CI evidence c5cf82c: "Box Squat — 3×10" was read as the status).
+      if element("Cancel").exists && element("Create program").exists {
+        log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: set-up offered for the restored athlete; cancelled")
+        element("Cancel").tap()
+        openProfile()
+        continue
+      }
       let now = restoreStatus.exists ? restoreStatus.label : "<absent>"
       if now != lastRestoreStatus {
         log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: \(now.prefix(120))")
         lastRestoreStatus = now
       }
       if now.hasPrefix("Restore complete.") || !(now.hasPrefix("Creating") || now.hasPrefix("Recovery") || now.hasPrefix("Replacing") || now == "<absent>") { break }
-      // The restore reopens the app on the restored active athlete; without a
-      // program that athlete is offered set-up, which covers the Profile.
-      if now == "<absent>" && element("Cancel").exists && element("Create program").exists {
-        log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: set-up offered for the restored athlete; cancelled")
-        element("Cancel").tap()
-        openProfile()
-      }
       sleep(2)
     }
     settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)
