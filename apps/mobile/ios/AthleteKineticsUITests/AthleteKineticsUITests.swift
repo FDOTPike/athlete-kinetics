@@ -320,7 +320,7 @@ final class AthleteKineticsUITests: XCTestCase {
     for claim in ["Connected", "granted"] {
       XCTAssertFalse(hintA.contains(claim), "after a denial the wording claimed access ('\(claim)'): \(hintA)")
     }
-    XCTAssertFalse(dontAllow.exists, "the permission sheet stayed open")
+    XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 2), "the permission sheet stayed open")
 
     let before = expandCoachMode()
     XCTAssertTrue(before.hasPrefix("Coach mode, 1 athletes"), "expected one athlete before adding: \(before)")
