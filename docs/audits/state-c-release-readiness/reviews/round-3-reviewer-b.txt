@@ -1,0 +1,185 @@
+ROUND 3 (OPERATIVE) — REVIEWER B HANDOFF (verbatim as returned)
+Charter: progression, UI, state provenance, and the closeout audit. Read-only.
+Persisted by the executor without edit.
+Candidate reviewed:
+  MASTER_AUDIT_SYNTHESIS.md                            417e515a6b208e0bd7a12fc71e2ecd62c86dd533c71c4f2c77b3122b47e81840  867 lines
+  docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md          e99cf10dfa42ed0617f58edcc432bf067d5bf79257f586e1f2cee808f759b5d7  307 lines
+  docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md 03d367c350b35b720e8816c61f234df6c99facb3bff958f0a361a0d254380bcd  436 lines
+All three match the candidate table exactly. Line counts match.
+=====================================================================
+
+## 2. What verified clean (charter priorities 1-8)
+
+The progression, UI and state-provenance core of this document is, with the exceptions in 3,
+unusually precise. Every one of the following I re-derived from source, not from the document:
+
+Closeout findings 1-5. Every cited line span resolves and entails its sentence. Spot-exact
+examples: bodyweightRepsFor is at 767-771 (cited 765-771); the Option C set ramp is at 853-857 and
+slotReps at 862 (cited as such); bodyweightSlot at 846 inside the cited 844-862; plannedImplementFor
+at 1833-1834; beginSuspension's BEGIN/ROLLBACK at 2680-2699 and endSuspension's bare executeSync at
+2704-2713; BlockScreen.tsx's suspension conditional at exactly 471-517 with the resume button at
+480-485 and the entry try/catch at 499-506 — the remediation's "lines 499-506" is byte-accurate. The
+suspension-error node is indeed mounted only in the not-suspended branch. resetTrainingData contains
+exactly 49 DELETE statements, none naming a suspension table, and exactly five post-reset refresh
+calls, none refreshSuspension(). The git grep returns exactly the seven paths listed, none a screen
+or component.
+
+The isPurelyBodyweight regression claim is correct and is not overstated. At State A the predicate
+is m.primaryImplement === 'Bodyweight' with primaryImplement: m.supportedPrefixes[0] ?? undefined at
+both store call sites; at State C it is m.plannedImplement === 'Bodyweight' fed by
+plannedImplementFor, which returns undefined for any multi-member prefix list. Push-up is
+('Push-up', 'handstand-push-up', 0) at 016_movement_library_seed.sql:281 — rung 0.
+DEFAULT_ADVANCEMENT_POLICY.requiredReps is 8, and the only INSERT INTO progression_policy anywhere
+at 34f91ff is inside verify_blocks.mjs, so the chainAdvancementReps ?? fallback is live at 8 for
+every chain. The claim that this is a dose regression at State C relative to State A — not merely a
+ruling-completeness gap — is correct.
+
+Owner rulings. The docket ruling table at a80f955 occupies lines 444-455 exactly as cited; L1 is at
+452, L2 at 453, M1 at 454. The word "legacy" is present in 2.2's L1 row and in the closeout's
+verbatim L1 quote. The prior round's defect is fixed. The remaining abridgements in 2.2 drop
+corollaries without inverting or narrowing any ruling. I do not treat them as meaning-changing.
+
+Four-state matrix and State B. All six State B SHA-256 hashes and all six line counts reproduce
+exactly. SuspensionCard is imported at ProfileScreen.tsx:36 and never rendered; the only
+<SuspensionCard element is at BlockScreen.tsx:413. The sheet is wired into both screens with
+sub-view back handling (:247, :234). The store field is suspensionEpisode (State B) versus
+suspension (State C, declared 643, initialised 2096) — RC-12 and OW-003 use the right name for the
+right state. Zero occurrences of the three 059 objects across all five overlay files.
+
+State C commits. git log --oneline 48719b0..34f91ff returns exactly the four commits in the stated
+order; subjects match; diffstats match to the digit (f3ebab3 5 files +183/-10, 0cd8db9 9 files
++965/-62, 34f91ff +69/-4, 16 files changed overall).
+
+058/059 separation. 58 schema files at State A, 59 at State C; git cat-file -e
+48719b0:.../059_*.sql exits 128. Both pins re-pinned 57->58: verify_migrations.mjs:1720-1723 and
+verify_pipeline.mjs:514-517. [058] section begins at 1932, file terminates at 1997, no [059]
+section. Seven sentinels at migrationRunner.ts:190-196. trg_suspension_episode_program_immutable_bu
+is BEFORE UPDATE with no WHEN — the delete asymmetry is real.
+
+C6. RATIFIED_CEILING_BYTES = 536_870_912 and PREFERRED_TARGET_BYTES = 450_000_000 at
+memory_gate.mjs:56-57; the review-band condition at audit.mjs:173-175; reviewedEnvelopeBytes:
+471936000 and the "honestly RED ... This record IS that ratification" note at budget.json:40-43;
+RELEASE_READINESS.md:106-108 places the 471,936,000 B envelope in the band. verify:release =
+verify:ci && verify:memory-contract && verify:qa-candidate at package.json:48. C6 is consistently
+DEFERRED, never passed or failed, and the modelled envelope / physical-device measurement
+distinction holds in 3.4, RG-01 and 6.3. RG-03 is correct including the improvement row: at State A
+primaryImplement = supportedPrefixes[0] routes Weighted Pull-up (["Bodyweight","Banded"]) as
+bodyweight, so U1's weighted-calisthenics row fails at State A and passes at State C. The 8-rep
+push-up expectation is restored and matches HANDOVER:82-85.
+
+6.1. Exit code 128 correct; the three REPORTED rows are correctly bolded and disclaimed; the State A
+verify:ci row's "17 suites / 218 tests" is genuinely at docket line 29.
+
+## 3. Discrepancy table
+
+1  Synthesis 6.1, "Discovery reproducibility (CR-03)" row, executed_at 2026-08-31, label OBSERVED —
+   MEDIUM. Claims "A 62/117, B 5, C 115, D 16 changed / 2 Markdown, 120 untracked Markdown — every
+   declared count reproduced". git ls-files --others --exclude-standard | grep -i '.md$' returns 6
+   outside .agents/ and 121 total. The declared counts are 6 and 121 in 1.1, in the manifest
+   1.1/6.2, and in 6.3's own reproduction block (# expect 121). The row contradicts all three,
+   contradicts the "Corpus totals" row immediately above it bearing the same date, and its closing
+   assertion is false. A directly-observed verification row is stale and self-refuting, in a
+   document whose central discipline is that no evidence row overstates what it observed.
+
+2  6.3 "Limitations", bullet 8 — MEDIUM. "Round 1 returned two REQUEST_CHANGES verdicts; round 2
+   could not run. Every round-1 correction is unverified by anyone other than its author." 6.2 of
+   the same document records round 2, operative as having run with two REQUEST_CHANGES verdicts,
+   persists both handoffs by hash, and devotes ~25 lines to "What operative round 2 changed". Only
+   the aborted round-2 pair hit HTTP 429.
+
+3  3.1, para 3 — MEDIUM. "The owner's ratification on 2026-08-27 is recorded separately: 'RR-04 is
+   implemented. The capability ladder now agrees with what blocks prescribe. Migration 058 gives the
+   app a real suspending state.'" [HANDOVER_2026-08-27_SOL.md@48719b0, lines 31-33]. The span
+   records implementation status, not ratification, and is an agent-authored orchestrator handover
+   (T1) — the document's own 2.1 labels it "Orchestrator handover". Line 31's "All six
+   progression-measurement owner decisions are ratified" does not reach RR-04, which is not one of
+   those six. The only "owner-ratified 2026-08-27" attributions for RR-04 at State A are code
+   comments (blockGenerator.ts:812, :804, :720, 058_suspension_episode.sql:3) — T4, which 0.3 bars
+   from originating. 3.1's whole thesis is the recommend-vs-ratify distinction, and here an
+   implementation report is substituted for the ratification record.
+
+4  Closeout 2.1, line 265-266 — LOW. "Both pinned migration counts were re-pinned from 57 to 58
+   files, never loosened." [verify_migrations.mjs@34f91ff, lines 1721-1725]. The cited span covers
+   one pin. The second lives in verify_pipeline.mjs:514-517 and is uncited here. 6.2 records that
+   round 2 caught this; the fix landed in synthesis 3.3 but not in the closeout.
+
+5  Closeout 2.1 table + prose; synthesis 3.3 and 6.1 "059 mutation surface" row — LOW. "the only
+   permitted lifecycle transition is the athlete's own resume"; "permits exactly one"; "7 refusals,
+   1 permitted transition". 059_*.sql:147-151 deliberately permits deletion of an OPEN episode: "An
+   OPEN episode may still be removed: it carries no completed trail..." The trigger fires only WHEN
+   OLD.ended_at_ms IS NOT NULL. This is a second permitted mutation class on suspension_episode,
+   absent from a table headed "The exact allowed and refused mutations" — and the closeout's own 1.2
+   remediation depends on it (DELETE FROM suspension_episode WHERE ended_at_ms IS NULL).
+
+6  3.4, "A Pixel 9 Pro result does not satisfy C6" — LOW. "...they were specified against a device
+   that is not the 4 GB target." [HANDOVER_2026-08-27_SOL.md@48719b0, lines 78-89]. Lines 78-89 are
+   the U1 heading and its four-row functional table; they name no device. The Pixel 9 identification
+   is at HANDOVER:36, which is not cited. The functional/memory distinction itself is correct.
+
+7  Closeout 1.1, para "The impact is wider..." — LOW. "a single predicate gates three behaviours,
+   not one: isPurelyBodyweight(m) selects the Option C set ramp at :853-857, and the SAME flag
+   selects the L2(b) chain rep floor at :862". Only two are enumerated at that call site; both come
+   from the same bodyweightSlot local at :846. The third (bodyweightDominant at :681) is a different
+   call site, treated in 2.2 and named correctly in synthesis 3.1.
+
+8  Closeout 0.3, first sentence — LOW. "The 59 migration files at 34f91ff were extracted..." The
+   same section then establishes that "slot 004 is the parameterized state_vector materialize
+   script, never a migration" and that the contract is 58 migrations / 59 schema files. The opening
+   sentence commits the exact conflation the paragraph exists to disclaim. Synthesis 6.1 gets it
+   right ("59/59 schema files").
+
+## 4. Commands and locators used
+
+sha256sum and wc -l on the three candidates.
+git log --oneline 48719b0..34f91ff ; git show --stat --format=%s on each of the four commits ;
+git diff --stat 48719b0 34f91ff
+git show 34f91ff:packages/inference/src/blockGenerator.ts | sed -n '100,125p;490,515p;660,700p;750,880p'
+git show 48719b0:packages/inference/src/blockGenerator.ts | sed -n '88,108p;715,740p;805,825p'
+git show 34f91ff:packages/inference/src/progressionEngine.ts
+git grep -n "handstand-push-up" 34f91ff -- packages/core-db/src/schema
+git grep -n "INTO progression_policy" 34f91ff
+git grep -l "planned_slot_load_intent|plannedImplement" 34f91ff -- apps/ packages/
+git show 34f91ff:apps/mobile/src/state/useStore.ts | sed -n '641,645p;1820,1870p;2048,2062p;2094,2098p;2193,2197p;2678,2716p;3050,3056p;3177,3183p;3342,3356p;6076,6082p;6126,6160p'
+git show 48719b0:apps/mobile/src/state/useStore.ts | grep -n "primaryImplement"
+git show 34f91ff:apps/mobile/src/screens/BlockScreen.tsx | sed -n '468,520p'
+git show a80f955:docs/decisions/RELEASE_CANDIDATE_C1_DOCKET.md | sed -n '27,31p;240,270p;282,315p;380,400p;435,480p'
+git show 48719b0:HANDOVER_2026-08-27_SOL.md | sed -n '29,35p;75,100p;165,176p'
+git show 48719b0:docs/AUDIT_architecture_review_8b4e75b.md | sed -n '10,24p;205,213p'
+git show 48719b0:tools/memory-audit/{memory_gate.mjs,audit.mjs,budget.json}
+git show 48719b0:RELEASE_READINESS.md | sed -n '23,32p;104,110p'
+git show 48719b0:package.json | sed -n '35,50p'
+git show f3ebab3:packages/core-db/src/schema/059_suspension_state_and_load_intent.sql | sed -n '54,74p;114,160p'
+git show 34f91ff:packages/core-db/src/migrationRunner.ts | sed -n '188,198p'
+git show 34f91ff:packages/core-db/test/verify_migrations.mjs | sed -n '1715,1730p'
+git show 34f91ff:packages/inference/test/verify_pipeline.mjs | sed -n '508,522p'
+git ls-tree -r --name-only <48719b0|34f91ff> packages/core-db/src/schema | grep -c '.sql$'
+git cat-file -e 48719b0:packages/core-db/src/schema/059_suspension_state_and_load_intent.sql
+git ls-files --others --exclude-standard | grep -i '.md$'
+sha256sum AGENTS.md ; wc -l AGENTS.md
+sha256sum <the six State B files> ; wc -l <same>
+grep -n "SuspensionCard|SuspensionSheet|suspensionEpisode" apps/mobile/src/screens/*.tsx apps/mobile/src/state/useStore.ts
+
+## 5. Assessment
+
+Discrepancies 1-3 are the ones that matter. #1 is a 6.1 row labelled directly observed, dated today,
+whose numbers are wrong and whose closing assertion is false against the document's own declared
+counts. #2 is a limitations bullet that denies a review round the document itself records in detail.
+#3 is charter item 3 in its purest form: the recommend/ratify distinction is drawn correctly for the
+architecture review, then immediately undercut by offering an agent's implementation report as the
+owner's ratification record.
+
+None of these is a progression-engine error — the progression analysis, the isPurelyBodyweight
+fan-out, the ladder-floor regression, the bar-of-8 fallback, the State A/State C dose comparison and
+the U1 row-by-row re-derivation are all correct and, in the case of the weighted-calisthenics
+improvement, commendably even-handed. But #1 and #3 are state-provenance and attribution
+discrepancies, and the charter's approval bar is zero.
+
+Suggested minimal fixes: correct the CR-03 row to B 6 / 121 (or delete it as redundant with the
+"Corpus totals" row); rewrite the 6.3 bullet to match 6.2's register and re-scope "What a round-2
+reviewer should attack first" to round 3; re-cite or reword 3.1's ratification sentence; add the
+verify_pipeline.mjs:514-517 citation to closeout 2.1; and add the permitted open-episode delete to
+the 2.1 table so it agrees with 1.2.
+
+REQUEST_CHANGES
+=====================================================================
+END OF VERBATIM HANDOFF

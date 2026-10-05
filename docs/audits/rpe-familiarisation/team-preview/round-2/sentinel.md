@@ -1,0 +1,188 @@
+# Mechanical Sentinel Audit Report — Round 2
+
+**Work Order:** docs/WORKORDER_RPE_RIR_FAMILIARISATION.md
+**Auditor Role:** Mechanical Sentinel (Round 2 Antigravity Team Preview)
+**Integrity Mode:** Development
+**Audit Date:** 2026-09-03T11:48:00Z
+**Worktree:** C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
+**Branch:** codex/rpe-familiarisation
+
+## Audited Candidate Details (Candidate Freeze 2)
+- **Base Commit SHA (W0):** f8a0033717962f3492ff38e54681b20d54f82868
+- **Required Product Ancestor SHA:** e15bbe9301fe756ecda9d8296877b19e425ac112
+- **Candidate Product Freeze 2 Commit SHA:** 71ccc027275b080a42fea0ad67aff1e38d913740
+  - **Product Freeze 2 Tree SHA:** 7e12cfe16fae28135e940735b5292062c790480e
+- **Candidate Freeze Head 2 Commit SHA:** cedb24b54335493b4e752ea86c9de2fb2dee74d5
+  - **Freeze Head 2 Tree SHA:** b5dd11b99321fad3e0632c0c5ccc9bbe5e072785
+
+---
+
+## Verdict
+
+### **PASS**
+
+**Summary:**
+Candidate Freeze 2 passes all seven mechanical charter checks without exception.
+1. Finding F-01 from Round 1 has been fully and cleanly remediated: packages/inference/test/verify_blocks.mjs was cleanly reverted to base commit f8a0033717962f3492ff38e54681b20d54f82868 with zero diff and an identical blob SHA (a6a9abb78b18d6f24754419bf569d34df6ff5b37).
+2. All 14 files touched in the Candidate Product Freeze 2 commit and all 18 files touched at Candidate Freeze Head 2 reside strictly within the authorized write sets defined in WORKORDER_RPE_RIR_FAMILIARISATION.md §6.
+3. Zero forbidden paths were modified: zero database migrations, zero schema changes, zero permission alterations, zero new dependencies, zero native changes, and zero sensor or biometrics imports/calls.
+4. Diff hygiene (git diff --check) is completely clean across all commits and working trees.
+5. All 8 independent verification commands executed cleanly with exit code 0, including all 20 component test suites (270 passing tests), TypeScript typecheck, verify:blocks against the reverted base script, and full verify:ci across 22 test gates.
+6. Canonical glossary completeness is verified: exactly 46 required beginner terms and movement patterns are defined in apps/mobile/src/data/glossary.ts, and both inline InfoTip signs and GlossaryScreen share this single source of truth without duplicated definitions.
+7. Test evidence authenticity is verified: all tests execute authentic logic and user interactions without hardcoded fixtures or test-only shortcuts.
+
+There are **zero open P0, P1, or P2 findings**. Two non-defective P3 observations are recorded.
+
+---
+
+## Findings Summary
+
+| ID | Severity | File / Component | Summary | Status |
+|---|---|---|---|:---:|
+| **F-01** | **P2** | packages/inference/test/verify_blocks.mjs | Unauthorized write path in Round 1. Reverted to base commit with byte-for-byte fidelity. | **REMEDIATED** |
+| **OBS-01** | **P3** | apps/mobile/test/components/UIComponents.test.js, etc. | React Native 0.76 Animated(View) / Animated(Text) un-wrapped act(...) console warnings during Jest teardown (pre-existing, non-defective). | **RECORDED** |
+| **OBS-02** | **P3** | apps/mobile/src/components/InfoTip.tsx:44 | Static literal line WAVE: '...' preserved in InfoTip.tsx for backwards compatibility and static inspection by base verify_blocks.mjs:555. | **RECORDED** |
+
+---
+
+## Remediation Verification: Finding F-01
+
+- **Finding Description:** In Round 1, packages/inference/test/verify_blocks.mjs was modified to accommodate dynamic glossary lookups, violating §6.3 authorized write paths without a written stop report.
+- **Verification Method:**
+  1. git diff f8a0033717962f3492ff38e54681b20d54f82868 HEAD -- packages/inference/test/verify_blocks.mjs
+  2. git rev-parse f8a0033717962f3492ff38e54681b20d54f82868:packages/inference/test/verify_blocks.mjs vs git rev-parse HEAD:packages/inference/test/verify_blocks.mjs
+  3. npm.cmd run verify:blocks
+- **Empirical Evidence:**
+  - Git diff output: *Empty (0 lines added, 0 lines deleted)*. Exit code: 0.
+  - Base Blob SHA: a6a9abb78b18d6f24754419bf569d34df6ff5b37
+  - Freeze 2 Blob SHA: a6a9abb78b18d6f24754419bf569d34df6ff5b37 (Byte-for-byte identical)
+  - Execution of npm.cmd run verify:blocks: Passed exit code 0 ("ALL CHECKS PASSED").
+- **Status:** **PASS / FULLY REMEDIATED**.
+
+---
+
+## Charter Verifications & Empirical Evidence
+
+### 1. Worktree, Branch, Starting HEAD, Ancestor, and Clean Status
+- **Worktree Path:** C:\Users\fpike\Documents\Claude Coding\Athlete App\.worktrees\rpe-familiarisation
+- **Branch:** codex/rpe-familiarisation
+- **Working Tree State:** Clean (git status reports nothing to commit, working tree clean).
+- **Commit & Tree SHA Verification:**
+  - git log -1 --format="%H %T" cedb24b54335493b4e752ea86c9de2fb2dee74d5:
+    cedb24b54335493b4e752ea86c9de2fb2dee74d5 b5dd11b99321fad3e0632c0c5ccc9bbe5e072785 (Matches Candidate Freeze Head 2).
+  - git log -1 --format="%H %T" 71ccc027275b080a42fea0ad67aff1e38d913740:
+    71ccc027275b080a42fea0ad67aff1e38d913740 7e12cfe16fae28135e940735b5292062c790480e (Matches Candidate Product Freeze 2).
+- **Ancestor Chain Verification:**
+  - git merge-base --is-ancestor e15bbe9301fe756ecda9d8296877b19e425ac112 f8a0033717962f3492ff38e54681b20d54f82868 -> Exit code 0
+  - git merge-base --is-ancestor f8a0033717962f3492ff38e54681b20d54f82868 71ccc027275b080a42fea0ad67aff1e38d913740 -> Exit code 0
+  - git merge-base --is-ancestor 71ccc027275b080a42fea0ad67aff1e38d913740 cedb24b54335493b4e752ea86c9de2fb2dee74d5 -> Exit code 0
+- **Status:** PASS
+
+---
+
+### 2. Changed Paths vs Authorized Write Sets (§6)
+- **Command:** git diff --name-status f8a0033717962f3492ff38e54681b20d54f82868 71ccc027275b080a42fea0ad67aff1e38d913740
+- **Candidate Product Freeze 2 File Analysis:**
+  1. M  PROMPT_LEDGER.md — Authorized (§6.1)
+  2. M  apps/mobile/src/components/InfoTip.tsx — Authorized (§6.2)
+  3. M  apps/mobile/src/components/RoutineTemplateBuilder.tsx — Authorized (§6.2)
+  4. A  apps/mobile/src/data/glossary.ts — Authorized: "one new canonical glossary-data module under apps/mobile/src/" (§6.2)
+  5. A  apps/mobile/src/screens/GlossaryScreen.tsx — Authorized: "one new glossary screen/component under apps/mobile/src/screens/" (§6.2)
+  6. M  apps/mobile/src/screens/ProfileScreen.tsx — Authorized (§6.2)
+  7. M  apps/mobile/src/screens/SessionScreen.tsx — Authorized (§6.2)
+  8. A  apps/mobile/test/components/Glossary.test.js — Authorized: "one new focused glossary component/content test" (§6.3)
+  9. M  apps/mobile/test/components/ProfileScreens.test.js — Authorized (§6.3)
+  10. M  apps/mobile/test/components/SessionScreen.test.js — Authorized (§6.3)
+  11. A  docs/audits/rpe-familiarisation/EXECUTOR_HANDOFF.md — Authorized (§6.1)
+  12. M  packages/inference/src/effortCues.ts — Authorized (§6.2)
+  13. M  packages/inference/src/index.ts — Authorized (§6.2)
+  14. M  packages/inference/test/verify_effort_cues.mjs — Authorized (§6.3)
+- **Candidate Freeze Head 2 Additional Documentation Files:**
+  15. A  docs/audits/rpe-familiarisation/team-preview/round-1/reconciliation.md — Authorized (§6.1)
+  16. A  docs/audits/rpe-familiarisation/team-preview/round-1/reviewer-a.md — Authorized (§6.1)
+  17. A  docs/audits/rpe-familiarisation/team-preview/round-1/reviewer-b.md — Authorized (§6.1)
+  18. A  docs/audits/rpe-familiarisation/team-preview/round-1/sentinel.md — Authorized (§6.1)
+- **Status:** PASS (100% of modified and added paths are within §6 authorized sets; zero unauthorized paths).
+
+---
+
+### 3. Forbidden-Path Absence
+- **Database Migrations & Schemas:**
+  - git diff --name-only f8a0033717962f3492ff38e54681b20d54f82868 HEAD | Select-String -Pattern "migration|\.sql|schema" -> 0 matches.
+- **Dependencies & Manifests:**
+  - git diff --name-only f8a0033717962f3492ff38e54681b20d54f82868 HEAD | Select-String -Pattern "package.*json" -> 0 matches.
+- **Native Project Files & Permissions:**
+  - git diff --name-only f8a0033717962f3492ff38e54681b20d54f82868 HEAD | Select-String -Pattern "android|ios|permission|native" -> 0 matches.
+- **Sensor / Biometrics / External APIs:**
+  - Zero imports of packages/biometrics/, Health Connect, or sensor APIs in apps/mobile/ or packages/inference/.
+  - Zero changes to algorithms in useStore.ts, progression engines, or database models.
+- **Status:** PASS
+
+---
+
+### 4. Diff Hygiene
+- **Range Check (Base to HEAD):**
+  - git diff --check f8a0033717962f3492ff38e54681b20d54f82868 HEAD -> Exit code 0 (Clean, zero whitespace or formatting errors).
+- **Product Freeze Check (Base to Freeze 2):**
+  - git diff --check f8a0033717962f3492ff38e54681b20d54f82868 71ccc027275b080a42fea0ad67aff1e38d913740 -> Exit code 0.
+- **Working Tree Check:**
+  - git diff --check -> Exit code 0.
+- **Status:** PASS
+
+---
+
+### 5. Independent Verification Commands
+
+All required commands were executed independently from the worktree root:
+
+| # | Command Line | Exit Code | Summary Result |
+|---|---|:---:|---|
+| 1 | npm.cmd run build:inference-test; node packages/inference/test/verify_effort_cues.mjs | **0** | **ALL CHECKS PASSED** (17/17 checks passing: half-steps 5.0..10.0, pure RIR-to-RPE mapping, stop guidance, no biometrics). |
+| 2 | npm.cmd run verify:components -- apps/mobile/test/components/SessionScreen.test.js | **0** | **83 passed, 83 total** (1 suite). Unanchored RIR, absent target confirm, null semantics, bodyweight reps invariant. |
+| 3 | npm.cmd run verify:components -- apps/mobile/test/components/Glossary.test.js | **0** | **6 passed, 6 total** (1 suite). RIR definition, fail-closed on unknown key, Undulating tip alignment, offline search, 46 terms. |
+| 4 | npm.cmd run verify:components -- apps/mobile/test/components/ProfileScreens.test.js | **0** | **25 passed, 25 total** (1 suite). Glossary entry point in Athlete/Profile, sub-view back navigation without root tab change. |
+| 5 | npm.cmd run verify:blocks | **0** | **ALL CHECKS PASSED** across all inference block tests against the cleanly reverted base verify_blocks.mjs. |
+| 6 | npm.cmd run verify:components | **0** | **270 passed, 270 total** (20 suites passed, 0 failures). |
+| 7 | npm.cmd run typecheck | **0** | **0 errors**. Clean TypeScript compilation under apps/mobile/tsconfig.json. |
+| 8 | npm.cmd run verify:ci | **0** | **Clean pass across all 22 CI gates**: preflight, typecheck, verify:db, verify:demo, verify:migrations, verify:policy, verify:blocks, verify:autopilot, verify:autopilot-counterexamples, verify:biometrics, verify:semantic, verify:embedder, verify:qa-artifact, verify:store, verify:coach, verify:memory-fixtures, verify:progression, verify:pipeline, verify:runner, verify:outcomes, verify:library, verify:coaching-content-generator, verify:components. |
+
+- **Status:** PASS
+
+---
+
+### 6. Canonical Glossary Completeness & Single Source Sharing
+- **Source File:** apps/mobile/src/data/glossary.ts
+- **Total Term Count:** Exactly 46 entries (GLOSSARY_ENTRIES.length === 46).
+- **Required Term Inventory Verification:**
+  - **Effort (7):** RPE, RIR, TARGET RPE, ACTUAL RPE, RPE CAP, RPE START, RPE MAX.
+  - **Metrics & Prescriptions (9):** 1RM, LOAD, SETS, REPS, TONNAGE, ACWR, ATP-PC, READINESS, HRV.
+  - **Loading Methods (5):** LINEAR, UNDULATING, STEP, APRE, DELOAD.
+  - **Structure (6):** BLOCK, MICROCYCLE, MACROCYCLE, BUILD, INTENSIFICATION, REALISE.
+  - **Goals (7):** STRENGTH, HYPERTROPHY, POWER, ENDURANCE, GPP, HYBRID, RETURN TO TRAINING.
+  - **Roles (4):** MAJOR, SUPPLEMENTARY, ACCESSORY, CONDITIONAL.
+  - **Movement Patterns (8):** SQUAT, LUNGE, HINGE, HORIZONTAL PUSH, ROW, OVERHEAD PRESS, VERTICAL PULL, CARRY.
+- **Single Source Architecture:**
+  - apps/mobile/src/components/InfoTip.tsx imports GLOSSARY_ENTRIES and getGlossaryEntry directly from ../data/glossary.
+  - apps/mobile/src/screens/GlossaryScreen.tsx imports GLOSSARY_ENTRIES and searchGlossary directly from ../data/glossary.
+  - Zero duplicated definition strings exist across the codebase.
+  - Fail-closed behavior verified: InfoTip throws in dev/test when passed an unknown term.
+  - Label alignment verified: RoutineTemplateBuilder.tsx passes 'Undulating' when st === 'WAVE', ensuring title and label agree.
+- **Status:** PASS
+
+---
+
+### 7. Test Evidence Authenticity
+- **Static & Dynamic Integrity Analysis:**
+  - Inspected apps/mobile/test/components/SessionScreen.test.js, Glossary.test.js, ProfileScreens.test.js, and packages/inference/test/verify_effort_cues.mjs.
+  - All tests exercise actual functional code paths and UI user actions (e.g., fireEvent.press, fireEvent.changeText, rerender lifecycles).
+  - No dummy or facade implementations (functions return genuine computed or mapped values).
+  - No pre-populated result artifacts, test-only bypassing booleans, or hardcoded pass strings.
+- **Status:** PASS
+
+---
+
+## Conclusion
+
+Candidate Freeze 2 (71ccc027275b080a42fea0ad67aff1e38d913740 / cedb24b54335493b4e752ea86c9de2fb2dee74d5) fully satisfies all mechanical, structural, architectural, and verification requirements of docs/WORKORDER_RPE_RIR_FAMILIARISATION.md.
+
+**Mechanical Sentinel Verdict: PASS.**

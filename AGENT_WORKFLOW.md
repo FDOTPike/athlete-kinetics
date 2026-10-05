@@ -33,7 +33,10 @@ migration.
    embedded web views. Video links are inert text opened via the OS handler.
 2. **Determinism**: prescriptions, blocks, progression, substitution = pure
    TS functions. No RNG, no clock reads inside engines, no LLMs at runtime.
-3. **Memory**: 450 MB peak dirty RAM ceiling (4 GB Jetsam devices). GC-friendly
+3. **Memory**: hard ceiling 536,870,912 B (512 MiB), preferred operating target
+   450,000,000 B — ratified 2026-08-24, one ceiling for every supported Android
+   and iOS device. Between target and ceiling requires physical-device evidence
+   and an explicit review record; above the ceiling blocks release. GC-friendly
    code; reference data loads once.
 4. **Strict typing**: TS `--strict`, no `any`. SQLite tables STRICT.
 5. **Append-only migration chain**: shipped migrations are FROZEN. New work =
@@ -57,21 +60,32 @@ session. Therefore:
   git process is live).
 
 ## 3. The verification loop (nothing ships around it)
+Clean-checkout contract: `npm ci` -> `npm run fetch:embedder` -> `npm run verify:ci`.
+MERGE gate = `verify:ci` (must be green). RELEASE gate = `verify:release`, which
+adds the ratified memory contract [A] and measured device evidence [D]; CI cannot
+run it because no runner has an authorized device packet. `verify:all` is an alias
+for `verify:release`.
 ```
 npm run typecheck        # first, always
-npm run verify:all       # 20 gates + typecheck; semantic+embedder need network
+npm run verify:ci        # 24 gates + preflight + typecheck; semantic+embedder need bootstrap
+npm run verify:release   # verify:ci + memory contract [A]/[D] + REAL candidate APK (owner-run)
 ```
-Gates: db, demo, migrations, policy, blocks, autopilot,
-autopilot-counterexamples, biometrics, semantic, embedder, store, coach, memory,
-progression, pipeline, runner, outcomes, library,
-coaching-content-generator, components (+ typecheck).
+verify:ci gates: db, demo, migrations, policy, blocks, autopilot,
+autopilot-counterexamples, biometrics, semantic, embedder, qa-artifact, native-config, store,
+coach, backup, memory-fixtures, progression, pipeline, runner, outcomes,
+preparation, library, coaching-content-generator, components (+ typecheck).
+verify:release adds: memory-contract ([A] ratified envelope, [D] measured device
+evidence, [G] evidence provenance — the packet must be re-derivable from its own
+sealed raw logcat/meminfo bytes, closing the fabricated-packet hole Hermes
+found in audit r3) and qa-candidate (provenance of the REAL app-qa.apk).
 - A new invariant is not real until a gate asserts it. Prefer extending the
   owning gate over prose promises. Behavior contracts (source-grep checks in
   verify_store/verify_blocks) are acceptable until RN component tests exist.
 - Sandbox quirks: verify:db can fail on libsqlite < 3.41 (STRICT/REAL) —
   environmental, expect green on CI/modern machines. semantic/embedder are
   CI/network-only.
-- Every gate you add: wire it into `verify:all` and the CI expectations.
+- Every gate you add: wire it into `verify:ci` (or `verify:release` if it needs a
+  device or a ratified budget) and the CI expectations.
 
 ## 4. Migration protocol
 - Next slot = `max(seeded_manifest slots, files on disk in src/schema) + 1`.
@@ -142,6 +156,37 @@ black, minimalist. Until his design drops:
 - Builder responses end with a MASTER LEDGER ENTRY block (see PROMPT_LEDGER
   conventions): input state, constraints enforced, actions, RAM/latency/
   constraint deltas.
+
+### 8.1 Evidence artifacts — one artifact, one observation
+An artifact records **what was observed**, never the story of the
+investigation. Three incidents in Aug 2026 all had the same shape: the
+narrative got filed as files, and the files then implied observations nobody
+made.
+
+- **One capture, one name.** Before filing an artifact, hash it against those
+  already on disk. If it is byte-identical to an existing one, you captured the
+  same state twice — say so; do not file it again under a second name.
+  (`WE_weeks_horizon.xml` was byte-identical to `WE_dated_180d.xml` and was
+  filed as separate proof of the opposite behaviour. Six `.db` pulls named for
+  a reproduction sequence — `reproduction_pre_state`, `reproduction_push`,
+  `live_app_created`, … — were one pull copied six times, for a reproduction
+  that never ran.)
+- **Never name an artifact for a step you did not complete.** A file called
+  `*_post_creation` asserts a creation happened. If it did not, there is no
+  file.
+- **The claim must live in the named artifact.** Do not put a database fact in
+  a column headed "string found in the XML". Database corroboration is
+  legitimate evidence — give it its own column naming the `.db` it came from.
+- **A claim about a row you can no longer read is not evidence.** State-holding
+  rows get overwritten (`block_meta.block_id 1` was overwritten by each new
+  program). Cite what survives in a retained snapshot, or mark it NOT VERIFIED.
+- **Never present a value your own test harness wrote as app behaviour.** If a
+  script inserted or edited a row, that row is a fixture, not an observation,
+  and must be labelled as one at the moment it is recorded.
+- Absence claims carry their own grep output showing zero matches. Absence
+  asserted from reading source is not evidence.
+- A gate you did not watch fail is not evidence that it works. When you add a
+  guard, break the thing it guards, record the failure output, then revert.
 
 ## 9. Audit protocol (for auditor agents)
 - Verify claims by RUNNING gates, not reading prose. `verify:all` may exceed

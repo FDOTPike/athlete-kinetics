@@ -1,0 +1,67 @@
+REVIEWER A — FRESH FULL-SCOPE RE-CERTIFICATION — State C release-readiness freeze, commit 952afd3
+========================================================================================================
+Reviewer: Reviewer A (second pair, independent read-only certification)
+Candidate: 952afd3ce0c45497e0d46c66d2d71788a56dead2 (docs(audit): reconcile State C release evidence)
+Parents: 88f5b5c72271f34df04a88c9817f63a128e8bcdf (fix(progression): decouple chain rep floor from load routing) <- 34f91ffe548a0b9e51db863ffc6fad993619f940 (State C base)
+Worktree: clean at review time; branch codex/state-c-release-readiness; no writes performed.
+Scope: FRESH full-scope re-certification of the remediated freeze. Prior pair's findings not assumed; the manifest §6.2 'Totals by Boundary' correction was independently re-derived.
+
+1. LEDGER LINEAGES — VERIFIED
+  - git show 34f91ff:PROMPT_LEDGER.md = SHA-256 00f3d78475d4192a0bcbe03db2432301ab23fdabb5bb6a994b5835cb4f8f9c68, 3139 lines (matches fingerprint).
+  - Committed PROMPT_LEDGER.md prefix up to Entry 0058's separator: byte-identical to the base (cmp over the full base byte length, PASS). Entry 0058 heading at line 3142; appended entry is 86 lines (3139 -> 3225).
+  - Archive docs/audits/state-c-release-readiness/lineage/PROMPT_LEDGER_AUDIT_LINEAGE_1A878602.md = SHA-256 1a8786020be1eef107a1b3c8b6e1d02ff7826b688e67789adaf1414bc8e5c3b0, 3942 lines. Matches fingerprint and crosswalk.
+  - Archive contents: Entry 0055..0065 present with titles matching the crosswalk's AUD-* descriptions (0055 remediation workorder request; 0056 retarget to Opus; 0057 execute; 0058 prepare continuation; 0059..0065 continuation/closeout/corrective entries, incl. Entry 0065's two-Output historical defect).
+  - Crosswalk LEDGER_LINEAGE_CROSSWALK.md (48 lines, SHA-256 c73354c8...) namespaces CANON-0055..0058 vs AUD-0055..0065; every AUD-0055..0065 and CANON-0058 label present; distinct events, no merge or renumber (read in full; verifier auditLineageArchive also enforces AUD-0055..0065 coverage).
+  - OW-024 closure: archive byte-for-byte + crosswalk namespacing, three controls stated; future reader cannot mistake archived Entry 0065 for canonical Entry 0058. VERIFIED.
+
+2. MANIFEST ARITHMETIC — VERIFIED (mechanically re-derived from rows, not from the declared totals)
+  - docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md: 343 lines actual = declared self-count (S-OUT-01 row: "343 after the State C release-readiness rebuild"). SHA-256 93c82429beb6118005320ec7d1c1ca24bfbff1968f6e87693a2a7e414eeb691e = fingerprint re-pin; matches disk.
+  - 79 source records parsed; zero duplicate source IDs.
+  - Tier table (§6.1): T0=9, T1=16, T2=0, T3=28 (6 Corpus C .agents/ paths + 21 .txt handoffs + S-T3-07), T4=22, T5=1, S-OUT-=3. Total 79. Matches the declared table exactly.
+  - §6.2 Totals by Boundary, row by row: Worktree tracked at State A = 30; Worktree untracked outside .agents/ = 10; Worktree untracked under .agents/ = 27; Branch at exact commit = 10; Repository metadata = 1; Outside audit worktree = 1. Column sums to 79 (30+10+27+10+1+1). The corrected untracked-outside row = 10 with the parenthetical 6 Corpus B (S-T0-07, S-T0-08, S-T0-09, S-T3-07, S-OUT-01, S-OUT-02) + 3 State B code (S-T4-18/19/20) + 1 State C crosswalk (S-OUT-03). Prior P2 (13 vs 10) is fully remediated.
+  - Distinct paths: 76. 79 records minus blockGenerator.ts recorded twice (S-T4-07 State A, S-T4-11 State C) minus useStore.ts twice (S-T4-10 State C, S-T4-20 State B) minus pathless S-T4-05 (Git metadata) = 76; no other duplicate paths (mechanically enumerated).
+
+3. SYNTHESIS §4 STRICT LEDGER — VERIFIED
+  - Exactly 56 rows: 19 §4.1 OPEN + 11 §4.2 PARKED/OWNER_ONLY + 26 §4.3 RELEASE_GATE. Mechanically counted; tracked verifier pins rows === 56 (originAdmissibility).
+  - OW-036, OW-024, OW-025 absent from §4.1 rows (present only in preamble prose explaining the deliberate ID gaps; each dispositioned in §5.1). IDs never reused.
+  - Admissibility: every §4 row carries a T0/T1/T2 origin (verifier originAdmissibility PASS over all 56 rows); T4 rows appear only as labelled corroboration; S-OUT-02 correctly demoted to admission gate, not origin.
+  - Stale-current hunt (targeted, at each row's own as_of_revision): OW-001 residual still live at 952afd3 — plannedImplementFor (useStore.ts:1833/3052/3179/3348) still declares only a singleton supportedPrefixes value, no athlete-selection UI exists in screens/components (git grep), and verify_blocks §[28] at 88f5b5c machine-proves the undeclared-intent route matches loaded sets; OW-011's 057 SCHEMA_FILES gap still open at 34f91ff (file self-documents the deliberate omission, lines 20-51); OW-003 PER_ATHLETE_RESET span (2053-2060) still lacks suspension: null; OW-006 bodyweightDominant still every(movements) (671-682); OW-007 resume flow still uncatch'd (BlockScreen 471-517); OW-014/OW-022 origins still hold. No stale-current row found.
+  - OW-001 status accurate: OPEN, NON_BLOCKING on dose grounds (undeclared slot takes flat loaded set schedule instead of 4->5->5 bodyweight ramp — fewer sets, no ratified constraint violated); consistent with addendum §1.1 verdict PARTIALLY_CONFIRMED and its split record (line 404); adjudicated by prior independent rounds; the old BLOCKING attribution is gone everywhere.
+  - OW-035 status accurate: OWNER_ONLY, BLOCKING; docket S3(a) ruling (a80f955 lines 467-468) requires the disclosure in the C7 handback; C7 remains owner-open (§3.4, RG-02), so the row is still open and BLOCKING is the only remaining BLOCKING release effect in §4 (stated in §3.4, verified consistent).
+
+4. THREE DISPOSITIONS — VERIFIED against primary sources
+  - OW-036 CLOSED: at 88f5b5c, blockGenerator.ts lines 765-775 contain chainScopedRepsFor keyed on chain membership — 'if (m.progressionGroup === undefined) return reps;' (lines 768-772), applied to every slot (slotReps = chainScopedRepsFor(m), line 863); isPurelyBodyweight now gates only Option C set routing (bodyweightSlot, line 847). verify_blocks.mjs §[28] lines 2070-2085 carry the bodyweight/loaded/undeclared/deload cases asserting the floor applies on all three routes while set routing diverges; file is 2210 lines (span in bounds). Mutation proof recorded in §6.1 (row 797: 4 targeted failures on the restored coupling, bytes restored, re-run green). 88f5b5c changes only blockGenerator.ts + verify_blocks.mjs. Commit reachable (parent of candidate).
+  - OW-024 CLOSED: via lineage archive (byte-identical, hash 1a878602..., 3942 lines) + crosswalk (c73354c8..., 48 lines) — both hashes independently verified against disk; no merge/renumber.
+  - OW-025 SUPERSEDED (State-B-only): candidate = State C (34f91ff) + push-ready commits; State B overlay deliberately excluded (A1 'adopt none', docket lines 61-95 verified; S5(c)/S6(b) carried by Migration 059, docket lines 105-118 verified); no SuspensionCard/SuspensionSheet/SuspensionUI in the candidate tree (curatedEvidence check + manifest S-T4-18/19/20 registered as State B snapshot only). The conditional exposure is thereby closed; archived State B snapshot preserved as external evidence.
+
+5. ZERO-HALLUCINATION / CITATION RESOLUTION — VERIFIED
+  - Tracked verifier: 18/18 checks green, including the full citations check (>150 citations mechanically resolved: path exists at cited commit, commit reachable from base or base from commit, line bounds in range, SHA-256 exact for working-tree forms). Notes printed: 21 review-handoff citations resolve in the curated reviews directory (bytes identical); 6 working-tree citations resolve in the preserved source worktree.
+  - Independent spot-checks: 27/27 hand-resolved citations (20 [Source: path@commit, lines a-b] + 7 [Working-tree source: ...]), all in bounds, all commits reachable, all hashes exact. Working-tree relocations verified: .agents/orchestrator/GATE_STATUS.md (9a3f2a58.../25 lines) and State B overlay (SuspensionCard 77d798e6.../148 lines; useStore 6216 lines fa561697...) resolve in STATE_C_SOURCE_WORKTREE; review handoffs resolve byte-identical in docs/audits/state-c-release-readiness/reviews/.
+  - Content entailment re-derived for the critical spans: workorder §3.5 Finding 1 (line 191) names the L1 athlete-choice gap; addendum §1.1 (63-157) records PARTIALLY_CONFIRMED and the OW-001/OW-036 split (line 404); docket L1(a) (line 452) requires athlete selection; docket S3(a) (467-468); OW-036 engine/test spans (above); OW-011/003/006/007/014/022 spans (above). No fabricated locator, hash, or count found.
+
+6. VERIFIER RUNS (executed by this reviewer, read-only)
+  - STATE_C_SOURCE_WORKTREE="C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/progression-evidence-remediation" node tools/audit/verify_state_c_release_evidence.mjs
+    -> 18/18 checks passed (exit 0). All 18 named checks PASS, including fingerprintFile, candidateFingerprints, ancestry, canonicalLedgerPreserved, auditLineageArchive, canonicalLedgerEntry0058, workOrderPresent, headings, mojibake, c6Status, reviewStatus, manifestArithmetic, manifestSelfCount, citations, originAdmissibility, curatedEvidence, fingerprintFileIntegrity, gitHygiene.
+  - Same command with --self-test -> 7/7 probes failed as intended (mutated candidate hash, duplicate manifest ID, altered citation hash, tampered lineage hash, contradictory status, inserted mojibake, forbidden curated artifact), exit 0. Repo bytes untouched; worktree still clean after both runs.
+
+7. REVIEW-STATUS WORDING — VERIFIED
+  - §0.1: revision 4 status is PENDING_EXTERNAL_REVIEW until a fresh Reviewer A/B pair certifies the rebuilt candidate (lines 16, 51); revision-3 approval correctly scoped to the carried revision-3 bytes (Round 12).
+  - §6.3: 'Independent review status: PENDING_EXTERNAL_REVIEW for revision 4' (line 1172) with the correct rationale (revision 4 changes substantive ledger dispositions).
+  - No stale 'This document is NOT approved' / 'has not passed independent review' / stale four-rounds wording anywhere in MASTER_AUDIT_SYNTHESIS.md, the manifest, the addendum, or the ledger (grep + verifier reviewStatus check).
+  - Fingerprint re-pinned to the corrected manifest SHA-256 (93c82429...) and corrected synthesis SHA-256 (a8b6599f...); both match disk; verifier candidateFingerprints validates.
+
+OBSERVATIONS (non-blocking, no finding)
+  - §6.4's 'recorded in PROMPT_LEDGER.md Entry 0063' phrasing refers to the archived audit lineage's ledger (entries 0061-0063 exist there — verified in the archive); the State C freeze's authoritative hashes live in tools/audit/state-c-release-fingerprint.json, which the verifier validates and commit 3 will record. Self-labelled historical text; resolves correctly against the archived lineage.
+  - The prior freeze 19f7e28 is not in the candidate's ancestry (amended away); the remediation commit 952afd3 contains the corrected boundary table, the re-pinned fingerprint, and no other substantive change to the carried package.
+
+FINDINGS: NONE. Zero P1, zero P2. The single prior P2 (manifest §6.2 boundary row 13 vs 10) is verified corrected.
+
+VERDICT: APPROVE, subject to the coverage limits below.
+
+COVERAGE LIMITS (what this approval certifies)
+  1. Ledger lineages, manifest arithmetic (incl. the corrected §6.2 boundary table), §4 row count/admissibility, the three dispositions (OW-036/OW-024/OW-025), OW-001 and OW-035 statuses, review-status wording, verifier integrity, and citation resolution/bounds/hashes (all citations mechanically, 27 semantically spot-checked): fully certified.
+  2. Semantic entailment was re-derived from primary sources for the disposition rows and the rows named above; the remaining §4 rows (unchanged from the revision-3 candidate that received full semantic coverage in Rounds 11-12) were certified at the level of full-row read, citation resolution, tier admissibility, bounds, and status/scope/as_of consistency — not a fresh per-statement entailment re-derivation.
+  3. Product gate suites (verify:blocks etc.) were not re-executed by this reviewer; the §6.1 OBSERVED rows at 88f5b5c are relied on, corroborated by direct content verification of the engine and test bytes at 88f5b5c and the recorded mutation proof.
+  4. State B overlay: hashes and cited spans verified against the preserved source worktree; no behavioral audit of the overlay (it is not part of the candidate).
+  5. §2/§3 historical narrative and the §5.2 retraction table: citation resolution verified; substance carried from the Round 11-12 approvals of the byte-identical revision-3 portions.
+  6. C6 physical-device measurement and C7 remain owner/device gates outside any documentation review; nothing here certifies them.

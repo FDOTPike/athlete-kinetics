@@ -1,0 +1,33 @@
+# Round 3 Reviewer A — Program Semantics & Athlete Experience — VERBATIM HANDOFF
+
+Candidate: 048ca85e11bccafae860d28281fd4598b9be0873 (tree de683c3ff292d34b5afec82e97e7234bf08e45cb) · 2026-09-01
+Model: z-ai/glm-5.3-flash via nous (reduced model diversity disclosed — same model family as executor)
+
+```json
+{
+  "verdict": "APPROVE",
+  "findings": [
+    {
+      "class": "P3-observation (non-blocking)",
+      "detail": "The un-hidden caption's wording is slightly imprecise for advanced/elite athletes: 'Fast ... alternatives are planned until your training history supports the competition olympic lifts' reads as forward-looking, yet for an advanced power athlete the Advanced-tier olympic lift can be planned now (tier law allows it; gates permitting). Mitigated because the [P1b]-pinned export copy directly above states the accurate conditional ('appear only when your training history supports them'), and the caption never renders for the population it would actually mislead (beginners). Pre-existing wording; this commit only scoped its rendering, matching the round-2 remediation scope.",
+      "evidence": "ProgramSetupScreen.tsx:272-277 vs packages/inference/src/movementRanking.ts:203-208; tierPolicy.ts:38-39 (advanced/elite: no Advanced ceiling); verify_programQualityRound2.mjs PASS '[P1] an advanced power athlete with clean gates open receives the Power Clean'."
+    },
+    {
+      "class": "P3-observation (non-blocking)",
+      "detail": "The caption's tier-scoped rendering itself has no regression test: no component test asserts its presence for non-beginners or its absence for beginners ('Fast barbell' appears in no test file). The [P1b] gate pins the explanation function copy only. Low risk (a one-line conditional on a DB-CHECK-constrained enum), and no test in the suite depended on the old unconditional rendering, but the fix is currently proof-by-inspection on the UI side.",
+      "evidence": "grep for 'Fast barbell' across apps/mobile/test/ returns nothing; npx jest ProgramSetupScreen ProgramQualityRound2: 16/16 pass before and after the scoping (no assertion touched the caption)."
+    }
+  ],
+  "reproduction": [
+    "cd 'C:/Users/fpike/Documents/Claude Coding/Athlete App/.worktrees/program-quality-remediation' && git status --short --branch && git log --oneline -8 && git show 048ca85  # candidate tip 048ca85e11bccafae860d28281fd4598b9be0873, tree de683c3ff292d34b5afec82e97e7234bf08e45cb confirmed via git rev-parse HEAD^{tree}",
+    "git show 048ca85  # exactly the three A2 remediations: caption gated by profile.training_age !== 'beginner'; handoff gate row 20/20 -> 23/23 with breakdown; re-freeze pin declares cb900c8 + this commit explicitly above b8d5056",
+    "git log --oneline b8d5056..048ca85 && git diff b8d5056..048ca85 --stat  # exactly two commits (cb900c8 docs-only, 048ca85), touching only ProgramSetupScreen.tsx (+10/-4 region) and EXECUTOR_HANDOFF_R2.md — matches the pin's 'no engine, gate, or data change' claim",
+    "npm.cmd run verify:blocks  # ALL CHECKS PASSED; grep -o \"check('[P1]\\|check('[P2]\\|check('[P3]\\|check('[P1b]\" verify_programQualityRound2.mjs -> 7/6/7/3 = 20 + 3 = 23, matching the corrected handoff row exactly",
+    "npx jest --config apps/mobile/jest.config.js --runInBand ProgramSetupScreen ProgramQualityRound2  # 2 suites, 16/16 pass; no test depended on the previously unconditional caption",
+    "npm.cmd run typecheck  # exit 0",
+    "Read-only confirmed: git status shows only the pre-existing untracked .agents/ and docs/audits/.../team-preview/; nothing staged, nothing modified by this review."
+  ],
+  "prior_findings_resolution": "All three Round 2 (A2) findings are resolved and independently verified. (1) Untiered/overpromising caption: ProgramSetupScreen.tsx:272 now renders the 'Fast barbell, kettlebell and jump-style alternatives are planned...' caption only when profile.training_age !== 'beginner' — beginners see only the honest base-first [P1b] beginner variant of powerObjectiveExplanation (modeFor('beginner')='legacy' makes the 'planned' claim invalid for them); training_age is enum-constrained ('beginner','intermediate','advanced','elite') so the condition is sound. (2) '20/20' handoff row: now states 23/23 with the exact machine-verified breakdown ([P1] 7 + [P2] 6 + [P3] 7 = 20 Round 2, + 3 [P1b] review-proof added in bc2c744); I counted the check( labels in verify_programQualityRound2.mjs and re-ran the gate — numbers match and all pass. (3) Self-referential re-freeze pin: the pin now names cb900c8 explicitly as a docs-only follow-up above b8d5056 and describes the containing commit by content (it cannot cite its own SHA), with the diff-scope claim ('touches only ProgramSetupScreen.tsx and this handoff/ledger — no engine, gate, or data change') verified true against b8d5056..048ca85; the reviewer-pair line is pinned to 'the candidate tip at dispatch time (HEAD above b8d5056)' rather than a circular reference.",
+  "semantics_assessment": "Program semantics are sound and the athlete experience is honest by training age. The caption gating aligns the UI with the ratified tier and mode laws: beginners are in legacy ranking mode where no speed-rung guarantee exists, so all 'fast alternatives are planned' copy is correctly absent for them; intermediates are tier-blocked from Advanced olympic lifts (tierPolicy isDifficultyAllowed), where the caption's 'until your training history supports' claim is accurate and matches the [P1b]-pinned export copy above it. The engine/gate/data surface is untouched (diff above b8d5056 is one UI conditional plus handoff docs), so no previously certified behavior changed. Gates re-run by this review: typecheck exit 0, verify:blocks ALL CHECKS PASSED (23 checks, P1b section confirming beginner copy does not promise speed rungs), ProgramSetupScreen + ProgramQualityRound2 component suites 16/16. Full verify:ci (~10 min) was not re-run by this reviewer; the handoff's recorded gate outcomes for the re-freeze base plus my spot re-runs cover the changed surface. Two non-blocking wording/test-coverage observations are logged above; neither contradicts a ratified law nor misleads any tier the caption renders for. APPROVE."
+}
+```

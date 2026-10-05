@@ -22,7 +22,8 @@ validation, and store paperwork (one health gate in particular), not the design.
       (the outstanding checkpoint bundle).
 - [ ] Full native `verify:all` green on a real machine (today it caught a real
       Law-6 regression — treat it as a required gate, not a formality).
-- [ ] **Validate the 450MB dirty-RAM ceiling on a real 4GB legacy device** under
+- [ ] **Validate the 512 MiB (536,870,912 B) dirty-RAM ceiling on a real 4GB legacy
+      device** — the preferred operating target remains 450,000,000 B — under
       Jetsam pressure. This is *your own* hard release criterion and has only
       been reasoned about statically — it must be measured (Instruments /
       Android Profiler) before you can claim it.
@@ -102,7 +103,9 @@ validation, and store paperwork (one health gate in particular), not the design.
 ## Biggest surprises to plan around
 1. **Google Play Health Connect declaration (Jan 2026)** — the most likely thing
    to delay you; start it early, justify each data type narrowly.
-2. **On-device 450MB/Jetsam validation** — your own gate, still unmeasured.
+2. **On-device 512 MiB/Jetsam validation** — your own gate. The component envelope
+   (471,936,000 B) sits in the ratified review band, so release requires a device
+   evidence packet; `verify:release` fails without one.
 3. **iOS 26 SDK / Android API 36 deadlines** — toolchain, not code, but hard
    dates.
 4. **Health-claims disclaimers** — cheap to add, expensive to get flagged on.

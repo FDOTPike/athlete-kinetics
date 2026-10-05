@@ -1,0 +1,199 @@
+ROUND 2 — REVIEWER A HANDOFF (verbatim as returned)
+Charter: strict outstanding-ledger provenance
+Reviewer ran read-only. Persisted by the document executor without edit.
+Candidate reviewed: MASTER_AUDIT_SYNTHESIS.md eb1cb9dd57893e64cd896fabede8b8628e3549b6935cff6062866d0357019a5d (795 lines)
+                    docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md 80641c393b7b9bbc771992cc8981ae48046c08b6a125abc1d712e38250dbd703 (304 lines)
+                    docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md 1b0ceb2c723bd64375c1f8d42c7c6c81f71b67d51bfc8fc9860ccbee72663963 (434 lines)
+
+=====================================================================
+# Reviewer A — Round 2 Report
+
+## 1. Candidate hashes as observed
+
+| Artifact | Declared lines | Observed lines | Observed SHA-256 | Match |
+|---|---:|---:|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` | 795 | 795 | `eb1cb9dd57893e64cd896fabede8b8628e3549b6935cff6062866d0357019a5d` | MATCH |
+| `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` | 304 | 304 | `80641c393b7b9bbc771992cc8981ae48046c08b6a125abc1d712e38250dbd703` | MATCH |
+| `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` | 434 | 434 | `1b0ceb2c723bd64375c1f8d42c7c6c81f71b67d51bfc8fc9860ccbee72663963` | MATCH |
+
+All three match. Proceeding.
+
+**Scope covered:** 52 ledger rows (23 in 4.1, 11 in 4.2, 18 in 4.3), 12 dispositions in 5.1,
+12 retractions in 5.2, and all 124 live citations.
+
+## 2. Discrepancy table
+
+A. OW-016 — supersession (stale-current). Checked whether the C3 headline figures are still
+   quoted in DEVIATION_LOG.md / RELEASE_READINESS.md at the row's own as_of_revision 48719b0.
+   Found: the demanded work is already done and recorded in the document the row names.
+   DEVIATION_LOG.md@48719b0:183-188 reads "C3 aggregates restated under the corrected
+   applied-block classifier. The isolated pre-R1/pre-R2 replay reproduced the historical labels
+   exactly, then changed the primary headlines from 14 to 7 limit cycles and from 1,711 to 1,687
+   saturated cases: 1,445 upward and 242 downward." 1,505 appears in neither file.
+   RELEASE_READINESS.md@48719b0 contains no C3 aggregate at all. The row survives only because its
+   AUDIT_C6B citation still resolves — the exact failure WR-08 exists to catch, and the same
+   failure mode as OW-021, which this revision closed.
+
+B. OW-009 — statement. Row states "it is imported at useStore.ts:138 and called at :2568 and
+   :2570." At 48719b0: resolveActiveRung is imported at 140, called at 2598 and 2600. Line 138 is
+   CAPABILITY_EVIDENCE_WINDOW_DAYS, ; line 2568 is get().computePrescription([]); 2570 is blank.
+   The conclusion (engine is wired, WO-02 false) is true and the row stays open — but the T1
+   handover's locators were reproduced as verified current fact without re-derivation.
+
+C. Section 0.3 tier table, line 62 — tier (CR-01 not landed). Line 62 still reads
+   "| T2 | Exact-revision branch documents and code, a80f955-34f91ff | Yes |" while line 64
+   assigns the same class to T4. This is verbatim the defect CR-01 named and contradicts the
+   section 4 preamble (474-478) and manifest 4.1. Manifest side landed; Master side did not.
+
+D. Manifest S-T4-08 — citation (wrong file). Registered as 032_capability_content.sql line 281.
+   The tuple is at 016_movement_library_seed.sql:281. 032_capability_content.sql:281 is
+   "SELECT movement_id, progression_group, progression_rank". Same line number, wrong file. The
+   fact is true, and this is not a section 4 citation cell — but it is the registered source
+   record for the single load-bearing fact behind OW-001's escalation to BLOCKING.
+
+E. RG-08, RG-09, RG-10, RG-13, RG-15 — bundling. RG-08 fuses three independently closable
+   checkboxes (51-52 privacy URL / 53-55 Apple labels / 56-57 Google Data Safety); RG-10 three
+   (39 / 40 / 41-42); RG-15 three (89-90 / 91 / 92-93); RG-09 and RG-13 two each. Section 5.1
+   split U8's three bullets into OW-011/012/013 because bundling was a revision-1 defect. Same
+   source shape, opposite treatment.
+
+F. OW-001 — bundling. Two independently closable actions: (i) build the athlete-selection surface
+   (L1(a) residue) and (ii) stop one predicate gating the chain rep floor. (ii) is closable
+   without (i) — e.g. key bodyweightRepsFor on chain membership rather than plannedImplement.
+   They carry different release effects: (ii) is what makes the row BLOCKING. The addendum's 2.3
+   justification is sound as to discovery but does not override 5.3's split rule for ledger rows,
+   and the fusion muddies the very adjudication I was asked to make.
+
+G. Section 5.1 lines 579 / 583 vs OW-022 supersedes — bookkeeping. Line 579 says item 20 was
+   "Split into OW-021 and OW-022"; line 583 dispositions "item 20, first half; carried into
+   revision 2 as OW-021"; OW-022's supersedes cell also reads "Revision 1 item 20, first half
+   only." Two rows claim the same half. Unauditable — 6.3 concedes revision 1 was overwritten in
+   place.
+
+H. Section 5.1 lines 584-585 — citation syntax (minor). Line 584 uses
+   docs/PROPOSAL_suspended_state_trigger.md@48719b0:134-137 — abbreviated commit + :a-b, a fourth
+   form. Line 585 supports the live-removal-guard claim with a bare path. Both sit in 5.1, outside
+   CR-02's section 4 pass condition, so not disqualifying alone. Guard verified at :689 State A,
+   :701 State C.
+
+I. Manifest 6.2 — total. "untracked, outside .agents/ = 4" and "under .agents/ = 7". Rows give
+   5 and 6: S-T3-07 is MASTER_AUDIT_SYNTHESIS.md at repo root, not under .agents/. Total 49
+   unaffected; the split is wrong, and 6.1 claims these are "counted from the rows in this
+   manifest".
+
+### What came out clean
+
+- All 124 live citations pass mechanically — every one uses one of the three permitted forms,
+  resolves at its revision, hash-matches, and is in bounds. Zero exceptions. (127 tokens total;
+  3 are the format templates in 0.3.)
+- Every manifest discovery command reproduced its declared total, run by me: Corpus A 62 of 117
+  tracked, B 5, C 115, D 16 changed / 2 Markdown, E 1, untracked Markdown 120, find .agents 116,
+  48719b0..34f91ff exactly 4 commits.
+- All six State B hashes and line counts still match today, and the overlay claims hold: zero
+  occurrences of the three 059 objects; suspensionEpisode: null present in PER_ATHLETE_RESET.
+- Status purity holds: 4.1 all OPEN, 4.2 only PARKED/OWNER_ONLY, 4.3 all RELEASE_GATE. IDs
+  unique; the OW-021 gap is deliberate and correctly documented; exactly one H1.
+- OW-021's closure is correct — re-derived independently (zero hits for getMovementE1rmSeries in
+  TRAINING_PROGRESSION_LAYERS.md@48719b0; corrected wording at 206-212).
+- Section 5.2 retractions RC-01, RC-06, RC-07, RC-08, RC-09, RC-10 are all factually correct.
+- Section 3.4 / RG-01 memory contract is exact: 536,870,912 and 450,000,000 at memory_gate.mjs:56-57;
+  the 2026-08-24 ratification and review-band language at audit.mjs:173-175; 471,936,000 and
+  "This record IS that ratification." at budget.json:40-43; verify:release composition at
+  package.json:48.
+- Section 2.2's ten-ruling table is accurate against RELEASE_CANDIDATE_C1_DOCKET.md@a80f955:444-455.
+- OW-002/003/005/006/007/008/010/011/020/022/025 all independently confirmed still open at their
+  stated revisions.
+
+## 3. Adjudication of OW-001's BLOCKING status
+
+BLOCKING is supportable. I affirm it.
+
+I re-derived the whole causal chain from primary sources rather than accepting the addendum's:
+
+1. L1(a) is a ratified owner ruling requiring "Ambiguous mixed movements require athlete selection"
+   — RELEASE_CANDIDATE_C1_DOCKET.md@a80f955:452.
+2. At 34f91ff, isPurelyBodyweight is m.plannedImplement === 'Bodyweight' (blockGenerator.ts:113-114),
+   and plannedImplementFor leaves every multi-prefix movement undeclared, so an ambiguous slot is
+   never bodyweight.
+3. That one flag gates both the Option C set ramp (:846, :853-858) and the rep floor (:862,
+   slotReps = bodyweightSlot ? bodyweightRepsFor(m) : reps). One predicate, two behaviours, plus
+   the fatigue-class accessor at :681-682.
+4. At 48719b0 the predicate was m.primaryImplement === 'Bodyweight' (blockGenerator.ts:100-101),
+   and the docket measured Push-up among the seven movements listing Bodyweight first (:254-257).
+   So Push-up WAS bodyweight at State A and received both the bodyweight set delta and
+   Math.max(reps, DEFAULT_ADVANCEMENT_POLICY.requiredReps) (State A :736).
+5. Push-up is ('Push-up','handstand-push-up',0) — rung 0 of a seeded chain
+   (016_movement_library_seed.sql:281), whose bar is requiredReps: 8 (progressionEngine.ts:51-54).
+
+The decisive point, which I checked because the obvious rebuttal is the docket's "progression_policy
+has zero seeded rows, so no athlete is affected today": that mitigation does not reach the floor.
+bodyweightRepsFor at 34f91ff:770 falls back to DEFAULT_ADVANCEMENT_POLICY.requiredReps when no
+policy row exists. The bar of 8 is therefore live now for all 15 chain movements. The regression is
+current, not hypothetical.
+
+So the harm that carries the status is NOT the load-class routing — L1(a) expressly blesses failing
+closed to loaded for missing state. It is the loss of the capability-ladder rep floor for a movement
+that is on a chain, which no ruling authorized. L2(b) narrowed the floor to chain movements; it did
+not remove it from them. This reintroduces the exact defect section 6 of
+AUDIT_architecture_review_8b4e75b.md identified, against the owner's verbatim instruction to
+reconcile the ladder "so athletes can actually level up to harder variations" (docket:302-304). A
+release candidate that regresses an owner-directed fix, on a shipped progression path, without
+ratification, is the paradigm case for BLOCKING.
+
+Two constraints on that affirmation:
+- It must stay labelled what it is — the executor's conservative status inference, not an owner
+  ruling. Section 4's preamble and addendum 1.1/4.2 do label it correctly, and the mandate's
+  ratification firewall is not breached by populating a required schema column.
+- Marking it NON_BLOCKING would be equally an executor judgment, and the less conservative one.
+  There is no neutral option here; given a live, unratified dose change, conservatism is the
+  correct default.
+
+Per the addendum's own observation, either answer leaves release posture unchanged — C6 is
+independently deferred.
+
+Caveat carried forward as finding F: the row should be split. The athlete-selection residue alone
+would be NON_BLOCKING; the predicate-fan-out regression is what is BLOCKING. Fusing them means
+closing the blocking half cannot be recorded without closing the other.
+
+## 4. Commands and locators used
+
+sha256sum on the three candidates and on docs/WORKORDER_MASTER_AUDIT_SYNTHESIS_REMEDIATION.md
+(687617d9... confirms section 4 origin cites).
+
+Manifest discovery totals, all five corpora, run verbatim from 1.1:
+  git ls-tree -r --name-only 48719b0 | grep -E '(^|/)(AUDIT_|HANDOVER_|...)|/decisions/|/audits/' | grep -cE '\.md$'   -> 62
+  git ls-tree -r --name-only 48719b0 | grep -cE '\.md$'                                                                -> 117
+  git ls-files --others --exclude-standard | grep -E '\.md$' | grep -vc '^\.agents/'                                   -> 5
+  git ls-files --others --exclude-standard | grep -cE '^\.agents/.*\.md$'                                              -> 115
+  git diff --name-only 48719b0..34f91ff | wc -l ; ... | grep -cE '\.md$'                                               -> 16 / 2
+  git ls-files --others --exclude-standard | grep -cE '\.md$' ; find .agents -type f -name '*.md' | wc -l              -> 120 / 116
+  git log --oneline 48719b0..34f91ff | wc -l                                                                           -> 4
+
+Full citation sweep: form, resolution, hash, bounds (124 live citations, 0 failures).
+
+Finding A: git show 48719b0:DEVIATION_LOG.md | awk 'NR>=183 && NR<=188'
+           git grep -n "1,505\|1,711\|limit cycle\|saturat" 48719b0 -- DEVIATION_LOG.md RELEASE_READINESS.md
+Finding B: git show 48719b0:apps/mobile/src/state/useStore.ts | grep -n "resolveActiveRung"  -> 140, 2598, 2600
+OW-001 chain: git show 34f91ff:packages/inference/src/blockGenerator.ts | awk 'NR>=840&&NR<=866'
+              git show 48719b0:packages/inference/src/blockGenerator.ts | awk 'NR==100,NR==101'
+              git grep -n "handstand-push-up" 48719b0 -- packages/core-db/src/schema/   -> 016_...:281, not 032_...
+              git show 48719b0:packages/inference/src/progressionEngine.ts | grep -A3 DEFAULT_ADVANCEMENT_POLICY
+Supersession probes: git grep -n "getMovementE1rmSeries" 48719b0 -- docs/decisions/TRAINING_PROGRESSION_LAYERS.md  -> 0
+                     git show 48719b0:apps/mobile/test/verify_store_sql.mjs | sed -n '20,51p'
+                     git show 34f91ff:apps/mobile/src/state/useStore.ts | awk 'NR>=2053&&NR<=2060; NR==2195'
+
+## 5. Verdict
+
+Finding A alone is disqualifying under my charter: OW-016 is a stale-current ledger item, open only
+because its citation still resolves, whose demanded work is recorded as completed in the very
+document the row names, at the row's own as_of_revision. Findings B and C are independent defects —
+three non-resolving locators asserted as current fact, and CR-01's Master-side correction never
+landed at line 62.
+
+The package is otherwise unusually strong: 124 of 124 citations clean, every discovery total
+reproducible, OW-021's closure correct, and the memory contract exact. The remediation is close. It
+is not done.
+
+REQUEST_CHANGES
+=====================================================================
+END OF VERBATIM HANDOFF

@@ -1,0 +1,56 @@
+All checks complete. Final report:
+
+---
+
+# Round 9 Reviewer B — Independent Read-Only Review Report
+
+**Scope:** chronology consistency after the Round 8 fix, Round 8 narrative accuracy vs. the persisted handoff, progression/UI/state spot-checks, encoding. Read-only; no files modified, staged, committed, or gated. No other reviewer's conclusions consulted.
+
+## 1. Verified Hashes Table
+
+| File | Computed SHA-256 | Expected | Match |
+|---|---|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` (1077 lines) | `96c70557fd2540c35996f744cca398ccfcac18505475ef5e1c277538a1601c13` | `96c70557…1c13` | ✅ |
+| `docs/audits/MASTER_AUDIT_SOURCE_MANIFEST.md` (332 lines) | `7ee8e8124b48daaf38bc2dd701c25dbe9dc1ebea1076eb07ccd4c493c9edcbc4` | `7ee8e812…cbc4` | ✅ |
+| `docs/audits/AUDIT_CLAUDE_RELEASE_CLOSEOUT_34F91FF.md` (456 lines) | `2e347231e16281ea5123111dc507d6d6ca63166dc9c72839250e93577531d90c` | `2e347231…d90c` | ✅ |
+| `.agents/audit-synthesis-remediation/round-8-reviewer-b.txt` | `cd1a7ccce0aac52bf05849d186f0a9b20e7c7cd1a919656c6954d783f3642bf5` | cited §6.2:933 | ✅ |
+
+`git rev-parse HEAD` → `48719b07988ad30d255b0fed37f45ed5db49c935`, branch `codex/progression-evidence-remediation` (State A). The handoff file has 53 lines (last unterminated; `wc -l` shows 52), matching the cited "lines 1-53".
+
+## 2. Discrepancy Table
+
+| Location | Claim | Evidence | Severity |
+|---|---|---|---|
+| `MASTER_AUDIT_SYNTHESIS.md` §6.3 line 1028 | "**Seven** review rounds have run to a verdict — round 1, operative round 2, operative round 3, and round 4 …; Round 5 …; Round 6 …; Round 7 …; Round 8 returned one `REQUEST_CHANGES` (Reviewer B …) and no Reviewer A verdict" | The em-dash enumeration contains **eight** rounds (1, 2op, 3op, 4, 5, 6, 7, 8). Round 8 produced a verdict (B's `REQUEST_CHANGES`) and the same sentence calls it a "completed round" (line 1033: "…and one chronology defect in Round 8"). The count was written when seven rounds had run and the Round 8 clause was appended without updating it. Same defect class as Round 7's corpus-totals finding (declared count not reproducing under the sentence's own enumeration), in the Round 8 remediation's own new text. All enumerated verdict facts are individually accurate and the status story (`PENDING_EXTERNAL_REVIEW`, Round 9 pending) is correct everywhere — hence MINOR, not MAJOR. | **MINOR** |
+| `MASTER_AUDIT_SYNTHESIS.md` §6.2 lines 923–925 | "**Both** Round 8 reviewers verified the re-frozen candidate hashes against disk bytes and **both** confirmed the Round 7 remediation … was accurately described." | Reviewer B's side is fully evidenced by the persisted handoff (hash-verified above; its own hash table confirms the 1057-line candidate's three digests and both Round 7 handoff hashes). Reviewer A's side has **no persisted artifact**: there is no `round-8-reviewer-a.txt` in `.agents/audit-synthesis-remediation/` (dir listing shows 13 files, round-8 B only), and `grep -rln "Round 8\|round-8"` across `.agents/` (excluding that dir) returns no trace. The affirmative attribution of hash verification and Round 7-remediation confirmation to Reviewer A is unverifiable by any third party — the document's own precedent for truncated runs (Round 2/3) records only "terminated early … before producing any verdict" with no claims about what was verified. The subsequent no-verdict record (lines 928–932) is honest and the verdict-relevant content is accurate; the unsupported attribution is the defect. | **MINOR** |
+
+No stale forward-references remain anywhere: `grep -n "Round 7 reviewers approve\|pending Round 7\|pending Round 8\|pending a fresh independent review (Round 7"` hits only §6.2 line 927, which is the narrative *describing the historical Round 8 defect* ("candidate as pending Round 7 — the same stale-current defect class") — correct historical usage, not a live claim.
+
+## 3. Commands / Source Locators Checked
+
+- **Chronology (the Round 8 finding):** §0.1 lines 11–25, §6.2 lines 772–964, §6.3 lines 1007–1035 read in full. §0.1 now states rounds 1–4 two `REQUEST_CHANGES`, 5 A=APPROVE/B=REQUEST_CHANGES, 6 both APPROVE for `85a192a…`, 7 A=REQUEST_CHANGES (two findings, remediated)/B=APPROVE, 8 B=REQUEST_CHANGES on the stale §0.1 bullet + A truncated no-verdict, pending Round 9 — **one consistent story across §0.1/§6.2/§6.3**, matching the §6.2 table rows (lines 786–797) exactly. The "now fixed" self-reference in §0.1 line 22 is accurate.
+- **Round 8 narrative accuracy:** §6.2:923–933 vs. the handoff — one finding (stale §0.1 chronology bullet, severity MAJOR, `VERDICT: REQUEST_CHANGES` as the final line), hash match, line bound correct. Handoff's own verified-hashes table (1057-line candidate `62c563…`) is consistent with the current 1077-line re-freeze being the post-remediation revision. Handoff confirms the Round 7 narrative and both Round 7 handoff hashes.
+- **RR-04 primary slot:** `git show 48719b0:packages/inference/src/blockGenerator.ts` → `const primarySlot = slotIndex < ACCESSORY_SLOT_FROM;` at **817** ✅; `34f91ff` same statement at **852** ✅.
+- **SCHEMES ramps @A:** `rpeWave: [7.5, 8.0, 8.5]` at lines **347** (strength), **349** (hypertrophy), **352** (hybrid) ✅.
+- **Closeout mirror:** closeout §4.1 verdict table (lines 402–408) vs. synthesis §3.3 table (lines 474–482): F1 `PARTIALLY_CONFIRMED`→OW-001/OW-036, F2/F3/F4/F5 `CONFIRMED`→OW-002/003, OW-004/005, OW-006, OW-007 — all five dispositions match verbatim ✅.
+- **058/059 separation:** `git cat-file -e` — `058_suspension_episode.sql` PRESENT at both `48719b0` and `34f91ff`; `059_suspension_state_and_load_intent.sql` ABSENT at `48719b0`, PRESENT at `34f91ff` ✅. (Note: 058's filename is `058_suspension_episode.sql`, not the 059-style name.)
+- **Task U3 overlay:** `git ls-tree -r 48719b0 | grep Suspension` → no hits (absent from commit) ✅; all six working-tree files byte-match §3.2 (lines 384–390): `77d798e6…` (Card), `cb65064b…` (Sheet), `d6635e3c…` (test, 414 lines), `eb5cf5fa…` (BlockScreen), `acd799d5…` (ProfileScreen), `fa561697…` (useStore) ✅.
+- **Encoding:** UTF-8 mojibake byte-pattern grep (`Â§`, `â€`, `â†`) → **0 hits** in all three documents; `### 3.3 Claude C1–C5 Branch at 34f91ff` (line 436, en-dash) and `RELEASE_GATE — DEFERRED` (lines 494, 557, em-dash) valid ✅.
+- **C6:** `RELEASE_GATE — DEFERRED`, "has not passed, has not failed, and has not been run" (494); 471,936,000 B kept distinct as *modelled component envelope* vs. `UNKNOWN` *device measurement* (510–544, 648, 1013) ✅.
+- **§3.4 posture (553–557):** names `OW-036` + `OW-024`/`OW-025`/`OW-035` as `BLOCKING` before C6/C7 ✅.
+
+## 4. Coverage Limits
+
+- Did not re-verify manifest §6.4 record arithmetic, the `w4aug.mjs` 36/36 claim, or the 222-corpus recount in depth (Reviewer A charter / §6.1).
+- Did not run `verify:ci`, `verify:release`, the SQL probe, or any gate (read-only mandate); `REPORTED` rows accepted as history per §6.1.
+- Did not verify all 456 closeout lines individually (verified the §4.1 table and §3.3 mirror); did not walk the 4-commit ancestry `48719b0..34f91ff`.
+- State B hash-claims accepted as of the 2026-08-30 capture; working tree is mutable (currently byte-matching).
+- Could not verify any Round 8 Reviewer A activity from primary sources (none exist — that absence is itself Finding 2).
+
+## 5. Summary of Findings
+
+The Round 8 fix succeeded on its own terms: §0.1, §6.2 and §6.3 now tell one consistent chronology through Round 8 with a pending Round 9, no stale forward-reference survives, and the §6.2 Round 8 block matches the persisted handoff exactly (one MAJOR finding, `REQUEST_CHANGES`, hash and line bound verified). All standing charter spot-checks passed exactly: RR-04 locators 817/852, SCHEMES ramps at 347/349/352, all five closeout dispositions mirrored, 058/059 state separation, all six overlay files absent from the commit and byte-identical in the tree, zero mojibake, correct en/em-dash rendering, C6 modelled-vs-measured distinction, and the four BLOCKING rows under §3.4. Two residual **MINOR** defects remain, both in the Round 8 remediation's own newly written text: an off-by-one round count in §6.3's chronology bullet ("Seven" enumerating eight), and an unverifiable attribution of hash-verification to Round 8's Reviewer A, for whom no persisted artifact exists.
+
+## 6. Verdict
+
+VERDICT: REQUEST_CHANGES
