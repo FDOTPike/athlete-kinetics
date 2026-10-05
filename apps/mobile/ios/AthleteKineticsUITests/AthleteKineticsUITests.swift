@@ -294,22 +294,31 @@ final class AthleteKineticsUITests: XCTestCase {
     for attempt in 1...2 where !answered {
       let control = "Choose whether to share sleep and resting heart rate from Apple Health"
       tap(control, "Apple Health CONNECT / TRY AGAIN (attempt \(attempt))")
-      if let dontAllow = findHealthSheetButton("Don’t Allow", timeout: 60) {
-        log("health sheet shown (attempt \(attempt)): allow=\(healthPermissionButton("Allow").exists) dontAllow=true")
+      let started = Date()
+      if let dontAllow = findHealthSheetButton("Don’t Allow", timeout: 150) {
+        log("health sheet shown (attempt \(attempt)) after \(Int(Date().timeIntervalSince(started))) s: allow=\(healthPermissionButton("Allow").exists)")
         dontAllow.tap()
         log("health sheet: tapped Don't Allow")
       } else {
-        log("health sheet not shown within 60 s (attempt \(attempt))")
+        log("health sheet not shown within 150 s (attempt \(attempt)); on screen: \(visibleLabels(app).prefix(700))")
       }
-      // Every change of the wording for up to 120 s.
+      // Every change of the wording for up to 180 s; when the app's own text
+      // is not visible, record what is on screen instead (twice).
       var seen = ""
-      for second in 0..<120 {
+      var inventories = 0
+      for second in 0..<180 {
         let now = healthHint.exists ? String(healthHint.label.prefix(60)) : "<absent>"
         if now != seen { log("health hint attempt \(attempt) t=\(second)s: \(now)"); seen = now }
+        if now == "<absent>" && (second == 20 || second == 90) && inventories < 2 {
+          inventories += 1
+          log("health hint absent at t=\(second)s; app{\(visibleLabels(app).prefix(700))} springboard{\(visibleLabels(XCUIApplication(bundleIdentifier: "com.apple.springboard")).prefix(300))}")
+        }
         if now.hasPrefix("Apple Health access requested") { answered = true; break }
         if now.hasPrefix("The Apple Health request did not complete") { break }
         sleep(1)
       }
+      // Only ask again once the first request has visibly settled.
+      if !answered && !(healthHint.exists && healthHint.label.hasPrefix("The Apple Health request did not complete")) { break }
     }
     XCTAssertTrue(answered, "the person's answer on HealthKit's sheet was never reflected in the app")
     // HealthKit never tells an app that reading was denied, so the honest
@@ -398,7 +407,22 @@ final class AthleteKineticsUITests: XCTestCase {
     log("restore preview: \(databases.label) / \(names.label)")
     XCTAssertFalse(names.label.contains("After Backup"), "the preview lists an athlete created after the backup: \(names.label)")
     tap("confirm-restore-button", "CONFIRM REPLACE ALL DATA")
-    settledLabel(element("backup-status-message"), beginsWith: "Restore complete.", "status after restore", timeout: 180)
+    // Restore seals and twice authenticates a recovery copy (scrypt N=65536
+    // in JavaScript on Hermes): slow on the CI simulator. Each stage's time is
+    // recorded as evidence; the bound is 15 minutes.
+    let restoreStatus = element("backup-status-message")
+    let restoreStart = Date()
+    var lastRestoreStatus = ""
+    while Date().timeIntervalSince(restoreStart) < 900 {
+      let now = restoreStatus.exists ? restoreStatus.label : "<absent>"
+      if now != lastRestoreStatus {
+        log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: \(now.prefix(120))")
+        lastRestoreStatus = now
+      }
+      if now.hasPrefix("Restore complete.") || !(now.hasPrefix("Creating") || now.hasPrefix("Recovery") || now.hasPrefix("Replacing") || now == "<absent>") { break }
+      sleep(2)
+    }
+    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 5)
     wait(element("shell-root"), "the app after restore")
     openProfile()
     let after = expandCoachMode()

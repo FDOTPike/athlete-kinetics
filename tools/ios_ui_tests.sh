@@ -76,7 +76,7 @@ for test in "${TESTS[@]}"; do
   kill "$LOG_PID" >/dev/null 2>&1 || true
   echo "$test exit=$code"
   if [ "$code" -ne 0 ] && [ "$test" = test3_healthDenialAndAthleteSwitching ]; then
-    grep -iE 'authoriz|requestAuth|prompt|HKHealthStore|ak-health' "$OUT/$test.system.log" | tail -25 | cut -c1-240 > "$OUT/$test.health-excerpt.txt" || true
+    grep -E 'ak-health|HealthKit:auth|ViewServices.*HealthPrivacy' "$OUT/$test.system.log" | tail -30 | cut -c1-240 > "$OUT/$test.health-excerpt.txt" || true
     echo "::warning title=ui $test system log (HealthKit)::$(tr '\n' '~' < "$OUT/$test.health-excerpt.txt" | cut -c1-5500)"
   fi
   [ "$code" -eq 0 ] || FAILED=1
