@@ -1,0 +1,8 @@
+﻿No tests found, exiting with code 1
+Run with `--passWithNoTests` to exit with code 0
+In C:\Users\fpike\.gemini\antigravity\worktrees\Athlete App\athlete_movement_animation_completion\apps\mobile
+  238 files checked.
+  testMatch: C:/Users/fpike/.gemini/antigravity/worktrees/Athlete App/athlete_movement_animation_completion/apps/mobile/test/components/**/*.test.js - 93 matches
+  testPathIgnorePatterns: \\node_modules\\ - 238 matches
+  testRegex:  - 0 matches
+Pattern: C:\Users\fpike\.gemini\antigravity\brain\7cb88369-2526-4296-882b-6e8de9ff46d6\scratch\zzAudit52Runtime.test.js - 0 matches

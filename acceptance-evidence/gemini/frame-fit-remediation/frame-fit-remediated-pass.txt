@@ -1,0 +1,17 @@
+﻿node.exe : PASS apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (8.309 s)
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\fpike\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS apps/mobil...st.js (8.309 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  MovementPreview canonical stage and frame fit
+    ΓêÜ 52 all painted limbs and floor line lie within the visible frame window (neutral) (2265 ms)
+    ΓêÜ 52 all painted limbs and floor line lie within the visible frame window (male) (2589 ms)
+    ΓêÜ 52 all painted limbs and floor line lie within the visible frame window (female) (2217 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        8.598 s, estimated 9 s
+Ran all test suites matching /apps\\mobile\\test\\components\\MovementPreview.canonicalFrameFit.test.js/i.

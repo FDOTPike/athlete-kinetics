@@ -1,0 +1,19 @@
+{
+  "apps/mobile/src/components/movementPreview/MovementPreview.tsx": "273b71c1a7a56887601830417a50da14411ca88bfe8f49bfc315a73ab6cdb826",
+  "apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js": "faf4ac99a690a887fc69755e33fd7a8fac31a82db8b5967e04f33fce3a02c819",
+  "apps/mobile/test/components/MovementPreview.fixedBarBodyMotion.test.js": "97f68e4aa2b4346cd25dbb461a9e1135662d43c48a4d4d0496d0aa4b233bc83c",
+  "acceptance-evidence/gemini/frame-fit-remediation/auditor-probe-output.txt": "4e8bc98646ee39a136febe47dc6756cbb4873908200b7405be9758883c1e2aa4",
+  "acceptance-evidence/gemini/frame-fit-remediation/frame-fit-base-failure.txt": "85f55ba80549cba0b29f69eee66277ad3d941bb68360a8b733dc516be38a0e61",
+  "acceptance-evidence/gemini/frame-fit-remediation/frame-fit-complete-pass.txt": "377e9a37ece53b7f83141bc09b13865189b9dbc52093fa377de0946d16e9e67e",
+  "acceptance-evidence/gemini/frame-fit-remediation/frame-fit-remediated-pass.txt": "5e5536f683df6c21f2bfae06df6fff48f7c65ca0e6587d20c57b6c4a15d85462",
+  "acceptance-evidence/gemini/frame-fit-remediation/git-status-short.txt": "9f389da9edb64df97cf7e5a08f8e0ed204728a3ba446f69cadd14e971b057b6a",
+  "acceptance-evidence/gemini/frame-fit-remediation/jest-final-remediated-owning-and-challengers.txt": "893648f4e55d6f3d254fd67f9baadc7d47e9d844b87fd9a5c64bb5225a88d14d",
+  "acceptance-evidence/gemini/frame-fit-remediation/jest-remediated-owning-and-challengers.txt": "85547e9398bdcd95fb8b099a3317bb519a6320541b93e58f943779c0d4e2195f",
+  "acceptance-evidence/gemini/frame-fit-remediation/parent-screens-test.txt": "a58df2a6c4dfc03c98dfacad80463e816e88687279d0048d089a352333551365",
+  "acceptance-evidence/gemini/frame-fit-remediation/probe-runtime-base.txt": "b0028ab1f22dd2506f469727c94d140c2012a70e7c8c993488354bd9877b1866",
+  "acceptance-evidence/gemini/frame-fit-remediation/probe-runtime-final.txt": "b0028ab1f22dd2506f469727c94d140c2012a70e7c8c993488354bd9877b1866",
+  "acceptance-evidence/gemini/frame-fit-remediation/probe-runtime-remediated.txt": "b0028ab1f22dd2506f469727c94d140c2012a70e7c8c993488354bd9877b1866",
+  "acceptance-evidence/gemini/frame-fit-remediation/typecheck-base.txt": "a7fa20ad897d7e795a574cea33a2e75e51300e155322f14ad3837d73cd400d28",
+  "acceptance-evidence/gemini/frame-fit-remediation/typecheck-final.txt": "a7fa20ad897d7e795a574cea33a2e75e51300e155322f14ad3837d73cd400d28",
+  "acceptance-evidence/gemini/frame-fit-remediation/typecheck-remediated.txt": "a7fa20ad897d7e795a574cea33a2e75e51300e155322f14ad3837d73cd400d28"
+}

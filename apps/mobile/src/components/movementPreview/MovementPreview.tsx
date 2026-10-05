@@ -547,7 +547,10 @@ export function MovementPreview({
   const body = DUAL_BODY_PARAMETERS[bodyType];
   let caption: string;
   let figure: React.JSX.Element;
+  let canonicalStageH: number | undefined;
   if (canonical !== null) {
+    const canonicalScale = Math.min(CANONICAL_FIT / canonical.viewBox[2], CANONICAL_FIT / canonical.viewBox[3]);
+    canonicalStageH = canonical.viewBox[3] * canonicalScale;
     const pose = !reduceMotion
       ? poseAtTime(canonical.frames.map((f) => f.joints), canonicalTimeMs, canonical.segmentDurationsMs)
       : canonical.frames[drawnFrameIndex].joints;
@@ -599,7 +602,7 @@ export function MovementPreview({
         accessibilityRole="image"
         accessibilityLabel={`${preview.name} preview. ${position}: ${caption}`}
         testID="movement-preview-figure"
-        style={styles.figureFrame}
+        style={[styles.figureFrame, canonicalStageH !== undefined && { height: canonicalStageH }]}
       >
         {figure}
       </View>
