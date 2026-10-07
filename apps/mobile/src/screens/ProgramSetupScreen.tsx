@@ -348,7 +348,8 @@ export default function ProgramSetupScreen({
   }, [horizonKind, reviewDate]);
 
   return (
-    <KeyboardAwareScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <View style={styles.root}>
+    <KeyboardAwareScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{editing ? 'MANAGE PROGRAM' : 'BUILD YOUR PROGRAM'}</Text>
       <Text style={styles.title}>{styleLabel}</Text>
       <Text style={styles.body}>
@@ -660,6 +661,12 @@ export default function ProgramSetupScreen({
           ))}
         </View>
       )}
+      <Text style={styles.caption}>Program starts {today}. Future blocks require confirmation.</Text>
+    </KeyboardAwareScrollView>
+    {/* The actions stay on screen below the plan: reaching them never takes
+        scrolling past the whole generated week (issue #38). The blocking
+        requirement sits beside the button it disables. */}
+    <View style={styles.actions} testID="program-setup-actions">
       {missingRequirement !== null && (
         <Text style={styles.caption} accessibilityLiveRegion="polite">
           {missingRequirement}
@@ -669,14 +676,19 @@ export default function ProgramSetupScreen({
         disabled={input === null || previewResult.preview === null
           || (sessionTime !== null && sessionTime.conflicts.length > 0)} />
       {onCancel !== undefined && <SecondaryButton label="Cancel" onPress={onCancel} />}
-      <Text style={styles.caption}>Program starts {today}. Future blocks require confirmation.</Text>
-    </KeyboardAwareScrollView>
+    </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.color.ink0 },
-  content: { padding: theme.space[5], paddingBottom: 56, gap: theme.space[4] },
+  scroll: { flex: 1 },
+  content: { padding: theme.space[5], gap: theme.space[4] },
+  actions: {
+    paddingHorizontal: theme.space[5], paddingVertical: theme.space[3], gap: theme.space[2],
+    borderTopWidth: 1, borderTopColor: theme.color.line, backgroundColor: theme.color.ink0,
+  },
   eyebrow: { color: theme.color.textLow, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
   title: { color: theme.color.textHi, fontSize: 30, fontWeight: '800', textTransform: 'capitalize' },
   body: { color: theme.color.textMid, fontSize: 15, lineHeight: 22 },
