@@ -19,7 +19,7 @@
  * which is what the "without deleting capabilities" clause of §2 requires.
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import ProgramSetupScreen from '../../src/screens/ProgramSetupScreen';
 import { RECOMMENDED_BLOCK_COUNT, recommendedProgramDefaults } from '../../src/state/programDefaults';
 
@@ -79,6 +79,35 @@ test('a first run can create the program without making any programming decision
     dayIndices: [1],
     movementPreferences: [],
   });
+});
+
+test('Create program and Cancel stay on screen below the plan, never at the end of the scroll (issue #38)', () => {
+  mockState = stateFor('intermediate');
+  const onCancel = jest.fn();
+  render(<ProgramSetupScreen onCancel={onCancel} />);
+
+  const actions = screen.getByTestId('program-setup-actions');
+  const scroll = screen.getByTestId('keyboard-aware-scroll-view');
+  // Both actions live in the fixed bar, outside the scrolling plan.
+  expect(within(actions).getByText('Create program')).toBeOnTheScreen();
+  expect(within(actions).getByText('Cancel')).toBeOnTheScreen();
+  expect(within(scroll).queryByText('Create program')).toBeNull();
+  expect(within(scroll).queryByText('Cancel')).toBeNull();
+  // The plan itself still scrolls above them.
+  expect(within(scroll).getByTestId('program-recommendation-card')).toBeOnTheScreen();
+
+  fireEvent.press(within(actions).getByText('Cancel'));
+  expect(onCancel).toHaveBeenCalledTimes(1);
+});
+
+test('the blocking-rule guidance sits in the action bar, beside the button it disables', () => {
+  mockState = stateFor('intermediate');
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  fireEvent.press(screen.getByText('Date'));
+  const actions = screen.getByTestId('program-setup-actions');
+  expect(within(actions).getByText('Enter a review date.')).toBeOnTheScreen();
+  expect(within(actions).getByText('Create program')).toBeDisabled();
 });
 
 test('every default the athlete no longer chooses is disclosed on the screen', () => {
