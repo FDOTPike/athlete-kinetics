@@ -1315,6 +1315,53 @@ const INCLINE_EXTENSION_HIP: readonly [number, number] = [50, CHAIN_SEATED_HIP];
 /** The high pulley behind the Cable Incline Triceps Extension. */
 export const INCLINE_EXTENSION_PULLEY: readonly [number, number] = [5.4, 74.6];
 
+/** A flat bench: a level pad whose top is at height `top`, from `x0` to `x1`, on a support near each end. */
+function chainFlatBench(x0: number, x1: number, top: number): ChainShape[] {
+  return [
+    { kind: 'post', at: [x0 + 5, top - 4] },
+    { kind: 'post', at: [x1 - 5, top - 4] },
+    { kind: 'slab', a: [x0, top - 2], b: [x1, top - 2] },
+  ];
+}
+
+/**
+ * A decline bench for a figure lying back on it, head at the low end: one
+ * board under the back and thighs, a support at each end, and a roller the
+ * ankles hook under so the legs are secured.
+ */
+function chainDeclineBench(hip: readonly [number, number], declineDeg: number, ankle: readonly [number, number]): ChainShape[] {
+  const downhill = chainUnit([180 + declineDeg, 0], 1);
+  const under = chainUnit([270 + declineDeg, 0], 1);
+  const foot: ChainVec = chainAdd([hip[0], hip[1], 0], under, CHAIN_BACK_HALF + 2);
+  const low = chainAdd(foot, downhill, 40), high = chainAdd(foot, downhill, -21);
+  const roller: readonly [number, number] = [ankle[0] + 4.6, ankle[1] + 2.4];
+  return [
+    { kind: 'post', at: [low[0] + 5, low[1]] },
+    { kind: 'post', at: [high[0] - 3, high[1]] },
+    { kind: 'frame', a: [high[0], high[1]], b: roller },
+    { kind: 'slab', a: [low[0], low[1]], b: [high[0], high[1]] },
+    { kind: 'roller', at: roller },
+  ];
+}
+
+/** The decline the two decline triceps extensions lie at, and the lying figure they share. */
+export const DECLINE_EXTENSION_DEG = 20;
+const DECLINE_EXTENSION_HIP: readonly [number, number] = [60, 36];
+const DECLINE_EXTENSION_BODY = {
+  at: DECLINE_EXTENSION_HIP, trunk: 180 + DECLINE_EXTENSION_DEG, thigh: DECLINE_EXTENSION_DEG - 8, shin: -80, foot: 10,
+} as const;
+/** Where the secured ankles sit: at the end of that fixed leg. */
+const DECLINE_EXTENSION_ANKLE: readonly [number, number] = [
+  DECLINE_EXTENSION_HIP[0] + CHAIN_THIGH * Math.cos(chainRad(DECLINE_EXTENSION_DEG - 8)) + CHAIN_SHIN * Math.cos(chainRad(-80)),
+  DECLINE_EXTENSION_HIP[1] + CHAIN_THIGH * Math.sin(chainRad(DECLINE_EXTENSION_DEG - 8)) + CHAIN_SHIN * Math.sin(chainRad(-80)),
+];
+/** The flat benches the two cable extensions lie on, by the height of the pad's top. */
+const CABLE_LYING_BENCH_TOP = 18;
+const LOW_CABLE_BENCH_TOP = 12;
+/** The low pulleys behind the head for the two lying cable extensions. */
+export const CABLE_LYING_EXTENSION_PULLEY: readonly [number, number] = [4, 10];
+export const LOW_CABLE_EXTENSION_PULLEY: readonly [number, number] = [5, 14];
+
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // Incline Dumbbell Curl: sitting back on an incline bench, the upper arms
@@ -1366,6 +1413,64 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     poses: [
       { at: INCLINE_EXTENSION_HIP, trunk: 125, thigh: 0, shin: -90, upperArm: 60, forearm: 150 },
       { at: INCLINE_EXTENSION_HIP, trunk: 125, thigh: 0, shin: -90, upperArm: 60, forearm: 60 },
+    ],
+  },
+  // Decline Dumbbell Triceps Extension: lying back on a decline bench with
+  // the legs secured, the upper arms point up from the lying chest and stay
+  // there while the elbows bend to bring the dumbbells down beside the ears.
+  'decline-dumbbell-triceps-extension': {
+    root: 'hip',
+    feet: 'free',
+    implement: 'hammer',
+    equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
+    poses: [
+      { ...DECLINE_EXTENSION_BODY, upperArm: 105, forearm: 105 },
+      { ...DECLINE_EXTENSION_BODY, upperArm: 105, forearm: 240 },
+    ],
+  },
+  // Decline EZ Bar Triceps Extension: the same bench, one bar, and a shorter
+  // bend that stops with the bar just above the forehead.
+  'decline-ez-bar-triceps-extension': {
+    root: 'hip',
+    feet: 'free',
+    implement: 'ez',
+    equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
+    poses: [
+      { ...DECLINE_EXTENSION_BODY, upperArm: 105, forearm: 105 },
+      { ...DECLINE_EXTENSION_BODY, upperArm: 105, forearm: 225 },
+    ],
+  },
+  // Cable Lying Triceps Extension: flat bench, head toward a low pulley, the
+  // bar lowered from straight arms to just above the forehead and pressed back.
+  'cable-lying-triceps-extension': {
+    root: 'hip',
+    implement: 'cableBar',
+    lines: [{ from: CABLE_LYING_EXTENSION_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [CABLE_LYING_EXTENSION_PULLEY[0], 0.5], b: [CABLE_LYING_EXTENSION_PULLEY[0], 20] },
+      { kind: 'pulley', at: CABLE_LYING_EXTENSION_PULLEY },
+      ...chainFlatBench(20, 66, CABLE_LYING_BENCH_TOP),
+    ],
+    poses: [
+      { at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 90 },
+      { at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 200 },
+    ],
+  },
+  // Low Cable Triceps Extension: face up on the low bench of a row station,
+  // head toward the pulley, a rope in the hands; the forearms go from level to
+  // vertical and back, and no further.
+  'low-cable-triceps-extension': {
+    root: 'hip',
+    implement: 'rope',
+    lines: [{ from: LOW_CABLE_EXTENSION_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [LOW_CABLE_EXTENSION_PULLEY[0], 0.5], b: [LOW_CABLE_EXTENSION_PULLEY[0], 22] },
+      { kind: 'pulley', at: LOW_CABLE_EXTENSION_PULLEY },
+      ...chainFlatBench(18, 64, LOW_CABLE_BENCH_TOP),
+    ],
+    poses: [
+      { at: [60, LOW_CABLE_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 180 },
+      { at: [60, LOW_CABLE_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 90 },
     ],
   },
   // chain movements are added above this line
@@ -2531,6 +2636,10 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'decline-dumbbell-triceps-extension': 'dumbbells',
+  'decline-ez-bar-triceps-extension': 'barbell',
+  'cable-lying-triceps-extension': 'cable_machine',
+  'low-cable-triceps-extension': 'cable_machine',
   'incline-dumbbell-curl': 'dumbbells',
   'incline-hammer-curls': 'dumbbells',
   'front-incline-dumbbell-raise': 'dumbbells',

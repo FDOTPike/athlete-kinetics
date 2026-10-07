@@ -73,4 +73,72 @@ export const CHAIN_SPECS = [
     reason: 'Source-bound side-view draft. Lying back on an incline bench facing away from a high pulley; the upper arms stay fixed beside the head while the elbows straighten from a right angle to fully extended, pause, and bend again more slowly. The pulley is placed where the forearms point at the start, so the cable only lengthens as the arms extend. Not drawn: the narrow overhand grip, which a side view cannot show; the bar reads end-on at the hands.',
     summary: 'Lying back on an incline bench facing away from a high pulley, straighten the elbows with the upper arms fixed beside the head, pause, then let the bar return slowly.',
   },
+  {
+    id: 179,
+    slug: 'decline-dumbbell-triceps-extension',
+    equipment: 'dumbbells',
+    phases: [0, 1, 1, 0, 0],
+    // "Lower slowly beside the ears."
+    segments: [1700, 250, 1100, 500],
+    captions: [
+      'Secure the legs on a decline bench, lie back and hold a dumbbell in each hand above the chest, palms facing each other and arms straight.',
+      'Keeping the upper arms still and the elbows in, bend the elbows to lower the dumbbells beside the ears.',
+      'Upper arms stay still. Elbows point at the ceiling.',
+      'Straighten the elbows to return the dumbbells above the chest.',
+      'Arms straight above the chest again.',
+    ],
+    reason: 'Source-bound side-view draft. Lying back on a decline bench, head at the low end, knees over the high end and ankles hooked under a roller; the upper arms point up from the lying chest, 15 degrees back from plumb, and do not move while the elbows bend to bring the dumbbells down beside the ears, slowly, and straighten again. The palms-in grip is shown by each bell being seen along its length, square to the forearm. Not drawn: the decline angle is not given by the source, so 20 degrees is a drawing choice.',
+    summary: 'Lying back on a decline bench with the legs secured, lower the dumbbells beside the ears by bending only the elbows, then straighten the arms above the chest.',
+  },
+  {
+    id: 180,
+    slug: 'decline-ez-bar-triceps-extension',
+    equipment: 'barbell',
+    phases: [0, 1, 1, 0, 0],
+    // "Lower slowly toward the forehead."
+    segments: [1600, 250, 1000, 500],
+    captions: [
+      'Secure the legs on a decline bench, lie back and hold the EZ bar above the chest with a grip slightly narrower than shoulder width, arms straight.',
+      'Keeping the upper arms still, bend the elbows to lower the bar toward the forehead.',
+      'Upper arms stay still, elbows in, bar just above the forehead.',
+      'Straighten the elbows to return the bar above the chest.',
+      'Arms straight above the chest again.',
+    ],
+    reason: 'Source-bound side-view draft. Lying back on a decline bench with the legs secured under a roller; the upper arms point up from the lying chest, 15 degrees back from plumb, and stay still while the elbows bend to lower the EZ bar toward the forehead, slowly, stopping just above it, and straighten again. The bar is one implement through both hands and reads end-on with its cambered shaft. Not drawn: the grip width, which a side view cannot show; the decline angle is not given by the source, so 20 degrees is a drawing choice.',
+    summary: 'Lying back on a decline bench with the legs secured, lower the EZ bar toward the forehead by bending only the elbows, then straighten the arms above the chest.',
+  },
+  {
+    id: 156,
+    slug: 'cable-lying-triceps-extension',
+    equipment: 'cable_machine',
+    phases: [0, 1, 1, 0, 0],
+    // "Lower slowly to the forehead line." ... "return the bar above the chest and pause."
+    segments: [1600, 250, 1000, 700],
+    captions: [
+      'Lie on a flat bench with your head toward a low pulley and hold the bar with a narrow overhand grip, arms straight above the chest.',
+      'Keeping the upper arms still and the elbows in, bend the elbows to lower the bar until it is just above the forehead.',
+      'Elbows in, upper arms pointing at the ceiling.',
+      'Straighten the elbows to return the bar above the chest.',
+      'Pause with the arms straight above the chest.',
+    ],
+    reason: 'Source-bound side-view draft. Lying on a flat bench with the head toward a low pulley, feet on the floor; the upper arms point at the ceiling and stay there while the elbows bend to lower the bar to just above the forehead, then straighten, with a pause at the top. The cable runs from the pulley past the end of the bench to the bar without crossing the bench or the head, and only lengthens as the arms straighten. Not drawn: the narrow overhand grip, which a side view cannot show.',
+    summary: 'Lying on a flat bench with the head toward a low pulley, lower the bar to just above the forehead by bending only the elbows, then straighten the arms and pause.',
+  },
+  {
+    id: 237,
+    slug: 'low-cable-triceps-extension',
+    equipment: 'cable_machine',
+    phases: [0, 1, 1, 0, 0],
+    // "Squeeze, then let the elbows bend slowly back to a right angle."
+    segments: [1100, 600, 1900, 500],
+    captions: [
+      'Lie face up on the bench of a seated row station, head toward the pulley, holding the rope ends with palms facing each other, upper arms pointing at the ceiling and elbows bent to a right angle.',
+      'Keeping the upper arms still, straighten the elbows until the forearms are vertical.',
+      'Squeeze with the forearms vertical.',
+      'Let the elbows bend slowly back to a right angle.',
+      'Upper arms point at the ceiling. Only the forearms move.',
+    ],
+    reason: 'Source-bound side-view draft. Face up on the low bench of a seated row station with the head toward the low pulley and a rope in the hands; the upper arms point at the ceiling and stay there while the forearms go from level, elbows at a right angle, to vertical, hold, and return slowly to a right angle and no further. The cable only lengthens as the arms straighten. Not drawn: the palms-in grip on the rope ends, which a side view cannot show.',
+    summary: 'Face up on a row-station bench with the head toward the low pulley, straighten the elbows until the forearms are vertical, squeeze, then let them bend slowly back to a right angle.',
+  },
 ];
