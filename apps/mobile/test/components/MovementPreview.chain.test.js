@@ -121,10 +121,19 @@ describe.each(entries.map((e) => [e.name, e]))('%s', (_name, entry) => {
         expect(side.toe[1]).toBeCloseTo(side.ankle[1], 12);
       }
       if (view === 'front') continue;
+      const soles = [];
       for (const [ankle, toe] of [[figure.joints.an, figure.toe.near], [figure.joints.af, figure.toe.far]]) {
         const foot = prims.find((p) => p.kind === 'bone' && p.x1 === ankle[0] && p.y1 === ankle[1] && p.x2 === toe[0] && p.y2 === toe[1]);
         expect(foot).toBeDefined();
-        expect(foot.y1 + foot.w / 2).toBeCloseTo(FLOOR, 9);
+        soles.push(Math.max(foot.y1, foot.y2) + foot.w / 2);
+      }
+      // Seen level, both soles are on the floor line. Looked down on, the nearer
+      // foot sits lower: that one is on the line and the other is above it.
+      if (movement.pitchDeg) {
+        expect(Math.max(...soles)).toBeCloseTo(FLOOR, 9);
+        expect(Math.min(...soles)).toBeLessThan(FLOOR);
+      } else {
+        for (const sole of soles) expect(sole).toBeCloseTo(FLOOR, 9);
       }
     }
   });
