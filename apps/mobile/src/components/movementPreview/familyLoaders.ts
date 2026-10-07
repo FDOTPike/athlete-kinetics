@@ -28,6 +28,7 @@ export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> =
   'flye__incline': () => require('./families/flye__incline.json') as PreviewFamilyFile,
   'flye__supine': () => require('./families/flye__supine.json') as PreviewFamilyFile,
   'front-raise__incline': () => require('./families/front-raise__incline.json') as PreviewFamilyFile,
+  'front-raise__standing': () => require('./families/front-raise__standing.json') as PreviewFamilyFile,
   'glute-kickback__standing': () => require('./families/glute-kickback__standing.json') as PreviewFamilyFile,
   'hip-extension__standing': () => require('./families/hip-extension__standing.json') as PreviewFamilyFile,
   'hip-extension__supine': () => require('./families/hip-extension__supine.json') as PreviewFamilyFile,

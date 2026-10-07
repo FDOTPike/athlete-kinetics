@@ -99,6 +99,8 @@ export interface CanonicalPose {
   tp?: number;
   /** Standing lateral raise: shoulder abduction in degrees from the arm hanging straight down. */
   la?: number;
+  /** Standing front raise: shoulder flexion of the working arm(s) in degrees from hanging straight down. */
+  fr?: number;
 }
 
 export type ColorRole = 'textHi' | 'textLow' | 'textMid' | 'line' | 'ink1';
@@ -152,7 +154,7 @@ export function lerpJoints(a: CanonicalPose, b: CanonicalPose, u: number): Canon
   // motion frames would not match their own stills.
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof CanonicalPose>;
   for (const key of keys) {
-    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la') {
+    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la' || key === 'fr') {
       out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * u;
       continue;
     }
@@ -674,6 +676,21 @@ export const LATERAL_RAISE_ELBOW_DEG: Readonly<Record<string, number>> = {
   'dumbbell-lateral-raise': 15,
   'lateral-raise-with-bands': 10,
 };
+/**
+ * Standing front raises, side view. The soft elbow is the slight bend the text
+ * asks for; bothArms is false where one arm works and the other hangs.
+ */
+export const FRONT_RAISE: Readonly<Record<string, { softElbowDeg: number; bothArms: boolean }>> = {
+  'dumbbell-front-raise': { softElbowDeg: 10, bothArms: true },
+  'front-cable-raise': { softElbowDeg: 8, bothArms: false },
+};
+/** Where a free arm hangs while the other one works, in degrees of flexion. */
+export const FRONT_RAISE_FREE_ARM_DEG = 3;
+/** The low pulley behind the athlete in the Front Cable Raise. */
+export const FRONT_CABLE_RAISE_PULLEY: CanonicalPoint = [14, 91];
+/** Side-view arm bone lengths (the same 12.5 / 12.0 the other side-view solved arms use). */
+const SAGITTAL_UPPER_ARM = 12.5;
+const SAGITTAL_FOREARM = 12.0;
 /** Front-view arm bone lengths (the same 13.26 / 11.2 the keyed front-view arms use). */
 const RAISE_UPPER_ARM = 13.26;
 const RAISE_FOREARM = 11.2;
@@ -823,6 +840,28 @@ export function lateralRaiseArms(
   };
   const nearOutward = nearShoulder[0] <= farShoulder[0] ? -1 : 1;
   return { near: arm(nearShoulder, nearOutward), far: arm(farShoulder, -nearOutward) };
+}
+
+/**
+ * One arm of a standing front raise, seen from the side, from its shoulder
+ * root. The arm flexes forward in the sagittal plane. A soft elbow bends in the
+ * arm's own plane: with the arm hanging it shows as the forearm sitting a little
+ * forward of the upper arm, and it turns out of view as the arm comes level
+ * (palms down, the elbow then points out to the side), so the visible bend
+ * fades with the cosine of the flexion angle.
+ */
+export function frontRaiseArm(
+  flexionDeg: number, softElbowDeg: number, shoulder: CanonicalPoint,
+): { el: CanonicalPoint; wr: CanonicalPoint } {
+  const upper = flexionDeg * Math.PI / 180;
+  const fore = (flexionDeg + softElbowDeg * Math.cos(upper)) * Math.PI / 180;
+  const el: CanonicalPoint = [
+    shoulder[0] + SAGITTAL_UPPER_ARM * Math.sin(upper), shoulder[1] + SAGITTAL_UPPER_ARM * Math.cos(upper),
+  ];
+  const wr: CanonicalPoint = [
+    el[0] + SAGITTAL_FOREARM * Math.sin(fore), el[1] + SAGITTAL_FOREARM * Math.cos(fore),
+  ];
+  return { el, wr };
 }
 
 /** Small hip arc with fixed soft knee; an actual cuff, not a hand cable. */
@@ -1235,6 +1274,19 @@ export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): F
     j.el = raise.near.el; j.wr = raise.near.wr;
     j.ef = raise.far.el; j.wf = raise.far.wr;
   }
+  if (!front && FRONT_RAISE[slug] !== undefined && j.fr !== undefined) {
+    // The far shoulder keeps its perspective offset for the whole rep. It must
+    // not depend on whether the two hands happen to be close on this tick, or
+    // a one-arm raise would shift the far shoulder part-way through.
+    const spec = FRONT_RAISE[slug];
+    const off = FAROFF[slug] ?? FAROFF_DEFAULT;
+    nArm = [j.nk[0], j.nk[1]];
+    fArm = [j.nk[0] + off[0], j.nk[1] + off[1]];
+    const near = frontRaiseArm(j.fr, spec.softElbowDeg, nArm);
+    const far = frontRaiseArm(spec.bothArms ? j.fr : FRONT_RAISE_FREE_ARM_DEG, spec.softElbowDeg, fArm);
+    j.el = near.el; j.wr = near.wr;
+    j.ef = far.el; j.wf = far.wr;
+  }
 
   return {
     hd: j.hd, nk: j.nk, hp: j.hp, waist,
@@ -1319,6 +1371,9 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     j.el = f.el; j.wr = f.wr; j.ef = f.ef; j.wf = f.wf;
   }
   if (front && LATERAL_RAISE_ELBOW_DEG[slug] !== undefined && pose.la !== undefined) {
+    j.el = f.el; j.wr = f.wr; j.ef = f.ef; j.wf = f.wf;
+  }
+  if (!front && FRONT_RAISE[slug] !== undefined && pose.fr !== undefined) {
     j.el = f.el; j.wr = f.wr; j.ef = f.ef; j.wf = f.wf;
   }
   const fly = FLYE_INCLINES[slug] !== undefined && pose.fo !== undefined
@@ -1575,6 +1630,8 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   'dumbbell-lateral-raise': 'dumbbells',
   'lateral-raise-with-bands': 'band',
+  'dumbbell-front-raise': 'dumbbells',
+  'front-cable-raise': 'cable_machine',
   'inverted-row': 'barbell',
   'body-tricep-press': 'squat_rack',
   'dumbbell-reverse-lunge': 'dumbbells',
@@ -2466,16 +2523,17 @@ function implement(
       // Neutral (thumbs-up) vertical orientation.
       if (j.wr) out.push({ kind: 'rect', x: j.wr[0] - 2.3, y: j.wr[1] - 6.5, w: 4.6, h: 13, rx: 1.6, fill: 'textHi', opacity: 1 });
       if (j.wf) out.push({ kind: 'rect', x: j.wf[0] - 2.3, y: j.wf[1] - 6.5, w: 4.6, h: 13, rx: 1.6, fill: farColor, opacity: farOpacity });
-    } else if (slug === 'dumbbell-lateral-raise') {
-      // Seen from the front, a bell held at the side or lifted out to the side
-      // points at the viewer, so it reads end-on in the fist for the whole
-      // rep. The outline keeps it apart from the thigh at the start.
-      const bell = (p: CanonicalPoint): void => {
+    } else if (slug === 'dumbbell-lateral-raise' || slug === 'dumbbell-front-raise') {
+      // The bell's handle points at the viewer in both: a lateral raise seen
+      // from the front, and a palms-back front raise seen from the side. So it
+      // reads end-on in the fist for the whole rep. The outline keeps it apart
+      // from the thigh at the start. The far bell is painted first.
+      const bell = (p: CanonicalPoint, color: ColorRole, opacity: number): void => {
         out.push({ kind: 'rect', x: p[0] - 2.8, y: p[1] - 2.8, w: 5.6, h: 5.6, rx: 1.6,
-          fill: 'textHi', opacity: 1, stroke: 'ink1', strokeWidth: 1.4 });
+          fill: color, opacity, stroke: 'ink1', strokeWidth: 1.4 });
       };
-      if (j.wr) bell(j.wr);
-      if (j.wf) bell(j.wf);
+      if (j.wf) bell(j.wf, farColor, farOpacity);
+      if (j.wr) bell(j.wr, 'textHi', 1);
     } else if (slug === 'goblet-squat' && j.b) {
       // Single front-held implement at anchor b.
       out.push({ kind: 'circle', cx: j.b[0], cy: j.b[1] + 1.6, r: 5.2, fill: 'textHi', opacity: 1 });
@@ -2677,6 +2735,17 @@ function implement(
     out.push({ kind: 'bone', x1: farFoot[0], y1: farFoot[1], x2: j.wf[0], y2: j.wf[1], w: 1.4, color: 'textMid', opacity: 1 });
     out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: body.lw * 0.44, fill: 'textHi', opacity: 1 });
     out.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
+  }
+  if (slug === 'front-cable-raise' && j.wr && j.wf) {
+    // One handle on a low pulley BEHIND the athlete. The working (near) hand
+    // holds it; the free hand hangs empty. The pulley never moves, so the
+    // cable swings up and lengthens as the arm rises.
+    const pulley = FRONT_CABLE_RAISE_PULLEY;
+    out.push({ kind: 'bone', x1: pulley[0], y1: pulley[1], x2: pulley[0], y2: GROUND_LINE, w: 1.6, color: 'textLow', opacity: 0.75 });
+    out.push({ kind: 'circle', cx: pulley[0], cy: pulley[1], r: 2.2, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+    out.push({ kind: 'bone', x1: pulley[0], y1: pulley[1], x2: j.wr[0], y2: j.wr[1], w: 1.4, color: 'textMid', opacity: 1 });
+    out.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
+    out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: 2.6, fill: 'textHi', opacity: 1 });
   }
   if (slug === 'calf-raises-with-bands' && j.wr && j.an) {
     // Family 9: the band runs from under the forefeet up to the handles.
