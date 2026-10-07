@@ -371,7 +371,7 @@ function readCanonicalFrame(entry: RawEntry, frame: RawFrame): CanonicalFrame {
   // app's motion frames with a level bar while the stills and the evidence show it
   // tilted at the top of the curl. Entry 0184's `ct`, the chin-stop flag, rides the
   // same path so the finish-line tick is on the app's own motion frames.
-  for (const flag of ['bt', 'ct', 'se', 'ca', 'ra', 'pe', 'sa', 'fo', 'ke', 'rl', 'ir', 'tp'] as const) {
+  for (const flag of ['bt', 'ct', 'se', 'ca', 'ra', 'pe', 'sa', 'fo', 'ke', 'rl', 'ir', 'tp', 'la'] as const) {
     const value = (frame.joints as Record<string, unknown>)[flag];
     if (value === undefined) continue;
     if (typeof value !== 'number' || !Number.isFinite(value)) {
