@@ -1,0 +1,51 @@
+source commit: 78e51522d0331fcb801172225345b2baca1096aa
+command: node --expose-gc tools/rendering/verify_preview_storage.mjs
+
+{
+  "runtime": "v24.11.1",
+  "scope": "Host storage and retained JSON-clone regression only; no native peak memory/frame-timing/4GBphone acceptance",
+  "records": 158,
+  "families": 62,
+  "rawBytes": 462777,
+  "gzipBytes": 71076,
+  "largestFamily": {
+    "file": "horizontal-press__supine.json",
+    "rawBytes": 40359
+  },
+  "singleFamily": {
+    "samples": [
+      89512,
+      93976,
+      94104,
+      94104,
+      94336
+    ],
+    "medianBytes": 94104
+  },
+  "allFamilies": {
+    "samples": [
+      1226896,
+      1226016,
+      1225968,
+      1225968,
+      1225968
+    ],
+    "medianBytes": 1225968
+  },
+  "budgets": {
+    "rawBytes": 1048576,
+    "gzipBytes": 196608,
+    "familyBytes": 65536,
+    "singleFamilyMaxBytes": 262144,
+    "allFamiliesMaxBytes": 2097152
+  },
+  "checks": {
+    "aggregateRaw": true,
+    "aggregateGzip": true,
+    "everyFamily": true,
+    "singleFamilyClone": true,
+    "allFamiliesClone": true
+  },
+  "pass": true
+}
+exit code: 0
