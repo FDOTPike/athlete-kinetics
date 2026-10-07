@@ -1,0 +1,14 @@
+source commit: 6a7050929d4129a904a9976b43574549eda2de30
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov09.json
+
+movements measured: 147 (baseline 143)
+added: 179 Decline Dumbbell Triceps Extension; 180 Decline EZ Bar Triceps Extension; 156 Cable Lying Triceps Extension; 237 Low Cable Triceps Extension
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  179 Decline Dumbbell Triceps Extension: drawn 5b9f7e1d80f001f93004edcb28fccf0e62941e8ec715721a0f4be0a93ae64326 captions ce1ff3a79b57704f8531cfb5bce8d3e63d7931a221c489c5fd1fb5f5fc999ce1 stage 240.00x177.27 cycle 3550 ms
+  180 Decline EZ Bar Triceps Extension: drawn d80746586b132e8f479d4b73502900bbea0ac14db114a9c5b432383b85994cc1 captions 96323a6a04fba0ba4c462d72dc3a630f57fbe43be7a6f3a85ec8c09f139020e6 stage 240.00x182.07 cycle 3350 ms
+  156 Cable Lying Triceps Extension: drawn 10f79454a3cd3e76d61fad503981f46cb9488243e754ae018cd7de7b778df310 captions f8f9630184a88bdf283d086224475d074a54cd439469f68be6a9a8d85b258a6f stage 240.00x143.51 cycle 3550 ms
+  237 Low Cable Triceps Extension: drawn e9d4b32b5289ad5896b0b74886d964ac16b9f4d3f7ba2d748b5fdb32a6f87c81 captions da67efd85f9281816ec73135d7987f58fda1c4dbb909d49607e16637481f055c stage 240.00x130.00 cycle 4100 ms
+exit code: 0 (probe run exit 0)
