@@ -38,7 +38,8 @@ function figureAt(entry, t) {
   const figure = chainGeometry(slugOf(entry), pose.ph, BODY);
   return { ...figure, prims: layoutCanonicalFigure(pose, { ...entry, body: BODY }) };
 }
-const topTime = (entry) => entry.segmentDurationsMs[0] + entry.segmentDurationsMs[1];
+/** Keyframes are start, top, top after the pause, start, start: the top is reached at the end of the first gap. */
+const topTime = (entry) => entry.segmentDurationsMs[0];
 /** The back pad of the bench: the long slab that is not level. */
 const backPad = (slug) => CHAIN_MOVEMENTS[slug].equipment.find((s) => s.kind === 'slab' && Math.abs(s.a[1] - s.b[1]) > 1);
 const seatPad = (slug) => CHAIN_MOVEMENTS[slug].equipment.find((s) => s.kind === 'slab' && Math.abs(s.a[1] - s.b[1]) < 1e-9);
@@ -131,13 +132,13 @@ describe('Incline Dumbbell Curl (219)', () => {
   });
 
   test('"Pause, then lower slowly until the arms are straight"', () => {
-    const [upA, upB, pause, down] = entry219.segmentDurationsMs;
+    const [up, pause, down] = entry219.segmentDurationsMs;
     expect(pause).toBeGreaterThanOrEqual(400);
-    expect(down).toBeGreaterThanOrEqual(1.5 * (upA + upB));
-    const held = [0, pause / 2, pause].map((dt) => figureAt(entry219, upA + upB + dt).world.near.wrist);
+    expect(down).toBeGreaterThanOrEqual(1.5 * up);
+    const held = [0, pause / 2, pause].map((dt) => figureAt(entry219, up + dt).world.near.wrist);
     expect(held[1]).toEqual(held[0]);
     expect(held[2]).toEqual(held[0]);
-    expect(elbowAngle(figureAt(entry219, upA + upB + pause + down).world.near)).toBeCloseTo(180, 4);
+    expect(elbowAngle(figureAt(entry219, up + pause + down).world.near)).toBeCloseTo(180, 4);
   });
 
   test('"palms facing forward": a dumbbell in each hand, read end-on', () => {
@@ -182,10 +183,10 @@ describe('Incline Hammer Curls (221)', () => {
   });
 
   test('"Pause at the top, then lower slowly until the arms are straight"', () => {
-    const [upA, upB, pause, down] = entry221.segmentDurationsMs;
+    const [up, pause, down] = entry221.segmentDurationsMs;
     expect(pause).toBeGreaterThanOrEqual(400);
-    expect(down).toBeGreaterThanOrEqual(1.5 * (upA + upB));
-    expect(elbowAngle(figureAt(entry221, upA + upB + pause + down).world.near)).toBeCloseTo(180, 4);
+    expect(down).toBeGreaterThanOrEqual(1.5 * up);
+    expect(elbowAngle(figureAt(entry221, up + pause + down).world.near)).toBeCloseTo(180, 4);
   });
 });
 
@@ -225,9 +226,9 @@ describe('Front Incline Dumbbell Raise (207)', () => {
   });
 
   test('"Squeeze for a second, then lower back to the start"', () => {
-    const [upA, upB, hold] = entry207.segmentDurationsMs;
+    const [up, hold] = entry207.segmentDurationsMs;
     expect(hold).toBeGreaterThanOrEqual(1000);
-    const held = [0, hold / 2, hold].map((dt) => figureAt(entry207, upA + upB + dt).world.near.wrist);
+    const held = [0, hold / 2, hold].map((dt) => figureAt(entry207, up + dt).world.near.wrist);
     expect(held[1]).toEqual(held[0]);
     expect(held[2]).toEqual(held[0]);
   });
@@ -275,10 +276,10 @@ describe('Cable Incline Triceps Extension (155)', () => {
   });
 
   test('"Pause, then let the bar return slowly until the elbows are bent again"', () => {
-    const [upA, upB, pause, down] = entry155.segmentDurationsMs;
+    const [up, pause, down] = entry155.segmentDurationsMs;
     expect(pause).toBeGreaterThanOrEqual(400);
-    expect(down).toBeGreaterThanOrEqual(1.5 * (upA + upB));
-    expect(elbowAngle(figureAt(entry155, upA + upB + pause + down).world.near)).toBeCloseTo(90, 5);
+    expect(down).toBeGreaterThanOrEqual(1.5 * up);
+    expect(elbowAngle(figureAt(entry155, up + pause + down).world.near)).toBeCloseTo(90, 5);
   });
 
   test('one cable runs from the pulley to the bar, and extending the arms only ever lengthens it', () => {
@@ -295,6 +296,19 @@ describe('Cable Incline Triceps Extension (155)', () => {
     for (let i = 1; i < lengths.length; i++) expect(lengths[i]).toBeGreaterThanOrEqual(lengths[i - 1] - 1e-9);
     expect(lengths.at(-1) - lengths[0]).toBeGreaterThan(5);
   });
+});
+
+test.each([entry219, entry221, entry207, entry155].map((e) => [e.name, e]))('%s: the rise and the lowering are each one unbroken motion', (_name, entry) => {
+  // One eased gap each way: the hand never stops between the start and the top.
+  const [up, pause, down] = entry.segmentDurationsMs;
+  expect(entry.frames.map((f) => f.joints.ph)).toEqual([0, 1, 1, 0, 0]);
+  const moving = (from, to) => {
+    for (let t = from + 33; t < to - 66; t += 33) {
+      expect(distance(figureAt(entry, t).joints.wr, figureAt(entry, t + 33).joints.wr)).toBeGreaterThan(0.01);
+    }
+  };
+  moving(0, up);
+  moving(up + pause, up + pause + down);
 });
 
 test('the four incline movements are four drawings, not one drawing with new captions', () => {
