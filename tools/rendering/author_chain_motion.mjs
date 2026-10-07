@@ -73,7 +73,11 @@ for (const spec of CHAIN_SPECS) {
   if (spec.phases.length < 5 || spec.captions.length !== spec.phases.length || spec.segments.length !== spec.phases.length - 1) {
     throw Error(`Movement ${spec.id} needs at least five keyframes, one caption each and one duration per gap`);
   }
-  if (spec.phases[0] !== spec.phases.at(-1)) throw Error(`Movement ${spec.id} does not close its loop`);
+  // A movement whose poses form a loop closes by running on to the first pose again.
+  const closes = movement.cycle === true
+    ? (spec.phases.at(-1) - spec.phases[0]) % movement.poses.length === 0
+    : spec.phases[0] === spec.phases.at(-1);
+  if (!closes) throw Error(`Movement ${spec.id} does not close its loop`);
   if (spec.turns && (spec.turns.length !== spec.phases.length || spec.turns[0] !== spec.turns.at(-1))) {
     throw Error(`Movement ${spec.id} needs one turn per keyframe, closing its loop`);
   }
