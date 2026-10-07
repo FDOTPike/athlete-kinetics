@@ -101,6 +101,8 @@ export interface CanonicalPose {
   la?: number;
   /** Standing front raise: shoulder flexion of the working arm(s) in degrees from hanging straight down. */
   fr?: number;
+  /** Chest-supported incline raise phase, from 0 (arms hanging) to 1 (elbows at shoulder height). */
+  pi?: number;
 }
 
 export type ColorRole = 'textHi' | 'textLow' | 'textMid' | 'line' | 'ink1';
@@ -154,7 +156,7 @@ export function lerpJoints(a: CanonicalPose, b: CanonicalPose, u: number): Canon
   // motion frames would not match their own stills.
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof CanonicalPose>;
   for (const key of keys) {
-    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la' || key === 'fr') {
+    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la' || key === 'fr' || key === 'pi') {
       out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * u;
       continue;
     }
@@ -864,6 +866,187 @@ export function frontRaiseArm(
   return { el, wr };
 }
 
+/**
+ * Chest-supported incline shoulder raises (owner correction, 2026-10-07): the
+ * athlete lies chest-down on a 45 degree incline pad with the feet wide on the
+ * floor, and the arms raise with the elbows leading.
+ */
+export const PRONE_INCLINE_RAISE_SLUGS: ReadonlySet<string> = new Set([
+  'barbell-incline-shoulder-raise', 'dumbbell-incline-shoulder-raise',
+]);
+/** Everything the owner fixed, in one place, so the tests read the same numbers. */
+export const PRONE_INCLINE_RAISE = {
+  inclineDeg: 45,
+  yawDeg: 40,
+  /** Dumbbells: the angle held at the elbow, between upper arm and forearm. */
+  dumbbellElbowAngleDeg: 105,
+  /** Dumbbells: the upper arm's abduction from hanging at the start and the top. */
+  dumbbellAbductionDeg: [20, 90] as const,
+  /** Barbell: half the grip width, and the elbow angle at the start and the top. */
+  barbellGripHalfWidth: 24,
+  barbellElbowAngleDeg: [170, 104] as const,
+  /** Where the pad runs along the trunk, as fractions from hip (0) to neck (1). */
+  padSpan: [-0.25, 0.55] as const,
+  /** Each ankle's distance out from the midline; wider than the hips. */
+  stanceHalfWidth: 15,
+} as const;
+
+/**
+ * The whole figure for a chest-supported incline raise, from a 3D model. World
+ * axes: X forward along the floor, Y up, Z across the body (positive toward
+ * the viewer). The trunk lies along the incline with the chest facing the pad;
+ * the legs reach back to feet planted wide; nothing but the arms moves. The
+ * arms work in the plane across the body: each upper arm swings from hanging
+ * to level with the shoulder, and the forearm hangs below the elbow, so the
+ * elbow leads the whole way. World joints are returned beside the projection
+ * so a test can measure real lengths and angles, not foreshortened ones.
+ */
+export function proneInclineRaiseGeometry(phase: number, body: BodyParameters, barbell: boolean) {
+  type Point3 = readonly [number, number, number];
+  const spec = PRONE_INCLINE_RAISE;
+  const rad = (d: number): number => d * Math.PI / 180;
+  const incline = rad(spec.inclineDeg), yaw = rad(spec.yawDeg);
+  const trunk: Point3 = [Math.cos(incline), Math.sin(incline), 0];
+  const anterior: Point3 = [Math.sin(incline), -Math.cos(incline), 0];
+  const HIP_SCREEN: CanonicalPoint = [46, 56];
+  const project = (q: Point3): CanonicalPoint =>
+    [HIP_SCREEN[0] + q[0] * Math.cos(yaw) - q[2] * Math.sin(yaw), HIP_SCREEN[1] - q[1]];
+  const along = (t: number, lift = 0): Point3 =>
+    [24 * t * trunk[0] + lift * anterior[0], 24 * t * trunk[1] + lift * anterior[1], 0];
+  const hip: Point3 = [0, 0, 0];
+  const neck = along(1);
+  const head: Point3 = [neck[0] + 9 * trunk[0], neck[1] + 9 * trunk[1], 0];
+  const shoulderZ = body.sw * 0.92;
+  const UPPER = 12.5, FORE = 12.0;
+
+  const arm = (side: number) => {
+    const shoulder: Point3 = [neck[0], neck[1], side * shoulderZ];
+    let elbow: Point3;
+    let wrist: Point3;
+    if (barbell) {
+      // Both hands are fixed on one bar at a wide grip. The bar rises straight
+      // up under the shoulders; the elbow is solved and flares out and up.
+      const [open, closed] = spec.barbellElbowAngleDeg;
+      const reachAt = (angleDeg: number): number =>
+        Math.sqrt(UPPER * UPPER + FORE * FORE - 2 * UPPER * FORE * Math.cos(rad(angleDeg)));
+      const span = spec.barbellGripHalfWidth - shoulderZ;
+      const dropAt = (angleDeg: number): number => Math.sqrt(reachAt(angleDeg) ** 2 - span ** 2);
+      const drop = dropAt(open) + (dropAt(closed) - dropAt(open)) * phase;
+      wrist = [shoulder[0], shoulder[1] - drop, side * spec.barbellGripHalfWidth];
+      const reach = Math.hypot(span, drop);
+      const a = (UPPER * UPPER - FORE * FORE + reach * reach) / (2 * reach);
+      const h = Math.sqrt(Math.max(0, UPPER * UPPER - a * a));
+      // In the (across, up) plane: from the shoulder toward the hand, then out and up.
+      const u = [span / reach, -drop / reach];
+      const across = shoulderZ + u[0] * a + (-u[1]) * h;
+      const up = shoulder[1] + u[1] * a + u[0] * h;
+      elbow = [shoulder[0], up, side * across];
+    } else {
+      const [from, to] = spec.dumbbellAbductionDeg;
+      const upper = rad(from + (to - from) * phase);
+      const fore = upper - rad(180 - spec.dumbbellElbowAngleDeg);
+      elbow = [shoulder[0], shoulder[1] - UPPER * Math.cos(upper), shoulder[2] + side * UPPER * Math.sin(upper)];
+      wrist = [elbow[0], elbow[1] - FORE * Math.cos(fore), elbow[2] + side * FORE * Math.sin(fore)];
+    }
+    return { world: { shoulder, elbow, wrist }, projected: { shoulder: project(shoulder), elbow: project(elbow), wrist: project(wrist) } };
+  };
+  const near = arm(1), far = arm(-1);
+
+  // Feet planted wide behind the hips; the knee is solved, bending forward.
+  const ankleHeight = -(96.9 - body.lw * 0.9 / 2 - HIP_SCREEN[1]);
+  const leg = (side: number) => {
+    const root: Point3 = [0, 0, side * body.hw * 0.8];
+    const ankle: Point3 = [-15, ankleHeight, side * spec.stanceHalfWidth];
+    const d: Point3 = [ankle[0] - root[0], ankle[1] - root[1], ankle[2] - root[2]];
+    const length = Math.hypot(d[0], d[1], d[2]);
+    const u: Point3 = [d[0] / length, d[1] / length, d[2] / length];
+    const dot = u[0];
+    const forward: Point3 = [1 - dot * u[0], -dot * u[1], -dot * u[2]];
+    const fl = Math.hypot(forward[0], forward[1], forward[2]);
+    const bend = Math.sqrt(Math.max(0, 22.25 * 22.25 - (length / 2) ** 2));
+    const knee: Point3 = [
+      root[0] + d[0] / 2 + forward[0] / fl * bend,
+      root[1] + d[1] / 2 + forward[1] / fl * bend,
+      root[2] + d[2] / 2 + forward[2] / fl * bend,
+    ];
+    return { world: { root, knee, ankle }, projected: { root: project(root), knee: project(knee), ankle: project(ankle) } };
+  };
+  const nearLeg = leg(1), farLeg = leg(-1);
+
+  // The pad lies against the chest, parallel to the trunk, and stops short of
+  // the shoulders so the arms and the implement clear its top end. It is laid
+  // out against the DRAWN trunk: the trunk is painted at its side-profile
+  // width about the projected spine, so a pad offset in world space would sit
+  // partly under that silhouette in a turned view.
+  const hp = project(hip), nk = project(neck);
+  const drawnLength = Math.hypot(nk[0] - hp[0], nk[1] - hp[1]);
+  const alongScreen: CanonicalPoint = [(nk[0] - hp[0]) / drawnLength, (nk[1] - hp[1]) / drawnLength];
+  // The chest side of the drawn trunk: forward and down on screen.
+  const chestSide: CanonicalPoint = [-alongScreen[1], alongScreen[0]];
+  const trunkHalf = body.sw * 0.58;
+  const padHalf = 2;
+  const padLift = trunkHalf + padHalf + 0.8;
+  const padAt = (t: number, lift: number): CanonicalPoint => [
+    hp[0] + alongScreen[0] * drawnLength * t + chestSide[0] * lift,
+    hp[1] + alongScreen[1] * drawnLength * t + chestSide[1] * lift,
+  ];
+  const pad: readonly [CanonicalPoint, CanonicalPoint] = [padAt(spec.padSpan[0], padLift), padAt(spec.padSpan[1], padLift)];
+  const padMid = padAt((spec.padSpan[0] + spec.padSpan[1]) / 2, padLift + padHalf);
+  const floorScreen = 96.4;
+  const post: readonly [CanonicalPoint, CanonicalPoint] = [padMid, [padMid[0], floorScreen]];
+  const base: readonly [CanonicalPoint, CanonicalPoint] = [[padMid[0] - 9, floorScreen], [padMid[0] + 11, floorScreen]];
+
+  const joints: FigureJoints = {
+    hd: project(head), nk, hp,
+    waist: [nk[0] + (hp[0] - nk[0]) * 0.56, nk[1] + (hp[1] - nk[1]) * 0.56],
+    nArm: near.projected.shoulder, fArm: far.projected.shoulder,
+    el: near.projected.elbow, wr: near.projected.wrist, ef: far.projected.elbow, wf: far.projected.wrist,
+    nLeg: nearLeg.projected.root, fLeg: farLeg.projected.root,
+    kn: nearLeg.projected.knee, an: nearLeg.projected.ankle, kf: farLeg.projected.knee, af: farLeg.projected.ankle,
+  };
+  return {
+    near, far, nearLeg, farLeg, joints, pad, post, base, padHalf, project,
+    world: { hip, neck, head, trunk, anterior },
+    chestSide,
+    inclineDeg: spec.inclineDeg, yawDeg: spec.yawDeg,
+  };
+}
+
+/** The implement of a chest-supported incline raise, split so the far half sits behind the body. */
+function layoutProneInclineImplement(
+  raise: ReturnType<typeof proneInclineRaiseGeometry>, barbell: boolean,
+): { far: FigurePrim[]; near: FigurePrim[] } {
+  const far: FigurePrim[] = [];
+  const near: FigurePrim[] = [];
+  if (barbell) {
+    // One straight bar through both hands, with a plate outside each hand.
+    const y = raise.near.world.wrist[1], x = raise.near.world.wrist[0];
+    const grip = PRONE_INCLINE_RAISE.barbellGripHalfWidth;
+    const end = (z: number): CanonicalPoint => raise.project([x, y, z]);
+    const nearEnd = end(grip + 7), farEnd = end(-grip - 7), middle = end(0);
+    far.push({ kind: 'bone', x1: middle[0], y1: middle[1], x2: farEnd[0], y2: farEnd[1], w: 1.6, color: 'textLow', opacity: 0.9 });
+    const farPlate = end(-grip - 5);
+    far.push({ kind: 'bone', x1: farPlate[0], y1: farPlate[1] - 4.2, x2: farPlate[0], y2: farPlate[1] + 4.2, w: 2.4, color: 'textLow', opacity: 0.9 });
+    near.push({ kind: 'bone', x1: middle[0], y1: middle[1], x2: nearEnd[0], y2: nearEnd[1], w: 1.6, color: 'textHi', opacity: 1 });
+    const nearPlate = end(grip + 5);
+    near.push({ kind: 'bone', x1: nearPlate[0], y1: nearPlate[1] - 4.2, x2: nearPlate[0], y2: nearPlate[1] + 4.2, w: 2.4, color: 'textHi', opacity: 1, stroke: 'ink1', strokeWidth: 0.6 });
+  } else {
+    // A bell in each fist, its handle pointing forward, so it reads as a short
+    // bar with a head at each end.
+    const bell = (wrist: readonly [number, number, number], color: ColorRole, opacity: number, out: FigurePrim[]): void => {
+      const a = raise.project([wrist[0] - 4.2, wrist[1], wrist[2]]);
+      const b = raise.project([wrist[0] + 4.2, wrist[1], wrist[2]]);
+      out.push({ kind: 'bone', x1: a[0], y1: a[1], x2: b[0], y2: b[1], w: 1.8, color, opacity });
+      for (const head of [a, b]) {
+        out.push({ kind: 'bone', x1: head[0], y1: head[1] - 2.2, x2: head[0], y2: head[1] + 2.2, w: 2.6, color, opacity, stroke: 'ink1', strokeWidth: 0.6 });
+      }
+    };
+    bell(raise.far.world.wrist, 'textLow', 0.9, far);
+    bell(raise.near.world.wrist, 'textHi', 1, near);
+  }
+  return { far, near };
+}
+
 /** Small hip arc with fixed soft knee; an actual cuff, not a hand cable. */
 export function kickbackGeometry(extensionDeg: number, body: BodyParameters): FigureJoints {
   const upper = (extensionDeg + 2.5) * Math.PI / 180;
@@ -1098,6 +1281,9 @@ export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): F
   if (slug === 'inverted-row' && j.ir !== undefined) return invertedRowGeometry(j.ir, body).joints;
   if (slug === 'body-tricep-press' && j.tp !== undefined) return bodyTricepPressGeometry(j.tp, body).joints;
   if (slug === ANKLE_KICKBACK && j.ke !== undefined) return kickbackGeometry(j.ke, body);
+  if (PRONE_INCLINE_RAISE_SLUGS.has(slug) && j.pi !== undefined) {
+    return proneInclineRaiseGeometry(j.pi, body, slug === 'barbell-incline-shoulder-raise').joints;
+  }
   if (FLYE_INCLINES[slug] !== undefined && j.fo !== undefined) {
     return flyeGeometry(j.fo, body, FLYE_INCLINES[slug]).joints;
   }
@@ -1379,6 +1565,11 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   const fly = FLYE_INCLINES[slug] !== undefined && pose.fo !== undefined
     ? flyeGeometry(pose.fo, body, FLYE_INCLINES[slug]) : null;
   if (fly) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
+  const proneRaise = PRONE_INCLINE_RAISE_SLUGS.has(slug) && pose.pi !== undefined
+    ? proneInclineRaiseGeometry(pose.pi, body, slug === 'barbell-incline-shoulder-raise') : null;
+  if (proneRaise) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
+  const proneImplement = proneRaise
+    ? layoutProneInclineImplement(proneRaise, slug === 'barbell-incline-shoulder-raise') : null;
   const reverseLunge = slug === REVERSE_LUNGE && pose.rl !== undefined
     ? reverseLungeGeometry(pose.rl, body) : null;
   if (reverseLunge) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
@@ -1455,6 +1646,14 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     PERSPECTIVE_BARBELL_SLUGS.has(slug) ? 94.4 : 96.4));
   if (cableDraw) prims.push(...cableDraw.farHandle);
   if (fly) prims.push(...layoutFlyeDumbbell(fly, false));
+  if (proneRaise && proneImplement) {
+    // Back to front: the far hand's implement, then the bench, which hides the
+    // far arm where they cross, then the trunk lying on it.
+    prims.push(...proneImplement.far);
+    prims.push(bone(proneRaise.base[0], proneRaise.base[1], 1.6, 'textLow', 0.75));
+    prims.push(bone(proneRaise.post[0], proneRaise.post[1], 1.6, 'textLow', 0.75));
+    prims.push(bone(proneRaise.pad[0], proneRaise.pad[1], proneRaise.padHalf * 2, 'textMid', 1));
+  }
   if (reverseLunge) prims.push(...layoutHammerDumbbell(j.wf, j.ef, false));
 
   // The row's bench sits BETWEEN the far leg and the torso: the kneeling
@@ -1477,6 +1676,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   // The oblique transverse shoulder roots must visibly join the trunk;
   // front/side silhouette bars alone cannot span this projected girdle.
   if (fly) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
+  if (proneRaise) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
   // The far arm is behind the head-support bench; the near arm is in front.
   if (slug === HEAD_SUPPORTED_RAISE) prims.push(...apparatus(slug, front, body));
   // Overlapping transverse bars form one shoulder→waist→hip silhouette.
@@ -1594,6 +1794,13 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     prims.push(bone(centre, fly.pad[0], 1.6, 'textLow', 0.75), bone(a, b, 4.4, 'textMid', 1));
   }
   if (reverseLunge) prims.push(...layoutHammerDumbbell(j.wr, j.el));
+  if (proneRaise && proneImplement) {
+    prims.push(...proneImplement.near);
+    if (slug === 'dumbbell-incline-shoulder-raise') {
+      prims.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
+      prims.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: body.lw * 0.44, fill: 'textHi', opacity: 1 });
+    }
+  }
   if (kickback) {
     const length = Math.hypot(j.an[0] - j.kn[0], j.an[1] - j.kn[1]);
     const half = (body.lw * 0.9 + 1) / 2;
@@ -2014,9 +2221,6 @@ const ELBOW_ON_SHOULDER_CIRCLE: ReadonlyMap<string, { upper: number; fore: numbe
   // Family 37: the kneeling row arms.
   ['kneeling-single-arm-high-pulley-row', { upper: 12.5, fore: 12.0, side: 1 }],
   ['kneeling-high-pulley-row', { upper: 12.5, fore: 12.0, side: 1 }],
-  // Family 38: the incline raise arms.
-  ['barbell-incline-shoulder-raise', { upper: 12.5, fore: 12.0, side: 1 }],
-  ['dumbbell-incline-shoulder-raise', { upper: 12.5, fore: 12.0, side: 1 }],
   // Entry 0183 (owner, L10): on a vertical pull the working elbow has to sit
   // BELOW the wrist and drive down past the shoulder, so these three take the
   // lower circle solution (side -1). The close grip keeps side 1: with its
@@ -2376,15 +2580,6 @@ function apparatus(slug: string, front: boolean, body: BodyParameters): FigurePr
     if (slug === 'incline-cable-chest-press') {
       out.push(frame(76, 58, 6, 34));
     }
-  } else if (slug === 'barbell-incline-shoulder-raise' || slug === 'dumbbell-incline-shoulder-raise') {
-    // Family 38: the incline bench (the reclined backrest) and, on the
-    // barbell version, the squat rack behind it.
-    out.push({ kind: 'rect', x: 20, y: 78, w: 34, h: 4, rx: 1.5, fill: 'textHi', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
-    out.push({ kind: 'bone', x1: 22, y1: 78, x2: 8, y2: 44, w: 3.2, color: 'textMid', opacity: 1 });
-    out.push({ kind: 'rect', x: 24, y: 82, w: 4, h: 16, rx: 1.2, fill: 'textMid', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
-    if (slug === 'barbell-incline-shoulder-raise') {
-      out.push({ kind: 'rect', x: 4, y: 30, w: 3, h: 62, rx: 1.2, fill: 'textMid', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
-    }
   } else if (slug === 'kneeling-single-arm-high-pulley-row' || slug === 'kneeling-high-pulley-row') {
     // Family 37: the drawn high pulley the rows reach into.
     out.push({ kind: 'circle', cx: 84, cy: 22, r: 1.9, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
@@ -2518,7 +2713,7 @@ function implement(
     out.push({ kind: 'bone', x1: cx - 4.5, y1: chin, x2: cx + 4.5, y2: chin,
       w: 1.2, color: 'textMid', opacity: 0.9 });
   }
-  if (equipment === 'dumbbells' && slug !== 'dumbbell-shrug' && slug !== 'preacher-hammer-dumbbell-curl' && slug !== HEAD_SUPPORTED_RAISE && FLYE_INCLINES[slug] === undefined && slug !== REVERSE_LUNGE) {
+  if (equipment === 'dumbbells' && slug !== 'dumbbell-shrug' && slug !== 'preacher-hammer-dumbbell-curl' && slug !== HEAD_SUPPORTED_RAISE && FLYE_INCLINES[slug] === undefined && slug !== REVERSE_LUNGE && !PRONE_INCLINE_RAISE_SLUGS.has(slug)) {
     if (slug === 'hammer-curl') {
       // Neutral (thumbs-up) vertical orientation.
       if (j.wr) out.push({ kind: 'rect', x: j.wr[0] - 2.3, y: j.wr[1] - 6.5, w: 4.6, h: 13, rx: 1.6, fill: 'textHi', opacity: 1 });
@@ -2799,17 +2994,6 @@ function implement(
     // sits at the wrists (the family-17 handle reading).
     out.push({ kind: 'bone', x1: 84, y1: 82, x2: j.wr[0], y2: j.wr[1], w: 1.4, color: 'textMid', opacity: 1 });
     out.push({ kind: 'rect', x: j.wr[0] - 1.1, y: j.wr[1] - 4, w: 2.2, h: 8, rx: 1, fill: 'textHi', opacity: 1 });
-    out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: 2.6, fill: 'textHi', opacity: 1 });
-  }
-  if (slug === 'barbell-incline-shoulder-raise' && j.wr) {
-    // the barbell across the hands
-    out.push({ kind: 'bone', x1: j.wr[0], y1: j.wr[1] - 3.2, x2: j.wr[0], y2: j.wr[1] + 3.2, w: 1.6, color: 'textHi', opacity: 1 });
-    out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1] - 3.2, r: 2.2, fill: 'textMid', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
-    out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1] + 3.2, r: 2.2, fill: 'textMid', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
-    out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: 2.6, fill: 'textHi', opacity: 1 });
-  }
-  if (slug === 'dumbbell-incline-shoulder-raise' && j.wr) {
-    out.push({ kind: 'rect', x: j.wr[0] - 1.8, y: j.wr[1] - 3.5, w: 3.6, h: 7, rx: 1.5, fill: 'textMid', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
     out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: 2.6, fill: 'textHi', opacity: 1 });
   }
   if ((slug === 'kneeling-single-arm-high-pulley-row' || slug === 'kneeling-high-pulley-row') && j.wr) {
