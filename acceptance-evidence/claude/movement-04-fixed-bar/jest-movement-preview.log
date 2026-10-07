@@ -1,0 +1,41 @@
+source commit: 5e6ee0155bb5f9bdb01b57cfdf1129e89e20e9e7
+command: npx jest --config apps/mobile/jest.config.js --runInBand --no-cache --testPathPattern MovementPreview
+
+PASS apps/mobile/test/components/MovementPreview.test.js (5.084 s)
+PASS apps/mobile/test/components/MovementPreview.gripDelta.test.js
+PASS apps/mobile/test/components/MovementPreview.adversarial.test.js
+PASS apps/mobile/test/components/MovementPreview.lifecycle_stress.test.js
+PASS apps/mobile/test/components/MovementPreview.derivation.test.js
+PASS apps/mobile/test/components/MovementPreview.challenger_m7_1.test.js
+PASS apps/mobile/test/components/MovementPreview.challenger_m6_4.test.js
+PASS apps/mobile/test/components/MovementPreview.approval.test.js
+PASS apps/mobile/test/components/MovementPreview.jointOffsets.test.js
+PASS apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (20.261 s)
+PASS apps/mobile/test/components/MovementPreview.torso.test.js (24.275 s)
+PASS apps/mobile/test/components/MovementPreview.fixedBarBodyMotion.test.js
+PASS apps/mobile/test/components/MovementPreview.batch3Perspective.test.js
+PASS apps/mobile/test/components/MovementPreview.cableLow.test.js
+PASS apps/mobile/test/components/MovementPreview.canonical.test.js
+PASS apps/mobile/test/components/MovementPreview.supportedGeometry.test.js
+PASS apps/mobile/test/components/MovementPreview.captionIntegrity.test.js
+PASS apps/mobile/test/components/MovementPreview.layout.test.js
+PASS apps/mobile/test/components/MovementPreview.flye.test.js
+PASS apps/mobile/test/components/MovementPreview.reverseLunge.test.js
+PASS apps/mobile/test/components/MovementPreview.pushdown.test.js
+PASS apps/mobile/test/components/MovementPreview.runtimeRegression.test.js
+PASS apps/mobile/test/components/MovementPreview.canonicalNavigation.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeReducedMotion.test.js
+PASS apps/mobile/test/components/MovementPreview.manifestSplit.test.js
+PASS apps/mobile/test/components/MovementPreview.lazyFamilyLoad.test.js
+PASS apps/mobile/test/components/MovementPreview.straightArmPulldown.test.js
+PASS apps/mobile/test/components/MovementPreview.kickback.test.js
+PASS apps/mobile/test/components/MovementPreview.reverseLungeNativeContact.test.js
+PASS apps/mobile/test/components/MovementPreview.headSupport.test.js
+PASS apps/mobile/test/components/MovementPreview.walkingLunge.test.js
+PASS apps/mobile/test/components/MovementPreview.ropeTension.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeContactMutation.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeContact.test.js
+Test Suites: 34 passed, 34 total
+Tests:       710 passed, 710 total
+Snapshots:   0 total
+exit code: 0

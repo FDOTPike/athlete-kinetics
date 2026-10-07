@@ -1,0 +1,12 @@
+source commit: 5e6ee0155bb5f9bdb01b57cfdf1129e89e20e9e7
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-982b081b.json
+
+movements measured: 134 (baseline 132)
+added: 66 Inverted Row; 152 Body Tricep Press
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  66 Inverted Row: drawn 2a5b1e3449ea4c94ac25d46ee949fe6942f93b913503409dd6d8a50aed89ca3b captions 02607e8f17ddfb77d9a29923015a4c4c3faf3b5a527c426008867d482014ed2e stage 240.00x240.00 cycle 3400 ms
+  152 Body Tricep Press: drawn fcd2492484fd3f585955b6f35bc84e653f58248b4824f65b836bd6347331e2ba captions ed7cf1fd8b02fa4fa18b4cc397cdce24e5c77e4fc58f6700e7d7e21159fb438b stage 221.74x240.00 cycle 3600 ms
+exit code: 0 (probe run exit 0)
