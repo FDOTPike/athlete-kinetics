@@ -67,6 +67,7 @@ export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> =
   'squat__standing': () => require('./families/squat__standing.json') as PreviewFamilyFile,
   'squat__sumo-stance': () => require('./families/squat__sumo-stance.json') as PreviewFamilyFile,
   'straight-arm-pulldown__standing': () => require('./families/straight-arm-pulldown__standing.json') as PreviewFamilyFile,
+  'trunk-flex__decline': () => require('./families/trunk-flex__decline.json') as PreviewFamilyFile,
   'trunk-flex__seated': () => require('./families/trunk-flex__seated.json') as PreviewFamilyFile,
   'trunk-flex__standing': () => require('./families/trunk-flex__standing.json') as PreviewFamilyFile,
   'trunk-flex__supine': () => require('./families/trunk-flex__supine.json') as PreviewFamilyFile,
