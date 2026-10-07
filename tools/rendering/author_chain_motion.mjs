@@ -23,12 +23,15 @@ const DANGLING_TAIL = /\b(and|the|with|while|of|to|a|an|from|over|into|for|then|
 /** Two decimals, as every stored joint in the manifest is. */
 const round = (p) => [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100];
 
-/** The stored joints for one keyframe: the drawn projection of the figure, plus the phase that drives it. */
-function pose(slug, ph) {
-  const j = layout.chainGeometry(slug, ph, BODY).joints;
+/**
+ * The stored joints for one keyframe: the drawn projection of the figure, plus
+ * the phase that drives it and, for a movement that turns, the turn.
+ */
+function pose(slug, ph, tw) {
+  const j = layout.chainGeometry(slug, ph, BODY, tw ?? 0).joints;
   const out = {};
   for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af']) out[key] = round(j[key]);
-  return { ...out, ph };
+  return tw === undefined ? { ...out, ph } : { ...out, ph, tw };
 }
 
 /** The painted extent of one primitive, in box units. */
@@ -71,6 +74,9 @@ for (const spec of CHAIN_SPECS) {
     throw Error(`Movement ${spec.id} needs at least five keyframes, one caption each and one duration per gap`);
   }
   if (spec.phases[0] !== spec.phases.at(-1)) throw Error(`Movement ${spec.id} does not close its loop`);
+  if (spec.turns && (spec.turns.length !== spec.phases.length || spec.turns[0] !== spec.turns.at(-1))) {
+    throw Error(`Movement ${spec.id} needs one turn per keyframe, closing its loop`);
+  }
   for (const caption of spec.captions) {
     // The caption-integrity rules, applied here so a fragment never reaches the manifest.
     if (caption.trim().length < 10 || !/[.!?]$/.test(caption) || DANGLING_TAIL.test(caption)) throw Error(`Movement ${spec.id} caption is not a finished sentence: ${caption}`);
@@ -91,7 +97,7 @@ for (const spec of CHAIN_SPECS) {
     coachingIntent: row.source.coaching_intent,
     reason: spec.reason,
     summary: spec.summary,
-    frames: spec.phases.map((ph, i) => ({ id: `p${i + 1}`, caption: spec.captions[i], joints: pose(spec.slug, ph) })),
+    frames: spec.phases.map((ph, i) => ({ id: `p${i + 1}`, caption: spec.captions[i], joints: pose(spec.slug, ph, spec.turns?.[i]) })),
     segmentDurationsMs: spec.segments,
   };
   entry.viewBox = viewBoxOf(entry);

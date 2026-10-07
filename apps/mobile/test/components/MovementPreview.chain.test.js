@@ -36,7 +36,7 @@ describe.each(entries.map((e) => [e.name, e]))('%s', (_name, entry) => {
     const pose = poseAtTime(entry.frames.map((f) => f.joints), t, entry.segmentDurationsMs);
     return {
       pose,
-      figure: chainGeometry(slug, pose.ph, BODY),
+      figure: chainGeometry(slug, pose.ph, BODY, pose.tw ?? 0),
       joints: resolveFigureJoints(pose, opts),
       prims: layoutCanonicalFigure(pose, opts),
     };

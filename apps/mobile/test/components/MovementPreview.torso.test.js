@@ -20,7 +20,12 @@ function torsoOf(pose, options) {
   const joints = resolveFigureJoints(pose, options);
   const prims = layoutCanonicalFigure(pose, options);
   const at = (p, point) => p.kind === 'bone' && p.x1 === point[0] && p.y1 === point[1];
-  const far = prims.findIndex((p) => at(p, joints.fArm) && p.w === options.body.lw * 0.88);
+  const farArm = prims.findIndex((p) => at(p, joints.fArm) && p.w === options.body.lw * 0.88);
+  // A far arm that crosses in front of the body is painted after the trunk, so
+  // the far limbs start at whichever of the far arm and far thigh comes first.
+  // For every figure whose far arm is behind the trunk that is the far arm, as before.
+  const farLeg = prims.findIndex((p) => at(p, joints.fLeg) && p.w === options.body.lw * 1.18);
+  const far = Math.min(farArm < 0 ? Infinity : farArm, farLeg < 0 ? Infinity : farLeg);
   // The torso layer is the run of opaque, stroke-free, near-colour bars; the far
   // limbs carry farOpacity (0.9 in side view) and the front-view far limbs carry
   // the highlight colour. Locate the layer by that signature instead of a fixed
