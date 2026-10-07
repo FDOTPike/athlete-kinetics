@@ -1,0 +1,14 @@
+source commit: d5b63a5ca9bc4b56c8e6f175bfa3f80891212325
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov13.json
+
+movements measured: 167 (baseline 163)
+added: 89 Floor Back Extension; 37 Bench Dip; 182 Decline Push-Up; 27 Road Run
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  89 Floor Back Extension: drawn b9a338718531c7ea9731ce6a5e32a9f065ff83b0844ef6a198dd58e2c2030e20 captions af67e1b88051b09a732326d9796378cf2e026c506cc614da01ff6ee410fd2a1b stage 240.00x52.63 cycle 3900 ms
+  37 Bench Dip: drawn c1356645edae3e6c386b6e770fc20745190837f0a6853e15137bdac4e24c96de captions 8541730cf27de6e7f8f2aaa23f66f56e3067e88d1f75c08a04a2e6d63b90e150 stage 240.00x212.66 cycle 3350 ms
+  182 Decline Push-Up: drawn eeec4f8e9bdc74d0b248637303adf9682c01b7321e3e30cdb7dc6d85eaae54fb captions ff5c74f5e9aab53dc263f434bef681b5837e7fab4e4120846f250ddbef38ca3f stage 240.00x94.62 cycle 3200 ms
+  27 Road Run: drawn d529fb9c46b2a9796ef90cb0e9d75c8e61746849e38aaae2a91709f2e2013e0d captions 3fc67df59fa7a48bec6889efed24dc1e75200a64aa9a68cdfac98c0e0726d3c6 stage 171.06x240.00 cycle 690 ms
+exit code: 0 (probe run exit 0)
