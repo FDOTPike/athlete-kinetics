@@ -127,24 +127,33 @@ describe.each([
       elbowHeights.push(elbow[1] - shoulder[1]);
     }
     const top = figureAt(entry, barbell, topTime(entry)).model.near.world;
-    // At the top the elbow is level with the shoulder (within 2 units) and well out to the side.
-    expect(Math.abs(top.elbow[1] - top.shoulder[1])).toBeLessThanOrEqual(2);
+    // At the top the elbow is up at the shoulder line and well out to the side.
+    // The dumbbell arm reaches it exactly. The bar's narrower grip, with the
+    // elbow angle kept above 100 degrees, leaves the elbow just under it.
+    expect(Math.abs(top.elbow[1] - top.shoulder[1])).toBeLessThanOrEqual(barbell ? 4.5 : 1);
     expect(top.elbow[2] - top.shoulder[2]).toBeGreaterThanOrEqual(10);
     expect(Math.max(...elbowHeights)).toBeCloseTo(top.elbow[1] - top.shoulder[1], 9);
-    // The elbow rises more than the hand does: it leads.
+    // "elbows leading first": through the first half of the raise the elbow
+    // climbs further than the hand does.
     const bottom = figureAt(entry, barbell, 0).model.near.world;
-    expect(top.elbow[1] - bottom.elbow[1]).toBeGreaterThan(top.wrist[1] - bottom.wrist[1]);
+    const half = figureAt(entry, barbell, entry.segmentDurationsMs[0]).model.near.world;
+    expect(half.elbow[1] - bottom.elbow[1]).toBeGreaterThanOrEqual(2);
+    expect(half.elbow[1] - bottom.elbow[1]).toBeGreaterThan(half.wrist[1] - bottom.wrist[1]);
   });
 
-  test('"elbow to wrist angle should be slightly bent, greater than 100 degrees"', () => {
-    for (const t of ticksOf(entry)) {
+  test('"elbow to wrist angle ... greater than 100 degrees", with "a gradual transition"', () => {
+    const angles = ticksOf(entry).map((t) => {
       const { shoulder, elbow, wrist } = figureAt(entry, barbell, t).model.near.world;
-      expect(angleAt(elbow, shoulder, wrist)).toBeGreaterThan(100);
+      return angleAt(elbow, shoulder, wrist);
+    });
+    for (const angle of angles) expect(angle).toBeGreaterThan(100);
+    // Gradual: the change is spread over the rep. No single 33 ms tick carries
+    // more than 8 percent of the whole change in elbow angle.
+    const whole = Math.max(...angles) - Math.min(...angles);
+    expect(whole).toBeGreaterThan(30);
+    for (let i = 1; i < angles.length; i++) {
+      expect(Math.abs(angles[i] - angles[i - 1])).toBeLessThanOrEqual(0.08 * whole);
     }
-    const top = figureAt(entry, barbell, topTime(entry)).model.near.world;
-    const atTop = angleAt(top.elbow, top.shoulder, top.wrist);
-    expect(atTop).toBeGreaterThan(100);
-    expect(atTop).toBeLessThanOrEqual(110); // "slightly" greater, not a straight arm
   });
 
   test('the stored keyframe joints are the drawn projection', () => {
@@ -158,11 +167,30 @@ describe.each([
 });
 
 describe('Dumbbell Incline Shoulder Raise (187)', () => {
-  test('holds one elbow angle for the whole rep, and the bells start together under the chest', () => {
-    for (const t of ticksOf(entry187)) {
+  test('"straighten the arms a bit more towards the end range ... elbow to wrist joints almost parallel with the floor"', () => {
+    // "the start position looks good": the start is the first draft's, unchanged.
+    const start = figureAt(entry187, false, 0).model.near.world;
+    expect(angleAt(start.elbow, start.shoulder, start.wrist)).toBeCloseTo(105, 9);
+    // The arm only ever straightens on the way up, and only ever bends on the way down.
+    const up = [];
+    for (let t = 0; t <= topTime(entry187); t += 33) {
       const { shoulder, elbow, wrist } = figureAt(entry187, false, t).model.near.world;
-      expect(angleAt(elbow, shoulder, wrist)).toBeCloseTo(PRONE_INCLINE_RAISE.dumbbellElbowAngleDeg, 9);
+      up.push(angleAt(elbow, shoulder, wrist));
     }
+    for (let i = 1; i < up.length; i++) expect(up[i]).toBeGreaterThanOrEqual(up[i - 1] - 1e-9);
+    // At the top the forearm is within 10 degrees of level, and the arm is nearly straight.
+    const top = figureAt(entry187, false, topTime(entry187)).model.near.world;
+    const forearm = top.wrist.map((v, i) => v - top.elbow[i]);
+    const belowLevel = deg(Math.atan2(-forearm[1], Math.hypot(forearm[0], forearm[2])));
+    expect(belowLevel).toBeGreaterThanOrEqual(0); // the hand is not above the elbow
+    expect(belowLevel).toBeLessThanOrEqual(10);
+    expect(angleAt(top.elbow, top.shoulder, top.wrist)).toBeGreaterThanOrEqual(165);
+    // It is a raise out to the sides, not an upright row: the hand finishes
+    // far outside the elbow, not hanging under it.
+    expect(top.wrist[2] - top.elbow[2]).toBeGreaterThanOrEqual(10);
+  });
+
+  test('the bells start together under the chest', () => {
     const bottom = figureAt(entry187, false, 0).model;
     expect(bottom.near.world.wrist[2]).toBeLessThan(bottom.near.world.shoulder[2]); // hands inside the shoulders
     expect(bottom.near.world.wrist[2]).toBeGreaterThan(0); // and not crossed over the midline
@@ -197,8 +225,20 @@ describe('Barbell Incline Shoulder Raise (135)', () => {
     const top = figureAt(entry135, true, topTime(entry135)).model.near.world.wrist[1];
     expect(Math.max(...heights)).toBeCloseTo(top, 9);
     expect(top - heights[0]).toBeGreaterThan(4); // the bar visibly rises
-    // A wide grip: the hands are well outside the shoulders.
+    // The hands are well outside the shoulders, and "in by one wrist width"
+    // from the first draft's 24: the drawn forearm is 3.5 wide.
     expect(PRONE_INCLINE_RAISE.barbellGripHalfWidth).toBeGreaterThan(BODY.sw * 0.92 * 2);
+    expect(PRONE_INCLINE_RAISE.barbellGripHalfWidth).toBeCloseTo(24 - BODY.lw * 0.72, 1);
+  });
+
+  test('"it should be more like an upright row": elbows out and up, with the elbow angle a little over 100 degrees at the top', () => {
+    const top = figureAt(entry135, true, topTime(entry135)).model.near.world;
+    const atTop = angleAt(top.elbow, top.shoulder, top.wrist);
+    expect(atTop).toBeGreaterThan(100);
+    expect(atTop).toBeLessThanOrEqual(110);
+    // The hand hangs under the elbow, as in a row, not out beyond it.
+    expect(top.elbow[1] - top.wrist[1]).toBeGreaterThanOrEqual(8);
+    expect(Math.abs(top.wrist[2] - top.elbow[2])).toBeLessThanOrEqual(3);
   });
 
   test('draws one bar through both hands and no dumbbells', () => {

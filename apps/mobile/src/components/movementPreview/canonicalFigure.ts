@@ -878,12 +878,20 @@ export const PRONE_INCLINE_RAISE_SLUGS: ReadonlySet<string> = new Set([
 export const PRONE_INCLINE_RAISE = {
   inclineDeg: 45,
   yawDeg: 40,
-  /** Dumbbells: the angle held at the elbow, between upper arm and forearm. */
-  dumbbellElbowAngleDeg: 105,
+  /**
+   * Dumbbells: the angle at the elbow, between upper arm and forearm, at the
+   * start and at the top. It opens steadily through the raise, so the forearm
+   * finishes almost parallel with the floor.
+   */
+  dumbbellElbowAngleDeg: [105, 172] as const,
   /** Dumbbells: the upper arm's abduction from hanging at the start and the top. */
   dumbbellAbductionDeg: [20, 90] as const,
-  /** Barbell: half the grip width, and the elbow angle at the start and the top. */
-  barbellGripHalfWidth: 24,
+  /**
+   * Barbell: half the grip width. The first draft held 24; the owner brought
+   * each hand in by one wrist width (the drawn forearm is 3.5 wide).
+   */
+  barbellGripHalfWidth: 20.5,
+  /** Barbell: the elbow angle at the start (long arms) and at the top. */
   barbellElbowAngleDeg: [170, 104] as const,
   /** Where the pad runs along the trunk, as fractions from hip (0) to neck (1). */
   padSpan: [-0.25, 0.55] as const,
@@ -895,10 +903,13 @@ export const PRONE_INCLINE_RAISE = {
  * The whole figure for a chest-supported incline raise, from a 3D model. World
  * axes: X forward along the floor, Y up, Z across the body (positive toward
  * the viewer). The trunk lies along the incline with the chest facing the pad;
- * the legs reach back to feet planted wide; nothing but the arms moves. The
- * arms work in the plane across the body: each upper arm swings from hanging
- * to level with the shoulder, and the forearm hangs below the elbow, so the
- * elbow leads the whole way. World joints are returned beside the projection
+ * the legs reach back to feet planted wide; nothing but the arms moves. With
+ * dumbbells each upper arm swings out across the body from hanging to level
+ * with the shoulder, the elbow leading, and the arm straightens gradually so
+ * the forearm finishes almost parallel with the floor. With a bar, which holds
+ * the hands at one width, it works like an upright row: the bar rises under
+ * the shoulders and the elbows flare out and up. (Owner's corrections,
+ * 2026-10-07.) World joints are returned beside the projection
  * so a test can measure real lengths and angles, not foreshortened ones.
  */
 export function proneInclineRaiseGeometry(phase: number, body: BodyParameters, barbell: boolean) {
@@ -924,8 +935,9 @@ export function proneInclineRaiseGeometry(phase: number, body: BodyParameters, b
     let elbow: Point3;
     let wrist: Point3;
     if (barbell) {
-      // Both hands are fixed on one bar at a wide grip. The bar rises straight
-      // up under the shoulders; the elbow is solved and flares out and up.
+      // Both hands are fixed on one bar, so this one works like an upright
+      // row: the bar rises straight up under the shoulders while the elbow is
+      // solved and flares out and up, leading the bar.
       const [open, closed] = spec.barbellElbowAngleDeg;
       const reachAt = (angleDeg: number): number =>
         Math.sqrt(UPPER * UPPER + FORE * FORE - 2 * UPPER * FORE * Math.cos(rad(angleDeg)));
@@ -942,9 +954,14 @@ export function proneInclineRaiseGeometry(phase: number, body: BodyParameters, b
       const up = shoulder[1] + u[1] * a + u[0] * h;
       elbow = [shoulder[0], up, side * across];
     } else {
+      // The upper arm swings out across the body to shoulder height. The
+      // forearm trails it: by a lot at the start, where the bells hang
+      // together under the chest, and by less and less as the arm rises, so
+      // the elbow leads and the arm straightens gradually toward the top.
       const [from, to] = spec.dumbbellAbductionDeg;
+      const [angleFrom, angleTo] = spec.dumbbellElbowAngleDeg;
       const upper = rad(from + (to - from) * phase);
-      const fore = upper - rad(180 - spec.dumbbellElbowAngleDeg);
+      const fore = upper - rad(180 - (angleFrom + (angleTo - angleFrom) * phase));
       elbow = [shoulder[0], shoulder[1] - UPPER * Math.cos(upper), shoulder[2] + side * UPPER * Math.sin(upper)];
       wrist = [elbow[0], elbow[1] - FORE * Math.cos(fore), elbow[2] + side * FORE * Math.sin(fore)];
     }
@@ -1022,6 +1039,7 @@ function layoutProneInclineImplement(
     // One straight bar through both hands, with a plate outside each hand.
     const y = raise.near.world.wrist[1], x = raise.near.world.wrist[0];
     const grip = PRONE_INCLINE_RAISE.barbellGripHalfWidth;
+    // The bar is level and square across the body wherever the hands carry it.
     const end = (z: number): CanonicalPoint => raise.project([x, y, z]);
     const nearEnd = end(grip + 7), farEnd = end(-grip - 7), middle = end(0);
     far.push({ kind: 'bone', x1: middle[0], y1: middle[1], x2: farEnd[0], y2: farEnd[1], w: 1.6, color: 'textLow', opacity: 0.9 });

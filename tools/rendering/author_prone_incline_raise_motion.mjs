@@ -36,28 +36,30 @@ const MOVEMENTS = [
   {
     id: 135,
     barbell: true,
+    viewBox: [10, 16, 72, 84],
     captions: [
-      'Lie chest-down on the incline bench, feet wide on the floor, with a wide grip on the bar.',
+      'Lie chest-down on the incline bench, feet wide on the floor, with the hands on the bar outside the shoulders.',
       'Set the shoulder blades, then lead the rep through the elbows.',
-      'Raise the bar until the elbows reach shoulder height.',
+      'Raise the bar under the shoulders with the elbows leading out and up.',
       'Hold the top with the shoulder position set.',
       'Lower with the same smooth path.',
     ],
-    summary: 'Chest on a 45 degree incline bench, raise the bar by leading with the elbows to shoulder height, then lower on the same path.',
-    reason: 'Redrawn to the owner correction of 2026-10-07. Chest facing a 45 degree incline bench with the feet wide on the floor; both hands on one bar at a wide grip; the elbows lead out and up to shoulder height while the elbow angle closes from long arms to a little over 100 degrees; trunk and legs stay still. Drawn from a 3D model through a 40 degree oblique projection so the side-on view shows the arms working across the body.',
+    summary: 'Chest on a 45 degree incline bench, raise the bar like an upright row by leading with the elbows, then lower on the same path.',
+    reason: 'Redrawn to the owner correction of 2026-10-07. Chest facing a 45 degree incline bench with the feet wide on the floor; both hands on one bar, each brought in one wrist width from the first draft at the direction of the owner; it works like an upright row, the bar rising under the shoulders while the elbows lead out and up and the elbow angle closes from long arms to a little over 100 degrees; trunk and legs stay still. Drawn from a 3D model through a 40 degree oblique projection so the side-on view shows the arms working across the body.',
   },
   {
     id: 187,
     barbell: false,
+    viewBox: [12, 16, 78, 84],
     captions: [
       'Lie chest-down on the incline bench, feet wide on the floor, with the dumbbells hanging under the chest.',
       'Set the shoulder blades, then lead the rep through the elbows.',
-      'Raise until the elbows reach shoulder height with the forearms hanging below them.',
+      'Raise until the elbows reach shoulder height and the forearms are almost level with the floor.',
       'Hold the top with the shoulder position set.',
       'Lower with the same smooth path.',
     ],
-    summary: 'Chest on a 45 degree incline bench, raise the dumbbells out to the sides by leading with the elbows, then lower on the same path.',
-    reason: 'Redrawn to the owner correction of 2026-10-07. Chest facing a 45 degree incline bench with the feet wide on the floor; a dumbbell in each hand; the upper arms swing out to shoulder height with the elbows leading and the elbow held at a little over 100 degrees, so the forearms hang below the elbows; trunk and legs stay still. Drawn from a 3D model through a 40 degree oblique projection so the side-on view shows the arms working across the body.',
+    summary: 'Chest on a 45 degree incline bench, raise the dumbbells out to the sides, elbows leading and arms straightening toward the top, then lower on the same path.',
+    reason: 'Redrawn to the owner correction of 2026-10-07. Chest facing a 45 degree incline bench with the feet wide on the floor; a dumbbell in each hand; the bells start together under the chest with the elbow at a little over 100 degrees; the upper arms swing out to shoulder height with the elbows leading, and the arms straighten gradually so the forearms finish almost parallel with the floor (the second owner correction: the top position of the first draft read too much like an upright row); trunk and legs stay still. Drawn from a 3D model through a 40 degree oblique projection so the side-on view shows the arms working across the body.',
   },
 ];
 
@@ -71,7 +73,7 @@ for (const spec of MOVEMENTS) {
   manifest.entries[at] = {
     ...previous,
     view: 'oblique',
-    viewBox: [10, 16, 72, 84],
+    viewBox: spec.viewBox,
     reason: spec.reason,
     summary: spec.summary,
     frames: PHASES.map((pi, i) => ({ id: `p${i + 1}`, caption: spec.captions[i], joints: pose(spec.barbell, pi) })),
