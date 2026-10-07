@@ -103,6 +103,8 @@ export interface CanonicalPose {
   fr?: number;
   /** Chest-supported incline raise phase, from 0 (arms hanging) to 1 (elbows at shoulder height). */
   pi?: number;
+  /** Chain movement phase: 0 is the movement's first pose, 1 its second, and so on. */
+  ph?: number;
 }
 
 export type ColorRole = 'textHi' | 'textLow' | 'textMid' | 'line' | 'ink1';
@@ -156,7 +158,7 @@ export function lerpJoints(a: CanonicalPose, b: CanonicalPose, u: number): Canon
   // motion frames would not match their own stills.
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof CanonicalPose>;
   for (const key of keys) {
-    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la' || key === 'fr' || key === 'pi') {
+    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la' || key === 'fr' || key === 'pi' || key === 'ph') {
       out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * u;
       continue;
     }
@@ -1150,6 +1152,518 @@ function layoutProneInclineImplement(
   return { far, near };
 }
 
+// ---------------------------------------------------------------------------
+// Chain movements: figures posed by the DIRECTION of each body segment.
+//
+// The figure is a 3D model. World axes: X forward (the way the athlete faces),
+// Y up from the floor, Z across the body (positive toward the viewer). A
+// direction is a sagittal angle in degrees (0 forward, 90 straight up, 180
+// back, -90 straight down), optionally with an "out" angle away from the
+// body's midline (90 is straight out to that limb's own side). A movement is a
+// short list of poses; one number per keyframe (`ph`) says where between them
+// the figure is, and every direction is blended, so each segment swings on its
+// true arc at its true length on every tick. One joint, the root, is placed
+// directly; everything else follows from it.
+// ---------------------------------------------------------------------------
+
+/** A segment direction: a sagittal angle in degrees, or [sagittal, out]. */
+export type ChainDir = number | readonly [number, number];
+type ChainVec = readonly [number, number, number];
+/** A fixed point: [forward, height above the floor] on the midline, or with a third across-body coordinate. */
+export type ChainPoint = readonly [number, number] | readonly [number, number, number];
+
+/** One pose of a chain movement. */
+export interface ChainPose {
+  /** Where the root joint is: [forward, height above the floor]. */
+  at: readonly [number, number];
+  /** The spine's direction, hip toward neck. */
+  trunk: ChainDir;
+  /** How far the spine is curled forward, in degrees, from one end to the other. */
+  curl?: number;
+  /** How far the spine is bent to the near side, in degrees. */
+  sideCurl?: number;
+  /** How far the shoulders are turned about the spine, in degrees; positive brings the near shoulder forward. */
+  twist?: number;
+  /** Neck to head; continues the spine when omitted. */
+  head?: ChainDir;
+  thigh: ChainDir;
+  shin: ChainDir;
+  /** Ankle to toe, for feet that are not flat on the floor. */
+  foot?: ChainDir;
+  upperArm: ChainDir;
+  forearm: ChainDir;
+  /** Wrist to grip, for movements that bend the wrist. */
+  hand?: ChainDir;
+  /** The far limbs, where they differ from the near ones. */
+  farThigh?: ChainDir;
+  farShin?: ChainDir;
+  farFoot?: ChainDir;
+  farUpperArm?: ChainDir;
+  farForearm?: ChainDir;
+  /** A hand position the arms are solved to, in place of the arm directions (hands planted, or on a fixed grip). */
+  wrist?: readonly [number, number];
+  farWrist?: readonly [number, number];
+  /** An ankle position the legs are solved to, in place of the leg directions (feet planted). */
+  ankle?: readonly [number, number];
+  farAnkle?: readonly [number, number];
+}
+
+/** Where a piece of equipment is painted: behind the figure, between the far limbs and the trunk, or in front of everything. */
+export type ChainLayer = 'behind' | 'mid' | 'front';
+/** A piece of fixed equipment. */
+export type ChainShape =
+  | { kind: 'slab'; a: ChainPoint; b: ChainPoint; layer?: ChainLayer }
+  | { kind: 'frame'; a: ChainPoint; b: ChainPoint; layer?: ChainLayer }
+  | { kind: 'post'; at: ChainPoint; layer?: ChainLayer }
+  | { kind: 'pulley'; at: ChainPoint; layer?: ChainLayer }
+  | { kind: 'ball'; at: ChainPoint; r: number; layer?: ChainLayer }
+  | { kind: 'roller'; at: ChainPoint; layer?: ChainLayer };
+
+/** A cable or band from a fixed point, or from under a foot, to a hand or an ankle. */
+export interface ChainLine {
+  from: ChainPoint | 'nearFoot' | 'farFoot';
+  to: 'nearGrip' | 'farGrip' | 'nearAnkle' | 'farAnkle';
+}
+
+/** A chain movement: its poses, how it is seen, what it holds and the equipment around it. */
+export interface ChainMovement {
+  root: 'hip' | 'neck';
+  /** Side view by default. 'oblique' turns the figure by `yawDeg`; 'front' faces it. */
+  view?: 'side' | 'oblique' | 'front';
+  yawDeg?: number;
+  /** The screen x of world x = 0. */
+  originX?: number;
+  poses: readonly ChainPose[];
+  /** Which part of the spine a curl bends: all of it, the upper part (a crunch) or the lower part (a pelvis roll). */
+  spine?: 'whole' | 'upper' | 'lower';
+  /** Which end of the spine `trunk` gives the direction of, when the spine is curled. */
+  trunkAt?: 'hip' | 'neck';
+  /** The way a solved elbow or knee points. */
+  elbowPole?: ChainDir;
+  kneePole?: ChainDir;
+  /** 'flat': level and on the floor. 'free': along the pose's foot direction. */
+  feet?: 'flat' | 'free' | 'none';
+  /** What the hands hold. */
+  implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope';
+  /** The direction a held dumbbell's handle points. Across the body when omitted. */
+  bellAxis?: readonly [number, number, number];
+  lines?: readonly ChainLine[];
+  equipment?: readonly ChainShape[];
+  /** Paint the far arm over the trunk (hands in front of the body in a front view). */
+  farArmOver?: boolean;
+  /** Paint the near arm over the head (an arm held beside the head). */
+  nearArmOverHead?: boolean;
+}
+
+const CHAIN_TRUNK = 24;
+const CHAIN_NECK = 9;
+const CHAIN_THIGH = 22.25;
+const CHAIN_SHIN = 22.25;
+const CHAIN_HAND = 4;
+const CHAIN_FOOT = 5.4;
+/** The floor the soles rest on. */
+const CHAIN_FLOOR = 96.9;
+const CHAIN_SPINE_STEPS = 32;
+/** The height of an ankle whose flat foot is on the floor, and of the hip of a figure standing straight on it. */
+export const CHAIN_ANKLE_HEIGHT = CANONICAL_BODY_PARAMETERS.lw * 0.9 / 2;
+export const CHAIN_STANDING_HIP = CHAIN_ANKLE_HEIGHT + CHAIN_THIGH + CHAIN_SHIN;
+
+const chainRad = (d: number): number => d * Math.PI / 180;
+const chainPair = (d: ChainDir): readonly [number, number] => (typeof d === 'number' ? [d, 0] : d);
+/** The unit vector of a direction, for a limb on the near (+1) or far (-1) side. */
+function chainUnit(d: readonly [number, number], side: number): ChainVec {
+  const a = chainRad(d[0]), o = chainRad(d[1]);
+  return [Math.cos(a) * Math.cos(o), Math.sin(a) * Math.cos(o), side * Math.sin(o)];
+}
+const chainAdd = (p: ChainVec, v: ChainVec, k: number): ChainVec => [p[0] + v[0] * k, p[1] + v[1] * k, p[2] + v[2] * k];
+const chainDot = (p: ChainVec, q: ChainVec): number => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+const chainCross = (p: ChainVec, q: ChainVec): ChainVec =>
+  [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]];
+function chainNormal(v: ChainVec): ChainVec {
+  const n = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / n, v[1] / n, v[2] / n];
+}
+const chainWorld = (p: ChainPoint): ChainVec => [p[0], p[1], p[2] ?? 0];
+
+/** The hip of a figure sitting with level thighs and feet flat on the floor. */
+const CHAIN_SEATED_HIP = CHAIN_ANKLE_HEIGHT + CHAIN_SHIN;
+/** Half the drawn depth of a thigh, and of the trunk at the shoulders. */
+const CHAIN_THIGH_HALF = CANONICAL_BODY_PARAMETERS.lw * 1.18 / 2;
+const CHAIN_BACK_HALF = CANONICAL_BODY_PARAMETERS.sw * 0.58;
+
+/**
+ * An incline bench for a figure sitting back against it: a back pad lying
+ * along the trunk's back, a seat under the thighs, and a support under each.
+ */
+function chainInclineBench(hip: readonly [number, number], trunkDeg: number): ChainShape[] {
+  const along = chainUnit([trunkDeg, 0], 1);
+  const behind = chainUnit([trunkDeg + 90, 0], 1);
+  const foot: ChainVec = chainAdd([hip[0], hip[1], 0], behind, CHAIN_BACK_HALF + 2);
+  const low = chainAdd(foot, along, -1), high = chainAdd(foot, along, 37), prop = chainAdd(foot, along, 20);
+  const seat = hip[1] - CHAIN_THIGH_HALF - 2;
+  return [
+    { kind: 'post', at: [prop[0], prop[1]] },
+    { kind: 'post', at: [hip[0] + 9, seat - 2] },
+    { kind: 'slab', a: [low[0], low[1]], b: [high[0], high[1]] },
+    { kind: 'slab', a: [hip[0] - 2, seat], b: [hip[0] + 13, seat] },
+  ];
+}
+
+const INCLINE_CURL_HIP: readonly [number, number] = [46, CHAIN_SEATED_HIP];
+const FRONT_INCLINE_RAISE_HIP: readonly [number, number] = [48, CHAIN_SEATED_HIP];
+const INCLINE_EXTENSION_HIP: readonly [number, number] = [50, CHAIN_SEATED_HIP];
+/** The high pulley behind the Cable Incline Triceps Extension. */
+export const INCLINE_EXTENSION_PULLEY: readonly [number, number] = [5.4, 74.6];
+
+/** The chain movements, by slug. */
+export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
+  // Incline Dumbbell Curl: sitting back on an incline bench, the upper arms
+  // hang straight down and stay there while the forearms curl.
+  'incline-dumbbell-curl': {
+    root: 'hip',
+    implement: 'bells',
+    equipment: chainInclineBench(INCLINE_CURL_HIP, 120),
+    poses: [
+      { at: INCLINE_CURL_HIP, trunk: 120, thigh: 0, shin: -90, upperArm: -90, forearm: -90 },
+      { at: INCLINE_CURL_HIP, trunk: 120, thigh: 0, shin: -90, upperArm: -90, forearm: 55 },
+    ],
+  },
+  // Incline Hammer Curls: the same seat, palms facing in throughout, so each
+  // bell is seen along its length and stays square to the forearm.
+  'incline-hammer-curls': {
+    root: 'hip',
+    implement: 'hammer',
+    equipment: chainInclineBench(INCLINE_CURL_HIP, 120),
+    poses: [
+      { at: INCLINE_CURL_HIP, trunk: 120, thigh: 0, shin: -90, upperArm: -90, forearm: -90 },
+      { at: INCLINE_CURL_HIP, trunk: 120, thigh: 0, shin: -90, upperArm: -90, forearm: 45 },
+    ],
+  },
+  // Front Incline Dumbbell Raise: reclined at 45 degrees, head on the bench,
+  // locked arms lift from just above the thighs to slightly above the shoulders.
+  'front-incline-dumbbell-raise': {
+    root: 'hip',
+    implement: 'bells',
+    equipment: chainInclineBench(FRONT_INCLINE_RAISE_HIP, 135),
+    poses: [
+      { at: FRONT_INCLINE_RAISE_HIP, trunk: 135, thigh: 0, shin: -90, upperArm: -25, forearm: -25 },
+      { at: FRONT_INCLINE_RAISE_HIP, trunk: 135, thigh: 0, shin: -90, upperArm: 8, forearm: 8 },
+    ],
+  },
+  // Cable Incline Triceps Extension: lying back facing away from a high
+  // pulley, the upper arms stay up beside the head while the elbows straighten.
+  // The pulley sits where the forearm points at the start, so the cable only
+  // ever lengthens as the arms extend.
+  'cable-incline-triceps-extension': {
+    root: 'hip',
+    implement: 'cableBar',
+    lines: [{ from: INCLINE_EXTENSION_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [INCLINE_EXTENSION_PULLEY[0], 0.5], b: [INCLINE_EXTENSION_PULLEY[0], 82] },
+      { kind: 'pulley', at: INCLINE_EXTENSION_PULLEY },
+      ...chainInclineBench(INCLINE_EXTENSION_HIP, 125),
+    ],
+    poses: [
+      { at: INCLINE_EXTENSION_HIP, trunk: 125, thigh: 0, shin: -90, upperArm: 60, forearm: 150 },
+      { at: INCLINE_EXTENSION_HIP, trunk: 125, thigh: 0, shin: -90, upperArm: 60, forearm: 60 },
+    ],
+  },
+  // chain movements are added above this line
+};
+
+/**
+ * The figure for a chain movement at phase `ph`: 0 is the first pose, 1 the
+ * second, and so on, with every direction and the root blended in between.
+ * Returns the 3D model, the joints it is drawn from, the spine's drawn path,
+ * and where the hands grip and the toes are.
+ */
+export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
+  const movement = CHAIN_MOVEMENTS[slug];
+  if (movement === undefined) throw new Error(`canonicalFigure: no chain movement for '${slug}'`);
+  const view = movement.view ?? 'side';
+  const front = view === 'front';
+  const last = movement.poses.length - 1;
+  const t = Math.max(0, Math.min(last, ph));
+  const index = Math.min(Math.max(0, last - 1), Math.floor(t));
+  const a = movement.poses[index];
+  const b = movement.poses[Math.min(last, index + 1)];
+  const u = last === 0 ? 0 : t - index;
+  const num = (x: number | undefined, y: number | undefined): number => (x ?? 0) + ((y ?? 0) - (x ?? 0)) * u;
+  const dir = (x: ChainDir, y: ChainDir): readonly [number, number] => {
+    const p = chainPair(x), q = chainPair(y);
+    return [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u];
+  };
+  const optDir = (x: ChainDir | undefined, y: ChainDir | undefined): readonly [number, number] | undefined =>
+    (x === undefined || y === undefined ? undefined : dir(x, y));
+  const point = (
+    x: readonly [number, number] | undefined, y: readonly [number, number] | undefined, name: string,
+  ): readonly [number, number] | undefined => {
+    if (x === undefined && y === undefined) return undefined;
+    if (x === undefined || y === undefined) throw new Error(`canonicalFigure: '${slug}' gives '${name}' on some poses only`);
+    return [x[0] + (y[0] - x[0]) * u, x[1] + (y[1] - x[1]) * u];
+  };
+
+  const at = point(a.at, b.at, 'at') as readonly [number, number];
+  const curl = num(a.curl, b.curl);
+  const sideCurl = num(a.sideCurl, b.sideCurl);
+  const twist = num(a.twist, b.twist);
+  const given = dir(a.trunk, b.trunk);
+  const thigh = dir(a.thigh, b.thigh);
+  const shin = dir(a.shin, b.shin);
+  const upperArm = dir(a.upperArm, b.upperArm);
+  const forearm = dir(a.forearm, b.forearm);
+  const farThigh = dir(a.farThigh ?? a.thigh, b.farThigh ?? b.thigh);
+  const farShin = dir(a.farShin ?? a.shin, b.farShin ?? b.shin);
+  const farUpperArm = dir(a.farUpperArm ?? a.upperArm, b.farUpperArm ?? b.upperArm);
+  const farForearm = dir(a.farForearm ?? a.forearm, b.farForearm ?? b.forearm);
+  const hand = optDir(a.hand, b.hand);
+  const foot = optDir(a.foot, b.foot);
+  const farFoot = optDir(a.farFoot ?? a.foot, b.farFoot ?? b.foot);
+  const wristTarget = point(a.wrist, b.wrist, 'wrist');
+  const farWristTarget = point(a.farWrist ?? a.wrist, b.farWrist ?? b.wrist, 'farWrist');
+  const ankleTarget = point(a.ankle, b.ankle, 'ankle');
+  const farAnkleTarget = point(a.farAnkle ?? a.ankle, b.farAnkle ?? b.ankle, 'farAnkle');
+
+  // The spine, hip to neck, as a run of short steps. A curl turns each step a
+  // little further toward the front of the body, so the trunk bends through
+  // its length instead of hinging as one stiff piece.
+  const atNeck = movement.trunkAt === 'neck';
+  const hipEnd: readonly [number, number] = atNeck ? [given[0] + curl, given[1] - sideCurl] : given;
+  const part = movement.spine ?? 'whole';
+  const bend = (s: number): number => {
+    if (part === 'upper') return Math.max(0, Math.min(1, (s - 0.4) / 0.6));
+    if (part === 'lower') return Math.max(0, Math.min(1, s / 0.6));
+    return s;
+  };
+  const tangent = (s: number): ChainVec => chainUnit([hipEnd[0] - curl * bend(s), hipEnd[1] + sideCurl * bend(s)], 1);
+  const stepLength = CHAIN_TRUNK / CHAIN_SPINE_STEPS;
+  const spineWorld: ChainVec[] = [[0, 0, 0]];
+  for (let i = 0; i < CHAIN_SPINE_STEPS; i++) {
+    spineWorld.push(chainAdd(spineWorld[i], tangent((i + 0.5) / CHAIN_SPINE_STEPS), stepLength));
+  }
+  const top = spineWorld[CHAIN_SPINE_STEPS];
+  const shift: ChainVec = movement.root === 'neck' ? [at[0] - top[0], at[1] - top[1], 0] : [at[0], at[1], 0];
+  for (let i = 0; i <= CHAIN_SPINE_STEPS; i++) spineWorld[i] = chainAdd(spineWorld[i], shift, 1);
+  const hip = spineWorld[0];
+  const neck = spineWorld[CHAIN_SPINE_STEPS];
+  const neckTangent = tangent(1);
+  const hipTangent = tangent(0);
+  const headDir = optDir(a.head, b.head);
+  const head = chainAdd(neck, headDir === undefined ? neckTangent : chainUnit(headDir, 1), CHAIN_NECK);
+
+  // Shoulders and hips sit either side of the spine, square across the body,
+  // and the shoulders turn about the spine with a twist.
+  const across = (axis: ChainVec): ChainVec => {
+    const k = axis[2];
+    return chainNormal([-axis[0] * k, -axis[1] * k, 1 - axis[2] * k]);
+  };
+  const shoulderLine = across(neckTangent);
+  const forward = chainCross(neckTangent, shoulderLine);
+  const tw = chainRad(twist);
+  const shoulderAxis: ChainVec = [
+    shoulderLine[0] * Math.cos(tw) + forward[0] * Math.sin(tw),
+    shoulderLine[1] * Math.cos(tw) + forward[1] * Math.sin(tw),
+    shoulderLine[2] * Math.cos(tw) + forward[2] * Math.sin(tw),
+  ];
+  const hipAxis = across(hipTangent);
+  const shoulderHalf = body.sw * 0.92;
+  const hipHalf = body.hw * 0.8;
+  const upperLength = front ? RAISE_UPPER_ARM : SAGITTAL_UPPER_ARM;
+  const foreLength = front ? RAISE_FOREARM : SAGITTAL_FOREARM;
+
+  /** The middle joint of a two-segment limb whose end is fixed, bent the way `pole` points. */
+  const solve = (root: ChainVec, target: ChainVec, first: number, second: number, pole: ChainVec): ChainVec => {
+    const d = Math.hypot(target[0] - root[0], target[1] - root[1], target[2] - root[2]) || 1;
+    const along: ChainVec = [(target[0] - root[0]) / d, (target[1] - root[1]) / d, (target[2] - root[2]) / d];
+    if (d >= first + second) return chainAdd(root, along, first);
+    const k = (first * first - second * second + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, first * first - k * k));
+    const p = chainDot(pole, along);
+    const side = chainNormal([pole[0] - along[0] * p, pole[1] - along[1] * p, pole[2] - along[2] * p]);
+    return chainAdd(chainAdd(root, along, k), side, h);
+  };
+  const limb = (
+    root: ChainVec, side: number, first: readonly [number, number], second: readonly [number, number],
+    firstLength: number, secondLength: number, target: readonly [number, number] | undefined, pole: ChainDir,
+  ) => {
+    if (target !== undefined) {
+      const end: ChainVec = [target[0], target[1], root[2]];
+      return { root, mid: solve(root, end, firstLength, secondLength, chainUnit(chainPair(pole), side)), end };
+    }
+    const mid = chainAdd(root, chainUnit(first, side), firstLength);
+    return { root, mid, end: chainAdd(mid, chainUnit(second, side), secondLength) };
+  };
+  const nearArm = limb(chainAdd(neck, shoulderAxis, shoulderHalf), 1, upperArm, forearm, upperLength, foreLength,
+    wristTarget, movement.elbowPole ?? -135);
+  const farArm = limb(chainAdd(neck, shoulderAxis, -shoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
+    farWristTarget, movement.elbowPole ?? -135);
+  const nearLeg = limb(chainAdd(hip, hipAxis, hipHalf), 1, thigh, shin, CHAIN_THIGH, CHAIN_SHIN,
+    ankleTarget, movement.kneePole ?? 45);
+  const farLeg = limb(chainAdd(hip, hipAxis, -hipHalf), -1, farThigh, farShin, CHAIN_THIGH, CHAIN_SHIN,
+    farAnkleTarget, movement.kneePole ?? 45);
+  const nearGrip = hand === undefined ? nearArm.end : chainAdd(nearArm.end, chainUnit(hand, 1), CHAIN_HAND);
+  const farGrip = hand === undefined ? farArm.end : chainAdd(farArm.end, chainUnit(hand, -1), CHAIN_HAND);
+  const feet = movement.feet ?? 'flat';
+  const toeOf = (ankle: ChainVec, side: number, free: readonly [number, number] | undefined): ChainVec | null => {
+    if (feet === 'flat') return [ankle[0] + CHAIN_FOOT, ankle[1], ankle[2]];
+    if (feet === 'free' && free !== undefined) return chainAdd(ankle, chainUnit(free, side), CHAIN_FOOT);
+    return null;
+  };
+  const nearToe = toeOf(nearLeg.end, 1, foot);
+  const farToe = toeOf(farLeg.end, -1, farFoot);
+
+  // What the viewer sees. A side view looks straight across the body, so the
+  // far limbs would hide exactly behind the near ones; they are set back by
+  // the side view's usual far-side offset instead.
+  const yaw = chainRad(front ? 90 : view === 'oblique' ? movement.yawDeg ?? 35 : 0);
+  const originX = movement.originX ?? (view === 'side' ? 0 : 50);
+  const project = (q: ChainVec): CanonicalPoint =>
+    [originX + q[0] * Math.cos(yaw) - q[2] * Math.sin(yaw), CHAIN_FLOOR - q[1]];
+  const off: readonly [number, number] = view === 'side' ? FAROFF_DEFAULT : [0, 0];
+  const projectFar = (q: ChainVec): CanonicalPoint => {
+    const p = project(q);
+    return [p[0] + off[0], p[1] + off[1]];
+  };
+  const spine = spineWorld.map(project).reverse();
+  const nk = project(neck), hp = project(hip);
+  const joints: FigureJoints = {
+    hd: project(head), nk, hp,
+    waist: spine[Math.round(0.56 * CHAIN_SPINE_STEPS)],
+    nArm: project(nearArm.root), fArm: projectFar(farArm.root),
+    nLeg: project(nearLeg.root), fLeg: projectFar(farLeg.root),
+    el: project(nearArm.mid), wr: project(nearArm.end), ef: projectFar(farArm.mid), wf: projectFar(farArm.end),
+    kn: project(nearLeg.mid), an: project(nearLeg.end), kf: projectFar(farLeg.mid), af: projectFar(farLeg.end),
+  };
+  return {
+    movement, view, joints, project, projectFar,
+    /** The trunk's drawn centreline, neck first. Straight unless the spine is curled. */
+    spine, curled: Math.abs(curl) > 1e-9 || Math.abs(sideCurl) > 1e-9,
+    /** Whether the shoulders are drawn as a girdle out from the neck (any view that shows their width). */
+    girdle: view === 'oblique' || (view === 'side' && Math.abs(twist) > 1e-9),
+    world: {
+      hip, neck, head, spine: spineWorld,
+      near: { shoulder: nearArm.root, elbow: nearArm.mid, wrist: nearArm.end, grip: nearGrip, hipJoint: nearLeg.root, knee: nearLeg.mid, ankle: nearLeg.end, toe: nearToe },
+      far: { shoulder: farArm.root, elbow: farArm.mid, wrist: farArm.end, grip: farGrip, hipJoint: farLeg.root, knee: farLeg.mid, ankle: farLeg.end, toe: farToe },
+    },
+    grip: { near: project(nearGrip), far: projectFar(farGrip) },
+    toe: { near: nearToe ? project(nearToe) : null, far: farToe ? projectFar(farToe) : null },
+    footWidth: feet === 'flat' ? body.lw * 0.9 : body.lw * 0.82,
+    angles: { trunk: given, curl, sideCurl, twist, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
+  };
+}
+
+/** A chain movement's equipment, lines and held implement, grouped by where they are painted. */
+function layoutChainExtras(
+  figure: ReturnType<typeof chainGeometry>, body: BodyParameters, farColor: ColorRole, farOpacity: number,
+) {
+  const { movement, joints: j, project } = figure;
+  const groups: Record<ChainLayer, FigurePrim[]> = { behind: [], mid: [], front: [] };
+  const far: FigurePrim[] = [];
+  const lines: FigurePrim[] = [];
+  const near: FigurePrim[] = [];
+  const line = (p: CanonicalPoint, q: CanonicalPoint, w: number, color: ColorRole, opacity: number): BonePrim =>
+    ({ kind: 'bone', x1: p[0], y1: p[1], x2: q[0], y2: q[1], w, color, opacity });
+
+  for (const shape of movement.equipment ?? []) {
+    if (shape.kind === 'slab') {
+      groups[shape.layer ?? 'mid'].push(line(project(chainWorld(shape.a)), project(chainWorld(shape.b)), 4, 'textMid', 1));
+    } else if (shape.kind === 'frame') {
+      groups[shape.layer ?? 'behind'].push(line(project(chainWorld(shape.a)), project(chainWorld(shape.b)), 1.6, 'textLow', 0.75));
+    } else if (shape.kind === 'post') {
+      const p = project(chainWorld(shape.at));
+      groups[shape.layer ?? 'behind'].push(line(p, [p[0], GROUND_LINE], 1.6, 'textLow', 0.75));
+    } else if (shape.kind === 'pulley') {
+      const p = project(chainWorld(shape.at));
+      groups[shape.layer ?? 'behind'].push({ kind: 'circle', cx: p[0], cy: p[1], r: 2.2, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+    } else if (shape.kind === 'ball') {
+      const p = project(chainWorld(shape.at));
+      groups[shape.layer ?? 'mid'].push({ kind: 'circle', cx: p[0], cy: p[1], r: shape.r, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+    } else {
+      const p = project(chainWorld(shape.at));
+      groups[shape.layer ?? 'front'].push({ kind: 'circle', cx: p[0], cy: p[1], r: 2.6, fill: 'textMid', opacity: 1 });
+    }
+  }
+
+  for (const cable of movement.lines ?? []) {
+    const start: CanonicalPoint = cable.from === 'nearFoot' ? [j.an[0] + CHAIN_FOOT / 2, GROUND_LINE]
+      : cable.from === 'farFoot' ? [j.af[0] + CHAIN_FOOT / 2, GROUND_LINE]
+        : project(chainWorld(cable.from));
+    const end = cable.to === 'nearGrip' ? figure.grip.near : cable.to === 'farGrip' ? figure.grip.far
+      : cable.to === 'nearAnkle' ? j.an : j.af;
+    lines.push(line(start, end, 1.4, 'textMid', 1));
+  }
+
+  const handDot = (p: CanonicalPoint, color: ColorRole, opacity: number): FigurePrim =>
+    ({ kind: 'circle', cx: p[0], cy: p[1], r: body.lw * 0.44, fill: color, opacity });
+  if (figure.angles.hand !== undefined) {
+    // A hand that bends at the wrist is its own short segment.
+    far.push(line(j.wf, figure.grip.far, body.lw * 0.6, farColor, farOpacity));
+    near.push(line(j.wr, figure.grip.near, body.lw * 0.6, 'textHi', 1));
+  }
+  far.push(handDot(figure.grip.far, farColor, farOpacity));
+  near.push(handDot(figure.grip.near, 'textHi', 1));
+
+  const kind = movement.implement ?? 'none';
+  const bell = (grip: ChainVec, to: (q: ChainVec) => CanonicalPoint, color: ColorRole, opacity: number, out: FigurePrim[]): void => {
+    const axis = movement.bellAxis ?? [0, 0, 1];
+    const p = to(chainAdd(grip, axis, -4.2)), q = to(chainAdd(grip, axis, 4.2));
+    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (length < 2.4) {
+      // The handle points at the viewer: the bell reads end-on in the fist.
+      const c = to(grip);
+      out.push({ kind: 'rect', x: c[0] - 2.8, y: c[1] - 2.8, w: 5.6, h: 5.6, rx: 1.6, fill: color, opacity, stroke: 'ink1', strokeWidth: 1.4 });
+      return;
+    }
+    const nx = -(q[1] - p[1]) / length * 2.2, ny = (q[0] - p[0]) / length * 2.2;
+    out.push(line(p, q, 1.8, color, opacity));
+    for (const end of [p, q]) {
+      out.push({ ...line([end[0] - nx, end[1] - ny], [end[0] + nx, end[1] + ny], 2.6, color, opacity), stroke: 'ink1', strokeWidth: 0.6 });
+    }
+  };
+  const w = figure.world;
+  if (kind === 'bells' || kind === 'bell') {
+    if (kind === 'bells') bell(w.far.grip, figure.projectFar, farColor, farOpacity, far);
+    bell(w.near.grip, project, 'textHi', 1, near);
+  } else if (kind === 'hammer') {
+    far.push(...layoutHammerDumbbell(figure.grip.far, j.ef, false));
+    near.push(...layoutHammerDumbbell(figure.grip.near, j.el));
+  } else if (kind === 'bar' || kind === 'ez' || kind === 'cableBar') {
+    const p = project(w.far.grip), q = project(w.near.grip);
+    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (length < 3) {
+      // One bar through both hands, seen end-on at the near hand.
+      if (kind === 'bar') near.push(...layoutEndOnBarbell(figure.grip.near));
+      else if (kind === 'ez') near.push(...layoutEndOnEzBar(figure.grip.near));
+      else near.push({ kind: 'circle', cx: figure.grip.near[0], cy: figure.grip.near[1], r: 2.4, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
+    } else {
+      // Seen along its length. From the front the whole bar is in front of
+      // the body; turned, its far half passes behind.
+      const ux = (q[0] - p[0]) / length, uy = (q[1] - p[1]) / length;
+      const over = kind === 'cableBar' ? 3.5 : 9;
+      const mid: CanonicalPoint = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      const farEnd: CanonicalPoint = [p[0] - ux * over, p[1] - uy * over];
+      const nearEnd: CanonicalPoint = [q[0] + ux * over, q[1] + uy * over];
+      const whole = figure.view === 'front';
+      const farGroup = whole ? near : far;
+      const farTone: ColorRole = whole ? 'textHi' : farColor;
+      const farAlpha = whole ? 1 : farOpacity;
+      farGroup.push(line(mid, farEnd, 1.6, farTone, farAlpha));
+      near.push(line(mid, nearEnd, 1.6, 'textHi', 1));
+      if (kind !== 'cableBar') {
+        const plate = (c: CanonicalPoint, color: ColorRole, opacity: number): FigurePrim =>
+          ({ ...line([c[0] + uy * 4.2, c[1] - ux * 4.2], [c[0] - uy * 4.2, c[1] + ux * 4.2], 2.4, color, opacity), stroke: 'ink1', strokeWidth: 0.6 });
+        farGroup.push(plate([farEnd[0] + ux * 2, farEnd[1] + uy * 2], farTone, farAlpha));
+        near.push(plate([nearEnd[0] - ux * 2, nearEnd[1] - uy * 2], 'textHi', 1));
+      }
+    }
+  } else if (kind === 'handle' || kind === 'handles' || kind === 'rope') {
+    const r = kind === 'rope' ? 2.2 : 2.6;
+    if (kind !== 'handle') far.push({ kind: 'circle', cx: figure.grip.far[0], cy: figure.grip.far[1], r, fill: farColor, opacity: farOpacity });
+    near.push({ kind: 'circle', cx: figure.grip.near[0], cy: figure.grip.near[1], r, fill: 'textHi', opacity: 1 });
+  }
+  return { ...groups, far, lines, near };
+}
+
 /** Small hip arc with fixed soft knee; an actual cuff, not a hand cable. */
 export function kickbackGeometry(extensionDeg: number, body: BodyParameters): FigureJoints {
   const upper = (extensionDeg + 2.5) * Math.PI / 180;
@@ -1394,6 +1908,7 @@ export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): F
     return proneInclineRaiseGeometry(j.pi, body, slug === 'barbell-incline-shoulder-raise').joints;
   }
   if (slug === SEATED_LATERAL_RAISE && j.la !== undefined) return seatedLateralRaiseGeometry(j.la, body).joints;
+  if (CHAIN_MOVEMENTS[slug] !== undefined && j.ph !== undefined) return chainGeometry(slug, j.ph, body).joints;
   if (FLYE_INCLINES[slug] !== undefined && j.fo !== undefined) {
     return flyeGeometry(j.fo, body, FLYE_INCLINES[slug]).joints;
   }
@@ -1684,6 +2199,8 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     ? seatedLateralRaiseGeometry(pose.la, body) : null;
   if (seatedRaise) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
   const seatedBells = seatedRaise ? layoutProjectedBells(seatedRaise) : null;
+  const chain = CHAIN_MOVEMENTS[slug] !== undefined && pose.ph !== undefined ? chainGeometry(slug, pose.ph, body) : null;
+  if (chain) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
   const reverseLunge = slug === REVERSE_LUNGE && pose.rl !== undefined
     ? reverseLungeGeometry(pose.rl, body) : null;
   if (reverseLunge) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
@@ -1703,11 +2220,13 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   const bone = (
     p1: CanonicalPoint, p2: CanonicalPoint, w: number, color: ColorRole, opacity: number,
   ): BonePrim => ({ kind: 'bone', x1: p1[0], y1: p1[1], x2: p2[0], y2: p2[1], w, color, opacity });
+  const chainDraw = chain ? layoutChainExtras(chain, body, farColor, farOpacity) : null;
 
   const prims: FigurePrim[] = [];
 
   // ---- Layer 1: apparatus / structure (behind everything but ground) ----
   if (!PREACHER_SLUGS.has(slug) && slug !== HEAD_SUPPORTED_RAISE) prims.push(...apparatus(slug, front, body));
+  if (chainDraw) prims.push(...chainDraw.behind);
   if (kickback) {
     // Cable is behind the support and working legs; cuff rides the ankle in
     // the final layer. Both balance hands grip the connected high crossbar.
@@ -1750,16 +2269,26 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   if (cableDraw) prims.push(...cableDraw.farCable);
 
   // ---- Layer 2: far limbs ----
-  prims.push(bone(fArm, j.ef, body.lw * 0.88, farColor, farOpacity));
-  prims.push(bone(j.ef, j.wf, body.lw * 0.72, farColor, farOpacity));
+  // A far arm that crosses in front of the body is painted after the trunk instead.
+  const farArmOver = chain !== null && chain.movement.farArmOver === true;
+  if (!farArmOver) {
+    prims.push(bone(fArm, j.ef, body.lw * 0.88, farColor, farOpacity));
+    prims.push(bone(j.ef, j.wf, body.lw * 0.72, farColor, farOpacity));
+  }
   prims.push(bone(fLeg, j.kf, body.lw * 1.18, farColor, farOpacity));
   prims.push(bone(j.kf, j.af, body.lw * 0.9, farColor, farOpacity));
   if (reverseLunge) prims.push(bone(reverseLunge.rearFoot[0], reverseLunge.rearFoot[1], reverseLunge.footWidth, farColor, farOpacity));
   else if (fly && fly.inclineDeg < 0) prims.push(bone(j.af, fly.farLeg.projected.toe, body.lw * 0.82, farColor, farOpacity));
   else if (seatedRaise) prims.push(bone(j.af, seatedRaise.farLeg.projected.toe, seatedRaise.footWidth, farColor, farOpacity));
+  else if (chain && !front) { if (chain.toe.far) prims.push(bone(j.af, chain.toe.far, chain.footWidth, farColor, farOpacity)); }
   else if (!NOFEET.has(slug)) prims.push(foot(j.af, farColor, body, front, farOpacity,
     PERSPECTIVE_BARBELL_SLUGS.has(slug) ? 94.4 : 96.4));
   if (cableDraw) prims.push(...cableDraw.farHandle);
+  if (chainDraw) {
+    // Back to front: what the far hand holds, then the equipment the body rests on.
+    if (!farArmOver) prims.push(...chainDraw.far);
+    prims.push(...chainDraw.mid);
+  }
   if (fly) prims.push(...layoutFlyeDumbbell(fly, false));
   if (seatedRaise && seatedBells) {
     // Back to front: the far bell and the hand that holds it, which travel
@@ -1804,7 +2333,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   // front/side silhouette bars alone cannot span this projected girdle.
   if (fly) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
   if (proneRaise) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
-  if (seatedRaise) {
+  if (seatedRaise || (chain && chain.girdle)) {
     // The shoulder girdle, as one piece out to each shoulder. With an upright
     // trunk a single bar across both shoulders would sit exactly where the
     // first trunk slice does and be mistaken for it by the torso checks.
@@ -1825,8 +2354,25 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   const waistWidth = Math.min(sw, hw) * 0.72;
   const slices = 32;
   const thickness = Math.max(0.6, (spineLength / slices) * 1.6);
+  // A curled spine is drawn along its own path, each slice square to the
+  // spine where it sits; a straight one keeps the single shared normal.
+  const curledSpine = chain && chain.curled ? chain.spine : null;
   for (let i = 0; i <= slices; i++) {
     const t = i / slices;
+    if (curledSpine) {
+      const here = curledSpine[i];
+      const before = curledSpine[Math.max(0, i - 1)], after = curledSpine[Math.min(slices, i + 1)];
+      const run = Math.hypot(after[0] - before[0], after[1] - before[1]) || 1;
+      const across: CanonicalPoint = [-(after[1] - before[1]) / run, (after[0] - before[0]) / run];
+      const half = !front ? sw + (Math.min(hw, sw * 0.9) - sw) * t
+        : t <= 0.56 ? sw + (waistWidth - sw) * (t / 0.56) : waistWidth + (hw - waistWidth) * ((t - 0.56) / 0.44);
+      prims.push(bone(
+        [here[0] - across[0] * half, here[1] - across[1] * half],
+        [here[0] + across[0] * half, here[1] + across[1] * half],
+        Math.max(0.6, (24 / slices) * 1.6), 'textLow', 1,
+      ));
+      continue;
+    }
     const center = at(t);
     // Profile depth tapers directly to the hips: carrying the frontal waist
     // pinch and pelvic breadth into side view produced a skirt-like flare.
@@ -1845,6 +2391,11 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
 
   // B1-113: the near cable passes behind the near leg, never over it.
   if (cableDraw) prims.push(...cableDraw.nearCable);
+  if (farArmOver && chainDraw) {
+    prims.push(bone(fArm, j.ef, body.lw * 0.88, farColor, farOpacity));
+    prims.push(bone(j.ef, j.wf, body.lw * 0.72, farColor, farOpacity));
+    prims.push(...chainDraw.far);
+  }
 
   // ---- Layer 4: near limbs ----
   // The preacher pad is in front of the chest; keep its support surface
@@ -1855,6 +2406,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   if (reverseLunge) prims.push(bone(reverseLunge.frontFoot[0], reverseLunge.frontFoot[1], reverseLunge.footWidth, 'textHi', 1));
   else if (fly && fly.inclineDeg < 0) prims.push(bone(j.an, fly.nearLeg.projected.toe, body.lw * 0.82, 'textHi', 1));
   else if (seatedRaise) prims.push(bone(j.an, seatedRaise.nearLeg.projected.toe, seatedRaise.footWidth, 'textHi', 1));
+  else if (chain && !front) { if (chain.toe.near) prims.push(bone(j.an, chain.toe.near, chain.footWidth, 'textHi', 1)); }
   else if (!NOFEET.has(slug)) prims.push(foot(j.an, 'textHi', body, front, 1));
   const nearUpperArm = bone(nArm, j.el, body.lw * 0.88, 'textHi', 1);
   const nearForearm = bone(j.el, j.wr, body.lw * 0.72, 'textHi', 1);
@@ -1862,7 +2414,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   // is on the NEAR side of the head, so it draws AFTER the head ring —
   // otherwise the lockout elbow (authored over the shoulder axis per O-8)
   // hides inside the head circle and the press reads as clipped.
-  const armAfterHead = slug === 'dumbbell-shoulder-press';
+  const armAfterHead = slug === 'dumbbell-shoulder-press' || (chain !== null && chain.movement.nearArmOverHead === true);
   if (!armAfterHead) {
     prims.push(nearUpperArm, nearForearm);
   }
@@ -1884,6 +2436,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   });
   prims.push(...implementPrims.filter((p) => p.kind === 'bone'
     && (p.color === 'textMid' || p.beforeHead === true)));
+  if (chainDraw) prims.push(...chainDraw.lines);
   prims.push(bone(at(0.02), j.hd, body.lw * 0.74, 'textHi', 1));
   prims.push({
     kind: 'circle', cx: j.hd[0], cy: j.hd[1], r: body.hr,
@@ -1898,7 +2451,9 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   if (endOnBar) prims.push(...endOnBar);
   if (cableDraw) prims.push(...cableDraw.nearHandle);
   const equipment = EQUIPMENT_BY_SLUG[slug] ?? 'none';
-  if ((equipment === 'none' || equipment === 'barbell' || equipment === 'kettlebell' || equipment === 'squat_rack')
+  if (chain) {
+    // A chain movement paints its own hands with what they hold, below.
+  } else if ((equipment === 'none' || equipment === 'barbell' || equipment === 'kettlebell' || equipment === 'squat_rack')
     && !CURL_SLUGS.has(slug)) {
     prims.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: body.lw * 0.44, fill: 'textHi', opacity: 1 });
     prims.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
@@ -1940,6 +2495,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
       prims.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: body.lw * 0.44, fill: 'textHi', opacity: 1 });
     }
   }
+  if (chainDraw) prims.push(...chainDraw.near, ...chainDraw.front);
   if (kickback) {
     const length = Math.hypot(j.an[0] - j.kn[0], j.an[1] - j.kn[1]);
     const half = (body.lw * 0.9 + 1) / 2;
@@ -1975,6 +2531,10 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'incline-dumbbell-curl': 'dumbbells',
+  'incline-hammer-curls': 'dumbbells',
+  'front-incline-dumbbell-raise': 'dumbbells',
+  'cable-incline-triceps-extension': 'cable_machine',
   'dumbbell-lateral-raise': 'dumbbells',
   'lateral-raise-with-bands': 'band',
   'seated-side-lateral-raise': 'dumbbells',
@@ -2839,6 +3399,8 @@ function implement(
 ): FigurePrim[] {
   const out: FigurePrim[] = [];
   if (PERSPECTIVE_BARBELL_SLUGS.has(slug)) return out;
+  // A chain movement draws what it holds itself (layoutChainExtras).
+  if (CHAIN_MOVEMENTS[slug] !== undefined && j.ph !== undefined) return out;
   const equipment = EQUIPMENT_BY_SLUG[slug] ?? 'none';
   const front = view === 'front';
   // Owner batch (B1-20-R2): the carries draw their bells 1.4x. The scale travels
