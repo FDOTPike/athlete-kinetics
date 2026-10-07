@@ -1,0 +1,15 @@
+source commit: 2486caec8d620d93d4eebb2e09ac8f0e7dcd636d
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov12.json
+
+movements measured: 163 (baseline 158)
+added: 285 Standing Rope Crunch; 232 Kneeling Cable Crunch With Alternating Oblique Twists; 181 Decline Oblique Crunch; 160 Cable Russian Twists; 248 One-Arm High-Pulley Cable Side Bends
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  285 Standing Rope Crunch: drawn fba577a06d39609f185ec901b48c623d3c68b17843dc2d7a8fbdd9575e551002 captions 27dad7f136920c76ecf7b74acd51a870350a5637a51f4bb3bd8c8cbcd6097e45 stage 181.18x240.00 cycle 4200 ms
+  232 Kneeling Cable Crunch With Alternating Oblique Twists: drawn c1460dedcf26863266adc7d400ec7995f149f3d578f90174548a028954400cda captions dfed70238c7094077d135b44cee3db765c28e731083e321b04baa94c03f2b149 stage 143.55x240.00 cycle 9750 ms
+  181 Decline Oblique Crunch: drawn 7b1a350c454fc64d91f595ec605c3018c5aae0e2c2e4f87cd92283b1f3a19b3d captions 20282069bd2e11b274a6bdd29f0e549ef63f59ad73e4a29650e84a002e014134 stage 222.44x240.00 cycle 4400 ms
+  160 Cable Russian Twists: drawn 5d0ea1842cbafe2a721f8091be8064bd6493f07400109fa451d97fe813a0154a captions 47c390ab45218878d6f14cb4c81df2fded03ff0d7b7dcdf66b0a80f26612f3c4 stage 240.00x186.67 cycle 4400 ms
+  248 One-Arm High-Pulley Cable Side Bends: drawn 2b447d8874096242f2cb6da443f37d3a8b79b85063989486f54b5dcb69bba682 captions af1b556a9313ed4a5bd570c522df521cf5be6c50c2e8de0cddbbbfe3bf502141 stage 157.65x240.00 cycle 3900 ms
+exit code: 0 (probe run exit 0)
