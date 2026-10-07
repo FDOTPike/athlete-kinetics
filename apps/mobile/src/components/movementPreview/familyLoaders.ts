@@ -41,6 +41,7 @@ export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> =
   'horizontal-pull__seated': () => require('./families/horizontal-pull__seated.json') as PreviewFamilyFile,
   'horizontal-pull__standing': () => require('./families/horizontal-pull__standing.json') as PreviewFamilyFile,
   'horizontal-pull__supine': () => require('./families/horizontal-pull__supine.json') as PreviewFamilyFile,
+  'lateral-raise__seated': () => require('./families/lateral-raise__seated.json') as PreviewFamilyFile,
   'lateral-raise__standing': () => require('./families/lateral-raise__standing.json') as PreviewFamilyFile,
   'locomotion__standing': () => require('./families/locomotion__standing.json') as PreviewFamilyFile,
   'lunge__reverse': () => require('./families/lunge__reverse.json') as PreviewFamilyFile,

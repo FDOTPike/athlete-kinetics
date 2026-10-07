@@ -10,6 +10,7 @@ import {
 } from '../../src/components/movementPreview/canonicalFigure';
 import { previewManifest } from './previewManifest';
 
+/** Straight-line distance between two 2D points. */
 const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const deg = (rad) => (rad * 180) / Math.PI;
 const MIDLINE = 50;
@@ -26,6 +27,7 @@ function ticksOf(entry) {
   return [...Array.from({ length: Math.ceil(total / 33) }, (_, i) => i * 33), total];
 }
 
+/** The interpolated pose, the joints it resolves to and the drawn primitives at time `t`. */
 function figureAt(entry, t) {
   const pose = poseAtTime(entry.frames.map((f) => f.joints), t, entry.segmentDurationsMs);
   const opts = { ...entry, body: CANONICAL_BODY_PARAMETERS };

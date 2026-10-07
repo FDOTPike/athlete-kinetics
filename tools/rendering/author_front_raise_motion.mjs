@@ -17,6 +17,7 @@ const file = 'apps/mobile/src/components/movementPreview/movementPreviewManifest
 const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
 const catalogue = JSON.parse(fs.readFileSync('docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json', 'utf8'));
 
+/** Two decimals, as every stored joint in the manifest is. */
 const round = (p) => [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100];
 
 // An upright side-view figure facing right: trunk 24, thigh and shin 22.25 each.
@@ -25,6 +26,7 @@ const STANDING_SIDE = {
   kn: [44, 73.75], an: [44, 96], kf: [44, 73.75], af: [44, 96],
 };
 
+/** The stored joints for one keyframe: the standing body, the solved arms before the far-side offset, and the angle that drives them. */
 function pose(slug, fr) {
   const spec = layout.FRONT_RAISE[slug];
   const near = layout.frontRaiseArm(fr, spec.softElbowDeg, STANDING_SIDE.nk);
