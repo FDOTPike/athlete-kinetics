@@ -17,6 +17,9 @@ const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
 const catalogue = JSON.parse(fs.readFileSync('docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json', 'utf8'));
 const BODY = layout.CANONICAL_BODY_PARAMETERS;
 
+/** A caption ending on one of these is a fragment (the same list the caption-integrity test uses). */
+const DANGLING_TAIL = /\b(and|the|with|while|of|to|a|an|from|over|into|for|then|but|or|that|as|at|in|on|by|its|their|your|is|are|be|been)\.$/i;
+
 /** Two decimals, as every stored joint in the manifest is. */
 const round = (p) => [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100];
 
@@ -68,6 +71,10 @@ for (const spec of CHAIN_SPECS) {
     throw Error(`Movement ${spec.id} needs at least five keyframes, one caption each and one duration per gap`);
   }
   if (spec.phases[0] !== spec.phases.at(-1)) throw Error(`Movement ${spec.id} does not close its loop`);
+  for (const caption of spec.captions) {
+    // The caption-integrity rules, applied here so a fragment never reaches the manifest.
+    if (caption.trim().length < 10 || !/[.!?]$/.test(caption) || DANGLING_TAIL.test(caption)) throw Error(`Movement ${spec.id} caption is not a finished sentence: ${caption}`);
+  }
   const entry = {
     movementId: spec.id,
     name: row.name,
