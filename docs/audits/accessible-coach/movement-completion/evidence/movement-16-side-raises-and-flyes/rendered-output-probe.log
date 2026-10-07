@@ -1,13 +1,10 @@
-source commit: 63c744a7e57586e089ca06d879ad6be3877b454d
-command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov15.json
+source commit: 705a75be7b15c688c48a1064a90ed6fcfc079a55
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov16.json
 
-movements measured: 173 (baseline 170)
-added: 162 Cable Seated Lateral Raise; 261 Reverse Flyes; 131 Back Flyes - With Bands
+movements measured: 173 (baseline 173)
+added: none
 removed: none
 changed, expected: none
 changed, NOT expected: none
 movements with overflow above 1e-6 dp: none
-  162 Cable Seated Lateral Raise: drawn 6bf5efd200233fa68901176ce3d017d079a10b1b2045c1ad7664bab7f770b483 captions a72a1dff8d62a5861683e0c9ecf5cea9e206d279bf51f335180683d96bbce43e stage 240.00x128.84 cycle 4200 ms
-  261 Reverse Flyes: drawn 89cc9c1224358227a1fb8da24722ccdd25e7059fe263b7b6ba2c9927ed03ca95 captions 5de6b75a65b95272ccc097ea5a3a2cd237296fec80509b68a44b50b6fb6b92d3 stage 227.53x240.00 cycle 4000 ms
-  131 Back Flyes - With Bands: drawn 08f5a2174095e140481c2f15ca3f7d097013ec3ae741ac19377666754a4c8c41 captions e86f37a614d4ed04f417a9f36e742bd41f9e3a9a7ba87f3ae99d5d2595b70c31 stage 183.09x240.00 cycle 4000 ms
 exit code: 0 (probe run exit 0)
