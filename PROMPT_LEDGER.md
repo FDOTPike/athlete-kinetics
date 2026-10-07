@@ -12379,3 +12379,58 @@ master from origin. I'll decide later how to renumber and carry those entries.
 - **Local edits preserved.** In the primary checkout, the uncommitted additions to `AGENT_WORKFLOW.md` (section 0.2) and `PROMPT_LEDGER.md` (entries 0023-0028 in the pre-merge master numbering) were committed unchanged to the new local branch `local-ledger-0023-0028` (`52221e7e`, parent `3358be6`; 2 files, 359 insertions). Not pushed. Renumbering and carrying them forward remains the owner's decision.
 - **Local master updated.** `git merge --ff-only origin/master` first stopped on one untracked file, `docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md`, which `origin/master` tracks. Its content was identical to the tracked version (blob `30fec443` both ways), so the untracked copy was moved aside, not deleted, and the fast-forward then completed: local `master` is `96ce954`, level with `origin/master`. The file at that path hashes the same before and after. The other untracked files in the primary checkout were not touched.
 - **Push and pull request (item 1).** The branch is pushed and opened as a pull request against `master` after this commit; its number is not known at commit time. It is to be merged with a merge commit only when CI is fully green on its head, including the iOS UI tests. If `test4` fails again, the `FOCUS-RETRY` lines and the error are reported and the test is left as strict as it is.
+
+---
+
+## Entry 0196 — 2026-10-08 · Owner decisions on merging pull request 43, the held pull requests and the remaining hand-over items (Claude Code Desktop)
+
+2026-10-08 (local date; 2026-10-07 UTC). Executor: Claude Code Desktop. Worktree `.claude/worktrees/master-takeover-2026-10-07`, branch `claude/master-followup-2026-10-08`, cut from the pull request 43 head `02e775f` so that this entry does not move that head while its CI is running.
+
+> **Ledger numbering note.** Entries 0193 and 0194 are on the pull request 43 branch. The primary checkout's `PROMPT_LEDGER.md` holds two further uncommitted entries written by other sessions after its `master` was updated: one numbered 0193 (movement order), which clashes with the 0193 above, and one numbered 0195 (Triage Lab). This entry takes 0196 to stay clear of both. Those uncommitted entries were not touched.
+
+### Input
+
+Received verbatim; the pasted text was the whole message.
+
+```text
+Merging and next steps, decided by the owner:
+
+1. PR #43 (UI tests: confirm keyboard focus). Merge it with a merge commit once ALL
+   CI on its current head is green, including the iOS UI-test step. Before merging,
+   check that test4 passed and report any FOCUS-RETRY lines.
+   - If test4 fails again: do not loosen the test. Download the run's ui-tests
+     artifact, read test4's log around the password field, find the actual cause,
+     and fix it on the same branch.
+   - After merging, confirm that the master run for the merge commit is also green.
+     The b99d0cb lesson: check the master run itself, not only the PR head.
+
+2. Do NOT merge any other open PR. Being green is not enough:
+   - #29, #34–#37, #40–#42 are movement-lane drafts. Hold them: all movements are
+     still "pending", with no technique review from rendered images.
+     - Do not push, rebase, retarget, undraft or merge them, and do not enable
+       previews.
+     - The CodeRabbit findings marked actionable on #34, #36 and #37 go to the movement
+       lane as a further stacked branch, not as pushes to those PRs.
+   - #28 is a draft with a red iOS job. Leave it; it is the owner's and the movement
+     lane's call. Its base branch claude/release-integration was reset to master+#39
+     after #26 merged; mention this in your report, change nothing.
+   - #21 is a draft with merge conflicts. Leave it; report what it would need.
+   - #7 targets codex/program-quality-remediation, which is already fully in master,
+     so merging it would not reach master. Leave it; report whether retargeting it
+     to master would be clean.
+
+3. Then continue with the remaining hand-over items:
+   - Issue #38: watch for the tester's UI-test report from her Mac. When it arrives,
+     verify its claims against CI and the code, fix real defects on a branch + PR, and
+     reply on the issue. Refer to her as "the tester (forgeaura)" in anything committed.
+   - Local checkout: commit my uncommitted AGENT_WORKFLOW.md / PROMPT_LEDGER.md edits
+     to a branch named local-ledger-0023-0028 (do not push it), then update local
+     master from origin.
+   - Owner-gated items (TestFlight, physical-device checks, the owner decisions list):
+     no action. Keep them in your final report.
+
+Report at the end:
+- what you merged, with the merge commit and master CI result;
+- what you left, and why;
+- anything new you found.
+```
