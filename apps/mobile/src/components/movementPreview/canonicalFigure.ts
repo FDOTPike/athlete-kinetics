@@ -2527,13 +2527,20 @@ function implement(
       // The bell's handle points at the viewer in both: a lateral raise seen
       // from the front, and a palms-back front raise seen from the side. So it
       // reads end-on in the fist for the whole rep. The outline keeps it apart
-      // from the thigh at the start. The far bell is painted first.
+      // from the thigh at the start. From the side the two bells overlap, so
+      // the far one is painted first; from the front they never meet and keep
+      // the order the lateral raise was drawn in.
       const bell = (p: CanonicalPoint, color: ColorRole, opacity: number): void => {
         out.push({ kind: 'rect', x: p[0] - 2.8, y: p[1] - 2.8, w: 5.6, h: 5.6, rx: 1.6,
           fill: color, opacity, stroke: 'ink1', strokeWidth: 1.4 });
       };
-      if (j.wf) bell(j.wf, farColor, farOpacity);
-      if (j.wr) bell(j.wr, 'textHi', 1);
+      if (front) {
+        if (j.wr) bell(j.wr, 'textHi', 1);
+        if (j.wf) bell(j.wf, farColor, farOpacity);
+      } else {
+        if (j.wf) bell(j.wf, farColor, farOpacity);
+        if (j.wr) bell(j.wr, 'textHi', 1);
+      }
     } else if (slug === 'goblet-squat' && j.b) {
       // Single front-held implement at anchor b.
       out.push({ kind: 'circle', cx: j.b[0], cy: j.b[1] + 1.6, r: 5.2, fill: 'textHi', opacity: 1 });
