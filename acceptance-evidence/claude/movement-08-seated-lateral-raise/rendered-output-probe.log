@@ -1,0 +1,12 @@
+source commit: f1b8a3f03eb8bae763d72428f7ac3b8b275a67ca
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov07.json
+
+movements measured: 139 (baseline 138)
+added: 272 Seated Side Lateral Raise
+removed: none
+changed, expected: 206 Front Cable Raise
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  206 Front Cable Raise: drawn 7dbd36ed230792a85c147bcf3cd244e0b0d18890ba6da07a90452b7d5fd2c476 captions a8332309cabae823474de05669d99fbfaf2af7eea78624be54f4526597e6059a stage 173.62x240.00 cycle 3800 ms
+  272 Seated Side Lateral Raise: drawn 4f2152dfabfccb860104f33de19e233dd10b85df2b4ecd24bf68bfe1b6d315b4 captions 535e06a7e9fe6a4529a8243b4fdeff3d2f6b0c855ac0cdc4c6cef7636482ed98 stage 233.51x240.00 cycle 4100 ms
+exit code: 0 (probe run exit 0)
