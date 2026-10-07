@@ -314,7 +314,7 @@ export const CHAIN_SPECS = [
   {
     id: 183,
     slug: 'decline-reverse-crunch',
-    equipment: 'none',
+    equipment: 'bench',
     phases: [0, 2, 2, 0, 0],
     // "Pause, then lower the hips and return the legs slowly to the start."
     segments: [1500, 600, 2200, 500],
@@ -371,7 +371,7 @@ export const CHAIN_SPECS = [
   {
     id: 181,
     slug: 'decline-oblique-crunch',
-    equipment: 'none',
+    equipment: 'bench',
     phases: [0, 1, 1, 0, 0],
     // "Pause, then lower slowly to the start."
     segments: [1300, 600, 2000, 500],
@@ -439,7 +439,7 @@ export const CHAIN_SPECS = [
   {
     id: 37,
     slug: 'bench-dip',
-    equipment: 'none',
+    equipment: 'bench',
     phases: [0, 1, 1, 0, 0],
     segments: [1500, 250, 1100, 500],
     captions: [
@@ -455,7 +455,7 @@ export const CHAIN_SPECS = [
   {
     id: 182,
     slug: 'decline-push-up',
-    equipment: 'none',
+    equipment: 'bench',
     phases: [0, 1, 1, 0, 0],
     segments: [1400, 200, 1100, 500],
     captions: [
@@ -507,7 +507,7 @@ export const CHAIN_SPECS = [
   {
     id: 297,
     slug: 'upright-row-with-bands',
-    equipment: 'bands',
+    equipment: 'band',
     phases: [0, 1, 1, 0, 0],
     // "Pause, then lower slowly to the thighs." / "Lower slowly against the band."
     segments: [1200, 600, 2000, 500],
@@ -574,7 +574,7 @@ export const CHAIN_SPECS = [
   {
     id: 131,
     slug: 'back-flyes-with-bands',
-    equipment: 'bands',
+    equipment: 'band',
     phases: [0, 1, 1, 0, 0],
     // "Pause, then let the hands return slowly to the front."
     segments: [1100, 500, 1900, 500],
