@@ -677,7 +677,10 @@ const ANKLE_KICKBACK = 'cable-glute-kickback';
 export const LATERAL_RAISE_ELBOW_DEG: Readonly<Record<string, number>> = {
   'dumbbell-lateral-raise': 15,
   'lateral-raise-with-bands': 10,
+  'seated-side-lateral-raise': 12,
 };
+/** The one seated lateral raise drawn so far; it has its own 3D figure. */
+export const SEATED_LATERAL_RAISE = 'seated-side-lateral-raise';
 /**
  * Standing front raises, side view. The soft elbow is the slight bend the text
  * asks for; bothArms is false where one arm works and the other hangs.
@@ -1029,6 +1032,89 @@ export function proneInclineRaiseGeometry(phase: number, body: BodyParameters, b
   };
 }
 
+/**
+ * The whole figure for the Seated Side Lateral Raise, from a 3D model. World
+ * axes: X forward (the way the athlete faces), Y up from the floor, Z across
+ * the body (positive toward the viewer). The athlete sits on the END of a flat
+ * bench: trunk upright, thighs level and pointing forward, shins down to feet
+ * flat on the floor, the bench running away behind. Only the arms move, out to
+ * the sides in the plane across the body, with one slight fixed elbow bend.
+ * A 35 degree oblique projection shows the seat and both arms at once.
+ */
+export function seatedLateralRaiseGeometry(abductionDeg: number, body: BodyParameters) {
+  type Point3 = readonly [number, number, number];
+  const rad = (d: number): number => d * Math.PI / 180;
+  const yaw = rad(35);
+  const HIP_SCREEN_X = 44;
+  const FLOOR_SCREEN = 96.9;
+  const project = (q: Point3): CanonicalPoint =>
+    [HIP_SCREEN_X + q[0] * Math.cos(yaw) - q[2] * Math.sin(yaw), FLOOR_SCREEN - q[1]];
+  const ankleY = body.lw * 0.9 / 2;
+  const SHIN = 22.25, THIGH = 22.25, UPPER = 12.5, FORE = 12.0;
+  const hipY = ankleY + SHIN;
+  const hip: Point3 = [0, hipY, 0];
+  const neck: Point3 = [0, hipY + 24, 0];
+  const head: Point3 = [0, hipY + 33, 0];
+  const shoulderZ = body.sw * 0.92;
+  const upper = rad(abductionDeg);
+  const fore = rad(abductionDeg - LATERAL_RAISE_ELBOW_DEG[SEATED_LATERAL_RAISE]);
+  const arm = (side: number) => {
+    const shoulder: Point3 = [0, neck[1], side * shoulderZ];
+    const elbow: Point3 = [0, shoulder[1] - UPPER * Math.cos(upper), shoulder[2] + side * UPPER * Math.sin(upper)];
+    const wrist: Point3 = [0, elbow[1] - FORE * Math.cos(fore), elbow[2] + side * FORE * Math.sin(fore)];
+    return { world: { shoulder, elbow, wrist }, projected: { shoulder: project(shoulder), elbow: project(elbow), wrist: project(wrist) } };
+  };
+  const near = arm(1), far = arm(-1);
+  // Thighs level and forward, a little apart; shins straight down; feet flat.
+  const leg = (side: number) => {
+    const root: Point3 = [0, hipY, side * body.hw * 0.8];
+    const kneeZ = side * (body.hw * 0.8 + 2.2);
+    const kneeX = Math.sqrt(THIGH * THIGH - 2.2 * 2.2);
+    const knee: Point3 = [kneeX, hipY, kneeZ];
+    const ankle: Point3 = [kneeX, ankleY, kneeZ];
+    return { world: { root, knee, ankle }, projected: { root: project(root), knee: project(knee), ankle: project(ankle) } };
+  };
+  const nearLeg = leg(1), farLeg = leg(-1);
+  // The bench top is under the thighs; the athlete is at its front end.
+  const seatY = hipY - body.lw * 1.18 / 2 - 2;
+  const slab: readonly [CanonicalPoint, CanonicalPoint] = [project([-30, seatY, 0]), project([5, seatY, 0])];
+  const posts: ReadonlyArray<readonly [CanonicalPoint, CanonicalPoint]> = [-25, 0].map((x) =>
+    [project([x, seatY - 2, 0]), project([x, FLOOR_SCREEN - 96.4, 0])] as const);
+  const hp = project(hip), nk = project(neck);
+  const joints: FigureJoints = {
+    hd: project(head), nk, hp,
+    waist: [nk[0] + (hp[0] - nk[0]) * 0.56, nk[1] + (hp[1] - nk[1]) * 0.56],
+    nArm: near.projected.shoulder, fArm: far.projected.shoulder,
+    el: near.projected.elbow, wr: near.projected.wrist, ef: far.projected.elbow, wf: far.projected.wrist,
+    nLeg: nearLeg.projected.root, fLeg: farLeg.projected.root,
+    kn: nearLeg.projected.knee, an: nearLeg.projected.ankle, kf: farLeg.projected.knee, af: farLeg.projected.ankle,
+  };
+  return { near, far, nearLeg, farLeg, joints, slab, posts, project, seatY, world: { hip, neck, head }, yawDeg: 35 };
+}
+
+/** A dumbbell in each fist with its handle pointing forward, drawn through the figure's own projection. */
+function layoutProjectedBells(
+  figure: {
+    near: { world: { wrist: readonly [number, number, number] } };
+    far: { world: { wrist: readonly [number, number, number] } };
+    project: (q: readonly [number, number, number]) => CanonicalPoint;
+  },
+): { far: FigurePrim[]; near: FigurePrim[] } {
+  const far: FigurePrim[] = [];
+  const near: FigurePrim[] = [];
+  const bell = (wrist: readonly [number, number, number], color: ColorRole, opacity: number, out: FigurePrim[]): void => {
+    const a = figure.project([wrist[0] - 4.2, wrist[1], wrist[2]]);
+    const b = figure.project([wrist[0] + 4.2, wrist[1], wrist[2]]);
+    out.push({ kind: 'bone', x1: a[0], y1: a[1], x2: b[0], y2: b[1], w: 1.8, color, opacity });
+    for (const head of [a, b]) {
+      out.push({ kind: 'bone', x1: head[0], y1: head[1] - 2.2, x2: head[0], y2: head[1] + 2.2, w: 2.6, color, opacity, stroke: 'ink1', strokeWidth: 0.6 });
+    }
+  };
+  bell(figure.far.world.wrist, 'textLow', 0.9, far);
+  bell(figure.near.world.wrist, 'textHi', 1, near);
+  return { far, near };
+}
+
 /** The implement of a chest-supported incline raise, split so the far half sits behind the body. */
 function layoutProneInclineImplement(
   raise: ReturnType<typeof proneInclineRaiseGeometry>, barbell: boolean,
@@ -1051,16 +1137,7 @@ function layoutProneInclineImplement(
   } else {
     // A bell in each fist, its handle pointing forward, so it reads as a short
     // bar with a head at each end.
-    const bell = (wrist: readonly [number, number, number], color: ColorRole, opacity: number, out: FigurePrim[]): void => {
-      const a = raise.project([wrist[0] - 4.2, wrist[1], wrist[2]]);
-      const b = raise.project([wrist[0] + 4.2, wrist[1], wrist[2]]);
-      out.push({ kind: 'bone', x1: a[0], y1: a[1], x2: b[0], y2: b[1], w: 1.8, color, opacity });
-      for (const head of [a, b]) {
-        out.push({ kind: 'bone', x1: head[0], y1: head[1] - 2.2, x2: head[0], y2: head[1] + 2.2, w: 2.6, color, opacity, stroke: 'ink1', strokeWidth: 0.6 });
-      }
-    };
-    bell(raise.far.world.wrist, 'textLow', 0.9, far);
-    bell(raise.near.world.wrist, 'textHi', 1, near);
+    return layoutProjectedBells(raise);
   }
   return { far, near };
 }
@@ -1289,6 +1366,12 @@ export interface FigureJoints {
   b?: CanonicalPoint;
 }
 
+/**
+ * The joints the figure is actually drawn from. Starts from the authored pose,
+ * applies the far side's perspective offset, front-view shoulder and hip
+ * roots, any declared grip or turn, and then the movement-specific solved
+ * geometry. Whatever is measured from the result is what gets painted.
+ */
 export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): FigureJoints {
   const { view, body = CANONICAL_BODY_PARAMETERS } = opts;
   const front = view === 'front';
@@ -1302,6 +1385,7 @@ export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): F
   if (PRONE_INCLINE_RAISE_SLUGS.has(slug) && j.pi !== undefined) {
     return proneInclineRaiseGeometry(j.pi, body, slug === 'barbell-incline-shoulder-raise').joints;
   }
+  if (slug === SEATED_LATERAL_RAISE && j.la !== undefined) return seatedLateralRaiseGeometry(j.la, body).joints;
   if (FLYE_INCLINES[slug] !== undefined && j.fo !== undefined) {
     return flyeGeometry(j.fo, body, FLYE_INCLINES[slug]).joints;
   }
@@ -1588,6 +1672,10 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   if (proneRaise) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
   const proneImplement = proneRaise
     ? layoutProneInclineImplement(proneRaise, slug === 'barbell-incline-shoulder-raise') : null;
+  const seatedRaise = slug === SEATED_LATERAL_RAISE && pose.la !== undefined
+    ? seatedLateralRaiseGeometry(pose.la, body) : null;
+  if (seatedRaise) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
+  const seatedBells = seatedRaise ? layoutProjectedBells(seatedRaise) : null;
   const reverseLunge = slug === REVERSE_LUNGE && pose.rl !== undefined
     ? reverseLungeGeometry(pose.rl, body) : null;
   if (reverseLunge) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
@@ -1664,6 +1752,14 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     PERSPECTIVE_BARBELL_SLUGS.has(slug) ? 94.4 : 96.4));
   if (cableDraw) prims.push(...cableDraw.farHandle);
   if (fly) prims.push(...layoutFlyeDumbbell(fly, false));
+  if (seatedRaise && seatedBells) {
+    // Back to front: the far bell and the hand that holds it, which travel
+    // with the far arm behind the trunk, then the bench the athlete sits on.
+    prims.push(...seatedBells.far);
+    prims.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
+    for (const post of seatedRaise.posts) prims.push(bone(post[0], post[1], 1.6, 'textLow', 0.75));
+    prims.push(bone(seatedRaise.slab[0], seatedRaise.slab[1], 4, 'textMid', 1));
+  }
   if (proneRaise && proneImplement) {
     // Back to front: the far hand's implement, then the bench, which hides the
     // far arm where they cross, then the trunk lying on it.
@@ -1673,6 +1769,10 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     prims.push(bone(proneRaise.pad[0], proneRaise.pad[1], proneRaise.padHalf * 2, 'textMid', 1));
   }
   if (reverseLunge) prims.push(...layoutHammerDumbbell(j.wf, j.ef, false));
+  if (slug === 'front-cable-raise' && FRONT_RAISE[slug] !== undefined && pose.fr !== undefined) {
+    // The free hand travels with its arm, so the trunk hides it like the arm.
+    prims.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
+  }
 
   // The row's bench sits BETWEEN the far leg and the torso: the kneeling
   // athlete's standing leg passes behind the bench, so the pad occludes it.
@@ -1695,6 +1795,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   // front/side silhouette bars alone cannot span this projected girdle.
   if (fly) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
   if (proneRaise) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
+  if (seatedRaise) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
   // The far arm is behind the head-support bench; the near arm is in front.
   if (slug === HEAD_SUPPORTED_RAISE) prims.push(...apparatus(slug, front, body));
   // Overlapping transverse bars form one shoulder→waist→hip silhouette.
@@ -1812,6 +1913,10 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     prims.push(bone(centre, fly.pad[0], 1.6, 'textLow', 0.75), bone(a, b, 4.4, 'textMid', 1));
   }
   if (reverseLunge) prims.push(...layoutHammerDumbbell(j.wr, j.el));
+  if (seatedRaise && seatedBells) {
+    prims.push(...seatedBells.near);
+    prims.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: body.lw * 0.44, fill: 'textHi', opacity: 1 });
+  }
   if (proneRaise && proneImplement) {
     prims.push(...proneImplement.near);
     if (slug === 'dumbbell-incline-shoulder-raise') {
@@ -1830,6 +1935,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   return prims;
 }
 
+/** One foot as a capsule from its ankle: flat across in front view, toe-forward and aimed at the floor in side view. */
 function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front: boolean, opacity: number, ground = 96.4): BonePrim {
   if (front) {
     return {
@@ -1855,6 +1961,7 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   'dumbbell-lateral-raise': 'dumbbells',
   'lateral-raise-with-bands': 'band',
+  'seated-side-lateral-raise': 'dumbbells',
   'dumbbell-front-raise': 'dumbbells',
   'front-cable-raise': 'cable_machine',
   'inverted-row': 'barbell',
@@ -2411,6 +2518,7 @@ export function layoutHammerDumbbell(wrist: CanonicalPoint, elbow: CanonicalPoin
   return out;
 }
 
+/** The fixed equipment a movement is done on or against (benches, racks, pulleys), painted behind the figure. */
 function apparatus(slug: string, front: boolean, body: BodyParameters): FigurePrim[] {
   const frame = (x: number, y: number, w: number, h: number): RectPrim =>
     ({ kind: 'rect', x, y, w, h, rx: 1, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
@@ -2731,7 +2839,7 @@ function implement(
     out.push({ kind: 'bone', x1: cx - 4.5, y1: chin, x2: cx + 4.5, y2: chin,
       w: 1.2, color: 'textMid', opacity: 0.9 });
   }
-  if (equipment === 'dumbbells' && slug !== 'dumbbell-shrug' && slug !== 'preacher-hammer-dumbbell-curl' && slug !== HEAD_SUPPORTED_RAISE && FLYE_INCLINES[slug] === undefined && slug !== REVERSE_LUNGE && !PRONE_INCLINE_RAISE_SLUGS.has(slug)) {
+  if (equipment === 'dumbbells' && slug !== 'dumbbell-shrug' && slug !== 'preacher-hammer-dumbbell-curl' && slug !== HEAD_SUPPORTED_RAISE && FLYE_INCLINES[slug] === undefined && slug !== REVERSE_LUNGE && !PRONE_INCLINE_RAISE_SLUGS.has(slug) && slug !== SEATED_LATERAL_RAISE) {
     if (slug === 'hammer-curl') {
       // Neutral (thumbs-up) vertical orientation.
       if (j.wr) out.push({ kind: 'rect', x: j.wr[0] - 2.3, y: j.wr[1] - 6.5, w: 4.6, h: 13, rx: 1.6, fill: 'textHi', opacity: 1 });
@@ -2958,13 +3066,13 @@ function implement(
   }
   if (slug === 'front-cable-raise' && j.wr && j.wf) {
     // One handle on a low pulley BEHIND the athlete. The working (near) hand
-    // holds it; the free hand hangs empty. The pulley never moves, so the
-    // cable swings up and lengthens as the arm rises.
+    // holds it; the free hand hangs empty and is painted with the far arm,
+    // behind the trunk. The pulley never moves, so the cable swings up and
+    // lengthens as the arm rises.
     const pulley = FRONT_CABLE_RAISE_PULLEY;
     out.push({ kind: 'bone', x1: pulley[0], y1: pulley[1], x2: pulley[0], y2: GROUND_LINE, w: 1.6, color: 'textLow', opacity: 0.75 });
     out.push({ kind: 'circle', cx: pulley[0], cy: pulley[1], r: 2.2, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
     out.push({ kind: 'bone', x1: pulley[0], y1: pulley[1], x2: j.wr[0], y2: j.wr[1], w: 1.4, color: 'textMid', opacity: 1 });
-    out.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
     out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: 2.6, fill: 'textHi', opacity: 1 });
   }
   if (slug === 'calf-raises-with-bands' && j.wr && j.an) {

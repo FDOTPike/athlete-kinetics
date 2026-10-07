@@ -17,6 +17,7 @@ const file = 'apps/mobile/src/components/movementPreview/movementPreviewManifest
 const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
 const catalogue = JSON.parse(fs.readFileSync('docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json', 'utf8'));
 
+/** Two decimals, as every stored joint in the manifest is. */
 const round = (p) => [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100];
 
 // The standing front-view figure every coronal movement in the manifest uses.
@@ -29,6 +30,7 @@ const half = layout.CANONICAL_BODY_PARAMETERS.sw * 0.92;
 const NEAR_SHOULDER = [STANDING_FRONT.nk[0] - half, STANDING_FRONT.nk[1]];
 const FAR_SHOULDER = [STANDING_FRONT.nk[0] + half, STANDING_FRONT.nk[1]];
 
+/** The stored joints for one keyframe: the standing body, the solved arms, and the angle that drives them. */
 function pose(slug, la) {
   const arms = layout.lateralRaiseArms(la, layout.LATERAL_RAISE_ELBOW_DEG[slug], NEAR_SHOULDER, FAR_SHOULDER);
   return {
