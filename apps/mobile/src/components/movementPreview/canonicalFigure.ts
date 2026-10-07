@@ -1233,7 +1233,14 @@ export interface ChainLine {
 
 /** A chain movement: its poses, how it is seen, what it holds and the equipment around it. */
 export interface ChainMovement {
-  root: 'hip' | 'neck';
+  /** The joint a pose places directly. 'ankle' is the near ankle: the body is built up from a planted foot. */
+  root: 'hip' | 'neck' | 'ankle';
+  /**
+   * The poses form a loop: after the last comes the first again, and the phase
+   * may run on past it. Between whole phases the figure moves at an even pace,
+   * so a stride does not pulse.
+   */
+  cycle?: boolean;
   /** Side view by default. 'oblique' turns the figure by `yawDeg`; 'front' faces it. */
   view?: 'side' | 'oblique' | 'front';
   yawDeg?: number;
@@ -1498,6 +1505,58 @@ export const RUSSIAN_TWIST_BALL = { at: [6, 10.5] as const, r: 10.5 };
 export const SIDE_BEND_PULLEY: readonly [number, number, number] = [0, 88, 40];
 /** How far the side bend bends, in degrees. */
 export const SIDE_BEND_DEG = 30;
+
+/**
+ * Lying face down with the legs long: the thigh's direction that rests the
+ * knee on the floor, and the shin's that rests the ankle there.
+ */
+const PRONE_KNEE_HEIGHT = CHAIN_THIGH_HALF + 0.02;
+const PRONE_THIGH = 180 + Math.asin((CHAIN_LYING_HEIGHT - PRONE_KNEE_HEIGHT) / CHAIN_THIGH) * 180 / Math.PI;
+const PRONE_SHIN = 180 + Math.asin((PRONE_KNEE_HEIGHT - CHAIN_ANKLE_HEIGHT - 0.02) / CHAIN_SHIN) * 180 / Math.PI;
+/** The arm's direction that rests a hand on the floor ahead of a prone figure. */
+const PRONE_ARM = -Math.asin((CHAIN_LYING_HEIGHT - 2.2) / (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM)) * 180 / Math.PI;
+/** How far the Floor Back Extension arches, and how far the legs lift, in degrees. */
+export const BACK_EXTENSION_ARCH = 18;
+const BACK_EXTENSION_LEG_LIFT = 9;
+/** The Bench Dip: the height of the bench top, where its front edge is, and where the hands grip it. */
+export const BENCH_DIP_BENCH = { top: 21, edge: 38 } as const;
+const BENCH_DIP_GRIP: readonly [number, number] = [BENCH_DIP_BENCH.edge - 2, BENCH_DIP_BENCH.top + 2.2];
+const BENCH_DIP_FEET: readonly [number, number] = [73, CHAIN_ANKLE_HEIGHT];
+/** The Decline Push-Up: the bench the feet are on, the ankle above it, and the hands on the floor. */
+export const DECLINE_PUSH_UP_BENCH_TOP = 21;
+const DECLINE_PUSH_UP_ANKLE: readonly [number, number] = [14, DECLINE_PUSH_UP_BENCH_TOP + CANONICAL_BODY_PARAMETERS.lw * 0.82 / 2 + 5.4 * Math.sin(chainRad(70))];
+const DECLINE_PUSH_UP_HANDS: readonly [number, number] = [82.5, 2.2];
+/** One body line from the ankles to the head, at an angle to the floor. */
+function plankAt(deg: number) {
+  return { at: DECLINE_PUSH_UP_ANKLE, trunk: deg, head: deg + 6, thigh: deg + 180, shin: deg + 180, foot: -70, upperArm: -90, forearm: -90, wrist: DECLINE_PUSH_UP_HANDS } as const;
+}
+/**
+ * One leg through a running stride, as six positions: landing beneath the
+ * body, mid-stance, toe-off, heel coming up behind, knee driving through, and
+ * reaching down to land again. The other leg is three positions ahead.
+ */
+const RUN_LEG = [
+  { thigh: -75, shin: -100, foot: 0 },
+  { thigh: -92, shin: -98, foot: 0 },
+  { thigh: -112, shin: -118, foot: -60 },
+  { thigh: -100, shin: -175, foot: -150 },
+  { thigh: -55, shin: -130, foot: -40 },
+  { thigh: -62, shin: -95, foot: -5 },
+] as const;
+/** The arm on the same side as that leg, which swings opposite it: furthest back as the knee drives through, furthest forward at toe-off. */
+const RUN_ARM = [-92, -70, -60, -82, -108, -112] as const;
+/** The hip's height at each of the six positions: lowest on landing, highest in flight. */
+const RUN_HIP = [46.1, 47.1, 48.1, 46.1, 47.1, 48.1] as const;
+const RUN_POSES: ChainPose[] = RUN_LEG.map((leg, k): ChainPose => {
+  const other = RUN_LEG[(k + 3) % 6];
+  return {
+    at: [50, RUN_HIP[k]], trunk: 84, head: 88,
+    thigh: leg.thigh, shin: leg.shin, foot: leg.foot,
+    farThigh: other.thigh, farShin: other.shin, farFoot: other.foot,
+    upperArm: RUN_ARM[k], forearm: RUN_ARM[k] + 80,
+    farUpperArm: RUN_ARM[(k + 3) % 6], farForearm: RUN_ARM[(k + 3) % 6] + 80,
+  };
+});
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -1879,6 +1938,50 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // Floor Back Extension: face down, arms reaching ahead. The spine arches a
+  // little so the chest and arms come a few inches off the floor, and the long
+  // legs lift a few inches from the hips; the pelvis stays down.
+  'floor-back-extension': {
+    root: 'hip',
+    feet: 'free',
+    poses: [
+      { at: [50, CHAIN_LYING_HEIGHT], trunk: 0, curl: 0, head: 0, thigh: PRONE_THIGH, shin: PRONE_SHIN, foot: 180, upperArm: PRONE_ARM, forearm: PRONE_ARM },
+      {
+        at: [50, CHAIN_LYING_HEIGHT], trunk: 0, curl: -BACK_EXTENSION_ARCH, head: 10,
+        thigh: PRONE_THIGH - BACK_EXTENSION_LEG_LIFT, shin: PRONE_SHIN - 2, foot: 180, upperArm: -2, forearm: -2,
+      },
+    ],
+  },
+  // Bench Dip: hands on the edge of a bench behind, knees bent, feet flat. The
+  // hips travel straight down and up just in front of the bench while the
+  // elbows bend straight back.
+  'bench-dip': {
+    root: 'hip',
+    elbowPole: 180,
+    kneePole: 90,
+    equipment: chainFlatBench(BENCH_DIP_BENCH.edge - 28, BENCH_DIP_BENCH.edge, BENCH_DIP_BENCH.top),
+    poses: [
+      { at: [BENCH_DIP_BENCH.edge + 6, 23.5], trunk: 99, thigh: 30, shin: -60, ankle: BENCH_DIP_FEET, upperArm: -90, forearm: -90, wrist: BENCH_DIP_GRIP },
+      { at: [BENCH_DIP_BENCH.edge + 6.3, 16.5], trunk: 99, thigh: 30, shin: -60, ankle: BENCH_DIP_FEET, upperArm: -90, forearm: -90, wrist: BENCH_DIP_GRIP },
+    ],
+  },
+  // Decline Push-Up: feet up on a bench, hands on the floor. The body is one
+  // line that pivots about the feet as the elbows bend.
+  'decline-push-up': {
+    root: 'ankle',
+    feet: 'free',
+    elbowPole: 150,
+    equipment: chainFlatBench(2, 25, DECLINE_PUSH_UP_BENCH_TOP),
+    poses: [plankAt(-1.2), plankAt(-14)],
+  },
+  // Road Run: an in-place stride. Six positions per leg, the two legs half a
+  // stride apart, at an even pace.
+  'road-run': {
+    root: 'hip',
+    feet: 'free',
+    cycle: true,
+    poses: RUN_POSES,
+  },
   // chain movements are added above this line
 };
 
@@ -1893,12 +1996,23 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   if (movement === undefined) throw new Error(`canonicalFigure: no chain movement for '${slug}'`);
   const view = movement.view ?? 'side';
   const front = view === 'front';
-  const last = movement.poses.length - 1;
-  const t = Math.max(0, Math.min(last, ph));
-  const index = Math.min(Math.max(0, last - 1), Math.floor(t));
+  const count = movement.poses.length;
+  const last = count - 1;
+  let t = Math.max(0, Math.min(last, ph));
+  let index = Math.min(Math.max(0, last - 1), Math.floor(t));
+  let u = last === 0 ? 0 : t - index;
+  let next = Math.min(last, index + 1);
+  if (movement.cycle === true) {
+    // Each gap between keyframes is eased in and out; undoing that ease here
+    // leaves the phase running evenly through the loop.
+    t = ((ph % count) + count) % count;
+    index = Math.floor(t);
+    const eased = t - index;
+    u = eased < 0.5 ? Math.sqrt(eased / 2) : 1 - Math.sqrt((1 - eased) / 2);
+    next = (index + 1) % count;
+  }
   const a = movement.poses[index];
-  const b = movement.poses[Math.min(last, index + 1)];
-  const u = last === 0 ? 0 : t - index;
+  const b = movement.poses[next];
   const num = (x: number | undefined, y: number | undefined): number => (x ?? 0) + ((y ?? 0) - (x ?? 0)) * u;
   const dir = (x: ChainDir, y: ChainDir): readonly [number, number] => {
     const p = chainPair(x), q = chainPair(y);
@@ -1918,7 +2032,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const at = point(a.at, b.at, 'at') as ChainPoint;
   const curl = num(a.curl, b.curl);
   const sideCurl = num(a.sideCurl, b.sideCurl);
-  const twist = num(a.twist, b.twist) + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, t)) : 1);
+  const twist = num(a.twist, b.twist) + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1);
   const given = dir(a.trunk, b.trunk);
   const thigh = dir(a.thigh, b.thigh);
   const shin = dir(a.shin, b.shin);
@@ -1957,7 +2071,12 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     spineWorld.push(chainAdd(spineWorld[i], tangent((i + 0.5) / CHAIN_SPINE_STEPS), stepLength));
   }
   const top = spineWorld[CHAIN_SPINE_STEPS];
-  const shift: ChainVec = movement.root === 'neck' ? [at[0] - top[0], at[1] - top[1], 0] : [at[0], at[1], 0];
+  // From a planted ankle the hip is back up the near leg: shin, then thigh.
+  const shinUp = chainUnit(shin, 1), thighUp = chainUnit(thigh, 1);
+  const shift: ChainVec = movement.root === 'neck' ? [at[0] - top[0], at[1] - top[1], 0]
+    : movement.root === 'ankle'
+      ? [at[0] - (shinUp[0] * CHAIN_SHIN + thighUp[0] * CHAIN_THIGH), at[1] - (shinUp[1] * CHAIN_SHIN + thighUp[1] * CHAIN_THIGH), 0]
+      : [at[0], at[1], 0];
   for (let i = 0; i <= CHAIN_SPINE_STEPS; i++) spineWorld[i] = chainAdd(spineWorld[i], shift, 1);
   const hip = spineWorld[0];
   const neck = spineWorld[CHAIN_SPINE_STEPS];
@@ -3070,6 +3189,10 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'floor-back-extension': 'none',
+  'bench-dip': 'none',
+  'decline-push-up': 'none',
+  'road-run': 'none',
   'standing-rope-crunch': 'cable_machine',
   'kneeling-cable-crunch-with-alternating-oblique-twists': 'cable_machine',
   'decline-oblique-crunch': 'none',

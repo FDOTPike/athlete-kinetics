@@ -46,7 +46,17 @@ describe.each(entries.map((e) => [e.name, e]))('%s', (_name, entry) => {
     expect(entry.status).toBe('pending');
     expect(entry.view).toBe(view);
     expect(entry.frames.length).toBeGreaterThanOrEqual(5);
-    expect(entry.frames[0].joints).toEqual(entry.frames.at(-1).joints);
+    // The cycle ends where it starts. A movement whose poses form a loop gets
+    // there by running on to its first pose again, so its phase differs there
+    // while every drawn joint is the same.
+    if (movement.cycle === true) {
+      const first = at(0).joints, lastDrawn = at(total).joints;
+      for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af']) {
+        expect(distance(first[key], lastDrawn[key])).toBeLessThan(1e-9);
+      }
+    } else {
+      expect(entry.frames[0].joints).toEqual(entry.frames.at(-1).joints);
+    }
     for (const frame of entry.frames) expect(typeof frame.joints.ph).toBe('number');
   });
 
@@ -124,7 +134,8 @@ describe.each(entries.map((e) => [e.name, e]))('%s', (_name, entry) => {
     for (const t of ticks.slice(1)) {
       const now = at(t).joints;
       for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af']) {
-        expect(distance(now[key], before[key])).toBeLessThanOrEqual(4);
+        // A running stride moves a foot much further in one tick than any lift does.
+        expect(distance(now[key], before[key])).toBeLessThanOrEqual(movement.cycle === true ? 14 : 4);
       }
       before = now;
     }

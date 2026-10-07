@@ -14,10 +14,12 @@ export interface PreviewFamilyFile {
 }
 
 export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> = {
+  'back-extension__prone': () => require('./families/back-extension__prone.json') as PreviewFamilyFile,
   'calf-raise__seated': () => require('./families/calf-raise__seated.json') as PreviewFamilyFile,
   'calf-raise__standing': () => require('./families/calf-raise__standing.json') as PreviewFamilyFile,
   'carry__standing': () => require('./families/carry__standing.json') as PreviewFamilyFile,
   'dead-bug__supine': () => require('./families/dead-bug__supine.json') as PreviewFamilyFile,
+  'dip__seated-supported': () => require('./families/dip__seated-supported.json') as PreviewFamilyFile,
   'elbow-extension__bodyweight-supported': () => require('./families/elbow-extension__bodyweight-supported.json') as PreviewFamilyFile,
   'elbow-extension__decline': () => require('./families/elbow-extension__decline.json') as PreviewFamilyFile,
   'elbow-extension__incline': () => require('./families/elbow-extension__incline.json') as PreviewFamilyFile,
@@ -57,6 +59,7 @@ export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> =
   'lunge__traveling': () => require('./families/lunge__traveling.json') as PreviewFamilyFile,
   'pallof__standing': () => require('./families/pallof__standing.json') as PreviewFamilyFile,
   'plank__prone': () => require('./families/plank__prone.json') as PreviewFamilyFile,
+  'push-up__decline': () => require('./families/push-up__decline.json') as PreviewFamilyFile,
   'push-up__floor': () => require('./families/push-up__floor.json') as PreviewFamilyFile,
   'push-up__incline': () => require('./families/push-up__incline.json') as PreviewFamilyFile,
   'rear-delt__bent-over': () => require('./families/rear-delt__bent-over.json') as PreviewFamilyFile,
