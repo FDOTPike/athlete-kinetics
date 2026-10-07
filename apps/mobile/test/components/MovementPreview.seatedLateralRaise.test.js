@@ -61,6 +61,19 @@ test('"Sit at the end of a flat bench with the feet firmly on the floor"', () =>
     expect(distance(knee, ankle)).toBeCloseTo(22.25, 9);
     // The foot is flat on the floor: the ankle sits half a foot-thickness above it.
     expect(leg.projected.ankle[1] + (BODY.lw * 0.9) / 2).toBeCloseTo(96.9, 9);
+    expect(leg.world.toe[1]).toBeCloseTo(leg.world.ankle[1], 12); // level, pointing forward
+    expect(leg.world.toe[0] - leg.world.ankle[0]).toBeCloseTo(5.4, 12);
+  }
+  // And it is PAINTED flat: each foot is a level capsule whose sole is on the
+  // floor line and never below it.
+  const { prims } = figureAt(0);
+  const feet = prims.filter((p) => p.kind === 'bone' && Math.abs(p.w - model.footWidth) < 1e-12
+    && [model.nearLeg, model.farLeg].some((leg) => Math.abs(p.x1 - leg.projected.ankle[0]) < 1e-9 && Math.abs(p.y1 - leg.projected.ankle[1]) < 1e-9));
+  expect(feet).toHaveLength(2);
+  for (const foot of feet) {
+    expect(foot.y2).toBeCloseTo(foot.y1, 12);
+    expect(foot.x2).toBeGreaterThan(foot.x1);
+    expect(foot.y1 + foot.w / 2).toBeCloseTo(96.9, 9);
   }
   // The trunk is upright over the hips.
   expect(model.world.neck[0]).toBeCloseTo(model.world.hip[0], 12);
