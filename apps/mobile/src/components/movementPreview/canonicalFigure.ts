@@ -105,6 +105,8 @@ export interface CanonicalPose {
   pi?: number;
   /** Chain movement phase: 0 is the movement's first pose, 1 its second, and so on. */
   ph?: number;
+  /** Chain movement turn: degrees the shoulders are turned about the spine, on top of the pose's own twist. */
+  tw?: number;
 }
 
 export type ColorRole = 'textHi' | 'textLow' | 'textMid' | 'line' | 'ink1';
@@ -158,7 +160,7 @@ export function lerpJoints(a: CanonicalPose, b: CanonicalPose, u: number): Canon
   // motion frames would not match their own stills.
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof CanonicalPose>;
   for (const key of keys) {
-    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la' || key === 'fr' || key === 'pi' || key === 'ph') {
+    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la' || key === 'fr' || key === 'pi' || key === 'ph' || key === 'tw') {
       out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * u;
       continue;
     }
@@ -1245,8 +1247,11 @@ export interface ChainMovement {
   /** The way a solved elbow or knee points. */
   elbowPole?: ChainDir;
   kneePole?: ChainDir;
-  /** 'flat': level and on the floor. 'free': along the pose's foot direction. */
-  feet?: 'flat' | 'free' | 'none';
+  /**
+   * 'flat': level and on the floor. 'free': along the pose's foot direction.
+   * 'front': standing, seen from the front, drawn the way every front view draws a foot.
+   */
+  feet?: 'flat' | 'free' | 'front' | 'none';
   /** What the hands hold. */
   implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope';
   /** Which way the palm of a bent hand faces: what it holds sits on that side of the knuckles. */
@@ -1260,6 +1265,11 @@ export interface ChainMovement {
    * top of the spine (hands that stay on the chest or by the head as the trunk curls).
    */
   armsFollowTrunk?: boolean;
+  /**
+   * The keyframe's turn (`tw`) grows with the phase: none at the first pose,
+   * all of it at the second. For a rep that turns as it goes down.
+   */
+  turnWithPhase?: boolean;
   /** Paint the far arm over the trunk (hands in front of the body in a front view). */
   farArmOver?: boolean;
   /** Paint the near arm over the head (an arm held beside the head). */
@@ -1463,6 +1473,31 @@ const DECLINE_REVERSE_CRUNCH_GRIP: readonly [number, number] = [
   DECLINE_REVERSE_CRUNCH_NECK[0] + 20 * Math.cos(chainRad(180 - DECLINE_REVERSE_CRUNCH_DEG)) + CHAIN_BACK_HALF * Math.cos(chainRad(270 - DECLINE_REVERSE_CRUNCH_DEG)),
   DECLINE_REVERSE_CRUNCH_NECK[1] + 20 * Math.sin(chainRad(180 - DECLINE_REVERSE_CRUNCH_DEG)) + CHAIN_BACK_HALF * Math.sin(chainRad(270 - DECLINE_REVERSE_CRUNCH_DEG)) + 2,
 ];
+
+/** The height of a knee resting on the floor: half the drawn depth of the thigh that ends there. */
+const CHAIN_KNEELING_KNEE = CHAIN_THIGH_HALF + 0.01;
+/** The height of an ankle, and of the hip above it, for a figure standing in a front view. */
+export const CHAIN_FRONT_ANKLE = 2.9;
+export const CHAIN_FRONT_HIP = CHAIN_FRONT_ANKLE + CHAIN_THIGH + CHAIN_SHIN;
+/** Hands held beside the ears with the elbows forward, given as if the trunk were upright. */
+const HANDS_BY_EARS = { upperArm: 35, forearm: 168 } as const;
+/** The high pulley behind the Standing Rope Crunch, and the one the Kneeling Cable Crunch faces. */
+export const STANDING_ROPE_CRUNCH_PULLEY: readonly [number, number] = [10, 88];
+export const KNEELING_CRUNCH_PULLEY: readonly [number, number] = [70, 96];
+/** How far the Kneeling Cable Crunch turns on its oblique repetitions, in degrees. */
+export const KNEELING_CRUNCH_TURN = 35;
+/** The Decline Oblique Crunch sits on the decline bench the triceps extensions lie on. */
+const DECLINE_OBLIQUE_LEGS = { at: DECLINE_EXTENSION_HIP, thigh: DECLINE_EXTENSION_DEG - 8, shin: -80, foot: 10 } as const;
+/** The mid-height pulley beside the Cable Russian Twists: across the body, on the far side. */
+export const RUSSIAN_TWIST_PULLEY: readonly [number, number, number] = [2, 46, -50];
+/** Both hands on one handle above the chest: each straight arm leans in from its shoulder to the midline. */
+const RUSSIAN_TWIST_ARM_IN = -Math.asin(CANONICAL_BODY_PARAMETERS.sw * 0.92 / (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM)) * 180 / Math.PI;
+/** The stability ball under the upper back. */
+export const RUSSIAN_TWIST_BALL = { at: [6, 10.5] as const, r: 10.5 };
+/** The high pulley beside the cable side bend: across the body, on the near side. */
+export const SIDE_BEND_PULLEY: readonly [number, number, number] = [0, 88, 40];
+/** How far the side bend bends, in degrees. */
+export const SIDE_BEND_DEG = 30;
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -1737,6 +1772,113 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { at: DECLINE_REVERSE_CRUNCH_NECK, trunk: 180 - DECLINE_REVERSE_CRUNCH_DEG, curl: 40, thigh: 135, shin: 50, foot: 135, upperArm: 150, forearm: 175, wrist: DECLINE_REVERSE_CRUNCH_GRIP },
     ],
   },
+  // Standing Rope Crunch: back to a high pulley, rope ends over the shoulders
+  // at the upper chest. The hips do not move; the spine curls the trunk down.
+  'standing-rope-crunch': {
+    root: 'hip',
+    implement: 'rope',
+    armsFollowTrunk: true,
+    lines: [{ from: STANDING_ROPE_CRUNCH_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [STANDING_ROPE_CRUNCH_PULLEY[0], 0.5], b: [STANDING_ROPE_CRUNCH_PULLEY[0], 94] },
+      { kind: 'pulley', at: STANDING_ROPE_CRUNCH_PULLEY },
+    ],
+    poses: [
+      { at: [50, CHAIN_STANDING_HIP], trunk: 90, curl: 0, thigh: -90, shin: -90, upperArm: -80, forearm: 78 },
+      { at: [50, CHAIN_STANDING_HIP], trunk: 90, curl: 70, thigh: -90, shin: -90, upperArm: -80, forearm: 78 },
+    ],
+  },
+  // Kneeling Cable Crunch With Alternating Oblique Twists: kneeling facing a
+  // high pulley, leaning toward it, rope ends beside the ears. The pulley is
+  // high and only a short step in front, so the cable only lengthens as the
+  // hands come down. The trunk curls down until the
+  // elbows reach the knees; on the oblique repetitions the shoulders turn as
+  // it goes down, so one elbow travels toward the opposite knee.
+  'kneeling-cable-crunch-with-alternating-oblique-twists': {
+    root: 'hip',
+    feet: 'free',
+    implement: 'rope',
+    armsFollowTrunk: true,
+    turnWithPhase: true,
+    lines: [{ from: KNEELING_CRUNCH_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [KNEELING_CRUNCH_PULLEY[0], 0.5], b: [KNEELING_CRUNCH_PULLEY[0], 99] },
+      { kind: 'pulley', at: KNEELING_CRUNCH_PULLEY },
+    ],
+    poses: [
+      { at: [40, CHAIN_KNEELING_KNEE + CHAIN_THIGH * Math.sin(chainRad(50))], trunk: 62, curl: 0, thigh: -50, shin: 180, foot: 180, ...HANDS_BY_EARS },
+      { at: [40, CHAIN_KNEELING_KNEE + CHAIN_THIGH * Math.sin(chainRad(50))], trunk: 45, curl: 95, thigh: -50, shin: 180, foot: 180, ...HANDS_BY_EARS },
+    ],
+  },
+  // Decline Oblique Crunch: legs secured on a decline bench, torso partway
+  // down, one hand beside the head and the other on the thigh. The trunk curls
+  // up while it turns, so the raised elbow travels toward the opposite knee.
+  'decline-oblique-crunch': {
+    root: 'hip',
+    feet: 'free',
+    nearArmOverHead: true,
+    equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
+    poses: [
+      { ...DECLINE_OBLIQUE_LEGS, trunk: 142, curl: 10, twist: 0, upperArm: 77, forearm: 210, farUpperArm: -30, farForearm: -20 },
+      { ...DECLINE_OBLIQUE_LEGS, trunk: 112, curl: 45, twist: 32, upperArm: 12, forearm: 145, farUpperArm: -70, farForearm: -40 },
+    ],
+  },
+  // Cable Russian Twists: upper back on a stability ball, hips raised, both
+  // hands on one handle above the chest, side-on to a mid-height pulley. The
+  // shoulders roll a quarter turn away from the pulley; the straight arms go
+  // with them, and the hips stay up.
+  'cable-russian-twists': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: -50,
+    originX: 46,
+    implement: 'handle',
+    lines: [{ from: RUSSIAN_TWIST_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [RUSSIAN_TWIST_PULLEY[0], 0.5, RUSSIAN_TWIST_PULLEY[2]], b: [RUSSIAN_TWIST_PULLEY[0], 62, RUSSIAN_TWIST_PULLEY[2]] },
+      { kind: 'pulley', at: RUSSIAN_TWIST_PULLEY },
+      { kind: 'ball', at: RUSSIAN_TWIST_BALL.at, r: RUSSIAN_TWIST_BALL.r },
+    ],
+    poses: [
+      {
+        at: [24, CHAIN_SEATED_HIP], trunk: 172, head: 180, thigh: [0, 12], shin: -90, twist: 0,
+        upperArm: [90, RUSSIAN_TWIST_ARM_IN], forearm: [90, RUSSIAN_TWIST_ARM_IN],
+        farUpperArm: [90, RUSSIAN_TWIST_ARM_IN], farForearm: [90, RUSSIAN_TWIST_ARM_IN],
+      },
+      {
+        at: [24, CHAIN_SEATED_HIP], trunk: 172, head: 180, thigh: [0, 12], shin: -90, twist: -90,
+        upperArm: [90, RUSSIAN_TWIST_ARM_IN + 90], forearm: [90, RUSSIAN_TWIST_ARM_IN + 90],
+        farUpperArm: [90, RUSSIAN_TWIST_ARM_IN - 90], farForearm: [90, RUSSIAN_TWIST_ARM_IN - 90],
+      },
+    ],
+  },
+  // One-Arm High-Pulley Cable Side Bends: seen from the front, side-on to a
+  // high pulley. The working elbow is at the side with the handle by the
+  // shoulder, the free hand on the hip; the trunk bends toward the cable and
+  // the arms go with it.
+  'one-arm-high-pulley-cable-side-bends': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'handle',
+    farArmOver: true,
+    lines: [{ from: SIDE_BEND_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, SIDE_BEND_PULLEY[2]], b: [0, 94, SIDE_BEND_PULLEY[2]] },
+      { kind: 'pulley', at: SIDE_BEND_PULLEY },
+    ],
+    poses: [
+      {
+        at: [0, CHAIN_FRONT_HIP], trunk: 90, sideCurl: 0, thigh: -90, shin: -90,
+        upperArm: [-90, 5], forearm: [90, 15], farUpperArm: [-90, 28], farForearm: [-90, -35],
+      },
+      {
+        at: [0, CHAIN_FRONT_HIP], trunk: 90, sideCurl: SIDE_BEND_DEG, thigh: -90, shin: -90,
+        upperArm: [-90, 5 - SIDE_BEND_DEG], forearm: [90, 15 + SIDE_BEND_DEG],
+        farUpperArm: [-90, 28 + SIDE_BEND_DEG], farForearm: [-90, -35 + SIDE_BEND_DEG],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -1746,7 +1888,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
  * Returns the 3D model, the joints it is drawn from, the spine's drawn path,
  * and where the hands grip and the toes are.
  */
-export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
+export function chainGeometry(slug: string, ph: number, body: BodyParameters, turn = 0) {
   const movement = CHAIN_MOVEMENTS[slug];
   if (movement === undefined) throw new Error(`canonicalFigure: no chain movement for '${slug}'`);
   const view = movement.view ?? 'side';
@@ -1776,7 +1918,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
   const at = point(a.at, b.at, 'at') as ChainPoint;
   const curl = num(a.curl, b.curl);
   const sideCurl = num(a.sideCurl, b.sideCurl);
-  const twist = num(a.twist, b.twist);
+  const twist = num(a.twist, b.twist) + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, t)) : 1);
   const given = dir(a.trunk, b.trunk);
   const thigh = dir(a.thigh, b.thigh);
   const shin = dir(a.shin, b.shin);
@@ -1941,7 +2083,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
 export function trunkCentreline(pose: CanonicalPose, opts: FigureOptions): CanonicalPoint[] {
   const slug = slugOf(opts.assetKey);
   if (CHAIN_MOVEMENTS[slug] !== undefined && pose.ph !== undefined) {
-    const figure = chainGeometry(slug, pose.ph, opts.body ?? CANONICAL_BODY_PARAMETERS);
+    const figure = chainGeometry(slug, pose.ph, opts.body ?? CANONICAL_BODY_PARAMETERS, pose.tw ?? 0);
     if (figure.curled) return figure.spine;
   }
   const joints = resolveFigureJoints(pose, opts);
@@ -2304,7 +2446,7 @@ export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): F
     return proneInclineRaiseGeometry(j.pi, body, slug === 'barbell-incline-shoulder-raise').joints;
   }
   if (slug === SEATED_LATERAL_RAISE && j.la !== undefined) return seatedLateralRaiseGeometry(j.la, body).joints;
-  if (CHAIN_MOVEMENTS[slug] !== undefined && j.ph !== undefined) return chainGeometry(slug, j.ph, body).joints;
+  if (CHAIN_MOVEMENTS[slug] !== undefined && j.ph !== undefined) return chainGeometry(slug, j.ph, body, j.tw ?? 0).joints;
   if (FLYE_INCLINES[slug] !== undefined && j.fo !== undefined) {
     return flyeGeometry(j.fo, body, FLYE_INCLINES[slug]).joints;
   }
@@ -2595,7 +2737,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     ? seatedLateralRaiseGeometry(pose.la, body) : null;
   if (seatedRaise) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
   const seatedBells = seatedRaise ? layoutProjectedBells(seatedRaise) : null;
-  const chain = CHAIN_MOVEMENTS[slug] !== undefined && pose.ph !== undefined ? chainGeometry(slug, pose.ph, body) : null;
+  const chain = CHAIN_MOVEMENTS[slug] !== undefined && pose.ph !== undefined ? chainGeometry(slug, pose.ph, body, pose.tw ?? 0) : null;
   if (chain) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
   const reverseLunge = slug === REVERSE_LUNGE && pose.rl !== undefined
     ? reverseLungeGeometry(pose.rl, body) : null;
@@ -2928,6 +3070,11 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'standing-rope-crunch': 'cable_machine',
+  'kneeling-cable-crunch-with-alternating-oblique-twists': 'cable_machine',
+  'decline-oblique-crunch': 'none',
+  'cable-russian-twists': 'cable_machine',
+  'one-arm-high-pulley-cable-side-bends': 'cable_machine',
   'sit-up': 'none',
   'tuck-crunch': 'none',
   'reverse-crunch': 'none',
