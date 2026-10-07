@@ -1072,7 +1072,12 @@ export function seatedLateralRaiseGeometry(abductionDeg: number, body: BodyParam
     const kneeX = Math.sqrt(THIGH * THIGH - 2.2 * 2.2);
     const knee: Point3 = [kneeX, hipY, kneeZ];
     const ankle: Point3 = [kneeX, ankleY, kneeZ];
-    return { world: { root, knee, ankle }, projected: { root: project(root), knee: project(knee), ankle: project(ankle) } };
+    // The foot lies flat, pointing forward from the ankle, at the ankle's height.
+    const toe: Point3 = [kneeX + 5.4, ankleY, kneeZ];
+    return {
+      world: { root, knee, ankle, toe },
+      projected: { root: project(root), knee: project(knee), ankle: project(ankle), toe: project(toe) },
+    };
   };
   const nearLeg = leg(1), farLeg = leg(-1);
   // The bench top is under the thighs; the athlete is at its front end.
@@ -1089,7 +1094,10 @@ export function seatedLateralRaiseGeometry(abductionDeg: number, body: BodyParam
     nLeg: nearLeg.projected.root, fLeg: farLeg.projected.root,
     kn: nearLeg.projected.knee, an: nearLeg.projected.ankle, kf: farLeg.projected.knee, af: farLeg.projected.ankle,
   };
-  return { near, far, nearLeg, farLeg, joints, slab, posts, project, seatY, world: { hip, neck, head }, yawDeg: 35 };
+  // The ankle sits half a foot-thickness above the floor, so a level foot of
+  // this width has its sole exactly on it.
+  const footWidth = body.lw * 0.9;
+  return { near, far, nearLeg, farLeg, joints, slab, posts, project, seatY, footWidth, world: { hip, neck, head }, yawDeg: 35 };
 }
 
 /** A dumbbell in each fist with its handle pointing forward, drawn through the figure's own projection. */
@@ -1748,6 +1756,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   prims.push(bone(j.kf, j.af, body.lw * 0.9, farColor, farOpacity));
   if (reverseLunge) prims.push(bone(reverseLunge.rearFoot[0], reverseLunge.rearFoot[1], reverseLunge.footWidth, farColor, farOpacity));
   else if (fly && fly.inclineDeg < 0) prims.push(bone(j.af, fly.farLeg.projected.toe, body.lw * 0.82, farColor, farOpacity));
+  else if (seatedRaise) prims.push(bone(j.af, seatedRaise.farLeg.projected.toe, seatedRaise.footWidth, farColor, farOpacity));
   else if (!NOFEET.has(slug)) prims.push(foot(j.af, farColor, body, front, farOpacity,
     PERSPECTIVE_BARBELL_SLUGS.has(slug) ? 94.4 : 96.4));
   if (cableDraw) prims.push(...cableDraw.farHandle);
@@ -1845,6 +1854,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   prims.push(bone(j.kn, j.an, body.lw * 0.9, 'textHi', 1));
   if (reverseLunge) prims.push(bone(reverseLunge.frontFoot[0], reverseLunge.frontFoot[1], reverseLunge.footWidth, 'textHi', 1));
   else if (fly && fly.inclineDeg < 0) prims.push(bone(j.an, fly.nearLeg.projected.toe, body.lw * 0.82, 'textHi', 1));
+  else if (seatedRaise) prims.push(bone(j.an, seatedRaise.nearLeg.projected.toe, seatedRaise.footWidth, 'textHi', 1));
   else if (!NOFEET.has(slug)) prims.push(foot(j.an, 'textHi', body, front, 1));
   const nearUpperArm = bone(nArm, j.el, body.lw * 0.88, 'textHi', 1);
   const nearForearm = bone(j.el, j.wr, body.lw * 0.72, 'textHi', 1);
