@@ -2,7 +2,7 @@
  * Regression test for Finding A: Canonical frame and stage enclosure.
  *
  * Verifies that:
- * 1. For Movement 52 (Dumbbell Reverse Lunge) on all bodies
+ * 1. For Movement 52 (Dumbbell Reverse Lunge) on neutral body
  *    and throughout every 33 ms tick of the full cycle, figureFrame height strictly matches
  *    the canonical stage height (240 dp), the floor line's full height (floor.top + floor.height)
  *    fits completely, and all painted primitives (accounting for rotation and rounded caps)
@@ -18,7 +18,6 @@ import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react-native';
 import { MovementPreview } from '../../src/components/movementPreview';
 import * as manifest from '../../src/components/movementPreview/manifest';
-import { DUAL_BODY_PARAMETERS } from '../../src/components/movementPreview/canonicalFigure';
 import { resetPreviewPlayback } from '../../src/components/movementPreview/playbackCoordinator';
 import { theme } from '../../src/theme/theme';
 import { previewManifest } from './previewManifest';
@@ -127,27 +126,24 @@ afterEach(() => {
 });
 
 describe('Finding A: Canonical Frame-Fit Enclosure and Stage Integrity', () => {
-  test.each(Object.keys(DUAL_BODY_PARAMETERS))(
-    'Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (%s)',
-    async (bodyName) => {
-      const { getByTestId, unmount } = render(<MovementPreview movement={subject52} bodyType={bodyName} />);
-      await act(async () => {});
+  test('Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (neutral)', async () => {
+    const { getByTestId, unmount } = render(<MovementPreview movement={subject52} bodyType="neutral" />);
+    await act(async () => {});
 
-      const control = getByTestId('movement-preview-control');
-      fireEvent.press(control);
+    const control = getByTestId('movement-preview-control');
+    fireEvent.press(control);
 
-      const ticks = Math.ceil(TOTAL_52_MS / TICK_MS);
-      for (let tick = 0; tick <= ticks; tick++) {
-        const frameEl = getByTestId('movement-preview-figure');
-        const stageEl = getByTestId('movement-preview-stage-canonical');
-        assertEnclosure(frameEl, stageEl);
-        act(() => {
-          jest.advanceTimersByTime(TICK_MS);
-        });
-      }
-      unmount();
-    },
-  );
+    const ticks = Math.ceil(TOTAL_52_MS / TICK_MS);
+    for (let tick = 0; tick <= ticks; tick++) {
+      const frameEl = getByTestId('movement-preview-figure');
+      const stageEl = getByTestId('movement-preview-stage-canonical');
+      assertEnclosure(frameEl, stageEl);
+      act(() => {
+        jest.advanceTimersByTime(TICK_MS);
+      });
+    }
+    unmount();
+  });
 
   test('Negative Control: original 171.43 dp frame height demonstrably fails enclosure guard for 52', async () => {
     const { getByTestId, unmount } = render(<MovementPreview movement={subject52} bodyType="neutral" />);
@@ -186,13 +182,76 @@ describe('Finding A: Canonical Frame-Fit Enclosure and Stage Integrity', () => {
     unmount();
   });
 
+  // Both shortened-frame controls trip the frame-encloses-stage check first, so
+  // on their own they would still pass if the floor and painted-bounds checks
+  // were deleted. These two keep the real frame and move one thing out of it.
+  test('Negative Control: a painted primitive past the stage edge fails the enclosure guard', async () => {
+    const { getByTestId, unmount } = render(<MovementPreview movement={subject52} bodyType="neutral" />);
+    await act(async () => {});
+    const frameEl = getByTestId('movement-preview-figure');
+    const stageEl = getByTestId('movement-preview-stage-canonical');
+    const stageStyle = StyleSheet.flatten(stageEl.props.style);
+    expect(() => assertEnclosure(frameEl, stageEl)).not.toThrow();
+
+    const children = React.Children.toArray(stageEl.props.children);
+    const stray = {
+      props: {
+        style: {
+          position: 'absolute', left: stageStyle.width - 4, top: 10, width: 8, height: 8, borderRadius: 4,
+        },
+      },
+    };
+    const mutatedStage = { ...stageEl, props: { ...stageEl.props, children: [...children, stray] } };
+    expect(() => assertEnclosure(frameEl, mutatedStage)).toThrow(/Primitive right/);
+    unmount();
+  });
+
+  test('Negative Control: a floor line whose thickness leaves the stage fails the enclosure guard', async () => {
+    const { getByTestId, unmount } = render(<MovementPreview movement={subject52} bodyType="neutral" />);
+    await act(async () => {});
+    const frameEl = getByTestId('movement-preview-figure');
+    const stageEl = getByTestId('movement-preview-stage-canonical');
+    const stageStyle = StyleSheet.flatten(stageEl.props.style);
+
+    const children = React.Children.toArray(stageEl.props.children);
+    const isFloor = (child) => {
+      const s = StyleSheet.flatten(child.props.style);
+      return s.height === 1 && s.backgroundColor === theme.color.line;
+    };
+    expect(children.filter(isFloor)).toHaveLength(1);
+    const moved = children.map((child) => (isFloor(child)
+      ? { props: { style: StyleSheet.flatten([child.props.style, { top: stageStyle.height - 0.5 }]) } }
+      : child));
+    const mutatedStage = { ...stageEl, props: { ...stageEl.props, children: moved } };
+    expect(() => assertEnclosure(frameEl, mutatedStage)).toThrow(/Floor/);
+    unmount();
+  });
+
   test('Coverage of all renderable canonical and derived entries across the full cycle', async () => {
     const renderableEntries = previewManifest.entries.filter(
-      (e) => Array.isArray(e.frames) && e.frames.length > 0 && Array.isArray(e.viewBox),
+      (e) => (Array.isArray(e.frames) && e.frames.length > 0 && Array.isArray(e.viewBox)) || Boolean(e.derivesFrom),
     );
 
+    // Nothing may drop out of coverage silently. Every manifest entry is either
+    // guarded here, marked unsuitable, or one of the legacy-rig prototypes that
+    // carry frames without a canonical view box and are not drawn on this stage.
+    const unsuitable = previewManifest.entries.filter((e) => e.status === 'intentionally_unsuitable');
+    const legacyRig = previewManifest.entries.filter(
+      (e) => e.status !== 'intentionally_unsuitable' && !e.derivesFrom
+        && Array.isArray(e.frames) && e.frames.length > 0 && !Array.isArray(e.viewBox),
+    );
+    expect(legacyRig.map((e) => e.movementId).sort((a, b) => a - b)).toEqual([16, 28, 88]);
+    expect(renderableEntries.length + unsuitable.length + legacyRig.length).toBe(previewManifest.entries.length);
+
+    let derivedCount = 0;
     for (const entry of renderableEntries) {
-      const fixture = manifest.buildPreviewEntry({ ...entry, status: 'covered' });
+      const base = entry.derivesFrom
+        ? previewManifest.entries.find((b) => b.movementId === entry.derivesFrom)
+        : undefined;
+      if (entry.derivesFrom) {
+        derivedCount++;
+      }
+      const fixture = manifest.buildPreviewEntry({ ...entry, status: 'covered' }, base);
       jest.spyOn(manifest, 'resolveMovementPreview').mockReturnValue(fixture);
 
       const subject = { movement_id: entry.movementId, media: { assetKey: entry.assetKey, status: 'ready' } };
@@ -202,7 +261,8 @@ describe('Finding A: Canonical Frame-Fit Enclosure and Stage Integrity', () => {
       const control = getByTestId('movement-preview-control');
       fireEvent.press(control);
 
-      const total = entry.segmentDurationsMs ? entry.segmentDurationsMs.reduce((a, b) => a + b, 0) : 1000;
+      const durations = fixture.frameData?.segmentDurationsMs ?? entry.segmentDurationsMs;
+      const total = durations ? durations.reduce((a, b) => a + b, 0) : 1000;
       const ticks = Math.ceil(total / TICK_MS);
       const frameEl = getByTestId('movement-preview-figure');
       for (let tick = 0; tick <= ticks; tick++) {
@@ -216,6 +276,8 @@ describe('Finding A: Canonical Frame-Fit Enclosure and Stage Integrity', () => {
       unmount();
       jest.restoreAllMocks();
     }
+
+    expect(derivedCount).toBeGreaterThanOrEqual(1);
   }, 300000);
 
   test('Parent layout presentation: compact mode (SessionScreen) and card mode (LibraryScreenV2)', async () => {

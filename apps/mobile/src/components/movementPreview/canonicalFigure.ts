@@ -93,6 +93,10 @@ export interface CanonicalPose {
   ke?: number;
   /** Reverse-lunge step, lower, rise and return phase, from0 through4. */
   rl?: number;
+  /** Inverted row pull phase, from 0 (long arms) to 1 (chest to bar). */
+  ir?: number;
+  /** Body tricep press extension phase, from 0 (lockout) to 1 (flexed pause). */
+  tp?: number;
 }
 
 export type ColorRole = 'textHi' | 'textLow' | 'textMid' | 'line' | 'ink1';
@@ -146,7 +150,7 @@ export function lerpJoints(a: CanonicalPose, b: CanonicalPose, u: number): Canon
   // motion frames would not match their own stills.
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof CanonicalPose>;
   for (const key of keys) {
-    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl') {
+    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp') {
       out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * u;
       continue;
     }
@@ -708,6 +712,82 @@ export function reverseLungeGeometry(phase: number, body: BodyParameters) {
   return { joints, frontFoot, rearFoot, footWidth };
 }
 
+/**
+ * Inverted row geometry (Movement 66).
+ * Fixed bar in rack at [54.70, 52.8] (hip height 44.1 dp above floor), planted heels on floor (94.74),
+ * rigid body plank, horizontal pull under bar with chest touching bar at peak.
+ */
+export function invertedRowGeometry(phase: number, body: BodyParameters) {
+  const footWidth = body.lw * 0.9;
+  const soleY = 96.9 - footWidth / 2;
+  const bar: CanonicalPoint = [54.70, 52.8];
+  const heelAnchor: CanonicalPoint = [8.0, soleY];
+  const phi = (21.22 + phase * (36.65 - 21.22)) * Math.PI / 180;
+  const cosP = Math.cos(phi), sinP = Math.sin(phi);
+
+  const an: CanonicalPoint = heelAnchor;
+  const kn: CanonicalPoint = [an[0] + 22.25 * cosP, an[1] - 22.25 * sinP];
+  const hp: CanonicalPoint = [an[0] + 44.50 * cosP, an[1] - 44.50 * sinP];
+  const nk: CanonicalPoint = [an[0] + 68.50 * cosP, an[1] - 68.50 * sinP];
+  const hd: CanonicalPoint = [nk[0] + 9.0 * cosP, nk[1] - 9.0 * sinP];
+  const waist: CanonicalPoint = [hp[0] + (nk[0] - hp[0]) * 0.44, hp[1] + (nk[1] - hp[1]) * 0.44];
+
+  const sols = elbowCircleSolutions(nk, bar, 12.5, 12.0);
+  if (!sols) throw new Error(`Unreachable inverted-row elbow at phase ${phase}`);
+  const el: CanonicalPoint = sols[1];
+
+  const joints: FigureJoints = {
+    hd, nk, hp, waist,
+    nArm: nk, fArm: nk,
+    el, wr: bar,
+    ef: el, wf: bar,
+    nLeg: hp, fLeg: hp,
+    kn, an, kf: kn, af: an,
+    b: bar,
+  };
+  return { bar, heelAnchor, footWidth, joints, plankAngleDeg: phi * 180 / Math.PI, barHeightAboveFloor: 96.9 - bar[1] };
+}
+
+/**
+ * Body tricep press geometry (Movement 152).
+ * Fixed bar in rack at [75, 39.9] (chest height 57.0 dp above floor), planted toes on floor (94.74),
+ * rigid body plank, isolated elbow extension with bounded upper arm drift (<= 10 deg across cycle).
+ */
+export function bodyTricepPressGeometry(phase: number, body: BodyParameters) {
+  const footWidth = body.lw * 0.9;
+  const soleY = 96.9 - footWidth / 2;
+  const bar: CanonicalPoint = [75.0, 39.9];
+  const heelAnchor: CanonicalPoint = [6.0, soleY];
+  const phi = (49.20 - phase * (49.20 - 41.40)) * Math.PI / 180;
+  const cosP = Math.cos(phi), sinP = Math.sin(phi);
+
+  const an: CanonicalPoint = heelAnchor;
+  const kn: CanonicalPoint = [an[0] + 22.25 * cosP, an[1] - 22.25 * sinP];
+  const hp: CanonicalPoint = [an[0] + 44.50 * cosP, an[1] - 44.50 * sinP];
+  const nk: CanonicalPoint = [an[0] + 68.50 * cosP, an[1] - 68.50 * sinP];
+  const hd: CanonicalPoint = [nk[0] + 9.0 * cosP, nk[1] - 9.0 * sinP];
+  const waist: CanonicalPoint = [hp[0] + (nk[0] - hp[0]) * 0.44, hp[1] + (nk[1] - hp[1]) * 0.44];
+
+  const sols = elbowCircleSolutions(nk, bar, 12.5, 12.0);
+  if (!sols) throw new Error(`Unreachable body-tricep-press elbow at phase ${phase}`);
+  const el: CanonicalPoint = sols[0];
+
+  const d = Math.hypot(nk[0] - bar[0], nk[1] - bar[1]);
+  const cosFlex = (12.5 * 12.5 + 12.0 * 12.0 - d * d) / (2 * 12.5 * 12.0);
+  const elbowFlexionDeg = 180 - Math.acos(Math.max(-1, Math.min(1, cosFlex))) * 180 / Math.PI;
+
+  const joints: FigureJoints = {
+    hd, nk, hp, waist,
+    nArm: nk, fArm: nk,
+    el, wr: bar,
+    ef: el, wf: bar,
+    nLeg: hp, fLeg: hp,
+    kn, an, kf: kn, af: an,
+    b: bar,
+  };
+  return { bar, heelAnchor, footWidth, joints, elbowFlexionDeg, plankAngleDeg: phi * 180 / Math.PI, barHeightAboveFloor: 96.9 - bar[1] };
+}
+
 /** Small hip arc with fixed soft knee; an actual cuff, not a hand cable. */
 export function kickbackGeometry(extensionDeg: number, body: BodyParameters): FigureJoints {
   const upper = (extensionDeg + 2.5) * Math.PI / 180;
@@ -939,6 +1019,8 @@ export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): F
 
   const j: CanonicalPose = applyJointOffsets(pose, opts.jointOffsets);
   if (slug === REVERSE_LUNGE && j.rl !== undefined) return reverseLungeGeometry(j.rl, body).joints;
+  if (slug === 'inverted-row' && j.ir !== undefined) return invertedRowGeometry(j.ir, body).joints;
+  if (slug === 'body-tricep-press' && j.tp !== undefined) return bodyTricepPressGeometry(j.tp, body).joints;
   if (slug === ANKLE_KICKBACK && j.ke !== undefined) return kickbackGeometry(j.ke, body);
   if (FLYE_INCLINES[slug] !== undefined && j.fo !== undefined) {
     return flyeGeometry(j.fo, body, FLYE_INCLINES[slug]).joints;
@@ -1200,6 +1282,10 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   const reverseLunge = slug === REVERSE_LUNGE && pose.rl !== undefined
     ? reverseLungeGeometry(pose.rl, body) : null;
   if (reverseLunge) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
+  const invertedRow = slug === 'inverted-row' && pose.ir !== undefined;
+  if (invertedRow) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
+  const bodyTricepPress = slug === 'body-tricep-press' && pose.tp !== undefined;
+  if (bodyTricepPress) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
   const kickback = slug === ANKLE_KICKBACK && pose.ke !== undefined;
   if (kickback) for (const key of ['hd', 'nk', 'hp', 'el', 'wr', 'ef', 'wf', 'kn', 'an', 'kf', 'af'] as const) j[key] = f[key];
   const farColor: ColorRole = front ? 'textHi' : 'textLow';
@@ -1377,7 +1463,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   if (endOnBar) prims.push(...endOnBar);
   if (cableDraw) prims.push(...cableDraw.nearHandle);
   const equipment = EQUIPMENT_BY_SLUG[slug] ?? 'none';
-  if ((equipment === 'none' || equipment === 'barbell' || equipment === 'kettlebell')
+  if ((equipment === 'none' || equipment === 'barbell' || equipment === 'kettlebell' || equipment === 'squat_rack')
     && !CURL_SLUGS.has(slug)) {
     prims.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: body.lw * 0.44, fill: 'textHi', opacity: 1 });
     prims.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
@@ -1442,6 +1528,8 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'inverted-row': 'barbell',
+  'body-tricep-press': 'squat_rack',
   'dumbbell-reverse-lunge': 'dumbbells',
   'cable-glute-kickback': 'cable_machine',
   'dumbbell-flye': 'dumbbells',
@@ -2014,6 +2102,22 @@ function apparatus(slug: string, front: boolean, body: BodyParameters): FigurePr
       { kind: 'circle', cx: 50, cy: 8, r: 1.8, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 },
       frame(34, 71, 26, 5), post(46, 76, 46, 96),
       frame(52, 64, 12, 4.5), post(58, 68.5, 58, 71));
+  } else if (slug === 'inverted-row') {
+    // Fixed barbell in a rack around hip height (bar at [54.70, 52.8]).
+    out.push(
+      post(54.70, 16, 54.70, 96),
+      { kind: 'rect', x: 52.95, y: 51.8, w: 3.5, h: 3, rx: 0.8, fill: 'line', stroke: 'textLow', strokeWidth: 1.0, opacity: 1 },
+      { kind: 'circle', cx: 54.70, cy: 52.8, r: 2.6, fill: 'textHi', opacity: 1 },
+      { kind: 'circle', cx: 54.70, cy: 52.8, r: 1.2, fill: 'ink1', opacity: 1 },
+    );
+  } else if (slug === 'body-tricep-press') {
+    // Fixed bar in a rack at chest height (bar at [75, 39.9]).
+    out.push(
+      post(75, 16, 75, 96),
+      { kind: 'rect', x: 73.25, y: 38.9, w: 3.5, h: 3, rx: 0.8, fill: 'line', stroke: 'textLow', strokeWidth: 1.0, opacity: 1 },
+      { kind: 'circle', cx: 75, cy: 39.9, r: 2.6, fill: 'textHi', opacity: 1 },
+      { kind: 'circle', cx: 75, cy: 39.9, r: 1.2, fill: 'ink1', opacity: 1 },
+    );
   } else if (slug === 'dumbbell-bench-press') {
     out.push(frame(36, 60, 36, 5), post(40, 65, 40, 96), post(68, 65, 68, 96));
   } else if (slug === 'close-grip-dumbbell-press') {
