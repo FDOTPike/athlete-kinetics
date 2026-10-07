@@ -1200,12 +1200,16 @@ export interface ChainPose {
   farFoot?: ChainDir;
   farUpperArm?: ChainDir;
   farForearm?: ChainDir;
-  /** A hand position the arms are solved to, in place of the arm directions (hands planted, or on a fixed grip). */
-  wrist?: readonly [number, number];
-  farWrist?: readonly [number, number];
+  /**
+   * A hand position the arms are solved to, in place of the arm directions
+   * (hands planted, or on a fixed grip). With two numbers the hand stays in
+   * line with its own shoulder; a third places it across the body.
+   */
+  wrist?: ChainPoint;
+  farWrist?: ChainPoint;
   /** An ankle position the legs are solved to, in place of the leg directions (feet planted). */
-  ankle?: readonly [number, number];
-  farAnkle?: readonly [number, number];
+  ankle?: ChainPoint;
+  farAnkle?: ChainPoint;
 }
 
 /** Where a piece of equipment is painted: behind the figure, between the far limbs and the trunk, or in front of everything. */
@@ -1245,6 +1249,8 @@ export interface ChainMovement {
   feet?: 'flat' | 'free' | 'none';
   /** What the hands hold. */
   implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope';
+  /** Which way the palm of a bent hand faces: what it holds sits on that side of the knuckles. */
+  palm?: 'up' | 'down';
   /** The direction a held dumbbell's handle points. Across the body when omitted. */
   bellAxis?: readonly [number, number, number];
   lines?: readonly ChainLine[];
@@ -1260,6 +1266,8 @@ const CHAIN_NECK = 9;
 const CHAIN_THIGH = 22.25;
 const CHAIN_SHIN = 22.25;
 const CHAIN_HAND = 4;
+/** How far from the knuckles' line a weight held in a bent hand sits. */
+const CHAIN_PALM = 1.8;
 const CHAIN_FOOT = 5.4;
 /** The floor the soles rest on. */
 const CHAIN_FLOOR = 96.9;
@@ -1361,6 +1369,64 @@ const LOW_CABLE_BENCH_TOP = 12;
 /** The low pulleys behind the head for the two lying cable extensions. */
 export const CABLE_LYING_EXTENSION_PULLEY: readonly [number, number] = [4, 10];
 export const LOW_CABLE_EXTENSION_PULLEY: readonly [number, number] = [5, 14];
+
+/**
+ * The wrist curls: sitting on the edge of a flat bench and leaning forward so
+ * the forearms lie level along the thighs. The upper arm's direction is the
+ * one that puts the forearm's underside exactly on the top of the thigh.
+ */
+const WRIST_CURL_HIP: readonly [number, number] = [34, CHAIN_SEATED_HIP];
+const WRIST_CURL_TRUNK = 44;
+const WRIST_CURL_FOREARM_HEIGHT = CHAIN_SEATED_HIP + CHAIN_THIGH_HALF + CANONICAL_BODY_PARAMETERS.lw * 0.72 / 2;
+const WRIST_CURL_UPPER_ARM = -180 + Math.asin(
+  (CHAIN_SEATED_HIP + CHAIN_TRUNK * Math.sin(chainRad(WRIST_CURL_TRUNK)) - WRIST_CURL_FOREARM_HEIGHT) / SAGITTAL_UPPER_ARM,
+) * 180 / Math.PI;
+const WRIST_CURL_BODY = {
+  at: WRIST_CURL_HIP, trunk: WRIST_CURL_TRUNK, head: 62, thigh: 0, shin: -90, upperArm: WRIST_CURL_UPPER_ARM, forearm: 0,
+} as const;
+const WRIST_CURL_BENCH = chainFlatBench(WRIST_CURL_HIP[0] - 17, WRIST_CURL_HIP[0] + 7, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF);
+/** The low pulley the Cable Wrist Curl faces. */
+export const CABLE_WRIST_CURL_PULLEY: readonly [number, number] = [92, 3];
+
+/** The Spider Curl: where the hips are, how far the trunk leans, and the wedge pad that leaning puts under it. */
+const SPIDER_CURL_HIP: readonly [number, number] = [37, 43.6];
+const SPIDER_CURL_TRUNK = 40;
+/** The direction the Spider Curl's upper arms lie in: down the far face of the pad, square to the leaning trunk. */
+export const SPIDER_CURL_UPPER_ARM = SPIDER_CURL_TRUNK - 90;
+/**
+ * A preacher pad seen from the side, as a wedge: the angled face the chest
+ * and stomach lie against, and the far face the upper arms rest on. The far
+ * face runs parallel to the upper arms, set where their backs meet it, and
+ * the two faces join at the top of the pad.
+ */
+export function spiderCurlPad(): { angled: readonly [ChainPoint, ChainPoint]; rest: readonly [ChainPoint, ChainPoint] } {
+  const hip: ChainVec = [SPIDER_CURL_HIP[0], SPIDER_CURL_HIP[1], 0];
+  const along = chainUnit([SPIDER_CURL_TRUNK, 0], 1);
+  const arm = chainUnit([SPIDER_CURL_UPPER_ARM, 0], 1);
+  const foot = chainAdd(hip, chainUnit([SPIDER_CURL_TRUNK - 90, 0], 1), CHAIN_BACK_HALF + 2);
+  const under = chainAdd(chainAdd(hip, along, CHAIN_TRUNK), chainUnit([SPIDER_CURL_UPPER_ARM - 90, 0], 1),
+    CANONICAL_BODY_PARAMETERS.lw * 0.88 / 2 + 2);
+  // Where the two faces meet: foot + k * along = under + t * arm.
+  const dx = under[0] - foot[0], dy = under[1] - foot[1];
+  const k = (arm[0] * dy - arm[1] * dx) / (arm[0] * along[1] - arm[1] * along[0]);
+  const top = chainAdd(foot, along, k);
+  const low = chainAdd(foot, along, -3), end = chainAdd(top, arm, 15);
+  return { angled: [[low[0], low[1]], [top[0], top[1]]], rest: [[top[0], top[1]], [end[0], end[1]]] };
+}
+const SPIDER_CURL_BODY = {
+  at: SPIDER_CURL_HIP, trunk: SPIDER_CURL_TRUNK, head: 70, thigh: -110, shin: -110, ankle: [22, CHAIN_ANKLE_HEIGHT],
+} as const;
+
+/** The Concentration Curl: seated with the feet wide, leaning forward, seen turned so the inner thigh shows. */
+const CONCENTRATION_BODY = {
+  at: [0, CHAIN_SEATED_HIP], trunk: 42, head: 62, thigh: [0, 30], shin: -90, upperArm: [-90, 20],
+  // The free hand rests on the other knee.
+  farWrist: [
+    CHAIN_THIGH * Math.cos(chainRad(30)) - 2,
+    CHAIN_SEATED_HIP + CHAIN_THIGH_HALF + 1.7,
+    -(CANONICAL_BODY_PARAMETERS.hw * 0.8 + CHAIN_THIGH * Math.sin(chainRad(30)) - 1),
+  ],
+} as const;
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -1473,6 +1539,82 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { at: [60, LOW_CABLE_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 90 },
     ],
   },
+  // Spider Curl: chest and stomach against the angled side of a preacher
+  // pad, feet on the floor, upper arms lying down its far side; only the
+  // forearms move.
+  'spider-curl': {
+    root: 'hip',
+    implement: 'bar',
+    equipment: [
+      { kind: 'post', at: [spiderCurlPad().angled[0][0] + 6, spiderCurlPad().angled[0][1] + 2] },
+      { kind: 'slab', a: spiderCurlPad().rest[0], b: spiderCurlPad().rest[1] },
+      { kind: 'slab', a: spiderCurlPad().angled[0], b: spiderCurlPad().angled[1] },
+    ],
+    poses: [
+      { ...SPIDER_CURL_BODY, upperArm: SPIDER_CURL_UPPER_ARM, forearm: SPIDER_CURL_UPPER_ARM },
+      { ...SPIDER_CURL_BODY, upperArm: SPIDER_CURL_UPPER_ARM, forearm: 60 },
+    ],
+  },
+  // Concentration Curls: seated with the feet wide, the back of the working
+  // upper arm against the inner thigh, the free hand on the other knee.
+  'concentration-curls': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 72,
+    originX: 44,
+    implement: 'bell',
+    elbowPole: [180, 70],
+    equipment: [
+      { kind: 'post', at: [-24, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 4] },
+      { kind: 'post', at: [0, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 4] },
+      { kind: 'slab', a: [-29, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 2], b: [5, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 2] },
+    ],
+    poses: [
+      { ...CONCENTRATION_BODY, forearm: [-90, 20] },
+      { ...CONCENTRATION_BODY, forearm: [60, -15] },
+    ],
+  },
+  // Seated Dumbbell Palms-Down Wrist Curl: forearms flat on the thighs, the
+  // backs of the hands lifting; only the hands move.
+  'seated-dumbbell-palms-down-wrist-curl': {
+    root: 'hip',
+    implement: 'bells',
+    palm: 'down',
+    equipment: WRIST_CURL_BENCH,
+    poses: [
+      { ...WRIST_CURL_BODY, hand: -45 },
+      { ...WRIST_CURL_BODY, hand: 30 },
+    ],
+  },
+  // Seated Dumbbell Palms-Up Wrist Curl: the same seat, palms up, a longer curl.
+  'seated-dumbbell-palms-up-wrist-curl': {
+    root: 'hip',
+    implement: 'bells',
+    palm: 'up',
+    equipment: WRIST_CURL_BENCH,
+    poses: [
+      { ...WRIST_CURL_BODY, hand: -35 },
+      { ...WRIST_CURL_BODY, hand: 50 },
+    ],
+  },
+  // Cable Wrist Curl: the same seat facing a low pulley, one bar in both
+  // hands, palms up. The pulley sits below the line of the dropped hands, so
+  // the cable only lengthens as the wrists curl.
+  'cable-wrist-curl': {
+    root: 'hip',
+    implement: 'cableBar',
+    palm: 'up',
+    lines: [{ from: CABLE_WRIST_CURL_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [CABLE_WRIST_CURL_PULLEY[0], 0.5], b: [CABLE_WRIST_CURL_PULLEY[0], 16] },
+      { kind: 'pulley', at: CABLE_WRIST_CURL_PULLEY },
+      ...WRIST_CURL_BENCH,
+    ],
+    poses: [
+      { ...WRIST_CURL_BODY, hand: -35 },
+      { ...WRIST_CURL_BODY, hand: 50 },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -1500,15 +1642,16 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
   };
   const optDir = (x: ChainDir | undefined, y: ChainDir | undefined): readonly [number, number] | undefined =>
     (x === undefined || y === undefined ? undefined : dir(x, y));
-  const point = (
-    x: readonly [number, number] | undefined, y: readonly [number, number] | undefined, name: string,
-  ): readonly [number, number] | undefined => {
+  const point = (x: ChainPoint | undefined, y: ChainPoint | undefined, name: string): ChainPoint | undefined => {
     if (x === undefined && y === undefined) return undefined;
-    if (x === undefined || y === undefined) throw new Error(`canonicalFigure: '${slug}' gives '${name}' on some poses only`);
-    return [x[0] + (y[0] - x[0]) * u, x[1] + (y[1] - x[1]) * u];
+    if (x === undefined || y === undefined || (x[2] === undefined) !== (y[2] === undefined)) {
+      throw new Error(`canonicalFigure: '${slug}' gives '${name}' on some poses only`);
+    }
+    const flat: readonly [number, number] = [x[0] + (y[0] - x[0]) * u, x[1] + (y[1] - x[1]) * u];
+    return x[2] === undefined || y[2] === undefined ? flat : [flat[0], flat[1], x[2] + (y[2] - x[2]) * u];
   };
 
-  const at = point(a.at, b.at, 'at') as readonly [number, number];
+  const at = point(a.at, b.at, 'at') as ChainPoint;
   const curl = num(a.curl, b.curl);
   const sideCurl = num(a.sideCurl, b.sideCurl);
   const twist = num(a.twist, b.twist);
@@ -1589,10 +1732,10 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
   };
   const limb = (
     root: ChainVec, side: number, first: readonly [number, number], second: readonly [number, number],
-    firstLength: number, secondLength: number, target: readonly [number, number] | undefined, pole: ChainDir,
+    firstLength: number, secondLength: number, target: ChainPoint | undefined, pole: ChainDir,
   ) => {
     if (target !== undefined) {
-      const end: ChainVec = [target[0], target[1], root[2]];
+      const end: ChainVec = [target[0], target[1], target[2] ?? root[2]];
       return { root, mid: solve(root, end, firstLength, secondLength, chainUnit(chainPair(pole), side)), end };
     }
     const mid = chainAdd(root, chainUnit(first, side), firstLength);
@@ -1608,6 +1751,12 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
     farAnkleTarget, movement.kneePole ?? 45);
   const nearGrip = hand === undefined ? nearArm.end : chainAdd(nearArm.end, chainUnit(hand, 1), CHAIN_HAND);
   const farGrip = hand === undefined ? farArm.end : chainAdd(farArm.end, chainUnit(hand, -1), CHAIN_HAND);
+  // What a bent hand holds sits on the palm's side of the knuckles.
+  const holdOf = (grip: ChainVec, side: number): ChainVec => {
+    if (hand === undefined || movement.palm === undefined) return grip;
+    return chainAdd(grip, chainUnit([hand[0] + (movement.palm === 'up' ? 90 : -90), hand[1]], side), CHAIN_PALM);
+  };
+  const nearHold = holdOf(nearGrip, 1), farHold = holdOf(farGrip, -1);
   const feet = movement.feet ?? 'flat';
   const toeOf = (ankle: ChainVec, side: number, free: readonly [number, number] | undefined): ChainVec | null => {
     if (feet === 'flat') return [ankle[0] + CHAIN_FOOT, ankle[1], ankle[2]];
@@ -1647,10 +1796,12 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
     girdle: view === 'oblique' || (view === 'side' && Math.abs(twist) > 1e-9),
     world: {
       hip, neck, head, spine: spineWorld,
-      near: { shoulder: nearArm.root, elbow: nearArm.mid, wrist: nearArm.end, grip: nearGrip, hipJoint: nearLeg.root, knee: nearLeg.mid, ankle: nearLeg.end, toe: nearToe },
-      far: { shoulder: farArm.root, elbow: farArm.mid, wrist: farArm.end, grip: farGrip, hipJoint: farLeg.root, knee: farLeg.mid, ankle: farLeg.end, toe: farToe },
+      near: { shoulder: nearArm.root, elbow: nearArm.mid, wrist: nearArm.end, grip: nearGrip, hold: nearHold, hipJoint: nearLeg.root, knee: nearLeg.mid, ankle: nearLeg.end, toe: nearToe },
+      far: { shoulder: farArm.root, elbow: farArm.mid, wrist: farArm.end, grip: farGrip, hold: farHold, hipJoint: farLeg.root, knee: farLeg.mid, ankle: farLeg.end, toe: farToe },
     },
     grip: { near: project(nearGrip), far: projectFar(farGrip) },
+    /** Where the held weight sits: the grip, moved to the palm's side when the hand is bent. */
+    hold: { near: project(nearHold), far: projectFar(farHold) },
     toe: { near: nearToe ? project(nearToe) : null, far: farToe ? projectFar(farToe) : null },
     footWidth: feet === 'flat' ? body.lw * 0.9 : body.lw * 0.82,
     angles: { trunk: given, curl, sideCurl, twist, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
@@ -1693,7 +1844,7 @@ function layoutChainExtras(
     const start: CanonicalPoint = cable.from === 'nearFoot' ? [j.an[0] + CHAIN_FOOT / 2, GROUND_LINE]
       : cable.from === 'farFoot' ? [j.af[0] + CHAIN_FOOT / 2, GROUND_LINE]
         : project(chainWorld(cable.from));
-    const end = cable.to === 'nearGrip' ? figure.grip.near : cable.to === 'farGrip' ? figure.grip.far
+    const end = cable.to === 'nearGrip' ? figure.hold.near : cable.to === 'farGrip' ? figure.hold.far
       : cable.to === 'nearAnkle' ? j.an : j.af;
     lines.push(line(start, end, 1.4, 'textMid', 1));
   }
@@ -1727,19 +1878,19 @@ function layoutChainExtras(
   };
   const w = figure.world;
   if (kind === 'bells' || kind === 'bell') {
-    if (kind === 'bells') bell(w.far.grip, figure.projectFar, farColor, farOpacity, far);
-    bell(w.near.grip, project, 'textHi', 1, near);
+    if (kind === 'bells') bell(w.far.hold, figure.projectFar, farColor, farOpacity, far);
+    bell(w.near.hold, project, 'textHi', 1, near);
   } else if (kind === 'hammer') {
     far.push(...layoutHammerDumbbell(figure.grip.far, j.ef, false));
     near.push(...layoutHammerDumbbell(figure.grip.near, j.el));
   } else if (kind === 'bar' || kind === 'ez' || kind === 'cableBar') {
-    const p = project(w.far.grip), q = project(w.near.grip);
+    const p = project(w.far.hold), q = project(w.near.hold);
     const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
     if (length < 3) {
       // One bar through both hands, seen end-on at the near hand.
-      if (kind === 'bar') near.push(...layoutEndOnBarbell(figure.grip.near));
-      else if (kind === 'ez') near.push(...layoutEndOnEzBar(figure.grip.near));
-      else near.push({ kind: 'circle', cx: figure.grip.near[0], cy: figure.grip.near[1], r: 2.4, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
+      if (kind === 'bar') near.push(...layoutEndOnBarbell(figure.hold.near));
+      else if (kind === 'ez') near.push(...layoutEndOnEzBar(figure.hold.near));
+      else near.push({ kind: 'circle', cx: figure.hold.near[0], cy: figure.hold.near[1], r: 2.4, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
     } else {
       // Seen along its length. From the front the whole bar is in front of
       // the body; turned, its far half passes behind.
@@ -2330,7 +2481,8 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   const prims: FigurePrim[] = [];
 
   // ---- Layer 1: apparatus / structure (behind everything but ground) ----
-  if (!PREACHER_SLUGS.has(slug) && slug !== HEAD_SUPPORTED_RAISE) prims.push(...apparatus(slug, front, body));
+  // A chain movement brings its own equipment; the shared apparatus drawer is for the rest.
+  if (!chain && !PREACHER_SLUGS.has(slug) && slug !== HEAD_SUPPORTED_RAISE) prims.push(...apparatus(slug, front, body));
   if (chainDraw) prims.push(...chainDraw.behind);
   if (kickback) {
     // Cable is behind the support and working legs; cuff rides the ankle in
@@ -2636,6 +2788,8 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'spider-curl': 'barbell',
+  'concentration-curls': 'dumbbells',
   'decline-dumbbell-triceps-extension': 'dumbbells',
   'decline-ez-bar-triceps-extension': 'barbell',
   'cable-lying-triceps-extension': 'cable_machine',

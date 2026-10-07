@@ -26,6 +26,8 @@ export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> =
   'elbow-extension__supine': () => require('./families/elbow-extension__supine.json') as PreviewFamilyFile,
   'elbow-flexion__incline': () => require('./families/elbow-flexion__incline.json') as PreviewFamilyFile,
   'elbow-flexion__preacher': () => require('./families/elbow-flexion__preacher.json') as PreviewFamilyFile,
+  'elbow-flexion__prone-supported': () => require('./families/elbow-flexion__prone-supported.json') as PreviewFamilyFile,
+  'elbow-flexion__seated': () => require('./families/elbow-flexion__seated.json') as PreviewFamilyFile,
   'elbow-flexion__standing': () => require('./families/elbow-flexion__standing.json') as PreviewFamilyFile,
   'face-pull__standing': () => require('./families/face-pull__standing.json') as PreviewFamilyFile,
   'flye__decline': () => require('./families/flye__decline.json') as PreviewFamilyFile,
@@ -72,4 +74,6 @@ export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> =
   'vertical-press__seated': () => require('./families/vertical-press__seated.json') as PreviewFamilyFile,
   'vertical-press__standing': () => require('./families/vertical-press__standing.json') as PreviewFamilyFile,
   'vertical-pull__standing': () => require('./families/vertical-pull__standing.json') as PreviewFamilyFile,
+  'wrist-flexion__seated': () => require('./families/wrist-flexion__seated.json') as PreviewFamilyFile,
+  'wrist-flexion__standing': () => require('./families/wrist-flexion__standing.json') as PreviewFamilyFile,
 };
