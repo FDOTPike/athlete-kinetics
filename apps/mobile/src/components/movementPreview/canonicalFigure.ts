@@ -97,6 +97,8 @@ export interface CanonicalPose {
   ir?: number;
   /** Body tricep press extension phase, from 0 (lockout) to 1 (flexed pause). */
   tp?: number;
+  /** Standing lateral raise: shoulder abduction in degrees from the arm hanging straight down. */
+  la?: number;
 }
 
 export type ColorRole = 'textHi' | 'textLow' | 'textMid' | 'line' | 'ink1';
@@ -150,7 +152,7 @@ export function lerpJoints(a: CanonicalPose, b: CanonicalPose, u: number): Canon
   // motion frames would not match their own stills.
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof CanonicalPose>;
   for (const key of keys) {
-    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp') {
+    if (key === 'bt' || key === 'ct' || key === 'se' || key === 'ca' || key === 'ra' || key === 'pe' || key === 'sa' || key === 'fo' || key === 'ke' || key === 'rl' || key === 'ir' || key === 'tp' || key === 'la') {
       out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * u;
       continue;
     }
@@ -663,6 +665,18 @@ const HEAD_BENCH_NORMAL = [Math.sin(HEAD_BENCH_ANGLE), Math.cos(HEAD_BENCH_ANGLE
 const PUSHDOWN_SLUGS = new Set(['triceps-pushdown', 'reverse-grip-triceps-pushdown', 'triceps-pushdown-rope-attachment']);
 const STRAIGHT_ARM_PULLDOWN = 'rope-straight-arm-pulldown';
 const ANKLE_KICKBACK = 'cable-glute-kickback';
+/**
+ * Standing lateral raises, front view. Each slug holds one fixed soft elbow
+ * bend for the whole rep: the forearm is that many degrees less abducted than
+ * the upper arm, which is what keeps the hand below the elbow at the top.
+ */
+export const LATERAL_RAISE_ELBOW_DEG: Readonly<Record<string, number>> = {
+  'dumbbell-lateral-raise': 15,
+  'lateral-raise-with-bands': 10,
+};
+/** Front-view arm bone lengths (the same 13.26 / 11.2 the keyed front-view arms use). */
+const RAISE_UPPER_ARM = 13.26;
+const RAISE_FOREARM = 11.2;
 const REVERSE_LUNGE = 'dumbbell-reverse-lunge';
 
 /** Rear foot steps away and returns; the entire front sole stays planted.
@@ -786,6 +800,29 @@ export function bodyTricepPressGeometry(phase: number, body: BodyParameters) {
     b: bar,
   };
   return { bar, heelAnchor, footWidth, joints, elbowFlexionDeg, plankAngleDeg: phi * 180 / Math.PI, barHeightAboveFloor: 96.9 - bar[1] };
+}
+
+/**
+ * Both arms of a standing lateral raise, drawn from the shoulder roots. The
+ * arms abduct in the frontal plane and mirror about the midline; nothing else
+ * on the figure moves. Exact on every tick, so the arc never cuts a chord.
+ */
+export function lateralRaiseArms(
+  abductionDeg: number, elbowBendDeg: number, nearShoulder: CanonicalPoint, farShoulder: CanonicalPoint,
+): { near: { el: CanonicalPoint; wr: CanonicalPoint }; far: { el: CanonicalPoint; wr: CanonicalPoint } } {
+  const upper = abductionDeg * Math.PI / 180;
+  const fore = (abductionDeg - elbowBendDeg) * Math.PI / 180;
+  const arm = (shoulder: CanonicalPoint, outward: number): { el: CanonicalPoint; wr: CanonicalPoint } => {
+    const el: CanonicalPoint = [
+      shoulder[0] + outward * RAISE_UPPER_ARM * Math.sin(upper), shoulder[1] + RAISE_UPPER_ARM * Math.cos(upper),
+    ];
+    const wr: CanonicalPoint = [
+      el[0] + outward * RAISE_FOREARM * Math.sin(fore), el[1] + RAISE_FOREARM * Math.cos(fore),
+    ];
+    return { el, wr };
+  };
+  const nearOutward = nearShoulder[0] <= farShoulder[0] ? -1 : 1;
+  return { near: arm(nearShoulder, nearOutward), far: arm(farShoulder, -nearOutward) };
 }
 
 /** Small hip arc with fixed soft knee; an actual cuff, not a hand cable. */
@@ -1193,6 +1230,11 @@ export function resolveFigureJoints(pose: CanonicalPose, opts: FigureOptions): F
     j.el = pull.near.projected.elbow; j.wr = pull.near.projected.wrist;
     j.ef = pull.far.projected.elbow; j.wf = pull.far.projected.wrist;
   }
+  if (front && LATERAL_RAISE_ELBOW_DEG[slug] !== undefined && j.la !== undefined) {
+    const raise = lateralRaiseArms(j.la, LATERAL_RAISE_ELBOW_DEG[slug], nArm, fArm);
+    j.el = raise.near.el; j.wr = raise.near.wr;
+    j.ef = raise.far.el; j.wf = raise.far.wr;
+  }
 
   return {
     hd: j.hd, nk: j.nk, hp: j.hp, waist,
@@ -1274,6 +1316,9 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     j.el = f.el; j.wr = f.wr; j.ef = f.ef; j.wf = f.wf;
   }
   if (slug === STRAIGHT_ARM_PULLDOWN && pose.sa !== undefined) {
+    j.el = f.el; j.wr = f.wr; j.ef = f.ef; j.wf = f.wf;
+  }
+  if (front && LATERAL_RAISE_ELBOW_DEG[slug] !== undefined && pose.la !== undefined) {
     j.el = f.el; j.wr = f.wr; j.ef = f.ef; j.wf = f.wf;
   }
   const fly = FLYE_INCLINES[slug] !== undefined && pose.fo !== undefined
@@ -1528,6 +1573,8 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'dumbbell-lateral-raise': 'dumbbells',
+  'lateral-raise-with-bands': 'band',
   'inverted-row': 'barbell',
   'body-tricep-press': 'squat_rack',
   'dumbbell-reverse-lunge': 'dumbbells',
@@ -2419,6 +2466,16 @@ function implement(
       // Neutral (thumbs-up) vertical orientation.
       if (j.wr) out.push({ kind: 'rect', x: j.wr[0] - 2.3, y: j.wr[1] - 6.5, w: 4.6, h: 13, rx: 1.6, fill: 'textHi', opacity: 1 });
       if (j.wf) out.push({ kind: 'rect', x: j.wf[0] - 2.3, y: j.wf[1] - 6.5, w: 4.6, h: 13, rx: 1.6, fill: farColor, opacity: farOpacity });
+    } else if (slug === 'dumbbell-lateral-raise') {
+      // Seen from the front, a bell held at the side or lifted out to the side
+      // points at the viewer, so it reads end-on in the fist for the whole
+      // rep. The outline keeps it apart from the thigh at the start.
+      const bell = (p: CanonicalPoint): void => {
+        out.push({ kind: 'rect', x: p[0] - 2.8, y: p[1] - 2.8, w: 5.6, h: 5.6, rx: 1.6,
+          fill: 'textHi', opacity: 1, stroke: 'ink1', strokeWidth: 1.4 });
+      };
+      if (j.wr) bell(j.wr);
+      if (j.wf) bell(j.wf);
     } else if (slug === 'goblet-squat' && j.b) {
       // Single front-held implement at anchor b.
       out.push({ kind: 'circle', cx: j.b[0], cy: j.b[1] + 1.6, r: 5.2, fill: 'textHi', opacity: 1 });
@@ -2609,6 +2666,17 @@ function implement(
     // at the overhead finish.
     out.push({ kind: 'bone', x1: 49, y1: 94, x2: j.wr[0] + 2.0, y2: j.wr[1] - 1.2, w: 1.4, color: 'textMid', opacity: 1 });
     out.push({ kind: 'bone', x1: 49, y1: 94, x2: j.wr[0] - 1.6, y2: j.wr[1] + 0.6, w: 1.4, color: 'textMid', opacity: 1 });
+  }
+  if (slug === 'lateral-raise-with-bands' && j.wr && j.wf && j.an && j.af) {
+    // The band is stood on at its middle and an end runs up to each hand. The
+    // foot anchors never move, so the band visibly lengthens as the arms rise.
+    const nearFoot: CanonicalPoint = [j.an[0], GROUND_LINE];
+    const farFoot: CanonicalPoint = [j.af[0], GROUND_LINE];
+    out.push({ kind: 'bone', x1: nearFoot[0], y1: nearFoot[1], x2: farFoot[0], y2: farFoot[1], w: 1.4, color: 'textMid', opacity: 1 });
+    out.push({ kind: 'bone', x1: nearFoot[0], y1: nearFoot[1], x2: j.wr[0], y2: j.wr[1], w: 1.4, color: 'textMid', opacity: 1 });
+    out.push({ kind: 'bone', x1: farFoot[0], y1: farFoot[1], x2: j.wf[0], y2: j.wf[1], w: 1.4, color: 'textMid', opacity: 1 });
+    out.push({ kind: 'circle', cx: j.wr[0], cy: j.wr[1], r: body.lw * 0.44, fill: 'textHi', opacity: 1 });
+    out.push({ kind: 'circle', cx: j.wf[0], cy: j.wf[1], r: body.lw * 0.44, fill: farColor, opacity: farOpacity });
   }
   if (slug === 'calf-raises-with-bands' && j.wr && j.an) {
     // Family 9: the band runs from under the forefeet up to the handles.
