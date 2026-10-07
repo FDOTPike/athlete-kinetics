@@ -42,8 +42,7 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // family 21 adds the Dead Bug, and family 22 adds Dumbbell Sumo Squat, and
   // family 27 adds the five overhead triceps extensions, and family 28 adds
   // family 37 adds the kneeling rows, and family 38 adds the incline raises.
-  // Original120 plus pushdowns, pulldown, flyes ankle kickback84 and reverse lunge52.
-  expect(CANONICAL.length).toBe(129);
+  expect(CANONICAL.length).toBe(131);
   for (const entry of CANONICAL) {
     for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {
