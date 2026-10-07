@@ -537,4 +537,55 @@ export const CHAIN_SPECS = [
     reason: 'Source-bound front-view draft. Standing tall with the bar across the back of the shoulders and the feet planted wide; the hips travel down and toward the lead foot as the lead knee and hip bend, the lead knee coming forward over its foot, while the trailing leg stays long with only a slight bend, and the lead leg straightens to return. Both feet stay where they are. One side is shown; the last caption carries the change of sides. Not drawn: the lead foot angled out, which this front-view foot cannot show; the caption states it.',
     summary: 'Feet wide and the bar across the back of the shoulders, bend the lead knee and hip to lower toward that side with the trailing leg long, then extend the lead leg to return.',
   },
+  {
+    id: 162,
+    slug: 'cable-seated-lateral-raise',
+    equipment: 'cable_machine',
+    phases: [0, 1, 1, 0, 0],
+    // "Pause, then lower the arms slowly to the start."
+    segments: [1200, 600, 1900, 500],
+    captions: [
+      'Sit on the end of a flat bench between two low pulleys, lean forward so the chest rests toward the thighs with the back flat, and hold the left handle in the right hand and the right handle in the left.',
+      'With a slight, fixed bend in the elbows, raise the upper arms out to the sides until they are level with the shoulders.',
+      'Pause at the top. Lead with the elbows.',
+      'Lower the arms slowly to the start.',
+      'Back flat, chest toward the thighs. Keep the elbow bend fixed.',
+    ],
+    reason: 'Source-bound draft, drawn from a 3D model turned 65 degrees so the seat, the forward lean and both arms show. Sitting on the end of a flat bench between two low pulleys, leaning forward from the hips with the back flat, each hand holding the handle from the opposite pulley so the cables cross under the chest; the arms raise out to the sides with one slight fixed elbow bend until the upper arms are level with the shoulders, pause, and lower more slowly. The trunk and legs do not move. Each cable only lengthens as its arm rises.',
+    summary: 'Seated between two low pulleys and leaning forward with a flat back, raise the arms out to the sides with a fixed slight elbow bend until level with the shoulders, pause, then lower slowly.',
+  },
+  {
+    id: 261,
+    slug: 'reverse-flyes',
+    equipment: 'dumbbells',
+    phases: [0, 1, 1, 0, 0],
+    // "Squeeze the shoulder blades together, then lower under control."
+    segments: [1200, 600, 1700, 500],
+    captions: [
+      'Lie chest-down on an incline bench with a dumbbell in each hand, palms facing each other, arms hanging perpendicular to the bench.',
+      'Holding a slight bend at the elbows, move the weights out and away from each other in an arc until the arms are parallel to the floor.',
+      'Squeeze the shoulder blades together.',
+      'Lower under control.',
+      'Keep the chest on the bench.',
+    ],
+    reason: 'Source-bound draft, drawn from a 3D model turned 40 degrees so both arms and the bench show. Chest down on a bench inclined at 45 degrees with the feet on the floor; the arms start hanging square to the bench and sweep out and apart in one arc, with one slight fixed elbow bend, until the upper arms are parallel to the floor, hold, and lower more slowly. The chest stays on the bench. Not drawn: the bench angle is not given by the source, so 45 degrees is a drawing choice; the shoulder blades squeezing together, which this figure has no way to show.',
+    summary: 'Chest down on an incline bench, sweep the dumbbells out and apart with a slight elbow bend until the arms are parallel to the floor, squeeze the shoulder blades, then lower under control.',
+  },
+  {
+    id: 131,
+    slug: 'back-flyes-with-bands',
+    equipment: 'bands',
+    phases: [0, 1, 1, 0, 0],
+    // "Pause, then let the hands return slowly to the front."
+    segments: [1100, 500, 1900, 500],
+    captions: [
+      'Loop a band around a rack upright, take an end in each hand and step back until the band is taut with the arms straight in front at shoulder height.',
+      'Keeping the arms straight and level with the floor, pull the hands apart and back until the arms are out to the sides.',
+      'Pause. Squeeze the shoulder blades together.',
+      'Let the hands return slowly to the front.',
+      'Arms straight and level with the floor.',
+    ],
+    reason: 'Source-bound draft, drawn from a 3D model turned 32 degrees and looked down on by 18, so the arms opening can be seen: the whole movement is in one level plane at shoulder height, which any level viewpoint flattens to a line. Because the view looks down, the nearer foot and the upright in front sit a little lower on the page than the farther foot. Standing facing a rack upright with a band looped round it at shoulder height and an end in each hand; the straight arms stay level with the floor and open from in front of the shoulders to out at the sides, pause, and return more slowly. Each end of the band runs from the upright to a hand and stretches as the hands part. This is the source\'s standing movement; the catalogue family name still says supine.',
+    summary: 'Standing with a band looped round a rack upright at shoulder height, pull the straight, level arms apart and back until they are out to the sides, pause, then return slowly to the front.',
+  },
 ];

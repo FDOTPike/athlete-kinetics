@@ -1244,6 +1244,12 @@ export interface ChainMovement {
   /** Side view by default. 'oblique' turns the figure by `yawDeg`; 'front' faces it. */
   view?: 'side' | 'oblique' | 'front';
   yawDeg?: number;
+  /**
+   * An oblique view can also look down on the figure by this many degrees, so
+   * that nearer things sit lower. For a movement that happens in one level
+   * plane, which any level viewpoint would flatten to a line.
+   */
+  pitchDeg?: number;
   /** The screen x of world x = 0. */
   originX?: number;
   poses: readonly ChainPose[];
@@ -1590,6 +1596,29 @@ function sideSplitSquatPose(hip: readonly [number, number, number]): ChainPose {
     upperArm: [-90, 35], forearm: [90, 0],
   };
 }
+
+/** The slight elbow bend the three side raises hold for the whole rep, in degrees. */
+export const SIDE_RAISE_ELBOW_BEND = { 'cable-seated-lateral-raise': 12, 'reverse-flyes': 10 } as const;
+/** The Cable Seated Lateral Raise: how far forward the trunk leans from the hips, and the two low pulleys either side of the bench. */
+export const SEATED_CABLE_RAISE_LEAN = 28;
+export const SEATED_CABLE_RAISE_PULLEYS: readonly [ChainPoint, ChainPoint] = [[20, 4, 46], [20, 4, -46]];
+/** The Reverse Flyes: the incline the chest lies on, and where the hips are. */
+export const REVERSE_FLYE_INCLINE = 45;
+const REVERSE_FLYE_HIP: readonly [number, number] = [38, 40];
+/** That bench: a pad along the front of the trunk, on a post. */
+function reverseFlyeBench(): ChainShape[] {
+  const along = chainUnit([REVERSE_FLYE_INCLINE, 0], 1);
+  const front = chainUnit([REVERSE_FLYE_INCLINE - 90, 0], 1);
+  const foot = chainAdd([REVERSE_FLYE_HIP[0], REVERSE_FLYE_HIP[1], 0], front, CHAIN_BACK_HALF + 2);
+  const low = chainAdd(foot, along, -2), high = chainAdd(foot, along, 21), prop = chainAdd(foot, along, 10);
+  return [
+    { kind: 'post', at: [prop[0], prop[1]] },
+    { kind: 'frame', a: [prop[0] - 12, 1.2], b: [prop[0] + 12, 1.2] },
+    { kind: 'slab', a: [low[0], low[1]], b: [high[0], high[1]] },
+  ];
+}
+/** The Back Flyes With Bands: where the band is looped round the rack upright, at shoulder height in front. */
+export const BACK_FLYE_ANCHOR: readonly [number, number] = [46, CHAIN_STANDING_HIP + CHAIN_TRUNK];
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -2050,6 +2079,81 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     kneePole: [0, 15],
     poses: [sideSplitSquatPose(SIDE_SPLIT_SQUAT.tall), sideSplitSquatPose(SIDE_SPLIT_SQUAT.low)],
   },
+  // Cable Seated Lateral Raise: on the end of a bench between two low
+  // pulleys, leaning forward with a flat back, each hand holding the opposite
+  // pulley's handle. The arms raise out to the sides with one fixed elbow bend.
+  'cable-seated-lateral-raise': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 65,
+    originX: 46,
+    implement: 'handles',
+    lines: [
+      { from: SEATED_CABLE_RAISE_PULLEYS[1], to: 'nearGrip' },
+      { from: SEATED_CABLE_RAISE_PULLEYS[0], to: 'farGrip' },
+    ],
+    equipment: [
+      { kind: 'pulley', at: SEATED_CABLE_RAISE_PULLEYS[0] },
+      { kind: 'pulley', at: SEATED_CABLE_RAISE_PULLEYS[1] },
+      { kind: 'post', at: [-24, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 4] },
+      { kind: 'post', at: [0, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 4] },
+      { kind: 'slab', a: [-29, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 2], b: [5, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 2] },
+    ],
+    poses: [
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: SEATED_CABLE_RAISE_LEAN, head: 12, thigh: [0, 10], shin: -90,
+        upperArm: [-90, 4], forearm: [-90, 4 - SIDE_RAISE_ELBOW_BEND['cable-seated-lateral-raise']],
+      },
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: SEATED_CABLE_RAISE_LEAN, head: 12, thigh: [0, 10], shin: -90,
+        upperArm: [-90, 90], forearm: [-90, 90 - SIDE_RAISE_ELBOW_BEND['cable-seated-lateral-raise']],
+      },
+    ],
+  },
+  // Reverse Flyes: chest down on an incline bench, feet on the floor. The arms
+  // start hanging square to the bench and sweep out and apart, with one slight
+  // elbow bend, until they are parallel to the floor.
+  'reverse-flyes': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 14,
+    implement: 'bells',
+    bellAxis: [Math.cos(chainRad(REVERSE_FLYE_INCLINE)), Math.sin(chainRad(REVERSE_FLYE_INCLINE)), 0],
+    kneePole: 0,
+    equipment: reverseFlyeBench(),
+    poses: [
+      {
+        at: REVERSE_FLYE_HIP, trunk: REVERSE_FLYE_INCLINE, thigh: -110, shin: -110, ankle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: [REVERSE_FLYE_INCLINE - 90, 6], forearm: [REVERSE_FLYE_INCLINE - 90, 6 - SIDE_RAISE_ELBOW_BEND['reverse-flyes']],
+      },
+      {
+        at: REVERSE_FLYE_HIP, trunk: REVERSE_FLYE_INCLINE, thigh: -110, shin: -110, ankle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: [REVERSE_FLYE_INCLINE - 90, 90], forearm: [REVERSE_FLYE_INCLINE - 90, 90 - SIDE_RAISE_ELBOW_BEND['reverse-flyes']],
+      },
+    ],
+  },
+  // Back Flyes - With Bands: standing, a band looped round a rack upright in
+  // front at shoulder height, an end in each hand. The straight arms stay
+  // level and open from in front of the shoulders to out at the sides.
+  'back-flyes-with-bands': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    // The whole movement is in one level plane at shoulder height, so the view looks down a little.
+    pitchDeg: 18,
+    originX: 30,
+    implement: 'handles',
+    lines: [{ from: BACK_FLYE_ANCHOR, to: 'nearGrip' }, { from: BACK_FLYE_ANCHOR, to: 'farGrip' }],
+    equipment: [
+      { kind: 'frame', a: [BACK_FLYE_ANCHOR[0], 0.5], b: [BACK_FLYE_ANCHOR[0], 92] },
+      { kind: 'frame', a: [BACK_FLYE_ANCHOR[0] - 8, 1.2], b: [BACK_FLYE_ANCHOR[0] + 8, 1.2] },
+    ],
+    poses: [
+      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [0, 0], forearm: [0, 0] },
+      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [0, 90], forearm: [0, 90] },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -2225,8 +2329,17 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   // the side view's usual far-side offset instead.
   const yaw = chainRad(front ? 90 : view === 'oblique' ? movement.yawDeg ?? 35 : 0);
   const originX = movement.originX ?? (view === 'side' ? 0 : 50);
-  const project = (q: ChainVec): CanonicalPoint =>
-    [originX + q[0] * Math.cos(yaw) - q[2] * Math.sin(yaw), CHAIN_FLOOR - q[1]];
+  const pitch = chainRad(view === 'oblique' ? movement.pitchDeg ?? 0 : 0);
+  /** How far toward the viewer a point is. */
+  const nearness = (q: ChainVec): number => q[0] * Math.sin(yaw) + q[2] * Math.cos(yaw);
+  // Looking down, the nearest sole would drop below the floor line: the whole
+  // figure is lifted by just that much, so its nearest foot still stands on it.
+  const soles = [nearLeg.end, farLeg.end, nearToe, farToe].filter((q): q is ChainVec => q !== null);
+  const lift = pitch === 0 ? 0
+    : Math.max(...soles.map(nearness)) * Math.sin(pitch) + CHAIN_ANKLE_HEIGHT * (1 - Math.cos(pitch));
+  const project = (q: ChainVec): CanonicalPoint => (pitch === 0
+    ? [originX + q[0] * Math.cos(yaw) - q[2] * Math.sin(yaw), CHAIN_FLOOR - q[1]]
+    : [originX + q[0] * Math.cos(yaw) - q[2] * Math.sin(yaw), CHAIN_FLOOR - lift - q[1] * Math.cos(pitch) + nearness(q) * Math.sin(pitch)]);
   const off: readonly [number, number] = view === 'side' ? FAROFF_DEFAULT : [0, 0];
   const projectFar = (q: ChainVec): CanonicalPoint => {
     const p = project(q);
@@ -3261,6 +3374,9 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'cable-seated-lateral-raise': 'cable_machine',
+  'reverse-flyes': 'dumbbells',
+  'back-flyes-with-bands': 'band',
   'upright-barbell-row': 'barbell',
   'upright-row-with-bands': 'band',
   'barbell-side-split-squat': 'barbell',
