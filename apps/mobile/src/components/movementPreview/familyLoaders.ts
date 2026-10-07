@@ -79,6 +79,7 @@ export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> =
   'trunk-twist__decline': () => require('./families/trunk-twist__decline.json') as PreviewFamilyFile,
   'trunk-twist__seated': () => require('./families/trunk-twist__seated.json') as PreviewFamilyFile,
   'trunk-twist__supine': () => require('./families/trunk-twist__supine.json') as PreviewFamilyFile,
+  'upright-row__standing': () => require('./families/upright-row__standing.json') as PreviewFamilyFile,
   'vertical-press__seated': () => require('./families/vertical-press__seated.json') as PreviewFamilyFile,
   'vertical-press__standing': () => require('./families/vertical-press__standing.json') as PreviewFamilyFile,
   'vertical-pull__standing': () => require('./families/vertical-pull__standing.json') as PreviewFamilyFile,

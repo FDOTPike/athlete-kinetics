@@ -1176,8 +1176,8 @@ export type ChainPoint = readonly [number, number] | readonly [number, number, n
 
 /** One pose of a chain movement. */
 export interface ChainPose {
-  /** Where the root joint is: [forward, height above the floor]. */
-  at: readonly [number, number];
+  /** Where the root joint is: [forward, height above the floor], with an optional third number across the body. */
+  at: ChainPoint;
   /** The spine's direction, hip toward neck. */
   trunk: ChainDir;
   /** How far the spine is curled forward, in degrees, from one end to the other. */
@@ -1557,6 +1557,39 @@ const RUN_POSES: ChainPose[] = RUN_LEG.map((leg, k): ChainPose => {
     farUpperArm: RUN_ARM[(k + 3) % 6], farForearm: RUN_ARM[(k + 3) % 6] + 80,
   };
 });
+
+/** The height of the shoulders of a figure standing tall in a front view. */
+const CHAIN_FRONT_SHOULDER = CHAIN_FRONT_HIP + CHAIN_TRUNK;
+/**
+ * The upright rows: half the distance between the hands, and where the hands
+ * are at the bottom (against the thighs) and at the top (toward the chin), as
+ * [forward of the shoulders, below the shoulders].
+ */
+export const UPRIGHT_ROW = {
+  'upright-barbell-row': { gripHalf: 7.6, bottom: [5, 23.6], top: [6.3, 1] },
+  'upright-row-with-bands': { gripHalf: 8.5, bottom: [5, 23.5], top: [6.3, 2.5] },
+} as const;
+/** One upright-row pose: both hands at the same height, each on its own side of the midline. */
+function uprightRowPose(slug: keyof typeof UPRIGHT_ROW, end: 'bottom' | 'top'): ChainPose {
+  const spec = UPRIGHT_ROW[slug];
+  const [forward, below] = spec[end];
+  return {
+    at: [0, CHAIN_FRONT_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: -90, forearm: -90,
+    wrist: [forward, CHAIN_FRONT_SHOULDER - below, spec.gripHalf],
+    farWrist: [forward, CHAIN_FRONT_SHOULDER - below, -spec.gripHalf],
+  };
+}
+/** The Barbell Side Split Squat: how far each foot is from the midline, and where the hips are standing tall and at the bottom. */
+export const SIDE_SPLIT_SQUAT = { footOut: 22, tall: [0, 44.4, 0], low: [0, 35.5, 14] } as const;
+/** One side-split-squat pose: feet planted wide, the bar held across the back of the shoulders. */
+function sideSplitSquatPose(hip: readonly [number, number, number]): ChainPose {
+  return {
+    at: hip, trunk: 90, thigh: -90, shin: -90,
+    ankle: [0, CHAIN_FRONT_ANKLE, SIDE_SPLIT_SQUAT.footOut],
+    farAnkle: [0, CHAIN_FRONT_ANKLE, -SIDE_SPLIT_SQUAT.footOut],
+    upperArm: [-90, 35], forearm: [90, 0],
+  };
+}
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -1982,6 +2015,41 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     cycle: true,
     poses: RUN_POSES,
   },
+  // Upright Barbell Row: seen from the front. The hands travel straight up
+  // the front of the body from the thighs toward the chin, and the elbows are
+  // solved up and out to the sides, finishing higher than the hands.
+  'upright-barbell-row': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'bar',
+    farArmOver: true,
+    elbowPole: [90, 65],
+    poses: [uprightRowPose('upright-barbell-row', 'bottom'), uprightRowPose('upright-barbell-row', 'top')],
+  },
+  // Upright Row - With Bands: the same lift with a band under the feet and an
+  // end in each hand, the hands a little wider and finishing a little lower.
+  'upright-row-with-bands': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'handles',
+    farArmOver: true,
+    elbowPole: [90, 65],
+    lines: [{ from: 'nearFoot', to: 'nearGrip' }, { from: 'farFoot', to: 'farGrip' }],
+    poses: [uprightRowPose('upright-row-with-bands', 'bottom'), uprightRowPose('upright-row-with-bands', 'top')],
+  },
+  // Barbell Side Split Squat: seen from the front, feet planted wide, the bar
+  // across the back of the shoulders. The hips travel down and toward the
+  // lead foot: the lead knee bends forward over it, the trailing leg stays long.
+  'barbell-side-split-squat': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'bar',
+    kneePole: [0, 15],
+    poses: [sideSplitSquatPose(SIDE_SPLIT_SQUAT.tall), sideSplitSquatPose(SIDE_SPLIT_SQUAT.low)],
+  },
   // chain movements are added above this line
 };
 
@@ -2076,7 +2144,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const shift: ChainVec = movement.root === 'neck' ? [at[0] - top[0], at[1] - top[1], 0]
     : movement.root === 'ankle'
       ? [at[0] - (shinUp[0] * CHAIN_SHIN + thighUp[0] * CHAIN_THIGH), at[1] - (shinUp[1] * CHAIN_SHIN + thighUp[1] * CHAIN_THIGH), 0]
-      : [at[0], at[1], 0];
+      : [at[0], at[1], at[2] ?? 0];
   for (let i = 0; i <= CHAIN_SPINE_STEPS; i++) spineWorld[i] = chainAdd(spineWorld[i], shift, 1);
   const hip = spineWorld[0];
   const neck = spineWorld[CHAIN_SPINE_STEPS];
@@ -2242,8 +2310,12 @@ function layoutChainExtras(
   }
 
   for (const cable of movement.lines ?? []) {
-    const start: CanonicalPoint = cable.from === 'nearFoot' ? [j.an[0] + CHAIN_FOOT / 2, GROUND_LINE]
-      : cable.from === 'farFoot' ? [j.af[0] + CHAIN_FOOT / 2, GROUND_LINE]
+    // Under the middle of the foot: ahead of the ankle from the side, at the ankle from the front.
+    const underFoot = figure.view === 'front' ? 0 : CHAIN_FOOT / 2;
+    // A band trapped under a foot starts on the floor: its own half-width above it.
+    const trapped = CHAIN_FLOOR - 0.7;
+    const start: CanonicalPoint = cable.from === 'nearFoot' ? [j.an[0] + underFoot, trapped]
+      : cable.from === 'farFoot' ? [j.af[0] + underFoot, trapped]
         : project(chainWorld(cable.from));
     const end = cable.to === 'nearGrip' ? figure.hold.near : cable.to === 'farGrip' ? figure.hold.far
       : cable.to === 'nearAnkle' ? j.an : j.af;
@@ -3189,6 +3261,9 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'upright-barbell-row': 'barbell',
+  'upright-row-with-bands': 'band',
+  'barbell-side-split-squat': 'barbell',
   'floor-back-extension': 'none',
   'bench-dip': 'none',
   'decline-push-up': 'none',
