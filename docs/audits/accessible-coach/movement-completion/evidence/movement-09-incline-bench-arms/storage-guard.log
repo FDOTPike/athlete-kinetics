@@ -1,4 +1,4 @@
-source commit: 1aa54fb73bacbc6a3c9b599222a9cc8085b97335
+source commit: bc0d89f720a5310e0d7b4534f714c25ffdc21bc8
 command: node --expose-gc tools/rendering/verify_preview_storage.mjs
 
 {
@@ -6,8 +6,8 @@ command: node --expose-gc tools/rendering/verify_preview_storage.mjs
   "scope": "Host storage and retained JSON-clone regression only; no native peak memory/frame-timing/4GBphone acceptance",
   "records": 149,
   "families": 56,
-  "rawBytes": 437857,
-  "gzipBytes": 67584,
+  "rawBytes": 438015,
+  "gzipBytes": 67589,
   "largestFamily": {
     "file": "horizontal-press__supine.json",
     "rawBytes": 40359
@@ -24,13 +24,13 @@ command: node --expose-gc tools/rendering/verify_preview_storage.mjs
   },
   "allFamilies": {
     "samples": [
-      1169776,
-      1168928,
-      1168880,
-      1168880,
-      1168880
+      1169624,
+      1168776,
+      1168728,
+      1168728,
+      1168728
     ],
-    "medianBytes": 1168880
+    "medianBytes": 1168728
   },
   "budgets": {
     "rawBytes": 1048576,

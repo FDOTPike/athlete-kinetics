@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "1aa54fb73bacbc6a3c9b599222a9cc8085b97335",
+  "sourceCommit": "bc0d89f720a5310e0d7b4534f714c25ffdc21bc8",
   "sourcesCommittedAtRender": true,
-  "previewDataSha256": "b245816e06c1208c5d0778b11ea5e5e8b4dd33e4284e7c0259dee6426e99a6e8",
+  "previewDataSha256": "585e5e1cf6fef58c1fb66cca49552f2fa62f55edb63b1777632c0a0a38dae976",
   "rendering": "Headless production primitives; no native FPS or technique approval.",
   "sourceHashes": {
     "apps/mobile/src/components/movementPreview/previewIndex.json": "39ae016b5f5704178d8d86d65f4e383fc89616c4501338ea21be19fe206ce4ec",
@@ -10,10 +10,10 @@
     "apps/mobile/src/components/movementPreview/families/carry__standing.json": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1",
     "apps/mobile/src/components/movementPreview/families/dead-bug__supine.json": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4",
     "apps/mobile/src/components/movementPreview/families/elbow-extension__bodyweight-supported.json": "8d7224737feb97b56676119f24b08333c83f6d6a431946db593046e5da491350",
-    "apps/mobile/src/components/movementPreview/families/elbow-extension__incline.json": "ee8653e29149e3edc624f56db076d37fc6deeab9b25a18e38cbc062e06a560cc",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__incline.json": "fc17be85a24dab44118a5c9498ab9880fa021e5b7e8dc76b699ebe106adb9b8b",
     "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json": "fdc05d92b4a9f9b3f97057d1401ca3571ed91aaf9a9f574755c698bb45fe39dc",
     "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json": "90f47cc370395e1f4f5865771042646b906d2900888920093ff62a1ef0d903c7",
-    "apps/mobile/src/components/movementPreview/families/elbow-flexion__incline.json": "59a0bebe1def121cf174e735395e5cbed42381dca65639c5646a785472603dbd",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__incline.json": "177477273ed652ced95919e99390cda012495d92297833c5e2b1a0e0811f9328",
     "apps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json": "0355638f947b68167280b6cbc4f88b38acd20bf9ce656d3af5abaacd1afa7e23",
     "apps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json": "2210f422efd0319444802d2cd8efd468d83c8aa47ab4862762c760b64fb60d1c",
     "apps/mobile/src/components/movementPreview/families/face-pull__standing.json": "5233dd4ac70c38daa6593f753c9db4468c3558cc00e70e8abe7d084060b2576a",
@@ -34,7 +34,7 @@
     "apps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json": "a690cf1dc453f422f8592c44c5128145f167f1fe84d2d227fb81d66c7deb1146",
     "apps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json": "9d5ae1ca045621f87d150913f9325718f00f5d1d870552278c443470c37eaa14",
     "apps/mobile/src/components/movementPreview/families/horizontal-pull__supine.json": "4cbcbf28d779fdb79f29236392f62647b00e60213a2b579bd52a09014ea43d34",
-    "apps/mobile/src/components/movementPreview/families/isolation-other__incline.json": "d786c633150a7e0f1065e041a301c520fc7dd818fc0dd8020bd9079a0539e4f9",
+    "apps/mobile/src/components/movementPreview/families/isolation-other__incline.json": "3ce388f9db170d958a63c4ba7d7219386f152077cbc95995822cf0715bcd2a1b",
     "apps/mobile/src/components/movementPreview/families/lateral-raise__seated.json": "be9760653a769408471ff60c71f859f7d42b1529b6fb7fe93deb596cda41d76a",
     "apps/mobile/src/components/movementPreview/families/lateral-raise__standing.json": "0624052005553ef2f7a1609e1a2ab4cb122739f117f82d038e38761a05f07a71",
     "apps/mobile/src/components/movementPreview/families/locomotion__standing.json": "8627d8fc74cda7e64ff7dccdf8b4d32e952dcc96e9a642473327490e2f9f112a",
@@ -81,11 +81,11 @@
       "records": [
         {
           "body": "neutral",
-          "tickCount": 114,
-          "totalMs": 3700,
-          "sheetSha256": "a0b144cf785a13c7db59d7834ebd60ac1981d09b8f41a8efe6cde662f9720d50",
-          "htmlSha256": "431f24eecd7d8bc7f6e9b3e2accab7410290a8532ef0e5b99968e3554066105e",
-          "primitiveFramesSha256": "3736936d82f8478b914838f76e46f47a8dfb4cd01b38b600a32574aa4614ae84"
+          "tickCount": 129,
+          "totalMs": 4200,
+          "sheetSha256": "72a4603dcf4f6549b9b8bebb6aa023b9754fc903de2b1b948841730e2f5a311d",
+          "htmlSha256": "0dea5e2e23ee9f1192271983d753e221f03ab46a8b9dfce5b9bb5e6d9ea0d138",
+          "primitiveFramesSha256": "38c375acb8271fce0abf25d659379f91bbaf574afbf408b1f349f803a97922a5"
         }
       ]
     },
@@ -102,11 +102,11 @@
       "records": [
         {
           "body": "neutral",
-          "tickCount": 123,
-          "totalMs": 4000,
-          "sheetSha256": "2ff895f91a03e118d8ea5268406fa19351a77782c0caab6c129f76b0a6dfced8",
-          "htmlSha256": "b1ba4eb63c42170b780dd9db4e25dcc4f311eaddb1981d3121f5fa51df2825e8",
-          "primitiveFramesSha256": "f202de8099e4c17ca18900ec8c66aad09bcda3111ee659dcd699cb0dfd8276bb"
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "1defc2b28184462587f03fe41485cae79f2c048a3ae8feb48b2acf3398671972",
+          "htmlSha256": "3a9c2ba772cc89d04b82e0989f447d98b3d2780b84ee9f602efd597e7e10a69e",
+          "primitiveFramesSha256": "8b57292dbbcb2e2eb42dc2aa08905f91f032200e4b441b05a7a84c9e4824bf0a"
         }
       ]
     },
@@ -123,11 +123,11 @@
       "records": [
         {
           "body": "neutral",
-          "tickCount": 117,
-          "totalMs": 3800,
-          "sheetSha256": "2ad516a7d694cb965bc740c855941093059f3759823ac4956a924a2e33492530",
-          "htmlSha256": "1463f35d7903b4cc8a85d8ea524c4859f75bec61cf114a343b62da2274900e51",
-          "primitiveFramesSha256": "99697120a8b7c1f0e749567f64aa3dec9cb04ee1c7549d277512786abdc0a66c"
+          "tickCount": 132,
+          "totalMs": 4300,
+          "sheetSha256": "c8ff93386544587166c5f9febda2a7f1d766385e89bc475e96eae0b26a714ce0",
+          "htmlSha256": "b3a10855e18e83662da9feab9129f008c60d3d4074090c00e0ff61a5ac61a7c2",
+          "primitiveFramesSha256": "440da0acee6e7ec1fd7395879b04cc7eeeb8d060d0e672003adf83029df7c352"
         }
       ]
     },
@@ -144,11 +144,11 @@
       "records": [
         {
           "body": "neutral",
-          "tickCount": 114,
-          "totalMs": 3700,
-          "sheetSha256": "2a0702d52006b7ed23ba618b609ca58b728eb1ca555f91a823d0d83c1fe1438d",
-          "htmlSha256": "0ca34f134a95ac2f4f6830f75e741f43e3383291bf663e608ea1f57d1e6b658e",
-          "primitiveFramesSha256": "3740161a0043f95e3793974c115bc7f8a46c3980faba67b84c957da1e69e8d78"
+          "tickCount": 129,
+          "totalMs": 4200,
+          "sheetSha256": "091d7a2b274e111268237290d03daca2c59710dc1c304ac0a70e69324cdb3059",
+          "htmlSha256": "0688f41e3d05e9c6c8922c8b5e36bf1d5807ad0c2f330a7e0edcbea145bad9c8",
+          "primitiveFramesSha256": "5c05c506d84e0254038d07dafff232ea29795d18ce8ad017682009bf612dde1a"
         }
       ]
     }
