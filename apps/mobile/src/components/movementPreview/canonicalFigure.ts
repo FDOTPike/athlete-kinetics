@@ -1795,7 +1795,13 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   // front/side silhouette bars alone cannot span this projected girdle.
   if (fly) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
   if (proneRaise) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
-  if (seatedRaise) prims.push(bone(fArm, nArm, body.lw * 0.88, 'textLow', 1));
+  if (seatedRaise) {
+    // The shoulder girdle, as one piece out to each shoulder. With an upright
+    // trunk a single bar across both shoulders would sit exactly where the
+    // first trunk slice does and be mistaken for it by the torso checks.
+    prims.push(bone(j.nk, fArm, body.lw * 0.88, 'textLow', 1));
+    prims.push(bone(j.nk, nArm, body.lw * 0.88, 'textLow', 1));
+  }
   // The far arm is behind the head-support bench; the near arm is in front.
   if (slug === HEAD_SUPPORTED_RAISE) prims.push(...apparatus(slug, front, body));
   // Overlapping transverse bars form one shoulder→waist→hip silhouette.
