@@ -1,0 +1,12 @@
+source commit: d1797e57e77a7337ddd1d8dc32ab190ad8150ba5
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov04.json
+
+movements measured: 136 (baseline 134)
+added: 50 Dumbbell Lateral Raise; 236 Lateral Raise - With Bands
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  50 Dumbbell Lateral Raise: drawn d3640ce372ecaa66a3ac3ced876e2a17a2a86e321a2163ad088d61cae9dacfb2 captions e7e2fe5de5a334b2bd6ec7e9ef0af8d5c25c48eef0e318d338efba88d70c57ca stage 213.33x240.00 cycle 4400 ms
+  236 Lateral Raise - With Bands: drawn 367c449237e71865628afdc0387a8504f848df29ebab435bd98ea5bc4636f409 captions 167e43b3df61d6e4a26fb116b337e295f3d44f6b5c1fec89ae2e232f230379f6 stage 213.33x240.00 cycle 4000 ms
+exit code: 0 (probe run exit 0)
