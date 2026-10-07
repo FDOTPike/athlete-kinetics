@@ -1,0 +1,16 @@
+source commit: 2b3ebd9f0d5df688715fa39a68310ff4a66dd519
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov11.json
+
+movements measured: 158 (baseline 152)
+added: 95 Sit-Up; 124 Tuck Crunch; 72 Reverse Crunch; 99 Cable Reverse Crunch; 150 Bent-Knee Hip Raise; 183 Decline Reverse Crunch
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  95 Sit-Up: drawn 39d20e8464f14e61d3637a95cc05294ad67f8046c4fdf12acd6863310ccb0282 captions b94a8a1ebbdce0b0f3b9359e281316e0827ab6a483c75412771936599dcb7f5f stage 240.00x148.15 cycle 4600 ms
+  124 Tuck Crunch: drawn f36c7a18e37a78de169c888e5cb0bb96e0e21a80e4e6e5507b0bd5623e41cdda captions dacc941cb945a2f7a3feaf5fd2e2b8b367a8cf6ee8a5a5fee94bc0ce95c06df7 stage 240.00x153.33 cycle 4000 ms
+  72 Reverse Crunch: drawn 44043e965a8c9ad85cde534a4ef77ed2a86d63226fe168ab03736db3e84c22ae captions 16a2ce5b909e2ee1b21ef2cea3da16f599def1864b267d47d30ff155f51a4586 stage 240.00x186.67 cycle 3750 ms
+  99 Cable Reverse Crunch: drawn 396ed38cf25784557aadf63392cb96f98f76164ce87fe70be0774962dbe863c5 captions 3efc4d009de35d3d60f4c942cbfcab34c6a281f8311cafefc7dd80ecdcd42630 stage 240.00x136.80 cycle 4100 ms
+  150 Bent-Knee Hip Raise: drawn 0cdb4d74a2aaa5fd273b86aa236b9113a33bbd66ce9ee7b22ba7abf9d901eb3a captions 14ae4a345418a209f1f32306ca64609d41c5c9f6fb0d2f7990601fd276c41d13 stage 240.00x155.45 cycle 5100 ms
+  183 Decline Reverse Crunch: drawn 833fc302f198630d10b65b0828cef9616e8cb3481211ac374edd5c6bf2164132 captions 2ec3b572ffa91d2c43ce3762997648e06d46d6e30ddac9eb2cd582a2d70ae1b4 stage 240.00x168.46 cycle 4800 ms
+exit code: 0 (probe run exit 0)
