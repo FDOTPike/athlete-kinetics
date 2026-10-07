@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 import React from 'react';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { DUAL_BODY_PARAMETERS, layoutCanonicalFigure, resolveFigureJoints, lerpJoints, poseAtTime } from '../../src/components/movementPreview/canonicalFigure';
+import { DUAL_BODY_PARAMETERS, layoutCanonicalFigure, resolveFigureJoints, lerpJoints, poseAtTime, trunkCentreline } from '../../src/components/movementPreview/canonicalFigure';
 import { MovementPreview } from '../../src/components/movementPreview';
 import * as manifest from '../../src/components/movementPreview/manifest';
 import { resetPreviewPlayback } from '../../src/components/movementPreview/playbackCoordinator';
@@ -35,7 +35,10 @@ function torsoOf(pose, options) {
   // Select the actual transverse slice at the resolved neck, rather than
   // treating every opaque anatomical connector as a torso slice. Connectivity
   // and all negative mutations below still grade the complete slice run.
-  const spine = [joints.hp[0] - joints.nk[0], joints.hp[1] - joints.nk[1]];
+  // A curled trunk has no single axis: its first slice is square to the spine
+  // where the spine leaves the neck.
+  const line = trunkCentreline(pose, options);
+  const spine = [line[1][0] - line[0][0], line[1][1] - line[0][1]];
   const start = prims.findIndex((p, i) => i >= far && isTrunk(p)
     && Math.hypot((p.x1 + p.x2) / 2 - joints.nk[0], (p.y1 + p.y2) / 2 - joints.nk[1]) < 1e-8
     && Math.abs((p.x2 - p.x1) * spine[0] + (p.y2 - p.y1) * spine[1]) < 1e-8);
@@ -53,7 +56,38 @@ test.each(['neutral'])('one opaque seam-free trunk replaces the outlined rings (
     && p.opacity === 1 && p.stroke === undefined)).toBe(true);
 });
 
-function connected(torso, pose) {
+/**
+ * The same connected-trunk law for a curled spine, measured along the spine's
+ * own drawn line: every bar centred on it, square to it where it sits, and
+ * the bars covering its whole length without a gap.
+ */
+function connectedAlong(torso, line) {
+  if (!torso.length || torso.some((p) => p.kind !== 'bone' || p.opacity !== 1
+    || p.color !== 'textLow' || p.stroke !== undefined)) return false;
+  const arc = [0];
+  for (let i = 1; i < line.length; i++) arc.push(arc[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+  const intervals = [];
+  for (const p of torso) {
+    const cx = (p.x1 + p.x2) / 2, cy = (p.y1 + p.y2) / 2;
+    const at = line.findIndex((q) => Math.hypot(q[0] - cx, q[1] - cy) < 1e-7);
+    if (at < 0) return false;
+    const before = line[Math.max(0, at - 1)], after = line[Math.min(line.length - 1, at + 1)];
+    const bx = p.x2 - p.x1, by = p.y2 - p.y1;
+    if (![bx, by, p.w].every(Number.isFinite) || p.w <= 0 || Math.hypot(bx, by) <= 0
+      || Math.abs(bx * (after[0] - before[0]) + by * (after[1] - before[1])) > 1e-7) return false;
+    intervals.push([arc[at] - p.w / 2, arc[at] + p.w / 2]);
+  }
+  intervals.sort((a, b) => a[0] - b[0]);
+  let end = 0;
+  for (const [lo, hi] of intervals) {
+    if (lo > end + 1e-8) return false;
+    end = Math.max(end, hi);
+  }
+  return end >= arc.at(-1);
+}
+
+function connected(torso, pose, line) {
+  if (line !== undefined && line.length > 2) return connectedAlong(torso, line);
   if (!torso.length || torso.some((p) => p.kind !== 'bone' || p.opacity !== 1
     || p.color !== 'textLow' || p.stroke !== undefined)) return false;
   const dx = pose.hp[0] - pose.nk[0], dy = pose.hp[1] - pose.nk[1];
@@ -90,7 +124,7 @@ test.each(canonicals.map((e) => [e.name, e]))('%s: both bodies retain connected,
       ? [f.joints] : [f.joints, lerpJoints(f.joints, e.frames[i + 1].joints, 0.5)]);
     for (const pose of poses) {
       const torso = torsoOf(pose, options);
-      expect(connected(torso, resolveFigureJoints(pose, options))).toBe(true);
+      expect(connected(torso, resolveFigureJoints(pose, options), trunkCentreline(pose, options))).toBe(true);
       // Bound View allocation, and reject a uniform stack or a narrow spine
       // masquerading as a torso. Widths remain body/view-specific.
       expect(torso.length).toBeLessThanOrEqual(40);

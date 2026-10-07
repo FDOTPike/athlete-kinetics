@@ -1255,6 +1255,11 @@ export interface ChainMovement {
   bellAxis?: readonly [number, number, number];
   lines?: readonly ChainLine[];
   equipment?: readonly ChainShape[];
+  /**
+   * Arm directions are given as if the trunk were upright and turn with the
+   * top of the spine (hands that stay on the chest or by the head as the trunk curls).
+   */
+  armsFollowTrunk?: boolean;
   /** Paint the far arm over the trunk (hands in front of the body in a front view). */
   farArmOver?: boolean;
   /** Paint the near arm over the head (an arm held beside the head). */
@@ -1427,6 +1432,37 @@ const CONCENTRATION_BODY = {
     -(CANONICAL_BODY_PARAMETERS.hw * 0.8 + CHAIN_THIGH * Math.sin(chainRad(30)) - 1),
   ],
 } as const;
+
+/**
+ * The height of the spine of a figure lying on the floor: half the trunk's
+ * depth, plus the rounded edge its slices are drawn with, so nothing is
+ * painted below the floor.
+ */
+export const CHAIN_LYING_HEIGHT = CHAIN_BACK_HALF + 0.6;
+/** Arms lying on the floor beside the body, pointing at the feet, palms down. */
+const ARMS_BESIDE = { upperArm: -8, forearm: -12 } as const;
+/** The low pulley beyond the feet for the Cable Reverse Crunch. */
+export const CABLE_REVERSE_CRUNCH_PULLEY: readonly [number, number] = [93, 5];
+/** The Decline Reverse Crunch: how steep the bench is, and where the shoulders lie on it. */
+export const DECLINE_REVERSE_CRUNCH_DEG = 20;
+const DECLINE_REVERSE_CRUNCH_NECK: readonly [number, number] = [24, 30];
+/** That bench: one board under the back with the head at the high end, a handle beyond the head, a support at each end. */
+function declineReverseCrunchBench(): ChainShape[] {
+  const uphill = chainUnit([180 - DECLINE_REVERSE_CRUNCH_DEG, 0], 1);
+  const under = chainUnit([270 - DECLINE_REVERSE_CRUNCH_DEG, 0], 1);
+  const foot = chainAdd([DECLINE_REVERSE_CRUNCH_NECK[0], DECLINE_REVERSE_CRUNCH_NECK[1], 0], under, CHAIN_BACK_HALF + 2);
+  const high = chainAdd(foot, uphill, 21), low = chainAdd(foot, uphill, -34);
+  return [
+    { kind: 'post', at: [high[0] + 4, high[1]] },
+    { kind: 'post', at: [low[0] - 4, low[1]] },
+    { kind: 'slab', a: [high[0], high[1]], b: [low[0], low[1]] },
+  ];
+}
+/** Where the hands hold the top of that bench: on the board's upper face, beyond the head. */
+const DECLINE_REVERSE_CRUNCH_GRIP: readonly [number, number] = [
+  DECLINE_REVERSE_CRUNCH_NECK[0] + 20 * Math.cos(chainRad(180 - DECLINE_REVERSE_CRUNCH_DEG)) + CHAIN_BACK_HALF * Math.cos(chainRad(270 - DECLINE_REVERSE_CRUNCH_DEG)),
+  DECLINE_REVERSE_CRUNCH_NECK[1] + 20 * Math.sin(chainRad(180 - DECLINE_REVERSE_CRUNCH_DEG)) + CHAIN_BACK_HALF * Math.sin(chainRad(270 - DECLINE_REVERSE_CRUNCH_DEG)) + 2,
+];
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -1615,6 +1651,92 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { ...WRIST_CURL_BODY, hand: 50 },
     ],
   },
+  // Sit-Up: knees bent, feet flat, hands crossed on the chest. The spine peels
+  // off the floor from the top down, then the whole curled trunk comes up
+  // until the chest meets the thighs, and it rolls back down the same way.
+  'sit-up': {
+    root: 'hip',
+    kneePole: 90,
+    armsFollowTrunk: true,
+    poses: [
+      { at: [50, CHAIN_LYING_HEIGHT], trunk: 180, curl: 0, thigh: 50, shin: -50, ankle: [77, CHAIN_ANKLE_HEIGHT], upperArm: -70, forearm: 92 },
+      { at: [50, CHAIN_LYING_HEIGHT], trunk: 180, curl: 60, thigh: 50, shin: -50, ankle: [77, CHAIN_ANKLE_HEIGHT], upperArm: -70, forearm: 92 },
+      { at: [50, CHAIN_LYING_HEIGHT], trunk: 97, curl: 64, thigh: 50, shin: -50, ankle: [77, CHAIN_ANKLE_HEIGHT], upperArm: -70, forearm: 92 },
+    ],
+  },
+  // Tuck Crunch: hips and knees bent, arms reaching toward the feet; the
+  // shoulders curl up while the knees travel a little toward the chest.
+  'tuck-crunch': {
+    root: 'hip',
+    spine: 'upper',
+    feet: 'free',
+    poses: [
+      { at: [48, CHAIN_LYING_HEIGHT], trunk: 180, curl: 0, thigh: 90, shin: 0, foot: 80, upperArm: 4, forearm: 4 },
+      { at: [48, CHAIN_LYING_HEIGHT], trunk: 180, curl: 48, thigh: 106, shin: 12, foot: 92, upperArm: 10, forearm: 6 },
+    ],
+  },
+  // Reverse Crunch: knees bent over the hips, hands flat beside the body. The
+  // lower spine curls so the pelvis rolls up; the legs ride with it and keep
+  // their shape, and the feet never come down.
+  'reverse-crunch': {
+    root: 'neck',
+    trunkAt: 'neck',
+    spine: 'lower',
+    feet: 'free',
+    poses: [
+      { at: [22, CHAIN_LYING_HEIGHT], trunk: 180, curl: 0, thigh: 90, shin: 0, foot: 80, ...ARMS_BESIDE },
+      { at: [22, CHAIN_LYING_HEIGHT], trunk: 180, curl: 50, thigh: 140, shin: 50, foot: 130, ...ARMS_BESIDE },
+    ],
+  },
+  // Cable Reverse Crunch: the same roll against a low cable cuffed to the
+  // ankles, lying with the head away from the stack.
+  'cable-reverse-crunch': {
+    root: 'neck',
+    trunkAt: 'neck',
+    spine: 'lower',
+    feet: 'free',
+    lines: [{ from: CABLE_REVERSE_CRUNCH_PULLEY, to: 'nearAnkle' }],
+    equipment: [
+      { kind: 'frame', a: [CABLE_REVERSE_CRUNCH_PULLEY[0], 0.5], b: [CABLE_REVERSE_CRUNCH_PULLEY[0], 18] },
+      { kind: 'pulley', at: CABLE_REVERSE_CRUNCH_PULLEY },
+    ],
+    poses: [
+      { at: [18, CHAIN_LYING_HEIGHT], trunk: 180, curl: 0, thigh: 90, shin: 0, foot: 80, ...ARMS_BESIDE },
+      { at: [18, CHAIN_LYING_HEIGHT], trunk: 180, curl: 12, thigh: 102, shin: 12, foot: 92, ...ARMS_BESIDE },
+      { at: [18, CHAIN_LYING_HEIGHT], trunk: 180, curl: 42, thigh: 134, shin: 44, foot: 124, ...ARMS_BESIDE },
+    ],
+  },
+  // Bent-Knee Hip Raise: from legs held low with the knees bent 75 degrees,
+  // the knees are drawn toward the chest at that same knee angle, then the
+  // pelvis rolls back and the hips leave the floor.
+  'bent-knee-hip-raise': {
+    root: 'neck',
+    trunkAt: 'neck',
+    spine: 'lower',
+    feet: 'free',
+    poses: [
+      { at: [20, CHAIN_LYING_HEIGHT], trunk: 180, curl: 0, thigh: 35, shin: -40, foot: 40, ...ARMS_BESIDE },
+      { at: [20, CHAIN_LYING_HEIGHT], trunk: 180, curl: 0, thigh: 105, shin: 30, foot: 110, ...ARMS_BESIDE },
+      { at: [20, CHAIN_LYING_HEIGHT], trunk: 180, curl: 40, thigh: 145, shin: 70, foot: 150, ...ARMS_BESIDE },
+    ],
+  },
+  // Decline Reverse Crunch: head at the high end of a decline bench, hands on
+  // the top of it; the legs start level with the floor, the knees come toward
+  // the chest and the pelvis rolls so the hips lift off the bench.
+  'decline-reverse-crunch': {
+    root: 'neck',
+    trunkAt: 'neck',
+    spine: 'lower',
+    feet: 'free',
+    elbowPole: 90,
+    nearArmOverHead: true,
+    equipment: declineReverseCrunchBench(),
+    poses: [
+      { at: DECLINE_REVERSE_CRUNCH_NECK, trunk: 180 - DECLINE_REVERSE_CRUNCH_DEG, curl: 0, thigh: 8, shin: -8, foot: 75, upperArm: 150, forearm: 175, wrist: DECLINE_REVERSE_CRUNCH_GRIP },
+      { at: DECLINE_REVERSE_CRUNCH_NECK, trunk: 180 - DECLINE_REVERSE_CRUNCH_DEG, curl: 0, thigh: 95, shin: 10, foot: 95, upperArm: 150, forearm: 175, wrist: DECLINE_REVERSE_CRUNCH_GRIP },
+      { at: DECLINE_REVERSE_CRUNCH_NECK, trunk: 180 - DECLINE_REVERSE_CRUNCH_DEG, curl: 40, thigh: 135, shin: 50, foot: 135, upperArm: 150, forearm: 175, wrist: DECLINE_REVERSE_CRUNCH_GRIP },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -1658,12 +1780,15 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
   const given = dir(a.trunk, b.trunk);
   const thigh = dir(a.thigh, b.thigh);
   const shin = dir(a.shin, b.shin);
-  const upperArm = dir(a.upperArm, b.upperArm);
-  const forearm = dir(a.forearm, b.forearm);
+  // Arms that follow the trunk turn by however far the top of the spine has left upright.
+  const carried = movement.armsFollowTrunk === true ? given[0] - (movement.trunkAt === 'neck' ? 0 : curl) - 90 : 0;
+  const carry = (d: readonly [number, number]): readonly [number, number] => [d[0] + carried, d[1]];
+  const upperArm = carry(dir(a.upperArm, b.upperArm));
+  const forearm = carry(dir(a.forearm, b.forearm));
   const farThigh = dir(a.farThigh ?? a.thigh, b.farThigh ?? b.thigh);
   const farShin = dir(a.farShin ?? a.shin, b.farShin ?? b.shin);
-  const farUpperArm = dir(a.farUpperArm ?? a.upperArm, b.farUpperArm ?? b.upperArm);
-  const farForearm = dir(a.farForearm ?? a.forearm, b.farForearm ?? b.forearm);
+  const farUpperArm = carry(dir(a.farUpperArm ?? a.upperArm, b.farUpperArm ?? b.upperArm));
+  const farForearm = carry(dir(a.farForearm ?? a.forearm, b.farForearm ?? b.forearm));
   const hand = optDir(a.hand, b.hand);
   const foot = optDir(a.foot, b.foot);
   const farFoot = optDir(a.farFoot ?? a.foot, b.farFoot ?? b.foot);
@@ -1806,6 +1931,21 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters) {
     footWidth: feet === 'flat' ? body.lw * 0.9 : body.lw * 0.82,
     angles: { trunk: given, curl, sideCurl, twist, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
   };
+}
+
+/**
+ * The line the trunk is drawn along, neck first: the two ends of a straight
+ * trunk, or every point of a curled one. The torso checks measure the drawn
+ * slices against this.
+ */
+export function trunkCentreline(pose: CanonicalPose, opts: FigureOptions): CanonicalPoint[] {
+  const slug = slugOf(opts.assetKey);
+  if (CHAIN_MOVEMENTS[slug] !== undefined && pose.ph !== undefined) {
+    const figure = chainGeometry(slug, pose.ph, opts.body ?? CANONICAL_BODY_PARAMETERS);
+    if (figure.curled) return figure.spine;
+  }
+  const joints = resolveFigureJoints(pose, opts);
+  return [joints.nk, joints.hp];
 }
 
 /** A chain movement's equipment, lines and held implement, grouped by where they are painted. */
@@ -2788,6 +2928,12 @@ function foot(an: CanonicalPoint, color: ColorRole, body: BodyParameters, front:
 
 /** Equipment class per movement slug (mirrors the manifest entries). */
 export const EQUIPMENT_BY_SLUG: Record<string, string> = {
+  'sit-up': 'none',
+  'tuck-crunch': 'none',
+  'reverse-crunch': 'none',
+  'cable-reverse-crunch': 'cable_machine',
+  'bent-knee-hip-raise': 'none',
+  'decline-reverse-crunch': 'none',
   'spider-curl': 'barbell',
   'concentration-curls': 'dumbbells',
   'decline-dumbbell-triceps-extension': 'dumbbells',
