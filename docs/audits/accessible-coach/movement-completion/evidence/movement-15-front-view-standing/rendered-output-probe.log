@@ -1,0 +1,13 @@
+source commit: 1ee91f04f81dfa88defa48c30e4b09ba175bcb59
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov14.json
+
+movements measured: 170 (baseline 167)
+added: 295 Upright Barbell Row; 297 Upright Row - With Bands; 139 Barbell Side Split Squat
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  295 Upright Barbell Row: drawn f214cb4a95d2fdbb2ab97f6d3c640ef12fa38756f3dd17776e1de7733ba6e946 captions 24a64c0f2e811ff7efdf580f817b344ad0d44a5dee44a2467c858b58beab1c64 stage 123.87x240.00 cycle 4000 ms
+  297 Upright Row - With Bands: drawn 54fc61888ad8a9429506d607dffcdbe9a4b3adb8fa5fe72b0b4ec90b10e687f6 captions a3b77ad2dbeef3024bb05fbb437a16a55568cc291354ae35f65fff0db84cab69 stage 129.03x240.00 cycle 4300 ms
+  139 Barbell Side Split Squat: drawn 5738c2d59a9dac0a976e881d89a76fcb594a2491f67d67a44fa7fbdbf758b564 captions 68fc5641bf7592777889b20557f5c03ddd156c915fea6266659f9657f8c7e8fe stage 197.33x240.00 cycle 3350 ms
+exit code: 0 (probe run exit 0)
