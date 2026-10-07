@@ -42,6 +42,9 @@ const RAW_MANIFEST = {
 };
 const PREVIEW_ENTRIES = previewEntries();
 
+// 164, 268 and 269 are back as pending drafts (the figure now has a hand that
+// bends at the wrist); 200 Finger Curls stays out on its source hold. The note
+// below records why they left.
 // Entry 0183: the four wrist-curl movements (164 Cable Wrist Curl, 200 Finger
 // Curls, 268 and 269 the seated dumbbell wrist curls) are out of the manifest, so
 // they are no longer authored canonical entries. They stay BLOCKED; nothing else
@@ -89,7 +92,7 @@ const PREVIEW_ENTRIES = previewEntries();
 // (122, base) and Kneeling High Pulley Row (234).
 // Family 38 (front raise, incline): Barbell Incline Shoulder Raise (135, base)
 // and Dumbbell Incline Shoulder Raise (187).
-const CANONICAL_AUTHORED = [14, 9, 15, 10, 11, 12, 21, 54, 17, 19, 39, 62, 55, 74, 103, 169, 294, 298, 300, 97, 113, 287, 86, 100, 128, 133, 141, 168, 185, 196, 227, 246, 22, 30, 117, 238, 273, 142, 144, 146, 147, 32, 115, 197, 198, 224, 127, 274, 280, 284, 76, 118, 267, 270, 34, 106, 114, 126, 167, 172, 199, 260, 278, 134, 212, 216, 218, 24, 159, 25, 251, 111, 191, 26, 42, 44, 57, 59, 266, 60, 254, 255, 174, 175, 263, 116, 157, 193, 282, 283, 53, 82, 138, 163, 125, 161, 225, 226, 40, 132, 214, 73, 173, 245, 90, 222, 223, 92, 158, 253, 29, 75, 51, 286, 110, 143, 122, 234, 135, 187, 80, 262, 292, 264, 49, 178, 220, 84, 52, 66, 152, 50, 236, 87, 206, 272, 219, 221, 207, 155, 179, 180, 156, 237];
+const CANONICAL_AUTHORED = [14, 9, 15, 10, 11, 12, 21, 54, 17, 19, 39, 62, 55, 74, 103, 169, 294, 298, 300, 97, 113, 287, 86, 100, 128, 133, 141, 168, 185, 196, 227, 246, 22, 30, 117, 238, 273, 142, 144, 146, 147, 32, 115, 197, 198, 224, 127, 274, 280, 284, 76, 118, 267, 270, 34, 106, 114, 126, 167, 172, 199, 260, 278, 134, 212, 216, 218, 24, 159, 25, 251, 111, 191, 26, 42, 44, 57, 59, 266, 60, 254, 255, 174, 175, 263, 116, 157, 193, 282, 283, 53, 82, 138, 163, 125, 161, 225, 226, 40, 132, 214, 73, 173, 245, 90, 222, 223, 92, 158, 253, 29, 75, 51, 286, 110, 143, 122, 234, 135, 187, 80, 262, 292, 264, 49, 178, 220, 84, 52, 66, 152, 50, 236, 87, 206, 272, 219, 221, 207, 155, 179, 180, 156, 237, 276, 171, 268, 269, 164];
 const PROTOTYPE_COVERED = [28, 16, 88];
 // R2 Part A authored the first derived draft preview (186, `derivesFrom` 62);
 // Stage 2 Batch 1 adds 247 (`derivesFrom` 12), 20 (`derivesFrom` 19) and 113
