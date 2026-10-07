@@ -1,0 +1,12 @@
+source commit: 809ac1ed2da2776a8a443ecc5bb930aa395caeb3
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov06.json
+
+movements measured: 138 (baseline 138)
+added: none
+removed: none
+changed, expected: 135 Barbell Incline Shoulder Raise; 187 Dumbbell Incline Shoulder Raise
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  135 Barbell Incline Shoulder Raise: drawn 4eb8ce0a21b4c5fb15e3c2aea072a288d9e881422d86c3d2542c0eda9d7bc8b2 captions fef9f42faef9bb02f00419d5ca4daaf9d6980ec323df7246c11546c6ef6a6fa9 stage 205.71x240.00 cycle 2700 ms
+  187 Dumbbell Incline Shoulder Raise: drawn 8051a83592a60ac94b052f4c5710ac9289d9e404c8bab78f4ae7312dfcdf2b3d captions 403d818175ad4973bc5decab592d316d841894ec1f7272e0b5344e10e3a2ab66 stage 222.86x240.00 cycle 2700 ms
+exit code: 0 (probe run exit 0)
