@@ -201,6 +201,42 @@ describe('Concentration Curls (171)', () => {
     }
   });
 
+  // Owner review, 8 October 2026: "the inner side of the wrist when supinated
+  // should rotate upward towards the same-side ear ... pinky towards ear".
+  test('owner cue, "pinky towards ear": at the peak the dumbbell tilts, its inner end rising toward the same-side ear', () => {
+    const [up, squeeze] = entry171.segmentDurationsMs;
+    /** The drawn handle's two ends, the one nearer the body's midline first. */
+    const handleOf = (figure) => {
+      const handle = figure.prims.find((p) => p.kind === 'bone' && p.w === 1.8);
+      const ends = [[handle.x1, handle.y1], [handle.x2, handle.y2]];
+      return Math.abs(ends[0][0] - figure.joints.nk[0]) <= Math.abs(ends[1][0] - figure.joints.nk[0]) ? ends : ends.reverse();
+    };
+    // Level through the lower half of the curl: the wrist has not started to turn.
+    for (const t of ticksOf(entry171).filter((tick) => tick <= up)) {
+      const figure = figureAt(entry171, t);
+      if (poseAtTime(entry171.frames.map((f) => f.joints), t, entry171.segmentDurationsMs).ph > 0.5) continue;
+      expect(figure.peakTilt).toBe(0);
+    }
+    // It builds over the upper half and is all there at the top, and through the squeeze.
+    const tilts = ticksOf(entry171).filter((tick) => tick <= up).map((t) => figureAt(entry171, t).peakTilt);
+    for (let i = 1; i < tilts.length; i++) expect(tilts[i]).toBeGreaterThanOrEqual(tilts[i - 1] - 1e-9);
+    for (const t of [up, up + squeeze / 2, up + squeeze]) {
+      const figure = figureAt(entry171, t);
+      expect(figure.peakTilt).toBeCloseTo(15, 9);
+      const [inner, outer] = handleOf(figure);
+      // Screen y grows downward: the inner end is the higher one, by the tilt.
+      const run = Math.abs(outer[0] - inner[0]);
+      expect(outer[1] - inner[1]).toBeCloseTo(run * Math.tan((15 * Math.PI) / 180), 6);
+      // Toward the same-side ear: the raised end is the one nearer the head.
+      expect(distance(inner, figure.joints.hd)).toBeLessThan(distance(outer, figure.joints.hd));
+      // Still one bell, still in the hand.
+      expect((inner[0] + outer[0]) / 2).toBeCloseTo(figure.hold.near[0], 9);
+      expect((inner[1] + outer[1]) / 2).toBeCloseTo(figure.hold.near[1], 9);
+    }
+    // And it is gone again by the time the arm is straight.
+    expect(figureAt(entry171, ticksOf(entry171).at(-1)).peakTilt).toBe(0);
+  });
+
   test('"Squeeze, then lower slowly until the arm is straight. Complete the repetitions, then change arms."', () => {
     const [up, squeeze, down] = entry171.segmentDurationsMs;
     expect(squeeze).toBeGreaterThanOrEqual(400);
