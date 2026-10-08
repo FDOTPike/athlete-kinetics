@@ -21,14 +21,14 @@ const basePose66 = Object.fromEntries(
 
 const captions66 = [
   'Get under the hip-height bar with heels planted and body in one rigid plank.',
-  'Pull your chest toward the bar, leading with the elbows.',
-  'Touch your chest to the bar with glutes squeezed and body rigid.',
+  'Pull your chest to the bar, leading with the elbows, glutes squeezed and body rigid.',
   'Hold chest to bar at the top, touching the same spot.',
   'Lower under control without letting the hips sag.',
   'Return to fully long arms with the plank held rigid.',
 ];
 
-const irValues = [0, 0.5, 1.0, 1.0, 0.5, 0];
+// One eased gap each way: a keyframe half-way would make the body hesitate there.
+const irValues = [0, 1.0, 1.0, 0, 0];
 const entry66 = {
   movementId: 66,
   name: row66.name,
@@ -50,7 +50,7 @@ const entry66 = {
     caption: captions66[i],
     joints: { ...structuredClone(basePose66), ir },
   })),
-  segmentDurationsMs: [800, 600, 400, 800, 800],
+  segmentDurationsMs: [1400, 400, 1600, 500],
 };
 
 const at66 = manifest.entries.findIndex(e => e.movementId === 66);
@@ -72,14 +72,13 @@ const basePose152 = Object.fromEntries(
 
 const captions152 = [
   'Grip the chest-height bar shoulder-width and lean on straight arms in one line.',
-  'Bend the elbows while shoulders stay still and the body stays straight.',
-  'Lower until elbows are deeply flexed toward the bar.',
+  'Bend the elbows while the shoulders stay still, lowering until the elbows are deeply flexed toward the bar.',
   'Pause at the bottom, keeping the body in one straight line.',
   'Press through the palms, straightening the elbows to push away.',
   'Return to straight arms with the body held in one line.',
 ];
 
-const tpValues = [0, 0.5, 1.0, 1.0, 0.5, 0];
+const tpValues = [0, 1.0, 1.0, 0, 0];
 const entry152 = {
   movementId: 152,
   name: row152.name,
@@ -101,7 +100,7 @@ const entry152 = {
     caption: captions152[i],
     joints: { ...structuredClone(basePose152), tp },
   })),
-  segmentDurationsMs: [900, 600, 500, 800, 800],
+  segmentDurationsMs: [1500, 500, 1300, 500],
 };
 
 const at152 = manifest.entries.findIndex(e => e.movementId === 152);

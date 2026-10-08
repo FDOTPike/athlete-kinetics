@@ -35,15 +35,16 @@ if (row.motion.source_hold_reason) throw Error('Movement 272 is on a source hold
 if (row.source.asset_key !== `movement/${SLUG}/demo/v1`) throw Error(`Movement 272 asset key ${row.source.asset_key} does not match slug ${SLUG}`);
 
 // Hanging by the sides, then out until the arms are parallel to the floor.
-const ANGLES = [8, 52, 94, 94, 8];
+// One eased gap each way: a keyframe half-way would make the arms hesitate there.
+const ANGLES = [8, 94, 94, 8, 8];
 // "pause for a second. Lower back down slowly": a one-second hold, then one unbroken lowering.
-const SEGMENTS = [550, 550, 1000, 2000];
+const SEGMENTS = [1100, 1000, 2000, 500];
 const CAPTIONS = [
   'Sit at the end of a flat bench with the feet firmly on the floor and a dumbbell in each hand hanging by your sides.',
-  'Keeping the torso still, lift the dumbbells out to the side with a slight bend at the elbow.',
-  'Continue until the arms are parallel to the floor.',
+  'Keeping the torso still, lift the dumbbells out to the side with a slight bend at the elbow until the arms are parallel to the floor.',
   'Pause for a second at shoulder level.',
   'Lower back down slowly to the start.',
+  'Lift out to shoulder level, torso still.',
 ];
 
 const entry = {

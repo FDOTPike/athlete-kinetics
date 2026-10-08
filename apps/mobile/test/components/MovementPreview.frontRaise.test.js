@@ -38,7 +38,7 @@ function figureAt(entry, t) {
 
 /** Flexion of a segment: degrees forward (toward +x, the way the figure faces) from hanging straight down. */
 const flexion = (from, to) => deg(Math.atan2(to[0] - from[0], to[1] - from[1]));
-const topTime = (entry) => entry.segmentDurationsMs[0] + entry.segmentDurationsMs[1];
+const topTime = (entry) => entry.segmentDurationsMs[0];
 
 describe.each([
   ['Dumbbell Front Raise', entry87, 'dumbbell-front-raise'],
@@ -112,9 +112,9 @@ describe('Dumbbell Front Raise (87)', () => {
   });
 
   test('"Slower down than up": the lowering is one unbroken phase, longer than the raise', () => {
-    const [upA, upB, hold, down] = entry87.segmentDurationsMs;
-    expect(down).toBeGreaterThanOrEqual(1.5 * (upA + upB));
-    expect(hold).toBeLessThan(upA + upB);
+    const [up, hold, down] = entry87.segmentDurationsMs;
+    expect(down).toBeGreaterThanOrEqual(1.5 * (up));
+    expect(hold).toBeLessThan(up);
   });
 
   test('draws one end-on dumbbell in each hand and no cable', () => {
@@ -156,10 +156,10 @@ describe('Front Cable Raise (206)', () => {
   });
 
   test('"Pause, then lower slowly": a real pause, and a lowering slower than the raise', () => {
-    const [upA, upB, pause, down] = entry206.segmentDurationsMs;
+    const [up, pause, down] = entry206.segmentDurationsMs;
     expect(pause).toBeGreaterThanOrEqual(400);
-    expect(down).toBeGreaterThan(upA + upB);
-    const held = [0, pause / 2, pause].map((dt) => figureAt(entry206, upA + upB + dt).joints.wr);
+    expect(down).toBeGreaterThan(up);
+    const held = [0, pause / 2, pause].map((dt) => figureAt(entry206, up + dt).joints.wr);
     expect(held[1]).toEqual(held[0]);
     expect(held[2]).toEqual(held[0]);
   });

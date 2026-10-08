@@ -45,7 +45,7 @@ function figureAt(entry, barbell, t) {
     prims: layoutCanonicalFigure(pose, opts),
   };
 }
-const topTime = (entry) => entry.segmentDurationsMs[0] + entry.segmentDurationsMs[1];
+const topTime = (entry) => entry.segmentDurationsMs[0];
 
 describe.each([
   ['Barbell Incline Shoulder Raise', entry135, true],
@@ -136,7 +136,7 @@ describe.each([
     // "elbows leading first": through the first half of the raise the elbow
     // climbs further than the hand does.
     const bottom = figureAt(entry, barbell, 0).model.near.world;
-    const half = figureAt(entry, barbell, entry.segmentDurationsMs[0]).model.near.world;
+    const half = figureAt(entry, barbell, entry.segmentDurationsMs[0] / 2).model.near.world;
     expect(half.elbow[1] - bottom.elbow[1]).toBeGreaterThanOrEqual(2);
     expect(half.elbow[1] - bottom.elbow[1]).toBeGreaterThan(half.wrist[1] - bottom.wrist[1]);
   });

@@ -50,16 +50,16 @@ const MOVEMENTS = [
     // Hanging just off the thighs, then elbows to shoulder height (the upper
     // arm 88 degrees from hanging puts the elbow within half a unit of the
     // shoulder line).
-    // The half-way keyframe is a teaching still: the elbows visibly lead the hands.
-    angles: [15, 52, 88, 88, 15],
+    // One eased gap each way: a keyframe half-way would make the arms hesitate there.
+    angles: [15, 88, 88, 15, 15],
     // "Three seconds down": one unbroken three-second lowering.
-    segmentDurationsMs: [550, 550, 300, 3000],
+    segmentDurationsMs: [1100, 300, 3000, 500],
     captions: [
       'Stand with a slight forward lean and the dumbbells hanging just off the thighs.',
-      'Lead with the elbows as the arms rise out to the sides.',
-      'Raise until the elbows reach shoulder height.',
+      'Lead with the elbows as the arms rise out to the sides, until the elbows reach shoulder height.',
       'At the top the elbows are at shoulder height and the hands stay below them.',
       'Lower on a controlled three-second count and keep the torso still.',
+      'Lean an inch forward to take the front delts out of it.',
     ],
     summary: 'Raise the dumbbells out to the sides until the elbows reach shoulder height, then lower for three seconds.',
     reason: 'Source-bound draft, front view. Arms abduct with one fixed soft elbow bend, elbows lead and finish at shoulder height with the hands below them, trunk and legs stay still, and the lowering takes three seconds as the cue asks. A front view cannot show the slight forward lean or the slightly-forward arm path the instructions describe; those live in the captions only.',
@@ -70,15 +70,15 @@ const MOVEMENTS = [
     previewId: 'lateral_raise_with_bands_236_draft',
     equipment: 'band',
     // Arms almost straight at the sides of the thighs, then just above level.
-    angles: [8, 52, 96, 96, 8],
+    angles: [8, 96, 96, 8, 8],
     // "Pause, then lower slowly."
-    segmentDurationsMs: [650, 650, 500, 2200],
+    segmentDurationsMs: [1300, 500, 2200, 500],
     captions: [
       'Stand on the middle of the band and hold an end in each hand at the sides of the thighs, back tall.',
-      'With a slight, fixed bend in the elbows, raise the arms out to the sides.',
-      'Raise until the arms are just above level with the floor.',
+      'With a slight, fixed bend in the elbows, raise the arms out to the sides until they are just above level with the floor.',
       'Pause at the top with the torso still.',
       'Lower slowly against the band to the start.',
+      'Torso stays still. Lead with the elbows.',
     ],
     summary: 'Stand on the band and raise both arms out to the sides to just above level, pause, then lower slowly.',
     reason: 'Source-bound draft, front view. The band is stood on at its middle and an end runs to each hand, so it lengthens as the arms rise. One fixed slight elbow bend, arms finish just above level with the floor, a pause at the top, and a lowering slower than the raise. Trunk and legs stay still.',

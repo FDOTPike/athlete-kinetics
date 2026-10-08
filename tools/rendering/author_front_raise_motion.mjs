@@ -47,15 +47,15 @@ const MOVEMENTS = [
     equipment: 'dumbbells',
     viewBox: [26, 6, 56, 94],
     // In front of the thighs, then straight ahead to shoulder height.
-    angles: [6, 48, 90, 90, 6],
-    // "Slower down than up": one unbroken lowering, twice the raise.
-    segmentDurationsMs: [450, 450, 200, 1800],
+    angles: [6, 90, 90, 6, 6],
+    // "Slower down than up": one unbroken raise, and a lowering twice as long.
+    segmentDurationsMs: [900, 200, 1800, 500],
     captions: [
       'Stand holding the dumbbells in front of your thighs, palms facing back.',
-      'Raise both arms straight ahead with a soft elbow.',
-      'Lift to shoulder height while the torso stays a pillar.',
+      'Raise both arms straight ahead with a soft elbow to shoulder height, the torso a pillar.',
       'Hold at shoulder height with the hands soft.',
       'Lower on a slow count, slower down than up.',
+      'The delts raise, the body stays.',
     ],
     summary: 'Raise both dumbbells straight ahead to shoulder height with a soft elbow, then lower on a slow count.',
     reason: 'Source-bound draft, side view. The text allows one or both arms; this draft shows both, as a labelled bilateral demonstration. The arms flex forward from in front of the thighs to shoulder height with a soft elbow, the trunk and legs stay still, and the lowering is slower than the raise. The bells are held palms back, so they read end-on from the side.',
@@ -67,15 +67,15 @@ const MOVEMENTS = [
     equipment: 'cable_machine',
     viewBox: [8, 6, 68, 94],
     // In front of the thigh, then just above level with the floor.
-    angles: [6, 50, 96, 96, 6],
+    angles: [6, 96, 96, 6, 6],
     // "Pause, then lower slowly."
-    segmentDurationsMs: [550, 550, 500, 2200],
+    segmentDurationsMs: [1100, 500, 2200, 500],
     captions: [
       'Stand facing away from the low pulley with the handle in one hand in front of the thigh.',
-      'Keep the torso still and a slight bend in the elbow as the arm rises to the front.',
-      'Raise until the arm is just above level with the floor.',
+      'Keep the torso still and a slight bend in the elbow as the arm rises to the front, until it is just above level with the floor.',
       'Pause at the top.',
-      'Lower slowly to the start, then change arms after the set.',
+      'Lower slowly to the start.',
+      'Change arms after the set.',
     ],
     summary: 'Facing away from a low pulley, raise one arm to the front to just above level, pause, then lower slowly.',
     reason: 'Source-bound draft, side view. One handle on a low pulley behind the athlete; the working arm rises to the front to just above level with the floor while the free arm hangs, the trunk and legs stay still, there is a pause at the top, and the lowering is slower than the raise. One arm is shown; the caption tells the athlete to change arms after the set.',

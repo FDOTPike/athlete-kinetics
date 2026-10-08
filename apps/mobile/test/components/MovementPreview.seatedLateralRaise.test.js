@@ -20,8 +20,8 @@ const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
 const abduction = (from, to) => deg(Math.atan2(to[2] - from[2], from[1] - to[1]));
 
 const entry = previewManifest.entries.find((e) => e.movementId === 272);
-const [upA, upB, hold, down] = entry.segmentDurationsMs;
-const TOP = upA + upB;
+const [up, hold, down] = entry.segmentDurationsMs;
+const TOP = up;
 
 /** Every 33 ms tick of the cycle, plus its exact end. */
 function ticks() {
@@ -137,7 +137,7 @@ test('"Continue until the arms are parallel to the floor" / "Lift out to shoulde
 
 test('"pause for a second. Lower back down slowly"', () => {
   expect(hold).toBeGreaterThanOrEqual(1000);
-  expect(down).toBeGreaterThanOrEqual(1.5 * (upA + upB));
+  expect(down).toBeGreaterThanOrEqual(1.5 * up);
   const held = [0, hold / 2, hold].map((dt) => figureAt(TOP + dt).model.near.world.wrist);
   expect(held[1]).toEqual(held[0]);
   expect(held[2]).toEqual(held[0]);
