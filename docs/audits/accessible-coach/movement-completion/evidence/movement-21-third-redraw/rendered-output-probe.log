@@ -1,0 +1,19 @@
+source commit: bd38f037ac620e88afbe71e7ff30cbca780a836e
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov20.json
+
+movements measured: 173 (baseline 173)
+added: none
+removed: none
+changed, expected: 280 Standing Dumbbell Press; 294 Underhand Cable Pulldowns; 298 V-Bar Pullup; 267 Seated Cable Shoulder Press; 270 Seated Dumbbell Press; 126 Alternate Hammer Curl; 172 Cross Body Hammer Curl; 57 Dumbbell Sumo Squat; 254 Push Up to Side Plank
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  280 Standing Dumbbell Press: drawn 2cac29a2e78a6e5aa7b71f9172e2895893cc7a9b5702e6de17dd16c017a4779f captions a2ed03b88210f094d0a354b3923ffb775fa6b30206d825343956dbe0fffe216f stage 144.91x240.00 cycle 4000 ms
+  294 Underhand Cable Pulldowns: drawn 3ea41d8285af05f6d794ceca362cfafb6de27d62e5251f1bbbdfa28d3bc1e706 captions 47dec7fc0c7235bd5ca633185a384a2b1139d711de22cc2886faf50d909ac10d stage 110.59x240.00 cycle 4900 ms
+  298 V-Bar Pullup: drawn c7c806da3f0c397f36961bccab6c511bcfe3eb1eca1db2237a7db5828a3f55c8 captions 8b5b59c2229b46b86cb6dd515e7f7202472f1f4eb70b247b036dccdfd41e8d65 stage 96.81x240.00 cycle 4500 ms
+  267 Seated Cable Shoulder Press: drawn d901fff876cbfb533602b4763678e885554c7f3a9b4787b76004d8b4e28bbfbd captions e421a6e9402f8e05a908b89fcfbc85997bdfc06adeda2ccdc66dc96b2c970c1b stage 240.00x237.14 cycle 4200 ms
+  270 Seated Dumbbell Press: drawn a692302be8d8bd5bc718ef28f1c0c9a6876416126267450b0a58200a86aa31b9 captions b1cbc11789826f6d27b585cffcc1ce6f0009e298bedea7e20283683a3319898a stage 164.82x240.00 cycle 4000 ms
+  126 Alternate Hammer Curl: drawn f4a225c73fd4bb5d168fd398e48438bff98780ea2ca6ba8bed26cc3549d1c7bb captions 5f5ccfcb894bc31a7623dfa78b7575c8b9e6fd36ae1b8a326c11b0fe68a982f8 stage 117.39x240.00 cycle 6600 ms
+  172 Cross Body Hammer Curl: drawn 1008b06d5b4304292bd297cca7d044e7b33af52d8da3d96d1cc3bb86fbd3135b captions b66126b00d47daa411796b9e2d6e7d182897d182be585d6052ad9614fc5ee4ba stage 109.57x240.00 cycle 7000 ms
+  57 Dumbbell Sumo Squat: drawn 8f676b5272ee40f6cec9beb9a66059dd8acfed764e6b69a8855666c988204bd5 captions ffdd7208f09c0019640d2af522fda08ae7c7ead3fc09a73cc384fc3235731fd7 stage 140.87x240.00 cycle 3700 ms
+  254 Push Up to Side Plank: drawn cd12cba55d623eee914df01624089960459a929eb441d9d660d5135774be7f75 captions 7071e081ecd7f002b4cd7eb0d558f9c59602a79cf8eca8d1df6fa86b651a783a stage 240.00x192.99 cycle 6100 ms
+exit code: 0 (probe run exit 0)
