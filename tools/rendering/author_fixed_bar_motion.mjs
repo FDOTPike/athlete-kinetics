@@ -100,7 +100,8 @@ const entry152 = {
     caption: captions152[i],
     joints: { ...structuredClone(basePose152), tp },
   })),
-  segmentDurationsMs: [1500, 500, 1300, 500],
+  // Lowering 1500 and pressing back 1600, as the two halves of each took before.
+  segmentDurationsMs: [1500, 500, 1600, 500],
 };
 
 const at152 = manifest.entries.findIndex(e => e.movementId === 152);
