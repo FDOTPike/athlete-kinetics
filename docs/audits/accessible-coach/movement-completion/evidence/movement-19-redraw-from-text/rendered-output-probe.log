@@ -1,0 +1,21 @@
+source commit: 5c9c25be7d6e8081fc2749b187fb6eca63af734a
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov18.json
+
+movements measured: 173 (baseline 173)
+added: none
+removed: none
+changed, expected: 238 Low Pulley Row To Neck; 115 Cable Internal Rotation; 224 Internal Rotation with Band; 39 Cable Crunch; 25 Pallof Press; 251 Pallof Press With Rotation; 161 Cable Seated Crunch; 226 Janda Sit-Up; 40 Cable Pull-Through; 173 Cross-Body Crunch; 286 Step-up with Knee Raise
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  238 Low Pulley Row To Neck: drawn e224896788cfea66fbf969f1a103f8faf74acd19840c14417793fe7ffbf17724 captions ad01629db1e0ee0e9cf2303851b9f3ec2fd3bfc2086d9b5c8413067937484e56 stage 240.00x215.65 cycle 4200 ms
+  115 Cable Internal Rotation: drawn 7a68b8a182b24116cf7af0b3c3e4fa17f342e263d5b921835bd186f3b1767a21 captions 252ba9fcb6f36596ecd7d3c615c38cb1b43fce7670b8b316ec7fee43a0695214 stage 158.30x240.00 cycle 3700 ms
+  224 Internal Rotation with Band: drawn d3a8ff89882425a124e6ea32130753529ba849aa71020a2e29db8e283e40fea0 captions f51030af50d2c553b7ddac9ae8d4acb43328930e7762c3af912dce83a574e1f1 stage 153.19x240.00 cycle 4100 ms
+  39 Cable Crunch: drawn 0ea577174722869e574f7e4dd860a75a4b4e35baa302575e695e555d421a69b7 captions 346324a4ca14f1be9f89d17af3d9e5d95c9cc03ef5c1723769d034a0345689f7 stage 143.55x240.00 cycle 4100 ms
+  25 Pallof Press: drawn 9256b9ca09561799c47960aba8105c290761d024da08657d30336f2790cdf52a captions 04130f8e2b948baa054c5e90fafd420790f5c3e63412e082e0d1318894bf77f1 stage 152.26x240.00 cycle 3700 ms
+  251 Pallof Press With Rotation: drawn 3f84586fea0ffc2a7135fd25dd3244e7a516799bd214524d87508247cf6e270c captions adc5477874c90846dfa149a9e82fbdae9ffbd76c70f08476d97172a4615cbb09 stage 165.16x240.00 cycle 5000 ms
+  161 Cable Seated Crunch: drawn 63c360b90f4de3e42aa13a7805ef83a0aacdc79b4a46a5d16987d843ecef56b9 captions 82675a6a311506a25b7288c1ee4f218b6577cc91dfbfbdb5b28a01c3060ad6d9 stage 183.67x240.00 cycle 4200 ms
+  226 Janda Sit-Up: drawn 3f431be4933026da89cb1f26973ab5afc966512fb44377008c6b6f296371a05b captions 8992c7369fdf8ed185e90a8ba2aba3e11f6e5bb7e4fa95394cdc5911c8d499a6 stage 240.00x141.18 cycle 8000 ms
+  40 Cable Pull-Through: drawn a3db2b298dd28c2e36101a2191edac12a4bbe093265b877e980745980a4c80cb captions 7ae9e095e694596a5858e018fffdf98876279d0328c3c2daa68371d9e8f4fbce stage 211.61x240.00 cycle 3350 ms
+  173 Cross-Body Crunch: drawn d5c8d4b47361ece796874de90217b00770ae5bb2b0c36cd305349ff4d434e4fa captions aaccc902e090c6547ad837d8b9f4af00c96b9fedcdee64c1c0b9edac910291a9 stage 240.00x111.22 cycle 6200 ms
+  286 Step-up with Knee Raise: drawn 84464c01b31901b88fff9562c329492e6949e038b28c053acc89f6d4f899916c captions 94098818fde8ee3a32ac9d6fea4143199d8eb76792430d6e38d61dc7f20ba836 stage 129.06x240.00 cycle 5100 ms
+exit code: 0 (probe run exit 0)
