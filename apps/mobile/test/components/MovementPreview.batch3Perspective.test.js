@@ -88,14 +88,15 @@ function identity(e,p) {
 // Cable Crunch (39) was redrawn on 8 October 2026 at the owner's request: its
 // original drawing was a stiff trunk hinging at the hips, where its text says
 // the upper spine rounds with the hips frozen. The baseline file still records
-// the original drawing at the commit it names, so the pin steps over that one
-// row and holds the other eleven. Its redraw is tested against its text in
+// the original drawing at the commit it names, so the pin steps over the
+// redrawn rows and holds the rest. Its redraw is tested against its text in
 // MovementPreview.redrawnFromText.test.js.
 // Hammer Curl (62) was redrawn turned on 9 October 2026, also at the owner's
 // request: from the front its curl came toward the viewer. Its redraw is
 // tested in MovementPreview.hammerCurl.test.js.
+// Two rows are stepped over; the other ten are pinned.
 const REDRAWN_SINCE_BASELINE = [39, 62];
-test('the original canonical neutral drawings stay byte-identical at 20ms intervals (all but the one redrawn since)', () => {
+test('the original canonical neutral drawings stay byte-identical at 20ms intervals (all but those redrawn since)', () => {
   expect(baselineNeutral.rows).toHaveLength(12);
   expect(baselineNeutral.rows.filter((row) => REDRAWN_SINCE_BASELINE.includes(row.id))).toHaveLength(REDRAWN_SINCE_BASELINE.length);
   for (const row of baselineNeutral.rows) {

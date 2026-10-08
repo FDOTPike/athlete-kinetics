@@ -45,7 +45,7 @@ describe('Batch B3b: Fixed-Bar Body Motion', () => {
       const pose = poseAtTime(entry66.frames.map(f => f.joints), t, entry66.segmentDurationsMs);
       const g = invertedRowGeometry(pose.ir, body);
       const f = resolveFigureJoints(pose, opts);
-      const prims = layoutCanonicalFigure(f, opts);
+      const prims = layoutCanonicalFigure(pose, opts);
 
       // 1. Fixed bar anchor: bar position is pinned at [54.70, 52.8] in rack at hip height
       expect(g.bar[0]).toBeCloseTo(54.70, 2);
@@ -147,7 +147,7 @@ describe('Batch B3b: Fixed-Bar Body Motion', () => {
       const pose = poseAtTime(entry152.frames.map(f => f.joints), t, entry152.segmentDurationsMs);
       const g = bodyTricepPressGeometry(pose.tp, body);
       const f = resolveFigureJoints(pose, opts);
-      const prims = layoutCanonicalFigure(f, opts);
+      const prims = layoutCanonicalFigure(pose, opts);
 
       // 1. Fixed bar anchor: bar position is pinned at [75.0, 39.9] in rack at chest height
       expect(g.bar[0]).toBeCloseTo(75.0, 2);

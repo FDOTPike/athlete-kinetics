@@ -45,10 +45,12 @@ const PREVIEW_ENTRIES = previewEntries();
 // 164, 268 and 269 are back as pending drafts (the figure now has a hand that
 // bends at the wrist); 200 Finger Curls stays out on its source hold. The note
 // below records why they left.
-// Entry 0183: the four wrist-curl movements (164 Cable Wrist Curl, 200 Finger
-// Curls, 268 and 269 the seated dumbbell wrist curls) are out of the manifest, so
-// they are no longer authored canonical entries. They stay BLOCKED; nothing else
-// moves.
+// Entry 0183 took the four wrist-curl movements (164 Cable Wrist Curl, 200
+// Finger Curls, 268 and 269 the seated dumbbell wrist curls) out of the manifest.
+// All four have since been drawn again as pending pose-table drafts and are in
+// the list below. For 200 Finger Curls only the catalogue TEXT is still on a
+// source hold: its drawing is an authored pending draft whose text came from a
+// separately audited description (see MovementPreview.fingerCurls.test.js).
 // Family 15 (horizontal press, incline): the barbell base (134) and its three
 // variations (212 the hammer-grip dumbbell pair, 216 the cable press, 218 the
 // palms-in dumbbell pair) join as authored canonicals, pending like the rest.

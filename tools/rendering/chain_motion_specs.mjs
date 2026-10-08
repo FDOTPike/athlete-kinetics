@@ -66,9 +66,9 @@ export const CHAIN_SPECS = [
     captions: [
       'Lie back on an incline bench facing away from a high pulley and take the bar overhead with a narrow overhand grip, elbows tucked in and bent.',
       'Keeping the upper arms still, straighten the elbows until the arms are fully extended.',
-      'Pause and squeeze the triceps.',
+      'Pause and squeeze the triceps at full extension.',
       'Let the bar return slowly until the elbows are bent again.',
-      'Upper arms stay still. Squeeze the triceps at full extension.',
+      'Upper arms stay still.',
     ],
     reason: 'Source-bound side-view draft. Lying back on an incline bench facing away from a high pulley; the upper arms stay fixed beside the head while the elbows straighten from a right angle to fully extended, pause, and bend again more slowly. The pulley is placed where the forearms point at the start, so the cable only lengthens as the arms extend. Not drawn: the narrow overhand grip, which a side view cannot show; the bar reads end-on at the hands.',
     summary: 'Lying back on an incline bench facing away from a high pulley, straighten the elbows with the upper arms fixed beside the head, pause, then let the bar return slowly.',
