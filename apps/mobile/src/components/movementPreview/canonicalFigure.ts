@@ -1236,8 +1236,12 @@ export interface ChainLine {
 
 /** A chain movement: its poses, how it is seen, what it holds and the equipment around it. */
 export interface ChainMovement {
-  /** The joint a pose places directly. 'ankle' is the near ankle: the body is built up from a planted foot. */
-  root: 'hip' | 'neck' | 'ankle';
+  /**
+   * The joint a pose places directly. 'ankle' is the near ankle: the body is
+   * built up from a planted foot. 'toe' is the near forefoot: the body is built
+   * up from the ball of a foot whose heel is free to rise.
+   */
+  root: 'hip' | 'neck' | 'ankle' | 'toe';
   /**
    * The poses form a loop: after the last comes the first again, and the phase
    * may run on past it. Between whole phases the figure moves at an even pace,
@@ -1269,7 +1273,10 @@ export interface ChainMovement {
    */
   feet?: 'flat' | 'free' | 'front' | 'none';
   /** What the hands hold. */
-  implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope';
+  implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope' | 'longBar';
+  /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
+  barAnchor?: ChainPoint;
+  barLength?: number;
   /** Which way the palm of a bent hand faces: what it holds sits on that side of the knuckles. */
   palm?: 'up' | 'down';
   /**
@@ -1670,6 +1677,79 @@ const INTERNAL_ROTATION_BODY = {
 const NECK_ROW_SEAT_TOP = 12;
 const NECK_ROW_FEET: readonly [number, number] = [43, 13];
 export const NECK_ROW_PULLEY: readonly [number, number] = [58, 14];
+
+/** Where a point sits against the front of a leaning trunk: `along` up the spine from the hip, `off` out from the spine's line. */
+function chainOnFront(hip: readonly [number, number], trunkDeg: number, along: number, off: number): readonly [number, number] {
+  const a = chainRad(trunkDeg);
+  return [hip[0] + Math.cos(a) * along + Math.sin(a) * off, hip[1] + Math.sin(a) * along - Math.cos(a) * off];
+}
+const chainNeckOf = (hip: readonly [number, number], trunkDeg: number): readonly [number, number] => chainOnFront(hip, trunkDeg, CHAIN_TRUNK, 0);
+/** How far from its shoulder the hand of a straight arm is: a hair short of the two segments, so the elbow can still be solved. */
+const CHAIN_LONG_ARM = SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM - 0.03;
+
+/** Bent Over Barbell Row: hips back over soft knees with the trunk almost level; the bar finishes against the body. */
+export const BENT_ROW_TRUNK = 15;
+const BENT_ROW_HIP: readonly [number, number] = [33, 44.2];
+const BENT_ROW_FEET: readonly [number, number] = [42, CHAIN_ANKLE_HEIGHT];
+const BENT_ROW_SHOULDER = chainNeckOf(BENT_ROW_HIP, BENT_ROW_TRUNK);
+/** How far up the spine from the hip the bar meets the body. */
+export const BENT_ROW_TOUCH = 10;
+const BENT_ROW_TOP = chainOnFront(BENT_ROW_HIP, BENT_ROW_TRUNK, BENT_ROW_TOUCH, 7.2);
+/** Barbell Rear Delt Row: the hinge, half the wide grip, and the upper chest the bar is rowed toward. */
+export const REAR_DELT_ROW_TRUNK = 25;
+export const REAR_DELT_ROW_GRIP_HALF = 15;
+const REAR_DELT_ROW_HIP: readonly [number, number] = [0, 44.6];
+const REAR_DELT_ROW_FEET: readonly [number, number] = [8, CHAIN_ANKLE_HEIGHT];
+const REAR_DELT_ROW_SHOULDER = chainNeckOf(REAR_DELT_ROW_HIP, REAR_DELT_ROW_TRUNK);
+export const REAR_DELT_ROW_TOUCH = 20;
+const REAR_DELT_ROW_TOP = chainOnFront(REAR_DELT_ROW_HIP, REAR_DELT_ROW_TRUNK, REAR_DELT_ROW_TOUCH, 7.6);
+const REAR_DELT_ROW_HANG = Math.sqrt(CHAIN_LONG_ARM ** 2 - (REAR_DELT_ROW_GRIP_HALF - CANONICAL_BODY_PARAMETERS.sw * 0.92) ** 2);
+/**
+ * Bent Over One-Arm Long Bar Row: the bar is braced on the floor behind the
+ * athlete and swings up about that end, so the hand on it travels on an arc.
+ */
+export const LONG_BAR = { anchor: [4, 1.5] as const, grip: 58.6, length: 67, lowDeg: 26.08, highDeg: 41.7 } as const;
+const LONG_BAR_ROW_HIP: readonly [number, number] = [34, 43.5];
+const LONG_BAR_ROW_FEET: readonly [number, number] = [44, CHAIN_ANKLE_HEIGHT];
+export const LONG_BAR_ROW_TRUNK = 20;
+const longBarHand = (deg: number): readonly [number, number] =>
+  [LONG_BAR.anchor[0] + LONG_BAR.grip * Math.cos(chainRad(deg)), LONG_BAR.anchor[1] + LONG_BAR.grip * Math.sin(chainRad(deg))];
+/** Where the free hand rests: on top of the far thigh just above the knee. */
+const LONG_BAR_ROW_REST: readonly [number, number] = [46.5, 30.2];
+/**
+ * Stiff Leg Barbell Good Morning: the feet, the one soft bend the knees keep
+ * for the whole rep, and how far the legs lean back with the hips. The leg
+ * turns about the ankle as one piece, so the knee's angle cannot change.
+ */
+const GOOD_MORNING_FEET: readonly [number, number] = [42, CHAIN_ANKLE_HEIGHT];
+export const GOOD_MORNING_KNEE_SOFT = 8;
+export const GOOD_MORNING_LEAN = 13;
+const goodMorningLeg = (lean: number) =>
+  ({ at: GOOD_MORNING_FEET, thigh: -90 + GOOD_MORNING_KNEE_SOFT + lean, shin: -90 - GOOD_MORNING_KNEE_SOFT + lean }) as const;
+/** Hands on a bar lying across the back of the shoulders, given as if the trunk were upright. */
+const BAR_ON_BACK = { upperArm: -82, forearm: 124.3 } as const;
+/** The low row station the Cable Row sits at: seat, foot plate and low pulley. */
+const ROW_STATION = { seatTop: 12, hipX: 20 } as const;
+const ROW_STATION_HIP: readonly [number, number] = [ROW_STATION.hipX, ROW_STATION.seatTop + CHAIN_THIGH_HALF];
+const ROW_STATION_FEET: readonly [number, number] = [62.5, 13];
+export const ROW_STATION_PULLEY: readonly [number, number] = [84, 16];
+/** Cable Row: the handle in long arms toward the pulley, and where it finishes at the lower ribs. */
+const CABLE_ROW_REACH: readonly [number, number] = [43.04, 30.61];
+const CABLE_ROW_FINISH: readonly [number, number] = [25.5, 27.5];
+/** Seated Cable Rows: half the width of the V-handle, and where it is at a full reach and at the stomach. */
+export const V_HANDLE_HALF = 2.5;
+const SEATED_ROW_REACH: readonly [number, number] = [21.55, 29.5];
+const SEATED_ROW_FINISH: readonly [number, number] = [7.5, 27];
+/** Face Pull: the pulley in front at upper-chest height. */
+export const FACE_PULL_PULLEY: readonly [number, number] = [44, CHAIN_STANDING_SHOULDER - 4];
+/**
+ * The height of the ball of a planted foot whose heel is free to rise: the
+ * height of a flat foot's ankle, so that with the heel down the shin's rounded
+ * end rests on the floor and never dips under it.
+ */
+export const CHAIN_FOREFOOT_HEIGHT = CHAIN_ANKLE_HEIGHT;
+/** Calf Raises - With Bands: how far the foot tilts at the top of the rise, in degrees. */
+export const BAND_CALF_RAISE_TILT = 42;
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -2383,7 +2463,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   'low-pulley-row-to-neck': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 35,
+    yawDeg: 55,
     originX: 24,
     feet: 'free',
     kneePole: 90,
@@ -2398,6 +2478,177 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     poses: [
       { at: [0, NECK_ROW_SEAT_TOP + CHAIN_THIGH_HALF], trunk: 90, thigh: 10, shin: -10, ankle: NECK_ROW_FEET, foot: 80, upperArm: [-25, 0], forearm: [-25, 0] },
       { at: [0, NECK_ROW_SEAT_TOP + CHAIN_THIGH_HALF], trunk: 90, thigh: 10, shin: -10, ankle: NECK_ROW_FEET, foot: 80, upperArm: [0, 50], forearm: [123.7, -52] },
+    ],
+  },
+  // Bent Over Barbell Row: hinged until the trunk is almost level, knees soft,
+  // the bar hanging under the shoulders. The trunk stays still while the bar
+  // is pulled up and back to the body, the elbows leading.
+  'bent-over-barbell-row': {
+    root: 'hip',
+    implement: 'bar',
+    kneePole: 0,
+    elbowPole: 120,
+    poses: [
+      {
+        at: BENT_ROW_HIP, trunk: BENT_ROW_TRUNK, head: 35, thigh: -90, shin: -90, ankle: BENT_ROW_FEET, upperArm: -90, forearm: -90,
+        wrist: [BENT_ROW_SHOULDER[0], BENT_ROW_SHOULDER[1] - CHAIN_LONG_ARM],
+      },
+      { at: BENT_ROW_HIP, trunk: BENT_ROW_TRUNK, head: 35, thigh: -90, shin: -90, ankle: BENT_ROW_FEET, upperArm: -90, forearm: -90, wrist: BENT_ROW_TOP },
+    ],
+  },
+  // Barbell Rear Delt Row: the same hinge seen turned, so the wide grip and the
+  // wide elbows show. The bar goes to the upper chest, the elbows out to the sides.
+  'barbell-rear-delt-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 40,
+    implement: 'bar',
+    kneePole: 0,
+    elbowPole: [90, 70],
+    poses: [
+      {
+        at: REAR_DELT_ROW_HIP, trunk: REAR_DELT_ROW_TRUNK, head: 42, thigh: -90, shin: -90, ankle: REAR_DELT_ROW_FEET, upperArm: -90, forearm: -90,
+        wrist: [REAR_DELT_ROW_SHOULDER[0], REAR_DELT_ROW_SHOULDER[1] - REAR_DELT_ROW_HANG, REAR_DELT_ROW_GRIP_HALF],
+        farWrist: [REAR_DELT_ROW_SHOULDER[0], REAR_DELT_ROW_SHOULDER[1] - REAR_DELT_ROW_HANG, -REAR_DELT_ROW_GRIP_HALF],
+      },
+      {
+        at: REAR_DELT_ROW_HIP, trunk: REAR_DELT_ROW_TRUNK, head: 42, thigh: -90, shin: -90, ankle: REAR_DELT_ROW_FEET, upperArm: -90, forearm: -90,
+        wrist: [REAR_DELT_ROW_TOP[0], REAR_DELT_ROW_TOP[1], REAR_DELT_ROW_GRIP_HALF],
+        farWrist: [REAR_DELT_ROW_TOP[0], REAR_DELT_ROW_TOP[1], -REAR_DELT_ROW_GRIP_HALF],
+      },
+    ],
+  },
+  // Bent Over One-Arm Long Bar Row: one end of the bar braced on the floor
+  // behind, the near hand on the shaft just behind the plates, the free hand
+  // resting above the knee. The bar swings up about its braced end.
+  'bent-over-one-arm-long-bar-row': {
+    root: 'hip',
+    implement: 'longBar',
+    barAnchor: LONG_BAR.anchor,
+    barLength: LONG_BAR.length,
+    kneePole: 0,
+    elbowPole: 120,
+    equipment: [{ kind: 'frame', a: [LONG_BAR.anchor[0] - 2.4, 0.5], b: [LONG_BAR.anchor[0] - 2.4, 12] }],
+    poses: [
+      {
+        at: LONG_BAR_ROW_HIP, trunk: LONG_BAR_ROW_TRUNK, head: 38, thigh: -90, shin: -90, ankle: LONG_BAR_ROW_FEET, upperArm: -90, forearm: -90,
+        wrist: longBarHand(LONG_BAR.lowDeg), farWrist: LONG_BAR_ROW_REST,
+      },
+      {
+        at: LONG_BAR_ROW_HIP, trunk: LONG_BAR_ROW_TRUNK, head: 38, thigh: -90, shin: -90, ankle: LONG_BAR_ROW_FEET, upperArm: -90, forearm: -90,
+        wrist: longBarHand(LONG_BAR.highDeg), farWrist: LONG_BAR_ROW_REST,
+      },
+    ],
+  },
+  // Stiff Leg Barbell Good Morning: the bar across the back of the shoulders.
+  // The hips go back and the trunk lowers to about level; the knees keep the
+  // one soft bend they started with, so the legs only lean back with the hips.
+  'stiff-leg-barbell-good-morning': {
+    root: 'ankle',
+    implement: 'bar',
+    armsFollowTrunk: true,
+    poses: [
+      { ...goodMorningLeg(0), trunk: 90, head: 90, ...BAR_ON_BACK },
+      { ...goodMorningLeg(GOOD_MORNING_LEAN), trunk: 8, head: 30, ...BAR_ON_BACK },
+    ],
+  },
+  // Cable Row: sitting tall at a low row station, feet on the plate. The
+  // handle comes from long arms to the lower ribs as the elbows drive down and
+  // back; the trunk does not rock.
+  'cable-row': {
+    root: 'hip',
+    feet: 'free',
+    kneePole: 90,
+    elbowPole: -160,
+    implement: 'handle',
+    lines: [{ from: ROW_STATION_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [ROW_STATION_PULLEY[0], 0.5], b: [ROW_STATION_PULLEY[0], 24] },
+      { kind: 'pulley', at: ROW_STATION_PULLEY },
+      { kind: 'frame', a: [ROW_STATION_FEET[0] + 4.4, 4], b: [ROW_STATION_FEET[0] + 4.4, 22] },
+      ...chainFlatBench(ROW_STATION.hipX - 13, ROW_STATION.hipX + 6, ROW_STATION.seatTop),
+    ],
+    poses: [
+      { at: ROW_STATION_HIP, trunk: 90, thigh: 10, shin: -10, ankle: ROW_STATION_FEET, foot: 80, upperArm: -20, forearm: -20, wrist: CABLE_ROW_REACH },
+      { at: ROW_STATION_HIP, trunk: 90, thigh: 10, shin: -10, ankle: ROW_STATION_FEET, foot: 80, upperArm: -20, forearm: -20, wrist: CABLE_ROW_FINISH },
+    ],
+  },
+  // Seated Cable Rows: the same kind of station seen turned, both hands on one
+  // V-handle. It comes from straight arms to the stomach with the arms close
+  // to the body and the elbows passing back beside the ribs.
+  'seated-cable-rows': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 35,
+    originX: 24,
+    feet: 'free',
+    kneePole: 90,
+    elbowPole: [-170, 25],
+    implement: 'handles',
+    lines: [{ from: NECK_ROW_PULLEY, to: 'nearGrip' }, { from: NECK_ROW_PULLEY, to: 'farGrip' }],
+    equipment: [
+      { kind: 'frame', a: [NECK_ROW_PULLEY[0], 0.5], b: [NECK_ROW_PULLEY[0], 22] },
+      { kind: 'pulley', at: NECK_ROW_PULLEY },
+      { kind: 'frame', a: [NECK_ROW_FEET[0] + 4.4, 4], b: [NECK_ROW_FEET[0] + 4.4, 22] },
+      ...chainFlatBench(-13, 6, NECK_ROW_SEAT_TOP),
+    ],
+    poses: [
+      {
+        at: [0, NECK_ROW_SEAT_TOP + CHAIN_THIGH_HALF], trunk: 90, thigh: 10, shin: -10, ankle: NECK_ROW_FEET, foot: 80, upperArm: -25, forearm: -25,
+        wrist: [SEATED_ROW_REACH[0], SEATED_ROW_REACH[1], V_HANDLE_HALF], farWrist: [SEATED_ROW_REACH[0], SEATED_ROW_REACH[1], -V_HANDLE_HALF],
+      },
+      {
+        at: [0, NECK_ROW_SEAT_TOP + CHAIN_THIGH_HALF], trunk: 90, thigh: 10, shin: -10, ankle: NECK_ROW_FEET, foot: 80, upperArm: -25, forearm: -25,
+        wrist: [SEATED_ROW_FINISH[0], SEATED_ROW_FINISH[1], V_HANDLE_HALF], farWrist: [SEATED_ROW_FINISH[0], SEATED_ROW_FINISH[1], -V_HANDLE_HALF],
+      },
+    ],
+  },
+  // Face Pull: standing facing a pulley at upper-chest height, seen turned.
+  // The arms start long toward it; the elbows go high and wide and the hands
+  // split to finish beside the ears, the forearms turned up and back.
+  'face-pull': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 58,
+    originX: 30,
+    implement: 'rope',
+    lines: [{ from: FACE_PULL_PULLEY, to: 'nearGrip' }, { from: FACE_PULL_PULLEY, to: 'farGrip' }],
+    equipment: [
+      { kind: 'frame', a: [FACE_PULL_PULLEY[0], 0.5], b: [FACE_PULL_PULLEY[0], 92] },
+      { kind: 'pulley', at: FACE_PULL_PULLEY },
+    ],
+    poses: [
+      // The upper arms start all but straight ahead, so everything the arms then do takes the hands back from the pulley.
+      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-8, -6], forearm: [-8, -25] },
+      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [10, 62], forearm: [130, -47] },
+    ],
+  },
+  // Calf Raises - With Bands: standing on a band, a handle in each hand beside
+  // the shoulders. The forefeet stay planted and the heels rise; the hands do
+  // not move against the body.
+  'calf-raises-with-bands': {
+    root: 'toe',
+    feet: 'free',
+    implement: 'handles',
+    lines: [{ from: 'nearFoot', to: 'nearGrip' }],
+    poses: [
+      { at: [50, CHAIN_FOREFOOT_HEIGHT], trunk: 90, thigh: -90, shin: -90, foot: 0, upperArm: -75, forearm: 80 },
+      { at: [50, CHAIN_FOREFOOT_HEIGHT], trunk: 90, thigh: -90, shin: -90, foot: -BAND_CALF_RAISE_TILT, upperArm: -75, forearm: 80 },
+    ],
+  },
+  // Crunch - Hands Overhead: knees bent, feet flat, arms long beside the head.
+  // The upper spine curls until the shoulder blades are just off the floor and
+  // the arms stay in line with the head.
+  'crunch-hands-overhead': {
+    root: 'hip',
+    spine: 'upper',
+    kneePole: 90,
+    armsFollowTrunk: true,
+    nearArmOverHead: true,
+    poses: [
+      { at: FLOOR_CRUNCH_HIP, trunk: 180, curl: 0, thigh: 50, shin: -50, ankle: FLOOR_CRUNCH_FOOT, upperArm: 96, forearm: 96 },
+      { at: FLOOR_CRUNCH_HIP, trunk: 180, curl: 38, thigh: 50, shin: -50, ankle: FLOOR_CRUNCH_FOOT, upperArm: 96, forearm: 96 },
     ],
   },
   // chain movements are added above this line
@@ -2491,9 +2742,12 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const top = spineWorld[CHAIN_SPINE_STEPS];
   // From a planted ankle the hip is back up the near leg: shin, then thigh.
   const shinUp = chainUnit(shin, 1), thighUp = chainUnit(thigh, 1);
+  // From a planted forefoot the ankle is back along the foot first.
+  const footBack = movement.root === 'toe' && foot !== undefined ? chainUnit(foot, 1) : null;
+  const heel: readonly [number, number] = footBack === null ? [0, 0] : [footBack[0] * CHAIN_FOOT, footBack[1] * CHAIN_FOOT];
   const shift: ChainVec = movement.root === 'neck' ? [at[0] - top[0], at[1] - top[1], 0]
-    : movement.root === 'ankle'
-      ? [at[0] - (shinUp[0] * CHAIN_SHIN + thighUp[0] * CHAIN_THIGH), at[1] - (shinUp[1] * CHAIN_SHIN + thighUp[1] * CHAIN_THIGH), 0]
+    : movement.root === 'ankle' || movement.root === 'toe'
+      ? [at[0] - heel[0] - (shinUp[0] * CHAIN_SHIN + thighUp[0] * CHAIN_THIGH), at[1] - heel[1] - (shinUp[1] * CHAIN_SHIN + thighUp[1] * CHAIN_THIGH), 0]
       : [at[0], at[1], at[2] ?? 0];
   for (let i = 0; i <= CHAIN_SPINE_STEPS; i++) spineWorld[i] = chainAdd(spineWorld[i], shift, 1);
   const hip = spineWorld[0];
@@ -2762,6 +3016,18 @@ function layoutChainExtras(
         farGroup.push(plate([farEnd[0] + ux * 2, farEnd[1] + uy * 2], farTone, farAlpha));
         near.push(plate([nearEnd[0] - ux * 2, nearEnd[1] - uy * 2], 'textHi', 1));
       }
+    }
+  } else if (kind === 'longBar' && movement.barAnchor !== undefined) {
+    // One end braced on the floor, the near hand on the shaft just behind the plates at the other.
+    const from = project(chainWorld(movement.barAnchor)), grip = figure.hold.near;
+    const reach = Math.hypot(grip[0] - from[0], grip[1] - from[1]) || 1;
+    const ux = (grip[0] - from[0]) / reach, uy = (grip[1] - from[1]) / reach;
+    const length = movement.barLength ?? reach + 8;
+    const end: CanonicalPoint = [from[0] + ux * length, from[1] + uy * length];
+    near.push(line(from, end, 1.6, 'textHi', 1));
+    for (const back of [2, 4.6]) {
+      const c: CanonicalPoint = [end[0] - ux * back, end[1] - uy * back];
+      near.push({ ...line([c[0] + uy * 6, c[1] - ux * 6], [c[0] - uy * 6, c[1] + ux * 6], 2.4, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 });
     }
   } else if (kind === 'handle' || kind === 'handles' || kind === 'rope') {
     const r = kind === 'rope' ? 2.2 : 2.6;
