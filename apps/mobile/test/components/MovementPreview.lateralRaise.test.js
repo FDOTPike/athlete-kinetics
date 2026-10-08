@@ -92,7 +92,7 @@ describe.each([
 
 describe('Dumbbell Lateral Raise (50)', () => {
   const bottom = () => figureAt(entry50, 0);
-  const top = () => figureAt(entry50, entry50.segmentDurationsMs[0] + entry50.segmentDurationsMs[1]);
+  const top = () => figureAt(entry50, entry50.segmentDurationsMs[0]);
 
   test('"the dumbbells hanging just off the thighs": arms hang near the sides, clear of the legs', () => {
     const { joints: f } = bottom();
@@ -111,8 +111,7 @@ describe('Dumbbell Lateral Raise (50)', () => {
   });
 
   test('"Three seconds down": the lowering takes three seconds and is the slow half', () => {
-    const [upA, upB, hold, down] = entry50.segmentDurationsMs;
-    const up = upA + upB;
+    const [up, hold, down] = entry50.segmentDurationsMs;
     expect(down).toBeGreaterThanOrEqual(3000);
     expect(down).toBeGreaterThan(2 * up);
     expect(hold).toBeLessThan(up);
@@ -138,7 +137,7 @@ describe('Dumbbell Lateral Raise (50)', () => {
 
 describe('Lateral Raise - With Bands (236)', () => {
   const bottom = () => figureAt(entry236, 0);
-  const top = () => figureAt(entry236, entry236.segmentDurationsMs[0] + entry236.segmentDurationsMs[1]);
+  const top = () => figureAt(entry236, entry236.segmentDurationsMs[0]);
 
   test('"at the sides of the thighs, arms almost straight"', () => {
     const { joints: f } = bottom();
@@ -157,8 +156,7 @@ describe('Lateral Raise - With Bands (236)', () => {
   });
 
   test('"Pause, then lower slowly": a real pause, and a lowering slower than the raise', () => {
-    const [upA, upB, pause, down] = entry236.segmentDurationsMs;
-    const up = upA + upB;
+    const [up, pause, down] = entry236.segmentDurationsMs;
     expect(pause).toBeGreaterThanOrEqual(400);
     expect(down).toBeGreaterThan(up);
     const held = [0, pause / 2, pause].map((dt) => figureAt(entry236, up + dt).joints.wr);
@@ -192,8 +190,8 @@ describe('Lateral Raise - With Bands (236)', () => {
 });
 
 test('the two lateral raises are different drawings, not one drawing with new captions', () => {
-  const top50 = figureAt(entry50, entry50.segmentDurationsMs[0] + entry50.segmentDurationsMs[1]).joints;
-  const top236 = figureAt(entry236, entry236.segmentDurationsMs[0] + entry236.segmentDurationsMs[1]).joints;
+  const top50 = figureAt(entry50, entry50.segmentDurationsMs[0]).joints;
+  const top236 = figureAt(entry236, entry236.segmentDurationsMs[0]).joints;
   expect(distance(top50.wr, top236.wr)).toBeGreaterThan(3); // different finish height
   expect(entry50.segmentDurationsMs).not.toEqual(entry236.segmentDurationsMs); // different tempo
   expect(LATERAL_RAISE_ELBOW_DEG['dumbbell-lateral-raise']).not.toBe(LATERAL_RAISE_ELBOW_DEG['lateral-raise-with-bands']);

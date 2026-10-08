@@ -215,8 +215,8 @@ describe('Batch B3b: Fixed-Bar Body Motion', () => {
     const drift = maxRelAngle - minRelAngle;
     expect(drift).toBeLessThanOrEqual(10);
 
-    // Visible pause at bottom: segment duration for bottom hold (frame 3 to 4) is at least 400 ms (tolerance >= 400 ms)
-    expect(entry152.segmentDurationsMs[2]).toBeGreaterThanOrEqual(400);
+    // Visible pause at bottom: the hold between the second and third keyframes is at least 400 ms
+    expect(entry152.segmentDurationsMs[1]).toBeGreaterThanOrEqual(400);
 
     // Loop closure: first and last keyframe joints must be byte-for-byte identical
     expect(entry152.frames[0].joints).toEqual(entry152.frames.at(-1).joints);
