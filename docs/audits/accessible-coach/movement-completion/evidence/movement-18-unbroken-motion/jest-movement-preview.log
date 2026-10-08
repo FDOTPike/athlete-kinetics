@@ -1,4 +1,4 @@
-source commit: 376926aca6cfee8a94d4c606c6e532045be52b1a
+source commit: d55409a7a01cda57f49c317b44161612e6196aa6
 command: npx jest --config apps/mobile/jest.config.js --runInBand --no-cache --testPathPattern MovementPreview
 
 PASS apps/mobile/test/components/MovementPreview.test.js
@@ -18,8 +18,8 @@ PASS apps/mobile/test/components/MovementPreview.sideRaisesAndFlyes.test.js
 PASS apps/mobile/test/components/MovementPreview.approval.test.js
 PASS apps/mobile/test/components/MovementPreview.jointOffsets.test.js
 PASS apps/mobile/test/components/MovementPreview.proneInclineRaise.test.js
-PASS apps/mobile/test/components/MovementPreview.torso.test.js (37.412 s)
-PASS apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (36.229 s)
+PASS apps/mobile/test/components/MovementPreview.torso.test.js (32.513 s)
+PASS apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (30.826 s)
 PASS apps/mobile/test/components/MovementPreview.frontStanding.test.js
 PASS apps/mobile/test/components/MovementPreview.fixedBarBodyMotion.test.js
 PASS apps/mobile/test/components/MovementPreview.batch3Perspective.test.js
@@ -30,7 +30,7 @@ PASS apps/mobile/test/components/MovementPreview.frontRaise.test.js
 PASS apps/mobile/test/components/MovementPreview.lateralRaise.test.js
 PASS apps/mobile/test/components/MovementPreview.seatedLateralRaise.test.js
 PASS apps/mobile/test/components/MovementPreview.captionIntegrity.test.js
-PASS apps/mobile/test/components/MovementPreview.chain.test.js (16.863 s)
+PASS apps/mobile/test/components/MovementPreview.chain.test.js (15.954 s)
 PASS apps/mobile/test/components/MovementPreview.layout.test.js
 PASS apps/mobile/test/components/MovementPreview.flye.test.js
 PASS apps/mobile/test/components/MovementPreview.reverseLunge.test.js
